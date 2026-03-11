@@ -256,18 +256,15 @@ internal static class CompatibilityVerification
             }
             .OrderBy(static entry => entry, StringComparer.Ordinal)
             .ToArray();
-        var canonicalOracleRoots = new[]
-            {
-                "Chummer"
-            }
-            .OrderBy(static entry => entry, StringComparer.Ordinal)
-            .ToArray();
+        var canonicalOracleRoots = Array.Empty<string>();
         var canonicalRetiredRoots = new[]
             {
+                "Chummer",
                 "Chummer.Api",
                 "ChummerDataViewer",
                 "ChummerHub",
                 "Plugins/ChummerHub.Client",
+                "Plugins/SamplePlugin",
                 "TextblockConverter",
                 "Translator"
             }
@@ -287,12 +284,11 @@ internal static class CompatibilityVerification
         var solutionPath = Path.Combine(RepoRoot, "Chummer.Run.sln");
         var solutionText = File.ReadAllText(solutionPath);
         var solutionProjectPaths = solutionText
-            .Split('
-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(static line => line.StartsWith("Project(", StringComparison.Ordinal) && line.Contains(".csproj", StringComparison.Ordinal))
             .Select(static line => line.Split('"'))
             .Where(static parts => parts.Length >= 6)
-            .Select(static parts => parts[5].Replace('/', '\'))
+            .Select(static parts => parts[5].Replace('/', '\\'))
             .ToArray();
 
         foreach (var projectName in expectedHostedProjects)
@@ -302,21 +298,21 @@ internal static class CompatibilityVerification
 
         foreach (var oracleRoot in oracleRoots)
         {
-            var normalizedRoot = oracleRoot.Replace('/', '\');
+            var normalizedRoot = oracleRoot.Replace('/', '\\');
             VerificationAssert.True(Directory.Exists(Path.Combine(RepoRoot, oracleRoot)), $"Oracle root '{oracleRoot}' must exist.");
             VerificationAssert.True(
-                !solutionProjectPaths.Any(projectPath => projectPath.StartsWith(normalizedRoot + "\", StringComparison.Ordinal)),
+                !solutionProjectPaths.Any(projectPath => projectPath.StartsWith(normalizedRoot + "\\", StringComparison.Ordinal)),
                 $"Hosted solution must not include oracle root '{oracleRoot}'.");
         }
 
         foreach (var retiredRoot in retiredRoots)
         {
-            var normalizedRoot = retiredRoot.Replace('/', '\');
+            var normalizedRoot = retiredRoot.Replace('/', '\\');
             VerificationAssert.True(
                 !Directory.Exists(Path.Combine(RepoRoot, retiredRoot)),
                 $"Retired hosted-clutter root '{retiredRoot}' must stay absent.");
             VerificationAssert.True(
-                !solutionProjectPaths.Any(projectPath => projectPath.StartsWith(normalizedRoot + "\", StringComparison.Ordinal)),
+                !solutionProjectPaths.Any(projectPath => projectPath.StartsWith(normalizedRoot + "\\", StringComparison.Ordinal)),
                 $"Hosted solution must not include retired hosted-clutter root '{retiredRoot}'.");
         }
 

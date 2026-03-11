@@ -13,14 +13,14 @@ if [ ! -f Chummer.Play.Contracts/Chummer.Play.Contracts.csproj ]; then
   exit 1
 fi
 
-if ! grep -En '<HintPath>\.\.\\Chummer\.Play\.Contracts\\bin\\\$\(Configuration\)\\net8\.0\\Chummer\.Play\.Contracts\.dll</HintPath>' \
+if ! grep -En '<HintPath>\.\.\\Chummer\.Play\.Contracts\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Play\.Contracts\.dll</HintPath>' \
   Chummer.Run.Contracts/Chummer.Run.Contracts.csproj \
   Chummer.Run.AI/Chummer.Run.AI.csproj >/dev/null; then
   echo "Chummer.Play.Contracts consumers must point at the built canonical contract assembly." >&2
   exit 1
 fi
 
-if ! grep -En '<HintPath>\.\.\\Chummer\.Media\.Contracts\\bin\\\$\(Configuration\)\\net8\.0\\Chummer\.Media\.Contracts\.dll</HintPath>' \
+if ! grep -En '<HintPath>\.\.\\Chummer\.Media\.Contracts\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Media\.Contracts\.dll</HintPath>' \
   Chummer.Run.Contracts/Chummer.Run.Contracts.csproj \
   Chummer.Run.AI/Chummer.Run.AI.csproj >/dev/null; then
   echo "Chummer.Media.Contracts consumers must point at the built canonical contract assembly." >&2
@@ -54,25 +54,25 @@ scripts/ai/build_r1_cleanroom.sh >/dev/null
 SDK_VERSION="$(dotnet --version)"
 DOTNET_ROOT="$(dirname "$(readlink -f "$(command -v dotnet)")")"
 CSC_DLL="${DOTNET_ROOT}/sdk/${SDK_VERSION}/Roslyn/bincore/csc.dll"
-NETCORE_REF_DIR="$(find "${DOTNET_ROOT}/packs/Microsoft.NETCore.App.Ref" -path '*/ref/net8.0' -type d | sort | tail -n 1)"
-ASPNET_REF_DIR="$(find "${DOTNET_ROOT}/packs/Microsoft.AspNetCore.App.Ref" -path '*/ref/net8.0' -type d | sort | tail -n 1)"
-NETCORE_RUNTIME_VERSION="$(dotnet --list-runtimes | awk '/Microsoft.NETCore.App 8\./ { print $2; exit }')"
-ASPNET_RUNTIME_VERSION="$(dotnet --list-runtimes | awk '/Microsoft.AspNetCore.App 8\./ { print $2; exit }')"
+NETCORE_REF_DIR="$(find "${DOTNET_ROOT}/packs/Microsoft.NETCore.App.Ref" -path '*/ref/net10.0' -type d | sort | tail -n 1)"
+ASPNET_REF_DIR="$(find "${DOTNET_ROOT}/packs/Microsoft.AspNetCore.App.Ref" -path '*/ref/net10.0' -type d | sort | tail -n 1)"
+NETCORE_RUNTIME_VERSION="$(dotnet --list-runtimes | awk '/Microsoft.NETCore.App 10\./ { print $2; exit }')"
+ASPNET_RUNTIME_VERSION="$(dotnet --list-runtimes | awk '/Microsoft.AspNetCore.App 10\./ { print $2; exit }')"
 OUT_DLL="${TMP_DIR}/RunServicesVerification.dll"
 RSP_FILE="${TMP_DIR}/RunServicesVerification.rsp"
 
 if [[ ! -f "$CSC_DLL" || -z "$NETCORE_REF_DIR" || -z "$ASPNET_REF_DIR" || -z "$NETCORE_RUNTIME_VERSION" || -z "$ASPNET_RUNTIME_VERSION" ]]; then
-  echo "unable to resolve installed .NET 8 SDK/reference/runtime locations" >&2
+  echo "unable to resolve installed .NET 10 SDK/reference/runtime locations" >&2
   exit 1
 fi
 
-cp Chummer.Play.Contracts/bin/Debug/net8.0/Chummer.Play.Contracts.dll "$TMP_DIR/"
-cp Chummer.Media.Contracts/bin/Debug/net8.0/Chummer.Media.Contracts.dll "$TMP_DIR/"
-cp Chummer.Run.Api/bin/Debug/net8.0/Chummer.Run.Api.dll "$TMP_DIR/"
-cp Chummer.Run.Identity/bin/Debug/net8.0/Chummer.Run.Identity.dll "$TMP_DIR/"
-cp Chummer.Run.Registry/bin/Debug/net8.0/Chummer.Run.Registry.dll "$TMP_DIR/"
-cp Chummer.Run.AI/bin/Debug/net8.0/Chummer.Run.AI.dll "$TMP_DIR/"
-cp Chummer.Run.Contracts/bin/Debug/net8.0/Chummer.Run.Contracts.dll "$TMP_DIR/"
+cp Chummer.Play.Contracts/bin/Debug/net10.0/Chummer.Play.Contracts.dll "$TMP_DIR/"
+cp Chummer.Media.Contracts/bin/Debug/net10.0/Chummer.Media.Contracts.dll "$TMP_DIR/"
+cp Chummer.Run.Api/bin/Debug/net10.0/Chummer.Run.Api.dll "$TMP_DIR/"
+cp Chummer.Run.Identity/bin/Debug/net10.0/Chummer.Run.Identity.dll "$TMP_DIR/"
+cp Chummer.Run.Registry/bin/Debug/net10.0/Chummer.Run.Registry.dll "$TMP_DIR/"
+cp Chummer.Run.AI/bin/Debug/net10.0/Chummer.Run.AI.dll "$TMP_DIR/"
+cp Chummer.Run.Contracts/bin/Debug/net10.0/Chummer.Run.Contracts.dll "$TMP_DIR/"
 
 {
   echo "-nologo"
@@ -96,7 +96,7 @@ cp Chummer.Run.Contracts/bin/Debug/net8.0/Chummer.Run.Contracts.dll "$TMP_DIR/"
 cat > "${TMP_DIR}/RunServicesVerification.runtimeconfig.json" <<EOF
 {
   "runtimeOptions": {
-    "tfm": "net8.0",
+    "tfm": "net10.0",
     "frameworks": [
       {
         "name": "Microsoft.NETCore.App",
