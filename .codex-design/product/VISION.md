@@ -18,7 +18,7 @@ The finished product is:
 
 ### 1. Engine truth is deterministic
 
-No repo other than `chummer-core-engine` computes canonical rules math.
+No repo other than `chummer6-core` computes canonical rules math.
 
 ### 2. Explain Everywhere is real
 
@@ -26,16 +26,16 @@ Every important derived value, legality outcome, or state transition can be expl
 
 ### 3. Workbench and play are different products
 
-`chummer-presentation` is the builder/workbench/admin surface.
-`chummer-play` is the live session shell.
+`chummer6-ui` is the builder/workbench/admin surface.
+`chummer6-mobile` is the live session shell.
 
 ### 4. Hosted orchestration is not rules truth
 
-`chummer.run-services` coordinates identity, relay, memory, approvals, and assistants, but it does not own duplicate mechanics.
+`chummer6-hub` coordinates identity, relay, memory, approvals, and assistants, but it does not own duplicate mechanics.
 
 ### 5. Shared UI is a package, not a rumor
 
-`chummer-ui-kit` becomes the only reusable cross-head UI boundary.
+`chummer6-ui-kit` becomes the only reusable cross-head UI boundary.
 
 ### 6. Registry and media are real services
 

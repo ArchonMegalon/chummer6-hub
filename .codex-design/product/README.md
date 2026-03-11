@@ -17,35 +17,35 @@ Read in this order:
 
 ## Active Chummer repos
 
-### `chummer-design`
+### `chummer6-design`
 
 Lead-designer repo. Owns cross-repo canonical design truth.
 
-### `chummer-core-engine`
+### `chummer6-core`
 
 Deterministic rules/runtime engine. Owns engine truth, explain canon, reducer truth, runtime bundles, and engine contracts.
 
-### `chummer-presentation`
+### `chummer6-ui`
 
 Workbench/browser/desktop product head. Owns builders, inspectors, compare tools, moderation/admin UX, and large-screen operator flows.
 
-### `chummer-play`
+### `chummer6-mobile`
 
 Player and GM play-mode shell. Owns mobile/PWA/session UX, offline ledger, sync client, and play-safe live-session surfaces.
 
-### `chummer.run-services`
+### `chummer6-hub`
 
 Hosted orchestration plane. Owns identity, play API aggregation, relay, approvals, memory, Coach/Spider/Director orchestration, and service policy.
 
-### `chummer-ui-kit`
+### `chummer6-ui-kit`
 
 Shared design system package. Owns tokens, themes, shell primitives, accessibility primitives, and Chummer-specific reusable UI components.
 
-### `chummer-hub-registry`
+### `chummer6-hub-registry`
 
 Artifact catalog and publication system. Owns immutable artifacts, publication workflows, moderation state, installs, reviews, compatibility, and runtime-bundle head metadata.
 
-### `chummer-media-factory`
+### `chummer6-media-factory`
 
 Dedicated media execution plant. Owns render jobs, previews, manifests, asset lifecycle, and provider isolation for documents, portraits, and bounded video.
 
@@ -64,13 +64,13 @@ These inform the program but are not part of the main release train:
 
 ## Current program priorities
 
-1. Make `chummer-design` trustworthy as the lead-designer repo.
+1. Make `chummer6-design` trustworthy as the lead-designer repo.
 2. Finalize package/contract canon.
-3. Complete the play split with package-only dependency discipline.
-4. Expand `chummer-ui-kit` into the real shared UI boundary.
+3. Complete the play split with package-only dependency discipline in `chummer6-mobile`.
+4. Expand `chummer6-ui-kit` into the real shared UI boundary.
 5. Complete registry and media service extractions.
-6. Shrink `chummer.run-services` into orchestration-only ownership where appropriate.
-7. Purify `chummer-core-engine` into a true deterministic engine repo.
+6. Shrink `chummer6-hub` into orchestration-only ownership where appropriate.
+7. Purify `chummer6-core` into a true deterministic engine repo.
 8. Finish product surfaces and release hardening.
 
 ## Non-goal
