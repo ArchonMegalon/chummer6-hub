@@ -1,0 +1,328 @@
+name: Desktop Downloads Matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_portal_downloads:
+        description: "Publish desktop-download-bundle into configured portal downloads directory"
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - Docker
+    paths:
+      - '.github/workflows/desktop-downloads-matrix.yml'
+      - 'Chummer.Avalonia/**'
+      - 'Chummer.Application/**'
+      - 'Chummer.Blazor.Desktop/**'
+      - 'Chummer.Blazor/**'
+      - 'Chummer.Core/**'
+      - 'Chummer.Contracts/**'
+      - 'Chummer.Rulesets.Sr5/**'
+      - 'Chummer.Desktop.Runtime/**'
+      - 'Chummer.Infrastructure/**'
+      - 'Chummer.Portal/**'
+      - 'Chummer.Presentation/**'
+      - 'global.json'
+      - 'scripts/generate-releases-manifest.sh'
+      - 'scripts/publish-download-bundle.sh'
+      - 'scripts/publish-download-bundle-s3.sh'
+      - 'scripts/verify-releases-manifest.sh'
+      - 'scripts/validate-amend-manifests.sh'
+
+permissions:
+  contents: read
+
+jobs:
+  build-desktop:
+    name: Build ${{ matrix.app }} ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: avalonia
+            project: Chummer.Avalonia/Chummer.Avalonia.csproj
+            os: windows-latest
+            rid: win-x64
+            archive_ext: zip
+          - app: avalonia
+            project: Chummer.Avalonia/Chummer.Avalonia.csproj
+            os: windows-latest
+            rid: win-arm64
+            archive_ext: zip
+          - app: avalonia
+            project: Chummer.Avalonia/Chummer.Avalonia.csproj
+            os: ubuntu-latest
+            rid: linux-x64
+            archive_ext: tar.gz
+          - app: avalonia
+            project: Chummer.Avalonia/Chummer.Avalonia.csproj
+            os: ubuntu-latest
+            rid: linux-arm64
+            archive_ext: tar.gz
+          - app: avalonia
+            project: Chummer.Avalonia/Chummer.Avalonia.csproj
+            os: macos-latest
+            rid: osx-arm64
+            archive_ext: tar.gz
+          - app: avalonia
+            project: Chummer.Avalonia/Chummer.Avalonia.csproj
+            os: macos-latest
+            rid: osx-x64
+            archive_ext: tar.gz
+          - app: blazor-desktop
+            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
+            os: windows-latest
+            rid: win-x64
+            archive_ext: zip
+          - app: blazor-desktop
+            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
+            os: windows-latest
+            rid: win-arm64
+            archive_ext: zip
+          - app: blazor-desktop
+            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
+            os: ubuntu-latest
+            rid: linux-x64
+            archive_ext: tar.gz
+          - app: blazor-desktop
+            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
+            os: ubuntu-latest
+            rid: linux-arm64
+            archive_ext: tar.gz
+          - app: blazor-desktop
+            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
+            os: macos-latest
+            rid: osx-arm64
+            archive_ext: tar.gz
+          - app: blazor-desktop
+            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
+            os: macos-latest
+            rid: osx-x64
+            archive_ext: tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore ${{ matrix.project }}
+
+      - name: Publish desktop app
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="out/${{ matrix.app }}/${{ matrix.rid }}"
+          dotnet publish "${{ matrix.project }}" \
+            -c Release \
+            -r "${{ matrix.rid }}" \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:PublishTrimmed=false \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o "$out_dir"
+
+      - name: Package archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          $archive = "dist/chummer-${{ matrix.app }}-${{ matrix.rid }}.zip"
+          if (Test-Path $archive) { Remove-Item $archive -Force }
+          Compress-Archive -Path "out/${{ matrix.app }}/${{ matrix.rid }}/*" -DestinationPath $archive -Force
+
+      - name: Package archive (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          tar -C "out/${{ matrix.app }}/${{ matrix.rid }}" -czf "dist/chummer-${{ matrix.app }}-${{ matrix.rid }}.tar.gz" .
+
+      - name: Upload RID artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.app }}-${{ matrix.rid }}
+          path: dist/chummer-${{ matrix.app }}-${{ matrix.rid }}.${{ matrix.archive_ext }}
+          if-no-files-found: error
+          retention-days: 14
+
+  generate-manifest:
+    name: Generate Downloads Manifest
+    needs: build-desktop
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate amend manifests checksums
+        run: bash scripts/validate-amend-manifests.sh
+
+      - name: Download desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: dist
+
+      - name: Stage portal downloads directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/files
+          shopt -s nullglob
+          moved=0
+          for artifact in dist/chummer-*.zip dist/chummer-*.tar.gz; do
+            [[ -f "$artifact" ]] || continue
+            mv "$artifact" dist/files/
+            moved=1
+          done
+          if [[ "$moved" -ne 1 ]]; then
+            echo "No desktop artifacts were staged for manifest generation." >&2
+            exit 1
+          fi
+
+      - name: Generate releases.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_PUBLISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          DOWNLOADS_DIR="dist/files" \
+          MANIFEST_PATH="dist/releases.json" \
+          PORTAL_MANIFEST_PATH="dist/releases.json" \
+          RELEASE_VERSION="run-${GITHUB_RUN_NUMBER:-local}" \
+          RELEASE_CHANNEL="docker" \
+          RELEASE_PUBLISHED_AT="${RELEASE_PUBLISHED_AT}" \
+          bash scripts/generate-releases-manifest.sh
+
+      - name: Upload manifest bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-download-bundle
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish summary
+        shell: bash
+        run: |
+          {
+            echo "## Desktop Download Bundle"
+            echo
+            echo "Generated manifest artifact: \`desktop-download-bundle\`"
+            echo
+            echo "Files:"
+            find dist -maxdepth 2 -type f | sort | sed 's|^|- `|' | sed 's|$|`|'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-downloads:
+    name: Deploy Downloads Bundle
+    needs: generate-manifest
+    if: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads)) && vars.CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR != '' }}
+    runs-on: ubuntu-latest
+    env:
+      CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR }}
+      CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL }}
+      CHUMMER_PORTAL_DOWNLOADS_DEPLOY_ENABLED: "true"
+      CHUMMER_PORTAL_DOWNLOADS_REQUIRE_PUBLISHED_VERSION: "true"
+      CHUMMER_PORTAL_DOWNLOADS_VERIFY_LINKS: "true"
+
+    steps:
+      - name: Validate deployment directory variable
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR}" ]]; then
+            echo "Set repository variable CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR before enabling deploy_portal_downloads." >&2
+            exit 1
+          fi
+
+      - name: Validate live verify URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-}" ]]; then
+            echo "Set CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL to verify the live portal manifest after deployment." >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download manifest bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-download-bundle
+          path: dist
+
+      - name: Publish bundle to portal downloads directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/publish-download-bundle.sh dist "$CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR"
+
+      - name: Verify deployed manifest has artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/verify-releases-manifest.sh "$CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR"
+
+      - name: Verify deployed portal manifest has artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/verify-releases-manifest.sh "$CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL"
+
+  deploy-downloads-object-storage:
+    name: Deploy Downloads Bundle (Object Storage)
+    needs: generate-manifest
+    if: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads)) && vars.CHUMMER_PORTAL_DOWNLOADS_S3_URI != '' }}
+    runs-on: ubuntu-latest
+    env:
+      CHUMMER_PORTAL_DOWNLOADS_S3_URI: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_S3_URI }}
+      CHUMMER_PORTAL_DOWNLOADS_S3_LATEST_URI: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_S3_LATEST_URI }}
+      CHUMMER_PORTAL_DOWNLOADS_S3_ENDPOINT_URL: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_S3_ENDPOINT_URL }}
+      CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL }}
+      CHUMMER_PORTAL_DOWNLOADS_VERIFY_LINKS: "true"
+      AWS_ACCESS_KEY_ID: ${{ secrets.CHUMMER_PORTAL_DOWNLOADS_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.CHUMMER_PORTAL_DOWNLOADS_AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.CHUMMER_PORTAL_DOWNLOADS_AWS_SESSION_TOKEN }}
+      AWS_DEFAULT_REGION: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_S3_REGION }}
+
+    steps:
+      - name: Validate object-storage variables
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${CHUMMER_PORTAL_DOWNLOADS_S3_URI:-}" ]]; then
+            echo "Set repository variable CHUMMER_PORTAL_DOWNLOADS_S3_URI to enable object-storage deploy mode." >&2
+            exit 1
+          fi
+          if [[ -z "${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-}" ]]; then
+            echo "Set CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL to verify the live portal manifest after object-storage deployment." >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download manifest bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-download-bundle
+          path: dist
+
+      - name: Publish bundle to object storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+          bash scripts/publish-download-bundle-s3.sh dist

@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="Chummer.Media.Contracts/Chummer.Media.Contracts.csproj" />
+  <Project Path="Chummer.Run.AI/Chummer.Run.AI.csproj" />
+  <Project Path="Chummer.Run.Api/Chummer.Run.Api.csproj" />
+  <Project Path="Chummer.Run.Contracts/Chummer.Run.Contracts.csproj" />
+  <Project Path="Chummer.Run.Identity/Chummer.Run.Identity.csproj" />
+  <Project Path="Chummer.Run.Registry/Chummer.Run.Registry.csproj" />
+</Solution>

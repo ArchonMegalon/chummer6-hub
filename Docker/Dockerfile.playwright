@@ -1,0 +1,11 @@
+FROM mcr.microsoft.com/playwright:v1.52.0-jammy
+
+WORKDIR /work
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+RUN npm init -y \
+    && npm install --no-audit --no-fund playwright@1.52.0
+
+COPY scripts/e2e-ui-playwright.cjs /work/scripts/e2e-ui-playwright.cjs
+COPY scripts/e2e-portal.cjs /work/scripts/e2e-portal.cjs
+COPY Chummer.Tests/TestFiles/BLUE.chum5 /work/testdata/BLUE.chum5

@@ -1,0 +1,186 @@
+name: Docker Branch Guardrails
+
+on:
+  push:
+    branches:
+      - Docker
+  pull_request:
+    branches:
+      - Docker
+
+jobs:
+  amend-manifest-checksums:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate amend manifests checksums
+        run: bash scripts/validate-amend-manifests.sh
+
+  compose-config-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate docker compose configuration
+        run: docker compose config > /tmp/chummer-compose-config.out
+
+  portal-format-guardrail:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore portal project
+        run: dotnet restore Chummer.Portal/Chummer.Portal.csproj
+
+      - name: Verify portal program formatting
+        run: dotnet format style Chummer.Portal/Chummer.Portal.csproj --verify-no-changes --no-restore --include Chummer.Portal/Program.cs
+
+  parity-checklist-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Regenerate parity checklist
+        run: RUNBOOK_MODE=parity-checklist bash scripts/runbook.sh
+
+      - name: Verify parity checklist is up to date
+        run: git diff --exit-code -- docs/PARITY_CHECKLIST.md
+
+  downloads-smoke-runbook:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run repo-local downloads smoke
+        run: RUNBOOK_MODE=downloads-smoke bash scripts/runbook.sh
+
+  fresh-state-local-runbook:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run local-tests with fresh runbook state
+        run: |
+          RUNBOOK_LOG_DIR="$PWD/.tmp/runbook-logs" \
+          RUNBOOK_STATE_DIR="$PWD/.tmp/runbook-state" \
+          TEST_NUGET_SOFT_FAIL=0 \
+          TEST_DISABLE_BUILD_SERVERS=1 \
+          TEST_MAX_CPU=1 \
+          bash scripts/runbook.sh local-tests net10.0 "FullyQualifiedName~MigrationComplianceTests"
+
+  linux-migration-loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker info
+        run: |
+          docker version
+          docker compose version
+
+      - name: Migration loop (1 iteration)
+        env:
+          CHUMMER_API_KEY: migration-smoke-key
+          CHUMMER_PORTAL_E2E: "1"
+        run: bash scripts/migration-loop.sh 1
+
+      - name: Compose cleanup
+        if: always()
+        run: docker compose down --remove-orphans --volumes
+
+  blazor-component-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Chummer.Tests/Chummer.Tests.csproj -p:TargetFramework=net10.0
+
+      - name: Blazor component suite
+        run: bash scripts/test-blazor-components.sh
+
+  blazor-playwright-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker info
+        run: |
+          docker version
+          docker compose version
+
+      - name: Start api + blazor stack
+        env:
+          CHUMMER_API_KEY: migration-smoke-key
+        run: docker compose up -d --build --remove-orphans chummer-api chummer-blazor
+
+      - name: Playwright UI E2E
+        env:
+          CHUMMER_API_KEY: migration-smoke-key
+          CHUMMER_UI_PLAYWRIGHT: "1"
+        run: bash scripts/e2e-ui.sh
+
+      - name: Compose cleanup
+        if: always()
+        run: docker compose down --remove-orphans --volumes
+
+  linux-headless-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Chummer.Tests/Chummer.Tests.csproj -p:TargetFramework=net10.0
+
+      - name: Test (net10.0)
+        run: dotnet test Chummer.Tests/Chummer.Tests.csproj -c Release -f net10.0 -p:TargetFramework=net10.0 --no-restore
+
+  windows-desktop-tests:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Chummer.Tests/Chummer.Tests.csproj -p:TargetFramework=net10.0-windows
+
+      - name: Test (net10.0-windows)
+        run: dotnet test Chummer.Tests/Chummer.Tests.csproj -c Release -f net10.0-windows -p:TargetFramework=net10.0-windows --no-restore

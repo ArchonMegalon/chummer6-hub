@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<chummer>
+  <qualities>
+    <quality>
+      <id>test-amend-quality</id>
+      <name>Test Amend Quality</name>
+      <category>General</category>
+      <karma>1</karma>
+      <source>TEST</source>
+      <page>1</page>
+    </quality>
+  </qualities>
+</chummer>

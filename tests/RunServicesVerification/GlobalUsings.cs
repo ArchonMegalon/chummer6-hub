@@ -1,0 +1,9 @@
+global using System;
+global using System.Collections.Generic;
+global using System.Linq;
+global using System.Threading.Tasks;
+global using Chummer.Play.Contracts.Docs;
+global using Chummer.Play.Contracts.Gateway;
+global using Chummer.Play.Contracts.Memory;
+global using Chummer.Play.Contracts.Relay;
+global using Chummer.Play.Contracts.Spider;

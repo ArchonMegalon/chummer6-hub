@@ -1,0 +1,306 @@
+product: chummer
+last_reviewed: 2026-03-11
+release_track: vnext-foundation
+program_phases:
+- id: A
+  title: Design and contract canon
+  status: in_progress
+  goal: Make central design and package ownership trustworthy.
+  milestones:
+  - id: A0
+    title: chummer-design bootstrap complete
+    owners:
+    - chummer-design
+    status: open
+    exit:
+    - Active repo list matches the live repo graph.
+    - Media-factory is represented in ownership, milestones, blockers, sync, and project
+      scope.
+    - Canonical files are substantive, not placeholders.
+    - Root-level orphan product docs are removed or relocated.
+  - id: A1
+    title: Engine contract canon
+    owners:
+    - chummer-core-engine
+    - chummer-design
+    status: open
+    exit:
+    - Chummer.Engine.Contracts is the sole canonical engine/shared contract package.
+    - Engine runtime, explain, and reducer DTO families are owned once.
+  - id: A2
+    title: Play contract canon
+    owners:
+    - chummer.run-services
+    - chummer-play
+    - chummer-design
+    status: open
+    exit:
+    - Chummer.Play.Contracts has stable ownership and package naming.
+    - Play consumes package-only seams.
+    - No duplicated semantic session DTO families remain across play/run surfaces.
+  - id: A3
+    title: Run orchestration contract canon
+    owners:
+    - chummer.run-services
+    - chummer-design
+    status: open
+    exit:
+    - Chummer.Run.Contracts owns hosted orchestration DTOs only.
+    - Media and registry execution contracts are no longer mixed into run orchestration
+      families.
+  - id: A4
+    title: External tools plane canon
+    owners:
+    - chummer-design
+    - chummer.run-services
+    - chummer-media-factory
+    status: open
+    exit:
+    - External tools policy exists centrally.
+    - All owned tools are classified by architectural role.
+    - System-of-record rules are documented.
+    - External integrations are assigned to owning repos.
+- id: B
+  title: Surface split completion
+  status: open
+  goal: Finish the play/workbench/UI-kit boundary.
+  milestones:
+  - id: B0
+    title: Play shell becomes real
+    owners:
+    - chummer-play
+    status: open
+    exit:
+    - Real local ledger and sync client exist.
+    - Player shell and GM shell reach first usable end-to-end flows.
+    - Play mirror coverage exists under .codex-design.
+  - id: B1
+    title: UI kit becomes the real shared boundary
+    owners:
+    - chummer-ui-kit
+    - chummer-presentation
+    - chummer-play
+    status: open
+    exit:
+    - Shared tokens, primitives, shell chrome, and state patterns live in Chummer.Ui.Kit.
+    - Presentation and play consume the package instead of duplicating shared UI.
+  - id: B2
+    title: Presentation purified to workbench/browser/desktop
+    owners:
+    - chummer-presentation
+    status: open
+    exit:
+    - No dedicated play/mobile hosts remain in presentation.
+    - Presentation design docs and implementation scopes match the split reality.
+- id: C
+  title: Service extraction
+  status: open
+  goal: Isolate registry and media into dedicated repos and shrink run-services.
+  milestones:
+  - id: C0
+    title: Hub registry extraction
+    owners:
+    - chummer-hub-registry
+    - chummer.run-services
+    status: open
+    exit:
+    - Artifact catalog, publication state, installs, reviews, and compatibility metadata
+      live behind chummer-hub-registry.
+    - Run-services consumes registry contracts instead of owning registry persistence
+      internals.
+  - id: C1
+    title: Media factory extraction
+    owners:
+    - chummer-media-factory
+    - chummer.run-services
+    status: open
+    exit:
+    - Chummer.Media.Contracts is canonical.
+    - Media render execution leaves run-services.
+    - Media-factory has source, mirrors, milestones, and integration coverage.
+  - id: C1b
+    title: Orchestration-side external adapters
+    owners:
+    - chummer.run-services
+    status: open
+    exit:
+    - Approval, docs/help, survey, research, and automation bridges are adapter-based.
+    - Provider routes emit Chummer receipts.
+    - No client repo owns third-party provider access.
+  - id: C1c
+    title: Media-side external adapters
+    owners:
+    - chummer-media-factory
+    status: open
+    exit:
+    - Document, preview, route, video, and archive adapters exist behind media-factory.
+    - Media provenance is captured in manifests.
+    - Provider choice remains switchable and kill-switchable.
+  - id: C2
+    title: Run-services shrink
+    owners:
+    - chummer.run-services
+    status: open
+    exit:
+    - Registry persistence and media render internals are no longer hosted here.
+    - Run-services reads as an orchestrator, not a hidden super-repo.
+- id: D
+  title: Truth and session canon
+  status: open
+  goal: Make semantics authoritative and reusable.
+  milestones:
+  - id: D0
+    title: Explain canon complete
+    owners:
+    - chummer-core-engine
+    status: open
+    exit:
+    - Structured explain traces are authoritative and consumable across product heads.
+  - id: D1
+    title: Session semantic canon complete
+    owners:
+    - chummer-core-engine
+    - chummer.run-services
+    - chummer-play
+    status: open
+    exit:
+    - Semantic session mutation DTOs have one canonical owner.
+    - Transport wrappers do not invent second semantic event families.
+  - id: D2
+    title: Runtime bundle canon complete
+    owners:
+    - chummer-core-engine
+    - chummer.run-services
+    - chummer-play
+    status: open
+    exit:
+    - Runtime bundle semantics, refresh/rebind flows, and provenance are coherent
+      across engine, services, and clients.
+- id: E
+  title: Product completion
+  status: open
+  goal: Finish the user-facing product once the seams are real.
+  milestones:
+  - id: E0
+    title: Workbench complete
+    owners:
+    - chummer-presentation
+    status: open
+    exit:
+    - Builder, compare, explain, publish, moderation, and admin workflows are complete
+      enough for release.
+  - id: E1
+    title: Play complete
+    owners:
+    - chummer-play
+    status: open
+    exit:
+    - Player and GM play shells are complete across supported platforms.
+  - id: E2
+    title: Hub complete
+    owners:
+    - chummer-hub-registry
+    - chummer.run-services
+    - chummer-presentation
+    status: open
+    exit:
+    - Publication, installs, reviews, discovery, and compatibility are coherent end-to-end.
+  - id: E2b
+    title: Docs, feedback, and operator projection plane complete
+    owners:
+    - chummer.run-services
+    - chummer-design
+    status: open
+    exit:
+    - Docs/help surfaces are integrated.
+    - Feedback collection loops are integrated.
+    - Operator projection boards exist without becoming systems of record.
+  - id: E3
+    title: Assistant plane complete
+    owners:
+    - chummer.run-services
+    status: open
+    exit:
+    - Coach, Spider, and Director are governed, grounded, and reviewable.
+  - id: E4
+    title: Media plane complete
+    owners:
+    - chummer-media-factory
+    - chummer.run-services
+    status: open
+    exit:
+    - Documents, portraits, and bounded video are stable service capabilities.
+- id: F
+  title: Hardening and release
+  status: open
+  goal: Reach release-quality operational and user-facing confidence.
+  milestones:
+  - id: F0
+    title: Accessibility, localization, performance
+    owners:
+    - chummer-presentation
+    - chummer-play
+    - chummer-ui-kit
+    status: open
+    exit:
+    - Accessibility and localization are first-class.
+    - Performance targets are documented and met.
+  - id: F1
+    title: Observability, DR, replay safety
+    owners:
+    - chummer-core-engine
+    - chummer.run-services
+    - chummer-hub-registry
+    - chummer-media-factory
+    status: open
+    exit:
+    - Operational runbooks, restore drills, and replay safety are verified.
+  - id: F2
+    title: Legacy migration certification
+    owners:
+    - chummer-core-engine
+    - chummer5a
+    status: open
+    exit:
+    - Legacy import/export and regression corpus are certified.
+  - id: F3
+    title: Release complete
+    owners:
+    - chummer-design
+    status: open
+    exit:
+    - All prior phase exits are met.
+    - No open red blockers remain.
+    - The product vision is complete enough for release.
+current_release_blockers:
+- A0
+- A1
+- A2
+- C1
+- D1
+executable_queue:
+- id: WL-D007
+  milestone: F3
+  status: blocked
+  backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
+  notes: Blocked on sibling-repo `.codex-design/review` write access and `/docker/chummercomplete/chummer-media-factory` provisioning.
+- id: WL-D008
+  milestone: F3
+  status: blocked
+  backlog: products/chummer/sync/LOCAL_MIRROR_PUBLISH_BACKLOG.md
+  notes: Blocked on sibling-repo `.codex-design` write access and run-services mirror drift until unblock scope completes.
+- id: WL-D009
+  milestone: F3
+  status: in_progress
+  backlog: products/chummer/sync/TRUTH_MAINTENANCE_BACKLOG.md
+  notes: Recurring split-wave truth-maintenance cycle with dated change/no-change evidence in maintenance log.
+- id: WL-D010
+  milestone: F3
+  status: blocked
+  backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_UNBLOCK_BACKLOG.md
+  notes: Blocked until `/docker/chummercomplete/chummer-media-factory` is provisioned in local workspace.
+- id: WL-D011
+  milestone: F3
+  status: blocked
+  backlog: products/chummer/sync/REVIEW_TEMPLATE_ACCESS_UNBLOCK_BACKLOG.md
+  notes: Blocked until sandbox access allows sibling-repo `.codex-design/review` writes.

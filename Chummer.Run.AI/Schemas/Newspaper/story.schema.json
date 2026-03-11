@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chummer.run/schemas/newspaper/story.schema.json",
+  "type": "object",
+  "required": [
+    "id",
+    "section",
+    "layout_role",
+    "headline",
+    "dek",
+    "summary",
+    "why_it_matters",
+    "source_label",
+    "source_url",
+    "image"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "section": { "type": "string", "enum": ["must_know", "worth_knowing", "agenda", "watchlist"] },
+    "layout_role": { "type": "string" },
+    "headline": { "type": "string", "maxLength": 75 },
+    "dek": { "type": "string", "maxLength": 130 },
+    "summary": { "type": "string", "minLength": 1 },
+    "why_it_matters": { "type": "string" },
+    "source_label": { "type": "string" },
+    "source_url": { "type": "string" },
+    "published_at": { "type": ["string", "null"] },
+    "image": {
+      "type": "object",
+      "required": ["kind", "url"],
+      "properties": {
+        "kind": { "type": "string" },
+        "url": { "type": "string", "minLength": 1 },
+        "caption": { "type": ["string", "null"] }
+      }
+    },
+    "pull_quote": { "type": ["string", "null"] },
+    "facts": {
+      "type": ["array", "null"],
+      "items": { "type": "string" }
+    }
+  }
+}
