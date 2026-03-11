@@ -1,0 +1,6 @@
+@Chummer.Run.Identity_HostAddress = http://localhost:0
+
+GET {{Chummer.Run.Identity_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

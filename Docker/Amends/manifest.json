@@ -1,0 +1,12 @@
+{
+  "id": "local-test-amend",
+  "name": "Local Test Amend",
+  "priority": 100,
+  "enabled": true,
+  "mode": "merge-catalog",
+  "description": "Sample overlay pack for Docker validation",
+  "checksums": {
+    "data/qualities.test-amend.xml": "sha256:60c8b6eee588d353d22341462691c876e093f7e26dde019bc080e48195fac63f",
+    "lang/en-us.test-amend.xml": "sha256:05145e673e288ee437370d146b6ca29185b12c59a2bffe191f8e662f9729af3f"
+  }
+}

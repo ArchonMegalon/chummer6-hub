@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{TITLE}}</title>
+  <link rel="stylesheet" href="styles/base.css" />
+  <link rel="stylesheet" href="styles/components.css" />
+  <link rel="stylesheet" href="styles/print.css" />
+</head>
+<body class="issue">
+  <header class="masthead">
+    <h1>{{TITLE}}</h1>
+    <p>{{SUBTITLE}}</p>
+    <div class="issue-rail">Issue {{EDITION_NO}} | {{ISSUE_DATE}}</div>
+  </header>
+
+  <section class="section">
+    <h2>Must Know</h2>
+    <div class="story-grid">{{MUST_KNOW}}</div>
+  </section>
+
+  <section class="section">
+    <h2>Worth Knowing</h2>
+    <div class="story-grid">{{WORTH_KNOWING}}</div>
+  </section>
+
+  <section class="section">
+    <h2>Agenda</h2>
+    <div class="story-grid">{{AGENDA}}</div>
+  </section>
+
+  <section class="section">
+    <h2>Watchlist</h2>
+    <div class="story-grid">{{WATCHLIST}}</div>
+  </section>
+
+  <footer class="footer">{{FOOTER_NOTE}}</footer>
+</body>
+</html>

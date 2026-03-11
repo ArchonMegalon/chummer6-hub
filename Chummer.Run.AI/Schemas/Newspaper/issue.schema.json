@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chummer.run/schemas/newspaper/issue.schema.json",
+  "type": "object",
+  "required": [
+    "issue_id",
+    "title",
+    "subtitle",
+    "issue_date",
+    "edition_no",
+    "timezone",
+    "sections"
+  ],
+  "properties": {
+    "issue_id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "maxLength": 80 },
+    "subtitle": { "type": "string", "maxLength": 120 },
+    "issue_date": { "type": "string" },
+    "edition_no": { "type": "integer", "minimum": 1 },
+    "timezone": { "type": "string" },
+    "sections": {
+      "type": "object",
+      "required": ["must_know", "worth_knowing", "agenda", "watchlist"],
+      "properties": {
+        "must_know": { "type": "array", "items": { "$ref": "./story.schema.json" } },
+        "worth_knowing": { "type": "array", "items": { "$ref": "./story.schema.json" } },
+        "agenda": { "type": "array", "items": { "$ref": "./story.schema.json" } },
+        "watchlist": { "type": "array", "items": { "$ref": "./story.schema.json" } }
+      }
+    },
+    "footer_note": { "type": "string" }
+  }
+}

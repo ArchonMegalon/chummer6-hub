@@ -1,0 +1,41 @@
+@page {
+  size: A4;
+  margin: 16mm 14mm 18mm 14mm;
+}
+
+@media print {
+  body.issue {
+    background: #fff;
+  }
+
+  .masthead,
+  .section,
+  .footer {
+    max-width: none;
+    padding: 0;
+  }
+
+  .section {
+    margin-top: 8mm;
+    break-before: page;
+  }
+
+  .section:first-of-type {
+    break-before: avoid;
+  }
+
+  .story-grid {
+    display: block;
+  }
+
+  .story-card {
+    margin-bottom: 8mm;
+    break-inside: avoid;
+  }
+
+  .story-card .article-body {
+    column-count: 2;
+    column-gap: 8mm;
+    column-fill: balance;
+  }
+}

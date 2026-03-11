@@ -1,0 +1,6 @@
+@Chummer.Run.Registry_HostAddress = http://localhost:0
+
+GET {{Chummer.Run.Registry_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

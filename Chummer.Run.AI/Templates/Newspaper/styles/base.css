@@ -1,0 +1,53 @@
+:root {
+  --bg: #f8f6f2;
+  --ink: #1a1a1a;
+  --muted: #626262;
+  --rule: #d4cec4;
+  --accent: #7a5b3a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.issue {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Georgia", "Times New Roman", serif;
+  line-height: 1.35;
+}
+
+.masthead,
+.section,
+.footer {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px 24px;
+}
+
+.masthead {
+  border-bottom: 1px solid var(--rule);
+}
+
+.masthead h1 {
+  margin: 0;
+  font-size: 48px;
+  letter-spacing: 1px;
+}
+
+.masthead p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.issue-rail {
+  margin-top: 10px;
+  color: var(--accent);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}

@@ -1,0 +1,222 @@
+services:
+  # Primary migration runtime: API + Blazor head. Legacy Chummer.Web is intentionally excluded.
+  chummer-api:
+    image: chummer-api:local
+    build:
+      context: .
+      dockerfile: Chummer.Run.Api/Dockerfile
+    environment:
+      CHUMMER_STATE_PATH: "/app/state"
+      CHUMMER_API_KEY: "${CHUMMER_API_KEY:-}"
+      CHUMMER_PROTECT_API_DOCS: "${CHUMMER_PROTECT_API_DOCS:-}"
+      CHUMMER_AMENDS_PATH: "/app/amends"
+      CHUMMER_AI_AIMAGICX_PRIMARY_API_KEY: "${CHUMMER_AI_AIMAGICX_PRIMARY_API_KEY:-}"
+      CHUMMER_AI_AIMAGICX_FALLBACK_API_KEY: "${CHUMMER_AI_AIMAGICX_FALLBACK_API_KEY:-}"
+      CHUMMER_AI_1MINAI_PRIMARY_API_KEY: "${CHUMMER_AI_1MINAI_PRIMARY_API_KEY:-}"
+      CHUMMER_AI_1MINAI_FALLBACK_API_KEY: "${CHUMMER_AI_1MINAI_FALLBACK_API_KEY:-}"
+      CHUMMER_AI_ENABLE_REMOTE_EXECUTION: "${CHUMMER_AI_ENABLE_REMOTE_EXECUTION:-}"
+      CHUMMER_AI_AIMAGICX_BASE_URL: "${CHUMMER_AI_AIMAGICX_BASE_URL:-}"
+      CHUMMER_AI_AIMAGICX_MODEL: "${CHUMMER_AI_AIMAGICX_MODEL:-}"
+      CHUMMER_AI_1MINAI_BASE_URL: "${CHUMMER_AI_1MINAI_BASE_URL:-}"
+      CHUMMER_AI_1MINAI_MODEL: "${CHUMMER_AI_1MINAI_MODEL:-}"
+    ports:
+      - "${CHUMMER_API_PORT:-${CHUMMER_WEB_PORT:-8088}}:8080"
+    volumes:
+      - chummer-state:/app/state
+      - ./Docker/Amends:/app/amends:ro
+  chummer-blazor:
+    image: chummer-blazor:local
+    build:
+      context: .
+      dockerfile: Chummer.Blazor/Dockerfile
+    depends_on:
+      - chummer-api
+    environment:
+      CHUMMER_API_BASE_URL: "http://chummer-api:8080"
+      CHUMMER_API_KEY: "${CHUMMER_API_KEY:-}"
+      CHUMMER_BLAZOR_PATH_BASE: "${CHUMMER_BLAZOR_PATH_BASE:-}"
+    ports:
+      - "${CHUMMER_BLAZOR_PORT:-8089}:8080"
+  chummer-hub-web:
+    image: chummer-hub-web:local
+    build:
+      context: .
+      dockerfile: Chummer.Hub.Web/Dockerfile
+    depends_on:
+      - chummer-api
+    environment:
+      CHUMMER_HUB_PATH_BASE: "${CHUMMER_HUB_PATH_BASE:-}"
+    ports:
+      - "${CHUMMER_HUB_PORT:-8092}:8080"
+  chummer-session-web:
+    image: chummer-session-web:local
+    build:
+      context: .
+      dockerfile: Chummer.Session.Web/Dockerfile
+    depends_on:
+      - chummer-api
+    environment:
+      CHUMMER_SESSION_PATH_BASE: "${CHUMMER_SESSION_PATH_BASE:-}"
+    ports:
+      - "${CHUMMER_SESSION_PORT:-8093}:8080"
+  chummer-coach-web:
+    image: chummer-coach-web:local
+    build:
+      context: .
+      dockerfile: Chummer.Coach.Web/Dockerfile
+    depends_on:
+      - chummer-api
+    environment:
+      CHUMMER_COACH_PATH_BASE: "${CHUMMER_COACH_PATH_BASE:-}"
+    ports:
+      - "${CHUMMER_COACH_PORT:-8094}:8080"
+  chummer-blazor-portal:
+    image: chummer-blazor:local
+    build:
+      context: .
+      dockerfile: Chummer.Blazor/Dockerfile
+    depends_on:
+      - chummer-api
+    profiles: ["portal"]
+    environment:
+      CHUMMER_API_BASE_URL: "http://chummer-api:8080"
+      CHUMMER_API_KEY: "${CHUMMER_API_KEY:-}"
+      CHUMMER_BLAZOR_PATH_BASE: "/blazor"
+  chummer-hub-web-portal:
+    image: chummer-hub-web:local
+    build:
+      context: .
+      dockerfile: Chummer.Hub.Web/Dockerfile
+    depends_on:
+      - chummer-api
+    profiles: ["portal"]
+    environment:
+      CHUMMER_HUB_PATH_BASE: "/hub"
+  chummer-session-web-portal:
+    image: chummer-session-web:local
+    build:
+      context: .
+      dockerfile: Chummer.Session.Web/Dockerfile
+    depends_on:
+      - chummer-api
+    profiles: ["portal"]
+    environment:
+      CHUMMER_SESSION_PATH_BASE: "/session"
+  chummer-coach-web-portal:
+    image: chummer-coach-web:local
+    build:
+      context: .
+      dockerfile: Chummer.Coach.Web/Dockerfile
+    depends_on:
+      - chummer-api
+    profiles: ["portal"]
+    environment:
+      CHUMMER_COACH_PATH_BASE: "/coach"
+  chummer-avalonia-browser:
+    image: chummer-avalonia-browser:local
+    build:
+      context: .
+      dockerfile: Chummer.Avalonia.Browser/Dockerfile
+    profiles: ["portal"]
+    environment:
+      CHUMMER_AVALONIA_BROWSER_PATH_BASE: "/avalonia"
+  chummer-portal:
+    image: chummer-portal:local
+    build:
+      context: .
+      dockerfile: Chummer.Portal/Dockerfile
+    depends_on:
+      - chummer-api
+      - chummer-blazor-portal
+      - chummer-hub-web-portal
+      - chummer-session-web-portal
+      - chummer-coach-web-portal
+      - chummer-avalonia-browser
+    profiles: ["portal"]
+    environment:
+      CHUMMER_PORTAL_BLAZOR_URL: "${CHUMMER_PORTAL_BLAZOR_URL:-/blazor/}"
+      CHUMMER_PORTAL_BLAZOR_PROXY_URL: "${CHUMMER_PORTAL_BLAZOR_PROXY_URL:-http://chummer-blazor-portal:8080/}"
+      CHUMMER_PORTAL_HUB_URL: "${CHUMMER_PORTAL_HUB_URL:-/hub/}"
+      CHUMMER_PORTAL_HUB_PROXY_URL: "${CHUMMER_PORTAL_HUB_PROXY_URL:-http://chummer-hub-web-portal:8080/}"
+      CHUMMER_PORTAL_SESSION_URL: "${CHUMMER_PORTAL_SESSION_URL:-/session/}"
+      CHUMMER_PORTAL_SESSION_PROXY_URL: "${CHUMMER_PORTAL_SESSION_PROXY_URL:-http://chummer-session-web-portal:8080/}"
+      CHUMMER_PORTAL_COACH_URL: "${CHUMMER_PORTAL_COACH_URL:-/coach/}"
+      CHUMMER_RUN_URL: "${CHUMMER_RUN_URL:-}"
+      CHUMMER_PORTAL_COACH_PROXY_URL: "${CHUMMER_PORTAL_COACH_PROXY_URL:-http://chummer-coach-web-portal:8080/}"
+      CHUMMER_PORTAL_AI_PROXY_URL: "${CHUMMER_PORTAL_AI_PROXY_URL:-}"
+      CHUMMER_PORTAL_AVALONIA_URL: "${CHUMMER_PORTAL_AVALONIA_URL:-/avalonia/}"
+      CHUMMER_PORTAL_AVALONIA_PROXY_URL: "${CHUMMER_PORTAL_AVALONIA_PROXY_URL:-http://chummer-avalonia-browser:8080/}"
+      CHUMMER_PORTAL_API_URL: "${CHUMMER_PORTAL_API_URL:-http://chummer-api:8080/}"
+      CHUMMER_API_KEY: "${CHUMMER_API_KEY:-}"
+      CHUMMER_PORTAL_API_KEY: "${CHUMMER_PORTAL_API_KEY:-}"
+      CHUMMER_PORTAL_DOWNLOADS_URL: "${CHUMMER_PORTAL_DOWNLOADS_URL:-/downloads/}"
+      CHUMMER_PORTAL_DOWNLOADS_FALLBACK_URL: "${CHUMMER_PORTAL_DOWNLOADS_FALLBACK_URL:-}"
+      CHUMMER_PORTAL_DOWNLOADS_PROXY_URL: "${CHUMMER_PORTAL_DOWNLOADS_PROXY_URL:-}"
+      CHUMMER_PORTAL_RELEASES_FILE: "${CHUMMER_PORTAL_RELEASES_FILE:-/app/downloads/releases.json}"
+      CHUMMER_PORTAL_RELEASES_DIR: "${CHUMMER_PORTAL_RELEASES_DIR:-/app/downloads}"
+    volumes:
+      - ./Docker/Downloads:/app/downloads:ro
+    ports:
+      - "${CHUMMER_PORTAL_PORT:-8091}:8080"
+  chummer-run-cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: chummer-run-cloudflared
+    profiles: ["portal"]
+    restart: unless-stopped
+    networks:
+      - chummer-run-origin
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - "${CHUMMER_RUN_CF_TUNNEL_TOKEN:?set CHUMMER_RUN_CF_TUNNEL_TOKEN in an ignored .env file}"
+  chummer-tests:
+    image: chummer-tests:local
+    build:
+      context: .
+      dockerfile: Docker/Dockerfile.tests
+    depends_on:
+      - chummer-api
+    profiles: ["test"]
+    environment:
+      CHUMMER_API_BASE_URL: "http://chummer-api:8080"
+      CHUMMER_WEB_BASE_URL: "http://chummer-api:8080"
+      CHUMMER_API_KEY: "${CHUMMER_API_KEY:-}"
+      CHUMMER_AMENDS_EXPECTED_ID: "${CHUMMER_AMENDS_EXPECTED_ID:-local-test-amend}"
+    command: >
+      bash scripts/ai/verify.sh
+  chummer-playwright:
+    image: chummer-playwright:local
+    build:
+      context: .
+      dockerfile: Docker/Dockerfile.playwright
+    depends_on:
+      - chummer-api
+      - chummer-blazor
+    profiles: ["test"]
+    network_mode: host
+    environment:
+      CHUMMER_BLAZOR_BASE_URL: "${CHUMMER_UI_PLAYWRIGHT_BASE_URL:-http://127.0.0.1:${CHUMMER_BLAZOR_PORT:-8089}}"
+      CHUMMER_API_BASE_URL: "http://chummer-api:8080"
+      CHUMMER_API_KEY: "${CHUMMER_API_KEY:-}"
+    command: >
+      node /work/scripts/e2e-ui-playwright.cjs
+  chummer-playwright-portal:
+    image: chummer-playwright:local
+    build:
+      context: .
+      dockerfile: Docker/Dockerfile.playwright
+    depends_on:
+      - chummer-portal
+    profiles: ["portal"]
+    command: >
+      node /work/scripts/e2e-portal.cjs
+
+volumes:
+  chummer-state:
+
+networks:
+  chummer-run-origin:
+    external: true
+    name: "${CHUMMER_RUN_TUNNEL_NETWORK:-chummer5a_default}"
