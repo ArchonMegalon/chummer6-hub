@@ -8,9 +8,9 @@ program_phases:
   goal: Make central design and package ownership trustworthy.
   milestones:
   - id: A0
-    title: chummer-design bootstrap complete
+    title: chummer6-design bootstrap complete
     owners:
-    - chummer-design
+    - chummer6-design
     status: open
     exit:
     - Active repo list matches the live repo graph.
@@ -21,8 +21,8 @@ program_phases:
   - id: A1
     title: Engine contract canon
     owners:
-    - chummer-core-engine
-    - chummer-design
+    - chummer6-core
+    - chummer6-design
     status: open
     exit:
     - Chummer.Engine.Contracts is the sole canonical engine/shared contract package.
@@ -30,9 +30,9 @@ program_phases:
   - id: A2
     title: Play contract canon
     owners:
-    - chummer.run-services
-    - chummer-play
-    - chummer-design
+    - chummer6-hub
+    - chummer6-mobile
+    - chummer6-design
     status: open
     exit:
     - Chummer.Play.Contracts has stable ownership and package naming.
@@ -41,8 +41,8 @@ program_phases:
   - id: A3
     title: Run orchestration contract canon
     owners:
-    - chummer.run-services
-    - chummer-design
+    - chummer6-hub
+    - chummer6-design
     status: open
     exit:
     - Chummer.Run.Contracts owns hosted orchestration DTOs only.
@@ -51,9 +51,9 @@ program_phases:
   - id: A4
     title: External tools plane canon
     owners:
-    - chummer-design
-    - chummer.run-services
-    - chummer-media-factory
+    - chummer6-design
+    - chummer6-hub
+    - chummer6-media-factory
     status: open
     exit:
     - External tools policy exists centrally.
@@ -68,7 +68,7 @@ program_phases:
   - id: B0
     title: Play shell becomes real
     owners:
-    - chummer-play
+    - chummer6-mobile
     status: open
     exit:
     - Real local ledger and sync client exist.
@@ -77,9 +77,9 @@ program_phases:
   - id: B1
     title: UI kit becomes the real shared boundary
     owners:
-    - chummer-ui-kit
-    - chummer-presentation
-    - chummer-play
+    - chummer6-ui-kit
+    - chummer6-ui
+    - chummer6-mobile
     status: open
     exit:
     - Shared tokens, primitives, shell chrome, and state patterns live in Chummer.Ui.Kit.
@@ -87,7 +87,7 @@ program_phases:
   - id: B2
     title: Presentation purified to workbench/browser/desktop
     owners:
-    - chummer-presentation
+    - chummer6-ui
     status: open
     exit:
     - No dedicated play/mobile hosts remain in presentation.
@@ -100,19 +100,19 @@ program_phases:
   - id: C0
     title: Hub registry extraction
     owners:
-    - chummer-hub-registry
-    - chummer.run-services
+    - chummer6-hub-registry
+    - chummer6-hub
     status: open
     exit:
     - Artifact catalog, publication state, installs, reviews, and compatibility metadata
-      live behind chummer-hub-registry.
+      live behind chummer6-hub-registry.
     - Run-services consumes registry contracts instead of owning registry persistence
       internals.
   - id: C1
     title: Media factory extraction
     owners:
-    - chummer-media-factory
-    - chummer.run-services
+    - chummer6-media-factory
+    - chummer6-hub
     status: open
     exit:
     - Chummer.Media.Contracts is canonical.
@@ -121,7 +121,7 @@ program_phases:
   - id: C1b
     title: Orchestration-side external adapters
     owners:
-    - chummer.run-services
+    - chummer6-hub
     status: open
     exit:
     - Approval, docs/help, survey, research, and automation bridges are adapter-based.
@@ -130,7 +130,7 @@ program_phases:
   - id: C1c
     title: Media-side external adapters
     owners:
-    - chummer-media-factory
+    - chummer6-media-factory
     status: open
     exit:
     - Document, preview, route, video, and archive adapters exist behind media-factory.
@@ -139,7 +139,7 @@ program_phases:
   - id: C2
     title: Run-services shrink
     owners:
-    - chummer.run-services
+    - chummer6-hub
     status: open
     exit:
     - Registry persistence and media render internals are no longer hosted here.
@@ -152,16 +152,16 @@ program_phases:
   - id: D0
     title: Explain canon complete
     owners:
-    - chummer-core-engine
+    - chummer6-core
     status: open
     exit:
     - Structured explain traces are authoritative and consumable across product heads.
   - id: D1
     title: Session semantic canon complete
     owners:
-    - chummer-core-engine
-    - chummer.run-services
-    - chummer-play
+    - chummer6-core
+    - chummer6-hub
+    - chummer6-mobile
     status: open
     exit:
     - Semantic session mutation DTOs have one canonical owner.
@@ -169,9 +169,9 @@ program_phases:
   - id: D2
     title: Runtime bundle canon complete
     owners:
-    - chummer-core-engine
-    - chummer.run-services
-    - chummer-play
+    - chummer6-core
+    - chummer6-hub
+    - chummer6-mobile
     status: open
     exit:
     - Runtime bundle semantics, refresh/rebind flows, and provenance are coherent
@@ -184,7 +184,7 @@ program_phases:
   - id: E0
     title: Workbench complete
     owners:
-    - chummer-presentation
+    - chummer6-ui
     status: open
     exit:
     - Builder, compare, explain, publish, moderation, and admin workflows are complete
@@ -192,24 +192,24 @@ program_phases:
   - id: E1
     title: Play complete
     owners:
-    - chummer-play
+    - chummer6-mobile
     status: open
     exit:
     - Player and GM play shells are complete across supported platforms.
   - id: E2
     title: Hub complete
     owners:
-    - chummer-hub-registry
-    - chummer.run-services
-    - chummer-presentation
+    - chummer6-hub-registry
+    - chummer6-hub
+    - chummer6-ui
     status: open
     exit:
     - Publication, installs, reviews, discovery, and compatibility are coherent end-to-end.
   - id: E2b
     title: Docs, feedback, and operator projection plane complete
     owners:
-    - chummer.run-services
-    - chummer-design
+    - chummer6-hub
+    - chummer6-design
     status: open
     exit:
     - Docs/help surfaces are integrated.
@@ -218,15 +218,15 @@ program_phases:
   - id: E3
     title: Assistant plane complete
     owners:
-    - chummer.run-services
+    - chummer6-hub
     status: open
     exit:
     - Coach, Spider, and Director are governed, grounded, and reviewable.
   - id: E4
     title: Media plane complete
     owners:
-    - chummer-media-factory
-    - chummer.run-services
+    - chummer6-media-factory
+    - chummer6-hub
     status: open
     exit:
     - Documents, portraits, and bounded video are stable service capabilities.
@@ -238,9 +238,9 @@ program_phases:
   - id: F0
     title: Accessibility, localization, performance
     owners:
-    - chummer-presentation
-    - chummer-play
-    - chummer-ui-kit
+    - chummer6-ui
+    - chummer6-mobile
+    - chummer6-ui-kit
     status: open
     exit:
     - Accessibility and localization are first-class.
@@ -248,17 +248,17 @@ program_phases:
   - id: F1
     title: Observability, DR, replay safety
     owners:
-    - chummer-core-engine
-    - chummer.run-services
-    - chummer-hub-registry
-    - chummer-media-factory
+    - chummer6-core
+    - chummer6-hub
+    - chummer6-hub-registry
+    - chummer6-media-factory
     status: open
     exit:
     - Operational runbooks, restore drills, and replay safety are verified.
   - id: F2
     title: Legacy migration certification
     owners:
-    - chummer-core-engine
+    - chummer6-core
     - chummer5a
     status: open
     exit:
@@ -266,7 +266,7 @@ program_phases:
   - id: F3
     title: Release complete
     owners:
-    - chummer-design
+    - chummer6-design
     status: open
     exit:
     - All prior phase exits are met.
@@ -283,7 +283,7 @@ executable_queue:
   milestone: F3
   status: blocked
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
-  notes: Blocked on sibling-repo `.codex-design/review` write access and `/docker/chummercomplete/chummer-media-factory` provisioning.
+  notes: Blocked on sibling-repo `.codex-design/review` write access and `/docker/chummercomplete/chummer6-media-factory` provisioning.
 - id: WL-D008
   milestone: F3
   status: blocked
@@ -298,7 +298,7 @@ executable_queue:
   milestone: F3
   status: blocked
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_UNBLOCK_BACKLOG.md
-  notes: Blocked until `/docker/chummercomplete/chummer-media-factory` is provisioned in local workspace.
+  notes: Blocked until `/docker/chummercomplete/chummer6-media-factory` is provisioned in local workspace.
 - id: WL-D011
   milestone: F3
   status: blocked

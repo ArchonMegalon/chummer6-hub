@@ -121,7 +121,7 @@ Examples:
 
 ## Done criteria for “lead designer” status
 
-`chummer-design` is functioning as lead designer only when:
+`chummer6-design` is functioning as lead designer only when:
 
 * every active repo is represented centrally
 * central canon is deeper than repo-local mirrors

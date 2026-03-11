@@ -4,7 +4,7 @@
 
 ### Rule 1 — Central design wins
 
-Cross-repo product truth lives in `chummer-design`.
+Cross-repo product truth lives in `chummer6-design`.
 Code repos receive mirrored local context; they do not become the canonical source of cross-repo architecture.
 
 ### Rule 2 — Shared DTOs are package-owned
@@ -20,7 +20,7 @@ No source-copy mirrors of cross-repo DTOs are allowed.
 
 ### Rule 3 — Engine semantics live in core
 
-`chummer-core-engine` owns:
+`chummer6-core` owns:
 
 * rules math
 * reducer truth
@@ -33,7 +33,7 @@ No other repo may compute or redefine canonical mechanics.
 
 ### Rule 4 — Hosted orchestration lives in run-services
 
-`chummer.run-services` owns:
+`chummer6-hub` owns:
 
 * identity
 * relay
@@ -48,24 +48,24 @@ It must not own duplicate mechanics, registry persistence after split, or media 
 
 ### Rule 5 — Workbench and play stay separate
 
-`chummer-presentation` owns builder/workbench/admin/browser/desktop UX.
-`chummer-play` owns live-session/mobile/PWA/player/GM shell UX.
+`chummer6-ui` owns builder/workbench/admin/browser/desktop UX.
+`chummer6-mobile` owns live-session/mobile/PWA/player/GM shell UX.
 
 No silent re-merging of those surfaces is allowed.
 
 ### Rule 6 — UI-kit is the only shared UI boundary
 
-Shared visual tokens, shell primitives, and reusable components belong in `chummer-ui-kit`.
+Shared visual tokens, shell primitives, and reusable components belong in `chummer6-ui-kit`.
 Presentation and play consume the package.
 They do not fork it.
 
 ### Rule 7 — Registry is a service boundary
 
-Artifact catalog, publication workflow, moderation state, installs, reviews, and compatibility metadata belong in `chummer-hub-registry`.
+Artifact catalog, publication workflow, moderation state, installs, reviews, and compatibility metadata belong in `chummer6-hub-registry`.
 
 ### Rule 8 — Media execution is a service boundary
 
-Render jobs, manifests, previews, asset lifecycle, and provider adapters belong in `chummer-media-factory`.
+Render jobs, manifests, previews, asset lifecycle, and provider adapters belong in `chummer6-media-factory`.
 
 ### Rule 9 — Legacy is reference-only
 
@@ -74,30 +74,30 @@ Render jobs, manifests, previews, asset lifecycle, and provider adapters belong 
 ## Repo graph
 
 ```text
-chummer-design
+chummer6-design
   ├─ governs every Chummer repo
   └─ mirrors local guidance into code repos
 
-chummer-core-engine
+chummer6-core
   ├─ publishes Chummer.Engine.Contracts
   ├─ computes mechanics truth
   └─ emits runtime/explain/reducer semantics
 
-chummer-ui-kit
+chummer6-ui-kit
   └─ publishes Chummer.Ui.Kit
 
-chummer-presentation
+chummer6-ui
   ├─ consumes Chummer.Engine.Contracts
   ├─ consumes Chummer.Ui.Kit
   └─ consumes hosted projections from run-services / registry
 
-chummer-play
+chummer6-mobile
   ├─ consumes Chummer.Engine.Contracts
   ├─ consumes Chummer.Play.Contracts
   ├─ consumes Chummer.Ui.Kit
   └─ consumes hosted play projections from run-services
 
-chummer.run-services
+chummer6-hub
   ├─ publishes Chummer.Play.Contracts
   ├─ publishes Chummer.Run.Contracts
   ├─ consumes Chummer.Engine.Contracts
@@ -105,10 +105,10 @@ chummer.run-services
   ├─ consumes Chummer.Media.Contracts
   └─ orchestrates hosted workflows
 
-chummer-hub-registry
+chummer6-hub-registry
   └─ publishes Chummer.Hub.Registry.Contracts
 
-chummer-media-factory
+chummer6-media-factory
   └─ publishes Chummer.Media.Contracts
 ```
 
@@ -144,7 +144,7 @@ chummer-media-factory
 
 ## New repo split gate
 
-A new repo split is not architecturally accepted until all of the following exist in `chummer-design`:
+A new repo split is not architecturally accepted until all of the following exist in `chummer6-design`:
 
 * ownership row in `OWNERSHIP_MATRIX.md`
 * active-repo entry in `products/chummer/README.md`
@@ -188,13 +188,13 @@ This plane exists to integrate owned third-party capabilities without allowing a
    * memory/canon truth
 4. No client repo may access third-party tools directly.
 5. All external-provider-assisted outputs that re-enter Chummer must carry Chummer-side provenance and receipts.
-6. `chummer.run-services` owns orchestration-side integrations.
-7. `chummer-media-factory` owns render/archive integrations.
-8. `chummer-design` owns external-tools policy and rollout governance.
+6. `chummer6-hub` owns orchestration-side integrations.
+7. `chummer6-media-factory` owns render/archive integrations.
+8. `chummer6-design` owns external-tools policy and rollout governance.
 
 ### External tools plane by repo
 
-* `chummer.run-services`
+* `chummer6-hub`
 
   * reasoning providers
   * approval bridges
@@ -203,7 +203,7 @@ This plane exists to integrate owned third-party capabilities without allowing a
   * automation bridges
   * research/eval tooling
 
-* `chummer-media-factory`
+* `chummer6-media-factory`
 
   * document render adapters
   * preview/thumbnail adapters
@@ -211,7 +211,7 @@ This plane exists to integrate owned third-party capabilities without allowing a
   * route visualization adapters
   * cold-archive adapters
 
-* `chummer-hub-registry`
+* `chummer6-hub-registry`
 
   * references to promoted reusable template/style/help/preview artifacts only
 

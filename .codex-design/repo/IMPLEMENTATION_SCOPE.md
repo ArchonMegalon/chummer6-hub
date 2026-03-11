@@ -2,7 +2,7 @@
 
 ## Mission
 
-`chummer.run-services` owns hosted orchestration: identity, session relay, Spider, Coach, approvals, play API aggregation, delivery, memory, and service-to-service policy.
+`chummer6-hub` owns hosted orchestration: identity, session relay, Spider, Coach, approvals, play API aggregation, delivery, memory, and service-to-service policy.
 
 ## Owns
 
@@ -17,8 +17,8 @@
 
 ## Must not own long-term
 
-* registry persistence internals after `chummer-hub-registry`
-* media render internals after `chummer-media-factory`
+* registry persistence internals after `chummer6-hub-registry`
+* media render internals after `chummer6-media-factory`
 * duplicate engine event semantics
 * canonical rules math
 
@@ -27,8 +27,8 @@
 * publish and stabilize `Chummer.Play.Contracts`
 * keep `Chummer.Run.Contracts` focused on orchestration concerns
 * dedupe any semantic session DTO overlap with engine canon
-* route registry work through `chummer-hub-registry`
-* route render/media execution through `chummer-media-factory`
+* route registry work through `chummer6-hub-registry`
+* route render/media execution through `chummer6-media-factory`
 * shrink root-level legacy clutter and stale README architecture claims
 
 ## Milestone spine
@@ -52,7 +52,7 @@ If it is about canonical mechanics, registry persistence, or render execution, i
 
 ## External integrations scope
 
-`chummer.run-services` is the orchestration owner for all non-render external-tool integrations.
+`chummer6-hub` is the orchestration owner for all non-render external-tool integrations.
 
 ### Owns
 

@@ -3,80 +3,80 @@ last_reviewed: 2026-03-10
 
 packages:
   - id: Chummer.Engine.Contracts
-    owner_repo: chummer-core-engine
+    owner_repo: chummer6-core
     purpose: Deterministic engine/runtime/explain/reducer DTOs.
     status: in_progress
     consumers:
-      - chummer-presentation
-      - chummer-play
-      - chummer.run-services
+      - chummer6-ui
+      - chummer6-mobile
+      - chummer6-hub
     forbidden_source_copies:
-      - chummer-presentation
-      - chummer-play
-      - chummer.run-services
+      - chummer6-ui
+      - chummer6-mobile
+      - chummer6-hub
 
   - id: Chummer.Play.Contracts
-    owner_repo: chummer.run-services
+    owner_repo: chummer6-hub
     purpose: Play/mobile/service seam for hosted play APIs and play-safe projections.
     status: in_progress
     consumers:
-      - chummer-play
-      - chummer-presentation
+      - chummer6-mobile
+      - chummer6-ui
     forbidden_source_copies:
-      - chummer-play
-      - chummer-presentation
+      - chummer6-mobile
+      - chummer6-ui
 
   - id: Chummer.Run.Contracts
-    owner_repo: chummer.run-services
+    owner_repo: chummer6-hub
     purpose: Hosted orchestration contracts for identity, approvals, memory, delivery, and service policy.
     status: in_progress
     consumers:
-      - chummer-presentation
+      - chummer6-ui
       - internal service clients
     forbidden_source_copies:
-      - chummer-presentation
-      - chummer-play
-      - chummer-core-engine
+      - chummer6-ui
+      - chummer6-mobile
+      - chummer6-core
 
   - id: Chummer.Ui.Kit
-    owner_repo: chummer-ui-kit
+    owner_repo: chummer6-ui-kit
     purpose: Shared design tokens, themes, primitives, shell chrome, and reusable Chummer UI patterns.
     status: bootstrap
     consumers:
-      - chummer-presentation
-      - chummer-play
+      - chummer6-ui
+      - chummer6-mobile
     forbidden_source_copies:
-      - chummer-presentation
-      - chummer-play
+      - chummer6-ui
+      - chummer6-mobile
 
   - id: Chummer.Hub.Registry.Contracts
-    owner_repo: chummer-hub-registry
+    owner_repo: chummer6-hub-registry
     purpose: Immutable registry/publication/install/compatibility contracts.
     status: bootstrap
     consumers:
-      - chummer.run-services
-      - chummer-presentation
+      - chummer6-hub
+      - chummer6-ui
     forbidden_source_copies:
-      - chummer.run-services
-      - chummer-presentation
+      - chummer6-hub
+      - chummer6-ui
 
   - id: Chummer.Media.Contracts
-    owner_repo: chummer-media-factory
+    owner_repo: chummer6-media-factory
     purpose: Media execution contracts for render jobs, manifests, previews, asset lifecycle, and media receipts.
     status: bootstrap
     consumers:
-      - chummer.run-services
-      - chummer-presentation
-      - chummer-play
+      - chummer6-hub
+      - chummer6-ui
+      - chummer6-mobile
     forbidden_source_copies:
-      - chummer.run-services
-      - chummer-presentation
-      - chummer-play
+      - chummer6-hub
+      - chummer6-ui
+      - chummer6-mobile
 
 contract_sets:
   - id: runtime_dtos_vnext
     canonical_package: Chummer.Engine.Contracts
-    semantic_owner: chummer-core-engine
+    semantic_owner: chummer6-core
     status: open
     includes:
       - runtime fingerprints
@@ -86,7 +86,7 @@ contract_sets:
 
   - id: explain_trace_vnext
     canonical_package: Chummer.Engine.Contracts
-    semantic_owner: chummer-core-engine
+    semantic_owner: chummer6-core
     status: open
     includes:
       - explain traces
@@ -96,7 +96,7 @@ contract_sets:
 
   - id: session_events_vnext
     canonical_package: Chummer.Engine.Contracts
-    semantic_owner: chummer-core-engine
+    semantic_owner: chummer6-core
     consumer_wrappers:
       - Chummer.Play.Contracts
       - Chummer.Run.Contracts
@@ -110,7 +110,7 @@ contract_sets:
 
   - id: play_api_vnext
     canonical_package: Chummer.Play.Contracts
-    semantic_owner: chummer.run-services
+    semantic_owner: chummer6-hub
     status: open
     includes:
       - play bootstrap
@@ -120,7 +120,7 @@ contract_sets:
 
   - id: run_orchestration_vnext
     canonical_package: Chummer.Run.Contracts
-    semantic_owner: chummer.run-services
+    semantic_owner: chummer6-hub
     status: open
     includes:
       - approvals
@@ -131,7 +131,7 @@ contract_sets:
 
   - id: ui_system_vnext
     canonical_package: Chummer.Ui.Kit
-    semantic_owner: chummer-ui-kit
+    semantic_owner: chummer6-ui-kit
     status: open
     includes:
       - design tokens
@@ -141,7 +141,7 @@ contract_sets:
 
   - id: hub_registry_vnext
     canonical_package: Chummer.Hub.Registry.Contracts
-    semantic_owner: chummer-hub-registry
+    semantic_owner: chummer6-hub-registry
     status: open
     includes:
       - artifact metadata
@@ -151,7 +151,7 @@ contract_sets:
 
   - id: media_execution_vnext
     canonical_package: Chummer.Media.Contracts
-    semantic_owner: chummer-media-factory
+    semantic_owner: chummer6-media-factory
     status: open
     includes:
       - media jobs
@@ -162,6 +162,6 @@ contract_sets:
 
 compatibility_rules:
   - Contract packages must version independently.
-  - Breaking changes require milestone and blocker updates in chummer-design.
+  - Breaking changes require milestone and blocker updates in chummer6-design.
   - No repo may source-copy a canonical contract family owned elsewhere.
   - Repo-local mirrors must refer to canonical package ids, not legacy aliases.

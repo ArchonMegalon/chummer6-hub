@@ -6,7 +6,7 @@ This roadmap carries the program all the way to finished-state vision, not just 
 
 ### A0 — Design repo bootstrap complete
 
-`chummer-design` becomes trustworthy: full canon, full sync coverage, real milestones, real blockers, real ownership matrix.
+`chummer6-design` becomes trustworthy: full canon, full sync coverage, real milestones, real blockers, real ownership matrix.
 
 ### A1 — Engine contract canon
 
@@ -24,29 +24,29 @@ This roadmap carries the program all the way to finished-state vision, not just 
 
 ### B0 — Play split real
 
-`chummer-play` moves beyond scaffold to real offline ledger, real sync client, and real player/GM shells.
+`chummer6-mobile` moves beyond scaffold to real offline ledger, real sync client, and real player/GM shells.
 
 ### B1 — UI kit real
 
-`chummer-ui-kit` becomes the actual shared design system package used by presentation and play.
+`chummer6-ui-kit` becomes the actual shared design system package used by presentation and play.
 
 ### B2 — Presentation purified
 
-`chummer-presentation` becomes workbench/browser/desktop only, with no play-shell confusion.
+`chummer6-ui` becomes workbench/browser/desktop only, with no play-shell confusion.
 
 ## Phase C — Service extraction
 
 ### C0 — Registry extraction
 
-`chummer-hub-registry` takes ownership of catalog, publication, moderation, installs, reviews, and compatibility metadata.
+`chummer6-hub-registry` takes ownership of catalog, publication, moderation, installs, reviews, and compatibility metadata.
 
 ### C1 — Media extraction
 
-`chummer-media-factory` takes ownership of render jobs, manifests, previews, and asset lifecycle.
+`chummer6-media-factory` takes ownership of render jobs, manifests, previews, and asset lifecycle.
 
 ### C2 — Run-services shrink
 
-`chummer.run-services` becomes a clean orchestration service rather than a hidden super-repo.
+`chummer6-hub` becomes a clean orchestration service rather than a hidden super-repo.
 
 ## Phase D — Truth and session canon
 
@@ -104,34 +104,34 @@ The product vision is complete enough for release: split finished, boundaries cl
 
 ## Repo milestone spine
 
-### `chummer-design`
+### `chummer6-design`
 
 D0 bootstrap -> D1 contract registry -> D2 blocker publication -> D3 mirror discipline -> D4 release governance -> D5 ADR/memory -> D6 finished lead designer.
 
-### `chummer-core-engine`
+### `chummer6-core`
 
 E0 purification -> E1 runtime DTO canon -> E2 explain canon -> E3 session reducer canon -> E4 ruleset ABI -> E5 explain backend completion -> E6 Build Lab backend -> E7 migration certification -> E8 hardening -> E9 finished engine.
 
-### `chummer-presentation`
+### `chummer6-ui`
 
 P0 ownership correction -> P1 package-only UI consumption -> P2 workbench shell -> P3 explain UX -> P4 Build Lab UX -> P5 registry/admin/publish UX -> P6 platform parity -> P7 accessibility/perf -> P8 finished workbench.
 
-### `chummer-play`
+### `chummer6-mobile`
 
 L0 package canon -> L1 offline ledger/sync -> L2 player shell -> L3 GM shell -> L4 relay/runtime convergence -> L5 Coach/Spider surfaces -> L6 mobile/PWA polish -> L7 observer/cross-device -> L8 hardening -> L9 finished play shell.
 
-### `chummer-ui-kit`
+### `chummer6-ui-kit`
 
 U0 governance -> U1 token canon -> U2 primitives -> U3 shell chrome -> U4 dense data controls -> U5 Chummer-specific patterns -> U6 accessibility/localization -> U7 visual regression/catalog -> U8 release discipline -> U9 finished design system.
 
-### `chummer-hub-registry`
+### `chummer6-hub-registry`
 
 H0 contract canon -> H1 artifact domain -> H2 publication drafts -> H3 install/compatibility engine -> H4 search/discovery/reviews -> H5 template/style publication -> H6 federation/org channels -> H7 hardening -> H8 finished registry.
 
-### `chummer-media-factory`
+### `chummer6-media-factory`
 
 M0 contract canon -> M1 asset/job kernel -> M2 document rendering -> M3 portrait forge -> M4 bounded video -> M5 template/style integration -> M6 run-services cutover -> M7 storage/DR/scale -> M8 finished media plant.
 
-### `chummer.run-services`
+### `chummer6-hub`
 
 R0 shrink-to-boundary reset -> R1 package canon -> R2 identity/campaign core -> R3 play APIs/relay -> R4 skill runtime -> R5 Spider/Director/memory -> R6 orchestration-only registry/media mode -> R7 notifications/docs/delivery -> R8 resilience/compliance -> R9 finished hosted orchestration.
