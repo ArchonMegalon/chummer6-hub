@@ -1,5 +1,5 @@
 group_id: chummer-vnext
-last_reviewed: 2026-03-10
+last_reviewed: 2026-03-13
 
 packages:
   - id: Chummer.Engine.Contracts

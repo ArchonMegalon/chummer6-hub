@@ -1,5 +1,5 @@
 product: chummer
-last_reviewed: 2026-03-11
+last_reviewed: 2026-03-13
 release_track: vnext-foundation
 program_phases:
 - id: A
@@ -281,14 +281,14 @@ current_release_blockers:
 executable_queue:
 - id: WL-D007
   milestone: F3
-  status: blocked
+  status: done
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
-  notes: Blocked on sibling-repo `.codex-design/review` write access and `/docker/chummercomplete/chummer6-media-factory` provisioning.
+  notes: Completed on 2026-03-11T23:31:00Z with review-context mirrors republished into core, ui, hub, mobile, ui-kit, hub-registry, and media-factory.
 - id: WL-D008
   milestone: F3
   status: blocked
   backlog: products/chummer/sync/LOCAL_MIRROR_PUBLISH_BACKLOG.md
-  notes: Blocked on sibling-repo `.codex-design` write access and run-services mirror drift until unblock scope completes.
+  notes: Initial publish completed on 2026-03-12T01:10:38Z, but WL-D009 freshness recheck at 2026-03-12T01:16:25Z found unresolved `PROGRAM_MILESTONES.yaml` drift in all seven mirrors; queue remains blocked until parity republish + checksum re-verification.
 - id: WL-D009
   milestone: F3
   status: in_progress
@@ -296,11 +296,11 @@ executable_queue:
   notes: Recurring split-wave truth-maintenance cycle with dated change/no-change evidence in maintenance log.
 - id: WL-D010
   milestone: F3
-  status: blocked
+  status: done
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_UNBLOCK_BACKLOG.md
-  notes: Blocked until `/docker/chummercomplete/chummer6-media-factory` is provisioned in local workspace.
+  notes: Completed on 2026-03-11T23:31:00Z after provisioning and successful media-factory review-context mirror publish.
 - id: WL-D011
   milestone: F3
-  status: blocked
+  status: done
   backlog: products/chummer/sync/REVIEW_TEMPLATE_ACCESS_UNBLOCK_BACKLOG.md
-  notes: Blocked until sandbox access allows sibling-repo `.codex-design/review` writes.
+  notes: Completed on 2026-03-11T23:31:00Z with sibling-repo review-context mirror republish and parity verification.

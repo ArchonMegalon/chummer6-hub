@@ -1,6 +1,6 @@
 # Group blockers
 
-Last reviewed: 2026-03-10
+Last reviewed: 2026-03-13
 
 ## RED blockers
 
@@ -80,6 +80,24 @@ Owners:
 
 * chummer6-core
 * chummer6-hub
+
+### BLK-007 — local mirror milestone parity drift
+
+`PROGRAM_MILESTONES.yaml` changed in canonical design after WL-D008 mirror publication, so `.codex-design/product/PROGRAM_MILESTONES.yaml` in all seven code repos now drifts (`source=fc55da...`, mirrored targets still `71a806...`).
+
+Why this matters:
+Workers and GitHub review in code repos can consume stale milestone truth even when central canon is current.
+
+Owners:
+
+* chummer6-design
+* chummer6-core
+* chummer6-ui
+* chummer6-hub
+* chummer6-mobile
+* chummer6-ui-kit
+* chummer6-hub-registry
+* chummer6-media-factory
 
 ## GREEN candidates once current blockers clear
 
