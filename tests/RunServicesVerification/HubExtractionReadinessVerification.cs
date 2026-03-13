@@ -275,7 +275,7 @@ internal static class HubExtractionReadinessVerification
         AssertExecutableQueueItem(
             milestoneText,
             "WL-D007",
-            "status: blocked",
+            "status: done",
             "backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md");
         AssertExecutableQueueItem(
             milestoneText,
@@ -290,12 +290,12 @@ internal static class HubExtractionReadinessVerification
         AssertExecutableQueueItem(
             milestoneText,
             "WL-D010",
-            "status: blocked",
+            "status: done",
             "backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_UNBLOCK_BACKLOG.md");
         AssertExecutableQueueItem(
             milestoneText,
             "WL-D011",
-            "status: blocked",
+            "status: done",
             "backlog: products/chummer/sync/REVIEW_TEMPLATE_ACCESS_UNBLOCK_BACKLOG.md");
     }
 
