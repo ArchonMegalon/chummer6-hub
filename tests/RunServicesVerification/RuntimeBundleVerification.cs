@@ -36,8 +36,8 @@ internal static class RuntimeBundleVerification
         VerificationAssert.Equal("sr6", sessionIssued.Artifact.RulesetId, "Runtime-bundle issuance should preserve caller-supplied ruleset metadata.");
         VerificationAssert.Equal(ArtifactVisibilityModes.CampaignShared, sessionIssued.Artifact.Visibility, "Runtime-bundle issuance should preserve caller-supplied visibility.");
         VerificationAssert.Equal(ArtifactTrustTiers.Official, sessionIssued.Artifact.TrustTier, "Runtime-bundle issuance should preserve caller-supplied trust tier.");
-        VerificationAssert.Equal("publisher.runtime", sessionIssued.Artifact.PublisherId, "Runtime-bundle issuance should preserve caller-supplied publisher metadata.");
-        VerificationAssert.Equal("Session bundle for the Redmond scene.", sessionIssued.Artifact.Description, "Runtime-bundle issuance should preserve caller-supplied descriptions.");
+        VerificationAssert.True(string.Equals("publisher.runtime", sessionIssued.Artifact.PublisherId, StringComparison.Ordinal), "Runtime-bundle issuance should preserve caller-supplied publisher metadata.");
+        VerificationAssert.True(string.Equals("Session bundle for the Redmond scene.", sessionIssued.Artifact.Description, StringComparison.Ordinal), "Runtime-bundle issuance should preserve caller-supplied descriptions.");
         VerificationAssert.Equal(RuntimeBundleHeadKind.Session, sessionIssued.Projection.Head, "Runtime-bundle projections should preserve the head kind.");
         VerificationAssert.Equal(sessionIssued.Artifact.Id, sessionIssued.Head.CurrentArtifactId, "Head projections should point at the issued artifact.");
 
