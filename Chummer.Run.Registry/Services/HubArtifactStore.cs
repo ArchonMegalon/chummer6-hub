@@ -1,6 +1,26 @@
 using Chummer.Run.Contracts.Registry;
 using Chummer.Run.Contracts.Observability;
 using System.Collections.Concurrent;
+using HubArtifactCreateRequest = Chummer.Hub.Registry.Contracts.HubArtifactCreateRequest;
+using HubArtifactDeleteAttemptResponse = Chummer.Hub.Registry.Contracts.HubArtifactDeleteAttemptResponse;
+using HubArtifactIdentifier = Chummer.Hub.Registry.Contracts.HubArtifactIdentifier;
+using HubArtifactInstallProjection = Chummer.Hub.Registry.Contracts.HubArtifactInstallProjection;
+using HubArtifactKind = Chummer.Hub.Registry.Contracts.HubArtifactKind;
+using HubArtifactMetadata = Chummer.Hub.Registry.Contracts.HubArtifactMetadata;
+using HubArtifactState = Chummer.Hub.Registry.Contracts.HubArtifactState;
+using HubArtifactStateChangeRequest = Chummer.Hub.Registry.Contracts.HubArtifactStateChangeRequest;
+using HubArtifactStateResponse = Chummer.Hub.Registry.Contracts.HubArtifactStateResponse;
+using HubInstallEvent = Chummer.Hub.Registry.Contracts.HubInstallEvent;
+using ArtifactInstallState = Chummer.Hub.Registry.Contracts.ArtifactInstallState;
+using ArtifactInstallStates = Chummer.Hub.Registry.Contracts.ArtifactInstallStates;
+using ArtifactTrustTiers = Chummer.Hub.Registry.Contracts.ArtifactTrustTiers;
+using ArtifactVisibilityModes = Chummer.Hub.Registry.Contracts.ArtifactVisibilityModes;
+using RuntimeBundleArtifactProjection = Chummer.Hub.Registry.Contracts.RuntimeBundleArtifactProjection;
+using RuntimeBundleHeadKind = Chummer.Hub.Registry.Contracts.RuntimeBundleHeadKind;
+using RuntimeBundleHeadListResponse = Chummer.Hub.Registry.Contracts.RuntimeBundleHeadListResponse;
+using RuntimeBundleHeadProjection = Chummer.Hub.Registry.Contracts.RuntimeBundleHeadProjection;
+using RuntimeBundleIssueRequest = Chummer.Hub.Registry.Contracts.RuntimeBundleIssueRequest;
+using RuntimeBundleIssueResponse = Chummer.Hub.Registry.Contracts.RuntimeBundleIssueResponse;
 
 namespace Chummer.Run.Registry.Services;
 
@@ -36,9 +56,14 @@ public sealed class HubArtifactStore : IHubArtifactStore
         public required string Name { get; set; }
         public required HubArtifactKind Kind { get; set; }
         public required string Version { get; set; }
+        public required string RulesetId { get; set; }
+        public required string Visibility { get; set; }
+        public required string TrustTier { get; set; }
         public HubArtifactState State { get; set; }
         public string? Owner { get; set; }
+        public string? PublisherId { get; set; }
         public string? Summary { get; set; }
+        public string? Description { get; set; }
         public string? RuntimeFingerprint { get; set; }
         public string? StateReason { get; set; }
         public string? SupersededByArtifactId { get; set; }
@@ -109,8 +134,13 @@ public sealed class HubArtifactStore : IHubArtifactStore
             request.Name,
             request.Kind,
             request.Version,
-            request.Owner,
+            request.RulesetId,
+            request.Visibility,
+            request.TrustTier,
+            request.OwnerId,
+            request.PublisherId,
             request.Summary,
+            request.Description,
             request.RuntimeFingerprint,
             request.StateReason);
         _artifacts[metadata.Id] = metadata;
@@ -165,8 +195,13 @@ public sealed class HubArtifactStore : IHubArtifactStore
                 name,
                 HubArtifactKind.RuntimeBundle,
                 version,
-                request.Owner,
+                request.RulesetId,
+                request.Visibility,
+                request.TrustTier,
+                request.OwnerId,
+                request.PublisherId,
                 summary,
+                request.Description,
                 projectionFingerprint,
                 stateReason: null);
             _artifacts[artifact.Id] = artifact;
@@ -308,6 +343,7 @@ public sealed class HubArtifactStore : IHubArtifactStore
                 Id: id,
                 Kind: HubArtifactKind.RulePack,
                 Version: "0.0.0",
+                RulesetId: "sr5",
                 State: HubArtifactState.Active,
                 StateReason: $"Artifact '{id}' was not found.",
                 SupersededByArtifactId: null,
@@ -322,6 +358,7 @@ public sealed class HubArtifactStore : IHubArtifactStore
                     Id: entry.Id,
                     Kind: entry.Kind,
                     Version: entry.Version,
+                    RulesetId: entry.RulesetId,
                     State: entry.State,
                     StateReason: $"Transition from {entry.State} to {request.TargetState} is not allowed.",
                     SupersededByArtifactId: entry.SupersededByArtifactId,
@@ -334,6 +371,7 @@ public sealed class HubArtifactStore : IHubArtifactStore
                     Id: entry.Id,
                     Kind: entry.Kind,
                     Version: entry.Version,
+                    RulesetId: entry.RulesetId,
                     State: entry.State,
                     StateReason: "Superseded state requires a replacement artifact id.",
                     SupersededByArtifactId: entry.SupersededByArtifactId,
@@ -353,6 +391,7 @@ public sealed class HubArtifactStore : IHubArtifactStore
             Id: entry.Id,
             Kind: entry.Kind,
             Version: entry.Version,
+            RulesetId: entry.RulesetId,
             State: entry.State,
             StateReason: entry.StateReason,
             SupersededByArtifactId: entry.SupersededByArtifactId,
@@ -396,6 +435,9 @@ public sealed class HubArtifactStore : IHubArtifactStore
                 Name = "Unknown",
                 Kind = HubArtifactKind.RulePack,
                 Version = "0.0.0",
+                RulesetId = "sr5",
+                Visibility = ArtifactVisibilityModes.Shared,
+                TrustTier = ArtifactTrustTiers.Curated,
                 State = HubArtifactState.Active,
                 CreatedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
@@ -554,7 +596,7 @@ public sealed class HubArtifactStore : IHubArtifactStore
             _runtimeBundleHeads.Clear();
             foreach (var snapshot in backup.RuntimeBundleHeads)
             {
-                var key = ComposeRuntimeBundleHeadKey(snapshot.BundleFamilyId, snapshot.Head);
+                var key = ComposeRuntimeBundleHeadKey(snapshot.BundleFamilyId, ToLiveRuntimeBundleHeadKind(snapshot.Head));
                 _runtimeBundleHeads[key] = FromBackupRuntimeBundleHead(snapshot);
             }
 
@@ -625,6 +667,24 @@ public sealed class HubArtifactStore : IHubArtifactStore
     private static string ComposeRuntimeBundleArtifactVersion(string sourceBundleVersion, RuntimeBundleHeadKind head) =>
         $"{sourceBundleVersion}-{head.ToString().ToLowerInvariant()}";
 
+    private static Chummer.Run.Contracts.Registry.HubArtifactKind ToLegacyHubArtifactKind(HubArtifactKind value) =>
+        Enum.Parse<Chummer.Run.Contracts.Registry.HubArtifactKind>(value.ToString());
+
+    private static HubArtifactKind ToLiveHubArtifactKind(Chummer.Run.Contracts.Registry.HubArtifactKind value) =>
+        Enum.Parse<HubArtifactKind>(value.ToString());
+
+    private static Chummer.Run.Contracts.Registry.HubArtifactState ToLegacyHubArtifactState(HubArtifactState value) =>
+        Enum.Parse<Chummer.Run.Contracts.Registry.HubArtifactState>(value.ToString());
+
+    private static HubArtifactState ToLiveHubArtifactState(Chummer.Run.Contracts.Registry.HubArtifactState value) =>
+        Enum.Parse<HubArtifactState>(value.ToString());
+
+    private static Chummer.Run.Contracts.Registry.RuntimeBundleHeadKind ToLegacyRuntimeBundleHeadKind(RuntimeBundleHeadKind value) =>
+        Enum.Parse<Chummer.Run.Contracts.Registry.RuntimeBundleHeadKind>(value.ToString());
+
+    private static RuntimeBundleHeadKind ToLiveRuntimeBundleHeadKind(Chummer.Run.Contracts.Registry.RuntimeBundleHeadKind value) =>
+        Enum.Parse<RuntimeBundleHeadKind>(value.ToString());
+
     private static bool AcceptingNewInstalls(HubArtifactInternal artifact) =>
         artifact.State == HubArtifactState.Active;
 
@@ -661,9 +721,14 @@ public sealed class HubArtifactStore : IHubArtifactStore
             Name: internalState.Name,
             Kind: internalState.Kind,
             Version: internalState.Version,
+            RulesetId: internalState.RulesetId,
             State: internalState.State,
-            Owner: internalState.Owner,
+            Visibility: internalState.Visibility,
+            TrustTier: internalState.TrustTier,
+            OwnerId: internalState.Owner,
+            PublisherId: internalState.PublisherId,
             Summary: internalState.Summary,
+            Description: internalState.Description,
             RuntimeFingerprint: internalState.RuntimeFingerprint,
             StateReason: internalState.StateReason,
             SupersededByArtifactId: internalState.SupersededByArtifactId,
@@ -681,11 +746,16 @@ public sealed class HubArtifactStore : IHubArtifactStore
         new(
             Id: internalState.Id,
             Name: internalState.Name,
-            Kind: internalState.Kind,
+            Kind: ToLegacyHubArtifactKind(internalState.Kind),
             Version: internalState.Version,
-            State: internalState.State,
+            RulesetId: internalState.RulesetId,
+            Visibility: internalState.Visibility,
+            TrustTier: internalState.TrustTier,
+            State: ToLegacyHubArtifactState(internalState.State),
             Owner: internalState.Owner,
+            PublisherId: internalState.PublisherId,
             Summary: internalState.Summary,
+            Description: internalState.Description,
             RuntimeFingerprint: internalState.RuntimeFingerprint,
             StateReason: internalState.StateReason,
             SupersededByArtifactId: internalState.SupersededByArtifactId,
@@ -703,7 +773,7 @@ public sealed class HubArtifactStore : IHubArtifactStore
             BundleFamilyId: internalState.BundleFamilyId,
             SessionId: internalState.SessionId,
             SceneId: internalState.SceneId,
-            Head: internalState.Head,
+            Head: ToLegacyRuntimeBundleHeadKind(internalState.Head),
             SourceBundleVersion: internalState.SourceBundleVersion,
             ProjectionFingerprint: internalState.ProjectionFingerprint,
             ProjectionVersion: internalState.ProjectionVersion,
@@ -722,7 +792,7 @@ public sealed class HubArtifactStore : IHubArtifactStore
             BundleFamilyId: internalState.BundleFamilyId,
             SessionId: internalState.SessionId,
             SceneId: internalState.SceneId,
-            Head: internalState.Head,
+            Head: ToLegacyRuntimeBundleHeadKind(internalState.Head),
             CurrentArtifactId: internalState.CurrentArtifactId,
             CurrentVersion: internalState.CurrentVersion,
             SourceBundleVersion: internalState.SourceBundleVersion,
@@ -741,11 +811,16 @@ public sealed class HubArtifactStore : IHubArtifactStore
         {
             Id = snapshot.Id,
             Name = snapshot.Name,
-            Kind = snapshot.Kind,
+            Kind = ToLiveHubArtifactKind(snapshot.Kind),
             Version = snapshot.Version,
-            State = snapshot.State,
+            RulesetId = snapshot.RulesetId,
+            Visibility = snapshot.Visibility,
+            TrustTier = snapshot.TrustTier,
+            State = ToLiveHubArtifactState(snapshot.State),
             Owner = snapshot.Owner,
+            PublisherId = snapshot.PublisherId,
             Summary = snapshot.Summary,
+            Description = snapshot.Description,
             RuntimeFingerprint = snapshot.RuntimeFingerprint,
             StateReason = snapshot.StateReason,
             SupersededByArtifactId = snapshot.SupersededByArtifactId,
@@ -767,7 +842,7 @@ public sealed class HubArtifactStore : IHubArtifactStore
             BundleFamilyId = snapshot.BundleFamilyId,
             SessionId = snapshot.SessionId,
             SceneId = snapshot.SceneId,
-            Head = snapshot.Head,
+            Head = ToLiveRuntimeBundleHeadKind(snapshot.Head),
             SourceBundleVersion = snapshot.SourceBundleVersion,
             ProjectionFingerprint = snapshot.ProjectionFingerprint,
             ProjectionVersion = snapshot.ProjectionVersion,
@@ -788,7 +863,7 @@ public sealed class HubArtifactStore : IHubArtifactStore
             BundleFamilyId = snapshot.BundleFamilyId,
             SessionId = snapshot.SessionId,
             SceneId = snapshot.SceneId,
-            Head = snapshot.Head,
+            Head = ToLiveRuntimeBundleHeadKind(snapshot.Head),
             CurrentArtifactId = snapshot.CurrentArtifactId,
             CurrentVersion = snapshot.CurrentVersion,
             SourceBundleVersion = snapshot.SourceBundleVersion,
@@ -864,6 +939,7 @@ public sealed class HubArtifactStore : IHubArtifactStore
             ArtifactId: internalState.Id,
             Kind: internalState.Kind,
             Version: internalState.Version,
+            RulesetId: internalState.RulesetId,
             State: internalState.State,
             SupersededByArtifactId: internalState.SupersededByArtifactId,
             ImmutableRetentionRequired: true,
@@ -872,14 +948,23 @@ public sealed class HubArtifactStore : IHubArtifactStore
             ActiveRuntimeRefCount: internalState.ActiveRuntimeRefCount,
             HasInstallReferences: internalState.InstallCount > 0,
             HasRuntimeReferences: internalState.ActiveRuntimeRefCount > 0,
-            LastInstalledAtUtc: internalState.LastInstalledAtUtc);
+            LastInstalledAtUtc: internalState.LastInstalledAtUtc,
+            Install: new ArtifactInstallState(
+                State: internalState.InstallCount > 0 ? ArtifactInstallStates.Installed : ArtifactInstallStates.Available,
+                InstalledAtUtc: internalState.InstallCount > 0 ? internalState.LastInstalledAtUtc : null,
+                RuntimeFingerprint: internalState.RuntimeFingerprint));
 
     private static HubArtifactInternal CreateArtifact(
         string name,
         HubArtifactKind kind,
         string version,
+        string rulesetId,
+        string visibility,
+        string trustTier,
         string? owner,
+        string? publisherId,
         string? summary,
+        string? description,
         string? runtimeFingerprint,
         string? stateReason)
     {
@@ -892,9 +977,14 @@ public sealed class HubArtifactStore : IHubArtifactStore
             Name = name,
             Kind = kind,
             Version = version,
+            RulesetId = rulesetId,
+            Visibility = visibility,
+            TrustTier = trustTier,
             State = HubArtifactState.Active,
             Owner = owner,
+            PublisherId = publisherId,
             Summary = summary,
+            Description = description,
             RuntimeFingerprint = runtimeFingerprint,
             StateReason = stateReason,
             CreatedAtUtc = now,

@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 
 dotnet build Chummer.Play.Contracts/Chummer.Play.Contracts.csproj --nologo
 dotnet build Chummer.Media.Contracts/Chummer.Media.Contracts.csproj --nologo
+dotnet build ../chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj --nologo
 dotnet build Chummer.Run.Contracts/Chummer.Run.Contracts.csproj --nologo
 dotnet build Chummer.Run.Api/Chummer.Run.Api.csproj --nologo
 dotnet build Chummer.Run.Identity/Chummer.Run.Identity.csproj --nologo

@@ -280,7 +280,7 @@ internal static class HubExtractionReadinessVerification
         AssertExecutableQueueItem(
             milestoneText,
             "WL-D008",
-            "status: blocked",
+            "status: done",
             "backlog: products/chummer/sync/LOCAL_MIRROR_PUBLISH_BACKLOG.md");
         AssertExecutableQueueItem(
             milestoneText,
@@ -301,11 +301,7 @@ internal static class HubExtractionReadinessVerification
 
     private static void AssertExecutableQueueItem(string text, string itemId, params string[] requiredTokens)
     {
-        var itemStart = text.IndexOf($"- id: {itemId}", StringComparison.Ordinal);
-        VerificationAssert.True(itemStart >= 0, $"Program milestones executable queue must contain '{itemId}'.");
-
-        var nextItem = text.IndexOf(Environment.NewLine + "- id: ", itemStart + 1, StringComparison.Ordinal);
-        var section = nextItem >= 0 ? text[itemStart..nextItem] : text[itemStart..];
+        var section = ExtractExecutableQueueItemSection(text, itemId);
 
         foreach (var token in requiredTokens)
         {
@@ -313,6 +309,15 @@ internal static class HubExtractionReadinessVerification
                 section.Contains(token, StringComparison.Ordinal),
                 $"Program milestones executable queue item '{itemId}' must retain token '{token}'.");
         }
+    }
+
+    private static string ExtractExecutableQueueItemSection(string text, string itemId)
+    {
+        var itemStart = text.IndexOf($"- id: {itemId}", StringComparison.Ordinal);
+        VerificationAssert.True(itemStart >= 0, $"Program milestones executable queue must contain '{itemId}'.");
+
+        var nextItem = text.IndexOf(Environment.NewLine + "- id: ", itemStart + 1, StringComparison.Ordinal);
+        return nextItem >= 0 ? text[itemStart..nextItem] : text[itemStart..];
     }
 
     private static void AssertSectionContainsTokens(string sectionText, string trackId, params string[] requiredTokens)

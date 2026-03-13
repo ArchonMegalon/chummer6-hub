@@ -1,7 +1,8 @@
 using System.Reflection;
+using Chummer.Hub.Registry.Contracts;
 using Chummer.Run.AI.Services.Session;
-using Chummer.Run.Contracts.Registry;
 using Chummer.Run.Registry.Services;
+using RegistryHubReviewRequest = Chummer.Run.Contracts.Registry.HubReviewRequest;
 
 namespace RunServicesVerification;
 
@@ -88,8 +89,13 @@ internal static class StateStoreBackupVerification
             Name: "Backup Artifact",
             Kind: HubArtifactKind.RulePack,
             Version: "1.0.0",
-            Owner: "ops.backup",
+            RulesetId: "sr6",
+            Visibility: ArtifactVisibilityModes.LocalOnly,
+            TrustTier: ArtifactTrustTiers.LocalOnly,
+            OwnerId: "ops.backup",
+            PublisherId: null,
             Summary: "state backup drill",
+            Description: null,
             RuntimeFingerprint: "runtime:v1"));
 
         store.RegisterInstall(created.Id, new HubInstallEvent(
@@ -97,7 +103,7 @@ internal static class StateStoreBackupVerification
             UserId: "runner-1",
             InstalledAtUtc: DateTimeOffset.Parse("2026-03-10T12:05:00+00:00"),
             ActiveRuntimeRef: true));
-        store.AddReview(created.Id, new HubReviewRequest(created.Id, 8, "stable"));
+        store.AddReview(created.Id, new RegistryHubReviewRequest(created.Id, 8, "stable"));
         store.ChangeState(created.Id, new HubArtifactStateChangeRequest(
             RequestedBy: "ops.backup",
             TargetState: HubArtifactState.Deprecated,
@@ -118,7 +124,12 @@ internal static class StateStoreBackupVerification
             IncludedEventTypes: ["event-a"],
             SupportedExchangeFormats: ["session-ledger.v1"],
             RequestedBy: "ops.backup",
-            Owner: "ops.backup",
+            OwnerId: "ops.backup",
+            RulesetId: "sr6",
+            Visibility: ArtifactVisibilityModes.CampaignShared,
+            TrustTier: ArtifactTrustTiers.Official,
+            PublisherId: "pub.backup",
+            Description: "backup drill bundle description",
             Summary: "backup drill bundle");
         var issued = store.IssueRuntimeBundle(issueRequest);
         store.IssueRuntimeBundle(issueRequest); // idempotency replay
@@ -135,21 +146,38 @@ internal static class StateStoreBackupVerification
             Name: "Post-backup drift",
             Kind: HubArtifactKind.BuildIdea,
             Version: "1.0.0",
-            Owner: "ops.backup",
+            RulesetId: "sr6",
+            Visibility: ArtifactVisibilityModes.LocalOnly,
+            TrustTier: ArtifactTrustTiers.LocalOnly,
+            OwnerId: "ops.backup",
+            PublisherId: null,
             Summary: "should not appear in restored state",
+            Description: null,
             RuntimeFingerprint: null));
 
         var restored = new HubArtifactStore();
         restored.RestoreBackup(backup);
 
         var restoredProjection = restored.GetProjection(created.Id);
+        var restoredArtifact = restored.GetArtifact(created.Id);
         var restoredHead = restored.GetRuntimeBundleHead("session-backup", "scene-1", RuntimeBundleHeadKind.Session);
         var restoredPipeline = restored.GetRegistryPipelineProjection();
 
         VerificationAssert.NotNull(restoredProjection, "Hub store restore should preserve artifact projections.");
         VerificationAssert.Equal(HubArtifactState.Deprecated.ToString(), restoredProjection!.State, "Hub store restore should preserve artifact lifecycle state.");
+        VerificationAssert.NotNull(restoredArtifact, "Hub store restore should preserve authored artifact metadata.");
+        VerificationAssert.Equal("sr6", restoredArtifact!.RulesetId, "Hub store restore should preserve artifact ruleset metadata.");
+        VerificationAssert.Equal(ArtifactVisibilityModes.LocalOnly, restoredArtifact.Visibility, "Hub store restore should preserve authored artifact visibility.");
+        VerificationAssert.Equal(ArtifactTrustTiers.LocalOnly, restoredArtifact.TrustTier, "Hub store restore should preserve authored artifact trust tier.");
         VerificationAssert.NotNull(restoredHead, "Hub store restore should preserve runtime bundle heads.");
         VerificationAssert.Equal(issued.Head.CurrentArtifactId, restoredHead!.CurrentArtifactId, "Hub store restore should preserve runtime head ownership.");
+        var restoredRuntimeArtifact = restored.GetArtifact(issued.Artifact.Id);
+        VerificationAssert.NotNull(restoredRuntimeArtifact, "Hub store restore should preserve runtime-bundle artifact metadata.");
+        VerificationAssert.Equal("sr6", restoredRuntimeArtifact!.RulesetId, "Hub store restore should preserve runtime-bundle ruleset metadata.");
+        VerificationAssert.Equal(ArtifactVisibilityModes.CampaignShared, restoredRuntimeArtifact.Visibility, "Hub store restore should preserve runtime-bundle visibility.");
+        VerificationAssert.Equal(ArtifactTrustTiers.Official, restoredRuntimeArtifact.TrustTier, "Hub store restore should preserve runtime-bundle trust tier.");
+        VerificationAssert.Equal("pub.backup", restoredRuntimeArtifact.PublisherId, "Hub store restore should preserve runtime-bundle publisher metadata.");
+        VerificationAssert.Equal("backup drill bundle description", restoredRuntimeArtifact.Description, "Hub store restore should preserve runtime-bundle description metadata.");
         VerificationAssert.Equal(beforePipeline.Observability.ProcessedCount, restoredPipeline.Observability.ProcessedCount, "Hub store restore should preserve observability counters.");
         VerificationAssert.Equal(beforePipeline.Idempotency.ReplayCount, restoredPipeline.Idempotency.ReplayCount, "Hub store restore should preserve replay counters.");
     }
@@ -228,6 +256,7 @@ internal static class StateStoreBackupVerification
         var ns = type.Namespace ?? string.Empty;
         return ns.StartsWith("System", StringComparison.Ordinal)
             || ns.StartsWith("Chummer.Run.Contracts", StringComparison.Ordinal)
+            || ns.StartsWith("Chummer.Hub.Registry.Contracts", StringComparison.Ordinal)
             || ns.StartsWith("Chummer.Play.Contracts", StringComparison.Ordinal)
             || ns.StartsWith("Chummer.Media.Contracts", StringComparison.Ordinal);
     }

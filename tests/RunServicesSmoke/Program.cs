@@ -59,7 +59,7 @@ using PortraitApprovalRequest = Chummer.Run.Contracts.Media.PortraitApprovalRequ
 using PortraitForgeRequest = Chummer.Run.Contracts.Media.PortraitForgeRequest;
 using RouteCinemaRequest = Chummer.Media.Contracts.RouteCinemaRequest;
 using RunMemoryIngestionRequest = Chummer.Run.Contracts.Memory.SessionMemoryIngestionRequest;
-using RegistryHubInstallEvent = Chummer.Run.Contracts.Registry.HubInstallEvent;
+using RegistryHubInstallEvent = Chummer.Hub.Registry.Contracts.HubInstallEvent;
 using RegistryHubReviewRequest = Chummer.Run.Contracts.Registry.HubReviewRequest;
 using TranscriptionRequest = Chummer.Run.Contracts.Transcription.TranscriptionRequest;
 
@@ -281,8 +281,13 @@ void VerifyRegistryWorkflow()
             Name: $"{kind} Smoke Bundle",
             Kind: kind,
             Version: "1.0.0",
-            Owner: "hub.demo",
+            RulesetId: "sr6",
+            Visibility: ArtifactVisibilityModes.LocalOnly,
+            TrustTier: ArtifactTrustTiers.LocalOnly,
+            OwnerId: "hub.demo",
+            PublisherId: null,
             Summary: "clean-room smoke artifact",
+            Description: null,
             RuntimeFingerprint: kind == HubArtifactKind.RuntimeBundle ? "scene-ledger:v1" : null));
 
         var reviews = registry.AddReview(created.Id, new RegistryHubReviewRequest(
@@ -343,7 +348,7 @@ void VerifyRegistryWorkflow()
         IncludedEventTypes: new[] { "objective.unresolved", "heat.alert" },
         SupportedExchangeFormats: new[] { "session-ledger.v1", "foundry-vtt.scene-ledger.v1" },
         RequestedBy: "ops.registry",
-        Owner: "hub.registry",
+        OwnerId: "hub.registry",
         Summary: "Session issuance smoke"));
     Assert(issuedSession.CreatedNewArtifact, "runtime-bundle issuance should create an immutable artifact on first issue");
 
@@ -361,7 +366,7 @@ void VerifyRegistryWorkflow()
         IncludedEventTypes: new[] { "objective.unresolved", "heat.alert" },
         SupportedExchangeFormats: new[] { "session-ledger.v1", "offline-snapshot.v1" },
         RequestedBy: "ops.registry",
-        Owner: "hub.registry",
+        OwnerId: "hub.registry",
         Summary: "Offline issuance smoke"));
     Assert(issuedOffline.Head.Head == RuntimeBundleHeadKind.Offline, "runtime-bundle issuance should support offline heads");
 
@@ -379,7 +384,7 @@ void VerifyRegistryWorkflow()
         IncludedEventTypes: new[] { "objective.unresolved", "heat.alert", "relationship.shift" },
         SupportedExchangeFormats: new[] { "session-ledger.v1", "foundry-vtt.scene-ledger.v1" },
         RequestedBy: "ops.registry",
-        Owner: "hub.registry",
+        OwnerId: "hub.registry",
         Summary: "Session issuance smoke v5"));
     Assert(reissuedSession.Projection.PreviousArtifactId == issuedSession.Artifact.Id, "runtime-bundle issuance should preserve prior artifact lineage");
     Assert(registry.GetArtifact(issuedSession.Artifact.Id)?.State == HubArtifactState.Superseded, "reissued runtime-bundle heads should supersede the previous artifact");
@@ -405,8 +410,13 @@ void VerifyRegistryControllerHardening()
         Name: "Runtime Bundle Projection",
         Kind: HubArtifactKind.RuntimeBundle,
         Version: "2.0.0",
-        Owner: "hub.controller",
+        RulesetId: "sr6",
+        Visibility: ArtifactVisibilityModes.LocalOnly,
+        TrustTier: ArtifactTrustTiers.LocalOnly,
+        OwnerId: "hub.controller",
+        PublisherId: null,
         Summary: "projection endpoint smoke",
+        Description: null,
         RuntimeFingerprint: "scene-ledger:v2"));
     var createdResult = create.Result as CreatedAtActionResult;
     Assert(createdResult is not null, "registry create should return CreatedAtActionResult");
@@ -455,7 +465,7 @@ void VerifyRegistryControllerHardening()
         IncludedEventTypes: new[] { "objective.unresolved" },
         SupportedExchangeFormats: new[] { "session-ledger.v1", "mobile-bootstrap.v1" },
         RequestedBy: "ops.controller",
-        Owner: "hub.controller",
+        OwnerId: "hub.controller",
         Summary: "Controller issuance smoke"));
     var issuedResult = issued.Result as CreatedAtActionResult;
     var issuedPayload = issuedResult?.Value as RuntimeBundleIssueResponse;
