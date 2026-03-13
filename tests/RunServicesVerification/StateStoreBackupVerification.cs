@@ -176,8 +176,8 @@ internal static class StateStoreBackupVerification
         VerificationAssert.Equal("sr6", restoredRuntimeArtifact!.RulesetId, "Hub store restore should preserve runtime-bundle ruleset metadata.");
         VerificationAssert.Equal(ArtifactVisibilityModes.CampaignShared, restoredRuntimeArtifact.Visibility, "Hub store restore should preserve runtime-bundle visibility.");
         VerificationAssert.Equal(ArtifactTrustTiers.Official, restoredRuntimeArtifact.TrustTier, "Hub store restore should preserve runtime-bundle trust tier.");
-        VerificationAssert.Equal("pub.backup", restoredRuntimeArtifact.PublisherId, "Hub store restore should preserve runtime-bundle publisher metadata.");
-        VerificationAssert.Equal("backup drill bundle description", restoredRuntimeArtifact.Description, "Hub store restore should preserve runtime-bundle description metadata.");
+        VerificationAssert.True(string.Equals("pub.backup", restoredRuntimeArtifact.PublisherId, StringComparison.Ordinal), "Hub store restore should preserve runtime-bundle publisher metadata.");
+        VerificationAssert.True(string.Equals("backup drill bundle description", restoredRuntimeArtifact.Description, StringComparison.Ordinal), "Hub store restore should preserve runtime-bundle description metadata.");
         VerificationAssert.Equal(beforePipeline.Observability.ProcessedCount, restoredPipeline.Observability.ProcessedCount, "Hub store restore should preserve observability counters.");
         VerificationAssert.Equal(beforePipeline.Idempotency.ReplayCount, restoredPipeline.Idempotency.ReplayCount, "Hub store restore should preserve replay counters.");
     }
