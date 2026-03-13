@@ -58,64 +58,6 @@ Any of the following is an ownership violation:
 * design repo becomes stale enough that code repos must invent architecture locally
 
 
-## External integration ownership notes
-
-### `chummer6-design`
-
-Owns:
-
-* external-tool classification
-* approved usage policy
-* system-of-record rules
-* rollout and blocker publication
-
-Must not own:
-
-* provider SDK code
-* runtime secrets
-* adapter implementations
-
-### `chummer6-hub`
-
-Owns:
-
-* AI/provider routing
-* approval bridges
-* docs/help bridges
-* survey bridges
-* automation bridges
-* evaluation and prompt-toolchain integrations
-
-Must not own:
-
-* media rendering internals
-* client-side provider access
-* duplicate engine semantics
-
-### `chummer6-media-factory`
-
-Owns:
-
-* document/image/video/preview/archive adapters
-* media provider receipts
-* media provider provenance
-* media asset lifecycle for provider-generated outputs
-
-Must not own:
-
-* approvals policy
-* campaign/session meaning
-* prompt registry canon
-* client UX
-
-### `chummer6-ui` and `chummer6-mobile`
-
-Must not own:
-
-* vendor credentials
-* direct provider SDK integrations
-* direct third-party API orchestration
-
 ## External integration ownership
 
 ### `chummer6-design`
@@ -175,4 +117,3 @@ Must not own:
 * vendor credentials
 * direct provider SDK access
 * direct third-party orchestration
-
