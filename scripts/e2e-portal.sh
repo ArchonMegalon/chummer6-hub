@@ -27,7 +27,7 @@ if [[ -n "$CHUMMER_API_KEY" ]]; then
   export CHUMMER_API_KEY
 fi
 
-compose_args=(-f docker-compose.yml)
+compose_args=(-f legacy/tooling/docker/docker-compose.yml)
 
 compose_up_log="$(mktemp)"
 set +e

@@ -4,9 +4,12 @@
 1. instructions.md
 2. .agent-memory.md
 3. AGENT_MEMORY.md
-4. chummer-run-services.design.v2.md
-5. AGENTS.md if present
-6. audit.md if present
+4. .codex-design/product/README.md
+5. .codex-design/repo/IMPLEMENTATION_SCOPE.md
+6. .codex-design/review/REVIEW_CONTEXT.md
+7. docs/HOSTED_BOUNDARY.md
+8. AGENTS.md if present
+9. audit.md if present
 
 ## Scope
 Own:

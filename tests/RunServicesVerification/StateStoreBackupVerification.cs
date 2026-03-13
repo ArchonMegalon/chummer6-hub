@@ -1,6 +1,7 @@
+using System.Text.Json;
 using System.Reflection;
-using Chummer.Hub.Registry.Contracts;
 using Chummer.Run.AI.Services.Session;
+using Chummer.Run.Contracts.Registry;
 using Chummer.Run.Registry.Services;
 using RegistryHubReviewRequest = Chummer.Run.Contracts.Registry.HubReviewRequest;
 
@@ -12,6 +13,7 @@ internal static class StateStoreBackupVerification
     {
         await VerifySessionLedgerBackupRestoreAsync();
         VerifyHubStoreBackupRestore();
+        VerifyHubStoreRestoresLegacyV1Backups();
         VerifyStoreSignatureBoundary();
     }
 
@@ -188,6 +190,60 @@ internal static class StateStoreBackupVerification
         VerifyMethodSignatures(typeof(IHubArtifactStore));
     }
 
+    private static void VerifyHubStoreRestoresLegacyV1Backups()
+    {
+        const string legacyBackupJson = """
+            {
+              "ExportedAtUtc": "2026-03-10T12:00:00+00:00",
+              "Artifacts": [
+                {
+                  "Id": "artifact-legacy",
+                  "Name": "Legacy Artifact",
+                  "Kind": 0,
+                  "Version": "1.0.0",
+                  "State": 0,
+                  "Owner": "ops.legacy",
+                  "Summary": "legacy backup payload",
+                  "RuntimeFingerprint": "legacy:fingerprint",
+                  "StateReason": null,
+                  "SupersededByArtifactId": null,
+                  "CreatedAtUtc": "2026-03-10T12:00:00+00:00",
+                  "UpdatedAtUtc": "2026-03-10T12:00:00+00:00",
+                  "LifecycleChangedAtUtc": null,
+                  "InstallCount": 1,
+                  "ActiveRuntimeRefCount": 0,
+                  "LastInstalledAtUtc": "2026-03-10T12:00:00+00:00",
+                  "ReviewScores": [7]
+                }
+              ],
+              "RuntimeBundleArtifacts": [],
+              "RuntimeBundleHeads": [],
+              "DeadLetters": [],
+              "UpsertCount": 1,
+              "RuntimeIssueCount": 0,
+              "RuntimeIssueIdempotentCount": 0,
+              "LastRuntimeIssueReplayAtUtc": null,
+              "InstallCount": 1,
+              "ReviewCount": 1,
+              "ContractFamily": "hub_state_backup_v1"
+            }
+            """;
+
+        var legacyBackup = JsonSerializer.Deserialize<HubArtifactStoreBackupPackage>(legacyBackupJson);
+        VerificationAssert.NotNull(legacyBackup, "Legacy hub-store backups should deserialize into the current backup package.");
+
+        var restored = new HubArtifactStore();
+        restored.RestoreBackup(legacyBackup!);
+
+        var restoredArtifact = restored.GetArtifact("artifact-legacy");
+        VerificationAssert.NotNull(restoredArtifact, "Legacy hub-store backups should restore authored artifact metadata.");
+        VerificationAssert.Equal("sr5", restoredArtifact!.RulesetId, "Legacy hub-store backups should default missing ruleset metadata.");
+        VerificationAssert.Equal(ArtifactVisibilityModes.Shared, restoredArtifact.Visibility, "Legacy hub-store backups should default missing visibility metadata.");
+        VerificationAssert.Equal(ArtifactTrustTiers.Curated, restoredArtifact.TrustTier, "Legacy hub-store backups should default missing trust tier metadata.");
+        VerificationAssert.True(restoredArtifact.PublisherId is null, "Legacy hub-store backups should default missing publisher metadata.");
+        VerificationAssert.True(restoredArtifact.Description is null, "Legacy hub-store backups should default missing description metadata.");
+    }
+
     private static void VerifyMethodSignatures(Type type)
     {
         const string message = "Store public signatures must stay on hosted clean-room contract surfaces.";
@@ -256,7 +312,6 @@ internal static class StateStoreBackupVerification
         var ns = type.Namespace ?? string.Empty;
         return ns.StartsWith("System", StringComparison.Ordinal)
             || ns.StartsWith("Chummer.Run.Contracts", StringComparison.Ordinal)
-            || ns.StartsWith("Chummer.Hub.Registry.Contracts", StringComparison.Ordinal)
             || ns.StartsWith("Chummer.Play.Contracts", StringComparison.Ordinal)
             || ns.StartsWith("Chummer.Media.Contracts", StringComparison.Ordinal);
     }

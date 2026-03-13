@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 BUNDLE_DIR="${1:-$REPO_ROOT/dist}"
-DEPLOY_DIR="${2:-$REPO_ROOT/Docker/Downloads}"
+DEPLOY_DIR="${2:-$REPO_ROOT/legacy/tooling/docker/Docker/Downloads}"
 PORTAL_MANIFEST_PATH="${PORTAL_MANIFEST_PATH:-}"
 PORTAL_DOWNLOADS_DIR="${PORTAL_DOWNLOADS_DIR:-}"
 DEPLOY_MODE="${CHUMMER_PORTAL_DOWNLOADS_DEPLOY_ENABLED:-false}"
@@ -20,7 +20,7 @@ to_bool() {
 }
 
 if [[ -z "$PORTAL_MANIFEST_PATH" ]]; then
-  if [[ "$(realpath "$DEPLOY_DIR")" == "$(realpath "$REPO_ROOT/Docker/Downloads")" ]]; then
+  if [[ "$(realpath "$DEPLOY_DIR")" == "$(realpath "$REPO_ROOT/legacy/tooling/docker/Docker/Downloads")" ]]; then
     PORTAL_MANIFEST_PATH="$REPO_ROOT/Chummer.Portal/downloads/releases.json"
   else
     PORTAL_MANIFEST_PATH="$DEPLOY_DIR/releases.json"

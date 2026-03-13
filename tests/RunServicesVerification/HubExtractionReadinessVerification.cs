@@ -14,6 +14,7 @@ internal static class HubExtractionReadinessVerification
         VerifyMediaBoundaryReadiness();
         VerifyDesignMirrorReadiness();
         VerifyAcceptanceDocument();
+        VerifyLegacyRootBoundaryMoves();
         VerifyMilestoneMapping();
     }
 
@@ -117,6 +118,22 @@ internal static class HubExtractionReadinessVerification
         foreach (var requiredToken in new[]
                  {
                      "WL-089",
+                     "WL-207",
+                     "WL-216",
+                     "WL-217",
+                     "WL-218",
+                     "WL-219",
+                     "WL-220",
+                     "WL-209",
+                     "WL-210",
+                     "WL-211",
+                     "WL-212",
+                     "A2",
+                     "A3",
+                     "C1b",
+                     "D1",
+                     "E2b",
+                     "F1",
                      "WL-148",
                      "WL-149",
                      "WL-150",
@@ -143,6 +160,7 @@ internal static class HubExtractionReadinessVerification
                      "4339",
                      "11709",
                      "1926",
+                     "2367",
                      "3948",
                      "4367",
                      "8667",
@@ -158,13 +176,19 @@ internal static class HubExtractionReadinessVerification
                      "Chummer.Run.Registry",
                      "Chummer.Play.Contracts",
                      "Chummer.Media.Contracts",
+                     "LEGACY_ROOT_SURFACE_INVENTORY.md",
                      "PublicationVerification.cs",
                      "CompatibilityVerification.cs",
+                     "PipelineProjectionVerification.cs",
+                     "StateStoreBackupVerification.cs",
+                     "RuntimeBundleVerification.cs",
                      "HOSTED_BOUNDARY.md",
                      "hosted-boundary.manifest",
                      ".codex-design/product/README.md",
                      ".codex-design/repo/IMPLEMENTATION_SCOPE.md",
                      ".codex-design/review/REVIEW_CONTEXT.md",
+                     "scripts/ai/run_services_smoke.sh",
+                     "scripts/ai/run_services_verification.sh",
                      "PROGRAM_MILESTONES.yaml",
                      "scripts/ai/verify.sh"
                  })
@@ -173,6 +197,43 @@ internal static class HubExtractionReadinessVerification
                 acceptanceText.Contains(requiredToken, StringComparison.Ordinal),
                 $"Hub extraction acceptance document must mention '{requiredToken}'.");
         }
+    }
+
+    private static void VerifyLegacyRootBoundaryMoves()
+    {
+        var legacyDcprojPath = Path.Combine(RepoRoot, "legacy", "tooling", "vs-compose", "docker-compose.dcproj");
+        var legacySettingsPath = Path.Combine(RepoRoot, "legacy", "interoperability", "settings", "README.txt");
+        var legacyArchitecturePath = Path.Combine(RepoRoot, "legacy", "architecture-archive", "chummer-run-services.design.v2.md");
+        var rootDcprojPath = Path.Combine(RepoRoot, "docker-compose.dcproj");
+        var rootSettingsPath = Path.Combine(RepoRoot, "settings");
+        var rootArchitecturePath = Path.Combine(RepoRoot, "chummer-run-services.design.v2.md");
+
+        VerificationAssert.True(
+            File.Exists(legacyDcprojPath),
+            "Legacy tooling boundary must keep docker-compose.dcproj under legacy/tooling/vs-compose.");
+        VerificationAssert.True(
+            File.Exists(legacySettingsPath),
+            "Legacy interoperability boundary must keep settings assets under legacy/interoperability/settings.");
+        VerificationAssert.True(
+            !File.Exists(rootDcprojPath),
+            "Root hosted topology must not keep docker-compose.dcproj at repo root.");
+        VerificationAssert.True(
+            !Directory.Exists(rootSettingsPath),
+            "Root hosted topology must not keep settings/ at repo root.");
+        VerificationAssert.True(
+            File.Exists(legacyArchitecturePath),
+            "Legacy architecture boundary must keep chummer-run-services.design.v2.md under legacy/architecture-archive.");
+        VerificationAssert.True(
+            !File.Exists(rootArchitecturePath),
+            "Root hosted topology must not keep chummer-run-services.design.v2.md at repo root.");
+
+        var dcprojText = File.ReadAllText(legacyDcprojPath);
+        VerificationAssert.True(
+            dcprojText.Contains(@"..\docker\docker-compose.yml", StringComparison.Ordinal),
+            "Legacy docker-compose.dcproj must bridge to legacy/tooling/docker/docker-compose.yml.");
+        VerificationAssert.True(
+            dcprojText.Contains(@"..\..\..\.dockerignore", StringComparison.Ordinal),
+            "Legacy docker-compose.dcproj must bridge to the root .dockerignore path.");
     }
 
     private static void VerifyMilestoneMapping()

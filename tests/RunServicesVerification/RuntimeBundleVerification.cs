@@ -1,4 +1,4 @@
-using Chummer.Hub.Registry.Contracts;
+using Chummer.Run.Contracts.Registry;
 using Chummer.Run.Registry.Services;
 
 namespace RunServicesVerification;

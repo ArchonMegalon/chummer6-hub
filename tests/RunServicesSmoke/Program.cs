@@ -59,7 +59,9 @@ using PortraitApprovalRequest = Chummer.Run.Contracts.Media.PortraitApprovalRequ
 using PortraitForgeRequest = Chummer.Run.Contracts.Media.PortraitForgeRequest;
 using RouteCinemaRequest = Chummer.Media.Contracts.RouteCinemaRequest;
 using RunMemoryIngestionRequest = Chummer.Run.Contracts.Memory.SessionMemoryIngestionRequest;
-using RegistryHubInstallEvent = Chummer.Hub.Registry.Contracts.HubInstallEvent;
+using ArtifactTrustTiers = Chummer.Run.Contracts.Registry.ArtifactTrustTiers;
+using ArtifactVisibilityModes = Chummer.Run.Contracts.Registry.ArtifactVisibilityModes;
+using RegistryHubInstallEvent = Chummer.Run.Contracts.Registry.HubInstallEvent;
 using RegistryHubReviewRequest = Chummer.Run.Contracts.Registry.HubReviewRequest;
 using TranscriptionRequest = Chummer.Run.Contracts.Transcription.TranscriptionRequest;
 

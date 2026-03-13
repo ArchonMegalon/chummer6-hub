@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 if [[ "$#" -gt 0 ]]; then
   TARGETS=("$@")
 else
-  TARGETS=("$REPO_ROOT/Docker/Amends")
+  TARGETS=("$REPO_ROOT/legacy/tooling/docker/Docker/Amends")
 fi
 
 python3 - "$REPO_ROOT" "${TARGETS[@]}" <<'PY'

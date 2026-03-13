@@ -33,6 +33,11 @@ if grep -En '<ProjectReference Include="\.\.\\\.\.\\chummer-hub-registry\\Chumme
   exit 1
 fi
 
+if grep -n 'chummer-hub-registry' Chummer.Run.Registry/Chummer.Run.Registry.csproj >/dev/null; then
+  echo "Chummer.Run.Registry must remain hermetic and not depend on sibling hub-registry outputs." >&2
+  exit 1
+fi
+
 if [ -f Chummer.Run.Api/Controllers/PublicationsController.cs ] || [ -f Chummer.Run.Api/Services/PublicationWorkflowService.cs ]; then
   echo "Publication ownership must stay in Chummer.Run.Registry, not Chummer.Run.Api." >&2
   exit 1
@@ -74,7 +79,6 @@ fi
 
 cp Chummer.Play.Contracts/bin/Debug/net10.0/Chummer.Play.Contracts.dll "$TMP_DIR/"
 cp Chummer.Media.Contracts/bin/Debug/net10.0/Chummer.Media.Contracts.dll "$TMP_DIR/"
-cp ../chummer-hub-registry/Chummer.Hub.Registry.Contracts/bin/Debug/net10.0/Chummer.Hub.Registry.Contracts.dll "$TMP_DIR/"
 cp Chummer.Run.Api/bin/Debug/net10.0/Chummer.Run.Api.dll "$TMP_DIR/"
 cp Chummer.Run.Identity/bin/Debug/net10.0/Chummer.Run.Identity.dll "$TMP_DIR/"
 cp Chummer.Run.Registry/bin/Debug/net10.0/Chummer.Run.Registry.dll "$TMP_DIR/"
