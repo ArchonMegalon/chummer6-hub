@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.IO;
+using System.Text.Json;
 using MediaAssetApprovalState = Chummer.Media.Contracts.AssetApprovalState;
 using MediaAssetLifecyclePolicy = Chummer.Media.Contracts.AssetLifecyclePolicy;
 using MediaMediaRenderJobState = Chummer.Media.Contracts.MediaRenderJobState;
@@ -13,9 +14,16 @@ using MediaPortraitForgeRequest = Chummer.Run.Contracts.Media.PortraitForgeReque
 using MediaPortraitVariant = Chummer.Run.Contracts.Media.PortraitVariant;
 using MediaRouteCinemaArtifactHandle = Chummer.Media.Contracts.RouteCinemaArtifactHandle;
 using MediaRouteCinemaArtifactRole = Chummer.Media.Contracts.RouteCinemaArtifactRole;
+using RegistryArtifactInstallProjection = Chummer.Run.Contracts.Registry.HubArtifactInstallProjection;
+using RegistryArtifactKind = Chummer.Run.Contracts.Registry.HubArtifactKind;
+using RegistryArtifactMetadata = Chummer.Run.Contracts.Registry.HubArtifactMetadata;
+using RegistryArtifactState = Chummer.Run.Contracts.Registry.HubArtifactState;
+using RegistryArtifactCreateRequest = Chummer.Run.Contracts.Registry.HubArtifactCreateRequest;
 using RegistryHubInstallEvent = Chummer.Run.Contracts.Registry.HubInstallEvent;
 using RegistryHubReviewRequest = Chummer.Run.Contracts.Registry.HubReviewRequest;
 using RegistryHubReviewResponse = Chummer.Run.Contracts.Registry.HubReviewResponse;
+using RegistryRuntimeBundleHeadKind = Chummer.Run.Contracts.Registry.RuntimeBundleHeadKind;
+using RegistryRuntimeBundleIssueRequest = Chummer.Run.Contracts.Registry.RuntimeBundleIssueRequest;
 using RunDocsContracts = Chummer.Run.Contracts.Docs;
 using RunGatewayContracts = Chummer.Run.Contracts.Gateway;
 using RunInteropContracts = Chummer.Run.Contracts.Interop;
@@ -37,6 +45,7 @@ internal static class CompatibilityVerification
         VerifyLegacyAiCompatibilityShapes();
         VerifyMediaCompatibilityShapes();
         VerifyRegistryCompatibilityShapes();
+        VerifyRegistryRequestBackCompat();
         VerifyHubRegistryPublicationBoundary();
         VerifySessionOverlayWrapperIsServerOnly();
         VerifyHostedBoundary();
@@ -176,6 +185,89 @@ internal static class CompatibilityVerification
         AssertEquivalentShape(typeof(RegistryHubReviewResponse), typeof(RunAiContracts.HubReviewResponse));
     }
 
+    private static void VerifyRegistryRequestBackCompat()
+    {
+        var legacyCreate = new RegistryArtifactCreateRequest(
+            Name: "Legacy pack",
+            Kind: RegistryArtifactKind.RulePack,
+            Version: "1.0.0",
+            Owner: "ops.legacy",
+            Summary: "Legacy summary",
+            RuntimeFingerprint: "fp-1");
+        VerificationAssert.Equal("sr5", legacyCreate.RulesetId, "Legacy create ctor should default missing ruleset id.");
+        VerificationAssert.Equal("ops.legacy", legacyCreate.ResolveOwnerId() ?? string.Empty, "Legacy create ctor should preserve Owner as the effective owner id.");
+
+        var legacyRuntimeIssue = new RegistryRuntimeBundleIssueRequest(
+            SessionId: "session-1",
+            SceneId: "scene-1",
+            Head: RegistryRuntimeBundleHeadKind.Session,
+            SourceBundleVersion: "bundle-1",
+            ProjectionFingerprint: "fingerprint-1",
+            ProjectionVersion: 3,
+            Ready: true,
+            OfflineCapable: true,
+            CollaborationMode: "portable",
+            InvalidationSignals: ["sig-1"],
+            IncludedEventTypes: ["alarm"],
+            SupportedExchangeFormats: ["portable-cache"],
+            RequestedBy: "ops",
+            Owner: "ops.legacy",
+            Summary: "Legacy summary");
+        VerificationAssert.Equal("sr5", legacyRuntimeIssue.RulesetId, "Legacy runtime issue ctor should default missing ruleset id.");
+        VerificationAssert.Equal("ops.legacy", legacyRuntimeIssue.ResolveOwnerId() ?? string.Empty, "Legacy runtime issue ctor should preserve Owner as the effective owner id.");
+
+        var legacyJsonRequest = JsonSerializer.Deserialize<RegistryArtifactCreateRequest>(
+            """
+            {
+              "Name": "JSON legacy pack",
+              "Kind": 0,
+              "Version": "2.0.0",
+              "Owner": "ops.json",
+              "Summary": "JSON legacy summary"
+            }
+            """);
+        VerificationAssert.True(legacyJsonRequest is not null, "Legacy create payload should deserialize.");
+        VerificationAssert.Equal("sr5", legacyJsonRequest!.RulesetId, "Legacy create payload should default the ruleset id when absent.");
+        VerificationAssert.Equal("ops.json", legacyJsonRequest.ResolveOwnerId() ?? string.Empty, "Legacy create payload should map Owner onto the effective owner id.");
+
+        var legacyMetadata = new RegistryArtifactMetadata(
+            Id: "artifact-1",
+            Name: "Legacy pack",
+            Kind: RegistryArtifactKind.RulePack,
+            Version: "1.0.0",
+            State: RegistryArtifactState.Active,
+            Owner: "ops.legacy",
+            Summary: "Legacy summary",
+            RuntimeFingerprint: "fp-1",
+            StateReason: null,
+            SupersededByArtifactId: null,
+            ImmutableRetentionRequired: true,
+            InstallCount: 0,
+            ActiveRuntimeRefCount: 0,
+            ReviewCount: 0,
+            AverageReviewScore: 0,
+            CreatedAtUtc: DateTimeOffset.Parse("2026-03-13T00:00:00+00:00"),
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-03-13T00:00:00+00:00"),
+            LifecycleChangedAtUtc: null);
+        var metadataJson = JsonSerializer.Serialize(legacyMetadata);
+        VerificationAssert.True(metadataJson.Contains("\"Owner\":\"ops.legacy\"", StringComparison.Ordinal), "Registry metadata should still emit the legacy Owner field.");
+
+        var legacyInstallProjection = new RegistryArtifactInstallProjection(
+            ArtifactId: "artifact-1",
+            Kind: RegistryArtifactKind.RulePack,
+            Version: "1.0.0",
+            State: RegistryArtifactState.Active,
+            SupersededByArtifactId: null,
+            ImmutableRetentionRequired: true,
+            AcceptingNewInstalls: true,
+            InstallCount: 1,
+            ActiveRuntimeRefCount: 0,
+            HasInstallReferences: true,
+            HasRuntimeReferences: false,
+            LastInstalledAtUtc: DateTimeOffset.Parse("2026-03-13T00:00:00+00:00"));
+        VerificationAssert.Equal("sr5", legacyInstallProjection.RulesetId, "Legacy install projection ctor should default the ruleset id.");
+    }
+
     private static void VerifyHubRegistryPublicationBoundary()
     {
         var registryAssembly = typeof(Chummer.Run.Registry.Services.HubArtifactStore).Assembly;
@@ -263,8 +355,7 @@ internal static class CompatibilityVerification
                 "Chummer.Api",
                 "ChummerDataViewer",
                 "ChummerHub",
-                "Plugins/ChummerHub.Client",
-                "Plugins/SamplePlugin",
+                "Plugins",
                 "TextblockConverter",
                 "Translator"
             }

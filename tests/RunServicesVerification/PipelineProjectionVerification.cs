@@ -1,5 +1,5 @@
 using Chummer.Media.Contracts;
-using Chummer.Hub.Registry.Contracts;
+using Chummer.Run.Contracts.Registry;
 using Chummer.Run.AI.Services.Assets;
 using Chummer.Run.AI.Services.Gateway;
 using Chummer.Run.AI.Services.Session;

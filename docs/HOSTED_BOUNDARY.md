@@ -21,8 +21,7 @@ Retired roots that must stay absent:
 - `Chummer.Api`
 - `ChummerDataViewer`
 - `ChummerHub`
-- `Plugins/ChummerHub.Client`
-- `Plugins/SamplePlugin`
+- `Plugins`
 - `TextblockConverter`
 - `Translator`
 

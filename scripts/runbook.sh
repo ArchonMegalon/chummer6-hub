@@ -5,9 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 if [[ -z "${COMPOSE_FILE:-}" ]]; then
-  COMPOSE_FILE="$REPO_ROOT/docker-compose.yml"
-  if [[ "${CHUMMER_RUNBOOK_INCLUDE_LOCAL_COMPOSE_OVERRIDE:-0}" == "1" && -f "$REPO_ROOT/docker-compose.override.yml" ]]; then
-    COMPOSE_FILE="${COMPOSE_FILE}:$REPO_ROOT/docker-compose.override.yml"
+  COMPOSE_FILE="$REPO_ROOT/legacy/tooling/docker/docker-compose.yml"
+  if [[ "${CHUMMER_RUNBOOK_INCLUDE_LOCAL_COMPOSE_OVERRIDE:-0}" == "1" && -f "$REPO_ROOT/legacy/tooling/docker/docker-compose.override.yml" ]]; then
+    COMPOSE_FILE="${COMPOSE_FILE}:$REPO_ROOT/legacy/tooling/docker/docker-compose.override.yml"
   fi
   export COMPOSE_FILE
 fi
@@ -360,7 +360,7 @@ if [[ "$RUNBOOK_MODE" == "desktop-gate" ]]; then
   require_match "\\[PASS\\]" "scripts/check-host-gate-prereqs.sh"
   require_match "\\[FAIL\\]" "scripts/check-host-gate-prereqs.sh"
   require_match "bash scripts/validate-amend-manifests.sh" "scripts/runbook.sh"
-  require_match "Docker/Downloads/releases.json" "scripts/generate-releases-manifest.sh"
+  require_match "legacy/tooling/docker/Docker/Downloads/releases.json" "scripts/generate-releases-manifest.sh"
   require_match "Chummer.Portal/downloads/releases.json" "scripts/generate-releases-manifest.sh"
   require_match "CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR" ".github/workflows/desktop-downloads-matrix.yml"
   require_match "deploy-downloads" ".github/workflows/desktop-downloads-matrix.yml"
@@ -391,7 +391,7 @@ if [[ "$RUNBOOK_MODE" == "desktop-build" ]]; then
 fi
 
 if [[ "$RUNBOOK_MODE" == "amend-checksums" ]]; then
-  AMEND_TARGET="${AMEND_TARGET:-${RUNBOOK_ARG_FRAMEWORK:-Docker/Amends}}"
+  AMEND_TARGET="${AMEND_TARGET:-${RUNBOOK_ARG_FRAMEWORK:-legacy/tooling/docker/Docker/Amends}}"
   AMEND_CHECKSUM_LOG_FILE="${AMEND_CHECKSUM_LOG_FILE:-$(resolve_runbook_log_file chummer-amend-checksums)}"
   set +e
   bash scripts/validate-amend-manifests.sh "$AMEND_TARGET" 2>&1 | tee "$AMEND_CHECKSUM_LOG_FILE"
@@ -423,17 +423,17 @@ if [[ "$RUNBOOK_MODE" == "downloads-manifest" ]]; then
   set -e
   echo
   echo "== manifest preview =="
-  if [[ -f Docker/Downloads/releases.json ]]; then
-    cat Docker/Downloads/releases.json
+  if [[ -f legacy/tooling/docker/Docker/Downloads/releases.json ]]; then
+    cat legacy/tooling/docker/Docker/Downloads/releases.json
   else
-    echo "Docker/Downloads/releases.json not found"
+    echo "legacy/tooling/docker/Docker/Downloads/releases.json not found"
   fi
   exit "$status"
 fi
 
 if [[ "$RUNBOOK_MODE" == "downloads-sync" ]]; then
   DOWNLOAD_BUNDLE_DIR="${DOWNLOAD_BUNDLE_DIR:-${RUNBOOK_ARG_FRAMEWORK:-$REPO_ROOT/dist}}"
-  DOWNLOAD_DEPLOY_DIR="${DOWNLOAD_DEPLOY_DIR:-${RUNBOOK_ARG_FILTER:-$REPO_ROOT/Docker/Downloads}}"
+  DOWNLOAD_DEPLOY_DIR="${DOWNLOAD_DEPLOY_DIR:-${RUNBOOK_ARG_FILTER:-$REPO_ROOT/legacy/tooling/docker/Docker/Downloads}}"
   DOWNLOADS_SYNC_DEPLOY_MODE="${DOWNLOADS_SYNC_DEPLOY_MODE:-0}"
   DOWNLOADS_SYNC_VERIFY_LINKS="${DOWNLOADS_SYNC_VERIFY_LINKS:-}"
   DOWNLOADS_SYNC_VERIFY_TARGET="${DOWNLOADS_SYNC_VERIFY_TARGET:-${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-}}"

@@ -181,7 +181,7 @@ Progress: `RestartSafeWorkspacePersistenceTests` now verify restart-safe bootstr
 
 - [x] `MIG-074` Make content packaging deterministic (data/lang assets) for docker runtime.
 Acceptance criteria: API container startup validates required content bundle and fails fast when missing.
-Progress: introduced `CHUMMER_AMENDS_PATH` overlay discovery in infrastructure with deterministic priority ordering, docker-mounted sample pack (`Docker/Amends`), API visibility via `/api/info` + `/api/content/overlays`, fail-fast startup validation (`requireContentBundle: true` in `Chummer.Run.Api` + `CHUMMER_REQUIRE_CONTENT_BUNDLE` host toggle), optional amend-manifest SHA-256 checksum validation (`checksums` map), and CI policy enforcement for release/sample packs via `scripts/validate-amend-manifests.sh`. Signed provenance for published overlay bundles is a later hardening/release follow-up, not a migration-parity blocker.
+Progress: introduced `CHUMMER_AMENDS_PATH` overlay discovery in infrastructure with deterministic priority ordering, docker-mounted sample pack (`legacy/tooling/docker/Docker/Amends`), API visibility via `/api/info` + `/api/content/overlays`, fail-fast startup validation (`requireContentBundle: true` in `Chummer.Run.Api` + `CHUMMER_REQUIRE_CONTENT_BUNDLE` host toggle), optional amend-manifest SHA-256 checksum validation (`checksums` map), and CI policy enforcement for release/sample packs via `scripts/validate-amend-manifests.sh`. Signed provenance for published overlay bundles is a later hardening/release follow-up, not a migration-parity blocker.
 
 ### Phase 8: Retire static legacy shell
 
@@ -189,7 +189,7 @@ Exit state: `Chummer` (WinForms) and `Chummer.Web` are oracle/parity assets only
 
 - [x] `MIG-080` Remove `Chummer.Web` from default product runtime path once parity gates are met.
 Acceptance criteria: compose and README primary flows reference API + Blazor + Avalonia only.
-Progress: default `docker-compose.yml` runtime continues to expose only `chummer-api` and `chummer-blazor`, portal flows use `chummer-blazor-portal` + `chummer-avalonia-browser`, and README primary startup paths reference active heads only while legacy heads remain documentation-only.
+Progress: default `legacy/tooling/docker/docker-compose.yml` runtime continues to expose only `chummer-api` and `chummer-blazor`, portal flows use `chummer-blazor-portal` + `chummer-avalonia-browser`, and README primary startup paths reference active heads only while legacy heads remain documentation-only.
 
 - [x] `MIG-081` Replace any remaining legacy-shell-coupled checks with head-agnostic parity tests.
 Acceptance criteria: migration/compliance tests no longer require `Chummer.Web` artifacts to assert parity.

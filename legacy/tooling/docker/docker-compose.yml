@@ -3,7 +3,7 @@ services:
   chummer-api:
     image: chummer-api:local
     build:
-      context: .
+      context: ../../..
       dockerfile: Chummer.Run.Api/Dockerfile
     environment:
       CHUMMER_STATE_PATH: "/app/state"
@@ -27,7 +27,7 @@ services:
   chummer-blazor:
     image: chummer-blazor:local
     build:
-      context: .
+      context: ../../..
       dockerfile: Chummer.Blazor/Dockerfile
     depends_on:
       - chummer-api
@@ -40,7 +40,7 @@ services:
   chummer-hub-web:
     image: chummer-hub-web:local
     build:
-      context: .
+      context: ../../..
       dockerfile: Chummer.Hub.Web/Dockerfile
     depends_on:
       - chummer-api
@@ -51,7 +51,7 @@ services:
   chummer-session-web:
     image: chummer-session-web:local
     build:
-      context: .
+      context: ../../..
       dockerfile: Chummer.Session.Web/Dockerfile
     depends_on:
       - chummer-api
@@ -62,7 +62,7 @@ services:
   chummer-coach-web:
     image: chummer-coach-web:local
     build:
-      context: .
+      context: ../../..
       dockerfile: Chummer.Coach.Web/Dockerfile
     depends_on:
       - chummer-api
@@ -73,7 +73,7 @@ services:
   chummer-blazor-portal:
     image: chummer-blazor:local
     build:
-      context: .
+      context: ../../..
       dockerfile: Chummer.Blazor/Dockerfile
     depends_on:
       - chummer-api
@@ -85,7 +85,7 @@ services:
   chummer-hub-web-portal:
     image: chummer-hub-web:local
     build:
-      context: .
+      context: ../../..
       dockerfile: Chummer.Hub.Web/Dockerfile
     depends_on:
       - chummer-api
@@ -95,7 +95,7 @@ services:
   chummer-session-web-portal:
     image: chummer-session-web:local
     build:
-      context: .
+      context: ../../..
       dockerfile: Chummer.Session.Web/Dockerfile
     depends_on:
       - chummer-api
@@ -105,7 +105,7 @@ services:
   chummer-coach-web-portal:
     image: chummer-coach-web:local
     build:
-      context: .
+      context: ../../..
       dockerfile: Chummer.Coach.Web/Dockerfile
     depends_on:
       - chummer-api
@@ -115,7 +115,7 @@ services:
   chummer-avalonia-browser:
     image: chummer-avalonia-browser:local
     build:
-      context: .
+      context: ../../..
       dockerfile: Chummer.Avalonia.Browser/Dockerfile
     profiles: ["portal"]
     environment:
@@ -123,7 +123,7 @@ services:
   chummer-portal:
     image: chummer-portal:local
     build:
-      context: .
+      context: ../../..
       dockerfile: Chummer.Portal/Dockerfile
     depends_on:
       - chummer-api
@@ -174,8 +174,8 @@ services:
   chummer-tests:
     image: chummer-tests:local
     build:
-      context: .
-      dockerfile: Docker/Dockerfile.tests
+      context: ../../..
+      dockerfile: legacy/tooling/docker/Docker/Dockerfile.tests
     depends_on:
       - chummer-api
     profiles: ["test"]
@@ -189,8 +189,8 @@ services:
   chummer-playwright:
     image: chummer-playwright:local
     build:
-      context: .
-      dockerfile: Docker/Dockerfile.playwright
+      context: ../../..
+      dockerfile: legacy/tooling/docker/Docker/Dockerfile.playwright
     depends_on:
       - chummer-api
       - chummer-blazor
@@ -205,8 +205,8 @@ services:
   chummer-playwright-portal:
     image: chummer-playwright:local
     build:
-      context: .
-      dockerfile: Docker/Dockerfile.playwright
+      context: ../../..
+      dockerfile: legacy/tooling/docker/Docker/Dockerfile.playwright
     depends_on:
       - chummer-portal
     profiles: ["portal"]

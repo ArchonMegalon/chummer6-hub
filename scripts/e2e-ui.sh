@@ -42,7 +42,7 @@ probe_docker_fallback_access() {
   local probe_log
   probe_log="$(mktemp)"
   set +e
-  docker compose --profile test ps >"$probe_log" 2>&1
+  COMPOSE_FILE=legacy/tooling/docker/docker-compose.yml docker compose --profile test ps >"$probe_log" 2>&1
   local status=$?
   set -e
   if [[ "$status" -eq 0 ]]; then
@@ -78,7 +78,7 @@ curl_with_retries() {
 docker_fetch_with_key() {
   local url="$1"
   local key="${2:-}"
-  docker compose --profile test run --rm -T chummer-playwright node -e \
+  COMPOSE_FILE=legacy/tooling/docker/docker-compose.yml docker compose --profile test run --rm -T chummer-playwright node -e \
     "const url=process.argv[1];const key=process.argv[2]||'';const headers=key?{'X-Api-Key':key}:{};fetch(url,{headers}).then(async r=>{const t=await r.text();if(!r.ok){console.error('HTTP '+r.status);process.exit(1);}process.stdout.write(t);}).catch(e=>{console.error(e.message);process.exit(1);});" \
     "$url" "$key"
 }
@@ -223,7 +223,7 @@ if [[ "$RUN_PLAYWRIGHT" == "1" ]]; then
   echo "running playwright ui e2e against ${PLAYWRIGHT_UI_URL} (timeout: ${PLAYWRIGHT_TIMEOUT_SECONDS}s)"
   playwright_log="$(mktemp)"
   set +e
-  CHUMMER_API_KEY="$API_KEY" CHUMMER_UI_PLAYWRIGHT_BASE_URL="$PLAYWRIGHT_UI_URL" \
+  CHUMMER_API_KEY="$API_KEY" CHUMMER_UI_PLAYWRIGHT_BASE_URL="$PLAYWRIGHT_UI_URL" COMPOSE_FILE=legacy/tooling/docker/docker-compose.yml \
     timeout "${PLAYWRIGHT_TIMEOUT_SECONDS}"s docker compose --profile test run --build --rm -T chummer-playwright \
     2>&1 | tee "$playwright_log"
   playwright_status=${PIPESTATUS[0]}

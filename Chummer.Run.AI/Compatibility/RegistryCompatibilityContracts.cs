@@ -1,13 +1,13 @@
 namespace Chummer.Run.AI.Compatibility;
 
-[Obsolete("Use Chummer.Hub.Registry.Contracts.HubArtifactCreateRequest.")]
+[Obsolete("Use Chummer.Run.Contracts.Registry.HubArtifactCreateRequest.")]
 internal sealed record HubProjectRequest(
     string Name,
     string Type,
     string Version,
     string Owner);
 
-[Obsolete("Use Chummer.Hub.Registry.Contracts.HubArtifactMetadata or Chummer.Run.Contracts.Registry.RegistryProjectionResponse.")]
+[Obsolete("Use Chummer.Run.Contracts.Registry.HubArtifactMetadata or Chummer.Run.Contracts.Registry.RegistryProjectionResponse.")]
 internal sealed record HubArtifactResponse(
     string Id,
     string Name,

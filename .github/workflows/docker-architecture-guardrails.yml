@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate docker compose configuration
-        run: docker compose config > /tmp/chummer-compose-config.out
+        run: docker compose -f legacy/tooling/docker/docker-compose.yml config > /tmp/chummer-compose-config.out
 
   portal-format-guardrail:
     runs-on: ubuntu-latest
@@ -105,7 +105,7 @@ jobs:
 
       - name: Compose cleanup
         if: always()
-        run: docker compose down --remove-orphans --volumes
+        run: docker compose -f legacy/tooling/docker/docker-compose.yml down --remove-orphans --volumes
 
   blazor-component-tests:
     runs-on: ubuntu-latest
@@ -139,7 +139,7 @@ jobs:
       - name: Start api + blazor stack
         env:
           CHUMMER_API_KEY: migration-smoke-key
-        run: docker compose up -d --build --remove-orphans chummer-api chummer-blazor
+        run: docker compose -f legacy/tooling/docker/docker-compose.yml up -d --build --remove-orphans chummer-api chummer-blazor
 
       - name: Playwright UI E2E
         env:
@@ -149,7 +149,7 @@ jobs:
 
       - name: Compose cleanup
         if: always()
-        run: docker compose down --remove-orphans --volumes
+        run: docker compose -f legacy/tooling/docker/docker-compose.yml down --remove-orphans --volumes
 
   linux-headless-tests:
     runs-on: ubuntu-latest

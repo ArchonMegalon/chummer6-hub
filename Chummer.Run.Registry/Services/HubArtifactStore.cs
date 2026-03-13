@@ -1,26 +1,6 @@
 using Chummer.Run.Contracts.Registry;
 using Chummer.Run.Contracts.Observability;
 using System.Collections.Concurrent;
-using HubArtifactCreateRequest = Chummer.Hub.Registry.Contracts.HubArtifactCreateRequest;
-using HubArtifactDeleteAttemptResponse = Chummer.Hub.Registry.Contracts.HubArtifactDeleteAttemptResponse;
-using HubArtifactIdentifier = Chummer.Hub.Registry.Contracts.HubArtifactIdentifier;
-using HubArtifactInstallProjection = Chummer.Hub.Registry.Contracts.HubArtifactInstallProjection;
-using HubArtifactKind = Chummer.Hub.Registry.Contracts.HubArtifactKind;
-using HubArtifactMetadata = Chummer.Hub.Registry.Contracts.HubArtifactMetadata;
-using HubArtifactState = Chummer.Hub.Registry.Contracts.HubArtifactState;
-using HubArtifactStateChangeRequest = Chummer.Hub.Registry.Contracts.HubArtifactStateChangeRequest;
-using HubArtifactStateResponse = Chummer.Hub.Registry.Contracts.HubArtifactStateResponse;
-using HubInstallEvent = Chummer.Hub.Registry.Contracts.HubInstallEvent;
-using ArtifactInstallState = Chummer.Hub.Registry.Contracts.ArtifactInstallState;
-using ArtifactInstallStates = Chummer.Hub.Registry.Contracts.ArtifactInstallStates;
-using ArtifactTrustTiers = Chummer.Hub.Registry.Contracts.ArtifactTrustTiers;
-using ArtifactVisibilityModes = Chummer.Hub.Registry.Contracts.ArtifactVisibilityModes;
-using RuntimeBundleArtifactProjection = Chummer.Hub.Registry.Contracts.RuntimeBundleArtifactProjection;
-using RuntimeBundleHeadKind = Chummer.Hub.Registry.Contracts.RuntimeBundleHeadKind;
-using RuntimeBundleHeadListResponse = Chummer.Hub.Registry.Contracts.RuntimeBundleHeadListResponse;
-using RuntimeBundleHeadProjection = Chummer.Hub.Registry.Contracts.RuntimeBundleHeadProjection;
-using RuntimeBundleIssueRequest = Chummer.Hub.Registry.Contracts.RuntimeBundleIssueRequest;
-using RuntimeBundleIssueResponse = Chummer.Hub.Registry.Contracts.RuntimeBundleIssueResponse;
 
 namespace Chummer.Run.Registry.Services;
 
@@ -130,14 +110,17 @@ public sealed class HubArtifactStore : IHubArtifactStore
 
     public HubArtifactMetadata UpsertArtifact(HubArtifactCreateRequest request)
     {
+        var rulesetId = NormalizeRulesetId(request.RulesetId);
+        var visibility = NormalizeVisibility(request.Visibility);
+        var trustTier = NormalizeTrustTier(request.TrustTier);
         var metadata = CreateArtifact(
             request.Name,
             request.Kind,
             request.Version,
-            request.RulesetId,
-            request.Visibility,
-            request.TrustTier,
-            request.OwnerId,
+            rulesetId,
+            visibility,
+            trustTier,
+            request.ResolveOwnerId(),
             request.PublisherId,
             request.Summary,
             request.Description,
@@ -155,6 +138,9 @@ public sealed class HubArtifactStore : IHubArtifactStore
         var sourceBundleVersion = request.SourceBundleVersion.Trim();
         var projectionFingerprint = request.ProjectionFingerprint.Trim();
         var collaborationMode = request.CollaborationMode.Trim();
+        var rulesetId = NormalizeRulesetId(request.RulesetId);
+        var visibility = NormalizeVisibility(request.Visibility);
+        var trustTier = NormalizeTrustTier(request.TrustTier);
         var bundleFamilyId = ComposeRuntimeBundleFamilyId(sessionId, sceneId);
         var headKey = ComposeRuntimeBundleHeadKey(bundleFamilyId, request.Head);
 
@@ -195,10 +181,10 @@ public sealed class HubArtifactStore : IHubArtifactStore
                 name,
                 HubArtifactKind.RuntimeBundle,
                 version,
-                request.RulesetId,
-                request.Visibility,
-                request.TrustTier,
-                request.OwnerId,
+                rulesetId,
+                visibility,
+                trustTier,
+                request.ResolveOwnerId(),
                 request.PublisherId,
                 summary,
                 request.Description,
@@ -831,7 +817,7 @@ public sealed class HubArtifactStore : IHubArtifactStore
             ActiveRuntimeRefCount = snapshot.ActiveRuntimeRefCount,
             LastInstalledAtUtc = snapshot.LastInstalledAtUtc
         };
-        artifact.ReviewScores.AddRange(snapshot.ReviewScores);
+        artifact.ReviewScores.AddRange(snapshot.ReviewScores ?? Array.Empty<double>());
         return artifact;
     }
 
@@ -995,4 +981,13 @@ public sealed class HubArtifactStore : IHubArtifactStore
     }
 
     private static int ToInt(long value) => value > int.MaxValue ? int.MaxValue : (int)value;
+
+    private static string NormalizeRulesetId(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "sr5" : value.Trim();
+
+    private static string NormalizeVisibility(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? ArtifactVisibilityModes.Shared : value.Trim();
+
+    private static string NormalizeTrustTier(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? ArtifactTrustTiers.Curated : value.Trim();
 }

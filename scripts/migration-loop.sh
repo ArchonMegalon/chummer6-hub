@@ -16,19 +16,19 @@ for ((iter = 1; iter <= MAX_ITERS; iter++)); do
   export CHUMMER_WEB_PORT="$PORT"
   export CHUMMER_BLAZOR_PORT="$UI_PORT"
 
-  if docker compose up -d --build --remove-orphans chummer-api chummer-blazor \
+  if COMPOSE_FILE=legacy/tooling/docker/docker-compose.yml docker compose up -d --build --remove-orphans chummer-api chummer-blazor \
     && bash scripts/audit-compliance.sh \
     && bash scripts/e2e-live.sh \
     && bash scripts/e2e-ui.sh \
     && bash scripts/e2e-auth.sh \
     && if [[ "$PORTAL_E2E" == "1" ]]; then bash scripts/e2e-portal.sh; else true; fi \
-    && docker compose --profile test run --build --rm chummer-tests; then
+    && COMPOSE_FILE=legacy/tooling/docker/docker-compose.yml docker compose --profile test run --build --rm chummer-tests; then
     echo "iteration $iter passed all gates"
     continue
   fi
 
   echo "[debug] dumping service logs after failed iteration"
-  docker compose logs --tail 200 chummer-api chummer-blazor chummer-portal || true
+  COMPOSE_FILE=legacy/tooling/docker/docker-compose.yml docker compose logs --tail 200 chummer-api chummer-blazor chummer-portal || true
   echo "iteration $iter failed; continuing to next loop"
   FAILED=$((FAILED + 1))
 done

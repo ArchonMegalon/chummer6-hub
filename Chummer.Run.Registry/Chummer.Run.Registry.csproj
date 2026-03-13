@@ -2,9 +2,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Chummer.Run.Contracts\Chummer.Run.Contracts.csproj" />
-    <Reference Include="Chummer.Hub.Registry.Contracts">
-      <HintPath>..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\bin\$(Configuration)\net10.0\Chummer.Hub.Registry.Contracts.dll</HintPath>
-    </Reference>
   </ItemGroup>
 
   <PropertyGroup>
