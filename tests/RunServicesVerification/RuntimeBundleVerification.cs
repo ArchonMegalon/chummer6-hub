@@ -1,4 +1,4 @@
-using Chummer.Run.Contracts.Registry;
+using Chummer.Hub.Registry.Contracts;
 using Chummer.Run.Registry.Services;
 
 namespace RunServicesVerification;
@@ -23,11 +23,21 @@ internal static class RuntimeBundleVerification
             IncludedEventTypes: new[] { "objective.unresolved", "relationship.shift" },
             SupportedExchangeFormats: new[] { "session-ledger.v1", "foundry-vtt.scene-ledger.v1" },
             RequestedBy: "ops.publisher",
-            Owner: "hub.ops",
+            OwnerId: "hub.ops",
+            RulesetId: "sr6",
+            Visibility: ArtifactVisibilityModes.CampaignShared,
+            TrustTier: ArtifactTrustTiers.Official,
+            PublisherId: "publisher.runtime",
+            Description: "Session bundle for the Redmond scene.",
             Summary: "Session head bundle"));
 
         VerificationAssert.True(sessionIssued.CreatedNewArtifact, "First runtime-bundle issue should create a new immutable artifact.");
         VerificationAssert.Equal(HubArtifactKind.RuntimeBundle, sessionIssued.Artifact.Kind, "Issued runtime bundles should land in the runtime-bundle registry kind.");
+        VerificationAssert.Equal("sr6", sessionIssued.Artifact.RulesetId, "Runtime-bundle issuance should preserve caller-supplied ruleset metadata.");
+        VerificationAssert.Equal(ArtifactVisibilityModes.CampaignShared, sessionIssued.Artifact.Visibility, "Runtime-bundle issuance should preserve caller-supplied visibility.");
+        VerificationAssert.Equal(ArtifactTrustTiers.Official, sessionIssued.Artifact.TrustTier, "Runtime-bundle issuance should preserve caller-supplied trust tier.");
+        VerificationAssert.Equal("publisher.runtime", sessionIssued.Artifact.PublisherId, "Runtime-bundle issuance should preserve caller-supplied publisher metadata.");
+        VerificationAssert.Equal("Session bundle for the Redmond scene.", sessionIssued.Artifact.Description, "Runtime-bundle issuance should preserve caller-supplied descriptions.");
         VerificationAssert.Equal(RuntimeBundleHeadKind.Session, sessionIssued.Projection.Head, "Runtime-bundle projections should preserve the head kind.");
         VerificationAssert.Equal(sessionIssued.Artifact.Id, sessionIssued.Head.CurrentArtifactId, "Head projections should point at the issued artifact.");
 
@@ -45,7 +55,12 @@ internal static class RuntimeBundleVerification
             IncludedEventTypes: new[] { "objective.unresolved", "relationship.shift" },
             SupportedExchangeFormats: new[] { "session-ledger.v1", "foundry-vtt.scene-ledger.v1" },
             RequestedBy: "ops.publisher",
-            Owner: "hub.ops",
+            OwnerId: "hub.ops",
+            RulesetId: "sr6",
+            Visibility: ArtifactVisibilityModes.CampaignShared,
+            TrustTier: ArtifactTrustTiers.Official,
+            PublisherId: "publisher.runtime",
+            Description: "Session bundle for the Redmond scene.",
             Summary: "Session head bundle"));
 
         VerificationAssert.True(!repeated.CreatedNewArtifact, "Issuing the same runtime bundle head twice should be idempotent.");
@@ -65,7 +80,12 @@ internal static class RuntimeBundleVerification
             IncludedEventTypes: new[] { "objective.unresolved", "relationship.shift" },
             SupportedExchangeFormats: new[] { "session-ledger.v1", "mobile-bootstrap.v1" },
             RequestedBy: "ops.publisher",
-            Owner: "hub.ops",
+            OwnerId: "hub.ops",
+            RulesetId: "sr6",
+            Visibility: ArtifactVisibilityModes.CampaignShared,
+            TrustTier: ArtifactTrustTiers.Official,
+            PublisherId: "publisher.runtime",
+            Description: "Mobile bundle for the Redmond scene.",
             Summary: "Mobile head bundle"));
 
         VerificationAssert.True(mobileIssued.CreatedNewArtifact, "Different runtime-bundle heads should issue distinct immutable artifacts.");
@@ -85,7 +105,12 @@ internal static class RuntimeBundleVerification
             IncludedEventTypes: new[] { "objective.unresolved", "relationship.shift", "heat.alert" },
             SupportedExchangeFormats: new[] { "session-ledger.v1", "foundry-vtt.scene-ledger.v1" },
             RequestedBy: "ops.publisher",
-            Owner: "hub.ops",
+            OwnerId: "hub.ops",
+            RulesetId: "sr6",
+            Visibility: ArtifactVisibilityModes.CampaignShared,
+            TrustTier: ArtifactTrustTiers.Official,
+            PublisherId: "publisher.runtime",
+            Description: "Session bundle for the Redmond scene v3.",
             Summary: "Session head bundle v3"));
 
         VerificationAssert.True(sessionUpdated.CreatedNewArtifact, "A new projection fingerprint should issue a new immutable artifact.");

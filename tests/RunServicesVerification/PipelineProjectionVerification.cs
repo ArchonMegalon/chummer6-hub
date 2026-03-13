@@ -1,9 +1,9 @@
 using Chummer.Media.Contracts;
+using Chummer.Hub.Registry.Contracts;
 using Chummer.Run.AI.Services.Assets;
 using Chummer.Run.AI.Services.Gateway;
 using Chummer.Run.AI.Services.Session;
 using PlayGateway = Chummer.Play.Contracts.Gateway;
-using Chummer.Run.Contracts.Registry;
 using Chummer.Run.Registry.Services;
 using Microsoft.Extensions.Configuration;
 using System.Threading;
@@ -144,8 +144,13 @@ internal static class PipelineProjectionVerification
             Name: "Registry C10",
             Kind: HubArtifactKind.RulePack,
             Version: "1.0.0",
-            Owner: "ops",
+            RulesetId: "sr6",
+            Visibility: ArtifactVisibilityModes.LocalOnly,
+            TrustTier: ArtifactTrustTiers.LocalOnly,
+            OwnerId: "ops",
+            PublisherId: null,
             Summary: "observability projection",
+            Description: null,
             RuntimeFingerprint: "fp",
             StateReason: null));
         _ = store.IssueRuntimeBundle(new RuntimeBundleIssueRequest(
@@ -160,7 +165,8 @@ internal static class PipelineProjectionVerification
             CollaborationMode: "hybrid",
             InvalidationSignals: ["projection:1"],
             IncludedEventTypes: ["event"],
-            SupportedExchangeFormats: ["foundry-vtt.scene-ledger.v1"]));
+            SupportedExchangeFormats: ["foundry-vtt.scene-ledger.v1"],
+            OwnerId: "ops"));
         _ = store.IssueRuntimeBundle(new RuntimeBundleIssueRequest(
             SessionId: "session-c10",
             SceneId: "scene-c10",
@@ -173,7 +179,8 @@ internal static class PipelineProjectionVerification
             CollaborationMode: "hybrid",
             InvalidationSignals: ["projection:1"],
             IncludedEventTypes: ["event"],
-            SupportedExchangeFormats: ["foundry-vtt.scene-ledger.v1"]));
+            SupportedExchangeFormats: ["foundry-vtt.scene-ledger.v1"],
+            OwnerId: "ops"));
 
         _ = store.AttemptDelete(artifact.Id);
         var projection = store.GetRegistryPipelineProjection();

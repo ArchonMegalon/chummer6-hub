@@ -1,7 +1,23 @@
 using Chummer.Run.Contracts.Registry;
 using Chummer.Run.Contracts.Observability;
 using Chummer.Run.Registry.Services;
+using HubArtifactCreateRequest = Chummer.Hub.Registry.Contracts.HubArtifactCreateRequest;
+using HubArtifactDeleteAttemptResponse = Chummer.Hub.Registry.Contracts.HubArtifactDeleteAttemptResponse;
+using HubArtifactIdentifier = Chummer.Hub.Registry.Contracts.HubArtifactIdentifier;
+using HubArtifactInstallProjection = Chummer.Hub.Registry.Contracts.HubArtifactInstallProjection;
+using HubArtifactKind = Chummer.Hub.Registry.Contracts.HubArtifactKind;
+using HubArtifactMetadata = Chummer.Hub.Registry.Contracts.HubArtifactMetadata;
+using HubArtifactState = Chummer.Hub.Registry.Contracts.HubArtifactState;
+using HubArtifactStateChangeRequest = Chummer.Hub.Registry.Contracts.HubArtifactStateChangeRequest;
+using HubArtifactStateResponse = Chummer.Hub.Registry.Contracts.HubArtifactStateResponse;
+using HubInstallEvent = Chummer.Hub.Registry.Contracts.HubInstallEvent;
 using Microsoft.AspNetCore.Mvc;
+using RuntimeBundleArtifactProjection = Chummer.Hub.Registry.Contracts.RuntimeBundleArtifactProjection;
+using RuntimeBundleHeadKind = Chummer.Hub.Registry.Contracts.RuntimeBundleHeadKind;
+using RuntimeBundleHeadListResponse = Chummer.Hub.Registry.Contracts.RuntimeBundleHeadListResponse;
+using RuntimeBundleHeadProjection = Chummer.Hub.Registry.Contracts.RuntimeBundleHeadProjection;
+using RuntimeBundleIssueRequest = Chummer.Hub.Registry.Contracts.RuntimeBundleIssueRequest;
+using RuntimeBundleIssueResponse = Chummer.Hub.Registry.Contracts.RuntimeBundleIssueResponse;
 
 namespace Chummer.Run.Registry.Controllers;
 

@@ -286,9 +286,9 @@ executable_queue:
   notes: Completed on 2026-03-11T23:31:00Z with review-context mirrors republished into core, ui, hub, mobile, ui-kit, hub-registry, and media-factory.
 - id: WL-D008
   milestone: F3
-  status: blocked
+  status: done
   backlog: products/chummer/sync/LOCAL_MIRROR_PUBLISH_BACKLOG.md
-  notes: Initial publish completed on 2026-03-12T01:10:38Z, but WL-D009 freshness recheck at 2026-03-12T01:16:25Z found unresolved `PROGRAM_MILESTONES.yaml` drift in all seven mirrors; queue remains blocked until parity republish + checksum re-verification.
+  notes: Completed on 2026-03-13T10:19:08Z after republishing WL-D008-01..07 mirror subsets across all seven code repos and re-verifying `PROGRAM_MILESTONES.yaml` checksum parity in `products/chummer/sync/LOCAL_MIRROR_PUBLISH_EVIDENCE.md`.
 - id: WL-D009
   milestone: F3
   status: in_progress
