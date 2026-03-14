@@ -1,4 +1,11 @@
 # Review guidelines
-- Generic review checklist
 - Flag engine session primitive duplication as P1.
 - Flag hosted DTOs leaking internal provider or policy details as P1.
+- Reject if changes blur registry-service boundary (must remain under `chummer6-hub-registry`):
+  - duplicate artifact publication state, moderation routing, install/review contract behavior,
+  - or persistent compatibility metadata outside registry ownership.
+- Reject if media orchestration, render-provider execution, or preview lifecycle logic appears in `chummer6-hub`:
+  - this remains owned by `chummer6-media-factory` unless explicitly mirrored at API boundaries.
+- Reject any change that moves play/runtime contracts or session behavior into `chummer6-hub`:
+  - `Chummer.Play.Contracts` and hosted play-shell contracts must remain consumed and boundary-respected.
+- Keep hosted/session orchestration checks in `chummer6-hub` scoped to approval, relay, memory, routing, and orchestration policy only.
