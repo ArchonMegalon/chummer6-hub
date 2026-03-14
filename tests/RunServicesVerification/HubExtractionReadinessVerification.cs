@@ -106,7 +106,7 @@ internal static class HubExtractionReadinessVerification
             "Run-services implementation scope");
         VerifyMirrorFile(
             Path.Combine(RepoRoot, ".codex-design", "review", "REVIEW_CONTEXT.md"),
-            "Generic review checklist");
+            "Review guidelines");
     }
 
     private static void VerifyAcceptanceDocument()
@@ -124,6 +124,7 @@ internal static class HubExtractionReadinessVerification
                      "WL-218",
                      "WL-219",
                      "WL-220",
+                     "WL-228",
                      "WL-209",
                      "WL-210",
                      "WL-211",
@@ -165,14 +166,18 @@ internal static class HubExtractionReadinessVerification
                      "4367",
                      "8667",
                      "21817",
+                     "21818",
                      "53652",
                      "53653",
                      "53654",
+                     "53655",
                      "8668",
                      "8697",
                      "8698",
                      "21924",
                      "2369",
+                     "C2",
+                     "R0",
                      "Chummer.Run.Registry",
                      "Chummer.Play.Contracts",
                      "Chummer.Media.Contracts",
@@ -346,7 +351,7 @@ internal static class HubExtractionReadinessVerification
         AssertExecutableQueueItem(
             milestoneText,
             "WL-D009",
-            "status: in_progress",
+            "status: done",
             "backlog: products/chummer/sync/TRUTH_MAINTENANCE_BACKLOG.md");
         AssertExecutableQueueItem(
             milestoneText,

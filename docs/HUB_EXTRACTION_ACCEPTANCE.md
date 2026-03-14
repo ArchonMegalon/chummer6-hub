@@ -51,9 +51,11 @@ Issue and migration anchors preserved in this acceptance narrative:
 - 11709
 - 21817
 - 21924
+- 21818
 - 53652
 - 53653
 - 53654
+- 53655
 
 ## WL-207 runnable publication outputs
 
@@ -118,8 +120,26 @@ Issue and migration anchors preserved in this acceptance narrative:
   - `scripts/ai/run_services_smoke.sh`
   - `scripts/ai/run_services_verification.sh`
   - `scripts/ai/verify.sh`
-  - `tests/RunServicesVerification/StateStoreBackupVerification.cs`
-  - `tests/RunServicesVerification/RuntimeBundleVerification.cs`
+- `tests/RunServicesVerification/StateStoreBackupVerification.cs`
+- `tests/RunServicesVerification/RuntimeBundleVerification.cs`
+
+## WL-228 legacy root-clutter milestone mapping materialization (`C2` / `R0`)
+
+- Source publication candidates: `21818`, `53655` (`project.uncovered_scope`, `project.queue_exhausted_with_uncovered_scope`).
+- Scope: explicit milestone/backlog mapping for the finding "Legacy desktop/tooling clutter still shares the run-services repo root with hosted-service code."
+- Mapping decision: this lane is already executable through the completed legacy-root boundary move set, so no new queue IDs were opened.
+- Executable backlog anchors already closed:
+  - `WL-207` publication/inventory lane (`docs/LEGACY_ROOT_SURFACE_INVENTORY.md`)
+  - `WL-209` (`Docker/` and `docker-compose.yml` moved under `legacy/tooling/docker/`)
+  - `WL-210` (`docker-compose.dcproj` and `settings/` moved behind `legacy/...` boundaries)
+  - `WL-211` (`Plugins/` moved behind legacy interoperability boundary)
+  - `WL-212` (legacy architecture document moved out of repo root)
+- Milestone alignment:
+  - Program milestone: `C2` (run-services shrink)
+  - Repo milestone spine: `R0` (shrink-to-boundary reset)
+- Executable verification path:
+  - `tests/RunServicesVerification/HubExtractionReadinessVerification.cs` (`VerifyLegacyRootBoundaryMoves`)
+  - `scripts/ai/verify.sh`
 
 ## Boundary artifacts that must stay aligned
 
