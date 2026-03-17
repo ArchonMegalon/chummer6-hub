@@ -50,11 +50,11 @@ The only repo allowed to own render execution and render-asset lifecycle.
 Any of the following is an ownership violation:
 
 * a repo introduces a shared cross-repo DTO family outside its canonical package
-* run-services reintroduces media rendering or registry persistence after those splits complete
-* presentation reclaims play-shell ownership
-* play reimplements rules truth
+* hub reintroduces media rendering or registry persistence after those splits complete
+* ui reclaims play-shell ownership
+* mobile reimplements rules truth
 * ui-kit gains domain DTOs or HTTP clients
-* engine begins depending on presentation/play/service code
+* engine begins depending on ui/mobile/hub code
 * design repo becomes stale enough that code repos must invent architecture locally
 
 

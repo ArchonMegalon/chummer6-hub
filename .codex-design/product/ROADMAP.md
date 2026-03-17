@@ -28,9 +28,9 @@ This roadmap carries the program all the way to finished-state vision, not just 
 
 ### B1 — UI kit real
 
-`chummer6-ui-kit` becomes the actual shared design system package used by presentation and play.
+`chummer6-ui-kit` becomes the actual shared design system package used by UI and mobile.
 
-### B2 — Presentation purified
+### B2 — UI purified
 
 `chummer6-ui` becomes workbench/browser/desktop only, with no play-shell confusion.
 
@@ -44,7 +44,7 @@ This roadmap carries the program all the way to finished-state vision, not just 
 
 `chummer6-media-factory` takes ownership of render jobs, manifests, previews, and asset lifecycle.
 
-### C2 — Run-services shrink
+### C2 — Hub shrink
 
 `chummer6-hub` becomes a clean orchestration service rather than a hidden super-repo.
 
@@ -66,11 +66,11 @@ Runtime bundles, fingerprints, and replay-safe payloads stabilize across engine 
 
 ### E0 — Workbench complete
 
-Presentation ships robust builder, compare, explain, publish, review, and admin surfaces.
+UI ships robust builder, compare, explain, publish, review, and admin surfaces.
 
 ### E1 — Play complete
 
-Play ships installable PWA/mobile session OS for players and GMs.
+Mobile ships installable PWA/mobile session OS for players and GMs.
 
 ### E2 — Hub complete
 
@@ -92,7 +92,7 @@ Cross-head quality bar is real.
 
 ### F1 — Replay, observability, DR
 
-Core, run-services, registry, and media all have operational confidence.
+Core, hub, registry, and media all have operational confidence.
 
 ### F2 — Legacy migration and certification
 
@@ -130,7 +130,7 @@ H0 contract canon -> H1 artifact domain -> H2 publication drafts -> H3 install/c
 
 ### `chummer6-media-factory`
 
-M0 contract canon -> M1 asset/job kernel -> M2 document rendering -> M3 portrait forge -> M4 bounded video -> M5 template/style integration -> M6 run-services cutover -> M7 storage/DR/scale -> M8 finished media plant.
+M0 contract canon -> M1 asset/job kernel -> M2 document rendering -> M3 portrait forge -> M4 bounded video -> M5 template/style integration -> M6 hub cutover -> M7 storage/DR/scale -> M8 finished media plant.
 
 ### `chummer6-hub`
 

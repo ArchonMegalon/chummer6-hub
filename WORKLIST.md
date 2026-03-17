@@ -11,6 +11,8 @@ Purpose: keep the live hosted-boundary queue readable. Historical re-entry and q
 ## Queue
 | ID | Status | Priority | Task | Owner | Notes |
 |---|---|---|---|---|---|
+| WL-231 | queued | P1 | Keep `Chummer.Media.Contracts` physically separated from hosted ownership by moving any repo-local contract copy into explicit compatibility wrappers only. | agent | Publish the expected ownership boundary into `docs/HOSTED_BOUNDARY.md` and verification evidence so no hosted code path can be mistaken for persistent media contract truth. |
+| WL-232 | queued | P1 | Add transport-wrapper evidence for `Play` and `Run` seams to prove runtime/protocol ownership moved to `chummer6-mobile` and `chummer6-core` respectively. | agent | Add route/contracts map for `/api/play/*` and `Chummer.Run.Contracts` reads so D1/session-semantics ownership is explicit and replay checks remain transport-only. |
 | WL-216 | done | P1 | Materialize explicit backlog/evidence anchors for `A2` and `A3` contract canon lanes. | agent | Closed 2026-03-13: hosted/play/run contract canon anchors now exist in `docs/HUB_EXTRACTION_ACCEPTANCE.md` and the verification suite keeps them executable. |
 | WL-217 | done | P1 | Materialize orchestration-side external-adapter acceptance anchors (`C1b`). | agent | Closed 2026-03-13: the hub boundary now documents receipt, kill-switch, and adapter expectations instead of relying on folklore. |
 | WL-218 | done | P1 | Materialize session semantic canon acceptance anchors (`D1`). | agent | Closed 2026-03-13: session-semantic canon is explicitly tracked as shared truth between hub, core, and mobile instead of being buried in queue prose. |
