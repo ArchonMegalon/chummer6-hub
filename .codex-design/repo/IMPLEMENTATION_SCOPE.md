@@ -1,98 +1,48 @@
-# Run-services implementation scope
+# Hub implementation scope
 
 ## Mission
 
-`chummer6-hub` owns hosted orchestration: identity, session relay, Spider, Coach, approvals, play API aggregation, delivery, memory, and service-to-service policy.
+`chummer6-hub` owns hosted orchestration, play API aggregation, identity, approvals, memory, and orchestration-side automation for Chummer6.
 
 ## Owns
 
-* identity and campaign/session access control
-* play API aggregation
-* relay and hosted session coordination
-* approvals and reviewable actions
-* Coach / Spider / Director orchestration
-* memory, recap, and delivery workflows
-* service policy and external-service coordination
-* run-service contract canon
+* hosted orchestration and relay seams
+* identity, approvals, memory, and delivery on the hosted side
+* play API aggregation and hosted session coordination
+* orchestration-side Coach/Spider/Director surfaces
+* hosted external-integration routing that is not render-only media execution
 
-## Must not own long-term
+## Must not own
 
-* registry persistence internals after `chummer6-hub-registry`
-* media render internals after `chummer6-media-factory`
-* duplicate engine event semantics
-* canonical rules math
+* engine or reducer truth
+* player/GM/mobile shell UX
+* shared UI-kit primitives
+* long-term registry persistence ownership after the registry split
+* long-term render execution ownership after the media-factory split
 
-## Current split focus
+## Package boundary
 
-* publish and stabilize `Chummer.Play.Contracts`
-* keep `Chummer.Run.Contracts` focused on orchestration concerns
-* dedupe any semantic session DTO overlap with engine canon
-* route registry work through `chummer6-hub-registry`
-* route render/media execution through `chummer6-media-factory`
-* shrink root-level legacy clutter and stale README architecture claims
+Canonical hosted package plane:
 
-## Milestone spine
+* `Chummer.Play.Contracts`
+* `Chummer.Run.Contracts`
 
-* R0 shrink-to-boundary reset
-* R1 package canon
-* R2 identity/campaign core
-* R3 play APIs and relay
-* R4 skill runtime
-* R5 Spider/Director/memory
-* R6 orchestration-only registry/media mode
-* R7 notifications/docs/delivery
-* R8 resilience/compliance
-* R9 finished hosted orchestration
+Mixed contract planes are temporary debt, not acceptable end state.
 
-## Worker rule
+## Boundary truth
 
-If it is about hosted orchestration and policy, it belongs here.
-If it is about canonical mechanics, registry persistence, or render execution, it does not.
+Closing `A2`, `A3`, `C0`, and `C1` requires physical shrinkage, not only correct README wording.
 
+The hub boundary is only considered clean when:
 
-## External integrations scope
+* registry persistence authority is visibly owned by `chummer6-hub-registry`
+* render-only media execution is visibly owned by `chummer6-media-factory`
+* hub no longer reads like the hidden super-repo for every hosted concern
+* active worklists highlight hosted implementation work instead of reconciliation churn
 
-`chummer6-hub` is the orchestration owner for all non-render external-tool integrations.
+## Current reality
 
-### Owns
+The mission statement is correct.
+The repo body still carries more authority than the mission statement allows.
 
-* `IReasoningProviderRoute`
-* `IApprovalBridge`
-* `IDocumentationBridge`
-* `ISurveyBridge`
-* `IAutomationBridge`
-* `IEvalLabAdapter`
-* `IResearchAssistAdapter`
-* prompt/style/persona toolchain orchestration
-* provider-route receipts for non-media operations
-
-### Initial vendor mapping
-
-* 1min.AI - fallback reasoning and multimodal route
-* AI Magicx - structured AI route
-* Prompting Systems - prompt/style authoring support
-* ChatPlayground AI - eval lab only
-* BrowserAct - no-API automation fallback, off critical path
-* ApproveThis - approval bridge
-* Documentation.AI - docs/help bridge
-* MetaSurvey - survey bridge
-* Teable - curated ops projection bridge
-* ApiX-Drive - low-risk automation bridge
-* Paperguide - cited research assist
-* Vizologi - design/program strategy support only
-
-### Must not own
-
-* document/image/video rendering internals
-* media binary lifecycle
-* direct provider use from clients
-* canonical rules math
-* registry truth
-
-### Required design rules
-
-* every provider route emits a Chummer receipt
-* every provider route is kill-switchable
-* every provider route degrades gracefully
-* every provider route preserves Chummer as system of record
-
+This repo should keep shrinking until the tree looks like the boundary story sounds.

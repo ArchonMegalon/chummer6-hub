@@ -31,7 +31,7 @@ No source-copy mirrors of cross-repo DTOs are allowed.
 
 No other repo may compute or redefine canonical mechanics.
 
-### Rule 4 — Hosted orchestration lives in run-services
+### Rule 4 — Hosted orchestration lives in hub
 
 `chummer6-hub` owns:
 
@@ -56,7 +56,7 @@ No silent re-merging of those surfaces is allowed.
 ### Rule 6 — UI-kit is the only shared UI boundary
 
 Shared visual tokens, shell primitives, and reusable components belong in `chummer6-ui-kit`.
-Presentation and play consume the package.
+UI and mobile consume the package.
 They do not fork it.
 
 ### Rule 7 — Registry is a service boundary
@@ -89,13 +89,13 @@ chummer6-ui-kit
 chummer6-ui
   ├─ consumes Chummer.Engine.Contracts
   ├─ consumes Chummer.Ui.Kit
-  └─ consumes hosted projections from run-services / registry
+  └─ consumes hosted projections from hub / registry
 
 chummer6-mobile
   ├─ consumes Chummer.Engine.Contracts
   ├─ consumes Chummer.Play.Contracts
   ├─ consumes Chummer.Ui.Kit
-  └─ consumes hosted play projections from run-services
+  └─ consumes hosted play projections from hub
 
 chummer6-hub
   ├─ publishes Chummer.Play.Contracts
@@ -116,31 +116,31 @@ chummer6-media-factory
 
 ### Allowed
 
-* presentation -> engine contracts
-* presentation -> ui-kit
-* play -> engine contracts
-* play -> play contracts
-* play -> ui-kit
-* run-services -> engine contracts
-* run-services -> play contracts
-* run-services -> run contracts
-* run-services -> registry contracts
-* run-services -> media contracts
+* ui -> engine contracts
+* ui -> ui-kit
+* mobile -> engine contracts
+* mobile -> play contracts
+* mobile -> ui-kit
+* hub -> engine contracts
+* hub -> play contracts
+* hub -> run contracts
+* hub -> registry contracts
+* hub -> media contracts
 * hub-registry -> its own contracts
 * media-factory -> its own contracts
 
 ### Forbidden
 
-* core -> presentation
-* core -> play
-* core -> run-services
-* play -> presentation
-* play -> run-services implementation source
-* presentation -> play implementation source
+* core -> ui
+* core -> mobile
+* core -> hub
+* mobile -> ui
+* mobile -> hub implementation source
+* ui -> mobile implementation source
 * ui-kit -> domain DTO packages
 * media-factory -> play contracts
 * media-factory -> campaign/session DB semantics
-* run-services -> duplicated engine semantic DTOs once canonical package owner exists
+* hub -> duplicated engine semantic DTOs once canonical package owner exists
 
 ## New repo split gate
 
@@ -221,4 +221,3 @@ This plane exists to integrate owned third-party capabilities without allowing a
 * no third-party tool holds canonical approval state
 * no third-party tool owns Chummer media manifests
 * no third-party tool bypasses Chummer moderation or canonization
-

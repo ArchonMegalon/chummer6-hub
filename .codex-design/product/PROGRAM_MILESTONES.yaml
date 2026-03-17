@@ -1,6 +1,39 @@
 product: chummer
-last_reviewed: 2026-03-13
+last_reviewed: 2026-03-14
 release_track: vnext-foundation
+repo_boundary_purity:
+- repo: chummer6-design
+  status: caution
+  score: 0.84
+  reason: Canonical naming drift is being retired, but historical aliases still exist for compatibility.
+- repo: chummer6-core
+  status: caution
+  score: 0.58
+  reason: Contract canon is improving, but legacy app/plugin and non-engine cargo still overstate engine ownership.
+- repo: chummer6-ui
+  status: risk
+  score: 0.41
+  reason: Feature delivery is ahead of boundary cleanup; legacy desktop/helper/tooling roots still make the repo body too broad.
+- repo: chummer6-hub
+  status: risk
+  score: 0.47
+  reason: The hosted boundary is conceptually right, but registry/media spillover and legacy root breadth still need shrink-to-fit cleanup.
+- repo: chummer6-mobile
+  status: healthy
+  score: 0.79
+  reason: Package-only and play-shell boundaries are mostly right; the remaining work is seam hardening and stale naming cleanup.
+- repo: chummer6-ui-kit
+  status: healthy
+  score: 0.74
+  reason: The shared package boundary is clear, but adoption evidence and deterministic downstream consumption still need closure.
+- repo: chummer6-hub-registry
+  status: healthy
+  score: 0.71
+  reason: Contract shape is strong; the next proof is visible service/read-model authority leaving hub.
+- repo: chummer6-media-factory
+  status: caution
+  score: 0.62
+  reason: The render-only contract plane exists, but scaffold-stage status remains until live execution and cutover proof are complete.
 program_phases:
 - id: A
   title: Design and contract canon
@@ -314,3 +347,23 @@ executable_queue:
   status: done
   backlog: products/chummer/sync/TRUTH_MAINTENANCE_BACKLOG.md
   notes: Completed on 2026-03-13T19:35:00Z after confirming the latest recurring split-wave truth-maintenance closeout remains `WL-D013 Cycle 2026-03-13O` in `products/chummer/maintenance/TRUTH_MAINTENANCE_LOG.md` with explicit no-change evidence for ownership matrix, contract canon, blockers, and milestone registry; the recurring lane now reopens only when a new delta exists.
+- id: WL-D014
+  milestone: F3
+  status: done
+  backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
+  notes: Completed on 2026-03-14T06:54:15Z: recurring parity check detected no drift across checked targets, and explicit no-change parity evidence was appended for every checked mirror target in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md`.
+- id: WL-D016
+  milestone: F3
+  status: queued
+  backlog: products/chummer/sync/TRUTH_MAINTENANCE_BACKLOG.md
+  notes: Recurring truth-maintenance lane reopened on 2026-03-14 so ownership matrix, contract canon, blockers, and milestone truth stay cycle-runnable with dated evidence in `products/chummer/maintenance/TRUTH_MAINTENANCE_LOG.md` (`WL-D016 Cycle 2026-03-14C` refreshed `CONTRACT_SETS.yaml` and `PROGRAM_MILESTONES.yaml`; ownership/contract/blocker/milestone status and exit criteria remained unchanged with `last_reviewed` at 2026-03-14).
+- id: WL-D017
+  milestone: F3
+  status: queued
+  backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
+  notes: Recurring review-template parity lane is queued so `.codex-design/review/REVIEW_CONTEXT.md` mirrors stay runnable and design-aware each cycle via WL-D014-01..04, with dated evidence appended in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md` (latest completed cycle `2026-03-14T06:54:15Z` with explicit no-change parity evidence for every checked target).
+- id: WL-D018
+  milestone: F3
+  status: queued
+  backlog: products/chummer/sync/LOCAL_MIRROR_PUBLISH_BACKLOG.md
+  notes: Recurring repo-local mirror lane is queued so `.codex-design/product`, `.codex-design/repo`, and `.codex-design/review` subsets remain current for workers and GitHub review each cycle via WL-D018-01..05, with dated evidence appended in `products/chummer/sync/LOCAL_MIRROR_PUBLISH_EVIDENCE.md`; WL-D008 remains the completed initial publication wave.

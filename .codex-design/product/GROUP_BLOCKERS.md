@@ -3,7 +3,7 @@
 Last reviewed: 2026-03-13
 
 Review-template mirror drift status:
-- `BLK-007` remains cleared after WL-D012 drift follow-up completion and the `chummer6-ui` presentation-template parity revalidation recorded on `2026-03-13T18:15:19Z`.
+- `BLK-007` remains cleared after WL-D012 drift follow-up completion and the `chummer6-ui` UI-template parity revalidation recorded on `2026-03-13T18:15:19Z`.
 - Completed WL-D007 drift rows now include `57`, `58`, `59`, `60`, `61`, `62`, and `63` with publish/revalidation evidence in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md`.
 
 ## RED blockers
@@ -78,7 +78,7 @@ Owners:
 
 ### BLK-006 — README drift in older repos
 
-Core and run-services still narrate older multi-head runtime ownership in ways that can mislead workers.
+Core and hub still narrate older multi-head runtime ownership in ways that can mislead workers.
 
 Owners:
 
@@ -88,6 +88,6 @@ Owners:
 ## GREEN candidates once current blockers clear
 
 * full hub-registry extraction
-* run-services shrink phase
+* hub shrink phase
 * engine purification phase
 * release hardening phase
