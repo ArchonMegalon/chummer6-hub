@@ -1,5 +1,5 @@
 product: chummer
-last_reviewed: 2026-03-17
+last_reviewed: 2026-03-18
 release_track: vnext-foundation
 repo_boundary_purity:
 - repo: chummer6-design
@@ -87,7 +87,7 @@ program_phases:
     - chummer6-design
     - chummer6-hub
     - chummer6-media-factory
-    status: open
+    status: complete
     exit:
     - External tools policy exists centrally.
     - All owned tools are classified by architectural role.
@@ -123,7 +123,7 @@ program_phases:
     - chummer6-design
     - chummer6-hub
     - chummer6-media-factory
-    status: open
+    status: complete
     exit:
     - Owned tools are mapped to promoted, bounded, parked, or non-product states.
     - Explicit owners exist for promoted and bounded product lanes.
