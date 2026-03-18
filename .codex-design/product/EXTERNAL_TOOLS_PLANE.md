@@ -44,6 +44,7 @@ Current known external-tool inventory includes:
 * ApproveThis
 * AvoMap
 * BrowserAct
+* Browserly
 * Crezlo Tours
 * Documentation.AI
 * First Book ai
@@ -72,6 +73,17 @@ Important current distinctions:
 * Paperguide - workspace integration Tier 3, vendor license plan Tier 4
 
 Chummer routing, rollout, and architectural ownership should follow workspace integration tier and system-of-record safety rules, not marketing or license-plan tier labels.
+
+## Horizon-facing bounded lanes
+
+Horizons may consume owned LTDs only through bounded capability lanes.
+The horizon docs decide whether a lane is active; this document decides which kinds of LTD use are architecturally allowed.
+
+Current horizon-facing posture:
+
+* `jackpoint` - narrated recap and briefing lanes may use `Soundmadeseen`; bounded candidate voice may use `Unmixr AI`; evidence/capture packets may use `Browserly`
+* `runsite` - explorable location artifacts may use `Crezlo Tours`, `AvoMap`, and `PeekShot`; optional narration may use `Soundmadeseen`; bounded capture/reference packets may use `Browserly`
+* `runbook-press` - long-form authoring and export may use `First Book ai`, `MarkupGo`, and `Documentation.AI`; narrated companion assets may use `Soundmadeseen`; bounded candidate voice or reference capture may use `Unmixr AI` and `Browserly`
 
 ## Classification model
 
@@ -395,6 +407,28 @@ Automation fallback and account-fact discovery.
 * never a critical hot-path requirement
 * never a canonical runtime store
 * never direct user-facing truth
+
+## Browserly
+
+### Role
+
+Bounded browser capture and reference-pack helper.
+
+### Architectural use
+
+* bounded page capture for horizon evidence packs
+* reference snapshots for run-site, guide, and recap research
+* structured crawl support where BrowserAct is too workflow-heavy
+
+### Owner
+
+* `chummer6-hub`
+
+### Hard boundary
+
+* not a live product runtime dependency
+* not a canonical archive or registry surface
+* not user-facing truth by itself
 
 ## ApproveThis
 

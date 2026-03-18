@@ -34,6 +34,7 @@ It does not imply that every owned tool must be integrated.
 * `Vizologi` - product strategy and ideation support only
 * `Teable` - curation and projection board only, never system of record
 * `ApiX-Drive` - low-risk automation glue only, never truth
+* `Browserly` - bounded browser capture and reference-pack helper
 * `Unmixr AI` - candidate voice lane until proven
 
 ## Research / Parked
@@ -55,3 +56,26 @@ Default owner posture:
 * `chummer6-media-factory` - document, image, preview, audio, video, route, and archive adapters
 * `chummer6-hub-registry` - publication references and compatibility metadata
 * `chummer6-design` - policy, classification, and rollout authority
+
+## Bounded owner assignments
+
+* `Paperguide` - `chummer6-design` for design research, `chummer6-hub` for operator help/research assist
+* `Teable` - `chummer6-hub` for curation/projection workflows
+* `ApiX-Drive` - `chummer6-hub` for low-risk automation glue
+* `Browserly` - `chummer6-hub` for bounded capture/reference packets
+* `Unmixr AI` - `chummer6-media-factory` for bounded voice experiments
+
+## Horizon capability map
+
+* `jackpoint`
+  `Soundmadeseen` is the promoted narration lane for recap and briefing media.
+  `Unmixr AI` is bounded candidate voice only.
+  `Browserly` is bounded evidence and reference capture only.
+* `runsite`
+  `Crezlo Tours`, `AvoMap`, and `PeekShot` are the promoted explorable/location lanes.
+  `Soundmadeseen` is an optional narration layer.
+  `Browserly` is bounded capture and reference support only.
+* `runbook-press`
+  `First Book ai`, `MarkupGo`, and `Documentation.AI` are the promoted authoring/export lanes.
+  `Soundmadeseen` is the promoted narrated companion lane.
+  `Unmixr AI` and `Browserly` remain bounded helper lanes only.
