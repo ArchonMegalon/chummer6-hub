@@ -344,6 +344,11 @@ internal static class CompatibilityVerification
             throw new InvalidOperationException("Boundary manifest must declare ACTIVE_HOSTED_PROJECTS.");
         }
 
+        if (!values.TryGetValue("EXTERNAL_OWNER_PACKAGES", out var externalOwnerPackagesValue))
+        {
+            throw new InvalidOperationException("Boundary manifest must declare EXTERNAL_OWNER_PACKAGES.");
+        }
+
         if (!values.TryGetValue("ORACLE_ROOTS", out var oracleRootsValue))
         {
             throw new InvalidOperationException("Boundary manifest must declare ORACLE_ROOTS.");
@@ -355,18 +360,25 @@ internal static class CompatibilityVerification
         }
 
         var expectedHostedProjects = SplitManifestList(hostedProjects);
+        var externalOwnerPackages = SplitManifestList(externalOwnerPackagesValue);
         var oracleRoots = SplitManifestList(oracleRootsValue);
         var retiredRoots = SplitManifestList(retiredRootsValue);
 
         var canonicalHostedProjects = new[]
             {
-                "Chummer.Media.Contracts",
                 "Chummer.Play.Contracts",
                 "Chummer.Run.AI",
                 "Chummer.Run.Api",
                 "Chummer.Run.Contracts",
                 "Chummer.Run.Identity",
                 "Chummer.Run.Registry"
+            }
+            .OrderBy(static entry => entry, StringComparer.Ordinal)
+            .ToArray();
+        var canonicalExternalOwnerPackages = new[]
+            {
+                "Chummer.Hub.Registry.Contracts",
+                "Chummer.Media.Contracts"
             }
             .OrderBy(static entry => entry, StringComparer.Ordinal)
             .ToArray();
@@ -388,6 +400,9 @@ internal static class CompatibilityVerification
             expectedHostedProjects.SequenceEqual(canonicalHostedProjects, StringComparer.Ordinal),
             "Boundary manifest must keep the canonical hosted project set for identity, registry, relay/Spider/media orchestration, and hosted APIs.");
         VerificationAssert.True(
+            externalOwnerPackages.SequenceEqual(canonicalExternalOwnerPackages, StringComparer.Ordinal),
+            "Boundary manifest must declare the canonical external owner packages for media-factory and hub-registry seams.");
+        VerificationAssert.True(
             oracleRoots.SequenceEqual(canonicalOracleRoots, StringComparer.Ordinal),
             "Boundary manifest must keep the canonical oracle root set.");
         VerificationAssert.True(
@@ -407,6 +422,13 @@ internal static class CompatibilityVerification
         foreach (var projectName in expectedHostedProjects)
         {
             VerificationAssert.True(solutionText.Contains($" = \"{projectName}\", ", StringComparison.Ordinal), $"Hosted solution must include '{projectName}'.");
+        }
+
+        foreach (var externalOwnerPackage in externalOwnerPackages)
+        {
+            VerificationAssert.True(
+                !solutionText.Contains($" = \"{externalOwnerPackage}\", ", StringComparison.Ordinal),
+                $"Hosted solution must not include external owner package '{externalOwnerPackage}'.");
         }
 
         foreach (var oracleRoot in oracleRoots)

@@ -20,21 +20,22 @@ if ! grep -En '<HintPath>\.\.\\Chummer\.Play\.Contracts\\bin\\\$\(Configuration\
   exit 1
 fi
 
-if ! grep -En '<HintPath>\.\.\\Chummer\.Media\.Contracts\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Media\.Contracts\.dll</HintPath>' \
+if ! grep -En '<HintPath>\.\.\\\.\.\\\.\.\\fleet\\repos\\chummer-media-factory\\src\\Chummer\.Media\.Contracts\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Media\.Contracts\.dll</HintPath>' \
   Chummer.Run.Contracts/Chummer.Run.Contracts.csproj \
   Chummer.Run.AI/Chummer.Run.AI.csproj >/dev/null; then
-  echo "Chummer.Media.Contracts consumers must point at the built canonical contract assembly." >&2
+  echo "Chummer.Media.Contracts consumers must point at the owner-repo canonical contract assembly." >&2
   exit 1
 fi
 
-if grep -En '<ProjectReference Include="\.\.\\\.\.\\chummer-hub-registry\\Chummer\.Hub\.Registry\.Contracts\\Chummer\.Hub\.Registry\.Contracts\.csproj" />' \
+if ! grep -En '<HintPath>\.\.\\\.\.\\chummer-core-engine\\Chummer\.Contracts\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Engine\.Contracts\.dll</HintPath>' \
   Chummer.Run.Contracts/Chummer.Run.Contracts.csproj >/dev/null; then
-  echo "Chummer.Run.Contracts must not source-couple to the sibling hub-registry contracts project." >&2
+  echo "Chummer.Run.Contracts must consume the owner-repo Chummer.Engine.Contracts assembly for hosted compatibility DTOs." >&2
   exit 1
 fi
 
-if grep -n 'chummer-hub-registry' Chummer.Run.Registry/Chummer.Run.Registry.csproj >/dev/null; then
-  echo "Chummer.Run.Registry must remain hermetic and not depend on sibling hub-registry outputs." >&2
+if ! grep -En '<HintPath>\.\.\\\.\.\\chummer-hub-registry\\Chummer\.Hub\.Registry\.Contracts\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Hub\.Registry\.Contracts\.dll</HintPath>' \
+  Chummer.Run.Registry/Chummer.Run.Registry.csproj >/dev/null; then
+  echo "Chummer.Run.Registry must consume the owner-repo hub-registry contracts assembly." >&2
   exit 1
 fi
 
@@ -48,9 +49,9 @@ if [ ! -f Chummer.Run.Registry/Controllers/PublicationsController.cs ] || [ ! -f
   exit 1
 fi
 
-if ! grep -En '<ProjectReference Include="\.\.\\Chummer\.Run\.Contracts\\Chummer\.Run\.Contracts\.csproj" />' \
+if grep -En '<ProjectReference Include="\.\.\\Chummer\.Run\.Contracts\\Chummer\.Run\.Contracts\.csproj" />' \
   Chummer.Run.Registry/Chummer.Run.Registry.csproj >/dev/null; then
-  echo "Chummer.Run.Registry must depend on Chummer.Run.Contracts for canonical registry/publication contracts." >&2
+  echo "Chummer.Run.Registry must not source-own registry/publication contracts through local Chummer.Run.Contracts." >&2
   exit 1
 fi
 
@@ -78,7 +79,9 @@ if [[ ! -f "$CSC_DLL" || -z "$NETCORE_REF_DIR" || -z "$ASPNET_REF_DIR" || -z "$N
 fi
 
 cp Chummer.Play.Contracts/bin/Debug/net10.0/Chummer.Play.Contracts.dll "$TMP_DIR/"
-cp Chummer.Media.Contracts/bin/Debug/net10.0/Chummer.Media.Contracts.dll "$TMP_DIR/"
+cp ../chummer-core-engine/Chummer.Contracts/bin/Debug/net10.0/Chummer.Engine.Contracts.dll "$TMP_DIR/"
+cp ../chummer-hub-registry/Chummer.Hub.Registry.Contracts/bin/Debug/net10.0/Chummer.Hub.Registry.Contracts.dll "$TMP_DIR/"
+cp ../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/bin/Debug/net10.0/Chummer.Media.Contracts.dll "$TMP_DIR/"
 cp Chummer.Run.Api/bin/Debug/net10.0/Chummer.Run.Api.dll "$TMP_DIR/"
 cp Chummer.Run.Identity/bin/Debug/net10.0/Chummer.Run.Identity.dll "$TMP_DIR/"
 cp Chummer.Run.Registry/bin/Debug/net10.0/Chummer.Run.Registry.dll "$TMP_DIR/"

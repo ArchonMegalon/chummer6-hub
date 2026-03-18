@@ -1,11 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Compile Remove="HubRegistryContracts.cs" />
+    <Compile Remove="PublicationContracts.cs" />
+    <Compile Remove="RegistryContracts.cs" />
+    <Reference Include="Chummer.Engine.Contracts">
+      <HintPath>..\..\chummer-core-engine\Chummer.Contracts\bin\$(Configuration)\net10.0\Chummer.Engine.Contracts.dll</HintPath>
+    </Reference>
     <Reference Include="Chummer.Play.Contracts">
       <HintPath>..\Chummer.Play.Contracts\bin\$(Configuration)\net10.0\Chummer.Play.Contracts.dll</HintPath>
     </Reference>
     <Reference Include="Chummer.Media.Contracts">
-      <HintPath>..\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll</HintPath>
+      <HintPath>..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll</HintPath>
     </Reference>
   </ItemGroup>
 
