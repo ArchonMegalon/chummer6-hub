@@ -1,6 +1,6 @@
 namespace Chummer.Run.AI.Compatibility;
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.PersonaMemoryQuery.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.PersonaMemoryQuery.")]
 internal sealed record PersonaMemoryQuery(
     string SessionId,
     string? SceneId = null,
@@ -10,13 +10,13 @@ internal sealed record PersonaMemoryQuery(
     string? Location = null,
     IReadOnlyList<string>? SessionContext = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.PersonaMemoryItem.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.PersonaMemoryItem.")]
 internal sealed record PersonaMemoryItem(
     string Key,
     string Value,
     double RelevanceScore);
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.SessionMemoryDraftRequest.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.SessionMemoryDraftRequest.")]
 internal sealed record SessionMemoryDraftRequest(
     string SessionId,
     string? SceneId = null,
@@ -24,13 +24,13 @@ internal sealed record SessionMemoryDraftRequest(
     string? Transcript = null,
     IReadOnlyList<string>? PlayerMessages = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.SessionMemoryEvidence.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.SessionMemoryEvidence.")]
 internal sealed record SessionMemoryEvidence(
     string Kind,
     string Reference,
     string Detail);
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.SessionRecapDraft.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.SessionRecapDraft.")]
 internal sealed record SessionRecapDraft(
     string Title,
     string ShortText,
@@ -40,7 +40,7 @@ internal sealed record SessionRecapDraft(
     string DraftState,
     string ProposedCanonTarget);
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.SessionUnresolvedThreadDraft.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.SessionUnresolvedThreadDraft.")]
 internal sealed record SessionUnresolvedThreadDraft(
     string ThreadId,
     string Title,
@@ -51,7 +51,7 @@ internal sealed record SessionUnresolvedThreadDraft(
     string DraftState,
     string ProposedCanonTarget);
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.SessionTimelineDraftEntry.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.SessionTimelineDraftEntry.")]
 internal sealed record SessionTimelineDraftEntry(
     string EntryId,
     string Summary,
@@ -61,7 +61,7 @@ internal sealed record SessionTimelineDraftEntry(
     string DraftState,
     string ProposedCanonTarget);
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.SessionRelationshipChangeDraft.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.SessionRelationshipChangeDraft.")]
 internal sealed record SessionRelationshipChangeDraft(
     string ChangeId,
     string Summary,
@@ -73,7 +73,7 @@ internal sealed record SessionRelationshipChangeDraft(
     string DraftState,
     string ProposedCanonTarget);
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.SessionMemoryCandidateDraft.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.SessionMemoryCandidateDraft.")]
 internal sealed record SessionMemoryCandidateDraft(
     string CandidateId,
     string Category,
@@ -85,7 +85,7 @@ internal sealed record SessionMemoryCandidateDraft(
     string DraftState,
     string ProposedCanonTarget);
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.SessionMemoryDraftResult.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.SessionMemoryDraftResult.")]
 internal sealed record SessionMemoryDraftResult(
     string SessionId,
     string? SceneId,
@@ -102,7 +102,7 @@ internal sealed record SessionMemoryDraftResult(
     double Confidence,
     DateTimeOffset GeneratedAtUtc);
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.PersonaMemoryCard.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.PersonaMemoryCard.")]
 internal sealed record PersonaMemoryCard(
     string PersonaId,
     string StaticCard,
@@ -116,7 +116,7 @@ internal sealed record PersonaMemoryCard(
     IReadOnlyList<string>? SceneIds = null,
     IReadOnlyList<string>? SessionContextTags = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Memory.PersonaMemoryResult.")]
+[Obsolete("Use Chummer.Play.Contracts.Memory.PersonaMemoryResult.")]
 internal sealed record PersonaMemoryResult(
     string SessionId,
     IReadOnlyList<PersonaMemoryCard> Cards,

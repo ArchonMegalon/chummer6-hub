@@ -1,6 +1,10 @@
 using System.Reflection;
 using System.IO;
 using System.Text.Json;
+using Chummer.Play.Core.Application;
+using Chummer.Play.Core.Offline;
+using Chummer.Play.Core.PlayApi;
+using Chummer.Play.Core.Sync;
 using MediaAssetApprovalState = Chummer.Media.Contracts.AssetApprovalState;
 using MediaAssetLifecyclePolicy = Chummer.Media.Contracts.AssetLifecyclePolicy;
 using MediaMediaRenderJobState = Chummer.Media.Contracts.MediaRenderJobState;
@@ -24,12 +28,8 @@ using RegistryHubReviewRequest = Chummer.Run.Contracts.Registry.HubReviewRequest
 using RegistryHubReviewResponse = Chummer.Run.Contracts.Registry.HubReviewResponse;
 using RegistryRuntimeBundleHeadKind = Chummer.Run.Contracts.Registry.RuntimeBundleHeadKind;
 using RegistryRuntimeBundleIssueRequest = Chummer.Run.Contracts.Registry.RuntimeBundleIssueRequest;
-using RunDocsContracts = Chummer.Run.Contracts.Docs;
 using RunGatewayContracts = Chummer.Run.Contracts.Gateway;
-using RunInteropContracts = Chummer.Run.Contracts.Interop;
 using RunMemoryContracts = Chummer.Run.Contracts.Memory;
-using RunRelayContracts = Chummer.Run.Contracts.Relay;
-using RunSpiderContracts = Chummer.Run.Contracts.Spider;
 using RunAiContracts = Chummer.Run.AI.Compatibility;
 
 namespace RunServicesVerification;
@@ -90,22 +90,48 @@ internal static class CompatibilityVerification
 
     private static void VerifyHostedCanonicalShapes()
     {
+        var playContractsAssembly = typeof(SessionEventEnvelope).Assembly;
+        var runContractsAssembly = typeof(RunGatewayContracts.ProviderRouteRequest).Assembly;
+
         AssertEquivalentShape(typeof(SubmitObservationRequest), typeof(RunGatewayContracts.SubmitObservationRequest));
         AssertEquivalentShape(typeof(ProviderRouteRequest), typeof(RunGatewayContracts.ProviderRouteRequest));
         AssertEquivalentShape(typeof(PromptTemplate), typeof(RunGatewayContracts.PromptTemplate));
         AssertEquivalentShape(typeof(GatewayStatus), typeof(RunGatewayContracts.GatewayStatus));
-        AssertEquivalentShape(typeof(SessionEventEnvelope), typeof(RunRelayContracts.SessionEventEnvelope));
-        AssertEquivalentShape(typeof(SessionRuntimeBundleDto), typeof(RunRelayContracts.SessionRuntimeBundleDto));
-        AssertEquivalentShape(typeof(OfflineSyncSnapshotPackage), typeof(RunRelayContracts.OfflineSyncSnapshotPackage));
-        AssertEquivalentShape(typeof(OfflineSyncReconcileResult), typeof(RunRelayContracts.OfflineSyncReconcileResult));
-        AssertEquivalentShape(typeof(Chummer.Play.Contracts.Interop.InteropExportPackage), typeof(RunInteropContracts.InteropExportPackage));
-        AssertEquivalentShape(typeof(Chummer.Play.Contracts.Interop.InteropImportResult), typeof(RunInteropContracts.InteropImportResult));
-        AssertEquivalentShape(typeof(SessionMemoryDraftRequest), typeof(RunMemoryContracts.SessionMemoryDraftRequest));
-        AssertEquivalentShape(typeof(PersonaMemoryResult), typeof(RunMemoryContracts.PersonaMemoryResult));
-        AssertEquivalentShape(typeof(SpiderObservation), typeof(RunSpiderContracts.SpiderObservation));
-        AssertEquivalentShape(typeof(PolicyDecision), typeof(RunSpiderContracts.PolicyDecision));
-        AssertEquivalentShape(typeof(SpiderTacticalPayload), typeof(RunSpiderContracts.SpiderTacticalPayload));
-        AssertEquivalentShape(typeof(RuntimeDocQuery), typeof(RunDocsContracts.RuntimeDocQuery));
+
+        VerificationAssert.True(
+            typeof(PlaySurfaceRole).Assembly == playContractsAssembly,
+            "Play surface roles must live in Chummer.Play.Contracts.");
+        VerificationAssert.True(
+            typeof(PlayBootstrapRequest).Assembly == playContractsAssembly,
+            "Play bootstrap requests must live in Chummer.Play.Contracts.");
+        VerificationAssert.True(
+            typeof(EngineSessionEnvelope).Assembly == playContractsAssembly,
+            "Play session envelopes must live in Chummer.Play.Contracts.");
+        VerificationAssert.True(
+            typeof(SyncCheckpoint).Assembly == playContractsAssembly,
+            "Play sync checkpoints must live in Chummer.Play.Contracts.");
+        VerificationAssert.True(
+            typeof(OfflineLedgerEnvelope).Assembly == playContractsAssembly,
+            "Offline ledger envelopes must live in Chummer.Play.Contracts.");
+
+        VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Relay.SessionEventEnvelope") is null,
+            "Chummer.Run.Contracts must not shadow relay event DTOs.");
+        VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Spider.SpiderObservation") is null,
+            "Chummer.Run.Contracts must not shadow spider DTOs.");
+        VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Docs.RuntimeDocQuery") is null,
+            "Chummer.Run.Contracts must not shadow docs DTOs.");
+        VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Interop.InteropExportPackage") is null,
+            "Chummer.Run.Contracts must not shadow interop DTOs.");
+        VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Memory.SessionMemoryDraftRequest") is null,
+            "Chummer.Run.Contracts must not shadow shared memory DTOs.");
+        VerificationAssert.True(
+            typeof(RunMemoryContracts.SessionMemoryIngestionResult).GetProperty(nameof(RunMemoryContracts.SessionMemoryIngestionResult.Draft))?.PropertyType == typeof(SessionMemoryDraftResult),
+            "Run-specific memory ingestion should point back to canonical play-memory draft results.");
 
         VerificationAssert.True(
             Enum.GetNames(typeof(AiProvider)).SequenceEqual(Enum.GetNames(typeof(RunGatewayContracts.AiProvider)), StringComparer.Ordinal),
@@ -113,15 +139,6 @@ internal static class CompatibilityVerification
         VerificationAssert.True(
             Enum.GetNames(typeof(PromptGroundingKind)).SequenceEqual(Enum.GetNames(typeof(RunGatewayContracts.PromptGroundingKind)), StringComparer.Ordinal),
             "Gateway grounding enums should remain aligned.");
-        VerificationAssert.True(
-            Enum.GetNames(typeof(InterruptionLevel)).SequenceEqual(Enum.GetNames(typeof(RunSpiderContracts.InterruptionLevel)), StringComparer.Ordinal),
-            "Spider interruption enums should remain aligned.");
-        VerificationAssert.True(
-            Enum.GetNames(typeof(Chummer.Play.Contracts.Interop.InteropAssetKind)).SequenceEqual(Enum.GetNames(typeof(RunInteropContracts.InteropAssetKind)), StringComparer.Ordinal),
-            "Interop asset-kind enums should remain aligned.");
-        VerificationAssert.True(
-            Enum.GetNames(typeof(Chummer.Play.Contracts.Interop.InteropImportMode)).SequenceEqual(Enum.GetNames(typeof(RunInteropContracts.InteropImportMode)), StringComparer.Ordinal),
-            "Interop import-mode enums should remain aligned.");
     }
 
     private static void VerifyLegacyAiCompatibilityShapes()
@@ -130,16 +147,16 @@ internal static class CompatibilityVerification
         AssertEquivalentShape(typeof(RunGatewayContracts.ProviderRouteRequest), typeof(RunAiContracts.ProviderRouteRequest));
         AssertEquivalentShape(typeof(RunGatewayContracts.PromptTemplate), typeof(RunAiContracts.PromptTemplate));
         AssertEquivalentShape(typeof(RunGatewayContracts.GatewayStatus), typeof(RunAiContracts.GatewayStatus));
-        AssertEquivalentShape(typeof(RunRelayContracts.SessionEventEnvelope), typeof(RunAiContracts.SessionEventEnvelope));
-        AssertEquivalentShape(typeof(RunRelayContracts.SessionRuntimeBundleDto), typeof(RunAiContracts.SessionRuntimeBundleDto));
-        AssertEquivalentShape(typeof(RunRelayContracts.OfflineSyncSnapshotPackage), typeof(RunAiContracts.OfflineSyncSnapshotPackage));
-        AssertEquivalentShape(typeof(RunRelayContracts.OfflineSyncReconcileResult), typeof(RunAiContracts.OfflineSyncReconcileResult));
-        AssertEquivalentShape(typeof(RunMemoryContracts.SessionMemoryDraftRequest), typeof(RunAiContracts.SessionMemoryDraftRequest));
-        AssertEquivalentShape(typeof(RunMemoryContracts.PersonaMemoryResult), typeof(RunAiContracts.PersonaMemoryResult));
-        AssertEquivalentShape(typeof(RunSpiderContracts.SpiderObservation), typeof(RunAiContracts.SpiderObservation));
-        AssertEquivalentShape(typeof(RunSpiderContracts.PolicyDecision), typeof(RunAiContracts.PolicyDecision));
-        AssertEquivalentShape(typeof(RunSpiderContracts.SpiderTacticalPayload), typeof(RunAiContracts.SpiderTacticalPayload));
-        AssertEquivalentShape(typeof(RunDocsContracts.RuntimeDocQuery), typeof(RunAiContracts.RuntimeDocQuery));
+        AssertEquivalentShape(typeof(SessionEventEnvelope), typeof(RunAiContracts.SessionEventEnvelope));
+        AssertEquivalentShape(typeof(SessionRuntimeBundleDto), typeof(RunAiContracts.SessionRuntimeBundleDto));
+        AssertEquivalentShape(typeof(OfflineSyncSnapshotPackage), typeof(RunAiContracts.OfflineSyncSnapshotPackage));
+        AssertEquivalentShape(typeof(OfflineSyncReconcileResult), typeof(RunAiContracts.OfflineSyncReconcileResult));
+        AssertEquivalentShape(typeof(SessionMemoryDraftRequest), typeof(RunAiContracts.SessionMemoryDraftRequest));
+        AssertEquivalentShape(typeof(PersonaMemoryResult), typeof(RunAiContracts.PersonaMemoryResult));
+        AssertEquivalentShape(typeof(SpiderObservation), typeof(RunAiContracts.SpiderObservation));
+        AssertEquivalentShape(typeof(PolicyDecision), typeof(RunAiContracts.PolicyDecision));
+        AssertEquivalentShape(typeof(SpiderTacticalPayload), typeof(RunAiContracts.SpiderTacticalPayload));
+        AssertEquivalentShape(typeof(RuntimeDocQuery), typeof(RunAiContracts.RuntimeDocQuery));
 
         VerificationAssert.True(
             Enum.GetNames(typeof(RunGatewayContracts.AiProvider)).SequenceEqual(Enum.GetNames(typeof(RunAiContracts.AiProvider)), StringComparer.Ordinal),
@@ -148,7 +165,7 @@ internal static class CompatibilityVerification
             Enum.GetNames(typeof(RunGatewayContracts.PromptGroundingKind)).SequenceEqual(Enum.GetNames(typeof(RunAiContracts.PromptGroundingKind)), StringComparer.Ordinal),
             "Gateway grounding compatibility enums should remain aligned.");
         VerificationAssert.True(
-            Enum.GetNames(typeof(RunSpiderContracts.InterruptionLevel)).SequenceEqual(Enum.GetNames(typeof(RunAiContracts.InterruptionLevel)), StringComparer.Ordinal),
+            Enum.GetNames(typeof(InterruptionLevel)).SequenceEqual(Enum.GetNames(typeof(RunAiContracts.InterruptionLevel)), StringComparer.Ordinal),
             "Spider interruption compatibility enums should remain aligned.");
     }
 
@@ -296,9 +313,14 @@ internal static class CompatibilityVerification
 
     private static void VerifySessionOverlayWrapperIsServerOnly()
     {
+        var runContractsAssembly = typeof(RunGatewayContracts.ProviderRouteRequest).Assembly;
+
         VerificationAssert.True(
-            typeof(RunRelayContracts.SessionEventEnvelope).Assembly.GetType("Chummer.Run.Contracts.Relay.SessionOverlayEventDto") is null,
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Relay.SessionOverlayEventDto") is null,
             "Chummer.Run.Contracts must not expose legacy session overlay wrappers.");
+        VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Relay.SessionEventEnvelope") is null,
+            "Chummer.Run.Contracts must not expose duplicate relay DTO families.");
         VerificationAssert.True(
             typeof(SessionEventEnvelope).Assembly.GetType("Chummer.Play.Contracts.Relay.SessionOverlayEventDto") is null,
             "Chummer.Play.Contracts must not expose legacy session overlay wrappers.");

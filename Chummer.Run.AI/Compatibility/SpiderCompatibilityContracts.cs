@@ -1,6 +1,6 @@
 namespace Chummer.Run.AI.Compatibility;
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.InterruptionLevel.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.InterruptionLevel.")]
 internal enum InterruptionLevel
 {
     Off,
@@ -10,7 +10,7 @@ internal enum InterruptionLevel
     High
 }
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.SpiderObservation.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.SpiderObservation.")]
 internal sealed record SpiderObservation(
     string SessionId,
     string Source,
@@ -19,14 +19,14 @@ internal sealed record SpiderObservation(
     string? SceneId = null,
     string? SceneRevision = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.FastSignal.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.FastSignal.")]
 internal sealed record FastSignal(
     string SessionId,
     string Signal,
     int Confidence,
     bool Escalate);
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.SpiderDeepAnalysis.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.SpiderDeepAnalysis.")]
 internal sealed record SpiderDeepAnalysis(
     string SessionId,
     string SceneId,
@@ -43,14 +43,14 @@ internal sealed record SpiderDeepAnalysis(
     string? ProviderOutput = null,
     IReadOnlyList<string>? FocusEventTypes = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.EvidencePointer.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.EvidencePointer.")]
 internal sealed record EvidencePointer(
     string Kind,
     string Reference,
     string Label,
     string? Source = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.SpiderTacticalAction.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.SpiderTacticalAction.")]
 internal sealed record SpiderTacticalAction(
     string ActionId,
     string Label,
@@ -60,7 +60,7 @@ internal sealed record SpiderTacticalAction(
     string DeliveryBehavior = "annotate",
     string? AuditEventType = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.SpiderActionExecutionState.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.SpiderActionExecutionState.")]
 internal sealed record SpiderActionExecutionState(
     string ActionId,
     string Status,
@@ -70,7 +70,7 @@ internal sealed record SpiderActionExecutionState(
     string? AuditEventId = null,
     string? Notes = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.SpiderTacticalPayload.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.SpiderTacticalPayload.")]
 internal sealed record SpiderTacticalPayload(
     string Workflow = "ooda",
     string Observe = "",
@@ -85,7 +85,7 @@ internal sealed record SpiderTacticalPayload(
     bool IsStaleDraft = false,
     string DraftState = "active");
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.PolicyDecision.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.PolicyDecision.")]
 internal sealed record PolicyDecision(
     string SessionId,
     string Action,
@@ -101,7 +101,7 @@ internal sealed record PolicyDecision(
     string DecisionTier = "fast",
     SpiderDeepAnalysis? DeepAnalysis = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.SpiderTacticalCard.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.SpiderTacticalCard.")]
 internal sealed record SpiderTacticalCard(
     string CardId,
     string SessionId,
@@ -121,7 +121,7 @@ internal sealed record SpiderTacticalCard(
     DateTimeOffset? StaleAfterUtc = null,
     SpiderTacticalPayload? Payload = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.DeliveryOutboxMessage.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.DeliveryOutboxMessage.")]
 internal sealed record DeliveryOutboxMessage(
     string Id,
     string SessionId,
@@ -138,7 +138,7 @@ internal sealed record DeliveryOutboxMessage(
     string CollaborationMode = "local-first",
     SpiderTacticalCard? Card = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.DeliveryOutboxCreateRequest.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.DeliveryOutboxCreateRequest.")]
 internal sealed record DeliveryOutboxCreateRequest(
     string SessionId,
     string SceneId,
@@ -154,7 +154,7 @@ internal sealed record DeliveryOutboxCreateRequest(
     string CollaborationMode = "local-first",
     SpiderTacticalCard? Card = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.SpiderActionExecuteRequest.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.SpiderActionExecuteRequest.")]
 internal sealed record SpiderActionExecuteRequest(
     string SessionId,
     string SceneId,
@@ -163,7 +163,7 @@ internal sealed record SpiderActionExecuteRequest(
     string? ApprovalState = null,
     string? Notes = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Spider.SpiderActionExecutionResult.")]
+[Obsolete("Use Chummer.Play.Contracts.Spider.SpiderActionExecutionResult.")]
 internal sealed record SpiderActionExecutionResult(
     string MessageId,
     string ActionId,
