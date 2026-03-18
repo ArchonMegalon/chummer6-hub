@@ -1,6 +1,6 @@
 # Hub Extraction Acceptance
 
-`docs/hosted-boundary.manifest`, `docs/HOSTED_BOUNDARY.md`, and `tests/RunServicesVerification/CompatibilityVerification.cs` keep the hosted boundary limited to the canonical `Chummer.Run.*`, `Chummer.Play.Contracts`, and `Chummer.Media.Contracts` surface, require the active hosted boundary to run through `Chummer.Run.Api`, target the hosted runtime on `net10.0`, and block retired legacy roots (`Chummer`, `Chummer.Api`, `ChummerDataViewer`, `ChummerHub`, `Plugins`, `TextblockConverter`, and `Translator`) from re-entering the repo.
+`docs/hosted-boundary.manifest`, `docs/HOSTED_BOUNDARY.md`, and `tests/RunServicesVerification/CompatibilityVerification.cs` keep the active hosted boundary limited to the canonical `Chummer.Run.*` plus `Chummer.Play.Contracts` surface, require media-factory and hub-registry contracts to flow through external owner-package seams, target the hosted runtime on `net10.0`, and block retired legacy roots (`Chummer`, `Chummer.Api`, `ChummerDataViewer`, `ChummerHub`, `Plugins`, `TextblockConverter`, and `Translator`) from re-entering the repo.
 
 ## Worklist and issue anchors
 
@@ -61,7 +61,7 @@ Issue and migration anchors preserved in this acceptance narrative:
 
 - Inventory source: `docs/LEGACY_ROOT_SURFACE_INVENTORY.md`
 - Queue anchors for boundary moves: `WL-209`, `WL-210`, `WL-211`, `WL-212`
-- Acceptance requirement: each queued boundary item must preserve hosted ownership seams (`Chummer.Run.*`, `Chummer.Play.Contracts`, `Chummer.Media.Contracts`) while moving non-hosted legacy/tooling surfaces behind an explicit legacy/interoperability boundary.
+- Acceptance requirement: each queued boundary item must preserve hosted ownership seams (`Chummer.Run.*`, `Chummer.Play.Contracts`) while keeping extracted owner packages (`Chummer.Media.Contracts`, `Chummer.Hub.Registry.Contracts`) outside the active hosted project set.
 - Completed handoff: `WL-209` moved `Docker/` + `docker-compose.yml` into `legacy/tooling/docker/` with compose/script/workflow handoff paths updated.
 - Completed handoff: `WL-210` moved `docker-compose.dcproj` to `legacy/tooling/vs-compose/docker-compose.dcproj` and `settings/` to `legacy/interoperability/settings/` with bridge paths updated inside the `.dcproj`.
 - Completed handoff: `WL-211` moved root `Plugins/` under `legacy/interoperability/plugins/` and tightened hosted-boundary verification so `Plugins` is blocked from returning as a hosted root.
@@ -79,7 +79,7 @@ Issue and migration anchors preserved in this acceptance narrative:
 
 - Source publication candidates: `26`, `2368`.
 - `A2` contract-canon anchor: `Chummer.Play.Contracts` remains the canonical play/session transport seam, with ownership guarded by hosted-boundary verification and compatibility checks.
-- `A3` contract-canon anchor: `Chummer.Run.Contracts` remains the hosted orchestration contract plane, with registry/media execution split out of the canonical orchestration surface.
+- `A3` contract-canon anchor: `Chummer.Run.Contracts` remains the hosted orchestration contract plane, with registry/media execution split out to sibling owner packages instead of local hosted-project ownership.
 - Executable proof path:
   - `tests/RunServicesVerification/HubExtractionReadinessVerification.cs`
   - `tests/RunServicesVerification/CompatibilityVerification.cs`
@@ -146,6 +146,7 @@ Issue and migration anchors preserved in this acceptance narrative:
 - Chummer.Run.Registry
 - Chummer.Play.Contracts
 - Chummer.Media.Contracts
+- Chummer.Hub.Registry.Contracts
 - LEGACY_ROOT_SURFACE_INVENTORY.md
 - PublicationVerification.cs
 - CompatibilityVerification.cs

@@ -28,10 +28,25 @@ internal static class HubExtractionReadinessVerification
             .Select(static value => value!)
             .ToArray();
 
-        VerificationAssert.Equal(1, projectReferences.Length, "Chummer.Run.Registry should keep a single project-reference seam while Hub extraction is in progress.");
+        VerificationAssert.Equal(0, projectReferences.Length, "Chummer.Run.Registry should stop source-owning registry/publication DTOs through project references.");
+        var assemblyReferences = registryProject
+            .Descendants("Reference")
+            .Select(static element => new
+            {
+                Include = (string?)element.Attribute("Include"),
+                HintPath = (string?)element.Element("HintPath")
+            })
+            .Where(static entry => !string.IsNullOrWhiteSpace(entry.Include))
+            .ToArray();
+
         VerificationAssert.True(
-            projectReferences[0].EndsWith(@"Chummer.Run.Contracts\Chummer.Run.Contracts.csproj", StringComparison.Ordinal),
-            "Chummer.Run.Registry should consume registry/publication DTOs only through Chummer.Run.Contracts.");
+            assemblyReferences.Any(static entry =>
+                string.Equals(entry.Include, "Chummer.Hub.Registry.Contracts", StringComparison.Ordinal)
+                && string.Equals(entry.HintPath, @"..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\bin\$(Configuration)\net10.0\Chummer.Hub.Registry.Contracts.dll", StringComparison.Ordinal)),
+            "Chummer.Run.Registry should consume registry/publication DTOs through the sibling hub-registry owner package.");
+        VerificationAssert.True(
+            assemblyReferences.All(static entry => !string.Equals(entry.Include, "Chummer.Run.Contracts", StringComparison.Ordinal)),
+            "Chummer.Run.Registry must not keep a local Chummer.Run.Contracts assembly seam for registry/publication ownership.");
 
         var runApiAssembly = AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(static assembly => string.Equals(assembly.GetName().Name, "Chummer.Run.Api", StringComparison.Ordinal))
@@ -87,13 +102,29 @@ internal static class HubExtractionReadinessVerification
                 $"Chummer.Run.Contracts.Media must not regrow render-only ownership via '{forbiddenRunType}'.");
         }
 
-        var mediaContractsProject = XDocument.Load(Path.Combine(RepoRoot, "Chummer.Media.Contracts", "Chummer.Media.Contracts.csproj"));
+        var mediaContractsProjectPath = Path.GetFullPath(Path.Combine(RepoRoot, "..", "..", "fleet", "repos", "chummer-media-factory", "src", "Chummer.Media.Contracts", "Chummer.Media.Contracts.csproj"));
+        VerificationAssert.True(File.Exists(mediaContractsProjectPath), "Media-factory owner contracts project must exist.");
+        var mediaContractsProject = XDocument.Load(mediaContractsProjectPath);
         VerificationAssert.True(
             !mediaContractsProject.Descendants("ProjectReference").Any(),
             "Chummer.Media.Contracts must remain dependency-light with no project references.");
         VerificationAssert.True(
             !mediaContractsProject.Descendants("PackageReference").Any(),
             "Chummer.Media.Contracts must remain dependency-light with no package references.");
+
+        var runAiProject = XDocument.Load(Path.Combine(RepoRoot, "Chummer.Run.AI", "Chummer.Run.AI.csproj"));
+        var mediaReference = runAiProject
+            .Descendants("Reference")
+            .Select(static element => new
+            {
+                Include = (string?)element.Attribute("Include"),
+                HintPath = (string?)element.Element("HintPath")
+            })
+            .FirstOrDefault(static entry => string.Equals(entry.Include, "Chummer.Media.Contracts", StringComparison.Ordinal));
+        VerificationAssert.NotNull(mediaReference, "Chummer.Run.AI must reference the media-factory owner contract assembly.");
+        VerificationAssert.True(
+            string.Equals(mediaReference!.HintPath, @"..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll", StringComparison.Ordinal),
+            "Chummer.Run.AI must consume Chummer.Media.Contracts through the sibling media-factory owner package.");
     }
 
     private static void VerifyDesignMirrorReadiness()
