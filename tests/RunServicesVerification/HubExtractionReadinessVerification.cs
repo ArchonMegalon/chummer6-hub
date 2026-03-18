@@ -103,7 +103,7 @@ internal static class HubExtractionReadinessVerification
             "Project Chummer");
         VerifyMirrorFile(
             Path.Combine(RepoRoot, ".codex-design", "repo", "IMPLEMENTATION_SCOPE.md"),
-            "Run-services implementation scope");
+            "Hub implementation scope");
         VerifyMirrorFile(
             Path.Combine(RepoRoot, ".codex-design", "review", "REVIEW_CONTEXT.md"),
             "Review guidelines");

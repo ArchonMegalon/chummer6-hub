@@ -25,6 +25,7 @@ If a code repo README or design mirror conflicts with central canon, central can
 Every active product must have:
 
 * vision
+* horizons
 * architecture
 * ownership
 * roadmap / milestones
@@ -56,7 +57,11 @@ Changes canonical package ownership, contract families, compatibility promises, 
 
 Changes program sequencing, status, release gates, or group blockers.
 
-Types C, D, and E must update multiple canonical files in the same change.
+### Type F — horizon/public-signal change
+
+Changes canonical future-capability posture, public-guide relationship, or advisory participation rules.
+
+Types C, D, E, and F must update multiple canonical files in the same change.
 
 ## Mandatory file updates by change type
 
@@ -88,6 +93,18 @@ Types C, D, and E must update multiple canonical files in the same change.
 * `projects/<repo>.md`
 * `sync/sync-manifest.yaml`
 * review coverage
+
+### Horizon/public-signal change must update
+
+* `products/chummer/HORIZONS.md`
+* `products/chummer/horizons/*.md`
+* `products/chummer/PUBLIC_GUIDE_POLICY.md`
+* `products/chummer/HORIZON_SIGNAL_POLICY.md`
+* `products/chummer/PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
+* `products/chummer/PROGRAM_MILESTONES.yaml`
+* `products/chummer/ROADMAP.md`
+* `products/chummer/README.md`
+* `sync/sync-manifest.yaml` if new canonical files must mirror downstream
 
 ## Mirror discipline
 

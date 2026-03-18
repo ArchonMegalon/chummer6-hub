@@ -7,13 +7,18 @@ Project Chummer is a multi-repo modernization of the legacy Chummer 5 applicatio
 Read in this order:
 
 1. `VISION.md`
-2. `ARCHITECTURE.md`
-3. `EXTERNAL_TOOLS_PLANE.md`
-4. `OWNERSHIP_MATRIX.md`
-5. `PROGRAM_MILESTONES.yaml`
-6. `CONTRACT_SETS.yaml`
-7. `GROUP_BLOCKERS.md`
-8. `projects/*.md` for repo-specific scope
+2. `HORIZONS.md`
+3. `ARCHITECTURE.md`
+4. `EXTERNAL_TOOLS_PLANE.md`
+5. `LTD_CAPABILITY_MAP.md`
+6. `PUBLIC_GUIDE_POLICY.md`
+7. `HORIZON_SIGNAL_POLICY.md`
+8. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
+9. `OWNERSHIP_MATRIX.md`
+10. `PROGRAM_MILESTONES.yaml`
+11. `CONTRACT_SETS.yaml`
+12. `GROUP_BLOCKERS.md`
+13. `projects/*.md` for repo-specific scope
 
 ## Active Chummer repos
 
@@ -61,6 +66,7 @@ These inform the program but are not part of the main release train:
 
 * `fleet` — worker orchestration/control plane
 * `executive-assistant` — skill/runtime reference pattern for governed assistant orchestration
+* `Chummer6` — downstream public guide and Horizons explainer repo; useful for public storytelling, but not canonical design truth
 
 ## Current program priorities
 

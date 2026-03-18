@@ -1,5 +1,5 @@
 product: chummer
-last_reviewed: 2026-03-14
+last_reviewed: 2026-03-17
 release_track: vnext-foundation
 repo_boundary_purity:
 - repo: chummer6-design
@@ -93,6 +93,61 @@ program_phases:
     - All owned tools are classified by architectural role.
     - System-of-record rules are documented.
     - External integrations are assigned to owning repos.
+- id: H
+  title: Horizons and public capability canon
+  status: in_progress
+  release_blocking: false
+  goal: Make future-capability posture canonical without expanding the current release critical path.
+  milestones:
+  - id: H0
+    title: Horizon canon established
+    owners:
+    - chummer6-design
+    status: open
+    exit:
+    - "`HORIZONS.md` exists in the product front door."
+    - Canonical horizon docs exist for promoted future lanes.
+    - Future-capability posture no longer lives only in downstream public guide copy.
+  - id: H1
+    title: Public guide and horizon sync policy
+    owners:
+    - chummer6-design
+    status: open
+    exit:
+    - "`PUBLIC_GUIDE_POLICY.md` defines `Chummer6` as downstream-only."
+    - The guide cannot outrun canonical horizon docs.
+    - Public-facing repo posture is explicit in the front door.
+  - id: H2
+    title: LTD capability map complete
+    owners:
+    - chummer6-design
+    - chummer6-hub
+    - chummer6-media-factory
+    status: open
+    exit:
+    - Owned tools are mapped to promoted, bounded, parked, or non-product states.
+    - Explicit owners exist for promoted and bounded product lanes.
+    - "`EXTERNAL_TOOLS_PLANE.md` and `LTD_CAPABILITY_MAP.md` agree."
+  - id: H3
+    title: First bounded horizon promoted to research-ready
+    owners:
+    - chummer6-design
+    - chummer6-hub
+    - chummer6-media-factory
+    status: open
+    exit:
+    - At least one horizon has named owners, tool posture, and provenance constraints.
+    - The horizon is ready for bounded research without widening release scope.
+  - id: H4
+    title: Public signal loop defined
+    owners:
+    - chummer6-design
+    - chummer6-hub
+    status: open
+    exit:
+    - Public proposal lanes are explicit.
+    - Advisory signal collection rules are documented.
+    - "`MetaSurvey`, `ApproveThis`, and `Teable` posture is canonical."
 - id: B
   title: Surface split completion
   status: open
@@ -351,7 +406,7 @@ executable_queue:
   milestone: F3
   status: done
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
-  notes: Completed on 2026-03-14T06:54:15Z: recurring parity check detected no drift across checked targets, and explicit no-change parity evidence was appended for every checked mirror target in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md`.
+  notes: "Completed on 2026-03-14T06:54:15Z: recurring parity check detected no drift across checked targets, and explicit no-change parity evidence was appended for every checked mirror target in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md`."
 - id: WL-D016
   milestone: F3
   status: queued
@@ -366,4 +421,4 @@ executable_queue:
   milestone: F3
   status: queued
   backlog: products/chummer/sync/LOCAL_MIRROR_PUBLISH_BACKLOG.md
-  notes: Recurring repo-local mirror lane is queued so `.codex-design/product`, `.codex-design/repo`, and `.codex-design/review` subsets remain current for workers and GitHub review each cycle via WL-D018-01..05, with dated evidence appended in `products/chummer/sync/LOCAL_MIRROR_PUBLISH_EVIDENCE.md`; WL-D008 remains the completed initial publication wave.
+  notes: Recurring repo-local mirror lane is queued so `.codex-design/product`, `.codex-design/repo`, and `.codex-design/review` subsets remain current for workers and GitHub review each cycle via WL-D018-01..05, with dated evidence appended in `products/chummer/sync/LOCAL_MIRROR_PUBLISH_EVIDENCE.md`; latest completed cycle closed at `2026-03-14T07:18:51Z` after WL-D018-03 drift-only republish (product subset across all seven targets plus media-factory repo subset) followed by WL-D018-04 no-drift parity confirmation across all seven targets; WL-D008 remains the completed initial publication wave.

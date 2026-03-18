@@ -102,6 +102,30 @@ Core, hub, registry, and media all have operational confidence.
 
 The product vision is complete enough for release: split finished, boundaries clean, packages canonical, product surfaces coherent, and operational discipline in place.
 
+## Non-blocking Horizons canon lane
+
+This lane makes future-capability posture explicit without turning Horizons into a release gate for `vnext-foundation`.
+
+### H0 — Horizon canon established
+
+`chummer6-design` publishes a canonical Horizons layer and keeps it ahead of downstream public storytelling.
+
+### H1 — Public guide and horizon sync policy
+
+`Chummer6` is governed as a downstream guide that cannot outrun canonical horizon docs.
+
+### H2 — LTD capability map complete
+
+Owned external tools are mapped to promoted, bounded, parked, or non-product states with explicit owners and system-of-record limits.
+
+### H3 — First bounded horizon promoted to research-ready
+
+At least one horizon has enough owner, tool, and provenance detail to move from vague idea to bounded research lane.
+
+### H4 — Public signal loop defined
+
+Public proposals and advisory prioritization routes are collected through governed surfaces without turning votes into canonical truth.
+
 ## Repo milestone spine
 
 ### `chummer6-design`

@@ -261,3 +261,14 @@ git/
 *.pyo
 *.user.delete
 Chummer/Resources/source/upscaling/4x_FireAlpha.pth
+
+# Local janitor artifacts
+/feedback/.applied.log
+/.codex-studio/
+/.aider.chat.history.md
+/.aider.input.history
+/.aider.tags.cache.v4/
+/.tmp/
+/.artifacts/
+/scripts/ai/logs/
+/*.log

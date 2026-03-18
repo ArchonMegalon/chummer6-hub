@@ -24,6 +24,8 @@ without allowing any external tool to become canonical product truth.
 External tools may assist, route, render, summarize, visualize, archive, notify, or project. They may not become the canonical source of rules truth, session truth, approval truth, registry truth, media truth, or canon truth.
 
 Chummer-owned repos and Chummer-owned manifests/stores remain authoritative.
+Owning an LTD does not obligate Chummer to integrate it.
+A tool may be promoted, bounded, parked, or explicitly excluded.
 
 ## Tool inventory posture
 
@@ -32,6 +34,7 @@ Current known external-tool inventory includes:
 * 1min.AI
 * Prompting Systems
 * ChatPlayground AI
+* Soundmadeseen
 * AI Magicx
 * FastestVPN PRO
 * OneAir
@@ -41,7 +44,9 @@ Current known external-tool inventory includes:
 * ApproveThis
 * AvoMap
 * BrowserAct
+* Crezlo Tours
 * Documentation.AI
+* First Book ai
 * Invoiless
 * MarkupGo
 * MetaSurvey
@@ -49,6 +54,7 @@ Current known external-tool inventory includes:
 * Paperguide
 * PeekShot
 * Teable
+* Unmixr AI
 * Vizologi
 
 Current internal posture assumes every listed LTD is redeemed and activated.
@@ -82,6 +88,7 @@ Examples:
 * survey bridges
 * route visualization orchestration
 * media orchestration
+* public-signal intake governance
 
 ### Class B - Runtime-adjacent media integrations
 
@@ -92,6 +99,7 @@ Examples:
 * document render providers
 * preview/thumbnail providers
 * image/portrait providers
+* narrated audio/video providers
 * bounded video providers
 * map/route visualization providers
 * archive providers
@@ -186,7 +194,7 @@ It is not automatically approved for canonical runtime use.
 
 ## Repo ownership
 
-### `chummer-design`
+### `chummer6-design`
 
 Owns:
 
@@ -204,7 +212,7 @@ Must not own:
 * runtime keys
 * implementation adapters
 
-### `chummer.run-services`
+### `chummer6-hub`
 
 Owns:
 
@@ -225,7 +233,7 @@ Must not own:
 * canonical registry persistence
 * canonical media lifecycle
 
-### `chummer-media-factory`
+### `chummer6-media-factory`
 
 Owns:
 
@@ -247,7 +255,7 @@ Must not own:
 * client UX
 * general AI orchestration
 
-### `chummer-hub-registry`
+### `chummer6-hub-registry`
 
 May own:
 
@@ -261,7 +269,7 @@ Must not own:
 * media job orchestration
 * reasoning provider routing
 
-### `chummer-presentation` and `chummer-play`
+### `chummer6-ui` and `chummer6-mobile`
 
 May render upstream projections that refer to external outputs.
 
@@ -288,8 +296,8 @@ Low-cost reasoning and multimodal provider route.
 
 ### Owner
 
-* `chummer.run-services`
-* optional media-prompt-assist only via `chummer.run-services`
+* `chummer6-hub`
+* optional media-prompt-assist only via `chummer6-hub`
 
 ### Hard boundary
 
@@ -312,7 +320,7 @@ Primary or alternate structured AI provider route.
 
 ### Owner
 
-* `chummer.run-services`
+* `chummer6-hub`
 
 ### Hard boundary
 
@@ -335,8 +343,8 @@ Prompt/style/persona authoring support.
 
 ### Owner
 
-* `chummer.run-services` for orchestration-side prompt toolchain
-* possible future publication via `chummer-hub-registry`
+* `chummer6-hub` for orchestration-side prompt toolchain
+* possible future publication via `chummer6-hub-registry`
 
 ### Hard boundary
 
@@ -358,7 +366,7 @@ Evaluation lab only.
 
 ### Owner
 
-* `chummer.run-services`
+* `chummer6-hub`
 
 ### Hard boundary
 
@@ -380,7 +388,7 @@ Automation fallback and account-fact discovery.
 
 ### Owner
 
-* `chummer.run-services`
+* `chummer6-hub`
 
 ### Hard boundary
 
@@ -404,7 +412,7 @@ Approval inbox bridge.
 
 ### Owner
 
-* `chummer.run-services`
+* `chummer6-hub`
 
 ### Hard boundary
 
@@ -427,8 +435,8 @@ Docs/help plane.
 
 ### Owner
 
-* integration/orchestration: `chummer.run-services`
-* canonical source material: `chummer-design`, `chummer-hub-registry`, approved docs exports
+* integration/orchestration: `chummer6-hub`
+* canonical source material: `chummer6-design`, `chummer6-hub-registry`, approved docs exports
 
 ### Hard boundary
 
@@ -452,7 +460,7 @@ Feedback loop.
 
 ### Owner
 
-* `chummer.run-services`
+* `chummer6-hub`
 
 ### Hard boundary
 
@@ -475,7 +483,7 @@ Curated projection surface.
 
 ### Owner
 
-* `chummer.run-services`
+* `chummer6-hub`
 
 ### Hard boundary
 
@@ -499,7 +507,7 @@ Automation bridge.
 
 ### Owner
 
-* `chummer.run-services`
+* `chummer6-hub`
 
 ### Hard boundary
 
@@ -522,8 +530,8 @@ Cited research and synthesis support.
 
 ### Owner
 
-* `chummer-design` for design research
-* `chummer.run-services` for internal operator help/research assist
+* `chummer6-design` for design research
+* `chummer6-hub` for internal operator help/research assist
 
 ### Hard boundary
 
@@ -545,7 +553,7 @@ Strategy and ideation tool.
 
 ### Owner
 
-* `chummer-design`
+* `chummer6-design`
 
 ### Hard boundary
 
@@ -570,12 +578,37 @@ Document-render adapter.
 
 ### Owner
 
-* `chummer-media-factory`
+* `chummer6-media-factory`
 
 ### Hard boundary
 
 * not content author
 * not manifest owner
+* not archive truth
+
+## Soundmadeseen
+
+### Role
+
+Narrated media and explainer adapter.
+
+### Architectural use
+
+* narrated recap clips
+* release videos
+* mission brief videos
+* dossier videos
+* voiced explainer artifacts
+
+### Owner
+
+* execution: `chummer6-media-factory`
+* orchestration and link shaping: `chummer6-hub`
+
+### Hard boundary
+
+* not canon writer
+* not source of briefing truth
 * not archive truth
 
 ## PeekShot
@@ -593,12 +626,37 @@ Preview/thumbnail/share-card adapter.
 
 ### Owner
 
-* `chummer-media-factory`
+* `chummer6-media-factory`
 
 ### Hard boundary
 
 * not canonical parent asset
 * not canonical manifest
+
+## Crezlo Tours
+
+### Role
+
+Explorable location and tour adapter.
+
+### Architectural use
+
+* run-site packs
+* GM walkthroughs
+* floor-plan briefings
+* safehouse and facility tours
+* hub-published location artifacts
+
+### Owner
+
+* execution: `chummer6-media-factory`
+* orchestration, permissions, and link shaping: `chummer6-hub`
+
+### Hard boundary
+
+* not live session truth
+* not campaign geography canon
+* not permission truth
 
 ## Mootion
 
@@ -615,13 +673,39 @@ Bounded video-render adapter.
 
 ### Owner
 
-* `chummer-media-factory`
+* `chummer6-media-factory`
 
 ### Hard boundary
 
 * no unbounded long-form runtime dependency
 * no bypass of preview-first or approval policy
 * no canonical archive ownership
+
+## First Book ai
+
+### Role
+
+Long-form authoring and blueprint support.
+
+### Architectural use
+
+* player primers
+* faction handbooks
+* campaign bibles
+* convention module drafts
+* district guides
+* season recap books
+
+### Owner
+
+* orchestration and source-pack shaping: `chummer6-hub`
+* downstream publication refs where needed: `chummer6-hub-registry`
+
+### Hard boundary
+
+* not source-of-truth for canon
+* not approval truth
+* not publication truth by itself
 
 ## AvoMap
 
@@ -638,13 +722,35 @@ Route visualization / route-render adapter.
 
 ### Owner
 
-* orchestration-side route semantics: `chummer.run-services`
-* render-side output execution: `chummer-media-factory`
+* orchestration-side route semantics: `chummer6-hub`
+* render-side output execution: `chummer6-media-factory`
 
 ### Hard boundary
 
 * not source of route truth
 * not source of campaign geography semantics
+
+## Unmixr AI
+
+### Role
+
+Candidate voice and audio adapter.
+
+### Architectural use
+
+* bounded TTS support
+* dubbing or narrated artifact experiments
+* future companion audio for briefings and primers
+
+### Owner
+
+* `chummer6-media-factory`
+
+### Hard boundary
+
+* candidate only until proven
+* not canon writer
+* not approval or archive truth
 
 ## Internxt Cloud Storage
 
@@ -660,7 +766,7 @@ Cold archive adapter.
 
 ### Owner
 
-* `chummer-media-factory`
+* `chummer6-media-factory`
 
 ### Hard boundary
 
@@ -680,7 +786,7 @@ Back-office only.
 
 ### Owner
 
-* future `chummer.run-services` back-office scope only if needed
+* future `chummer6-hub` back-office scope only if needed
 
 ### Hard boundary
 
