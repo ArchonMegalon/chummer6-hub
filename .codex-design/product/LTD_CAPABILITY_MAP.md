@@ -35,6 +35,7 @@ It does not imply that every owned tool must be integrated.
 * `Teable` - curation and projection board only, never system of record
 * `ApiX-Drive` - low-risk automation glue only, never truth
 * `Browserly` - bounded browser capture and reference-pack helper
+* `Nonverbia` - post-session coaching and social-dynamics analysis lane
 * `Unmixr AI` - candidate voice lane until proven
 
 ## Research / Parked
@@ -63,6 +64,7 @@ Default owner posture:
 * `Teable` - `chummer6-hub` for curation/projection workflows
 * `ApiX-Drive` - `chummer6-hub` for low-risk automation glue
 * `Browserly` - `chummer6-hub` for bounded capture/reference packets
+* `Nonverbia` - `chummer6-hub` for coaching analysis and privacy gating, `chummer6-media-factory` for bounded rendered outputs
 * `Unmixr AI` - `chummer6-media-factory` for bounded voice experiments
 
 ## Horizon capability map
@@ -79,3 +81,20 @@ Default owner posture:
   `First Book ai`, `MarkupGo`, and `Documentation.AI` are the promoted authoring/export lanes.
   `Soundmadeseen` is the promoted narrated companion lane.
   `Unmixr AI` and `Browserly` remain bounded helper lanes only.
+
+## Table coaching / social dynamics
+
+Horizon fit:
+
+* `TABLE PULSE`
+
+Current cluster:
+
+* `Nonverbia`
+* bounded `Soundmadeseen`
+* bounded `Unmixr AI`
+* bounded `MarkupGo`
+* bounded `PeekShot`
+
+Working rule:
+These tools may generate post-session coaching views and narrated guidance, but they do not become session truth, discipline systems, moderation truth, or player-scoring authority.

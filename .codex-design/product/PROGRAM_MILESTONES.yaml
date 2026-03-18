@@ -148,6 +148,17 @@ program_phases:
     - Public proposal lanes are explicit.
     - Advisory signal collection rules are documented.
     - "`MetaSurvey`, `ApproveThis`, and `Teable` posture is canonical."
+  - id: H5
+    title: Table coaching horizon defined
+    owners:
+    - chummer6-design
+    - chummer6-hub
+    - chummer6-media-factory
+    status: open
+    exit:
+    - "`TABLE PULSE` exists with explicit consent, privacy, and non-truth boundaries."
+    - "`Nonverbia` posture is canonical across `HORIZON_REGISTRY.yaml`, `EXTERNAL_TOOLS_PLANE.md`, and `LTD_CAPABILITY_MAP.md`."
+    - Post-session coaching outputs remain distinct from session truth, moderation truth, and player scoring.
 - id: B
   title: Surface split completion
   status: open

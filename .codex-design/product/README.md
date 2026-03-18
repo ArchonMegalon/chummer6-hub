@@ -8,17 +8,21 @@ Read in this order:
 
 1. `VISION.md`
 2. `HORIZONS.md`
-3. `ARCHITECTURE.md`
-4. `EXTERNAL_TOOLS_PLANE.md`
-5. `LTD_CAPABILITY_MAP.md`
-6. `PUBLIC_GUIDE_POLICY.md`
-7. `HORIZON_SIGNAL_POLICY.md`
-8. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
-9. `OWNERSHIP_MATRIX.md`
-10. `PROGRAM_MILESTONES.yaml`
-11. `CONTRACT_SETS.yaml`
-12. `GROUP_BLOCKERS.md`
-13. `projects/*.md` for repo-specific scope
+3. `HORIZON_REGISTRY.yaml`
+4. `ARCHITECTURE.md`
+5. `EXTERNAL_TOOLS_PLANE.md`
+6. `LTD_CAPABILITY_MAP.md`
+7. `PUBLIC_GUIDE_POLICY.md`
+8. `HORIZON_SIGNAL_POLICY.md`
+9. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
+10. `OWNERSHIP_MATRIX.md`
+11. `PROGRAM_MILESTONES.yaml`
+12. `CONTRACT_SETS.yaml`
+13. `GROUP_BLOCKERS.md`
+14. `projects/*.md` for repo-specific scope
+
+`HORIZON_REGISTRY.yaml` is the machine-readable source for horizon existence, order, public-guide eligibility, and eventual build path.
+The current horizon set covers knowledge fabric, spatial/runsite artifacts, creator press, replay/forensics, and bounded table coaching in addition to the earlier continuity and simulation lanes.
 
 ## Active Chummer repos
 

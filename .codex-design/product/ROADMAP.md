@@ -106,6 +106,8 @@ The product vision is complete enough for release: split finished, boundaries cl
 
 This lane makes future-capability posture explicit without turning Horizons into a release gate for `vnext-foundation`.
 
+It now spans knowledge fabric, spatial/runsite artifacts, creator press, replay/forensics, and bounded table coaching/social-dynamics futures.
+
 ### H0 — Horizon canon established
 
 `chummer6-design` publishes a canonical Horizons layer and keeps it ahead of downstream public storytelling.
@@ -125,6 +127,10 @@ At least one horizon has enough owner, tool, and provenance detail to move from 
 ### H4 — Public signal loop defined
 
 Public proposals and advisory prioritization routes are collected through governed surfaces without turning votes into canonical truth.
+
+### H5 — Table coaching horizon defined
+
+`TABLE PULSE` becomes a bounded, privacy-safe post-session coaching lane with explicit owners, tool posture, and non-truth boundaries.
 
 ## Repo milestone spine
 

@@ -13,6 +13,7 @@ This document defines how Chummer may use those tools for:
 * ops dashboards
 * user feedback loops
 * research/evaluation
+* post-session coaching
 * media creation
 * route visualization
 * archive and retention support
@@ -52,6 +53,7 @@ Current known external-tool inventory includes:
 * MarkupGo
 * MetaSurvey
 * Mootion
+* Nonverbia
 * Paperguide
 * PeekShot
 * Teable
@@ -84,6 +86,7 @@ Current horizon-facing posture:
 * `jackpoint` - narrated recap and briefing lanes may use `Soundmadeseen`; bounded candidate voice may use `Unmixr AI`; evidence/capture packets may use `Browserly`
 * `runsite` - explorable location artifacts may use `Crezlo Tours`, `AvoMap`, and `PeekShot`; optional narration may use `Soundmadeseen`; bounded capture/reference packets may use `Browserly`
 * `runbook-press` - long-form authoring and export may use `First Book ai`, `MarkupGo`, and `Documentation.AI`; narrated companion assets may use `Soundmadeseen`; bounded candidate voice or reference capture may use `Unmixr AI` and `Browserly`
+* `table-pulse` - post-session coaching packets may use `Nonverbia` as the primary analysis lane, with bounded narrated/report outputs from `Soundmadeseen`, `Unmixr AI`, `MarkupGo`, and `PeekShot`
 
 ## Classification model
 
@@ -138,6 +141,7 @@ Examples:
 * prompt research
 * cited synthesis
 * product strategy ideation
+* bounded coaching and social-dynamics analysis
 
 ### Class E - Non-product utilities
 
@@ -203,6 +207,10 @@ Canonical manifests remain Chummer-owned.
 
 A redeemed or activated tool is merely eligible for integration.
 It is not automatically approved for canonical runtime use.
+
+### Rule 8 - coaching analysis is opt-in and post-session only
+
+Any tool that analyzes human session behavior must stay opt-in, post-session, and clearly separate from canonical session truth, moderation truth, or player discipline.
 
 ## Repo ownership
 
@@ -500,6 +508,33 @@ Feedback loop.
 
 * not canonical analytics warehouse
 * not canonical moderation state
+
+## Nonverbia
+
+### Role
+
+Post-session coaching and social-dynamics analysis adapter.
+
+### Architectural use
+
+* spotlight balance diagnostics
+* pacing and engagement review
+* interruption or talk-balance review
+* GM coaching packets
+* optional narrated coaching overlays
+
+### Owner
+
+* orchestration, privacy gating, and policy framing: `chummer6-hub`
+* rendered coaching artifacts: `chummer6-media-factory`
+
+### Hard boundary
+
+* not canonical session truth
+* not player surveillance
+* not moderation truth
+* not discipline automation
+* not live-session monitoring
 
 ## Teable
 
