@@ -59,7 +59,7 @@ public sealed record LoreChunkMatch(
     IReadOnlyList<string> MatchedTerms,
     string Snippet,
     LoreVectorization Vectorization,
-    IReadOnlyList<Chummer.Run.Contracts.Spider.EvidencePointer> Evidence);
+    IReadOnlyList<Chummer.Play.Contracts.Spider.EvidencePointer> Evidence);
 
 public sealed record LoreLensResult(
     string QueryText,

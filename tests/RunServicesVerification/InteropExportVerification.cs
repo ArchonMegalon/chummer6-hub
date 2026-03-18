@@ -2,7 +2,7 @@ using Chummer.Run.AI.Services.Interop;
 using Chummer.Run.AI.Services.Ops;
 using Chummer.Run.AI.Services.Session;
 using Chummer.Run.AI.Services.Spider;
-using Chummer.Run.Contracts.Interop;
+using Chummer.Play.Contracts.Interop;
 using Chummer.Run.Contracts.Ops;
 
 namespace RunServicesVerification;

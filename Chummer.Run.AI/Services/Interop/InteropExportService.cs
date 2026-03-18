@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Chummer.Run.AI.Services.Ops;
-using InteropContracts = Chummer.Run.Contracts.Interop;
+using InteropContracts = Chummer.Play.Contracts.Interop;
 
 namespace Chummer.Run.AI.Services.Interop;
 

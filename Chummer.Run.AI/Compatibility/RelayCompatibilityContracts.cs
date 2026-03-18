@@ -1,6 +1,6 @@
 namespace Chummer.Run.AI.Compatibility;
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.SessionEventEnvelope.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.SessionEventEnvelope.")]
 internal sealed record SessionEventEnvelope(
     string SessionId,
     string SceneId,
@@ -12,7 +12,7 @@ internal sealed record SessionEventEnvelope(
     string? IdempotencyKey = null,
     string ContractFamily = "session_events_vnext");
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.SessionRelayConvergenceDiagnostics.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.SessionRelayConvergenceDiagnostics.")]
 internal sealed record SessionRelayConvergenceDiagnostics(
     string ContractFamily,
     int SubmittedEvents,
@@ -24,7 +24,7 @@ internal sealed record SessionRelayConvergenceDiagnostics(
     bool Converged,
     DateTimeOffset EvaluatedAtUtc);
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.SessionRelayMergeResponse.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.SessionRelayMergeResponse.")]
 internal sealed record SessionRelayMergeResponse(
     string SessionId,
     string SceneId,
@@ -35,7 +35,7 @@ internal sealed record SessionRelayMergeResponse(
     DateTimeOffset MergedAtUtc,
     SessionRelayConvergenceDiagnostics Diagnostics);
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.SessionEventProjectionDto.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.SessionEventProjectionDto.")]
 internal sealed record SessionEventProjectionDto(
     string SessionId,
     string SceneId,
@@ -45,7 +45,7 @@ internal sealed record SessionEventProjectionDto(
     IReadOnlyList<SessionEventEnvelope> Events,
     string ContractFamily = "session_events_vnext");
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.SessionRuntimeBundleDto.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.SessionRuntimeBundleDto.")]
 internal sealed record SessionRuntimeBundleDto(
     string SessionId,
     string SceneId,
@@ -62,7 +62,7 @@ internal sealed record SessionRuntimeBundleDto(
     string ContractFamily = "runtime_dtos_vnext",
     string RuntimeDtoKind = "session-runtime-bundle");
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.SessionRelayMergeResponse.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.SessionRelayMergeResponse.")]
 internal sealed record SessionRelayMergeResult(
     string SessionId,
     string SceneId,
@@ -73,7 +73,7 @@ internal sealed record SessionRelayMergeResult(
     DateTimeOffset MergedAtUtc,
     SessionRelayConvergenceDiagnostics Diagnostics);
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.SessionEventProjectionDto.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.SessionEventProjectionDto.")]
 internal sealed record SessionDeltaProjection(
     string SessionId,
     string SceneId,
@@ -83,7 +83,7 @@ internal sealed record SessionDeltaProjection(
     IReadOnlyList<SessionEventEnvelope> Events,
     string ContractFamily = "session_events_vnext");
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.SessionRuntimeBundleDto.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.SessionRuntimeBundleDto.")]
 internal sealed record SessionRuntimeBundleResponse(
     string SessionId,
     string SceneId,
@@ -100,14 +100,14 @@ internal sealed record SessionRuntimeBundleResponse(
     string ContractFamily = "runtime_dtos_vnext",
     string RuntimeDtoKind = "session-runtime-bundle");
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.OfflineSyncPrepChecklistItem.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.OfflineSyncPrepChecklistItem.")]
 internal sealed record OfflineSyncPrepChecklistItem(
     string ItemId,
     string Label,
     bool Completed = false,
     string? Notes = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.OfflineSyncPrepAsset.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.OfflineSyncPrepAsset.")]
 internal sealed record OfflineSyncPrepAsset(
     string AssetId,
     string CampaignId,
@@ -129,7 +129,7 @@ internal sealed record OfflineSyncPrepAsset(
     string? LastRevealChannel = null,
     int RevealCount = 0);
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.OfflineSyncSnapshotRequest.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.OfflineSyncSnapshotRequest.")]
 internal sealed record OfflineSyncSnapshotRequest(
     string CampaignId,
     string SessionId,
@@ -138,7 +138,7 @@ internal sealed record OfflineSyncSnapshotRequest(
     string? DeviceId = null,
     IReadOnlyList<string>? PrepAssetIds = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.OfflineSyncSnapshotPackage.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.OfflineSyncSnapshotPackage.")]
 internal sealed record OfflineSyncSnapshotPackage(
     string SnapshotId,
     string CampaignId,
@@ -155,7 +155,7 @@ internal sealed record OfflineSyncSnapshotPackage(
     string PackageHash,
     string ContractFamily = "offline_sync_snapshot_v1");
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.OfflineSyncConflict.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.OfflineSyncConflict.")]
 internal sealed record OfflineSyncConflict(
     string Surface,
     string EntityId,
@@ -164,14 +164,14 @@ internal sealed record OfflineSyncConflict(
     string? LocalFingerprint = null,
     string? RemoteFingerprint = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.OfflineSyncSurfaceMergeResult.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.OfflineSyncSurfaceMergeResult.")]
 internal sealed record OfflineSyncSurfaceMergeResult(
     string Surface,
     int ImportedCount,
     int SkippedCount,
     IReadOnlyList<OfflineSyncConflict> Conflicts);
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.OfflineSyncReconcileRequest.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.OfflineSyncReconcileRequest.")]
 internal sealed record OfflineSyncReconcileRequest(
     OfflineSyncSnapshotPackage Snapshot,
     string ReconciledBy,
@@ -179,7 +179,7 @@ internal sealed record OfflineSyncReconcileRequest(
     IReadOnlyList<SessionEventEnvelope>? LocalPendingEvents = null,
     IReadOnlyList<OfflineSyncPrepAsset>? LocalPrepAssets = null);
 
-[Obsolete("Use Chummer.Run.Contracts.Relay.OfflineSyncReconcileResult.")]
+[Obsolete("Use Chummer.Play.Contracts.Relay.OfflineSyncReconcileResult.")]
 internal sealed record OfflineSyncReconcileResult(
     string SnapshotId,
     string SessionId,

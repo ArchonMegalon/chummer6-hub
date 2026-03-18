@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AssemblyName>Chummer.Play.Contracts</AssemblyName>
+    <PackageId>Chummer.Play.Contracts</PackageId>
   </PropertyGroup>
 
 </Project>

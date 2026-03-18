@@ -192,7 +192,7 @@ public sealed class SessionLedgerService : ISessionLedgerService
                     return new Chummer.Run.Contracts.Relay.SessionLedgerSceneBackup(
                         SessionId: sessionId,
                         SceneId: sceneId,
-                        Events: item.Value.Events.Select(ToRunEvent).ToArray());
+                        Events: item.Value.Events.ToArray());
                 }
             })
             .ToArray();
@@ -239,7 +239,7 @@ public sealed class SessionLedgerService : ISessionLedgerService
             {
                 if (seenIds.Add(item.EventId))
                 {
-                    deduped.Add(ToPlayEvent(item));
+                    deduped.Add(item);
                 }
             }
 
@@ -346,28 +346,4 @@ public sealed class SessionLedgerService : ISessionLedgerService
     }
 
     private static int ToInt(long value) => value > int.MaxValue ? int.MaxValue : (int)value;
-
-    private static Chummer.Run.Contracts.Relay.SessionEventEnvelope ToRunEvent(SessionEventEnvelope source) =>
-        new(
-            SessionId: source.SessionId,
-            SceneId: source.SceneId,
-            EventType: source.EventType,
-            Payload: source.Payload,
-            AtUtc: source.AtUtc,
-            EventId: source.EventId,
-            SceneRevision: source.SceneRevision,
-            IdempotencyKey: source.IdempotencyKey,
-            ContractFamily: source.ContractFamily);
-
-    private static SessionEventEnvelope ToPlayEvent(Chummer.Run.Contracts.Relay.SessionEventEnvelope source) =>
-        new(
-            SessionId: source.SessionId,
-            SceneId: source.SceneId,
-            EventType: source.EventType,
-            Payload: source.Payload,
-            AtUtc: source.AtUtc,
-            EventId: source.EventId,
-            SceneRevision: source.SceneRevision,
-            IdempotencyKey: source.IdempotencyKey,
-            ContractFamily: source.ContractFamily);
 }

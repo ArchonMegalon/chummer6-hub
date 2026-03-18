@@ -1,5 +1,5 @@
 using Chummer.Run.AI.Services.Interop;
-using InteropContracts = Chummer.Run.Contracts.Interop;
+using InteropContracts = Chummer.Play.Contracts.Interop;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.AI.Controllers;

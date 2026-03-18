@@ -1,5 +1,5 @@
 
-using EvidencePointer = Chummer.Run.Contracts.Spider.EvidencePointer;
+using EvidencePointer = Chummer.Play.Contracts.Spider.EvidencePointer;
 using LoreChunk = Chummer.Run.Contracts.AI.LoreChunk;
 using LoreChunkMatch = Chummer.Run.Contracts.AI.LoreChunkMatch;
 using LoreIngestionRequest = Chummer.Run.Contracts.AI.LoreIngestionRequest;
