@@ -1,3 +1,4 @@
+using Chummer.Run.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +22,8 @@ builder.Services
             return new BadRequestObjectResult(problem);
         };
     });
+builder.Services.AddHttpClient<FleetBridgeService>();
+builder.Services.AddSingleton<CodexParticipationService>();
 
 var app = builder.Build();
 

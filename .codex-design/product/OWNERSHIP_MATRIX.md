@@ -12,6 +12,7 @@
 | `chummer6-ui-kit`        | shared design system               | tokens, themes, shell primitives, accessibility primitives, reusable components                         | domain DTOs, HTTP clients, storage, rules math                                     | `Chummer.Ui.Kit`                                                                |
 | `chummer6-hub-registry`  | catalog/publication service        | artifacts, publication drafts, moderation state, installs, reviews, compatibility, runtime-bundle heads | relay, Coach/Spider, media rendering, client UX                                    | `Chummer.Hub.Registry.Contracts`                                                |
 | `chummer6-media-factory` | media execution plant              | render jobs, previews, manifests, asset lifecycle, provider adapters, signed asset access               | campaign truth, rules truth, approvals policy, player/client UX                    | `Chummer.Media.Contracts`                                                       |
+| `fleet`                  | execution/control plane            | worker orchestration, queue policy, review/landing control, cheap-first automation, explicit premium burst lanes | product truth, contract canon, session truth, raw hosted identity/auth storage      | none                                                                            |
 | `chummer5a`             | legacy oracle                      | migration fixtures, regression corpus, legacy compatibility reference                                   | vNext architecture ownership                                                       | none                                                                            |
 
 ## Boundary notes
@@ -45,6 +46,10 @@ The only repo allowed to own immutable artifact catalog and publication/install 
 
 The only repo allowed to own render execution and render-asset lifecycle.
 
+### `fleet`
+
+The only adjacent repo allowed to own cross-repo worker scheduling and landing control, but never canonical Chummer product truth.
+
 ## Ownership violations
 
 Any of the following is an ownership violation:
@@ -56,6 +61,7 @@ Any of the following is an ownership violation:
 * ui-kit gains domain DTOs or HTTP clients
 * engine begins depending on ui/mobile/hub code
 * design repo becomes stale enough that code repos must invent architecture locally
+* fleet introduces execution policy that contradicts mirrored design canon
 
 
 ## External integration ownership
@@ -93,6 +99,7 @@ Must not own:
 * media rendering internals
 * client-side vendor access
 * duplicate engine semantics
+* raw participant Codex/OpenAI auth caches
 
 ### `chummer6-media-factory`
 
@@ -117,3 +124,18 @@ Must not own:
 * vendor credentials
 * direct provider SDK access
 * direct third-party orchestration
+
+### `fleet`
+
+Owns:
+
+* cheap-first execution policy
+* jury-gated landing automation
+* dynamic participant burst lanes after explicit Hub consent
+* lane-local auth/cache storage on the execution host
+
+Must not own:
+
+* product architecture canon
+* direct Hub identity/session issuance
+* participant-consent UX outside the Hub boundary

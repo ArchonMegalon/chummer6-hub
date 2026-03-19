@@ -68,7 +68,7 @@ Legacy/oracle repo. Used for migration, regression fixtures, and compatibility r
 
 These inform the program but are not part of the main release train:
 
-* `fleet` — worker orchestration/control plane
+* `fleet` — worker orchestration/control plane, mirrored from this repo for execution policy and review context
 * `executive-assistant` — skill/runtime reference pattern for governed assistant orchestration
 * `Chummer6` — downstream public guide and Horizons explainer repo; useful for public storytelling, but not canonical design truth
 
@@ -79,6 +79,7 @@ These inform the program but are not part of the main release train:
 3. Keep `chummer6-design` fresh enough that mirrors, Fleet status, and downstream public guides cannot drift from canon.
 4. Purify `chummer6-core` and `chummer6-hub` further by deleting remaining legacy cargo rather than arguing about it.
 5. Complete release hardening: accessibility, localization, performance, observability, DR, migration certification, and final release proof.
+6. Keep Fleet’s cheap-first execution plane canonical while adding explicit premium-burst policy only through mirrored design truth, not ad hoc repo-local drift.
 
 The current open-program follow-through is materialized in `WORKLIST.md` as `WL-D019` through `WL-D038` so the remaining closure wave is tracked as executable backlog instead of latent milestone prose.
 
