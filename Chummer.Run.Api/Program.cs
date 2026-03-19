@@ -25,6 +25,7 @@ builder.Services
     });
 builder.Services.AddHttpClient<FleetBridgeService>();
 builder.Services.AddHttpClient<HubIdentityClient>();
+builder.Services.AddHttpClient<HubBrowserAuthService>();
 builder.Services.AddSingleton<CommunityStore>();
 builder.Services.AddSingleton<PublicLandingService>();
 builder.Services.AddSingleton<FleetReceiptVerifier>();

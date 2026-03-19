@@ -27,22 +27,44 @@ public sealed class CodexParticipationController : ControllerBase
 
     [HttpGet("/participate/codex")]
     [Produces("text/html")]
-    public ContentResult ParticipationPage()
+    public async Task<IActionResult> ParticipationPage(CancellationToken cancellationToken)
     {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException)
+        {
+            return Redirect("/login?next=/participate/codex");
+        }
+
         var html = """
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Participate Through Hub</title>
+  <title>Participate · Chummer</title>
   <style>
+    :root {
+      --bg: #efe6d2;
+      --paper: rgba(255, 251, 242, 0.82);
+      --ink: #1a1712;
+      --muted: #665d52;
+      --accent: #125a58;
+      --warm: #8d5932;
+      --line: rgba(26, 23, 18, 0.12);
+      --shadow: 0 18px 40px rgba(26, 23, 18, 0.08);
+    }
     body { font-family: Georgia, serif; background: linear-gradient(180deg, #f4efe3 0%, #e6dcc3 100%); color: #1e1b16; margin: 0; }
-    main { max-width: 920px; margin: 0 auto; padding: 32px 20px 60px; }
+    main { max-width: 980px; margin: 0 auto; padding: 28px 20px 60px; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:18px; margin-bottom:22px; padding:14px 18px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.72); box-shadow:var(--shadow); }
+    .nav { display:flex; flex-wrap:wrap; gap:14px; color:var(--muted); font-size:.95rem; }
+    .brand { font-size:1.1rem; letter-spacing:.08em; text-transform:uppercase; }
     h1, h2 { margin: 0 0 12px; }
     .panel { background: rgba(255,255,255,0.75); border: 1px solid rgba(30,27,22,0.12); border-radius: 16px; padding: 18px; margin: 16px 0; box-shadow: 0 8px 20px rgba(30,27,22,0.08); }
     label { display: block; margin: 12px 0 6px; font-weight: 600; }
-    input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(30,27,22,0.2); background: #fffaf0; }
+    input, select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(30,27,22,0.2); background: #fffaf0; }
     button { margin: 8px 8px 0 0; padding: 10px 14px; border-radius: 999px; border: 0; background: #1f5f4a; color: white; cursor: pointer; }
     button.secondary { background: #7a5532; }
     .muted { color: #5d564e; }
@@ -52,31 +74,40 @@ public sealed class CodexParticipationController : ControllerBase
 </head>
 <body>
   <main>
+    <header class="topbar">
+      <div class="brand">Chummer.run</div>
+      <nav class="nav">
+        <a href="/">Landing</a>
+        <a href="/home">Home</a>
+        <a href="/account">Account</a>
+        <a href="/leaderboards">Leaderboards</a>
+        <a href="/logout">Sign out</a>
+      </nav>
+    </header>
     <h1>Participate Through Hub</h1>
-    <p class="muted">Hub owns the user, group, and ledger truth. Fleet opens the sponsored worker lane. Jury still lands the result.</p>
+    <p class="muted">Hub owns the user, group, receipt, reward, and privacy truth. Fleet opens the temporary worker lane. Final landing still goes through review.</p>
 
     <section class="panel">
-      <h2>How This Works</h2>
+      <h2>How this works</h2>
       <ol>
-        <li>Fleet keeps the cheap groundwork loop as the default path.</li>
-        <li>If you consent, Hub opens a sponsor session on the community plane and asks Fleet to create a temporary participant burst lane.</li>
-        <li>Fleet runs <code>codex login --device-auth</code> on the worker host and returns a verification URL plus one-time code.</li>
-        <li>Your auth cache stays lane-local on Fleet. Hub stores product metadata, receipts, rewards, and entitlements.</li>
-        <li>Premium work still lands through review and jury. Your lane never merges independently.</li>
+        <li>The cheap baseline remains the default path for the project.</li>
+        <li>If you opt in here, Hub opens a sponsor session and asks Fleet for a temporary help lane.</li>
+        <li>Fleet runs the device-auth step on the worker host and returns a verification URL plus one-time code.</li>
+        <li>Your auth cache stays lane-local on Fleet. Hub stores the product metadata, receipts, badges, and privacy settings.</li>
+        <li>Participation is additive, temporary, and still review-safe. Your lane never merges independently.</li>
       </ol>
       <p><a href="https://developers.openai.com/codex/auth/" target="_blank" rel="noreferrer">OpenAI Codex auth documentation</a></p>
     </section>
 
     <section class="panel">
-      <h2>1. Authenticate</h2>
-      <label for="accessToken">Bearer access token</label>
-      <input id="accessToken" placeholder="Paste a Hub access token from the identity surface once, then load your account" />
-      <button onclick="loadAccount()">Load my Hub account</button>
-      <pre id="accountState">No authenticated account loaded yet.</pre>
+      <h2>1. Confirm who you are</h2>
+      <p class="muted">This page already runs behind the hosted sign-in shell. Refresh your account state below if you want to confirm which groups and visibility settings are active.</p>
+      <button onclick="loadAccount()">Refresh my Hub account</button>
+      <pre id="accountState">Loading authenticated account…</pre>
     </section>
 
     <section class="panel">
-      <h2>2. Choose Help Mode</h2>
+      <h2>2. Choose your help mode</h2>
       <label for="projectId">Project id</label>
       <input id="projectId" value="fleet" />
       <label for="groupId">Existing group id</label>
@@ -110,7 +141,7 @@ public sealed class CodexParticipationController : ControllerBase
     </section>
 
     <section class="panel">
-      <h2>Current Intent</h2>
+      <h2>Current sponsor session</h2>
       <pre id="intentState">No intent created yet.</pre>
     </section>
 
@@ -139,15 +170,10 @@ public sealed class CodexParticipationController : ControllerBase
   <script>
     let currentIntentId = "";
 
-    function headers() {
-      const token = document.getElementById("accessToken").value.trim();
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      return headers;
-    }
+    const headers = { "Content-Type": "application/json" };
 
     async function api(path, options = {}) {
-      const response = await fetch(path, { headers: headers(), ...options });
+      const response = await fetch(path, { headers, ...options });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
       return data;
@@ -232,6 +258,10 @@ public sealed class CodexParticipationController : ControllerBase
       document.getElementById("badgeState").textContent = JSON.stringify(badges, null, 2);
       document.getElementById("recognitionState").textContent = JSON.stringify(recognition, null, 2);
     }
+
+    loadAccount().catch(error => {
+      document.getElementById("accountState").textContent = error.message;
+    });
   </script>
 </body>
 </html>

@@ -9,7 +9,12 @@ public sealed record PublicLandingRouteDto(
     string Path,
     string Title,
     string Audience,
-    string Purpose);
+    string Purpose,
+    bool RequiresAuth = false,
+    string? GuestFallback = null,
+    bool MustExist = true,
+    bool PlaceholderAllowed = false,
+    string? PlaceholderRequirements = null);
 
 public sealed record PublicLandingSectionDto(
     string Id,
@@ -47,6 +52,7 @@ public sealed record PublicLandingSurfaceDto(
     IReadOnlyList<PublicLandingActionDto> HeroCtas,
     IReadOnlyList<string> SecondaryHighlights,
     IReadOnlyList<PublicLandingRouteDto> PublicRoutes,
+    IReadOnlyList<PublicLandingRouteDto> AuthRoutes,
     IReadOnlyList<PublicLandingRouteDto> RegisteredRoutes,
     IReadOnlyList<PublicLandingSectionDto> Sections,
     IReadOnlyList<PublicLandingOverlayDto> RegisteredOverlays,

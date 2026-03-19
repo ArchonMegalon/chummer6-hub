@@ -20,6 +20,25 @@ public sealed record IdentitySessionIssueResponse(
     DateTimeOffset IssuedAtUtc,
     DateTimeOffset ExpiresAtUtc);
 
+public sealed record EmailAuthStartRequest(
+    [Required(AllowEmptyStrings = false), StringLength(320)] string Email,
+    string? DisplayName,
+    string? NextPath = null);
+
+public sealed record EmailAuthStartResponse(
+    string TicketId,
+    string SubjectId,
+    string Email,
+    string DisplayName,
+    string? NextPath,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset ExpiresAtUtc,
+    string DeliveryMode,
+    string PreviewNote);
+
+public sealed record EmailAuthCompleteRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string TicketId);
+
 public sealed record IdentityRoleSetRequest(
     [Required, MinLength(1)] IReadOnlyList<string> Roles,
     string? AssignedBy = null);
@@ -40,3 +59,12 @@ public sealed record IdentityIntrospectionResponse(
     string? SubjectId,
     IReadOnlyList<string>? Roles,
     DateTimeOffset? ExpiresAtUtc);
+
+public sealed record IdentitySessionRevokeRequest(
+    [Required(AllowEmptyStrings = false), StringLength(512)] string AccessToken);
+
+public sealed record IdentitySessionRevokeResponse(
+    bool Revoked,
+    string? SessionId,
+    string? SubjectId,
+    DateTimeOffset RevokedAtUtc);

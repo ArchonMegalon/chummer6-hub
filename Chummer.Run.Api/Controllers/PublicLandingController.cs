@@ -97,7 +97,7 @@ public sealed class PublicLandingController : ControllerBase
     <li>Fleet opens the temporary worker lane and handles device-code auth on the worker host.</li>
     <li>Final landing still goes through review and jury. Participation does not bypass governance.</li>
   </ol>
-  <p><a class="inline-link" href="/participate/codex">Open the current preview booster flow</a></p>
+  <p><a class="inline-link" href="/login?next=/participate/codex">Sign in for the booster console</a></p>
 </section>
 """);
         body.AppendLine(RenderCardSection(surface, "participate"));
@@ -134,7 +134,7 @@ public sealed class PublicLandingController : ControllerBase
 
     [HttpGet("/home")]
     [Produces("text/html")]
-    public async Task<ContentResult> HomePage(CancellationToken cancellationToken)
+    public async Task<IActionResult> HomePage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
         try
@@ -160,15 +160,7 @@ public sealed class PublicLandingController : ControllerBase
         }
         catch (HubRequestAuthException)
         {
-            var body = $$"""
-<section class="panel prose">
-  <h2>Sign in to unlock overlays</h2>
-  <p>This preview does not force a giant onboarding wizard. If you already have a Hub bearer token, use it on the account or participation preview surfaces. If you do not, stay on the public routes until the friendlier sign-in head lands.</p>
-  <p><a class="inline-link" href="/account">Account preview</a> · <a class="inline-link" href="/participate">Participate</a></p>
-</section>
-{{RenderOverlaySection(surface)}}
-""";
-            return Content(RenderPage(surface, "Home", "Sign in unlocks follows, beta interest, and the bounded booster lane.", body), "text/html");
+            return Redirect("/login?next=/home");
         }
     }
 
@@ -272,7 +264,10 @@ public sealed class PublicLandingController : ControllerBase
 
     private string RenderPage(PublicLandingSurfaceDto surface, string title, string lead, string body)
     {
-        var nav = string.Join("", surface.PublicRoutes.Select(route => $"""<a href="{EncodeHref(route.Path)}">{Encode(route.Title)}</a>"""));
+        var navRoutes = surface.PublicRoutes
+            .Concat(surface.AuthRoutes.Where(static route => string.Equals(route.Path, "/login", StringComparison.Ordinal)))
+            .ToArray();
+        var nav = string.Join("", navRoutes.Select(route => $"""<a href="{EncodeHref(route.Path)}">{Encode(route.Title)}</a>"""));
         return $$"""
 <!doctype html>
 <html lang="en">

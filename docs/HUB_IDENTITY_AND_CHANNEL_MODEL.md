@@ -32,6 +32,13 @@ Current posture:
 - Facebook stays optional and demand-driven
 - Telegram may be linked as identity, but it is not the account core
 
+First-wave hosted-shell posture:
+
+- `/login`, `/signup`, and `/logout` are the boring browser entry routes
+- email-first entry is the currently live default
+- Google routes may exist honestly before the adapter is fully configured
+- Facebook and user-provided Telegram bots stay out of the first-wave account UI
+
 ## Channels versus identity
 
 Do not conflate:

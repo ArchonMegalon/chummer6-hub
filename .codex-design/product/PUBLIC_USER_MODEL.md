@@ -96,3 +96,15 @@ The POC needs only:
 * future vote placeholder
 
 Do not force a giant onboarding wizard or hard role selection up front.
+
+## First-wave auth posture
+
+First-wave entry should be boring:
+
+* `/login`
+* `/signup`
+* browser session cookies for the hosted shell
+* email-first entry before a larger provider set appears
+
+Google is the next allowed mainstream adapter when provider credentials exist.
+Facebook and user-provided Telegram bots must stay out of the default first-wave UI until canon changes and the adapters are actually live.

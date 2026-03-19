@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
@@ -21,58 +20,88 @@ public sealed class AccountsController : ControllerBase
 
     [HttpGet("/account")]
     [Produces("text/html")]
-    public ContentResult AccountPage()
+    public async Task<IActionResult> AccountPage(CancellationToken cancellationToken)
     {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException)
+        {
+            return Redirect("/login?next=/account");
+        }
+
         var html = """
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hub Account</title>
+  <title>Account · Chummer</title>
   <style>
-    body { font-family: Georgia, serif; background: #f7f1e5; color: #1f1b16; margin: 0; }
-    main { max-width: 920px; margin: 0 auto; padding: 32px 20px 48px; }
-    .panel { background: white; border: 1px solid rgba(31,27,22,.12); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+    :root {
+      --bg: #efe6d2;
+      --paper: rgba(255, 251, 242, 0.82);
+      --ink: #1a1712;
+      --muted: #665d52;
+      --accent: #125a58;
+      --warm: #8d5932;
+      --line: rgba(26, 23, 18, 0.12);
+      --shadow: 0 18px 40px rgba(26, 23, 18, 0.08);
+    }
+    body { font-family: Georgia, serif; background: linear-gradient(180deg, #f5eedf 0%, var(--bg) 55%, #e7dac0 100%); color: var(--ink); margin: 0; }
+    main { max-width: 1040px; margin: 0 auto; padding: 28px 20px 56px; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:18px; margin-bottom:22px; padding:14px 18px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.72); box-shadow:var(--shadow); }
+    .nav { display:flex; flex-wrap:wrap; gap:14px; color:var(--muted); font-size:.95rem; }
+    .brand { font-size:1.1rem; letter-spacing:.08em; text-transform:uppercase; }
+    .panel { background: var(--paper); border: 1px solid rgba(31,27,22,.12); border-radius: 18px; padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
     label { display:block; margin: 10px 0 6px; font-weight: 600; }
-    input { width:100%; padding:10px 12px; border-radius: 10px; border:1px solid rgba(31,27,22,.2); }
-    select { width:100%; padding:10px 12px; border-radius: 10px; border:1px solid rgba(31,27,22,.2); }
-    button { margin-top: 12px; padding: 10px 14px; border-radius: 999px; border: 0; background: #205d4a; color: #fff; cursor: pointer; }
-    pre { background: #fbf7ef; padding: 12px; border-radius: 12px; overflow: auto; }
+    input, select { width:100%; padding:10px 12px; border-radius: 10px; border:1px solid rgba(31,27,22,.2); background:rgba(255,255,255,.92); }
+    button, .chip { margin-top: 12px; padding: 10px 14px; border-radius: 999px; border: 0; background: #205d4a; color: #fff; cursor: pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+    .chip.secondary { background:#7a5532; }
+    pre { background: #fbf7ef; padding: 12px; border-radius: 12px; overflow: auto; border:1px solid rgba(31,27,22,.08); }
     .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    p, li { color: var(--muted); }
   </style>
 </head>
 <body>
   <main>
+    <header class="topbar">
+      <div class="brand">Chummer.run</div>
+      <nav class="nav">
+        <a href="/">Landing</a>
+        <a href="/home">Home</a>
+        <a href="/participate">Participate</a>
+        <a href="/leaderboards">Leaderboards</a>
+        <a href="/logout">Sign out</a>
+      </nav>
+    </header>
     <section class="panel">
-      <h1>Hub Account</h1>
-      <p>Hub keeps the product-level account, visibility, and group identity layer above raw identity subjects. In this preview, a bearer token is enough to load the matching account.</p>
-      <label for="accessToken">Bearer access token</label>
-      <input id="accessToken" placeholder="Paste a Hub access token from the identity surface" />
+      <h1>Account</h1>
+      <p>Hub keeps the product-level account, visibility, linked identities, and channel policy above raw identity subjects. This page assumes you already reached it through the hosted sign-in flow.</p>
       <label for="displayName">Display name</label>
       <input id="displayName" placeholder="Archon" />
       <label for="handle">Handle</label>
       <input id="handle" placeholder="archon" />
       <label for="timezone">Timezone</label>
       <input id="timezone" value="Europe/Vienna" />
-      <button onclick="loadAccount()">Load account</button>
+      <button onclick="loadAccount()">Refresh account</button>
       <button onclick="saveProfile()">Save profile</button>
     </section>
     <section class="panel">
       <h2>Linked identities and channels</h2>
-      <p>Email verification is identity hygiene, social providers are auth adapters, Telegram is a channel or linked identity, and EA remains the orchestrator brain behind the official companion channel.</p>
+      <p>Email-first entry is live now. Google is the next allowed mainstream bootstrap when credentials land. Telegram can be linked as an identity or the official companion channel. Facebook and bring-your-own bots stay out of the first-wave UI.</p>
       <div class="grid">
         <div>
           <label for="emailAddress">Email / magic link</label>
           <input id="emailAddress" placeholder="runner@example.com" />
-          <button onclick="linkEmail()">Add email</button>
+          <button onclick="linkEmail()">Add email identity</button>
         </div>
         <div>
           <label for="provider">External provider</label>
           <select id="provider">
             <option value="google">Google</option>
             <option value="telegram">Telegram</option>
-            <option value="facebook">Facebook</option>
           </select>
           <label for="providerSubject">Provider subject / handle</label>
           <input id="providerSubject" placeholder="google-subject-123" />
@@ -82,7 +111,6 @@ public sealed class AccountsController : ControllerBase
           <label for="channelKind">Channel link</label>
           <select id="channelKind">
             <option value="telegram_official_bot">Official Telegram bot</option>
-            <option value="telegram_user_bot">Bring your own Telegram bot</option>
           </select>
           <label for="channelHandle">Channel handle</label>
           <input id="channelHandle" placeholder="@hubbrain" />
@@ -92,24 +120,26 @@ public sealed class AccountsController : ControllerBase
     </section>
     <section class="panel">
       <h2>Current account</h2>
-      <pre id="output">No account loaded yet.</pre>
+      <pre id="output">Loading account...</pre>
     </section>
     <section class="panel">
       <h2>Identity and channel summary</h2>
-      <pre id="linksOutput">No links loaded yet.</pre>
+      <pre id="linksOutput">Loading linked identities...</pre>
+    </section>
+    <section class="panel">
+      <h2>First-wave honesty</h2>
+      <ul>
+        <li>Email-first entry is the current live path for the browser shell.</li>
+        <li>Google is allowed next, but this host should not pretend it is active before provider credentials exist.</li>
+        <li>Facebook and user-provided Telegram bots are intentionally out of the first-wave account UI.</li>
+      </ul>
     </section>
   </main>
   <script>
-    function headers() {
-      const token = document.getElementById('accessToken').value.trim();
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      return headers;
-    }
+    const jsonHeaders = { 'Content-Type': 'application/json' };
+
     async function loadAccount() {
-      const response = await fetch('/api/v1/accounts/me', {
-        headers: headers()
-      });
+      const response = await fetch('/api/v1/accounts/me', { headers: jsonHeaders });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
       document.getElementById('displayName').value = data.displayName || '';
@@ -118,21 +148,23 @@ public sealed class AccountsController : ControllerBase
       document.getElementById('output').textContent = JSON.stringify(data, null, 2);
       await loadLinks();
     }
+
     async function saveProfile() {
+      const current = await fetch('/api/v1/accounts/me', { headers: jsonHeaders });
+      const currentData = await current.json();
+      if (!current.ok) throw new Error(currentData.detail || JSON.stringify(currentData));
+
       const payload = {
-        subjectId: "",
+        subjectId: currentData.subjectId,
         displayName: document.getElementById('displayName').value,
         handle: document.getElementById('handle').value,
         timezone: document.getElementById('timezone').value,
         visibility: 'private'
       };
-      const current = await fetch('/api/v1/accounts/me', { headers: headers() });
-      const currentData = await current.json();
-      if (!current.ok) throw new Error(currentData.detail || JSON.stringify(currentData));
-      payload.subjectId = currentData.subjectId;
+
       const response = await fetch('/api/v1/accounts/me/profile', {
         method: 'POST',
-        headers: headers(),
+        headers: jsonHeaders,
         body: JSON.stringify(payload)
       });
       const data = await response.json();
@@ -140,26 +172,27 @@ public sealed class AccountsController : ControllerBase
       document.getElementById('output').textContent = JSON.stringify(data, null, 2);
       await loadLinks();
     }
+
     async function loadLinks() {
-      const response = await fetch('/api/v1/accounts/me/links', {
-        headers: headers()
-      });
+      const response = await fetch('/api/v1/accounts/me/links', { headers: jsonHeaders });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
       document.getElementById('linksOutput').textContent = JSON.stringify(data, null, 2);
       return data;
     }
+
     async function currentSubjectId() {
-      const response = await fetch('/api/v1/accounts/me', { headers: headers() });
+      const response = await fetch('/api/v1/accounts/me', { headers: jsonHeaders });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
       return data.subjectId;
     }
+
     async function linkEmail() {
       const subjectId = await currentSubjectId();
       const response = await fetch('/api/v1/accounts/me/links/email', {
         method: 'POST',
-        headers: headers(),
+        headers: jsonHeaders,
         body: JSON.stringify({
           subjectId,
           email: document.getElementById('emailAddress').value,
@@ -170,27 +203,30 @@ public sealed class AccountsController : ControllerBase
       if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
       await loadLinks();
     }
+
     async function linkProvider() {
       const subjectId = await currentSubjectId();
+      const provider = document.getElementById('provider').value;
       const response = await fetch('/api/v1/accounts/me/links/provider', {
         method: 'POST',
-        headers: headers(),
+        headers: jsonHeaders,
         body: JSON.stringify({
           subjectId,
-          provider: document.getElementById('provider').value,
+          provider,
           providerSubject: document.getElementById('providerSubject').value,
-          makePrimary: document.getElementById('provider').value === 'google'
+          makePrimary: provider === 'google'
         })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
       await loadLinks();
     }
+
     async function linkChannel() {
       const subjectId = await currentSubjectId();
       const response = await fetch('/api/v1/accounts/me/channels', {
         method: 'POST',
-        headers: headers(),
+        headers: jsonHeaders,
         body: JSON.stringify({
           subjectId,
           channelKind: document.getElementById('channelKind').value,
@@ -202,6 +238,11 @@ public sealed class AccountsController : ControllerBase
       if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
       await loadLinks();
     }
+
+    loadAccount().catch(error => {
+      document.getElementById('output').textContent = error.message;
+      document.getElementById('linksOutput').textContent = error.message;
+    });
   </script>
 </body>
 </html>

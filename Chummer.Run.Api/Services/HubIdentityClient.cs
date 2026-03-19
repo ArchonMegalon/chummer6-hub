@@ -81,24 +81,28 @@ public sealed class HubIdentityClient
 
     private static string ExtractBearerToken(HttpRequest request)
     {
-        if (request is null || request.Headers is null)
+        if (request is null)
         {
             throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "bearer access token required.");
         }
 
         var header = request.Headers.Authorization.ToString();
-        if (string.IsNullOrWhiteSpace(header)
-            || !header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(header)
+            && header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
-            throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "bearer access token required.");
+            var token = header["Bearer ".Length..].Trim();
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                return token;
+            }
         }
 
-        var token = header["Bearer ".Length..].Trim();
-        if (string.IsNullOrWhiteSpace(token))
+        if (request.Cookies.TryGetValue(HubBrowserAuthConstants.AccessTokenCookieName, out var cookieToken)
+            && !string.IsNullOrWhiteSpace(cookieToken))
         {
-            throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "bearer access token required.");
+            return cookieToken.Trim();
         }
 
-        return token;
+        throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "bearer access token required.");
     }
 }
