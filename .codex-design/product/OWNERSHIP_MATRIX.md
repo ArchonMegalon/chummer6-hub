@@ -133,9 +133,28 @@ Owns:
 * jury-gated landing automation
 * dynamic participant burst lanes after explicit Hub consent
 * lane-local auth/cache storage on the execution host
+* sponsor-session execution metadata on participant lanes
+* signed contribution receipts emitted from meaningful execution events
 
 Must not own:
 
 * product architecture canon
 * direct Hub identity/session issuance
 * participant-consent UX outside the Hub boundary
+* canonical user, group, reward, or entitlement ledger truth
+
+### `chummer6-hub`
+
+Owns:
+
+* identity principal to product-user mapping
+* user accounts and profiles
+* generic groups, memberships, join codes, and boost codes
+* fact ledger, reward journal, and entitlement journal
+* sponsor-session UX, community visibility, badges, quests, and leaderboards
+
+Must not own:
+
+* raw participant Codex/OpenAI auth caches
+* Fleet worker-process lifecycle or repo landing control
+* provider-secret ownership or provider-runtime accounting

@@ -116,6 +116,41 @@ Every active worker-driven code repo must receive:
 
 Missing `.codex-design/*` in an active repo is a program-level blocker, not a local inconvenience.
 
+## Petition path
+
+When a worker or reviewer is blocked by canon, the legal next move is a design petition, not a repo-local workaround.
+
+Design petitions live under `products/chummer/proposals/` and must identify:
+
+* blocked repo
+* violated boundary or missing seam
+* why current canon is insufficient
+* workaround attempts rejected
+* proposed resolution
+* affected canonical files
+* urgency
+
+Petitions are design inputs. They are not implementation patches, and they do not overrule canon until merged here.
+
+## Synthesis rule
+
+Repeated auditor or worker findings with the same root cause must be clustered before they become backlog truth.
+
+The lead-designer repo should prefer:
+
+* one synthesized blocker delta
+* one synthesized milestone delta
+* one synthesized design task
+
+over a stream of nearly identical uncovered-scope publications.
+
+## Evidence discipline
+
+Canonical product/design truth belongs in canonical files under `products/chummer/*`.
+
+Operational mirror/checksum/drift evidence belongs in automation-owned machine-readable outputs plus short human summaries.
+The design repo must not drift into becoming a giant parity diary.
+
 ## Auditor publication rules
 
 Auditors publish to canonical files, not to random scratch notes.
@@ -147,3 +182,6 @@ Examples:
 * package ownership is unambiguous
 * milestones are specific enough to gate release decisions
 * no orphan design docs live outside canonical product paths
+* workers have a legal petition path when canon is insufficient
+* repeated drift findings are synthesized before they become visible backlog truth
+* recurring parity evidence is compact enough that canon remains easy to read

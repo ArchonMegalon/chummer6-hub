@@ -44,7 +44,7 @@ Player and GM play-mode shell. Owns mobile/PWA/session UX, offline ledger, sync 
 
 ### `chummer6-hub`
 
-Hosted orchestration plane. Owns identity, play API aggregation, relay, approvals, memory, Coach/Spider/Director orchestration, and service policy.
+Hosted orchestration and community plane. Owns identity mapping, user/community accounts, generic groups and memberships, sponsorship/booster UX, fact/reward/entitlement ledgers, play API aggregation, relay, approvals, memory, Coach/Spider/Director orchestration, and hosted service policy.
 
 ### `chummer6-ui-kit`
 
@@ -68,15 +68,17 @@ Legacy/oracle repo. Used for migration, regression fixtures, and compatibility r
 
 These inform the program but are not part of the main release train:
 
-* `fleet` — worker orchestration/control plane, mirrored from this repo for execution policy and review context
-* `executive-assistant` — skill/runtime reference pattern for governed assistant orchestration
+* `fleet` — worker orchestration/control plane, mirrored from this repo for execution policy, parity automation, and queue synthesis
+* `executive-assistant` — governed assistant runtime and synthesis/petition reference pattern, including proactive horizon scans, human-edit reflection, bounded replanning, interruption-budget throttling, and explicit design-governance skills such as `design_petition`, `design_synthesis`, and `mirror_status_brief`
 * `Chummer6` — downstream public guide and Horizons explainer repo; useful for public storytelling, but not canonical design truth
 
 ## Current program priorities
 
-1. Keep recurring truth, review-template, and local-mirror cycles explicit whenever canon changes.
-2. Maintain Fleet’s cheap-first execution plane and premium-burst policy through mirrored design truth rather than repo-local invention.
-3. Treat future repo work as additive product evolution, not split-wave cleanup or contract-canon repair.
+1. Keep canonical design files concise, machine-readable where useful, and clearly above operational evidence noise.
+2. Keep Hub’s user/group/ledger/sponsorship model canonical so community participation, premium bursts, and later GM-group tooling all grow from one reusable platform.
+3. Maintain Fleet’s cheap-first execution plane and premium-burst policy through mirrored design truth rather than repo-local invention.
+4. Give workers a legal petition path when the blueprint is missing a seam, and synthesize repeated findings before they become queue truth.
+5. Treat future repo work as additive product evolution, not split-wave cleanup or contract-canon repair.
 
 The foundational closure wave is materially finished. Future design work is maintenance or net-new product evolution rather than unresolved split, contract, or release-governance debt.
 
