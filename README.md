@@ -11,6 +11,7 @@ Hosted orchestration and play API boundary for Chummer6.
 - governed AI, docs/help, and automation bridges
 - orchestration-side registry and media adapters
 - user accounts, groups, sponsorship sessions, and the canonical community ledger
+- the `chummer.run` landing page, proof shelf, and thin signed-in home overlay
 
 ## What this repo is not
 
@@ -47,6 +48,7 @@ The public-facing community spine now lives here too:
 - `docs/HOSTED_BOUNDARY.md`
 - `docs/HUB_EXTRACTION_ACCEPTANCE.md`
 - `docs/HUB_COMMUNITY_LEDGER_PLANE.md`
+- `docs/PUBLIC_LANDING_SURFACE.md`
 - `.codex-design/repo/IMPLEMENTATION_SCOPE.md`
 
 ## Verification

@@ -1,0 +1,278 @@
+product: chummer
+surface: chummer.run
+version: 1
+cards:
+  - id: product_story
+    bucket: what_you_can_do_today
+    title: What is Chummer?
+    summary: Start with the product story instead of repo history.
+    href: /what-is-chummer
+    badge: Read first
+    audience: public
+    image_family: archive_stair
+  - id: see_whats_real
+    bucket: what_you_can_do_today
+    title: See what is real now
+    summary: Check the live proof shelf before you fall in love with a promise.
+    href: /now
+    badge: Available today
+    audience: public
+    image_family: dossier_desk
+  - id: get_the_poc
+    bucket: what_you_can_do_today
+    title: Get the POC
+    summary: Grab the current drop, notes, and integrity hints.
+    href: /downloads
+    badge: POC
+    audience: public
+    image_family: facility_exterior
+  - id: sign_in_follow
+    bucket: what_you_can_do_today
+    title: Sign in to follow the future
+    summary: Keep an eye on the lanes you care about and unlock participation later.
+    href: /home
+    badge: Registered soon
+    audience: public
+    image_family: boulevard_of_futures
+  - id: deterministic_truth
+    bucket: why_this_feels_different
+    title: Deterministic rules truth
+    summary: No fuzzy math. Core-owned receipts stay attached to the answer.
+    href: /what-is-chummer
+    badge: Trust
+    audience: public
+    image_family: simulation_bench
+  - id: receipts_and_provenance
+    bucket: why_this_feels_different
+    title: Receipts and provenance
+    summary: Show the work, keep the evidence, and stop asking people to trust vibes.
+    href: /now
+    badge: Proof
+    audience: public
+    image_family: dossier_desk
+  - id: local_first_continuity
+    bucket: why_this_feels_different
+    title: Local-first session continuity
+    summary: The table should not panic just because the network does.
+    href: /what-is-chummer
+    badge: Continuity
+    audience: public
+    image_family: streetfront
+  - id: lane_player
+    bucket: choose_your_lane
+    title: Player
+    summary: Build and inspect, carry your dossier, and stay synced later.
+    href: /what-is-chummer
+    badge: Public now
+    audience: public
+    image_family: solo_operator
+  - id: lane_gm
+    bucket: choose_your_lane
+    title: GM
+    summary: Run the table, brief the team, and see what tools are coming next.
+    href: /horizons
+    badge: Horizon mix
+    audience: public
+    image_family: archive_stair
+  - id: lane_creator
+    bucket: choose_your_lane
+    title: Creator
+    summary: Publish artifacts, primers, and packs as those lanes open up.
+    href: /artifacts
+    badge: Coming next
+    audience: public
+    image_family: prop_cluster
+  - id: real_rules_truth
+    bucket: whats_real_now
+    title: Deterministic rules truth
+    summary: Core-owned math and receipts are already the trust anchor.
+    href: /now
+    badge: Available today
+    audience: public
+    image_family: simulation_bench
+  - id: real_public_guide
+    bucket: whats_real_now
+    title: Public guide and horizons
+    summary: There is already a real human guide and a governed horizon shelf.
+    href: https://github.com/ArchonMegalon/Chummer6
+    badge: Available today
+    audience: public
+    image_family: archive_stair
+  - id: real_mobile_prep
+    bucket: whats_real_now
+    title: Local-first prep and session posture
+    summary: Mobile and session continuity are treated as real product surfaces, not hand-wavy add-ons.
+    href: /now
+    badge: Preview
+    audience: public
+    image_family: streetfront
+  - id: real_release_shelf
+    bucket: whats_real_now
+    title: Release shelf
+    summary: Public drops, notes, and integrity clues live on one shelf.
+    href: /downloads
+    badge: POC
+    audience: public
+    image_family: facility_exterior
+  - id: horizon_nexus_pan
+    bucket: coming_next
+    title: NEXUS-PAN
+    summary: Shared state survives device churn without the table losing trust.
+    href: /horizons#nexus-pan
+    badge: Horizon
+    audience: public
+    image_family: streetfront
+    pain: My devices drift and the table loses confidence.
+    payoff: Shared state survives device churn without the GM rebuilding the run from memory.
+  - id: horizon_alice
+    bucket: coming_next
+    title: ALICE
+    summary: Builders get grounded what-if analysis without trusting fuzzy assistants.
+    href: /horizons#alice
+    badge: Horizon
+    audience: public
+    image_family: simulation_bench
+    pain: We only discover weak builds after they explode in public.
+    payoff: Compare grounded tradeoffs with receipts instead of vibes.
+  - id: horizon_knowledge_fabric
+    bucket: coming_next
+    title: KNOWLEDGE FABRIC
+    summary: Ask a rules question and get a grounded answer with citations and receipts.
+    href: /horizons#knowledge-fabric
+    badge: Horizon
+    audience: public
+    image_family: archive_stair
+    pain: Rules answers are expensive, repetitive, and still easy to hallucinate.
+    payoff: Derived projections stay grounded instead of becoming assistant folklore.
+  - id: horizon_karma_forge
+    bucket: coming_next
+    title: KARMA FORGE
+    summary: Governed rules evolution without unreadable fork chaos.
+    href: /horizons#karma-forge
+    badge: Booster first
+    audience: public
+    image_family: boulevard_of_futures
+    pain: I want house rules without forking trust.
+    payoff: Rule-pack changes carry approvals, compatibility, and rollback posture.
+  - id: horizon_jackpoint
+    bucket: coming_next
+    title: JACKPOINT
+    summary: Dossiers, recaps, and briefings that feel finished without severing provenance.
+    href: /horizons#jackpoint
+    badge: Horizon
+    audience: public
+    image_family: dossier_desk
+    pain: I want mission packets that do not feel like a copy-paste graveyard.
+    payoff: Grounded artifacts can feel polished without becoming fictional truth.
+  - id: horizon_runsite
+    bucket: coming_next
+    title: RUNSITE
+    summary: Walk the job before the team walks into it.
+    href: /horizons#runsite
+    badge: Horizon
+    audience: public
+    image_family: facility_exterior
+    pain: Spatial prep is tedious and scattered.
+    payoff: The venue becomes a visible, inspectable run surface.
+  - id: horizon_runbook_press
+    bucket: coming_next
+    title: RUNBOOK PRESS
+    summary: Bring new players in without the two-hour lecture.
+    href: /horizons#runbook-press
+    badge: Horizon
+    audience: public
+    image_family: prop_cluster
+    pain: Table onboarding still depends on heroic patience.
+    payoff: Grounded primers become first-class artifacts instead of random PDFs.
+  - id: horizon_ghostwire
+    bucket: coming_next
+    title: GHOSTWIRE
+    summary: Replay and after-action truth that survives memory drift.
+    href: /horizons#ghostwire
+    badge: Horizon
+    audience: public
+    image_family: boulevard_of_futures
+    pain: People remember the drama and forget the sequence.
+    payoff: After-action review can point at the event trail instead of table folklore.
+  - id: horizon_local_co_processor
+    bucket: coming_next
+    title: LOCAL CO-PROCESSOR
+    summary: Optional local acceleration without turning the product into a black box.
+    href: /horizons#local-co-processor
+    badge: Horizon
+    audience: public
+    image_family: solo_operator
+    pain: Some heavy local workflows still need more muscle.
+    payoff: Local acceleration stays optional and bounded instead of becoming a mystery dependency.
+  - id: artifact_runsite_pack
+    bucket: featured_artifacts
+    title: Runsite pack
+    summary: Walk the job before the team walks into it.
+    href: /artifacts
+    badge: Coming soon
+    audience: public
+    image_family: facility_exterior
+  - id: artifact_dossier_brief
+    bucket: featured_artifacts
+    title: Dossier brief
+    summary: Turn notes into a credible mission packet.
+    href: /artifacts
+    badge: Coming soon
+    audience: public
+    image_family: dossier_desk
+  - id: artifact_campaign_primer
+    bucket: featured_artifacts
+    title: Campaign primer
+    summary: Bring new players in without the two-hour lecture.
+    href: /artifacts
+    badge: Coming soon
+    audience: public
+    image_family: prop_cluster
+  - id: artifact_after_action
+    bucket: featured_artifacts
+    title: Replay and after-action
+    summary: See what happened, not just what people remember.
+    href: /artifacts
+    badge: Coming soon
+    audience: public
+    image_family: boulevard_of_futures
+  - id: participate_feedback
+    bucket: participate
+    title: Report a problem
+    summary: Use the public issue tracker when you want to file a bug or a concrete improvement.
+    href: https://github.com/ArchonMegalon/Chummer6/issues
+    badge: Public
+    audience: public
+    image_family: archive_stair
+  - id: participate_future
+    bucket: participate
+    title: Suggest a future
+    summary: Advisory signals are welcome even though canon still lives in design.
+    href: /participate
+    badge: Public
+    audience: public
+    image_family: boulevard_of_futures
+  - id: participate_booster
+    bucket: participate
+    title: I have a ChatGPT subscription
+    summary: Open the bounded booster lane if you want to lend temporary premium capacity.
+    href: /participate
+    badge: Registered
+    audience: public
+    image_family: solo_operator
+  - id: participate_beta
+    bucket: participate
+    title: Join the beta waitlist
+    summary: Raise your hand for follow-up previews and future gated surfaces.
+    href: /home
+    badge: Registered soon
+    audience: public
+    image_family: dossier_desk
+  - id: release_latest
+    bucket: release_shelf
+    title: Latest POC build
+    summary: Current public drop, release notes, and integrity clues.
+    href: https://github.com/ArchonMegalon/Chummer6/releases
+    badge: POC
+    audience: public
+    image_family: facility_exterior

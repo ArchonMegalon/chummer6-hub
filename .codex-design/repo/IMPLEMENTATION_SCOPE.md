@@ -13,6 +13,7 @@
 * sponsorship / participation UX for Fleet premium burst lanes
 * fact ledger, reward journal, and entitlement journal for community participation
 * leaderboards, quests, badges, and community-side entitlement views
+* the `chummer.run` public landing, proof shelf, public status, and signed-in home overlays
 * play API aggregation and hosted session coordination
 * orchestration-side Coach/Spider/Director surfaces
 * hosted external-integration routing that is not render-only media execution
@@ -105,6 +106,7 @@ Rewards must be derived from validated Fleet contribution receipts, not from mer
 
 `Chummer.Run.Api` should host the first real community UI surface for:
 
+* the public landing page and signed-in home shell
 * account/profile management
 * groups and memberships
 * boost-code redemption

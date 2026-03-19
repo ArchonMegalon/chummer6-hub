@@ -1,0 +1,51 @@
+product: chummer
+surface: chummer.run
+version: 1
+style_epoch:
+  mode: single_epoch_per_full_build
+  comparison_between_builds: allowed
+  note: A full landing build pass should share one major visual family, while later passes may intentionally compare different epochs.
+rules:
+  - No provider names appear in public landing assets.
+  - No LTD names appear in public landing assets.
+  - No empty placeholder frames are allowed.
+  - Every placeholder card must still explain what is coming and why it matters.
+  - Text in rendered images must be post-composited or otherwise verified instead of trusting raw model lettering.
+  - A premium still hero is preferred over a mediocre teaser loop.
+sections:
+  - id: hero
+    brief_family: boulevard_of_futures
+    scene_families: boulevard_of_futures, facility_exterior, solo_operator
+    motion_policy: premium_still_or_short_muted_loop
+  - id: what_you_can_do_today
+    brief_family: archive_stair
+    scene_families: archive_stair, dossier_desk, facility_exterior
+    motion_policy: stills_only
+  - id: why_this_feels_different
+    brief_family: simulation_bench
+    scene_families: simulation_bench, prop_cluster, dossier_desk
+    motion_policy: stills_only
+  - id: choose_your_lane
+    brief_family: solo_operator
+    scene_families: solo_operator, archive_stair, prop_cluster
+    motion_policy: stills_only
+  - id: whats_real_now
+    brief_family: dossier_desk
+    scene_families: dossier_desk, simulation_bench, facility_exterior
+    motion_policy: stills_only
+  - id: coming_next
+    brief_family: boulevard_of_futures
+    scene_families: boulevard_of_futures, streetfront, facility_exterior
+    motion_policy: stills_only
+  - id: featured_artifacts
+    brief_family: prop_cluster
+    scene_families: prop_cluster, dossier_desk, archive_stair
+    motion_policy: stills_only
+  - id: participate
+    brief_family: solo_operator
+    scene_families: solo_operator, boulevard_of_futures, dossier_desk
+    motion_policy: stills_only
+  - id: release_shelf
+    brief_family: facility_exterior
+    scene_families: facility_exterior, archive_stair
+    motion_policy: stills_only
