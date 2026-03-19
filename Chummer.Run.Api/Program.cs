@@ -24,7 +24,6 @@ builder.Services
         };
     });
 builder.Services.AddHttpClient<FleetBridgeService>();
-builder.Services.AddSingleton<CodexParticipationService>();
 builder.Services.AddSingleton<CommunityStore>();
 builder.Services.AddSingleton<AccountService>();
 builder.Services.AddSingleton<GroupService>();

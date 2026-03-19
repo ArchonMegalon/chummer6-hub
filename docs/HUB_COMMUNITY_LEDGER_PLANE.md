@@ -52,6 +52,12 @@ Community services in `Chummer.Run.Api/Services/Community`:
 - `LeaderboardService`
 - `CommunityStore`
 
+Current durability posture:
+
+* `CommunityStore` is now a durable local snapshot store, not a process-local demo dictionary.
+* The snapshot path defaults to a local app/temp location and can be overridden with `CHUMMER_COMMUNITY_STORE_PATH`.
+* This is the current hosted durability baseline for the community plane until a stronger database-backed store is justified.
+
 AI-side receipt/projection surfaces in `Chummer.Run.AI`:
 
 - `BoosterReceiptsController`
@@ -64,3 +70,4 @@ AI-side receipt/projection surfaces in `Chummer.Run.AI`:
 - Git commits, Fleet telemetry files, and EA provider health are evidence sources, not the product reward ledger.
 - Sponsored lanes never receive direct merge authority; `jury` still lands protected work.
 - Boosting is the first public use case for a generic community/group/accounting platform, not a one-off booster-only schema.
+- Public participation routes must resolve onto sponsor-session/community-ledger truth instead of keeping a parallel intent-only state model.

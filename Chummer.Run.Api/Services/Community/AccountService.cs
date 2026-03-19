@@ -30,6 +30,7 @@ public sealed class AccountService
                     UpdatedAtUtc = now,
                 };
                 _store.UsersById[updated.UserId] = updated;
+                _store.PersistLocked();
                 return updated;
             }
 
@@ -47,6 +48,7 @@ public sealed class AccountService
                 UpdatedAtUtc: now);
             _store.UserIdBySubjectId[subjectId] = created.UserId;
             _store.UsersById[created.UserId] = created;
+            _store.PersistLocked();
             return created;
         }
     }
@@ -122,6 +124,7 @@ public sealed class AccountService
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             };
             _store.UsersById[normalizedUserId] = updated;
+            _store.PersistLocked();
             return updated;
         }
     }

@@ -52,6 +52,10 @@ public sealed class LedgerService
 
         var mintedPoints = _rewards.ApplyReceipt(canonicalReceipt);
         var granted = _entitlements.ApplyReceipt(canonicalReceipt, mintedPoints);
+        lock (_store.Gate)
+        {
+            _store.PersistLocked();
+        }
         return new ReceiptIngestResultDto(
             ReceiptId: canonicalReceipt.ReceiptId,
             Status: "ingested",

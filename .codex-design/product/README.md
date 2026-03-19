@@ -10,16 +10,17 @@ Read in this order:
 2. `HORIZONS.md`
 3. `HORIZON_REGISTRY.yaml`
 4. `ARCHITECTURE.md`
-5. `EXTERNAL_TOOLS_PLANE.md`
-6. `LTD_CAPABILITY_MAP.md`
-7. `PUBLIC_GUIDE_POLICY.md`
-8. `HORIZON_SIGNAL_POLICY.md`
-9. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
-10. `OWNERSHIP_MATRIX.md`
-11. `PROGRAM_MILESTONES.yaml`
-12. `CONTRACT_SETS.yaml`
-13. `GROUP_BLOCKERS.md`
-14. `projects/*.md` for repo-specific scope
+5. `COMMUNITY_SPONSORSHIP_BACKLOG.md`
+6. `EXTERNAL_TOOLS_PLANE.md`
+7. `LTD_CAPABILITY_MAP.md`
+8. `PUBLIC_GUIDE_POLICY.md`
+9. `HORIZON_SIGNAL_POLICY.md`
+10. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
+11. `OWNERSHIP_MATRIX.md`
+12. `PROGRAM_MILESTONES.yaml`
+13. `CONTRACT_SETS.yaml`
+14. `GROUP_BLOCKERS.md`
+15. `projects/*.md` for repo-specific scope
 
 `HORIZON_REGISTRY.yaml` is the machine-readable source for horizon existence, order, public-guide eligibility, and eventual build path.
 The current horizon set covers knowledge fabric, spatial/runsite artifacts, creator press, replay/forensics, and bounded table coaching in addition to the earlier continuity and simulation lanes.
@@ -44,7 +45,7 @@ Player and GM play-mode shell. Owns mobile/PWA/session UX, offline ledger, sync 
 
 ### `chummer6-hub`
 
-Hosted orchestration and community plane. Owns identity mapping, user/community accounts, generic groups and memberships, sponsorship/booster UX, fact/reward/entitlement ledgers, play API aggregation, relay, approvals, memory, Coach/Spider/Director orchestration, and hosted service policy.
+Hosted orchestration and community plane. Owns identity mapping, user/community accounts, generic groups and memberships, sponsorship/booster UX, fact/reward/entitlement ledgers, play API aggregation, relay, approvals, memory, Coach/Spider/Director orchestration, and hosted service policy. The next major product sequencing rule is Hub-first: account/group/ledger backbone before more booster-specific Fleet product behavior.
 
 ### `chummer6-ui-kit`
 
@@ -79,8 +80,11 @@ These inform the program but are not part of the main release train:
 3. Maintain Fleet’s cheap-first execution plane and premium-burst policy through mirrored design truth rather than repo-local invention.
 4. Give workers a legal petition path when the blueprint is missing a seam, and synthesize repeated findings before they become queue truth.
 5. Treat future repo work as additive product evolution, not split-wave cleanup or contract-canon repair.
+6. Keep sponsored participation generic: Hub grows the reusable user/group/ledger platform first, and Fleet stays the worker execution plane underneath it.
 
 The foundational closure wave is materially finished. Future design work is maintenance or net-new product evolution rather than unresolved split, contract, or release-governance debt.
+
+`COMMUNITY_SPONSORSHIP_BACKLOG.md` is the implementation-ordered source for the Hub-first community/accounting wave. It distinguishes what already landed in Hub/Fleet/EA from the remaining durable-storage, convergence, and product-depth deltas.
 
 ## Non-goal
 

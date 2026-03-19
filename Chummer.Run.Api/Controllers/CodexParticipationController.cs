@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
-using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Contracts.Boosters;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;
@@ -8,13 +9,11 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/participation/codex")]
 public sealed class CodexParticipationController : ControllerBase
 {
-    private readonly CodexParticipationService _participation;
-    private readonly FleetBridgeService _fleetBridge;
+    private readonly BoostSessionService _sessions;
 
-    public CodexParticipationController(CodexParticipationService participation, FleetBridgeService fleetBridge)
+    public CodexParticipationController(BoostSessionService sessions)
     {
-        _participation = participation;
-        _fleetBridge = fleetBridge;
+        _sessions = sessions;
     }
 
     [HttpGet("/participate/codex")]
@@ -45,15 +44,15 @@ public sealed class CodexParticipationController : ControllerBase
 <body>
   <main>
     <h1>Codex Participation</h1>
-    <p class="muted">Cheap groundwork remains the baseline. Premium burst lanes are opened only when a human explicitly sponsors them, and final landing still goes through Fleet review and jury.</p>
+    <p class="muted">Hub owns the user, group, and ledger truth. Fleet opens the sponsored worker lane. Jury still lands the result.</p>
 
     <section class="panel">
       <h2>How This Works</h2>
       <ol>
         <li>Fleet keeps the cheap groundwork loop as the default path.</li>
-        <li>If you consent, Hub asks Fleet to open a temporary participant burst lane on your behalf.</li>
+        <li>If you consent, Hub opens a sponsor session on the community plane and asks Fleet to create a temporary participant burst lane.</li>
         <li>Fleet runs <code>codex login --device-auth</code> on the worker host and returns a verification URL plus one-time code.</li>
-        <li>Your auth cache stays lane-local on Fleet. Hub records participation metadata only.</li>
+        <li>Your auth cache stays lane-local on Fleet. Hub stores product metadata, receipts, rewards, and entitlements.</li>
         <li>Premium work still lands through review and jury. Your lane never merges independently.</li>
       </ol>
       <p><a href="https://developers.openai.com/codex/auth/" target="_blank" rel="noreferrer">OpenAI Codex auth documentation</a></p>
@@ -67,6 +66,10 @@ public sealed class CodexParticipationController : ControllerBase
       <input id="subjectLabel" placeholder="Archon" />
       <label for="projectId">Project id</label>
       <input id="projectId" value="fleet" />
+      <label for="groupId">Existing group id</label>
+      <input id="groupId" placeholder="optional grp-..." />
+      <label for="boostCode">Boost code</label>
+      <input id="boostCode" placeholder="optional BOOST-..." />
       <label><input id="consent1" type="checkbox" /> I understand my ChatGPT/Codex entitlement will be used for project work.</label>
       <label><input id="consent2" type="checkbox" /> I understand this creates a temporary worker lane.</label>
       <label><input id="consent3" type="checkbox" /> I understand final merge is still controlled by Fleet review and jury.</label>
@@ -112,59 +115,61 @@ public sealed class CodexParticipationController : ControllerBase
       const payload = {
         subjectId: document.getElementById("subjectId").value,
         subjectLabel: document.getElementById("subjectLabel").value,
-        projectId: document.getElementById("projectId").value
+        projectId: document.getElementById("projectId").value,
+        groupId: document.getElementById("groupId").value || null,
+        boostCode: document.getElementById("boostCode").value || null
       };
-      const data = await api("/api/v1/participation/codex/intents", { method: "POST", body: JSON.stringify(payload) });
-      currentIntentId = data.intent.intentId;
+      const data = await api("/api/v1/participation/intents", { method: "POST", body: JSON.stringify(payload) });
+      currentIntentId = data.intent.intentId || data.intent.sponsorSessionId || "";
       render(data);
     }
 
     async function recordConsent() {
       if (!currentIntentId) return;
       if (!consentReady()) throw new Error("all consent checkboxes must be checked");
-      const data = await api(`/api/v1/participation/codex/intents/${currentIntentId}/consent`, { method: "POST" });
+      const data = await api(`/api/v1/participation/intents/${currentIntentId}/consent`, { method: "POST" });
       render(data);
     }
 
     async function startAuth() {
       if (!currentIntentId) return;
-      const data = await api(`/api/v1/participation/codex/intents/${currentIntentId}/device-auth/start`, { method: "POST" });
+      const data = await api(`/api/v1/participation/intents/${currentIntentId}/device-auth/start`, { method: "POST" });
       render(data);
     }
 
     async function activateLane() {
       if (!currentIntentId) return;
-      const data = await api(`/api/v1/participation/codex/intents/${currentIntentId}/activate`, { method: "POST" });
+      const data = await api(`/api/v1/participation/intents/${currentIntentId}/activate`, { method: "POST" });
       render(data);
     }
 
     async function refreshIntent() {
       if (!currentIntentId) return;
-      const data = await api(`/api/v1/participation/codex/intents/${currentIntentId}`);
+      const data = await api(`/api/v1/participation/intents/${currentIntentId}`);
       render(data);
     }
 
     async function stopLane() {
       if (!currentIntentId) return;
-      const data = await api(`/api/v1/participation/codex/intents/${currentIntentId}/stop`, { method: "POST" });
+      const data = await api(`/api/v1/participation/intents/${currentIntentId}/stop`, { method: "POST" });
       render(data);
     }
 
     async function revokeLane() {
       if (!currentIntentId) return;
-      const data = await api(`/api/v1/participation/codex/intents/${currentIntentId}`, { method: "DELETE" });
+      const data = await api(`/api/v1/participation/intents/${currentIntentId}`, { method: "DELETE" });
       render(data);
     }
 
     function render(data) {
-      const intent = data.intent || {};
+      const intent = data.intent || data.sponsorSession || {};
       const fleet = data.fleet || {};
-      currentIntentId = intent.intentId || currentIntentId;
+      currentIntentId = intent.intentId || intent.sponsorSessionId || currentIntentId;
       document.getElementById("intentState").textContent = JSON.stringify(intent, null, 2);
       const lane = fleet.lane || {};
       const auth = lane.device_auth || {};
-      document.getElementById("deviceCode").textContent = auth.user_code || "No device code issued yet.";
-      document.getElementById("deviceState").textContent = JSON.stringify({ lane, deviceAuth: auth }, null, 2);
+      document.getElementById("deviceCode").textContent = auth.user_code || intent.deviceAuthUserCode || "No device code issued yet.";
+      document.getElementById("deviceState").textContent = JSON.stringify({ lane, deviceAuth: auth, sponsorSession: data.sponsorSession || null }, null, 2);
     }
   </script>
 </body>
@@ -174,6 +179,7 @@ public sealed class CodexParticipationController : ControllerBase
     }
 
     [HttpPost("intents")]
+    [HttpPost("/api/v1/participation/intents")]
     public ActionResult<object> CreateIntent([FromBody] CreateCodexParticipationIntentRequest? request)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.SubjectId) || string.IsNullOrWhiteSpace(request.ProjectId))
@@ -181,17 +187,33 @@ public sealed class CodexParticipationController : ControllerBase
             return BadRequest("subjectId and projectId are required.");
         }
 
-        var intent = _participation.CreateIntent(request.SubjectId, request.SubjectLabel ?? request.SubjectId, request.ProjectId);
-        return Ok(new { intent });
+        try
+        {
+            var session = _sessions.Create(new CreateSponsorSessionRequest(
+                SubjectId: request.SubjectId,
+                ProjectId: request.ProjectId,
+                GroupId: request.GroupId,
+                SubjectLabel: request.SubjectLabel,
+                BoostCode: request.BoostCode,
+                CampaignId: request.CampaignId,
+                Visibility: request.Visibility ?? "group",
+                RequestedLaneType: request.RequestedLaneType ?? "participant_burst"));
+            return Ok(BuildIntentEnvelope(session));
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("intents/{intentId}/consent")]
+    [HttpPost("/api/v1/participation/intents/{intentId}/consent")]
     public ActionResult<object> RecordConsent([FromRoute] string intentId)
     {
         try
         {
-            var intent = _participation.RecordConsent(intentId);
-            return Ok(new { intent });
+            var session = _sessions.RecordConsent(intentId);
+            return Ok(BuildIntentEnvelope(session));
         }
         catch (KeyNotFoundException)
         {
@@ -200,141 +222,150 @@ public sealed class CodexParticipationController : ControllerBase
     }
 
     [HttpPost("intents/{intentId}/device-auth/start")]
+    [HttpPost("/api/v1/participation/intents/{intentId}/device-auth/start")]
     public async Task<ActionResult<object>> StartDeviceAuth([FromRoute] string intentId, CancellationToken cancellationToken)
     {
-        var intent = _participation.GetIntent(intentId);
-        if (intent is null)
+        try
+        {
+            var result = await _sessions.StartDeviceAuthAsync(intentId, cancellationToken);
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+        }
+        catch (KeyNotFoundException)
         {
             return NotFound();
         }
-
-        if (!intent.Consented)
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            return BadRequest("consent is required before device auth can start.");
+            return BadRequest(ex.Message);
         }
-
-        JsonObject fleet;
-        if (string.IsNullOrWhiteSpace(intent.FleetLaneId))
-        {
-            var created = await _fleetBridge.CreateParticipantLaneAsync(
-                intent.SubjectId,
-                intent.SubjectLabel,
-                intent.ProjectId,
-                "",
-                "",
-                "",
-                intent.IntentId,
-                "private",
-                cancellationToken);
-            var laneId = created["lane"]?["lane_id"]?.GetValue<string>() ?? "";
-            intent = _participation.AttachFleetLane(intent.IntentId, laneId, $"Fleet lane {laneId} created.");
-        }
-
-        fleet = await _fleetBridge.StartDeviceAuthAsync(intent.FleetLaneId!, cancellationToken);
-        intent = _participation.RecordStatus(intent.IntentId, "pending_auth", "Device auth started on Fleet.");
-        return Ok(new { intent, fleet });
     }
 
     [HttpPost("intents/{intentId}/activate")]
+    [HttpPost("/api/v1/participation/intents/{intentId}/activate")]
     public async Task<ActionResult<object>> ActivateLane([FromRoute] string intentId, CancellationToken cancellationToken)
     {
-        var intent = _participation.GetIntent(intentId);
-        if (intent is null)
+        try
+        {
+            var result = await _sessions.ActivateAsync(intentId, cancellationToken);
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+        }
+        catch (KeyNotFoundException)
         {
             return NotFound();
         }
-
-        if (string.IsNullOrWhiteSpace(intent.FleetLaneId))
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            return BadRequest("no Fleet lane exists for this intent.");
+            return BadRequest(ex.Message);
         }
-
-        var fleet = await _fleetBridge.ActivateParticipantLaneAsync(intent.FleetLaneId, cancellationToken);
-        intent = _participation.RecordStatus(intent.IntentId, "active", "Participant lane activated.");
-        return Ok(new { intent, fleet });
     }
 
     [HttpGet("intents/{intentId}")]
-    public async Task<ActionResult<object>> GetIntent([FromRoute] string intentId, CancellationToken cancellationToken)
+    [HttpGet("/api/v1/participation/intents/{intentId}")]
+    public ActionResult<object> GetIntent([FromRoute] string intentId)
     {
-        var intent = _participation.GetIntent(intentId);
-        if (intent is null)
+        var session = _sessions.Get(intentId);
+        if (session is null)
         {
             return NotFound();
         }
 
-        JsonObject? fleet = null;
-        if (!string.IsNullOrWhiteSpace(intent.FleetLaneId))
-        {
-            fleet = await _fleetBridge.GetParticipantLaneAsync(intent.FleetLaneId, cancellationToken);
-        }
-
-        return Ok(new { intent, fleet });
+        return Ok(BuildIntentEnvelope(session));
     }
 
     [HttpGet("intents/{intentId}/events")]
-    public async Task<ActionResult<object>> GetEvents([FromRoute] string intentId, CancellationToken cancellationToken)
+    [HttpGet("/api/v1/participation/intents/{intentId}/events")]
+    public ActionResult<object> GetEvents([FromRoute] string intentId)
     {
-        var intent = _participation.GetIntent(intentId);
-        if (intent is null)
+        var session = _sessions.Get(intentId);
+        if (session is null)
         {
             return NotFound();
-        }
-
-        JsonObject? fleet = null;
-        if (!string.IsNullOrWhiteSpace(intent.FleetLaneId))
-        {
-            fleet = await _fleetBridge.GetParticipantLaneAsync(intent.FleetLaneId, cancellationToken);
         }
 
         return Ok(new
         {
-            intentId = intent.IntentId,
-            events = _participation.GetEvents(intent.IntentId),
-            fleet
+            intentId = session.SponsorSessionId,
+            sponsorSessionId = session.SponsorSessionId,
+            events = session.Events,
+            fleet = (object?)null
         });
     }
 
     [HttpPost("intents/{intentId}/stop")]
+    [HttpPost("/api/v1/participation/intents/{intentId}/stop")]
     public async Task<ActionResult<object>> StopIntent([FromRoute] string intentId, CancellationToken cancellationToken)
     {
-        var intent = _participation.GetIntent(intentId);
-        if (intent is null)
+        try
+        {
+            var result = await _sessions.StopAsync(intentId, revoke: false, cancellationToken);
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+        }
+        catch (KeyNotFoundException)
         {
             return NotFound();
         }
-
-        JsonObject? fleet = null;
-        if (!string.IsNullOrWhiteSpace(intent.FleetLaneId))
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            fleet = await _fleetBridge.StopParticipantLaneAsync(intent.FleetLaneId, cancellationToken);
+            return BadRequest(ex.Message);
         }
-
-        intent = _participation.RecordStatus(intent.IntentId, "stopped", "Participant lane stopped.");
-        return Ok(new { intent, fleet });
     }
 
     [HttpDelete("intents/{intentId}")]
+    [HttpDelete("/api/v1/participation/intents/{intentId}")]
     public async Task<ActionResult<object>> DeleteIntent([FromRoute] string intentId, CancellationToken cancellationToken)
     {
-        var intent = _participation.GetIntent(intentId);
-        if (intent is null)
+        try
+        {
+            var result = await _sessions.StopAsync(intentId, revoke: true, cancellationToken);
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+        }
+        catch (KeyNotFoundException)
         {
             return NotFound();
         }
-
-        JsonObject? fleet = null;
-        if (!string.IsNullOrWhiteSpace(intent.FleetLaneId))
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            fleet = await _fleetBridge.DeleteParticipantLaneAsync(intent.FleetLaneId, cancellationToken);
+            return BadRequest(ex.Message);
         }
-
-        intent = _participation.RecordRevocation(intent.IntentId, "Participant lane revoked.");
-        return Ok(new { intent, fleet });
     }
+
+    // Keep the public participation surface on the canonical sponsor-session/community-ledger path.
+    private static object BuildIntentEnvelope(SponsorSessionStatusDto session, JsonObject? fleet = null)
+        => new
+        {
+            intent = new
+            {
+                intentId = session.SponsorSessionId,
+                sponsorSessionId = session.SponsorSessionId,
+                userId = session.UserId,
+                groupId = session.GroupId,
+                projectId = session.ProjectId,
+                requestedLaneType = session.RequestedLaneType,
+                visibility = session.Visibility,
+                status = session.Status,
+                consented = session.Consented,
+                fleetLaneId = session.FleetLaneId,
+                boostCampaignId = session.BoostCampaignId,
+                boostCodeId = session.BoostCodeId,
+                deviceAuthVerificationUri = session.DeviceAuthVerificationUri,
+                deviceAuthUserCode = session.DeviceAuthUserCode,
+                createdAtUtc = session.CreatedAtUtc,
+                updatedAtUtc = session.UpdatedAtUtc,
+                consentedAtUtc = session.ConsentedAtUtc,
+                stoppedAtUtc = session.StoppedAtUtc,
+                events = session.Events
+            },
+            sponsorSession = session,
+            fleet
+        };
 }
 
 public sealed record CreateCodexParticipationIntentRequest(
     string SubjectId,
     string? SubjectLabel,
-    string ProjectId);
+    string ProjectId,
+    string? GroupId = null,
+    string? BoostCode = null,
+    string? CampaignId = null,
+    string? Visibility = null,
+    string? RequestedLaneType = null);

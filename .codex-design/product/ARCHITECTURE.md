@@ -103,6 +103,20 @@ Canonical design truth belongs in `products/chummer/*`.
 Recurring parity/checksum/drift evidence belongs in automation-owned machine-readable outputs plus short human summaries.
 The design repo must not become the main operational log sink for work that Fleet can verify automatically.
 
+### Rule 13 — Community product semantics start in Hub, not Fleet
+
+`fleet` may run sponsored premium lanes, but the reusable product plane for:
+
+* user accounts
+* groups and memberships
+* join/boost codes
+* fact/reward/entitlement ledgers
+* leaderboards, badges, quests, and participation UX
+
+belongs in `chummer6-hub`.
+
+Boosting is the first use case of that platform, not a license to let Fleet absorb community-product ownership.
+
 ## Repo graph
 
 ```text
@@ -218,6 +232,25 @@ Canonical split:
 
 The boring parity math should move downward into automation.
 The upward path for real boundary questions should stay explicit and legal.
+
+## Community sponsorship plane
+
+Canonical split:
+
+* `chummer6-hub` owns the community/accounting plane
+* `fleet` owns the sponsored worker plane
+* `executive-assistant` owns provider-aware telemetry and runtime substrate
+
+Implementation order:
+
+1. Hub user accounts and profiles
+2. Hub generic groups and memberships
+3. Hub fact/reward/entitlement ledgers
+4. Hub participation UX
+5. Fleet dynamic participant lanes and receipt emission
+6. Hub leaderboards, quests, badges, and entitlement-backed perks
+
+Do not invert that order by making Fleet the first home of boost-code product behavior.
 
 
 ## External tools plane

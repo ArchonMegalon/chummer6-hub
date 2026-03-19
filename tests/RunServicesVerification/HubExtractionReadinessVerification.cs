@@ -16,6 +16,7 @@ internal static class HubExtractionReadinessVerification
         VerifyAssistantPlaneAuthority();
         VerifyDocsHelpConsumerRule();
         VerifyFeedbackAndOperatorConsumerRule();
+        VerifyCommunityPlaneDurabilityAndConvergence();
         VerifyDesignMirrorReadiness();
         VerifyAcceptanceDocument();
         VerifyLegacyRootBoundaryMoves();
@@ -381,6 +382,50 @@ internal static class HubExtractionReadinessVerification
                         $"Hosted adapter authority must not leak '{forbiddenToken}' into sibling repo file '{sourceFile}'.");
                 }
             }
+        }
+    }
+
+    private static void VerifyCommunityPlaneDurabilityAndConvergence()
+    {
+        var communityStorePath = Path.Combine(RepoRoot, "Chummer.Run.Api", "Services", "Community", "CommunityStore.cs");
+        VerificationAssert.True(File.Exists(communityStorePath), "CommunityStore source must exist.");
+        var communityStoreText = File.ReadAllText(communityStorePath);
+        foreach (var requiredToken in new[]
+                 {
+                     "CHUMMER_COMMUNITY_STORE_PATH",
+                     "PersistLocked()",
+                     "File.Move(tempPath, _storagePath, true)",
+                     "CommunityStoreSnapshot",
+                     "SponsorSessionStateSnapshot"
+                 })
+        {
+            VerificationAssert.True(
+                communityStoreText.Contains(requiredToken, StringComparison.Ordinal),
+                $"CommunityStore must keep durability token '{requiredToken}'.");
+        }
+
+        var legacyParticipationServicePath = Path.Combine(RepoRoot, "Chummer.Run.Api", "Services", "CodexParticipationService.cs");
+        VerificationAssert.True(
+            !File.Exists(legacyParticipationServicePath),
+            "Hub must not keep the retired CodexParticipationService after sponsor-session convergence.");
+
+        var programText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Program.cs"));
+        VerificationAssert.True(
+            !programText.Contains("AddSingleton<CodexParticipationService>()", StringComparison.Ordinal),
+            "Chummer.Run.Api must not register the retired CodexParticipationService.");
+
+        var participationControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Controllers", "CodexParticipationController.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "BoostSessionService",
+                     "/api/v1/participation/intents",
+                     "sponsor-session/community-ledger path",
+                     "BuildIntentEnvelope"
+                 })
+        {
+            VerificationAssert.True(
+                participationControllerText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Codex participation controller must keep convergence token '{requiredToken}'.");
         }
     }
 
