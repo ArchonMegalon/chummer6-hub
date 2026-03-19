@@ -4,8 +4,12 @@
 - Reject if changes blur registry-service boundary (must remain under `chummer6-hub-registry`):
   - duplicate artifact publication state, moderation routing, install/review contract behavior,
   - or persistent compatibility metadata outside registry ownership.
+- Reject any change that collapses identity subjects, product users, groups, rewards, and entitlements into one undifferentiated table or DTO family:
+  - Hub must keep principal, user-account, group, fact-ledger, reward-journal, and entitlement-journal concepts separate.
 - Reject if media orchestration, render-provider execution, or preview lifecycle logic appears in `chummer6-hub`:
   - this remains owned by `chummer6-media-factory` unless explicitly mirrored at API boundaries.
 - Reject any change that moves play/runtime contracts or session behavior into `chummer6-hub`:
   - `Chummer.Play.Contracts` and hosted play-shell contracts must remain consumed and boundary-respected.
+- Reject any change that stores raw participant Codex/OpenAI auth caches or device-auth secrets in Hub:
+  - Hub owns consent, accounts, groups, ledgers, and visibility, not execution-host auth state.
 - Keep hosted/session orchestration checks in `chummer6-hub` scoped to approval, relay, memory, routing, and orchestration policy only.

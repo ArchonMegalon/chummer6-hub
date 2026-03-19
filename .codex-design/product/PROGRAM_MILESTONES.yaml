@@ -533,3 +533,18 @@ executable_queue:
   status: done
   backlog: WORKLIST.md
   notes: Closed 2026-03-19: Fleet premium burst policy was canonized in design first and then implemented downstream as a cheap-first baseline with explicit participant and operator premium-burst rules.
+- id: WL-D040
+  milestone: F3
+  status: done
+  backlog: WORKLIST.md
+  notes: Closed 2026-03-19: Hub community/account/ledger canon now makes sponsorship a reusable platform wave: Hub owns users, groups, facts/rewards/entitlements; Fleet owns sponsored worker execution and signed receipts; EA stays provider/telemetry substrate.
+- id: WL-D041
+  milestone: F3
+  status: done
+  backlog: WORKLIST.md
+  notes: Closed 2026-03-19: petition and synthesis canon now makes blocked-worker escalation explicit, requires clustered synthesis for repeated findings, and separates canonical design truth from automation-owned parity evidence.
+- id: WL-D042
+  milestone: F3
+  status: done
+  backlog: WORKLIST.md
+  notes: Closed 2026-03-19: EA runtime evolution is now canonized as bounded cognitive-loop work on the existing substrate: proactive horizon scans, human-edit reflection, bounded replanning, and interruption-budget throttling.

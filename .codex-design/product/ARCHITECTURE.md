@@ -90,6 +90,19 @@ Fleet must not own:
 * Hub user identity truth
 * raw participant OpenAI auth state outside lane-local worker storage
 
+### Rule 11 — Petition upward, do not invent local truth
+
+When a repo cannot finish work without widening a boundary, inventing a cross-repo contract, or contradicting mirrored canon, it must petition `chummer6-design`.
+
+Blocked workers do not get to create silent local truth just because the blueprint is missing a seam.
+
+### Rule 12 — Keep canon and operational evidence separate
+
+Canonical design truth belongs in `products/chummer/*`.
+
+Recurring parity/checksum/drift evidence belongs in automation-owned machine-readable outputs plus short human summaries.
+The design repo must not become the main operational log sink for work that Fleet can verify automatically.
+
 ## Repo graph
 
 ```text
@@ -132,6 +145,7 @@ chummer6-media-factory
 
 fleet
   ├─ consumes mirrored Chummer canon from chummer6-design
+  ├─ owns parity automation and clustered queue synthesis for mirrored canon
   ├─ orchestrates repo work across Chummer codebases
   ├─ keeps cheap groundwork as the default execution plane
   └─ may open explicit premium burst lanes that still land through review authority
@@ -194,6 +208,17 @@ A repo is considered architecturally drifting when any of the following is true:
 * it duplicates a contract family owned elsewhere
 * it rebuilds a split boundary locally instead of consuming the package/service
 
+## Petition and synthesis plane
+
+Canonical split:
+
+* `chummer6-design` owns petition resolution, blocker truth, milestone truth, and final boundary decisions
+* `fleet` owns recurring mirror/parity verification plus clustering repeated drift findings into smaller, clearer queue work
+* `executive-assistant` owns reasoning-heavy synthesis and petition-packet generation where LLM help is useful, plus provider-aware cognitive loops such as proactive horizon scans, human-edit reflection, bounded replanning, and interruption-budget throttling
+
+The boring parity math should move downward into automation.
+The upward path for real boundary questions should stay explicit and legal.
+
 
 ## External tools plane
 
@@ -252,3 +277,47 @@ This plane exists to integrate owned third-party capabilities without allowing a
 * no third-party tool owns Chummer media manifests
 * no third-party tool bypasses Chummer moderation or canonization
 * no hosted UX stores raw participant Codex/OpenAI auth caches; those stay lane-local on the execution host
+
+## Community sponsorship plane
+
+Chummer uses one community/sponsorship spine rather than a one-off booster feature.
+
+Canonical split:
+
+* `chummer6-hub` = account, community, group, ledger, sponsorship, and entitlement plane
+* `fleet` = sponsored worker and landing-control plane
+* `executive-assistant` = provider-aware substrate and ownership telemetry plane
+
+### Canonical concepts
+
+* identity principal: authenticated subject/session issued by Hub identity
+* user account: product-level human account linked to one or more principals
+* group: reusable social/authority container with `group_type`, `visibility`, `capabilities`, and policy
+* membership: a user’s role relation to a group
+* sponsor session: a bounded premium-burst sponsorship intent/execution record
+* entitlement: a durable product right granted to a user or group
+
+User accounts must not collapse into raw identity-subject rows. Groups must stay generic enough to serve booster groups now and campaign / GM-circle / creator-team surfaces later.
+
+### Accounting rule
+
+Chummer keeps three distinct journals:
+
+1. fact ledger: immutable raw events and contribution receipts
+2. reward journal: derived score, badge, streak, quest, and leaderboard accounting
+3. entitlement journal: durable product-right grants and revocations
+
+These journals must not be merged into one implicit score table.
+
+### Booster participation rule
+
+Boosting is modeled as:
+
+1. account or group joins a campaign / redeems a code / creates a sponsor session intent
+2. consent is recorded in Hub
+3. Fleet opens the participant lane and performs device auth on the execution host
+4. Fleet emits signed contribution receipts after meaningful work events
+5. Hub ingests receipts into the fact ledger
+6. reward and entitlement rules derive downstream projections from those receipts
+
+Points and perks must not be granted merely for linking an account or creating an idle lane.
