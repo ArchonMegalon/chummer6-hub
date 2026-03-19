@@ -1,11 +1,11 @@
 group_id: chummer-vnext
-last_reviewed: 2026-03-14
+last_reviewed: 2026-03-19
 
 packages:
   - id: Chummer.Engine.Contracts
     owner_repo: chummer6-core
     purpose: Deterministic engine/runtime/explain/reducer DTOs.
-    status: in_progress
+    status: complete
     consumers:
       - chummer6-ui
       - chummer6-mobile
@@ -17,8 +17,8 @@ packages:
 
   - id: Chummer.Play.Contracts
     owner_repo: chummer6-hub
-    purpose: Play/mobile/service seam for hosted play APIs and play-safe projections.
-    status: in_progress
+    purpose: Play/mobile/service seam for hosted play APIs, role-shell transport DTOs, replay checkpoints, and play-safe projections.
+    status: complete
     consumers:
       - chummer6-mobile
       - chummer6-ui
@@ -28,8 +28,8 @@ packages:
 
   - id: Chummer.Run.Contracts
     owner_repo: chummer6-hub
-    purpose: Hosted orchestration contracts for identity, approvals, memory, delivery, and service policy.
-    status: in_progress
+    purpose: Hosted orchestration contracts for identity, approvals, run-specific ingestion/backup seams, delivery, and service policy.
+    status: complete
     consumers:
       - chummer6-ui
       - internal service clients
@@ -41,7 +41,7 @@ packages:
   - id: Chummer.Ui.Kit
     owner_repo: chummer6-ui-kit
     purpose: Shared design tokens, themes, primitives, shell chrome, and reusable Chummer UI patterns.
-    status: bootstrap
+    status: complete
     consumers:
       - chummer6-ui
       - chummer6-mobile
@@ -52,7 +52,7 @@ packages:
   - id: Chummer.Hub.Registry.Contracts
     owner_repo: chummer6-hub-registry
     purpose: Immutable registry/publication/install/compatibility contracts.
-    status: bootstrap
+    status: complete
     consumers:
       - chummer6-hub
       - chummer6-ui
@@ -63,7 +63,7 @@ packages:
   - id: Chummer.Media.Contracts
     owner_repo: chummer6-media-factory
     purpose: Media execution contracts for render jobs, manifests, previews, asset lifecycle, and media receipts.
-    status: bootstrap
+    status: complete
     consumers:
       - chummer6-hub
       - chummer6-ui
@@ -77,7 +77,7 @@ contract_sets:
   - id: runtime_dtos_vnext
     canonical_package: Chummer.Engine.Contracts
     semantic_owner: chummer6-core
-    status: open
+    status: complete
     includes:
       - runtime fingerprints
       - runtime bundles
@@ -87,7 +87,7 @@ contract_sets:
   - id: explain_trace_vnext
     canonical_package: Chummer.Engine.Contracts
     semantic_owner: chummer6-core
-    status: open
+    status: complete
     includes:
       - explain traces
       - modifier provenance
@@ -99,8 +99,7 @@ contract_sets:
     semantic_owner: chummer6-core
     consumer_wrappers:
       - Chummer.Play.Contracts
-      - Chummer.Run.Contracts
-    status: open
+    status: complete
     includes:
       - semantic session mutation events
       - causation and idempotency data
@@ -111,7 +110,7 @@ contract_sets:
   - id: play_api_vnext
     canonical_package: Chummer.Play.Contracts
     semantic_owner: chummer6-hub
-    status: open
+    status: complete
     includes:
       - play bootstrap
       - session profile catalog
@@ -121,7 +120,7 @@ contract_sets:
   - id: run_orchestration_vnext
     canonical_package: Chummer.Run.Contracts
     semantic_owner: chummer6-hub
-    status: open
+    status: complete
     includes:
       - approvals
       - memory
@@ -132,7 +131,7 @@ contract_sets:
   - id: ui_system_vnext
     canonical_package: Chummer.Ui.Kit
     semantic_owner: chummer6-ui-kit
-    status: open
+    status: complete
     includes:
       - design tokens
       - shell primitives
@@ -142,7 +141,7 @@ contract_sets:
   - id: hub_registry_vnext
     canonical_package: Chummer.Hub.Registry.Contracts
     semantic_owner: chummer6-hub-registry
-    status: open
+    status: complete
     includes:
       - artifact metadata
       - publication state
@@ -152,7 +151,7 @@ contract_sets:
   - id: media_execution_vnext
     canonical_package: Chummer.Media.Contracts
     semantic_owner: chummer6-media-factory
-    status: open
+    status: complete
     includes:
       - media jobs
       - asset manifests

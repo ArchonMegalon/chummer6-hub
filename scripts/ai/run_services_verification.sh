@@ -13,6 +13,11 @@ if [ ! -f Chummer.Play.Contracts/Chummer.Play.Contracts.csproj ]; then
   exit 1
 fi
 
+if [ -d Chummer.Media.Contracts ]; then
+  echo "repo-local Chummer.Media.Contracts source must stay deleted after media-factory owner transfer." >&2
+  exit 1
+fi
+
 for retired_contract in \
   Chummer.Run.Contracts/HubRegistryContracts.cs \
   Chummer.Run.Contracts/RegistryContracts.cs \

@@ -18,6 +18,8 @@ hosted projects here:
 - `Chummer.Media.Factory.Runtime` from `chummer6-media-factory`
 - `Chummer.Run.Registry` from `chummer6-hub-registry`
 
+No repo-local source mirror of `Chummer.Media.Contracts` is preserved here anymore.
+
 No legacy oracle root is preserved inside this repo anymore.
 
 Retired roots that must stay absent:

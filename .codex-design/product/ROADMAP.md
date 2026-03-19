@@ -2,6 +2,11 @@
 
 This roadmap carries the program all the way to finished-state vision, not just to the split wave.
 
+Current status on 2026-03-19:
+
+* package canon, split completion, explain canon, runtime-bundle canon, and horizon-governance foundations are materially complete
+* the active execution wave is now adapter depth (`C1b`, `C1c`), product completion (`E*`), and release hardening (`F*`)
+
 ## Phase A — Canon and package plane
 
 ### A0 — Design repo bootstrap complete
