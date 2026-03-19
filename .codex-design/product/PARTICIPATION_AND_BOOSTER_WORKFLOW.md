@@ -30,6 +30,55 @@ Use these terms consistently:
 Public copy should prefer `participate` and `booster`.
 Operator terms such as `participant burst lane`, `jury`, `core backend`, or `device-auth helper` may appear in operator and verifier surfaces, but they are not first-contact user language.
 
+## Public extract
+
+### `public_pitch`
+
+Chummer supports two clean help lanes:
+
+* the free baseline for bugs, guide feedback, and future-feature suggestions
+* the bounded `booster` lane for supporters who explicitly want to lend temporary premium help
+
+The public promise is simple:
+
+* boosters are opt-in
+* boosters are temporary
+* boosters are additive on top of the cheap baseline
+* final landing still goes through review
+
+### `public_faq`
+
+Public guide/landing copy must be able to answer these questions plainly:
+
+* What is a booster?
+* Do I need to boost to help?
+* Why are some things preview-only?
+* If a lane starts booster-first, is the long-run intent broader access later?
+* Can I stay private?
+* What do badges and leaderboards actually mean?
+
+### `privacy_notes`
+
+Public recognition is opt-in at the user level.
+Groups may be publicly visible even when a user keeps personal recognition private.
+
+### `review_safety_notes`
+
+Boosters are not a merge bypass.
+Participant lanes may help with bounded work, but final landing still routes through review and `jury`.
+
+### `free_later_note`
+
+`booster_first` is a rollout/access posture for expensive early lanes, not a permanent paywall signal.
+If a lane starts booster-first because approvals, compatibility, editorial work, or support burden are high, the long-run intent should still point toward broader access when the cost curve becomes boring enough.
+
+### `public_cta_copy`
+
+Public CTAs should point readers toward:
+
+* the Chummer6 issue tracker for free baseline feedback
+* the Hub participation page for the bounded booster lane
+
 ## Canonical split
 
 ### `chummer6-hub`
