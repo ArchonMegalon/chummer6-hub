@@ -144,6 +144,8 @@ Must not own:
 * canonical user, group, reward, or entitlement ledger truth
 * boost-code-first product logic that should live in Hub
 
+Fleet must also keep guide-generation and guide-verification truth downstream of `chummer6-design` instead of hiding canonical participation semantics behind EA-side helper code.
+
 ### `chummer6-hub`
 
 Owns:
@@ -159,3 +161,8 @@ Must not own:
 * raw participant Codex/OpenAI auth caches
 * Fleet worker-process lifecycle or repo landing control
 * provider-secret ownership or provider-runtime accounting
+
+### Participation workflow note
+
+The canonical sponsor/consent/device-auth/lane/receipt/revoke workflow is defined centrally in `products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md`.
+Hub, Fleet, EA, and `Chummer6` must compile from that workflow instead of carrying parallel product interpretations.

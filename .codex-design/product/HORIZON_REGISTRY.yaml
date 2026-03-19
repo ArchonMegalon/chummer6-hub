@@ -14,6 +14,10 @@ optional_fields:
 - artifact_types
 - public_signal_eligible
 - owner_handoff_gate
+- access_posture
+- resource_burden
+- booster_nudge
+- recognition_eligible
 horizons:
 - id: nexus-pan
   title: NEXUS-PAN
@@ -131,6 +135,10 @@ horizons:
   - approval packet
   - compatibility projection
   public_signal_eligible: true
+  access_posture: booster_first
+  resource_burden: high
+  booster_nudge: Governed rules evolution burns approval, compatibility, and rollback effort, so early support may stay booster-first while the lane is still expensive to operate safely.
+  recognition_eligible: true
   owner_handoff_gate: Rule evolution must route through governed packages, approvals, and compatibility metadata before promotion.
 - id: knowledge-fabric
   title: KNOWLEDGE FABRIC
@@ -222,6 +230,10 @@ horizons:
   - evidence room
   - share card
   public_signal_eligible: true
+  access_posture: booster_first
+  resource_burden: high
+  booster_nudge: Finished dossier and recap lanes burn editorial, narration, preview, and provenance effort, so early access may begin booster-first while those loops are still expensive.
+  recognition_eligible: true
   owner_handoff_gate: Registry manifests and media receipts must survive format changes before the studio is promoted beyond horizon.
 - id: runsite
   title: RUNSITE
@@ -310,6 +322,10 @@ horizons:
   - campaign book
   - convention module
   public_signal_eligible: true
+  access_posture: booster_first
+  resource_burden: high
+  booster_nudge: Long-form publishing carries editorial, compatibility, and publication-manifest cost, so the lane may begin booster-first while those burdens remain high.
+  recognition_eligible: true
   owner_handoff_gate: Publication and compatibility metadata must remain registry-owned before this lane becomes research-ready.
 - id: ghostwire
   title: GHOSTWIRE

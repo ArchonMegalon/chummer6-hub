@@ -128,6 +128,20 @@ contract_sets:
       - notifications
       - orchestration receipts
 
+  - id: participation_workflow_vnext
+    canonical_package: Chummer.Run.Contracts
+    semantic_owner: chummer6-hub
+    status: in_progress
+    includes:
+      - sponsor request
+      - consent record
+      - device-auth session
+      - participant-lane state
+      - contribution receipt
+      - revoke request
+      - recognition projection
+    rule: Hub owns sponsor, consent, visibility, ledger, and recognition semantics; Fleet owns execution-side lifecycle and receipt signing; EA may project ownership telemetry but may not redefine the workflow family.
+
   - id: ui_system_vnext
     canonical_package: Chummer.Ui.Kit
     semantic_owner: chummer6-ui-kit
@@ -164,3 +178,5 @@ compatibility_rules:
   - Breaking changes require milestone and blocker updates in chummer6-design.
   - No repo may source-copy a canonical contract family owned elsewhere.
   - Repo-local mirrors must refer to canonical package ids, not legacy aliases.
+  - Local and CI restore for `Chummer.Engine.Contracts` and `Chummer.Ui.Kit` must use a canonical package feed or an explicit generated compatibility tree.
+  - Legacy consumers may not rely on ambient monorepo-relative source references as bootstrap truth.

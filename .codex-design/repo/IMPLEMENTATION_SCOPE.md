@@ -56,6 +56,8 @@ Registry and media execution ownership are physically out of this repo.
 The remaining work is future product depth and physical cleanup, not pretending hub still owns every hosted surface or still lacks authority proof.
 Participation UX for premium burst lanes belongs here, but the resulting Codex auth cache stays lane-local on Fleet rather than being stored in hub identity or hub databases.
 
+The first-class sponsor/consent/device-auth/lane/receipt lifecycle is defined centrally in `products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md`.
+
 ## Sequencing rule
 
 Do not treat boost codes or sponsored premium lanes as the first-class product.
