@@ -7,7 +7,9 @@ Players and GMs want dossiers, recaps, primers, and narrated briefings, but most
 ## Bounded product move
 
 JACKPOINT is the artifact-studio horizon.
-It covers dossier packets, recap artifacts, narrated briefings, player primers, faction or city handbooks, mission anthologies, and creator packs as bounded outputs tied to Chummer-owned manifests and receipts.
+It covers dossier packets, recap artifacts, narrated briefings, evidence rooms, share cards, and creator packs as bounded outputs tied to Chummer-owned manifests and receipts.
+JACKPOINT is intentionally the short-to-medium-form studio lane.
+It does not replace RUNBOOK PRESS long-form publishing.
 
 ## Likely owners
 
@@ -17,7 +19,6 @@ It covers dossier packets, recap artifacts, narrated briefings, player primers, 
 
 ## Key tool posture
 
-* `First Book ai` - bounded long-form authoring support
 * `MarkupGo` - document/render adapter lane
 * `Soundmadeseen` - narrated recap and briefing media lane
 * `Unmixr AI` - candidate voice lane until proven
@@ -25,6 +26,7 @@ It covers dossier packets, recap artifacts, narrated briefings, player primers, 
 * `Documentation.AI` - downstream docs/help projection
 * `Paperguide` - cited grounding helper
 * `Mootion` - bounded video support
+* `First Book ai` - bounded overflow support when the artifact lane needs long-form carryover
 
 ## Foundations
 

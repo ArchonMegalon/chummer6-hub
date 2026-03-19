@@ -8,6 +8,9 @@ GMs spend too long describing spaces, and players still misread compounds, clubs
 
 Chummer would publish bounded explorable location packs linked to mission briefings.
 These packs may include floor plans, hotspots, route overlays, optional narration, and static map context, but they remain artifacts rather than live session truth.
+RUNSITE is the mission-space explorer:
+briefing, planning, and spatial understanding belong here.
+Live combat truth and VTT replacement ambitions do not.
 
 ## Likely owners
 

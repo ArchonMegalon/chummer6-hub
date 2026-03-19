@@ -17,33 +17,7 @@ public sealed class LeaderboardService
         {
             var rows = _store.RewardEntries
                 .GroupBy(entry => entry.UserId, StringComparer.OrdinalIgnoreCase)
-                .Select(group =>
-                {
-                    _store.UsersById.TryGetValue(group.Key, out var user);
-                    var sourceReceipts = group
-                        .Select(entry => entry.SourceReceiptId)
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToArray();
-                    var landedSlices = _store.Receipts.Count(receipt =>
-                        string.Equals(receipt.UserId, group.Key, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(receipt.EventKind, "slice_landed", StringComparison.OrdinalIgnoreCase));
-                    var verifiedSlices = _store.Receipts.Count(receipt =>
-                        string.Equals(receipt.UserId, group.Key, StringComparison.OrdinalIgnoreCase)
-                        && receipt.Verified);
-                    var activeSessions = _store.SponsorSessionsById.Values.Count(session =>
-                        string.Equals(session.UserId, group.Key, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(session.Status, "active", StringComparison.OrdinalIgnoreCase));
-                    return new
-                    {
-                        UserId = group.Key,
-                        DisplayName = user?.DisplayName ?? group.Key,
-                        Visibility = user?.Visibility ?? "private",
-                        Points = group.Sum(entry => entry.Points),
-                        LandedSlices = landedSlices,
-                        VerifiedSlices = verifiedSlices,
-                        ActiveSessions = activeSessions,
-                    };
-                })
+                .Select(group => BuildUserMetricsLocked(group.Key))
                 .Where(row => !publicOnly || string.Equals(row.Visibility, "public", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(row => row.Points)
                 .ThenBy(row => row.DisplayName, StringComparer.OrdinalIgnoreCase)
@@ -57,6 +31,37 @@ public sealed class LeaderboardService
                 LandedSlices: row.LandedSlices,
                 VerifiedSlices: row.VerifiedSlices,
                 ActiveSessions: row.ActiveSessions,
+                Visibility: row.Visibility)).ToArray();
+        }
+    }
+
+    public IReadOnlyList<SponsorRankLeaderboardRowDto> SponsorRankLeaderboard(int limit = 20, bool publicOnly = false)
+    {
+        lock (_store.Gate)
+        {
+            var rows = _store.UsersById.Keys
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(BuildUserMetricsLocked)
+                .Where(row => !publicOnly || string.Equals(row.Visibility, "public", StringComparison.OrdinalIgnoreCase))
+                .Where(row => row.Points > 0 || row.ActiveSessions > 0 || row.CurrentSponsorBonus > 0)
+                .OrderByDescending(row => row.CurrentRankScore)
+                .ThenByDescending(row => row.Points)
+                .ThenBy(row => row.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .Take(Math.Max(1, limit))
+                .ToArray();
+
+            return rows.Select((row, index) => new SponsorRankLeaderboardRowDto(
+                Rank: index + 1,
+                UserId: row.UserId,
+                DisplayName: row.DisplayName,
+                LifetimePoints: row.Points,
+                CurrentAuthorizationTier: row.CurrentAuthorizationTier,
+                CurrentSponsorBonus: row.CurrentSponsorBonus,
+                CurrentRankScore: row.CurrentRankScore,
+                ActiveSponsorSessions: row.ActiveSessions,
+                LandedSlices: row.LandedSlices,
+                CurrentStatusBadges: row.CurrentStatusBadges.Select(static badge => badge.Key).ToArray(),
+                PersistentBadges: row.PersistentBadges.Select(static badge => badge.Key).ToArray(),
                 Visibility: row.Visibility)).ToArray();
         }
     }
@@ -115,4 +120,104 @@ public sealed class LeaderboardService
             ];
         }
     }
+
+    public UserRecognitionSummaryDto UserRecognitionSummary(string userId)
+    {
+        lock (_store.Gate)
+        {
+            var metrics = BuildUserMetricsLocked(userId);
+            return new UserRecognitionSummaryDto(
+                UserId: metrics.UserId,
+                LifetimePoints: metrics.Points,
+                CurrentSponsorRankScore: metrics.CurrentRankScore,
+                CurrentAuthorizationTier: metrics.CurrentAuthorizationTier,
+                CurrentTierSource: metrics.CurrentTierSource,
+                CurrentSponsorBonus: metrics.CurrentSponsorBonus,
+                LandedSlices: metrics.LandedSlices,
+                ActiveSessionCount: metrics.ActiveSessions,
+                CurrentStatusBadges: metrics.CurrentStatusBadges.ToArray(),
+                PersistentBadges: metrics.PersistentBadges.ToArray(),
+                RevokedBadges: metrics.RevokedBadges.ToArray());
+        }
+    }
+
+    private UserMetrics BuildUserMetricsLocked(string userId)
+    {
+        _store.UsersById.TryGetValue(userId, out var user);
+        var sessions = _store.SponsorSessionsById.Values
+            .Where(session => string.Equals(session.UserId, userId, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var currentSessions = sessions
+            .Where(session => SponsorStatusPolicy.IsCurrentSponsorSession(session.Status, session.AuthorizedAtUtc))
+            .ToArray();
+        var bestCurrentSession = currentSessions
+            .OrderByDescending(session => SponsorStatusPolicy.TierPriority(session.AuthorizationTier))
+            .ThenByDescending(session => session.AuthorizedAtUtc ?? session.ActivatedAtUtc ?? session.UpdatedAtUtc)
+            .FirstOrDefault();
+        var activeStatusBadges = _store.Badges
+            .Where(badge =>
+                string.Equals(badge.UserId, userId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(badge.BadgeKind, "transient", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(badge => badge.AwardedAtUtc)
+            .ToArray();
+        var persistentBadges = _store.Badges
+            .Where(badge =>
+                string.Equals(badge.UserId, userId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(badge.BadgeKind, "persistent", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(badge => badge.AwardedAtUtc)
+            .ToArray();
+        var revokedBadges = _store.Badges
+            .Where(badge =>
+                string.Equals(badge.UserId, userId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(badge.Status, "revoked", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(badge => badge.RevokedAtUtc ?? badge.AwardedAtUtc)
+            .ToArray();
+        var points = _store.RewardEntries
+            .Where(entry => string.Equals(entry.UserId, userId, StringComparison.OrdinalIgnoreCase))
+            .Sum(entry => entry.Points);
+        var landedSlices = _store.Receipts.Count(receipt =>
+            string.Equals(receipt.UserId, userId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(receipt.EventKind, "slice_landed", StringComparison.OrdinalIgnoreCase));
+        var verifiedSlices = _store.Receipts.Count(receipt =>
+            string.Equals(receipt.UserId, userId, StringComparison.OrdinalIgnoreCase)
+            && receipt.Verified);
+        var activeSessions = currentSessions.Length;
+        var currentTier = SponsorStatusPolicy.NormalizeAuthorizationTier(bestCurrentSession?.AuthorizationTier);
+        var currentTierSource = SponsorStatusPolicy.NormalizeTierSource(bestCurrentSession?.TierSource);
+        var currentSponsorBonus = SponsorStatusPolicy.TierBonus(currentTier) + (activeSessions > 0 ? SponsorStatusPolicy.ActiveSessionBonus : 0);
+
+        return new UserMetrics(
+            UserId: userId,
+            DisplayName: user?.DisplayName ?? userId,
+            Visibility: user?.Visibility ?? "private",
+            Points: points,
+            LandedSlices: landedSlices,
+            VerifiedSlices: verifiedSlices,
+            ActiveSessions: activeSessions,
+            CurrentAuthorizationTier: currentTier,
+            CurrentTierSource: currentTierSource,
+            CurrentSponsorBonus: currentSponsorBonus,
+            CurrentRankScore: points + currentSponsorBonus,
+            CurrentStatusBadges: activeStatusBadges,
+            PersistentBadges: persistentBadges,
+            RevokedBadges: revokedBadges);
+    }
+
+    private sealed record UserMetrics(
+        string UserId,
+        string DisplayName,
+        string Visibility,
+        int Points,
+        int LandedSlices,
+        int VerifiedSlices,
+        int ActiveSessions,
+        string CurrentAuthorizationTier,
+        string CurrentTierSource,
+        int CurrentSponsorBonus,
+        int CurrentRankScore,
+        IReadOnlyList<BadgeDto> CurrentStatusBadges,
+        IReadOnlyList<BadgeDto> PersistentBadges,
+        IReadOnlyList<BadgeDto> RevokedBadges);
 }

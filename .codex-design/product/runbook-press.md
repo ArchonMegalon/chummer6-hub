@@ -7,6 +7,9 @@ GMs, creators, and publishers need consistent long-form artifacts such as primer
 ## Bounded product move
 
 Chummer would support governed long-form authoring and publication prep for player-facing and GM-facing books without letting vendor dashboards become the source of truth.
+RUNBOOK PRESS is the long-form publishing lane:
+primers, handbooks, district guides, campaign books, and convention modules belong here.
+It complements JACKPOINT rather than duplicating it.
 
 ## Likely owners
 

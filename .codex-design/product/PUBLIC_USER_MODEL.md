@@ -44,6 +44,31 @@ The first public profile pass should prefer flags over hard roles:
 
 These flags may later inform richer roles or product lanes, but they are not a license to hardcode complex role UX into the POC.
 
+## Linked identities
+
+Registered users may later link:
+
+* email or magic link
+* Google
+* Telegram identity
+* optional Facebook if that provider is enabled
+
+Email verification is account hygiene.
+Google is the preferred mainstream social bootstrap.
+Telegram is a useful linked identity or channel, but not the account core.
+
+## Linked channels
+
+Linked channels are distinct from linked identities.
+
+First-wave channel posture:
+
+* official Telegram companion bot is allowed
+* user-provided Telegram bots are future capability only
+
+EA remains the orchestrator brain behind companion channels.
+Hub owns identity, linking, permissions, and entitlement checks around those channels.
+
 ## Future expansion
 
 Future role expansion may introduce:

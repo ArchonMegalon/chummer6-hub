@@ -14,23 +14,25 @@ Read in this order:
 6. `PUBLIC_LANDING_MANIFEST.yaml`
 7. `PUBLIC_FEATURE_REGISTRY.yaml`
 8. `PUBLIC_USER_MODEL.md`
-9. `PUBLIC_MEDIA_BRIEFS.yaml`
-10. `PARTICIPATION_AND_BOOSTER_WORKFLOW.md`
-11. `COMMUNITY_SPONSORSHIP_BACKLOG.md`
-12. `EXTERNAL_TOOLS_PLANE.md`
-13. `LTD_CAPABILITY_MAP.md`
-14. `PUBLIC_GUIDE_POLICY.md`
-15. `HORIZON_SIGNAL_POLICY.md`
-16. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
-17. `OWNERSHIP_MATRIX.md`
-18. `PROGRAM_MILESTONES.yaml`
-19. `CONTRACT_SETS.yaml`
-20. `GROUP_BLOCKERS.md`
-21. `projects/*.md` for repo-specific scope
+9. `IDENTITY_AND_CHANNEL_LINKING_MODEL.md`
+10. `PUBLIC_MEDIA_BRIEFS.yaml`
+11. `PARTICIPATION_AND_BOOSTER_WORKFLOW.md`
+12. `COMMUNITY_SPONSORSHIP_BACKLOG.md`
+13. `EXTERNAL_TOOLS_PLANE.md`
+14. `LTD_CAPABILITY_MAP.md`
+15. `PUBLIC_GUIDE_POLICY.md`
+16. `HORIZON_SIGNAL_POLICY.md`
+17. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
+18. `OWNERSHIP_MATRIX.md`
+19. `PROGRAM_MILESTONES.yaml`
+20. `CONTRACT_SETS.yaml`
+21. `GROUP_BLOCKERS.md`
+22. `projects/*.md` for repo-specific scope
 
 `HORIZON_REGISTRY.yaml` is the machine-readable source for horizon existence, order, public-guide eligibility, and eventual build path.
 The current horizon set covers knowledge fabric, spatial/runsite artifacts, creator press, replay/forensics, and bounded table coaching in addition to the earlier continuity and simulation lanes.
 `PUBLIC_LANDING_MANIFEST.yaml` and `PUBLIC_FEATURE_REGISTRY.yaml` are the machine-readable source for the `chummer.run` landing structure, CTA routing, public proof shelf, and signed-in overlay posture.
+`IDENTITY_AND_CHANNEL_LINKING_MODEL.md` is the canonical source for email hygiene, social bootstrap, linked identities, official companion channels, and the rule that EA stays the orchestrator brain behind those channels.
 
 ## Active Chummer repos
 

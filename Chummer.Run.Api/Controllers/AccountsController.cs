@@ -36,8 +36,10 @@ public sealed class AccountsController : ControllerBase
     .panel { background: white; border: 1px solid rgba(31,27,22,.12); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
     label { display:block; margin: 10px 0 6px; font-weight: 600; }
     input { width:100%; padding:10px 12px; border-radius: 10px; border:1px solid rgba(31,27,22,.2); }
+    select { width:100%; padding:10px 12px; border-radius: 10px; border:1px solid rgba(31,27,22,.2); }
     button { margin-top: 12px; padding: 10px 14px; border-radius: 999px; border: 0; background: #205d4a; color: #fff; cursor: pointer; }
     pre { background: #fbf7ef; padding: 12px; border-radius: 12px; overflow: auto; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
   </style>
 </head>
 <body>
@@ -57,8 +59,44 @@ public sealed class AccountsController : ControllerBase
       <button onclick="saveProfile()">Save profile</button>
     </section>
     <section class="panel">
+      <h2>Linked identities and channels</h2>
+      <p>Email verification is identity hygiene, social providers are auth adapters, Telegram is a channel or linked identity, and EA remains the orchestrator brain behind the official companion channel.</p>
+      <div class="grid">
+        <div>
+          <label for="emailAddress">Email / magic link</label>
+          <input id="emailAddress" placeholder="runner@example.com" />
+          <button onclick="linkEmail()">Add email</button>
+        </div>
+        <div>
+          <label for="provider">External provider</label>
+          <select id="provider">
+            <option value="google">Google</option>
+            <option value="telegram">Telegram</option>
+            <option value="facebook">Facebook</option>
+          </select>
+          <label for="providerSubject">Provider subject / handle</label>
+          <input id="providerSubject" placeholder="google-subject-123" />
+          <button onclick="linkProvider()">Link provider</button>
+        </div>
+        <div>
+          <label for="channelKind">Channel link</label>
+          <select id="channelKind">
+            <option value="telegram_official_bot">Official Telegram bot</option>
+            <option value="telegram_user_bot">Bring your own Telegram bot</option>
+          </select>
+          <label for="channelHandle">Channel handle</label>
+          <input id="channelHandle" placeholder="@hubbrain" />
+          <button onclick="linkChannel()">Link channel</button>
+        </div>
+      </div>
+    </section>
+    <section class="panel">
       <h2>Current account</h2>
       <pre id="output">No account loaded yet.</pre>
+    </section>
+    <section class="panel">
+      <h2>Identity and channel summary</h2>
+      <pre id="linksOutput">No links loaded yet.</pre>
     </section>
   </main>
   <script>
@@ -78,6 +116,7 @@ public sealed class AccountsController : ControllerBase
       document.getElementById('handle').value = data.handle || '';
       document.getElementById('timezone').value = data.timezone || 'UTC';
       document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+      await loadLinks();
     }
     async function saveProfile() {
       const payload = {
@@ -99,6 +138,69 @@ public sealed class AccountsController : ControllerBase
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
       document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+      await loadLinks();
+    }
+    async function loadLinks() {
+      const response = await fetch('/api/v1/accounts/me/links', {
+        headers: headers()
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
+      document.getElementById('linksOutput').textContent = JSON.stringify(data, null, 2);
+      return data;
+    }
+    async function currentSubjectId() {
+      const response = await fetch('/api/v1/accounts/me', { headers: headers() });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
+      return data.subjectId;
+    }
+    async function linkEmail() {
+      const subjectId = await currentSubjectId();
+      const response = await fetch('/api/v1/accounts/me/links/email', {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({
+          subjectId,
+          email: document.getElementById('emailAddress').value,
+          makePrimary: true
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
+      await loadLinks();
+    }
+    async function linkProvider() {
+      const subjectId = await currentSubjectId();
+      const response = await fetch('/api/v1/accounts/me/links/provider', {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({
+          subjectId,
+          provider: document.getElementById('provider').value,
+          providerSubject: document.getElementById('providerSubject').value,
+          makePrimary: document.getElementById('provider').value === 'google'
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
+      await loadLinks();
+    }
+    async function linkChannel() {
+      const subjectId = await currentSubjectId();
+      const response = await fetch('/api/v1/accounts/me/channels', {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({
+          subjectId,
+          channelKind: document.getElementById('channelKind').value,
+          channelHandle: document.getElementById('channelHandle').value,
+          notificationsEnabled: true
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
+      await loadLinks();
     }
   </script>
 </body>

@@ -31,7 +31,9 @@ public sealed record ContributionReceiptDto(
     int DiffSize = 0,
     IReadOnlyList<string>? IssueFingerprints = null,
     decimal CreditBurnEstimate = 0,
-    string? SignedByFleet = null);
+    string? SignedByFleet = null,
+    string AuthorizationTierAtReceipt = "unknown",
+    string? TierSource = null);
 
 public sealed record LedgerEntryDto(
     string EntryId,

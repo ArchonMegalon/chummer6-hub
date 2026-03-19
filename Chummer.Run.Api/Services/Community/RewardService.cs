@@ -7,6 +7,7 @@ namespace Chummer.Run.Api.Services.Community;
 public sealed class RewardService
 {
     private readonly CommunityStore _store;
+    private static readonly StringComparer Comparer = StringComparer.OrdinalIgnoreCase;
 
     public RewardService(CommunityStore store)
     {
@@ -57,22 +58,33 @@ public sealed class RewardService
         }
     }
 
-    public IReadOnlyList<BadgeDto> ListBadgesForUser(string userId)
+    public IReadOnlyList<BadgeDto> ListBadgesForUser(string userId, string? status = null, string? badgeKind = null)
     {
         lock (_store.Gate)
         {
             return _store.Badges
                 .Where(badge => string.Equals(badge.UserId, userId, StringComparison.OrdinalIgnoreCase))
+                .Where(badge => string.IsNullOrWhiteSpace(status) || string.Equals(badge.Status, status, StringComparison.OrdinalIgnoreCase))
+                .Where(badge => string.IsNullOrWhiteSpace(badgeKind) || string.Equals(badge.BadgeKind, badgeKind, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(badge => badge.AwardedAtUtc)
                 .ToArray();
         }
     }
 
-    public bool AwardBadgeIfMissing(string userId, string key, string label)
+    public bool AwardBadgeIfMissing(
+        string userId,
+        string key,
+        string label,
+        string badgeScope = "user",
+        string badgeKind = "persistent",
+        string? sourceSponsorSessionId = null)
     {
         var normalizedUserId = AccountService.NormalizeOptional(userId);
-        var normalizedKey = AccountService.NormalizeOptional(key);
+        var normalizedKey = NormalizeBadgeKey(AccountService.NormalizeOptional(key));
         var normalizedLabel = AccountService.NormalizeOptional(label);
+        var normalizedScope = AccountService.NormalizeOptional(badgeScope) ?? "user";
+        var normalizedKind = AccountService.NormalizeOptional(badgeKind) ?? "persistent";
+        var normalizedSourceSessionId = AccountService.NormalizeOptional(sourceSponsorSessionId);
         if (normalizedUserId is null || normalizedKey is null || normalizedLabel is null)
         {
             return false;
@@ -80,16 +92,101 @@ public sealed class RewardService
 
         lock (_store.Gate)
         {
-            if (_store.Badges.Any(badge =>
-                    string.Equals(badge.UserId, normalizedUserId, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(badge.Key, normalizedKey, StringComparison.OrdinalIgnoreCase)))
+            if (TryFindActiveBadgeLocked(normalizedUserId, normalizedKey, normalizedSourceSessionId) is not null)
             {
                 return false;
             }
 
-            _store.Badges.Add(new BadgeDto($"badge-{normalizedKey}", normalizedUserId, normalizedKey, normalizedLabel, DateTimeOffset.UtcNow));
+            _store.Badges.Add(new BadgeDto(
+                BadgeId: $"badge-{normalizedKey}-{Guid.NewGuid():N}",
+                UserId: normalizedUserId,
+                Key: normalizedKey,
+                Label: normalizedLabel,
+                AwardedAtUtc: DateTimeOffset.UtcNow,
+                BadgeScope: normalizedScope,
+                BadgeKind: normalizedKind,
+                Status: "active",
+                RevokedAtUtc: null,
+                RevocationReason: null,
+                SourceSponsorSessionId: normalizedSourceSessionId));
             _store.PersistLocked();
             return true;
+        }
+    }
+
+    public bool RevokeBadgeIfActive(string userId, string key, string reason, string? sourceSponsorSessionId = null)
+    {
+        var normalizedUserId = AccountService.NormalizeOptional(userId);
+        var normalizedKey = NormalizeBadgeKey(AccountService.NormalizeOptional(key));
+        var normalizedReason = AccountService.NormalizeOptional(reason) ?? "superseded";
+        var normalizedSourceSessionId = AccountService.NormalizeOptional(sourceSponsorSessionId);
+        if (normalizedUserId is null || normalizedKey is null)
+        {
+            return false;
+        }
+
+        lock (_store.Gate)
+        {
+            var badgeIndex = FindActiveBadgeIndexLocked(normalizedUserId, normalizedKey, normalizedSourceSessionId);
+            if (badgeIndex < 0)
+            {
+                return false;
+            }
+
+            _store.Badges[badgeIndex] = _store.Badges[badgeIndex] with
+            {
+                Status = "revoked",
+                RevokedAtUtc = DateTimeOffset.UtcNow,
+                RevocationReason = normalizedReason,
+            };
+            _store.PersistLocked();
+            return true;
+        }
+    }
+
+    public int RevokeBadgesIfActive(string userId, IEnumerable<string> keys, string reason)
+    {
+        var normalizedUserId = AccountService.NormalizeOptional(userId);
+        var normalizedKeys = keys
+            .Select(key => NormalizeBadgeKey(AccountService.NormalizeOptional(key)))
+            .Where(static key => key is not null)
+            .Cast<string>()
+            .Distinct(Comparer)
+            .ToArray();
+        var normalizedReason = AccountService.NormalizeOptional(reason) ?? "superseded";
+        if (normalizedUserId is null || normalizedKeys.Length == 0)
+        {
+            return 0;
+        }
+
+        lock (_store.Gate)
+        {
+            var revoked = 0;
+            for (var index = 0; index < _store.Badges.Count; index++)
+            {
+                var badge = _store.Badges[index];
+                if (!string.Equals(badge.UserId, normalizedUserId, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)
+                    || !normalizedKeys.Contains(NormalizeBadgeKey(badge.Key) ?? string.Empty, Comparer))
+                {
+                    continue;
+                }
+
+                _store.Badges[index] = badge with
+                {
+                    Status = "revoked",
+                    RevokedAtUtc = DateTimeOffset.UtcNow,
+                    RevocationReason = normalizedReason,
+                };
+                revoked++;
+            }
+
+            if (revoked > 0)
+            {
+                _store.PersistLocked();
+            }
+
+            return revoked;
         }
     }
 
@@ -138,16 +235,64 @@ public sealed class RewardService
 
         var userId = receipt.UserId!;
         if (string.Equals(receipt.EventKind, "lane_activated", StringComparison.OrdinalIgnoreCase)
-            && _store.Badges.All(badge => !(badge.UserId == userId && badge.Key == "booster-starter")))
+            && TryFindActiveBadgeLocked(userId, "booster-starter", null) is null)
         {
-            _store.Badges.Add(new BadgeDto("badge-booster-starter", userId, "booster-starter", "Booster Starter", DateTimeOffset.UtcNow));
+            _store.Badges.Add(new BadgeDto(
+                BadgeId: $"badge-booster-starter-{Guid.NewGuid():N}",
+                UserId: userId,
+                Key: "booster-starter",
+                Label: "Booster Starter",
+                AwardedAtUtc: DateTimeOffset.UtcNow,
+                BadgeScope: "user",
+                BadgeKind: "persistent",
+                Status: "active"));
         }
 
         if (string.Equals(receipt.EventKind, "slice_landed", StringComparison.OrdinalIgnoreCase)
             && receipt.Verified
-            && _store.Badges.All(badge => !(badge.UserId == userId && badge.Key == "jury-finisher")))
+            && TryFindActiveBadgeLocked(userId, "jury-finisher", null) is null)
         {
-            _store.Badges.Add(new BadgeDto("badge-jury-finisher", userId, "jury-finisher", "Jury Finisher", DateTimeOffset.UtcNow));
+            _store.Badges.Add(new BadgeDto(
+                BadgeId: $"badge-jury-finisher-{Guid.NewGuid():N}",
+                UserId: userId,
+                Key: "jury-finisher",
+                Label: "Jury Finisher",
+                AwardedAtUtc: DateTimeOffset.UtcNow,
+                BadgeScope: "user",
+                BadgeKind: "persistent",
+                Status: "active"));
         }
     }
+
+    private BadgeDto? TryFindActiveBadgeLocked(string userId, string key, string? sourceSponsorSessionId)
+        => FindActiveBadgeIndexLocked(userId, key, sourceSponsorSessionId) is var index && index >= 0 ? _store.Badges[index] : null;
+
+    private int FindActiveBadgeIndexLocked(string userId, string key, string? sourceSponsorSessionId)
+    {
+        var normalizedKey = NormalizeBadgeKey(key);
+        var normalizedSourceSessionId = AccountService.NormalizeOptional(sourceSponsorSessionId);
+        for (var index = 0; index < _store.Badges.Count; index++)
+        {
+            var badge = _store.Badges[index];
+            if (string.Equals(badge.UserId, userId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NormalizeBadgeKey(badge.Key), normalizedKey, StringComparison.OrdinalIgnoreCase)
+                && (normalizedSourceSessionId is null
+                    || string.Equals(AccountService.NormalizeOptional(badge.SourceSponsorSessionId) ?? string.Empty, normalizedSourceSessionId, StringComparison.OrdinalIgnoreCase)))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static string? NormalizeBadgeKey(string? key)
+        => (key ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "" => null,
+            "chickend-out" => "chickened-out",
+            _ => (key ?? string.Empty).Trim().ToLowerInvariant(),
+        };
+
 }

@@ -30,6 +30,8 @@ public sealed class FleetBridgeService
         string boostCampaignId,
         string sponsorSessionId,
         string publicContributionVisibility,
+        string authorizationTier,
+        string tierSource,
         CancellationToken cancellationToken)
     {
         var payload = new
@@ -43,6 +45,8 @@ public sealed class FleetBridgeService
             boost_campaign_id = boostCampaignId,
             sponsor_session_id = sponsorSessionId,
             public_contribution_visibility = publicContributionVisibility,
+            authorization_tier = authorizationTier,
+            tier_source = tierSource,
         };
         return SendAsync(HttpMethod.Post, "/api/internal/participant-lanes", payload, cancellationToken);
     }

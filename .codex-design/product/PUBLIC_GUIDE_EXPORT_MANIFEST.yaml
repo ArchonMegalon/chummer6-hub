@@ -1,0 +1,59 @@
+product: chummer
+version: 1
+target_repo: Chummer6
+purpose: Canonical source mapping for downstream public-guide generation.
+sources:
+  product_entry: products/chummer/README.md
+  horizon_registry: products/chummer/HORIZON_REGISTRY.yaml
+  horizon_docs_root: products/chummer/horizons
+  public_guide_policy: products/chummer/PUBLIC_GUIDE_POLICY.md
+  public_media_policy: products/chummer/PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md
+rules:
+- Downstream generators must not define or retain a private hardcoded horizon catalog.
+- Downstream generators must source horizon existence, ordering, and enable/disable state from HORIZON_REGISTRY.yaml.
+- Only horizons with public_guide.enabled == true may appear in Chummer6.
+- Retired or disabled horizons must disappear from the guide on the next generation pass.
+- Horizon detail pages may elaborate in human language, but may not invent new horizons, owners, or delivery promises.
+pages:
+  horizons_index:
+    source: products/chummer/HORIZON_REGISTRY.yaml
+    include:
+      where: public_guide.enabled == true
+    order_by: public_guide.order
+    required_fields:
+    - id
+    - title
+    - public_guide.pain_label
+    - canon_doc
+    - build_path.current_state
+  horizon_detail:
+    source: canon_doc
+    for_each:
+      from: products/chummer/HORIZON_REGISTRY.yaml
+      where: public_guide.enabled == true
+    required_sections:
+    - Table pain
+    - Bounded product move
+    - Likely owners
+    - Foundations
+    - Why still a horizon
+    required_registry_fields:
+    - build_path.intent
+    - build_path.current_state
+    - build_path.next_state
+    - build_path.owning_repos
+    - tool_posture
+    allowed_expansions:
+    - human-language table scenes
+    - public-facing dialogue examples
+    - downstream humor
+    - downstream visuals
+    forbidden_expansions:
+    - inventing new horizon ids
+    - overriding horizon order
+    - overriding owning repos
+    - overriding tool posture
+    - inventing build promises absent from design canon
+working_rule: >
+  The public guide may humanize and visualize canonical future lanes,
+  but the design repo decides which future lanes exist.

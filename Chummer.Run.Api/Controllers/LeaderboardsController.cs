@@ -20,9 +20,11 @@ public sealed class LeaderboardsController : ControllerBase
     public ContentResult LeaderboardsPage()
     {
         var individuals = _leaderboards.IndividualLeaderboard(publicOnly: true);
+        var sponsorRanks = _leaderboards.SponsorRankLeaderboard(publicOnly: true);
         var groups = _leaderboards.GroupLeaderboard(publicOnly: true);
         var quests = _leaderboards.Quests();
         var individualRows = string.Join("", individuals.Select(row => $"<tr><td>{row.Rank}</td><td>{WebUtility.HtmlEncode(row.DisplayName)}</td><td>{row.Points}</td><td>{row.LandedSlices}</td></tr>"));
+        var sponsorRows = string.Join("", sponsorRanks.Select(row => $"<tr><td>{row.Rank}</td><td>{WebUtility.HtmlEncode(row.DisplayName)}</td><td>{WebUtility.HtmlEncode(row.CurrentAuthorizationTier)}</td><td>{row.CurrentRankScore}</td><td>{row.LifetimePoints}</td></tr>"));
         var groupRows = string.Join("", groups.Select(row => $"<tr><td>{row.Rank}</td><td>{WebUtility.HtmlEncode(row.GroupName)}</td><td>{row.Points}</td><td>{row.LandedSlices}</td></tr>"));
         var questRows = string.Join("", quests.Select(quest => $"<li><strong>{WebUtility.HtmlEncode(quest.Title)}</strong>: {WebUtility.HtmlEncode(quest.Description)} ({quest.CurrentProgress}/{quest.TargetProgress})</li>"));
         var html = $"""
@@ -34,6 +36,8 @@ public sealed class LeaderboardsController : ControllerBase
   <p>Public boards show only users who opted into public recognition and groups that are not private.</p>
   <h2>Individuals</h2>
   <table style="width:100%;background:white;border-collapse:collapse;"><tr><th align="left">Rank</th><th align="left">User</th><th align="left">Points</th><th align="left">Landed</th></tr>{individualRows}</table>
+  <h2>Current sponsor rank</h2>
+  <table style="width:100%;background:white;border-collapse:collapse;"><tr><th align="left">Rank</th><th align="left">User</th><th align="left">Tier</th><th align="left">Current score</th><th align="left">Lifetime points</th></tr>{sponsorRows}</table>
   <h2>Groups</h2>
   <table style="width:100%;background:white;border-collapse:collapse;"><tr><th align="left">Rank</th><th align="left">Group</th><th align="left">Points</th><th align="left">Landed</th></tr>{groupRows}</table>
   <h2>Quests</h2>
@@ -50,6 +54,7 @@ public sealed class LeaderboardsController : ControllerBase
         => Ok(new
         {
             individuals = _leaderboards.IndividualLeaderboard(publicOnly: true),
+            sponsorRank = _leaderboards.SponsorRankLeaderboard(publicOnly: true),
             groups = _leaderboards.GroupLeaderboard(publicOnly: true),
             quests = _leaderboards.Quests(),
         });
