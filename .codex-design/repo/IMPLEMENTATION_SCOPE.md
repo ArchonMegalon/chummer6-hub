@@ -47,5 +47,5 @@ The hub boundary is considered clean when:
 The mission statement and the repo body are much closer now.
 Registry and media execution ownership are physically out of this repo.
 
-The remaining work is orchestrator-side adapters and product completion, not pretending hub still owns every hosted surface.
+The remaining work is future product depth and physical cleanup, not pretending hub still owns every hosted surface or still lacks authority proof.
 Participation UX for premium burst lanes belongs here, but the resulting Codex auth cache stays lane-local on Fleet rather than being stored in hub identity or hub databases.
