@@ -128,6 +128,20 @@ page_types:
     - privacy
     - preview honesty
     - free-later explanation
+  download_page:
+    audience: public
+    max_technical_depth: low
+    allowed_sources:
+    - products/chummer/PUBLIC_FEATURE_REGISTRY.yaml
+    - approved public-status summaries
+    - generated release matrix artifacts
+    forbidden_sources:
+    - products/chummer/projects/*.md
+    required_topics:
+    - current build matrix
+    - honest artifact format
+    - checksums
+    - raw release fallback
   deep_source_trail:
     audience: deeper_public
     max_technical_depth: high

@@ -30,6 +30,7 @@ public sealed class FleetBridgeService
         string boostCampaignId,
         string sponsorSessionId,
         string publicContributionVisibility,
+        string laneRole,
         string authorizationTier,
         string tierSource,
         CancellationToken cancellationToken)
@@ -45,6 +46,7 @@ public sealed class FleetBridgeService
             boost_campaign_id = boostCampaignId,
             sponsor_session_id = sponsorSessionId,
             public_contribution_visibility = publicContributionVisibility,
+            lane_role = laneRole,
             authorization_tier = authorizationTier,
             tier_source = tierSource,
         };

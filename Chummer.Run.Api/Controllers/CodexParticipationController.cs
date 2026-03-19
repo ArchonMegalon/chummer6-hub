@@ -125,6 +125,13 @@ public sealed class CodexParticipationController : ControllerBase
         <option value="edu">Edu</option>
         <option value="enterprise">Enterprise</option>
       </select>
+      <label for="requestedLaneRole">What should your sponsor lane help with?</label>
+      <select id="requestedLaneRole">
+        <option value="coding" selected>Boost Coding</option>
+        <option value="review">Boost Review</option>
+        <option value="deep_review">Boost Deep Review</option>
+      </select>
+      <p class="muted">Coding accelerates implementation. Review helps acceptance throughput. Deep review is reserved for tougher final checks and expects a higher sponsor tier.</p>
       <label><input id="consent1" type="checkbox" /> I understand my ChatGPT/Codex entitlement will be used for project work.</label>
       <label><input id="consent2" type="checkbox" /> I understand this creates a temporary worker lane.</label>
       <label><input id="consent3" type="checkbox" /> I understand final merge is still controlled by Fleet review and jury.</label>
@@ -197,6 +204,7 @@ public sealed class CodexParticipationController : ControllerBase
         groupId: document.getElementById("groupId").value || null,
         boostCode: document.getElementById("boostCode").value || null,
         visibility: "group",
+        requestedLaneRole: document.getElementById("requestedLaneRole").value || "coding",
         authorizationTier: document.getElementById("authorizationTier").value || null,
         tierSource: document.getElementById("authorizationTier").value !== "unknown" ? "user_declared" : null
       };
@@ -292,6 +300,7 @@ public sealed class CodexParticipationController : ControllerBase
                 CampaignId: request.CampaignId,
                 Visibility: request.Visibility ?? "group",
                 RequestedLaneType: request.RequestedLaneType ?? "participant_burst",
+                RequestedLaneRole: request.RequestedLaneRole ?? "coding",
                 AuthorizationTier: request.AuthorizationTier,
                 TierSource: request.TierSource));
             return Ok(BuildIntentEnvelope(session, receipts: _sessions.ListReceipts(session.SponsorSessionId), badges: _sessions.ListBadgesForSessionUser(session.SponsorSessionId), recognition: _leaderboards.UserRecognitionSummary(session.UserId)));
@@ -564,6 +573,7 @@ public sealed class CodexParticipationController : ControllerBase
                 groupId = session.GroupId,
                 projectId = session.ProjectId,
                 requestedLaneType = session.RequestedLaneType,
+                requestedLaneRole = session.RequestedLaneRole,
                 visibility = session.Visibility,
                 status = session.Status,
                 consented = session.Consented,
@@ -617,5 +627,6 @@ public sealed record CreateCodexParticipationIntentRequest(
     string? CampaignId = null,
     string? Visibility = null,
     string? RequestedLaneType = null,
+    string? RequestedLaneRole = null,
     string? AuthorizationTier = null,
     string? TierSource = null);

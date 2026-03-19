@@ -175,6 +175,7 @@ internal sealed class SponsorSessionState
     public string GroupId { get; set; } = "";
     public string ProjectId { get; set; } = "";
     public string RequestedLaneType { get; set; } = "participant_burst";
+    public string RequestedLaneRole { get; set; } = "coding";
     public string Visibility { get; set; } = "group";
     public string Status { get; set; } = "intent_created";
     public bool Consented { get; set; }
@@ -200,6 +201,7 @@ internal sealed class SponsorSessionState
             GroupId,
             ProjectId,
             RequestedLaneType,
+            RequestedLaneRole,
             Visibility,
             Status,
             Consented,
@@ -240,6 +242,7 @@ internal sealed record SponsorSessionStateSnapshot(
     string GroupId,
     string ProjectId,
     string RequestedLaneType,
+    string RequestedLaneRole,
     string Visibility,
     string Status,
     bool Consented,
@@ -265,6 +268,7 @@ internal sealed record SponsorSessionStateSnapshot(
             state.GroupId,
             state.ProjectId,
             state.RequestedLaneType,
+            state.RequestedLaneRole,
             state.Visibility,
             state.Status,
             state.Consented,
@@ -292,6 +296,7 @@ internal sealed record SponsorSessionStateSnapshot(
             GroupId = GroupId,
             ProjectId = ProjectId,
             RequestedLaneType = RequestedLaneType,
+            RequestedLaneRole = RequestedLaneRole,
             Visibility = Visibility,
             Status = Status,
             Consented = Consented,

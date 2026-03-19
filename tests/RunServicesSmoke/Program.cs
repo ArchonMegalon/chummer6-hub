@@ -558,11 +558,13 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         ProjectId: "fleet",
         GroupId: ownerGroup.GroupId,
         SubjectLabel: "Runner Demo",
+        RequestedLaneRole: "deep_review",
         AuthorizationTier: "pro",
         TierSource: "user_declared"));
     laterSessions.RecordConsent(laterSession.SponsorSessionId);
     var authStarted = await laterSessions.StartDeviceAuthAsync(laterSession.SponsorSessionId, CancellationToken.None);
     Assert(authStarted.Session.AuthorizedAtUtc is not null, "auth-ready device auth should mark the sponsor session as authorized.");
+    Assert(string.Equals(authStarted.Session.RequestedLaneRole, "deep_review", StringComparison.OrdinalIgnoreCase), "sponsor sessions should preserve the requested participation role.");
     var laterBadges = laterSessions.ListBadgesForSessionUser(laterSession.SponsorSessionId);
     Assert(!laterBadges.Any(static badge => string.Equals(badge.Key, "chickened-out", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)), "later successful authorization should revoke the Chickened Out badge.");
     Assert(laterBadges.Any(static badge => string.Equals(badge.Key, "pro-sponsor-active", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)), "current sponsor tier should award a transient active-tier badge.");
@@ -600,6 +602,48 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     Assert(missingLaneThrown, "device-auth startup should fail fast when Fleet does not return a lane_id.");
     var failedLaneSession = laneCreationSessions.Get(laneCreationSession.SponsorSessionId);
     Assert(string.IsNullOrWhiteSpace(failedLaneSession?.FleetLaneId), "failed lane creation should not persist an empty Fleet lane id.");
+
+    var waitingBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/internal/participant-lanes")
+        {
+            return JsonResponse(new { detail = "participant burst capacity reached for fleet" }, HttpStatusCode.Conflict);
+        }
+
+        return JsonResponse(new { detail = "unexpected fleet call" }, HttpStatusCode.InternalServerError);
+    })), configuration);
+    var waitingSessions = new BoostSessionService(store, accounts, groups, waitingBridge, rewards);
+    var waitingSession = waitingSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.demo",
+        ProjectId: "fleet",
+        GroupId: ownerGroup.GroupId,
+        SubjectLabel: "Runner Demo",
+        RequestedLaneRole: "review",
+        AuthorizationTier: "plus",
+        TierSource: "user_declared"));
+    waitingSessions.RecordConsent(waitingSession.SponsorSessionId);
+    var waitingResult = await waitingSessions.StartDeviceAuthAsync(waitingSession.SponsorSessionId, CancellationToken.None);
+    Assert(string.Equals(waitingResult.Session.Status, "waiting_for_slot", StringComparison.OrdinalIgnoreCase), "capacity pressure should move sponsor sessions into waiting_for_slot instead of throwing.");
+    Assert(string.Equals(waitingResult.Session.RequestedLaneRole, "review", StringComparison.OrdinalIgnoreCase), "waiting sessions should keep the requested sponsor role.");
+
+    var invalidRoleThrown = false;
+    try
+    {
+        _ = laterSessions.Create(new CreateSponsorSessionRequest(
+            SubjectId: "subject.demo",
+            ProjectId: "fleet",
+            GroupId: ownerGroup.GroupId,
+            RequestedLaneRole: "deep_review",
+            AuthorizationTier: "free",
+            TierSource: "user_declared"));
+    }
+    catch (InvalidOperationException ex)
+    {
+        invalidRoleThrown = ex.Message.Contains("deep review", StringComparison.OrdinalIgnoreCase)
+            || ex.Message.Contains("pro", StringComparison.OrdinalIgnoreCase);
+    }
+
+    Assert(invalidRoleThrown, "deep review sponsor sessions should require a higher authorization tier.");
 }
 
 async Task VerifyPublicLandingProjectionAsync()
