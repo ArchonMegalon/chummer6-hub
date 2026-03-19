@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace Chummer.Run.Contracts.Transcription;
 
 public sealed record TranscriptionRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(2048)] string Source,
+    [Required(AllowEmptyStrings = false), StringLength(2048)] string Source,
     string? MimeType,
     string? LanguageHint,
     bool PreserveSpeakerTurns);

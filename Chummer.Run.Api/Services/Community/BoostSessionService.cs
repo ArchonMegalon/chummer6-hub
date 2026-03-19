@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Contracts.Ledger;
+using Chummer.Run.Contracts.Leaderboards;
 
 namespace Chummer.Run.Api.Services.Community;
 
@@ -10,28 +12,32 @@ public sealed class BoostSessionService
     private readonly AccountService _accounts;
     private readonly GroupService _groups;
     private readonly FleetBridgeService _fleetBridge;
+    private readonly RewardService _rewards;
 
     public BoostSessionService(
         CommunityStore store,
         AccountService accounts,
         GroupService groups,
-        FleetBridgeService fleetBridge)
+        FleetBridgeService fleetBridge,
+        RewardService rewards)
     {
         _store = store;
         _accounts = accounts;
         _groups = groups;
         _fleetBridge = fleetBridge;
+        _rewards = rewards;
     }
 
     public SponsorSessionStatusDto Create(CreateSponsorSessionRequest request)
     {
-        var user = _accounts.EnsureUser(request.SubjectId, request.SubjectLabel ?? request.SubjectId);
+        var subjectId = AccountService.NormalizeRequired(request.SubjectId ?? string.Empty, nameof(request.SubjectId));
+        var user = _accounts.EnsureUser(subjectId, request.SubjectLabel ?? subjectId);
         var group = ResolveGroupForSession(user, request);
         var boostCodeId = default(string);
         var campaignId = AccountService.NormalizeOptional(request.CampaignId);
         if (!string.IsNullOrWhiteSpace(request.BoostCode))
         {
-            var redeemed = _groups.RedeemBoostCode(new RedeemBoostCodeRequest(request.SubjectId, request.BoostCode!));
+            var redeemed = _groups.RedeemBoostCode(new RedeemBoostCodeRequest(subjectId, request.BoostCode!));
             boostCodeId = redeemed.BoostCodeId;
             campaignId ??= redeemed.CampaignId;
         }
@@ -74,6 +80,54 @@ public sealed class BoostSessionService
         lock (_store.Gate)
         {
             return _store.SponsorSessionsById.TryGetValue(normalized, out var state) ? state.Snapshot() : null;
+        }
+    }
+
+    public async Task<(SponsorSessionStatusDto Session, JsonObject? Fleet)> RefreshAsync(string sponsorSessionId, CancellationToken cancellationToken)
+    {
+        var state = Require(sponsorSessionId);
+        var fleetLaneId = default(string);
+        lock (_store.Gate)
+        {
+            fleetLaneId = AccountService.NormalizeOptional(state.FleetLaneId);
+        }
+
+        JsonObject? fleet = null;
+        if (!string.IsNullOrWhiteSpace(fleetLaneId))
+        {
+            fleet = await _fleetBridge.GetParticipantLaneAsync(fleetLaneId!, cancellationToken);
+            lock (_store.Gate)
+            {
+                ApplyFleetSnapshotLocked(state, fleet);
+                _store.PersistLocked();
+                return (state.Snapshot(), fleet);
+            }
+        }
+
+        return (state.Snapshot(), null);
+    }
+
+    public IReadOnlyList<ContributionReceiptDto> ListReceipts(string sponsorSessionId)
+    {
+        var normalized = AccountService.NormalizeRequired(sponsorSessionId, nameof(sponsorSessionId));
+        lock (_store.Gate)
+        {
+            return _store.Receipts
+                .Where(receipt => string.Equals(receipt.SponsorSessionId, normalized, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(receipt => receipt.EndedAtUtc ?? receipt.LandedAtUtc ?? receipt.StartedAtUtc ?? DateTimeOffset.MinValue)
+                .ToArray();
+        }
+    }
+
+    public IReadOnlyList<BadgeDto> ListBadgesForSessionUser(string sponsorSessionId)
+    {
+        var state = Require(sponsorSessionId);
+        lock (_store.Gate)
+        {
+            return _store.Badges
+                .Where(badge => string.Equals(badge.UserId, state.UserId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(badge => badge.AwardedAtUtc)
+                .ToArray();
         }
     }
 
@@ -180,6 +234,7 @@ public sealed class BoostSessionService
                 state.StoppedAtUtc ??= DateTimeOffset.UtcNow;
                 state.UpdatedAtUtc = DateTimeOffset.UtcNow;
                 state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), revoke ? "revoked" : "stopped", revoke ? "Sponsor session revoked before Fleet lane creation." : "Sponsor session stopped before Fleet lane creation.", DateTimeOffset.UtcNow));
+                MaybeAwardChickendOutBadgeLocked(state);
                 _store.PersistLocked();
                 return (state.Snapshot(), new JsonObject());
             }
@@ -190,10 +245,12 @@ public sealed class BoostSessionService
             : await _fleetBridge.StopParticipantLaneAsync(state.FleetLaneId!, cancellationToken);
         lock (_store.Gate)
         {
+            ApplyFleetSnapshotLocked(state, fleet);
             state.Status = revoke ? "revoked" : "stopped";
             state.StoppedAtUtc ??= DateTimeOffset.UtcNow;
             state.UpdatedAtUtc = DateTimeOffset.UtcNow;
             state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), revoke ? "revoked" : "stopped", revoke ? "Participant lane revoked." : "Participant lane stopped.", DateTimeOffset.UtcNow));
+            MaybeAwardChickendOutBadgeLocked(state);
             _store.PersistLocked();
             return (state.Snapshot(), fleet);
         }
@@ -239,6 +296,62 @@ public sealed class BoostSessionService
         }
 
         throw new KeyNotFoundException($"Unknown sponsor session: {normalized}");
+    }
+
+    private static string MapFleetLaneStatusToSessionStatus(string fleetStatus, bool authReady)
+        => fleetStatus switch
+        {
+            "active" => "active",
+            "stopped" => "stopped",
+            "revoked" => "revoked",
+            "paused" => "paused",
+            "pending_auth" when authReady => "lane_pending",
+            "pending_auth" => "pending_auth",
+            _ => string.IsNullOrWhiteSpace(fleetStatus) ? "intent_created" : fleetStatus,
+        };
+
+    private void ApplyFleetSnapshotLocked(SponsorSessionState state, JsonObject fleet)
+    {
+        var lane = fleet["lane"] as JsonObject;
+        if (lane is null)
+        {
+            return;
+        }
+
+        state.FleetLaneId = AccountService.NormalizeOptional(lane["lane_id"]?.GetValue<string>()) ?? state.FleetLaneId;
+        var deviceAuth = lane["device_auth"] as JsonObject;
+        var verificationUri = AccountService.NormalizeOptional(deviceAuth?["verification_uri"]?.GetValue<string>())
+            ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["verification_uri"]?.GetValue<string>());
+        var userCode = AccountService.NormalizeOptional(deviceAuth?["user_code"]?.GetValue<string>())
+            ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["user_code"]?.GetValue<string>());
+        var authReady = (deviceAuth?["auth_ready"]?.GetValue<bool?>()).GetValueOrDefault()
+            || ((lane["telemetry"] as JsonObject)?["auth_ready"]?.GetValue<bool?>()).GetValueOrDefault();
+        state.DeviceAuthVerificationUri = verificationUri ?? state.DeviceAuthVerificationUri;
+        state.DeviceAuthUserCode = userCode ?? state.DeviceAuthUserCode;
+        var fleetStatus = AccountService.NormalizeOptional(lane["status"]?.GetValue<string>()) ?? state.Status;
+        state.Status = MapFleetLaneStatusToSessionStatus(fleetStatus, authReady);
+        if (string.Equals(state.Status, "active", StringComparison.OrdinalIgnoreCase))
+        {
+            state.ActivatedAtUtc ??= DateTimeOffset.UtcNow;
+        }
+        state.UpdatedAtUtc = DateTimeOffset.UtcNow;
+    }
+
+    private void MaybeAwardChickendOutBadgeLocked(SponsorSessionState state)
+    {
+        if (state.ActivatedAtUtc is not null || !state.Consented)
+        {
+            return;
+        }
+
+        if (_rewards.AwardBadgeIfMissing(state.UserId, "chickend-out", "Chickend Out"))
+        {
+            state.Events.Add(new SponsorSessionEventDto(
+                AccountService.NewId("evt"),
+                "badge_awarded",
+                "Chickend Out badge awarded after stopping before lane activation.",
+                DateTimeOffset.UtcNow));
+        }
     }
 
     private sealed record HubUserSubject(string SubjectId, string DisplayName);

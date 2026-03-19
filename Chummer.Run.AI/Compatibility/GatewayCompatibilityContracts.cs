@@ -4,9 +4,9 @@ namespace Chummer.Run.AI.Compatibility;
 
 [Obsolete("Use Chummer.Run.Contracts.Gateway.SubmitObservationRequest.")]
 internal sealed record SubmitObservationRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SessionId,
-    [property: Required(AllowEmptyStrings = false), StringLength(64)] string Source,
-    [property: Required(AllowEmptyStrings = false), StringLength(8000)] string Payload,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SessionId,
+    [Required(AllowEmptyStrings = false), StringLength(64)] string Source,
+    [Required(AllowEmptyStrings = false), StringLength(8000)] string Payload,
     DateTimeOffset ObservedAtUtc);
 
 [Obsolete("Use Chummer.Run.Contracts.Gateway.SubmitObservationResponse.")]

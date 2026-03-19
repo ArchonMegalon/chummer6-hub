@@ -9,11 +9,13 @@ namespace Chummer.Run.AI.Controllers;
 [Route("api/v1/ai/booster")]
 public sealed class BoosterReceiptsController : ControllerBase
 {
+    private readonly BoosterProjectionAccessGuard _accessGuard;
     private readonly BoosterReceiptProjectionService _projections;
     private readonly BoosterReceiptVerifier _verifier;
 
-    public BoosterReceiptsController(BoosterReceiptProjectionService projections, BoosterReceiptVerifier verifier)
+    public BoosterReceiptsController(BoosterProjectionAccessGuard accessGuard, BoosterReceiptProjectionService projections, BoosterReceiptVerifier verifier)
     {
+        _accessGuard = accessGuard;
         _projections = projections;
         _verifier = verifier;
     }
@@ -35,13 +37,43 @@ public sealed class BoosterReceiptsController : ControllerBase
 
     [HttpGet("sessions/{sponsorSessionId}")]
     public ActionResult<object> GetSessionProjection([FromRoute] string sponsorSessionId)
-        => Ok(_projections.SessionProjection(sponsorSessionId));
+    {
+        try
+        {
+            _accessGuard.Require(Request);
+            return Ok(_projections.SessionProjection(sponsorSessionId));
+        }
+        catch (BoosterProjectionAccessException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
 
     [HttpGet("leaderboard-projection")]
     public ActionResult<object> GetLeaderboardProjection()
-        => Ok(_projections.LeaderboardProjection());
+    {
+        try
+        {
+            _accessGuard.Require(Request);
+            return Ok(_projections.LeaderboardProjection());
+        }
+        catch (BoosterProjectionAccessException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
 
     [HttpGet("group-projection/{groupId}")]
     public ActionResult<object> GetGroupProjection([FromRoute] string groupId)
-        => Ok(_projections.GroupProjection(groupId));
+    {
+        try
+        {
+            _accessGuard.Require(Request);
+            return Ok(_projections.GroupProjection(groupId));
+        }
+        catch (BoosterProjectionAccessException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
 }

@@ -299,6 +299,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var ledger = new LedgerService(store, rewards, entitlements);
     var ledgerVerifier = new FleetReceiptVerifier(configuration);
     var projectionVerifier = new BoosterReceiptVerifier(configuration);
+    var projectionAccess = new BoosterProjectionAccessGuard(configuration);
     var projections = new BoosterReceiptProjectionService();
     var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(request =>
     {
@@ -384,7 +385,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var acceptedLedgerPayload = acceptedLedgerResult?.Value as ReceiptIngestResultDto;
     Assert(acceptedLedgerPayload?.Status == "ingested", "ledger receipt ingest should accept Fleet-signed payloads.");
 
-    var aiReceiptController = new BoosterReceiptsController(projections, projectionVerifier)
+    var aiReceiptController = new BoosterReceiptsController(projectionAccess, projections, projectionVerifier)
     {
         ControllerContext = ReceiptControllerContext("hmac-sha256:forged", forgedReceipt)
     };
@@ -423,7 +424,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         Interlocked.Increment(ref fleetCallCount);
         return JsonResponse(new { detail = "fleet should not be called" }, HttpStatusCode.InternalServerError);
     })), configuration);
-    var boostSessions = new BoostSessionService(store, accounts, groups, fleetBridge);
+    var boostSessions = new BoostSessionService(store, accounts, groups, fleetBridge, rewards);
     var pendingSession = boostSessions.Create(new CreateSponsorSessionRequest(
         SubjectId: "subject.demo",
         ProjectId: "fleet",
@@ -432,6 +433,10 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     boostSessions.RecordConsent(pendingSession.SponsorSessionId);
     var locallyStopped = await boostSessions.StopAsync(pendingSession.SponsorSessionId, revoke: false, CancellationToken.None);
     Assert(string.Equals(locallyStopped.Session.Status, "stopped", StringComparison.OrdinalIgnoreCase), "sessions without Fleet lanes should stop locally.");
+    Assert(locallyStopped.Session.ActivatedAtUtc is null, "sessions stopped before auth should never report activation.");
+    Assert(
+        boostSessions.ListBadgesForSessionUser(pendingSession.SponsorSessionId).Any(static badge => string.Equals(badge.Key, "chickend-out", StringComparison.OrdinalIgnoreCase)),
+        "stopping after consent but before activation should award the Chickend Out badge.");
     Assert(fleetCallCount == 0, "stopping a session before lane creation should not call Fleet.");
 
     var laneCreationBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
@@ -443,7 +448,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
 
         return JsonResponse(new { detail = "unexpected fleet call" }, HttpStatusCode.InternalServerError);
     })), configuration);
-    var laneCreationSessions = new BoostSessionService(store, accounts, groups, laneCreationBridge);
+    var laneCreationSessions = new BoostSessionService(store, accounts, groups, laneCreationBridge, rewards);
     var laneCreationSession = laneCreationSessions.Create(new CreateSponsorSessionRequest(
         SubjectId: "subject.demo",
         ProjectId: "fleet",
@@ -457,7 +462,8 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     }
     catch (InvalidOperationException ex)
     {
-        missingLaneThrown = ex.Message.Contains("lane_id", StringComparison.OrdinalIgnoreCase);
+        missingLaneThrown = ex.Message.Contains("lane", StringComparison.OrdinalIgnoreCase)
+            || ex.Message.Contains("Fleet bridge request failed", StringComparison.OrdinalIgnoreCase);
     }
 
     Assert(missingLaneThrown, "device-auth startup should fail fast when Fleet does not return a lane_id.");

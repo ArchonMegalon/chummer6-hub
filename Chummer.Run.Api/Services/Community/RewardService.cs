@@ -68,6 +68,31 @@ public sealed class RewardService
         }
     }
 
+    public bool AwardBadgeIfMissing(string userId, string key, string label)
+    {
+        var normalizedUserId = AccountService.NormalizeOptional(userId);
+        var normalizedKey = AccountService.NormalizeOptional(key);
+        var normalizedLabel = AccountService.NormalizeOptional(label);
+        if (normalizedUserId is null || normalizedKey is null || normalizedLabel is null)
+        {
+            return false;
+        }
+
+        lock (_store.Gate)
+        {
+            if (_store.Badges.Any(badge =>
+                    string.Equals(badge.UserId, normalizedUserId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(badge.Key, normalizedKey, StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            _store.Badges.Add(new BadgeDto($"badge-{normalizedKey}", normalizedUserId, normalizedKey, normalizedLabel, DateTimeOffset.UtcNow));
+            _store.PersistLocked();
+            return true;
+        }
+    }
+
     private static int ScoreReceipt(ContributionReceiptDto receipt)
     {
         var eventKind = (receipt.EventKind ?? string.Empty).Trim().ToLowerInvariant();

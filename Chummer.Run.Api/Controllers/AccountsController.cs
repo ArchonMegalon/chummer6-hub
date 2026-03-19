@@ -106,13 +106,14 @@ public sealed class AccountsController : ControllerBase
     [HttpGet("me")]
     [ProducesResponseType<HubUserDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<HubUserDto>> GetMe([FromQuery] string subjectId, CancellationToken cancellationToken)
+    public async Task<ActionResult<HubUserDto>> GetMe([FromQuery] string? subjectId, CancellationToken cancellationToken)
     {
         try
         {
-            var subject = await _identity.RequireMatchingSubjectAsync(Request, subjectId, cancellationToken);
-            var user = _accounts.GetBySubject(subject.SubjectId);
-            return user is null ? NotFound() : Ok(user);
+            var subject = string.IsNullOrWhiteSpace(subjectId)
+                ? await _identity.RequireSubjectAsync(Request, cancellationToken)
+                : await _identity.RequireMatchingSubjectAsync(Request, subjectId, cancellationToken);
+            return Ok(_accounts.EnsureUser(subject.SubjectId, subject.SubjectId));
         }
         catch (HubRequestAuthException ex)
         {
