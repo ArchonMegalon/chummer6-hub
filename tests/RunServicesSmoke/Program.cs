@@ -82,6 +82,7 @@ await VerifyPublicationWorkflowAsync();
 VerifyPublicationControllerHardening();
 VerifyIdentityWorkflow();
 await VerifyHubCommunitySecurityAndDurabilityAsync();
+await VerifyPublicLandingProjectionAsync();
 VerifyRegistryWorkflow();
 VerifyRegistryControllerHardening();
 await VerifyAiGatewayWorkflowAsync();
@@ -469,6 +470,51 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     Assert(missingLaneThrown, "device-auth startup should fail fast when Fleet does not return a lane_id.");
     var failedLaneSession = laneCreationSessions.Get(laneCreationSession.SponsorSessionId);
     Assert(string.IsNullOrWhiteSpace(failedLaneSession?.FleetLaneId), "failed lane creation should not persist an empty Fleet lane id.");
+}
+
+async Task VerifyPublicLandingProjectionAsync()
+{
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_PUBLIC_CANON_ROOT"] = "/docker/chummercomplete/chummer.run-services"
+        })
+        .Build();
+    using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
+    var landing = new PublicLandingService(configuration, loggerFactory.CreateLogger<PublicLandingService>());
+    var surface = landing.LoadSurface();
+    Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
+    Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
+    Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/participate", StringComparison.Ordinal)), "landing surface should expose the participate entry route");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Title, "KARMA FORGE", StringComparison.Ordinal) && string.Equals(card.Badge, "Booster first", StringComparison.Ordinal)), "landing feature registry should carry the booster-first posture for KARMA FORGE");
+
+    var storePath = Path.Combine(Path.GetTempPath(), "run-services-smoke", Guid.NewGuid().ToString("N"), "community-store.json");
+    Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
+    var communityConfiguration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_PUBLIC_CANON_ROOT"] = "/docker/chummercomplete/chummer.run-services",
+            ["CHUMMER_COMMUNITY_STORE_PATH"] = storePath
+        })
+        .Build();
+    var store = new CommunityStore(communityConfiguration, loggerFactory.CreateLogger<CommunityStore>());
+    var accounts = new AccountService(store);
+    var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
+        JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized))), communityConfiguration);
+    var controller = new PublicLandingController(landing, accounts, identityClient)
+    {
+        ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        }
+    };
+
+    var landingHtml = controller.LandingPage().Content ?? string.Empty;
+    Assert(landingHtml.Contains("Shadowrun rules truth, with receipts.", StringComparison.Ordinal), "landing page should render the canonical headline");
+    Assert(landingHtml.Contains("/participate", StringComparison.Ordinal), "landing page should route people toward participate");
+
+    var homeHtml = (await controller.HomePage(CancellationToken.None)).Content ?? string.Empty;
+    Assert(homeHtml.Contains("Sign in to unlock overlays", StringComparison.Ordinal), "home page should render a clean signed-out overlay prompt");
 }
 
 void VerifyRegistryWorkflow()

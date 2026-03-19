@@ -202,6 +202,40 @@ program_phases:
     - "`Chummer.Engine.Contracts` and `Chummer.Ui.Kit` restore deterministically through package feeds or explicit compatibility trees."
     - Missing feed versus missing compatibility-tree failures are explicit.
     - Legacy consumers no longer depend on ambient monorepo-relative project references as the implied default.
+- id: J
+  title: Public landing and discovery surface
+  status: in_progress
+  release_blocking: false
+  goal: Make `chummer.run` a canon-backed product front door with a proof shelf, invitation flow, and thin signed-in overlays.
+  milestones:
+  - id: J0
+    title: Public landing canon established
+    owners:
+    - chummer6-design
+    status: complete
+    exit:
+    - "`PUBLIC_LANDING_POLICY.md` exists and defines landing purpose, public-versus-registered posture, and copy constraints."
+    - "`PUBLIC_LANDING_MANIFEST.yaml` and `PUBLIC_FEATURE_REGISTRY.yaml` exist as machine-readable landing truth."
+    - "`PUBLIC_USER_MODEL.md` and `PUBLIC_MEDIA_BRIEFS.yaml` exist and constrain user handling plus visual generation."
+  - id: J1
+    title: Hosted landing projected from canon
+    owners:
+    - chummer6-hub
+    - chummer6-design
+    status: in_progress
+    exit:
+    - "`chummer.run` exposes `/`, `/what-is-chummer`, `/now`, `/horizons`, `/downloads`, `/participate`, `/status`, and `/artifacts` from design-owned landing truth."
+    - Public CTA routing does not depend on repo-local improvised feature maps.
+    - Landing copy does not mention provider or LTD names."
+  - id: J2
+    title: Signed-in overlays become boring
+    owners:
+    - chummer6-hub
+    status: in_progress
+    exit:
+    - "`/home` and `/account` give registered users a thin but real overlay above the public landing."
+    - Follow/beta/participation overlays exist as product surfaces even if deeper workflows remain preview-bound."
+    - Public and registered behavior matches `PUBLIC_USER_MODEL.md`."
 - id: B
   title: Surface split completion
   status: complete

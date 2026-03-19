@@ -153,6 +153,22 @@ Hub, Fleet, `Chummer6`, and any EA helper compile from design-owned participatio
 
 `Chummer.Engine.Contracts` and `Chummer.Ui.Kit` restore through deterministic local/CI package feeds or explicit generated compatibility trees, not legacy ambient project references.
 
+## Non-blocking public landing and discovery lane
+
+This lane makes `chummer.run` a canon-backed product front door instead of leaving public discovery split across guide copy and insider routes.
+
+### J0 — Public landing canon established
+
+`chummer6-design` publishes first-class landing policy, route structure, feature registry, user model, and media briefs for the hosted public surface.
+
+### J1 — Hosted landing projected from canon
+
+`chummer6-hub` projects the public landing, proof shelf, and signed-in home shell from design-owned manifest and registry data.
+
+### J2 — Registered overlays and teaser surfaces become boring
+
+`chummer.run` exposes thin but real signed-in overlays, participation entry, artifact teasers, and status/download surfaces without inventing local product truth.
+
 ## Repo milestone spine
 
 ### `chummer6-design`

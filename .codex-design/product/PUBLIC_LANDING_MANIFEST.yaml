@@ -1,0 +1,120 @@
+product: chummer
+surface: chummer.run
+version: 1
+headline: Shadowrun rules truth, with receipts.
+subhead: Build, inspect, play, and follow what is coming next without mystery math or empty promises.
+proof_line: Local-first continuity, deterministic explainability, and a real public proof shelf belong on the same front door.
+no_provider_names: true
+no_ltd_names: true
+hero_ctas:
+  - label: See what is real now
+    href: /now
+    emphasis: primary
+  - label: Get the POC
+    href: /downloads
+    emphasis: primary
+  - label: Sign in to follow what is coming
+    href: /home
+    emphasis: secondary
+secondary_highlights:
+  - Runs local-first.
+  - Explains the math.
+  - Grows into runsites, dossiers, creator tools, and replay.
+public_routes:
+  - path: /
+    title: Landing
+    audience: public
+    purpose: product_front_door
+  - path: /what-is-chummer
+    title: What is Chummer?
+    audience: public
+    purpose: product_story
+  - path: /now
+    title: What is real today
+    audience: public
+    purpose: proof_shelf
+  - path: /horizons
+    title: Coming next
+    audience: public
+    purpose: horizon_summary
+  - path: /downloads
+    title: Downloads
+    audience: public
+    purpose: release_shelf
+  - path: /participate
+    title: Participate
+    audience: public
+    purpose: help_and_booster_entry
+  - path: /status
+    title: Public status
+    audience: public
+    purpose: status_summary
+  - path: /artifacts
+    title: Featured artifacts
+    audience: public
+    purpose: teaser_gallery
+registered_routes:
+  - path: /home
+    title: Home
+    audience: registered
+    purpose: signed_in_dashboard
+  - path: /account
+    title: Account
+    audience: registered
+    purpose: profile_and_preferences
+sections:
+  - id: hero
+    title: Shadowrun rules truth, with receipts.
+    audience: public
+    route: /
+  - id: what_you_can_do_today
+    title: What you can do today
+    audience: public
+    route: /
+  - id: why_this_feels_different
+    title: Why this feels different
+    audience: public
+    route: /
+  - id: choose_your_lane
+    title: Choose your lane
+    audience: public
+    route: /
+  - id: whats_real_now
+    title: What is real now
+    audience: public
+    route: /now
+  - id: coming_next
+    title: Coming next
+    audience: public
+    route: /horizons
+  - id: featured_artifacts
+    title: Featured artifacts
+    audience: public
+    route: /artifacts
+  - id: participate
+    title: Participate and help
+    audience: public
+    route: /participate
+  - id: release_shelf
+    title: Download and release shelf
+    audience: public
+    route: /downloads
+registered_overlays:
+  - id: follow_horizons
+    path: /home
+    title: Follow horizons
+    summary: Track the futures you care about without turning advisory signals into canon.
+  - id: beta_interest
+    path: /home
+    title: Beta interest
+    summary: Raise your hand for future player, GM, or creator previews.
+  - id: participate_booster
+    path: /participate
+    title: Booster path
+    summary: Signed-in users can unlock the bounded booster flow and see sponsor-session state.
+  - id: vote_placeholder
+    path: /home
+    title: Future vote placeholder
+    summary: Advisory signals may appear later, but they do not become design authority.
+footer_canonical_source: chummer6-design
+footer_generated_note: Generated from the canonical landing manifest, feature registry, and current public design surface.

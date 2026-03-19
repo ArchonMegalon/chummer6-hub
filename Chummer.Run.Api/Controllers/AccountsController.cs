@@ -44,11 +44,9 @@ public sealed class AccountsController : ControllerBase
   <main>
     <section class="panel">
       <h1>Hub Account</h1>
-      <p>Hub keeps the product-level account, visibility, and group identity layer above raw identity subjects.</p>
+      <p>Hub keeps the product-level account, visibility, and group identity layer above raw identity subjects. In this preview, a bearer token is enough to load the matching account.</p>
       <label for="accessToken">Bearer access token</label>
       <input id="accessToken" placeholder="Paste a Hub access token from the identity surface" />
-      <label for="subjectId">Subject id</label>
-      <input id="subjectId" placeholder="subject-123" />
       <label for="displayName">Display name</label>
       <input id="displayName" placeholder="Archon" />
       <label for="handle">Handle</label>
@@ -71,22 +69,28 @@ public sealed class AccountsController : ControllerBase
       return headers;
     }
     async function loadAccount() {
-      const subjectId = document.getElementById('subjectId').value;
-      const response = await fetch(`/api/v1/accounts/me?subjectId=${encodeURIComponent(subjectId)}`, {
+      const response = await fetch('/api/v1/accounts/me', {
         headers: headers()
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
+      document.getElementById('displayName').value = data.displayName || '';
+      document.getElementById('handle').value = data.handle || '';
+      document.getElementById('timezone').value = data.timezone || 'UTC';
       document.getElementById('output').textContent = JSON.stringify(data, null, 2);
     }
     async function saveProfile() {
       const payload = {
-        subjectId: document.getElementById('subjectId').value,
+        subjectId: "",
         displayName: document.getElementById('displayName').value,
         handle: document.getElementById('handle').value,
         timezone: document.getElementById('timezone').value,
         visibility: 'private'
       };
+      const current = await fetch('/api/v1/accounts/me', { headers: headers() });
+      const currentData = await current.json();
+      if (!current.ok) throw new Error(currentData.detail || JSON.stringify(currentData));
+      payload.subjectId = currentData.subjectId;
       const response = await fetch('/api/v1/accounts/me/profile', {
         method: 'POST',
         headers: headers(),

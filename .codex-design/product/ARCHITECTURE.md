@@ -142,6 +142,26 @@ For `Chummer.Engine.Contracts` and `Chummer.Ui.Kit`, design canon must define:
 
 Ambient monorepo-relative source references are not bootstrap truth.
 
+### Rule 16 — Public landing and guide meaning start in design
+
+`chummer.run` and `Chummer6` are downstream public surfaces with different jobs:
+
+* `chummer.run` is the product front door, proof shelf, and invitation surface
+* `Chummer6` is the deeper explainer and horizon guide
+
+Canonical public-surface truth lives in design-owned files such as:
+
+* `PUBLIC_LANDING_POLICY.md`
+* `PUBLIC_LANDING_MANIFEST.yaml`
+* `PUBLIC_FEATURE_REGISTRY.yaml`
+* `PUBLIC_USER_MODEL.md`
+* `PUBLIC_MEDIA_BRIEFS.yaml`
+* `PUBLIC_GUIDE_POLICY.md`
+
+Hub may project that truth.
+Guide generators may explain it.
+Neither may invent a second public feature map.
+
 ## Repo graph
 
 ```text

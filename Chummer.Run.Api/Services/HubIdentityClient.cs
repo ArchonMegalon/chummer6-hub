@@ -81,6 +81,11 @@ public sealed class HubIdentityClient
 
     private static string ExtractBearerToken(HttpRequest request)
     {
+        if (request is null || request.Headers is null)
+        {
+            throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "bearer access token required.");
+        }
+
         var header = request.Headers.Authorization.ToString();
         if (string.IsNullOrWhiteSpace(header)
             || !header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))

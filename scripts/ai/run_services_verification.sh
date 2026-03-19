@@ -18,6 +18,7 @@ test -f docs/ASSISTANT_PLANE_AUTHORITY.md
 test -f docs/HOSTED_DOCS_HELP_CONSUMERS.md
 test -f docs/HOSTED_FEEDBACK_AND_OPERATOR_CONSUMERS.md
 test -f docs/HUB_COMMUNITY_LEDGER_PLANE.md
+test -f docs/PUBLIC_LANDING_SURFACE.md
 rg -n 'BrowserActGatewayAdapter|MarkupGoGatewayAdapter|PeekShotGatewayAdapter|SessionProjectionSkillToolAdapter|LoreSearchSkillToolAdapter|PromptRegistry|GmOpsBoardService|CreativeAssetsController|SpiderController|DirectorPolicyEngine|InteropController|AiDirectorController|survey adapters are not live yet' \
   docs/HOSTED_ADAPTER_AUTHORITY.md >/dev/null
 rg -n 'coach.system|PromptRegistry|LoreService|PersonaMemoryService|SessionMemoryService|AiGatewayService|EvaluationStore|FastSignalDetector|SpiderDeepIngestionService|DirectorPolicyEngine|InterruptionBudgetService|SpiderCardActionService|GmOpsBoardService|AiDirectorController|PipelineObservabilityController' \
@@ -28,14 +29,21 @@ rg -n 'HubRegistryController\.AddReview|PublicationsController\.Review|Publicati
   docs/HOSTED_FEEDBACK_AND_OPERATOR_CONSUMERS.md >/dev/null
 rg -n 'AccountsController|GroupsController|BoostCodesController|BoostSessionsController|LedgerController|LeaderboardsController|EntitlementsController|BoosterReceiptsController|fact ledger|reward journal|entitlement journal|Fleet executes sponsored participant lanes' \
   docs/HUB_COMMUNITY_LEDGER_PLANE.md >/dev/null
+rg -n 'PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|/what-is-chummer|/downloads|/participate|/status|/artifacts|product front door' \
+  docs/PUBLIC_LANDING_SURFACE.md >/dev/null
 rg -n 'durable local snapshot|CHUMMER_COMMUNITY_STORE_PATH|parallel intent-only state model' \
   docs/HUB_COMMUNITY_LEDGER_PLANE.md >/dev/null
 rg -n 'user accounts, groups, sponsorship sessions, and the canonical community ledger|Chummer\.Run\.Api owns product-level users, groups, join/boost codes, sponsor sessions, leaderboards, rewards, and entitlements' \
   README.md >/dev/null
 rg -n 'public sealed class AccountsController|public sealed class GroupsController|public sealed class BoostCodesController|public sealed class BoostSessionsController|public sealed class LedgerController|public sealed class LeaderboardsController|public sealed class EntitlementsController' \
   Chummer.Run.Api/Controllers/*.cs >/dev/null
+rg -n 'public sealed class PublicLandingController|/what-is-chummer|/downloads|/participate|/status|/artifacts|GetLanding' \
+  Chummer.Run.Api/Controllers/PublicLandingController.cs >/dev/null
 rg -n 'public sealed class AccountService|public sealed class GroupService|public sealed class BoostSessionService|public sealed class LedgerService|public sealed class RewardService|public sealed class EntitlementService|public sealed class LeaderboardService|public sealed class CommunityStore' \
   Chummer.Run.Api/Services/Community/*.cs >/dev/null
+rg -n 'public sealed class PublicLandingService|PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|registered_overlays|feature registry' \
+  Chummer.Run.Api/Services/PublicLandingService.cs >/dev/null
+rg -n 'AddSingleton<PublicLandingService>\(\)' Chummer.Run.Api/Program.cs >/dev/null
 rg -n 'CHUMMER_COMMUNITY_STORE_PATH|PersistLocked|File.Move' Chummer.Run.Api/Services/Community/CommunityStore.cs >/dev/null
 rg -n 'BoostSessionService|/api/v1/participation/intents|sponsor-session/community-ledger path' Chummer.Run.Api/Controllers/CodexParticipationController.cs >/dev/null
 rg -n 'public sealed class BoosterReceiptsController|public sealed class BoosterReceiptProjectionService' \
