@@ -428,3 +428,103 @@ executable_queue:
   status: queued
   backlog: products/chummer/sync/LOCAL_MIRROR_PUBLISH_BACKLOG.md
   notes: Recurring repo-local mirror lane is queued so `.codex-design/product`, `.codex-design/repo`, and `.codex-design/review` subsets remain current for workers and GitHub review each cycle via WL-D018-01..05, with dated evidence appended in `products/chummer/sync/LOCAL_MIRROR_PUBLISH_EVIDENCE.md`; latest completed cycle closed at `2026-03-14T07:18:51Z` after WL-D018-03 drift-only republish (product subset across all seven targets plus media-factory repo subset) followed by WL-D018-04 no-drift parity confirmation across all seven targets; WL-D008 remains the completed initial publication wave.
+- id: WL-D019
+  milestone: C1b
+  status: in_progress
+  backlog: WORKLIST.md
+  notes: In progress 2026-03-19: `chummer6-hub` now has executable inventory and verification for live provider, research, prompt/help, approval-gated automation, operator, interop, and director-intake surfaces; the remaining `C1b` gap is the future survey/feedback/docs-help SaaS adapter wave, which is not live yet.
+- id: WL-D020
+  milestone: C1b
+  status: done
+  backlog: WORKLIST.md
+  notes: Closed 2026-03-19: `chummer6-core` now quarantines the env/http direct-provider path behind explicit `AddLegacyEnvironmentAiTransportCompatibility(...)`, while the active default headless-core boundary uses neutral credential/transport catalogs plus `NotImplementedAiProviderTransportClient`.
+- id: WL-D021
+  milestone: C1c
+  status: in_progress
+  backlog: WORKLIST.md
+  notes: In progress 2026-03-19: `chummer6-media-factory` now carries `MEDIA_ADAPTER_MATRIX.md` with family-by-family ownership plus the live preview bridge posture; remaining work is deeper live executor coverage beyond the current preview lane.
+- id: WL-D022
+  milestone: C1c
+  status: in_progress
+  backlog: WORKLIST.md
+  notes: In progress 2026-03-19: media verification now asserts env-gated backend selection, fail-closed disable posture, unsupported-backend fast failure, and receipt capture of the selected backend/env controls for the live preview bridge.
+- id: WL-D023
+  milestone: E2
+  status: in_progress
+  backlog: WORKLIST.md
+  notes: In progress 2026-03-19: `chummer6-hub-registry` now has controller-backed verification for create/search/preview/install/review/projection/publication flows in `Chummer.Run.Registry.Verify/Program.cs`; the remaining gap is richer downstream hub consumer proof above the owner API.
+- id: WL-D024
+  milestone: E2
+  status: in_progress
+  backlog: WORKLIST.md
+  notes: In progress 2026-03-19: the owner repo now verifies moderation timeline, approval audit trail, install projection, pipeline projection, and runtime-bundle head lookup at the public-controller layer; downstream product-consumer proof is still open.
+- id: WL-D025
+  milestone: E2b
+  status: in_progress
+  backlog: WORKLIST.md
+  notes: In progress 2026-03-19: `chummer6-hub` now carries `HOSTED_DOCS_HELP_CONSUMERS.md` and verifier-backed proof that docs query/result contracts stay owned by `Chummer.Play.Contracts.Docs` while prompt/lore/session help flows remain hosted consumers.
+- id: WL-D026
+  milestone: E2b
+  status: in_progress
+  backlog: WORKLIST.md
+  notes: In progress 2026-03-19: `chummer6-hub` now carries `HOSTED_FEEDBACK_AND_OPERATOR_CONSUMERS.md` and verifier-backed proof that advisory review, approval, checklist, and outbox-action feedback stays receipt-bearing and downstream of canonical registry/session truth.
+- id: WL-D027
+  milestone: E2b
+  status: in_progress
+  backlog: WORKLIST.md
+  notes: In progress 2026-03-19: hosted verification now binds `GmOpsBoardController`, `PipelineObservabilityController`, and sibling registry projection surfaces into one explicit operator-consumer rule rather than leaving ops-board posture implicit.
+- id: WL-D028
+  milestone: E3
+  status: in_progress
+  backlog: WORKLIST.md
+  notes: In progress 2026-03-19: `chummer6-hub` now has explicit assistant-plane authority documentation and verifier-backed Coach/Spider/Director governance, grounding, approval-loop, and observability checks; remaining work is deeper product maturity rather than missing ownership truth.
+- id: WL-D029
+  milestone: E4
+  status: queued
+  backlog: WORKLIST.md
+  notes: Stabilize document and packet-generation media capabilities with provenance and approval-safe execution proof.
+- id: WL-D030
+  milestone: E4
+  status: queued
+  backlog: WORKLIST.md
+  notes: Stabilize portrait and bounded-video media capabilities with the same governance and lifecycle depth.
+- id: WL-D031
+  milestone: E0
+  status: queued
+  backlog: WORKLIST.md
+  notes: Finish the missing workbench feature-depth surfaces: graphs, continuity, planner/calendar, and diagnostics.
+- id: WL-D032
+  milestone: E0
+  status: queued
+  backlog: WORKLIST.md
+  notes: Finish moderation, admin, publish, and richer Hub UX depth on the workbench side.
+- id: WL-D033
+  milestone: E1
+  status: queued
+  backlog: WORKLIST.md
+  notes: Close the remaining player/GM shell depth and installable-PWA proof in mobile.
+- id: WL-D034
+  milestone: F0
+  status: queued
+  backlog: WORKLIST.md
+  notes: Land explicit accessibility, localization, and performance signoff across UI, mobile, and ui-kit.
+- id: WL-D035
+  milestone: F1
+  status: queued
+  backlog: WORKLIST.md
+  notes: Add auditable runbooks, restore drills, and replay-safety proof across core, hub, hub-registry, and media-factory.
+- id: WL-D036
+  milestone: F2
+  status: queued
+  backlog: WORKLIST.md
+  notes: Certify import/export and regression fidelity against the legacy `chummer5a` corpus.
+- id: WL-D037
+  milestone: F3
+  status: queued
+  backlog: WORKLIST.md
+  notes: Build the final release evidence pack and keep mirror/status/public-promotion truth converged.
+- id: WL-D038
+  milestone: F3
+  status: queued
+  backlog: WORKLIST.md
+  notes: Keep the post-canon purification wave explicit so remaining legacy cargo in core and hub is deleted instead of normalized.

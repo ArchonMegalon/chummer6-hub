@@ -89,7 +89,15 @@ Issue and migration anchors preserved in this acceptance narrative:
 
 - `C1b` scope is adapter ownership for approval/docs/survey/automation/research routes under `Chummer.Run.AI`.
 - Acceptance rule: orchestration-side external adapters must stay switchable, receipt-bearing, and kill-switchable without pushing third-party provider ownership into client repos.
+- Authority matrix:
+  - `docs/HOSTED_ADAPTER_AUTHORITY.md`
 - Executable proof path:
+  - `Chummer.Run.AI/Program.cs`
+  - `Chummer.Run.AI/Services/Gateway/HttpProviderAdapters.cs`
+  - `Chummer.Run.AI/Services/Gateway/GovernedSkillRuntimeService.cs`
+  - `Chummer.Run.AI/Services/Gateway/AiGatewayService.cs`
+  - `Chummer.Run.AI/Controllers/AiGatewayController.cs`
+  - `tests/RunServicesVerification/HubExtractionReadinessVerification.cs`
   - `tests/RunServicesVerification/PipelineProjectionVerification.cs`
   - `tests/RunServicesVerification/CompatibilityVerification.cs`
   - `scripts/ai/verify.sh`

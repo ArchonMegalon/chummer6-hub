@@ -13,6 +13,39 @@ if [ ! -f Chummer.Play.Contracts/Chummer.Play.Contracts.csproj ]; then
   exit 1
 fi
 
+test -f docs/HOSTED_ADAPTER_AUTHORITY.md
+test -f docs/ASSISTANT_PLANE_AUTHORITY.md
+test -f docs/HOSTED_DOCS_HELP_CONSUMERS.md
+test -f docs/HOSTED_FEEDBACK_AND_OPERATOR_CONSUMERS.md
+rg -n 'BrowserActGatewayAdapter|MarkupGoGatewayAdapter|PeekShotGatewayAdapter|SessionProjectionSkillToolAdapter|LoreSearchSkillToolAdapter|PromptRegistry|GmOpsBoardService|CreativeAssetsController|SpiderController|DirectorPolicyEngine|InteropController|AiDirectorController|survey adapters are not live yet' \
+  docs/HOSTED_ADAPTER_AUTHORITY.md >/dev/null
+rg -n 'coach.system|PromptRegistry|LoreService|PersonaMemoryService|SessionMemoryService|AiGatewayService|EvaluationStore|FastSignalDetector|SpiderDeepIngestionService|DirectorPolicyEngine|InterruptionBudgetService|SpiderCardActionService|GmOpsBoardService|AiDirectorController|PipelineObservabilityController' \
+  docs/ASSISTANT_PLANE_AUTHORITY.md >/dev/null
+rg -n 'Chummer\.Play\.Contracts\.Docs\.RuntimeDocQuery|RuntimeDocResult|PromptTemplates|PreviewPrompt|SearchLore|QueryPersonaMemory|DraftFromSession|compatibility-only|second system of record' \
+  docs/HOSTED_DOCS_HELP_CONSUMERS.md >/dev/null
+rg -n 'HubRegistryController\.AddReview|PublicationsController\.Review|PublicationsController\.Moderate|GmOpsBoardController\.GetProjection|GmOpsBoardController\.UpdateChecklist|GmOpsBoardController\.Reveal|SpiderController\.QueueManual|SpiderController\.ExecuteAction|DeliveryOutboxService\.RecordAction|PipelineObservabilityController\.GetProjection|advisory input with receipts|hidden write-owning side systems' \
+  docs/HOSTED_FEEDBACK_AND_OPERATOR_CONSUMERS.md >/dev/null
+rg -n 'AddSingleton<IProviderAdapter, BrowserActGatewayAdapter>\(\)|AddSingleton<IProviderAdapter, MarkupGoGatewayAdapter>\(\)|AddSingleton<IProviderAdapter, PeekShotGatewayAdapter>\(\)|AddSingleton<ISkillToolAdapter, SessionProjectionSkillToolAdapter>\(\)|AddSingleton<ISkillToolAdapter, LoreSearchSkillToolAdapter>\(\)|AddSingleton<IGmOpsBoardService, GmOpsBoardService>\(\)|AddSingleton<IFastSignalDetector, FastSignalDetector>\(\)|AddSingleton<IDirectorPolicyEngine, DirectorPolicyEngine>\(\)|AddSingleton<ISpiderCardActionService, SpiderCardActionService>\(\)' \
+  Chummer.Run.AI/Program.cs >/dev/null
+rg -n 'global using Chummer\.Play\.Contracts\.Docs;' Chummer.Run.AI/GlobalUsings.cs >/dev/null
+rg -n 'Use Chummer\.Play\.Contracts\.Docs\.RuntimeDocQuery|Use Chummer\.Play\.Contracts\.Docs\.RuntimeDocResult' Chummer.Run.AI/Compatibility/DocsCompatibilityContracts.cs >/dev/null
+rg -n 'public sealed class BrowserActGatewayAdapter|public sealed class MarkupGoGatewayAdapter|public sealed class PeekShotGatewayAdapter' \
+  Chummer.Run.AI/Services/Gateway/HttpProviderAdapters.cs >/dev/null
+rg -n 'public sealed class PromptRegistry' Chummer.Run.AI/Services/Gateway/PromptRegistry.cs >/dev/null
+rg -n 'public sealed class GmOpsBoardService' Chummer.Run.AI/Services/Ops/GmOpsBoardService.cs >/dev/null
+rg -n 'public sealed class DirectorPolicyEngine' Chummer.Run.AI/Services/Spider/DirectorPolicyEngine.cs >/dev/null
+rg -n 'GetProjection|UpdateChecklist|Reveal' Chummer.Run.AI/Controllers/GmOpsBoardController.cs Chummer.Run.AI/Services/Ops/GmOpsBoardService.cs >/dev/null
+rg -n 'QueueManual|ExecuteAction|GetOutbox' Chummer.Run.AI/Controllers/SpiderController.cs >/dev/null
+rg -n 'RecordAction|ApprovalState|ProjectionFingerprint' Chummer.Run.AI/Services/Spider/DeliveryOutboxService.cs >/dev/null
+rg -n 'public sealed class SpiderController' Chummer.Run.AI/Controllers/SpiderController.cs >/dev/null
+rg -n 'public sealed class CreativeAssetsController' Chummer.Run.AI/Controllers/CreativeAssetsController.cs >/dev/null
+rg -n 'public sealed class InteropController' Chummer.Run.AI/Controllers/InteropController.cs >/dev/null
+rg -n 'public sealed class AiDirectorController' Chummer.Run.AI/Controllers/AiDirectorController.cs >/dev/null
+rg -n 'PromptTemplates|PreviewPrompt|coach.system|RunEvaluations|SearchLore|QueryPersonaMemory|DraftFromSession' Chummer.Run.AI/Controllers/AiGatewayController.cs Chummer.Run.AI/Services/Gateway/PromptRegistry.cs >/dev/null
+rg -n 'public sealed class SpiderDeepIngestionService|PromptLineage|ISessionLedgerService|SessionRuntimeBundleDto' Chummer.Run.AI/Services/Spider/SpiderDeepIngestionService.cs >/dev/null
+rg -n 'approval-required|DeliveryOutboxCreateRequest|SpiderActionExecutionState' Chummer.Run.AI/Services/Spider/SpiderCardActionService.cs >/dev/null
+rg -n 'GetGatewayPipelineProjection|GetApprovalPipelineProjection|GetMediaPipelineProjection' Chummer.Run.AI/Controllers/PipelineObservabilityController.cs >/dev/null
+
 if [ -d Chummer.Media.Contracts ]; then
   echo "repo-local Chummer.Media.Contracts source must stay deleted after media-factory owner transfer." >&2
   exit 1
