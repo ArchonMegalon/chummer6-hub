@@ -56,6 +56,22 @@ Registry and media execution ownership are physically out of this repo.
 The remaining work is future product depth and physical cleanup, not pretending hub still owns every hosted surface or still lacks authority proof.
 Participation UX for premium burst lanes belongs here, but the resulting Codex auth cache stays lane-local on Fleet rather than being stored in hub identity or hub databases.
 
+## Sequencing rule
+
+Do not treat boost codes or sponsored premium lanes as the first-class product.
+
+Build order for the next serious Hub wave:
+
+1. user accounts and profiles
+2. generic groups, memberships, and join codes
+3. fact ledger, reward journal, and entitlement journal
+4. participation intent/session UX
+5. Fleet receipt ingest and sponsor-session projections
+6. leaderboards, badges, quests, and entitlement-backed perks
+
+New booster-facing UX must not outrun that shared backbone.
+The point is to make boosting the first public use case of a reusable community platform, not a one-off side feature.
+
 ## Community modeling rule
 
 Canonical Hub concepts:
@@ -69,6 +85,8 @@ Canonical Hub concepts:
 
 User accounts must not collapse into raw identity subjects, and group types must stay generic enough for `booster`, `campaign`, `gm_circle`, `creator_team`, `guild`, and future org-like surfaces.
 
+The generic group system exists so later GM and campaign tooling can reuse the same account, role, and entitlement substrate rather than introducing a second social/authority model.
+
 ## Ledger rule
 
 Hub keeps three ledgers:
@@ -78,3 +96,35 @@ Hub keeps three ledgers:
 3. entitlement journal for durable product-right grants and revocations
 
 Do not fold these into one table or one DTO family.
+
+Rewards must be derived from validated Fleet contribution receipts, not from merely redeeming a code or completing device auth.
+
+## UI host rule
+
+`Chummer.Run.Api` should host the first real community UI surface for:
+
+* account/profile management
+* groups and memberships
+* boost-code redemption
+* participation consent and sponsor-session status
+* leaderboards, rewards, and entitlements
+
+That initial product shell can be server-rendered and thin, but it must exist here before Fleet grows more booster-specific product behavior.
+
+## Fleet boundary handoff
+
+Hub owns:
+
+* participation intent creation
+* consent UX
+* user/group/ledger truth
+* reward and entitlement derivation
+
+Fleet owns:
+
+* lane creation
+* device-auth execution on the worker host
+* worker lifecycle
+* signed contribution receipts
+
+Hub must not execute Codex auth directly, and Fleet must not become the canonical community ledger.

@@ -58,6 +58,7 @@ public sealed class BoostSessionService
         lock (_store.Gate)
         {
             _store.SponsorSessionsById[state.SponsorSessionId] = state;
+            _store.PersistLocked();
         }
         return state.Snapshot();
     }
@@ -86,6 +87,7 @@ public sealed class BoostSessionService
             state.ConsentedAtUtc ??= DateTimeOffset.UtcNow;
             state.UpdatedAtUtc = DateTimeOffset.UtcNow;
             state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "consent_recorded", "User consent recorded.", DateTimeOffset.UtcNow));
+            _store.PersistLocked();
             return state.Snapshot();
         }
     }
@@ -123,6 +125,7 @@ public sealed class BoostSessionService
                 state.Status = "fleet_lane_created";
                 state.UpdatedAtUtc = DateTimeOffset.UtcNow;
                 state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "fleet_lane_created", $"Fleet lane {laneId} created.", DateTimeOffset.UtcNow));
+                _store.PersistLocked();
             }
         }
 
@@ -136,6 +139,7 @@ public sealed class BoostSessionService
             state.Status = "pending_auth";
             state.UpdatedAtUtc = DateTimeOffset.UtcNow;
             state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "device_auth_started", "Device auth started on Fleet.", DateTimeOffset.UtcNow));
+            _store.PersistLocked();
             return (state.Snapshot(), fleet);
         }
     }
@@ -155,6 +159,7 @@ public sealed class BoostSessionService
             state.ActivatedAtUtc ??= DateTimeOffset.UtcNow;
             state.UpdatedAtUtc = DateTimeOffset.UtcNow;
             state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "lane_activated", "Participant lane activated on Fleet.", DateTimeOffset.UtcNow));
+            _store.PersistLocked();
             return (state.Snapshot(), fleet);
         }
     }
@@ -176,6 +181,7 @@ public sealed class BoostSessionService
             state.StoppedAtUtc ??= DateTimeOffset.UtcNow;
             state.UpdatedAtUtc = DateTimeOffset.UtcNow;
             state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), revoke ? "revoked" : "stopped", revoke ? "Participant lane revoked." : "Participant lane stopped.", DateTimeOffset.UtcNow));
+            _store.PersistLocked();
             return (state.Snapshot(), fleet);
         }
     }

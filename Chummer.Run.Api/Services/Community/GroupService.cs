@@ -125,6 +125,7 @@ public sealed class GroupService
         lock (_store.Gate)
         {
             _store.JoinCodesByValue[joinCode.Code] = joinCode;
+            _store.PersistLocked();
         }
         return joinCode;
     }
@@ -201,6 +202,7 @@ public sealed class GroupService
                 RedeemedAtUtc: null,
                 RedeemedByUserId: null);
             _store.BoostCodesByValue[boostCode.Code] = boostCode;
+            _store.PersistLocked();
             return boostCode;
         }
     }
@@ -303,6 +305,7 @@ public sealed class GroupService
             Status: "active",
             CreatedAtUtc: DateTimeOffset.UtcNow);
         _store.CampaignsById[created.CampaignId] = created;
+        _store.PersistLocked();
         return created;
     }
 

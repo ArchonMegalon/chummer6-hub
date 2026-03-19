@@ -8,11 +8,11 @@
 | `chummer6-core`   | deterministic rules/runtime engine | engine truth, reducer truth, runtime bundles, explain canon, engine contracts                           | play UI, workbench UI, registry persistence, media execution, hosted orchestration | `Chummer.Engine.Contracts`                                                      |
 | `chummer6-ui`  | workbench/browser/desktop UX       | builders, inspectors, compare, explain UX, admin/moderation UX                                          | play shell, rule evaluation, offline ledger, media execution                       | consumes `Chummer.Engine.Contracts`, `Chummer.Ui.Kit`                           |
 | `chummer6-mobile`          | live session/mobile/PWA shell      | player shell, GM shell, offline ledger, sync client, play-safe Coach/Spider surfaces                    | builder UX, rule evaluation, registry/moderation, provider secrets                 | consumes `Chummer.Engine.Contracts`, `Chummer.Play.Contracts`, `Chummer.Ui.Kit` |
-| `chummer6-hub`  | hosted orchestration plane         | identity, relay, approvals, memory, Coach/Spider/Director orchestration, delivery, play API aggregation | duplicate mechanics, registry persistence after split, media rendering after split | `Chummer.Play.Contracts`, `Chummer.Run.Contracts`                               |
+| `chummer6-hub`  | hosted orchestration and community plane | identity, user accounts, groups, memberships, ledgers, participation UX, relay, approvals, memory, Coach/Spider/Director orchestration, delivery, play API aggregation | duplicate mechanics, registry persistence after split, media rendering after split, raw participant auth caches, Fleet worker execution | `Chummer.Play.Contracts`, `Chummer.Run.Contracts`                               |
 | `chummer6-ui-kit`        | shared design system               | tokens, themes, shell primitives, accessibility primitives, reusable components                         | domain DTOs, HTTP clients, storage, rules math                                     | `Chummer.Ui.Kit`                                                                |
 | `chummer6-hub-registry`  | catalog/publication service        | artifacts, publication drafts, moderation state, installs, reviews, compatibility, runtime-bundle heads | relay, Coach/Spider, media rendering, client UX                                    | `Chummer.Hub.Registry.Contracts`                                                |
 | `chummer6-media-factory` | media execution plant              | render jobs, previews, manifests, asset lifecycle, provider adapters, signed asset access               | campaign truth, rules truth, approvals policy, player/client UX                    | `Chummer.Media.Contracts`                                                       |
-| `fleet`                  | execution/control plane            | worker orchestration, queue policy, review/landing control, cheap-first automation, explicit premium burst lanes | product truth, contract canon, session truth, raw hosted identity/auth storage      | none                                                                            |
+| `fleet`                  | execution/control plane            | worker orchestration, queue policy, review/landing control, cheap-first automation, explicit premium burst lanes, lane-local auth helpers, sponsor-session receipts | product truth, contract canon, session truth, user/group/ledger truth, raw hosted identity/auth storage      | none                                                                            |
 | `chummer5a`             | legacy oracle                      | migration fixtures, regression corpus, legacy compatibility reference                                   | vNext architecture ownership                                                       | none                                                                            |
 
 ## Boundary notes
@@ -31,7 +31,7 @@ The only repo allowed to define the dedicated live play/mobile shell.
 
 ### `chummer6-hub`
 
-The only repo allowed to own hosted orchestration, but not the only repo allowed to own hosted services.
+The only repo allowed to own the reusable community/accounting plane and hosted orchestration, but not the only repo allowed to own hosted services.
 Registry and media must remain separate service boundaries.
 
 ### `chummer6-ui-kit`
@@ -48,7 +48,7 @@ The only repo allowed to own render execution and render-asset lifecycle.
 
 ### `fleet`
 
-The only adjacent repo allowed to own cross-repo worker scheduling and landing control, but never canonical Chummer product truth.
+The only adjacent repo allowed to own cross-repo worker scheduling, participant worker lifecycle, and landing control, but never canonical Chummer product truth.
 
 ## Ownership violations
 
@@ -142,6 +142,7 @@ Must not own:
 * direct Hub identity/session issuance
 * participant-consent UX outside the Hub boundary
 * canonical user, group, reward, or entitlement ledger truth
+* boost-code-first product logic that should live in Hub
 
 ### `chummer6-hub`
 
