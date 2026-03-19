@@ -17,6 +17,7 @@ test -f docs/HOSTED_ADAPTER_AUTHORITY.md
 test -f docs/ASSISTANT_PLANE_AUTHORITY.md
 test -f docs/HOSTED_DOCS_HELP_CONSUMERS.md
 test -f docs/HOSTED_FEEDBACK_AND_OPERATOR_CONSUMERS.md
+test -f docs/HUB_COMMUNITY_LEDGER_PLANE.md
 rg -n 'BrowserActGatewayAdapter|MarkupGoGatewayAdapter|PeekShotGatewayAdapter|SessionProjectionSkillToolAdapter|LoreSearchSkillToolAdapter|PromptRegistry|GmOpsBoardService|CreativeAssetsController|SpiderController|DirectorPolicyEngine|InteropController|AiDirectorController|survey adapters are not live yet' \
   docs/HOSTED_ADAPTER_AUTHORITY.md >/dev/null
 rg -n 'coach.system|PromptRegistry|LoreService|PersonaMemoryService|SessionMemoryService|AiGatewayService|EvaluationStore|FastSignalDetector|SpiderDeepIngestionService|DirectorPolicyEngine|InterruptionBudgetService|SpiderCardActionService|GmOpsBoardService|AiDirectorController|PipelineObservabilityController' \
@@ -25,6 +26,16 @@ rg -n 'Chummer\.Play\.Contracts\.Docs\.RuntimeDocQuery|RuntimeDocResult|PromptTe
   docs/HOSTED_DOCS_HELP_CONSUMERS.md >/dev/null
 rg -n 'HubRegistryController\.AddReview|PublicationsController\.Review|PublicationsController\.Moderate|GmOpsBoardController\.GetProjection|GmOpsBoardController\.UpdateChecklist|GmOpsBoardController\.Reveal|SpiderController\.QueueManual|SpiderController\.ExecuteAction|DeliveryOutboxService\.RecordAction|PipelineObservabilityController\.GetProjection|advisory input with receipts|hidden write-owning side systems' \
   docs/HOSTED_FEEDBACK_AND_OPERATOR_CONSUMERS.md >/dev/null
+rg -n 'AccountsController|GroupsController|BoostCodesController|BoostSessionsController|LedgerController|LeaderboardsController|EntitlementsController|BoosterReceiptsController|fact ledger|reward journal|entitlement journal|Fleet executes sponsored participant lanes' \
+  docs/HUB_COMMUNITY_LEDGER_PLANE.md >/dev/null
+rg -n 'user accounts, groups, sponsorship sessions, and the canonical community ledger|Chummer\.Run\.Api owns product-level users, groups, join/boost codes, sponsor sessions, leaderboards, rewards, and entitlements' \
+  README.md >/dev/null
+rg -n 'public sealed class AccountsController|public sealed class GroupsController|public sealed class BoostCodesController|public sealed class BoostSessionsController|public sealed class LedgerController|public sealed class LeaderboardsController|public sealed class EntitlementsController' \
+  Chummer.Run.Api/Controllers/*.cs >/dev/null
+rg -n 'public sealed class AccountService|public sealed class GroupService|public sealed class BoostSessionService|public sealed class LedgerService|public sealed class RewardService|public sealed class EntitlementService|public sealed class LeaderboardService|public sealed class CommunityStore' \
+  Chummer.Run.Api/Services/Community/*.cs >/dev/null
+rg -n 'public sealed class BoosterReceiptsController|public sealed class BoosterReceiptProjectionService' \
+  Chummer.Run.AI/Controllers/*.cs Chummer.Run.AI/Services/Booster/*.cs >/dev/null
 rg -n 'AddSingleton<IProviderAdapter, BrowserActGatewayAdapter>\(\)|AddSingleton<IProviderAdapter, MarkupGoGatewayAdapter>\(\)|AddSingleton<IProviderAdapter, PeekShotGatewayAdapter>\(\)|AddSingleton<ISkillToolAdapter, SessionProjectionSkillToolAdapter>\(\)|AddSingleton<ISkillToolAdapter, LoreSearchSkillToolAdapter>\(\)|AddSingleton<IGmOpsBoardService, GmOpsBoardService>\(\)|AddSingleton<IFastSignalDetector, FastSignalDetector>\(\)|AddSingleton<IDirectorPolicyEngine, DirectorPolicyEngine>\(\)|AddSingleton<ISpiderCardActionService, SpiderCardActionService>\(\)' \
   Chummer.Run.AI/Program.cs >/dev/null
 rg -n 'global using Chummer\.Play\.Contracts\.Docs;' Chummer.Run.AI/GlobalUsings.cs >/dev/null

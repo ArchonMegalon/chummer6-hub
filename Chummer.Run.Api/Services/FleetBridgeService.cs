@@ -17,14 +17,28 @@ public sealed class FleetBridgeService
     private string BaseUrl =>
         (_configuration["FLEET_CONTROLLER_BASE_URL"] ?? "http://fleet-controller:8090").TrimEnd('/');
 
-    public Task<JsonObject> CreateParticipantLaneAsync(string subjectId, string subjectLabel, string projectId, CancellationToken cancellationToken)
+    public Task<JsonObject> CreateParticipantLaneAsync(
+        string subjectId,
+        string subjectLabel,
+        string projectId,
+        string hubUserId,
+        string hubGroupId,
+        string boostCampaignId,
+        string sponsorSessionId,
+        string publicContributionVisibility,
+        CancellationToken cancellationToken)
     {
         var payload = new
         {
             subject_id = subjectId,
             subject_label = subjectLabel,
             project_id = projectId,
-            backend = "chatgpt_participant"
+            backend = "chatgpt_participant",
+            hub_user_id = hubUserId,
+            hub_group_id = hubGroupId,
+            boost_campaign_id = boostCampaignId,
+            sponsor_session_id = sponsorSessionId,
+            public_contribution_visibility = publicContributionVisibility,
         };
         return SendAsync(HttpMethod.Post, "/api/internal/participant-lanes", payload, cancellationToken);
     }

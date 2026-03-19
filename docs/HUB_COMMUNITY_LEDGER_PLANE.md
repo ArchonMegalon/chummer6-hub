@@ -1,0 +1,66 @@
+# Hub Community And Ledger Plane
+
+`chummer6-hub` now owns the reusable community sponsorship spine for Chummer6.
+
+## Canonical split
+
+- Identity subject and session truth stays in `Chummer.Run.Identity`.
+- Product-level user, group, and sponsorship truth lives in `Chummer.Run.Api`.
+- Sponsor-session receipt ingest and execution-side projections live in `Chummer.Run.AI`.
+- Fleet remains the sponsored worker executor.
+- EA remains the provider-aware telemetry substrate.
+
+## Core concepts
+
+- `principal`: the authenticated subject from the hosted identity boundary
+- `user`: the product-level human account layered above raw principals
+- `group`: a reusable social/authority container with `group_type`, `visibility`, and capability flags
+- `membership`: the user's role inside a group
+- `sponsor session`: a consented participation session that can open a temporary sponsored Fleet lane
+- `entitlement`: a durable product right granted to a user or group
+
+## Three ledgers, not one
+
+Hub keeps three distinct accounting layers:
+
+- fact ledger: immutable contribution events and sponsor-session receipts
+- reward journal: derived points, streaks, and badge-oriented score events
+- entitlement journal: durable product rights such as flair, beta access, or GM-tool priority
+
+Points and perks come from validated receipts after meaningful work. They do not come from merely linking an account or idling in device auth.
+
+## Current hosted surfaces
+
+Community/account controllers in `Chummer.Run.Api`:
+
+- `AccountsController`
+- `GroupsController`
+- `BoostCodesController`
+- `BoostSessionsController`
+- `LedgerController`
+- `LeaderboardsController`
+- `EntitlementsController`
+
+Community services in `Chummer.Run.Api/Services/Community`:
+
+- `AccountService`
+- `GroupService`
+- `BoostSessionService`
+- `LedgerService`
+- `RewardService`
+- `EntitlementService`
+- `LeaderboardService`
+- `CommunityStore`
+
+AI-side receipt/projection surfaces in `Chummer.Run.AI`:
+
+- `BoosterReceiptsController`
+- `BoosterReceiptProjectionService`
+
+## Boundary rules
+
+- Hub owns canonical user/group/ledger/reward/entitlement truth.
+- Fleet may cache sponsor metadata for lane execution, but it is not the canonical community ledger.
+- Git commits, Fleet telemetry files, and EA provider health are evidence sources, not the product reward ledger.
+- Sponsored lanes never receive direct merge authority; `jury` still lands protected work.
+- Boosting is the first public use case for a generic community/group/accounting platform, not a one-off booster-only schema.

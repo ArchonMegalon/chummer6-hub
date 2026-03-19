@@ -1,5 +1,6 @@
 using Chummer.Run.AI.Services.Gateway;
 using Chummer.Run.AI.Services.Assets;
+using Chummer.Run.AI.Services.Booster;
 using Chummer.Run.AI.Services.Creative;
 using Chummer.Run.AI.Services.Lore;
 using Chummer.Run.AI.Services.Session;
@@ -46,6 +47,7 @@ builder.Services.AddSingleton<IProviderAdapter, PeekShotGatewayAdapter>();
 builder.Services.AddSingleton<IPromptRegistry, PromptRegistry>();
 builder.Services.AddSingleton<IAiGatewayService, AiGatewayService>();
 builder.Services.AddSingleton<IAiBudgetService, AiBudgetService>();
+builder.Services.AddSingleton<BoosterReceiptProjectionService>();
 builder.Services.AddSingleton<ISkillToolAdapter, SessionProjectionSkillToolAdapter>();
 builder.Services.AddSingleton<ISkillToolAdapter, LoreSearchSkillToolAdapter>();
 builder.Services.AddSingleton<IGovernedSkillRuntimeService, GovernedSkillRuntimeService>();

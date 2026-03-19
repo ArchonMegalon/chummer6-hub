@@ -10,6 +10,7 @@ Hosted orchestration and play API boundary for Chummer6.
 - hosted play APIs and orchestration
 - governed AI, docs/help, and automation bridges
 - orchestration-side registry and media adapters
+- user accounts, groups, sponsorship sessions, and the canonical community ledger
 
 ## What this repo is not
 
@@ -34,10 +35,18 @@ Current honesty clause:
 - the remaining shrinkage is orchestration polish, not hidden service ownership
 - closing the remaining hosted milestones is now about contract cleanup and adapter depth, not where registry/media code lives
 
+The public-facing community spine now lives here too:
+
+- `Chummer.Run.Api` owns product-level users, groups, join/boost codes, sponsor sessions, leaderboards, rewards, and entitlements
+- `Chummer.Run.Identity` remains the principal/session boundary below that account layer
+- `Chummer.Run.AI` ingests sponsor receipts and projects sponsored-lane activity
+- Fleet executes sponsored participant lanes, but Hub owns the canonical community/accounting truth
+
 ## Go deeper
 
 - `docs/HOSTED_BOUNDARY.md`
 - `docs/HUB_EXTRACTION_ACCEPTANCE.md`
+- `docs/HUB_COMMUNITY_LEDGER_PLANE.md`
 - `.codex-design/repo/IMPLEMENTATION_SCOPE.md`
 
 ## Verification

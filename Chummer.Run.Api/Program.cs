@@ -1,4 +1,5 @@
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Community;
 using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +25,14 @@ builder.Services
     });
 builder.Services.AddHttpClient<FleetBridgeService>();
 builder.Services.AddSingleton<CodexParticipationService>();
+builder.Services.AddSingleton<CommunityStore>();
+builder.Services.AddSingleton<AccountService>();
+builder.Services.AddSingleton<GroupService>();
+builder.Services.AddSingleton<RewardService>();
+builder.Services.AddSingleton<EntitlementService>();
+builder.Services.AddSingleton<LeaderboardService>();
+builder.Services.AddSingleton<LedgerService>();
+builder.Services.AddScoped<BoostSessionService>();
 
 var app = builder.Build();
 
