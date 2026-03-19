@@ -11,7 +11,7 @@ public sealed class LeaderboardService
         _store = store;
     }
 
-    public IReadOnlyList<LeaderboardRowDto> IndividualLeaderboard(int limit = 20)
+    public IReadOnlyList<LeaderboardRowDto> IndividualLeaderboard(int limit = 20, bool publicOnly = false)
     {
         lock (_store.Gate)
         {
@@ -44,6 +44,7 @@ public sealed class LeaderboardService
                         ActiveSessions = activeSessions,
                     };
                 })
+                .Where(row => !publicOnly || string.Equals(row.Visibility, "public", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(row => row.Points)
                 .ThenBy(row => row.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .Take(Math.Max(1, limit))
@@ -60,7 +61,7 @@ public sealed class LeaderboardService
         }
     }
 
-    public IReadOnlyList<GroupLeaderboardRowDto> GroupLeaderboard(int limit = 20)
+    public IReadOnlyList<GroupLeaderboardRowDto> GroupLeaderboard(int limit = 20, bool publicOnly = false)
     {
         lock (_store.Gate)
         {
@@ -80,11 +81,13 @@ public sealed class LeaderboardService
                     {
                         GroupId = group.Key,
                         GroupName = hubGroup?.Name ?? group.Key,
+                        Visibility = hubGroup?.Visibility ?? "private",
                         Points = group.Sum(entry => entry.Points),
                         LandedSlices = landedSlices,
                         ActiveSessions = activeSessions,
                     };
                 })
+                .Where(row => !publicOnly || !string.Equals(row.Visibility, "private", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(row => row.Points)
                 .ThenBy(row => row.GroupName, StringComparer.OrdinalIgnoreCase)
                 .Take(Math.Max(1, limit))

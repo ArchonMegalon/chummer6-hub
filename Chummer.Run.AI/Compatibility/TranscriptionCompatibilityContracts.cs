@@ -6,7 +6,7 @@ namespace Chummer.Run.AI.Compatibility;
 
 [Obsolete("Use Chummer.Run.Contracts.Transcription.TranscriptionRequest.")]
 internal sealed record TranscriptionRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(2048)] string Source,
+    [Required(AllowEmptyStrings = false), StringLength(2048)] string Source,
     string? MimeType,
     string? LanguageHint,
     bool PreserveSpeakerTurns);

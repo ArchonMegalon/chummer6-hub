@@ -16,7 +16,7 @@ public sealed record HubUserDto(
     DateTimeOffset UpdatedAtUtc);
 
 public sealed record UpsertHubUserProfileRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
     string? DisplayName = null,
     string? Handle = null,
     string Visibility = "private",
@@ -57,17 +57,17 @@ public sealed record JoinCodeDto(
     int Uses);
 
 public sealed record CreateGroupRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string Name,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string Name,
     string GroupType = "booster",
     string Visibility = "private",
     IReadOnlyList<string>? Capabilities = null);
 
 public sealed record CreateJoinCodeRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
     string Role = "member",
     TimeSpan? Ttl = null);
 
 public sealed record JoinGroupByCodeRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string Code);
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string Code);

@@ -3,10 +3,10 @@ using System.ComponentModel.DataAnnotations;
 namespace Chummer.Run.Contracts.Ledger;
 
 public sealed record ContributionReceiptDto(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string ReceiptId,
-    [property: Required(AllowEmptyStrings = false), StringLength(64)] string EventKind,
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string LaneId,
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string ProjectId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string ReceiptId,
+    [Required(AllowEmptyStrings = false), StringLength(64)] string EventKind,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string LaneId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string ProjectId,
     string? UserId,
     string? GroupId,
     string? SponsorSessionId,

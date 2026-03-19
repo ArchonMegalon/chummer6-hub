@@ -19,8 +19,8 @@ public sealed class LeaderboardsController : ControllerBase
     [Produces("text/html")]
     public ContentResult LeaderboardsPage()
     {
-        var individuals = _leaderboards.IndividualLeaderboard();
-        var groups = _leaderboards.GroupLeaderboard();
+        var individuals = _leaderboards.IndividualLeaderboard(publicOnly: true);
+        var groups = _leaderboards.GroupLeaderboard(publicOnly: true);
         var quests = _leaderboards.Quests();
         var individualRows = string.Join("", individuals.Select(row => $"<tr><td>{row.Rank}</td><td>{WebUtility.HtmlEncode(row.DisplayName)}</td><td>{row.Points}</td><td>{row.LandedSlices}</td></tr>"));
         var groupRows = string.Join("", groups.Select(row => $"<tr><td>{row.Rank}</td><td>{WebUtility.HtmlEncode(row.GroupName)}</td><td>{row.Points}</td><td>{row.LandedSlices}</td></tr>"));
@@ -31,6 +31,7 @@ public sealed class LeaderboardsController : ControllerBase
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Leaderboards</title></head>
 <body style="font-family:Georgia,serif;background:#f5efe2;color:#1f1b16;padding:24px;">
   <h1>Leaderboards</h1>
+  <p>Public boards show only users who opted into public recognition and groups that are not private.</p>
   <h2>Individuals</h2>
   <table style="width:100%;background:white;border-collapse:collapse;"><tr><th align="left">Rank</th><th align="left">User</th><th align="left">Points</th><th align="left">Landed</th></tr>{individualRows}</table>
   <h2>Groups</h2>
@@ -48,8 +49,8 @@ public sealed class LeaderboardsController : ControllerBase
     public ActionResult<object> GetLeaderboards()
         => Ok(new
         {
-            individuals = _leaderboards.IndividualLeaderboard(),
-            groups = _leaderboards.GroupLeaderboard(),
+            individuals = _leaderboards.IndividualLeaderboard(publicOnly: true),
+            groups = _leaderboards.GroupLeaderboard(publicOnly: true),
             quests = _leaderboards.Quests(),
         });
 }

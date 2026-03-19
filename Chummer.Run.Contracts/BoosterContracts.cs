@@ -65,19 +65,19 @@ public sealed record GroupContributionProjectionDto(
     IReadOnlyList<string> ActiveSponsorSessionIds);
 
 public sealed record CreateBoostCodeRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string GroupId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string GroupId,
     string? CampaignId = null,
     string? ProjectId = null,
     string Label = "general");
 
 public sealed record RedeemBoostCodeRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string Code);
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string Code);
 
 public sealed record CreateSponsorSessionRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string ProjectId,
+    string? SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string ProjectId,
     string? GroupId = null,
     string? SubjectLabel = null,
     string? BoostCode = null,

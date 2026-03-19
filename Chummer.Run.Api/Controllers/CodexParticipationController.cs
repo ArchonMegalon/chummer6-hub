@@ -2,6 +2,8 @@ using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Boosters;
+using Chummer.Run.Contracts.Ledger;
+using Chummer.Run.Contracts.Leaderboards;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;
@@ -31,7 +33,7 @@ public sealed class CodexParticipationController : ControllerBase
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Codex Participation</title>
+  <title>Participate Through Hub</title>
   <style>
     body { font-family: Georgia, serif; background: linear-gradient(180deg, #f4efe3 0%, #e6dcc3 100%); color: #1e1b16; margin: 0; }
     main { max-width: 920px; margin: 0 auto; padding: 32px 20px 60px; }
@@ -48,7 +50,7 @@ public sealed class CodexParticipationController : ControllerBase
 </head>
 <body>
   <main>
-    <h1>Codex Participation</h1>
+    <h1>Participate Through Hub</h1>
     <p class="muted">Hub owns the user, group, and ledger truth. Fleet opens the sponsored worker lane. Jury still lands the result.</p>
 
     <section class="panel">
@@ -64,13 +66,15 @@ public sealed class CodexParticipationController : ControllerBase
     </section>
 
     <section class="panel">
-      <h2>Consent</h2>
+      <h2>1. Authenticate</h2>
       <label for="accessToken">Bearer access token</label>
-      <input id="accessToken" placeholder="Paste a Hub access token from the identity surface" />
-      <label for="subjectId">Hub subject id</label>
-      <input id="subjectId" placeholder="subject-123" />
-      <label for="subjectLabel">Display label</label>
-      <input id="subjectLabel" placeholder="Archon" />
+      <input id="accessToken" placeholder="Paste a Hub access token from the identity surface once, then load your account" />
+      <button onclick="loadAccount()">Load my Hub account</button>
+      <pre id="accountState">No authenticated account loaded yet.</pre>
+    </section>
+
+    <section class="panel">
+      <h2>2. Choose Help Mode</h2>
       <label for="projectId">Project id</label>
       <input id="projectId" value="fleet" />
       <label for="groupId">Existing group id</label>
@@ -102,6 +106,16 @@ public sealed class CodexParticipationController : ControllerBase
       <div class="codebox" id="deviceCode">No device code issued yet.</div>
       <pre id="deviceState">Waiting for Fleet lane state.</pre>
     </section>
+
+    <section class="panel">
+      <h2>Receipt History</h2>
+      <pre id="receiptState">No contribution receipts yet.</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Badges</h2>
+      <pre id="badgeState">No badges yet.</pre>
+    </section>
   </main>
 
   <script>
@@ -121,17 +135,24 @@ public sealed class CodexParticipationController : ControllerBase
       return data;
     }
 
+    async function loadAccount() {
+      const data = await api("/api/v1/accounts/me");
+      document.getElementById("accountState").textContent = JSON.stringify(data, null, 2);
+      if (!document.getElementById("groupId").value && Array.isArray(data.groupIds) && data.groupIds.length > 0) {
+        document.getElementById("groupId").value = data.groupIds[0];
+      }
+    }
+
     function consentReady() {
       return ["consent1", "consent2", "consent3", "consent4"].every(id => document.getElementById(id).checked);
     }
 
     async function createIntent() {
       const payload = {
-        subjectId: document.getElementById("subjectId").value,
-        subjectLabel: document.getElementById("subjectLabel").value,
         projectId: document.getElementById("projectId").value,
         groupId: document.getElementById("groupId").value || null,
-        boostCode: document.getElementById("boostCode").value || null
+        boostCode: document.getElementById("boostCode").value || null,
+        visibility: "group"
       };
       const data = await api("/api/v1/participation/intents", { method: "POST", body: JSON.stringify(payload) });
       currentIntentId = data.intent.intentId || data.intent.sponsorSessionId || "";
@@ -178,12 +199,16 @@ public sealed class CodexParticipationController : ControllerBase
     function render(data) {
       const intent = data.intent || data.sponsorSession || {};
       const fleet = data.fleet || {};
+      const receipts = data.receipts || [];
+      const badges = data.badges || [];
       currentIntentId = intent.intentId || intent.sponsorSessionId || currentIntentId;
       document.getElementById("intentState").textContent = JSON.stringify(intent, null, 2);
       const lane = fleet.lane || {};
       const auth = lane.device_auth || {};
       document.getElementById("deviceCode").textContent = auth.user_code || intent.deviceAuthUserCode || "No device code issued yet.";
       document.getElementById("deviceState").textContent = JSON.stringify({ lane, deviceAuth: auth, sponsorSession: data.sponsorSession || null }, null, 2);
+      document.getElementById("receiptState").textContent = JSON.stringify(receipts, null, 2);
+      document.getElementById("badgeState").textContent = JSON.stringify(badges, null, 2);
     }
   </script>
 </body>
@@ -198,12 +223,14 @@ public sealed class CodexParticipationController : ControllerBase
     {
         if (request is null || string.IsNullOrWhiteSpace(request.ProjectId))
         {
-            return BadRequest("subjectId and projectId are required.");
+            return BadRequest("projectId is required.");
         }
 
         try
         {
-            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
+            var subject = string.IsNullOrWhiteSpace(request.SubjectId)
+                ? await _identity.RequireSubjectAsync(Request, cancellationToken)
+                : await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
             var session = _sessions.Create(new CreateSponsorSessionRequest(
                 SubjectId: subject.SubjectId,
                 ProjectId: request.ProjectId,
@@ -213,7 +240,7 @@ public sealed class CodexParticipationController : ControllerBase
                 CampaignId: request.CampaignId,
                 Visibility: request.Visibility ?? "group",
                 RequestedLaneType: request.RequestedLaneType ?? "participant_burst"));
-            return Ok(BuildIntentEnvelope(session));
+            return Ok(BuildIntentEnvelope(session, receipts: _sessions.ListReceipts(session.SponsorSessionId), badges: _sessions.ListBadgesForSessionUser(session.SponsorSessionId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -244,7 +271,7 @@ public sealed class CodexParticipationController : ControllerBase
             }
 
             var session = _sessions.RecordConsent(intentId);
-            return Ok(BuildIntentEnvelope(session));
+            return Ok(BuildIntentEnvelope(session, receipts: _sessions.ListReceipts(session.SponsorSessionId), badges: _sessions.ListBadgesForSessionUser(session.SponsorSessionId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -275,7 +302,7 @@ public sealed class CodexParticipationController : ControllerBase
             }
 
             var result = await _sessions.StartDeviceAuthAsync(intentId, cancellationToken);
-            return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -310,7 +337,7 @@ public sealed class CodexParticipationController : ControllerBase
             }
 
             var result = await _sessions.ActivateAsync(intentId, cancellationToken);
-            return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -339,11 +366,21 @@ public sealed class CodexParticipationController : ControllerBase
                 return denied;
             }
 
-            return session is null ? NotFound() : Ok(BuildIntentEnvelope(session));
+            if (session is null)
+            {
+                return NotFound();
+            }
+
+            var refreshed = await _sessions.RefreshAsync(intentId, cancellationToken);
+            return Ok(BuildIntentEnvelope(refreshed.Session, refreshed.Fleet, _sessions.ListReceipts(intentId), _sessions.ListBadgesForSessionUser(intentId)));
         }
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
     }
 
@@ -365,17 +402,24 @@ public sealed class CodexParticipationController : ControllerBase
                 return NotFound();
             }
 
+            var refreshed = await _sessions.RefreshAsync(intentId, cancellationToken);
             return Ok(new
             {
-                intentId = session.SponsorSessionId,
-                sponsorSessionId = session.SponsorSessionId,
-                events = session.Events,
-                fleet = (object?)null
+                intentId = refreshed.Session.SponsorSessionId,
+                sponsorSessionId = refreshed.Session.SponsorSessionId,
+                events = refreshed.Session.Events,
+                fleet = refreshed.Fleet,
+                receipts = _sessions.ListReceipts(intentId),
+                badges = _sessions.ListBadgesForSessionUser(intentId)
             });
         }
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
     }
 
@@ -398,7 +442,7 @@ public sealed class CodexParticipationController : ControllerBase
             }
 
             var result = await _sessions.StopAsync(intentId, revoke: false, cancellationToken);
-            return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -433,7 +477,7 @@ public sealed class CodexParticipationController : ControllerBase
             }
 
             var result = await _sessions.StopAsync(intentId, revoke: true, cancellationToken);
-            return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -450,7 +494,11 @@ public sealed class CodexParticipationController : ControllerBase
     }
 
     // Keep the public participation surface on the canonical sponsor-session/community-ledger path.
-    private static object BuildIntentEnvelope(SponsorSessionStatusDto session, JsonObject? fleet = null)
+    private static object BuildIntentEnvelope(
+        SponsorSessionStatusDto session,
+        JsonObject? fleet = null,
+        IReadOnlyList<ContributionReceiptDto>? receipts = null,
+        IReadOnlyList<BadgeDto>? badges = null)
         => new
         {
             intent = new
@@ -476,7 +524,9 @@ public sealed class CodexParticipationController : ControllerBase
                 events = session.Events
             },
             sponsorSession = session,
-            fleet
+            fleet,
+            receipts = receipts ?? Array.Empty<ContributionReceiptDto>(),
+            badges = badges ?? Array.Empty<BadgeDto>()
         };
 
     private SponsorSessionStatusDto? TryGetOwnedSession(string sponsorSessionId, string subjectId, out ActionResult? denied)
@@ -500,7 +550,7 @@ public sealed class CodexParticipationController : ControllerBase
 }
 
 public sealed record CreateCodexParticipationIntentRequest(
-    string SubjectId,
+    string? SubjectId,
     string? SubjectLabel,
     string ProjectId,
     string? GroupId = null,

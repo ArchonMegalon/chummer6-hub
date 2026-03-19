@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
 
 namespace Chummer.Run.Api.Services;
@@ -16,6 +17,9 @@ public sealed class FleetBridgeService
 
     private string BaseUrl =>
         (_configuration["FLEET_CONTROLLER_BASE_URL"] ?? "http://fleet-controller:8090").TrimEnd('/');
+
+    private string InternalApiToken =>
+        (_configuration["FLEET_INTERNAL_API_TOKEN"] ?? string.Empty).Trim();
 
     public Task<JsonObject> CreateParticipantLaneAsync(
         string subjectId,
@@ -60,7 +64,13 @@ public sealed class FleetBridgeService
 
     private async Task<JsonObject> SendAsync(HttpMethod method, string path, object? payload, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(InternalApiToken))
+        {
+            throw new InvalidOperationException("FLEET_INTERNAL_API_TOKEN is required for Fleet participant-lane bridge calls.");
+        }
+
         using var request = new HttpRequestMessage(method, $"{BaseUrl}{path}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", InternalApiToken);
         if (payload is not null)
         {
             request.Content = JsonContent.Create(payload);

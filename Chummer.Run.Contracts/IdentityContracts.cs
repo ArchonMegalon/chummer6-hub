@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace Chummer.Run.Contracts.Identity;
 
 public sealed record IdentitySessionIssueRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
     string? DisplayName,
     string? Email,
     IReadOnlyList<string>? RequestedRoles = null,
@@ -21,7 +21,7 @@ public sealed record IdentitySessionIssueResponse(
     DateTimeOffset ExpiresAtUtc);
 
 public sealed record IdentityRoleSetRequest(
-    [property: Required, MinLength(1)] IReadOnlyList<string> Roles,
+    [Required, MinLength(1)] IReadOnlyList<string> Roles,
     string? AssignedBy = null);
 
 public sealed record IdentitySubjectResponse(
@@ -32,7 +32,7 @@ public sealed record IdentitySubjectResponse(
     DateTimeOffset UpdatedAtUtc);
 
 public sealed record IdentityIntrospectionRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(512)] string AccessToken);
+    [Required(AllowEmptyStrings = false), StringLength(512)] string AccessToken);
 
 public sealed record IdentityIntrospectionResponse(
     bool Active,

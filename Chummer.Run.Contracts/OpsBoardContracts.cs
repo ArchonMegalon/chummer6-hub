@@ -73,19 +73,19 @@ public sealed record OpsBoardChecklistSummary(
 
 public sealed record GmPrepChecklistItem(
     string ItemId,
-    [property: Required(AllowEmptyStrings = false), StringLength(240)] string Label,
+    [Required(AllowEmptyStrings = false), StringLength(240)] string Label,
     bool Completed = false,
     string? Notes = null);
 
 public sealed record GmPrepAssetCreateRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string CampaignId,
-    [property: StringLength(128)] string? SessionId,
-    [property: StringLength(128)] string? SceneId,
-    [property: Required(AllowEmptyStrings = false), StringLength(160)] string Title,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string CampaignId,
+    [StringLength(128)] string? SessionId,
+    [StringLength(128)] string? SceneId,
+    [Required(AllowEmptyStrings = false), StringLength(160)] string Title,
     GmPrepAssetKind Kind,
     GmPrepAssetAudience Audience,
     string? Summary,
-    [property: Required(AllowEmptyStrings = false)] string Body,
+    [Required(AllowEmptyStrings = false)] string Body,
     IReadOnlyList<string>? Tags = null,
     IReadOnlyList<GmPrepChecklistItem>? ChecklistItems = null,
     IReadOnlyList<string>? SourceEventIds = null,
@@ -137,15 +137,15 @@ public sealed record GmPrepAssetListResponse(
     int TotalCount);
 
 public sealed record GmPrepChecklistUpdateRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string UpdatedBy,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string UpdatedBy,
     IReadOnlyList<GmPrepChecklistItem> ChecklistItems,
     string? Notes = null);
 
 public sealed record GmPrepAssetRevealRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SessionId,
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SceneId,
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string SceneRevision,
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string RequestedBy,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SessionId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SceneId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SceneRevision,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string RequestedBy,
     string Channel = "player-screen",
     string ApprovalState = "approved",
     string AutonomyMode = "gm-approved",
