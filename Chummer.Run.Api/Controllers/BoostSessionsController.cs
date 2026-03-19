@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Boosters;
 using Microsoft.AspNetCore.Mvc;
@@ -9,10 +10,14 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/boost-sessions")]
 public sealed class BoostSessionsController : ControllerBase
 {
+    private readonly AccountService _accounts;
+    private readonly HubIdentityClient _identity;
     private readonly BoostSessionService _sessions;
 
-    public BoostSessionsController(BoostSessionService sessions)
+    public BoostSessionsController(AccountService accounts, HubIdentityClient identity, BoostSessionService sessions)
     {
+        _accounts = accounts;
+        _identity = identity;
         _sessions = sessions;
     }
 
@@ -46,6 +51,8 @@ public sealed class BoostSessionsController : ControllerBase
     </section>
     <section class="panel">
       <h2>Create sponsor session</h2>
+      <label for="accessToken">Bearer access token</label>
+      <input id="accessToken" placeholder="Paste a Hub access token from the identity surface" />
       <label for="subjectId">Subject id</label>
       <input id="subjectId" placeholder="subject-123" />
       <label for="subjectLabel">Display name</label>
@@ -70,10 +77,16 @@ public sealed class BoostSessionsController : ControllerBase
   </main>
   <script>
     let currentSessionId = '';
+    function headers() {
+      const token = document.getElementById('accessToken').value.trim();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return headers;
+    }
     async function api(path, method, payload) {
       const response = await fetch(path, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers(),
         body: payload ? JSON.stringify(payload) : undefined
       });
       const data = await response.json();
@@ -107,7 +120,7 @@ public sealed class BoostSessionsController : ControllerBase
 
     [HttpPost]
     [ProducesResponseType<SponsorSessionStatusDto>(StatusCodes.Status200OK)]
-    public ActionResult<SponsorSessionStatusDto> Create([FromBody] CreateSponsorSessionRequest? request)
+    public async Task<ActionResult<SponsorSessionStatusDto>> Create([FromBody] CreateSponsorSessionRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
         {
@@ -116,7 +129,12 @@ public sealed class BoostSessionsController : ControllerBase
 
         try
         {
-            return Ok(_sessions.Create(request));
+            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
+            return Ok(_sessions.Create(request with { SubjectId = subject.SubjectId }));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
@@ -127,19 +145,48 @@ public sealed class BoostSessionsController : ControllerBase
     [HttpGet("{sponsorSessionId}")]
     [ProducesResponseType<SponsorSessionStatusDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<SponsorSessionStatusDto> Get([FromRoute] string sponsorSessionId)
+    public async Task<ActionResult<SponsorSessionStatusDto>> Get([FromRoute] string sponsorSessionId, CancellationToken cancellationToken)
     {
-        var session = _sessions.Get(sponsorSessionId);
-        return session is null ? NotFound() : Ok(session);
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(sponsorSessionId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            return session is null ? NotFound() : Ok(session);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpPost("{sponsorSessionId}/consent")]
     [ProducesResponseType<SponsorSessionStatusDto>(StatusCodes.Status200OK)]
-    public ActionResult<SponsorSessionStatusDto> Consent([FromRoute] string sponsorSessionId)
+    public async Task<ActionResult<SponsorSessionStatusDto>> Consent([FromRoute] string sponsorSessionId, CancellationToken cancellationToken)
     {
         try
         {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(sponsorSessionId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (session is null)
+            {
+                return NotFound();
+            }
+
             return Ok(_sessions.RecordConsent(sponsorSessionId));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -152,8 +199,24 @@ public sealed class BoostSessionsController : ControllerBase
     {
         try
         {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(sponsorSessionId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (session is null)
+            {
+                return NotFound();
+            }
+
             var result = await _sessions.StartDeviceAuthAsync(sponsorSessionId, cancellationToken);
             return Ok(new { sponsorSession = result.Session, fleet = result.Fleet });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -170,8 +233,24 @@ public sealed class BoostSessionsController : ControllerBase
     {
         try
         {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(sponsorSessionId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (session is null)
+            {
+                return NotFound();
+            }
+
             var result = await _sessions.ActivateAsync(sponsorSessionId, cancellationToken);
             return Ok(new { sponsorSession = result.Session, fleet = result.Fleet });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -188,8 +267,24 @@ public sealed class BoostSessionsController : ControllerBase
     {
         try
         {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(sponsorSessionId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (session is null)
+            {
+                return NotFound();
+            }
+
             var result = await _sessions.StopAsync(sponsorSessionId, revoke: false, cancellationToken);
             return Ok(new { sponsorSession = result.Session, fleet = result.Fleet });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -206,8 +301,24 @@ public sealed class BoostSessionsController : ControllerBase
     {
         try
         {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(sponsorSessionId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (session is null)
+            {
+                return NotFound();
+            }
+
             var result = await _sessions.StopAsync(sponsorSessionId, revoke: true, cancellationToken);
             return Ok(new { sponsorSession = result.Session, fleet = result.Fleet });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -217,5 +328,24 @@ public sealed class BoostSessionsController : ControllerBase
         {
             return BadRequest(ex.Message);
         }
+    }
+
+    private SponsorSessionStatusDto? TryGetOwnedSession(string sponsorSessionId, string subjectId, out ActionResult? denied)
+    {
+        denied = null;
+        var session = _sessions.Get(sponsorSessionId);
+        if (session is null)
+        {
+            return null;
+        }
+
+        var user = _accounts.EnsureUser(subjectId, subjectId);
+        if (!string.Equals(session.UserId, user.UserId, StringComparison.OrdinalIgnoreCase))
+        {
+            denied = Problem(statusCode: StatusCodes.Status403Forbidden, detail: "sponsor session does not belong to the authenticated subject.");
+            return null;
+        }
+
+        return session;
     }
 }

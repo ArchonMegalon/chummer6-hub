@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Boosters;
 using Microsoft.AspNetCore.Mvc;
@@ -9,10 +10,14 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/participation/codex")]
 public sealed class CodexParticipationController : ControllerBase
 {
+    private readonly AccountService _accounts;
+    private readonly HubIdentityClient _identity;
     private readonly BoostSessionService _sessions;
 
-    public CodexParticipationController(BoostSessionService sessions)
+    public CodexParticipationController(AccountService accounts, HubIdentityClient identity, BoostSessionService sessions)
     {
+        _accounts = accounts;
+        _identity = identity;
         _sessions = sessions;
     }
 
@@ -60,6 +65,8 @@ public sealed class CodexParticipationController : ControllerBase
 
     <section class="panel">
       <h2>Consent</h2>
+      <label for="accessToken">Bearer access token</label>
+      <input id="accessToken" placeholder="Paste a Hub access token from the identity surface" />
       <label for="subjectId">Hub subject id</label>
       <input id="subjectId" placeholder="subject-123" />
       <label for="subjectLabel">Display label</label>
@@ -100,8 +107,15 @@ public sealed class CodexParticipationController : ControllerBase
   <script>
     let currentIntentId = "";
 
+    function headers() {
+      const token = document.getElementById("accessToken").value.trim();
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      return headers;
+    }
+
     async function api(path, options = {}) {
-      const response = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
+      const response = await fetch(path, { headers: headers(), ...options });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
       return data;
@@ -180,17 +194,18 @@ public sealed class CodexParticipationController : ControllerBase
 
     [HttpPost("intents")]
     [HttpPost("/api/v1/participation/intents")]
-    public ActionResult<object> CreateIntent([FromBody] CreateCodexParticipationIntentRequest? request)
+    public async Task<ActionResult<object>> CreateIntent([FromBody] CreateCodexParticipationIntentRequest? request, CancellationToken cancellationToken)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.SubjectId) || string.IsNullOrWhiteSpace(request.ProjectId))
+        if (request is null || string.IsNullOrWhiteSpace(request.ProjectId))
         {
             return BadRequest("subjectId and projectId are required.");
         }
 
         try
         {
+            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
             var session = _sessions.Create(new CreateSponsorSessionRequest(
-                SubjectId: request.SubjectId,
+                SubjectId: subject.SubjectId,
                 ProjectId: request.ProjectId,
                 GroupId: request.GroupId,
                 SubjectLabel: request.SubjectLabel,
@@ -200,6 +215,10 @@ public sealed class CodexParticipationController : ControllerBase
                 RequestedLaneType: request.RequestedLaneType ?? "participant_burst"));
             return Ok(BuildIntentEnvelope(session));
         }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return BadRequest(ex.Message);
@@ -208,12 +227,28 @@ public sealed class CodexParticipationController : ControllerBase
 
     [HttpPost("intents/{intentId}/consent")]
     [HttpPost("/api/v1/participation/intents/{intentId}/consent")]
-    public ActionResult<object> RecordConsent([FromRoute] string intentId)
+    public async Task<ActionResult<object>> RecordConsent([FromRoute] string intentId, CancellationToken cancellationToken)
     {
         try
         {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var ownedSession = TryGetOwnedSession(intentId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (ownedSession is null)
+            {
+                return NotFound();
+            }
+
             var session = _sessions.RecordConsent(intentId);
             return Ok(BuildIntentEnvelope(session));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -227,8 +262,24 @@ public sealed class CodexParticipationController : ControllerBase
     {
         try
         {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(intentId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (session is null)
+            {
+                return NotFound();
+            }
+
             var result = await _sessions.StartDeviceAuthAsync(intentId, cancellationToken);
             return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -246,8 +297,24 @@ public sealed class CodexParticipationController : ControllerBase
     {
         try
         {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(intentId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (session is null)
+            {
+                return NotFound();
+            }
+
             var result = await _sessions.ActivateAsync(intentId, cancellationToken);
             return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -261,34 +328,55 @@ public sealed class CodexParticipationController : ControllerBase
 
     [HttpGet("intents/{intentId}")]
     [HttpGet("/api/v1/participation/intents/{intentId}")]
-    public ActionResult<object> GetIntent([FromRoute] string intentId)
+    public async Task<ActionResult<object>> GetIntent([FromRoute] string intentId, CancellationToken cancellationToken)
     {
-        var session = _sessions.Get(intentId);
-        if (session is null)
+        try
         {
-            return NotFound();
-        }
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(intentId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
 
-        return Ok(BuildIntentEnvelope(session));
+            return session is null ? NotFound() : Ok(BuildIntentEnvelope(session));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpGet("intents/{intentId}/events")]
     [HttpGet("/api/v1/participation/intents/{intentId}/events")]
-    public ActionResult<object> GetEvents([FromRoute] string intentId)
+    public async Task<ActionResult<object>> GetEvents([FromRoute] string intentId, CancellationToken cancellationToken)
     {
-        var session = _sessions.Get(intentId);
-        if (session is null)
+        try
         {
-            return NotFound();
-        }
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(intentId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
 
-        return Ok(new
+            if (session is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(new
+            {
+                intentId = session.SponsorSessionId,
+                sponsorSessionId = session.SponsorSessionId,
+                events = session.Events,
+                fleet = (object?)null
+            });
+        }
+        catch (HubRequestAuthException ex)
         {
-            intentId = session.SponsorSessionId,
-            sponsorSessionId = session.SponsorSessionId,
-            events = session.Events,
-            fleet = (object?)null
-        });
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpPost("intents/{intentId}/stop")]
@@ -297,8 +385,24 @@ public sealed class CodexParticipationController : ControllerBase
     {
         try
         {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(intentId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (session is null)
+            {
+                return NotFound();
+            }
+
             var result = await _sessions.StopAsync(intentId, revoke: false, cancellationToken);
             return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -316,8 +420,24 @@ public sealed class CodexParticipationController : ControllerBase
     {
         try
         {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(intentId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (session is null)
+            {
+                return NotFound();
+            }
+
             var result = await _sessions.StopAsync(intentId, revoke: true, cancellationToken);
             return Ok(BuildIntentEnvelope(result.Session, result.Fleet));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -358,6 +478,25 @@ public sealed class CodexParticipationController : ControllerBase
             sponsorSession = session,
             fleet
         };
+
+    private SponsorSessionStatusDto? TryGetOwnedSession(string sponsorSessionId, string subjectId, out ActionResult? denied)
+    {
+        denied = null;
+        var session = _sessions.Get(sponsorSessionId);
+        if (session is null)
+        {
+            return null;
+        }
+
+        var user = _accounts.EnsureUser(subjectId, subjectId);
+        if (!string.Equals(session.UserId, user.UserId, StringComparison.OrdinalIgnoreCase))
+        {
+            denied = Problem(statusCode: StatusCodes.Status403Forbidden, detail: "sponsor session does not belong to the authenticated subject.");
+            return null;
+        }
+
+        return session;
+    }
 }
 
 public sealed record CreateCodexParticipationIntentRequest(

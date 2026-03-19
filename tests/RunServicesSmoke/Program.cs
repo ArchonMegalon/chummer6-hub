@@ -1,4 +1,8 @@
+using Chummer.Run.Api.Controllers;
+using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Community;
 using Chummer.Run.AI.Services.Assets;
+using Chummer.Run.AI.Services.Booster;
 using Chummer.Run.AI.Services.Creative;
 using Chummer.Run.AI.Services.Gateway;
 using Chummer.Run.AI.Services.Lore;
@@ -17,7 +21,12 @@ using Chummer.Play.Contracts.Memory;
 using Chummer.Play.Contracts.Relay;
 using Chummer.Play.Contracts.Spider;
 using Chummer.Run.Contracts.AI.Newspaper;
+using Chummer.Run.Contracts.Boosters;
+using Chummer.Run.Contracts.Community;
+using Chummer.Run.Contracts.Entitlements;
 using Chummer.Run.Contracts.Identity;
+using Chummer.Run.Contracts.Ledger;
+using Chummer.Run.Contracts.Leaderboards;
 using Chummer.Run.Contracts.Ops;
 using Chummer.Run.Contracts.Publication;
 using Chummer.Run.Contracts.Registry;
@@ -27,10 +36,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -68,6 +81,7 @@ using TranscriptionRequest = Chummer.Run.Contracts.Transcription.TranscriptionRe
 await VerifyPublicationWorkflowAsync();
 VerifyPublicationControllerHardening();
 VerifyIdentityWorkflow();
+await VerifyHubCommunitySecurityAndDurabilityAsync();
 VerifyRegistryWorkflow();
 VerifyRegistryControllerHardening();
 await VerifyAiGatewayWorkflowAsync();
@@ -263,6 +277,192 @@ void VerifyIdentityWorkflow()
 
     var updated = identity.SetRoles("runner.demo", new IdentityRoleSetRequest(new[] { "publisher" }));
     Assert(updated.Roles.SequenceEqual(new[] { "publisher" }), "role updates should replace prior role grants");
+}
+
+async Task VerifyHubCommunitySecurityAndDurabilityAsync()
+{
+    var tempRoot = Path.Combine(Path.GetTempPath(), "run-services-smoke", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(tempRoot);
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json"),
+            ["FLEET_RECEIPT_SIGNING_SECRET"] = "smoke-secret",
+        })
+        .Build();
+    using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
+    var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
+    var accounts = new AccountService(store);
+    var groups = new GroupService(store, accounts);
+    var rewards = new RewardService(store);
+    var entitlements = new EntitlementService(store);
+    var ledger = new LedgerService(store, rewards, entitlements);
+    var ledgerVerifier = new FleetReceiptVerifier(configuration);
+    var projectionVerifier = new BoosterReceiptVerifier(configuration);
+    var projections = new BoosterReceiptProjectionService();
+    var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        var body = request.Content is null ? string.Empty : request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        return body.Contains("subject-token", StringComparison.Ordinal)
+            ? JsonResponse(new IdentityIntrospectionResponse(true, "session-subject", "subject.demo", new[] { "player" }, DateTimeOffset.UtcNow.AddHours(1)))
+            : JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized);
+    })), configuration);
+
+    var createdUser = accounts.UpsertProfile(new UpsertHubUserProfileRequest(
+        SubjectId: "subject.demo",
+        DisplayName: "Runner Demo",
+        Handle: "runner-demo",
+        Visibility: "private",
+        Timezone: "UTC",
+        CountryCode: "AT"));
+    var accountController = new AccountsController(accounts, identityClient)
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var forbiddenAccount = await accountController.GetMe("other.subject", CancellationToken.None);
+    var forbiddenAccountProblem = forbiddenAccount.Result as ObjectResult;
+    Assert(forbiddenAccountProblem?.StatusCode == StatusCodes.Status403Forbidden, "authenticated account endpoints should reject subject mismatch.");
+
+    var currentAccount = await accountController.GetMe("subject.demo", CancellationToken.None);
+    var currentAccountResult = currentAccount.Result as OkObjectResult;
+    Assert(currentAccountResult?.Value is HubUserDto { UserId: not null }, "authenticated account endpoints should allow matching subjects.");
+
+    var signedLaneReceipt = BuildSignedReceiptElement("smoke-secret", new Dictionary<string, object?>
+    {
+        ["receipt_id"] = "rcpt-signed-001",
+        ["event_kind"] = "slice_landed",
+        ["lane_id"] = "participant-01",
+        ["project_id"] = "fleet",
+        ["user_id"] = createdUser.UserId,
+        ["group_id"] = "grp-demo",
+        ["sponsor_session_id"] = "sps-demo",
+        ["auth_class"] = "chatgpt_auth_json",
+        ["lane_type"] = "participant_burst",
+        ["workflow_kind"] = "premium_burst",
+        ["review_rounds_used"] = 1,
+        ["accepted_on_round"] = "1",
+        ["landed_sha"] = "abc123",
+        ["landed_at_utc"] = DateTimeOffset.UtcNow.ToString("O"),
+        ["verified"] = true,
+        ["cheap_loop_only"] = false,
+        ["paid_lane_used"] = true,
+        ["groundwork_ms"] = 0,
+        ["review_ms"] = 1000,
+        ["jury_ms"] = 500,
+        ["core_ms"] = 2000,
+        ["files_touched"] = 2,
+        ["diff_size"] = 64,
+        ["issue_fingerprints"] = new[] { "lint" },
+        ["credit_burn_estimate"] = 0
+    });
+    var forgedReceipt = BuildSignedReceiptElement("wrong-secret", new Dictionary<string, object?>
+    {
+        ["receipt_id"] = "rcpt-forged-001",
+        ["event_kind"] = "slice_landed",
+        ["lane_id"] = "participant-02",
+        ["project_id"] = "fleet",
+        ["user_id"] = createdUser.UserId,
+        ["group_id"] = "grp-demo",
+        ["sponsor_session_id"] = "sps-demo",
+        ["auth_class"] = "chatgpt_auth_json",
+        ["lane_type"] = "participant_burst",
+        ["verified"] = true,
+    });
+
+    var ledgerController = new LedgerController(accounts, identityClient, ledger, ledgerVerifier, rewards)
+    {
+        ControllerContext = ReceiptControllerContext(signatureHeader: "hmac-sha256:forged", forgedReceipt)
+    };
+    var forgedLedgerResult = ledgerController.Ingest(forgedReceipt);
+    var forgedLedgerProblem = forgedLedgerResult.Result as ObjectResult;
+    Assert(forgedLedgerProblem?.StatusCode == StatusCodes.Status401Unauthorized, "ledger receipt ingest should reject forged signatures.");
+
+    var signedSignature = signedLaneReceipt.GetProperty("signed_by_fleet").GetString() ?? string.Empty;
+    ledgerController.ControllerContext = ReceiptControllerContext(signedSignature, signedLaneReceipt);
+    var acceptedLedger = ledgerController.Ingest(signedLaneReceipt);
+    var acceptedLedgerResult = acceptedLedger.Result as OkObjectResult;
+    var acceptedLedgerPayload = acceptedLedgerResult?.Value as ReceiptIngestResultDto;
+    Assert(acceptedLedgerPayload?.Status == "ingested", "ledger receipt ingest should accept Fleet-signed payloads.");
+
+    var aiReceiptController = new BoosterReceiptsController(projections, projectionVerifier)
+    {
+        ControllerContext = ReceiptControllerContext("hmac-sha256:forged", forgedReceipt)
+    };
+    var forgedProjectionResult = aiReceiptController.IngestReceipt(forgedReceipt);
+    var forgedProjectionProblem = forgedProjectionResult.Result as ObjectResult;
+    Assert(forgedProjectionProblem?.StatusCode == StatusCodes.Status401Unauthorized, "AI receipt projections should reject forged signatures.");
+
+    aiReceiptController.ControllerContext = ReceiptControllerContext(signedSignature, signedLaneReceipt);
+    var acceptedProjection = aiReceiptController.IngestReceipt(signedLaneReceipt);
+    var acceptedProjectionResult = acceptedProjection.Result as OkObjectResult;
+    var acceptedProjectionPayload = acceptedProjectionResult?.Value as ReceiptIngestResultDto;
+    Assert(acceptedProjectionPayload?.Status == "projected", "AI receipt projections should accept Fleet-signed payloads.");
+
+    var ownerGroup = groups.CreateGroup(new CreateGroupRequest(
+        SubjectId: "subject.demo",
+        Name: "Tuesday Boosters",
+        GroupType: "booster",
+        Visibility: "group",
+        Capabilities: null));
+    var boostCode = groups.CreateBoostCode(new CreateBoostCodeRequest(
+        SubjectId: "subject.demo",
+        GroupId: ownerGroup.GroupId,
+        CampaignId: null,
+        ProjectId: "fleet",
+        Label: "alpha"));
+    groups.RedeemBoostCode(new RedeemBoostCodeRequest("subject.demo", boostCode.Code));
+    var reloadedStore = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
+    var reloadedAccounts = new AccountService(reloadedStore);
+    var reloadedGroups = new GroupService(reloadedStore, reloadedAccounts);
+    var reloadedBoostCode = reloadedGroups.GetBoostCode(boostCode.Code);
+    Assert(string.Equals(reloadedBoostCode?.Status, "redeemed", StringComparison.OrdinalIgnoreCase), "redeemed boost codes should stay redeemed after store reload even when the redeemer was already a member.");
+
+    var fleetCallCount = 0;
+    var fleetBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        Interlocked.Increment(ref fleetCallCount);
+        return JsonResponse(new { detail = "fleet should not be called" }, HttpStatusCode.InternalServerError);
+    })), configuration);
+    var boostSessions = new BoostSessionService(store, accounts, groups, fleetBridge);
+    var pendingSession = boostSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.demo",
+        ProjectId: "fleet",
+        GroupId: ownerGroup.GroupId,
+        SubjectLabel: "Runner Demo"));
+    boostSessions.RecordConsent(pendingSession.SponsorSessionId);
+    var locallyStopped = await boostSessions.StopAsync(pendingSession.SponsorSessionId, revoke: false, CancellationToken.None);
+    Assert(string.Equals(locallyStopped.Session.Status, "stopped", StringComparison.OrdinalIgnoreCase), "sessions without Fleet lanes should stop locally.");
+    Assert(fleetCallCount == 0, "stopping a session before lane creation should not call Fleet.");
+
+    var laneCreationBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/internal/participant-lanes")
+        {
+            return JsonResponse(new { lane = new { } });
+        }
+
+        return JsonResponse(new { detail = "unexpected fleet call" }, HttpStatusCode.InternalServerError);
+    })), configuration);
+    var laneCreationSessions = new BoostSessionService(store, accounts, groups, laneCreationBridge);
+    var laneCreationSession = laneCreationSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.demo",
+        ProjectId: "fleet",
+        GroupId: ownerGroup.GroupId,
+        SubjectLabel: "Runner Demo"));
+    laneCreationSessions.RecordConsent(laneCreationSession.SponsorSessionId);
+    var missingLaneThrown = false;
+    try
+    {
+        await laneCreationSessions.StartDeviceAuthAsync(laneCreationSession.SponsorSessionId, CancellationToken.None);
+    }
+    catch (InvalidOperationException ex)
+    {
+        missingLaneThrown = ex.Message.Contains("lane_id", StringComparison.OrdinalIgnoreCase);
+    }
+
+    Assert(missingLaneThrown, "device-auth startup should fail fast when Fleet does not return a lane_id.");
+    var failedLaneSession = laneCreationSessions.Get(laneCreationSession.SponsorSessionId);
+    Assert(string.IsNullOrWhiteSpace(failedLaneSession?.FleetLaneId), "failed lane creation should not persist an empty Fleet lane id.");
 }
 
 void VerifyRegistryWorkflow()
@@ -1809,12 +2009,63 @@ T NotNull<T>(T? value, string message)
     return value;
 }
 
+ControllerContext AuthenticatedControllerContext(string accessToken)
+{
+    var httpContext = new DefaultHttpContext();
+    httpContext.Request.Headers.Authorization = $"Bearer {accessToken}";
+    return new ControllerContext
+    {
+        HttpContext = httpContext
+    };
+}
+
+ControllerContext ReceiptControllerContext(string signatureHeader, JsonElement _)
+{
+    var httpContext = new DefaultHttpContext();
+    httpContext.Request.Headers["X-Fleet-Receipt-Signature"] = signatureHeader;
+    return new ControllerContext
+    {
+        HttpContext = httpContext
+    };
+}
+
+HttpResponseMessage JsonResponse<T>(T payload, HttpStatusCode statusCode = HttpStatusCode.OK)
+{
+    return new HttpResponseMessage(statusCode)
+    {
+        Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+    };
+}
+
+JsonElement BuildSignedReceiptElement(string secret, IReadOnlyDictionary<string, object?> payload)
+{
+    using var unsignedDocument = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+    var signature = FleetReceiptSigning.ComputeHmacSignature(unsignedDocument.RootElement, secret);
+    var signedPayload = payload.ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal);
+    signedPayload["signed_by_fleet"] = signature;
+    using var signedDocument = JsonDocument.Parse(JsonSerializer.Serialize(signedPayload));
+    return signedDocument.RootElement.Clone();
+}
+
 void Assert(bool condition, string message)
 {
     if (!condition)
     {
         throw new InvalidOperationException(message);
     }
+}
+
+sealed class StubHttpMessageHandler : HttpMessageHandler
+{
+    private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
+
+    public StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler)
+    {
+        _handler = handler;
+    }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        => Task.FromResult(_handler(request));
 }
 
 sealed class SmokeMarkupGoAdapter : IProviderAdapter

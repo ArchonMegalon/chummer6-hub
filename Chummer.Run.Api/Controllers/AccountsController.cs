@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.Mvc;
@@ -10,10 +11,12 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class AccountsController : ControllerBase
 {
     private readonly AccountService _accounts;
+    private readonly HubIdentityClient _identity;
 
-    public AccountsController(AccountService accounts)
+    public AccountsController(AccountService accounts, HubIdentityClient identity)
     {
         _accounts = accounts;
+        _identity = identity;
     }
 
     [HttpGet("/account")]
@@ -42,6 +45,8 @@ public sealed class AccountsController : ControllerBase
     <section class="panel">
       <h1>Hub Account</h1>
       <p>Hub keeps the product-level account, visibility, and group identity layer above raw identity subjects.</p>
+      <label for="accessToken">Bearer access token</label>
+      <input id="accessToken" placeholder="Paste a Hub access token from the identity surface" />
       <label for="subjectId">Subject id</label>
       <input id="subjectId" placeholder="subject-123" />
       <label for="displayName">Display name</label>
@@ -50,6 +55,7 @@ public sealed class AccountsController : ControllerBase
       <input id="handle" placeholder="archon" />
       <label for="timezone">Timezone</label>
       <input id="timezone" value="Europe/Vienna" />
+      <button onclick="loadAccount()">Load account</button>
       <button onclick="saveProfile()">Save profile</button>
     </section>
     <section class="panel">
@@ -58,6 +64,21 @@ public sealed class AccountsController : ControllerBase
     </section>
   </main>
   <script>
+    function headers() {
+      const token = document.getElementById('accessToken').value.trim();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return headers;
+    }
+    async function loadAccount() {
+      const subjectId = document.getElementById('subjectId').value;
+      const response = await fetch(`/api/v1/accounts/me?subjectId=${encodeURIComponent(subjectId)}`, {
+        headers: headers()
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
+      document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+    }
     async function saveProfile() {
       const payload = {
         subjectId: document.getElementById('subjectId').value,
@@ -68,7 +89,7 @@ public sealed class AccountsController : ControllerBase
       };
       const response = await fetch('/api/v1/accounts/me/profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers(),
         body: JSON.stringify(payload)
       });
       const data = await response.json();
@@ -85,21 +106,37 @@ public sealed class AccountsController : ControllerBase
     [HttpGet("me")]
     [ProducesResponseType<HubUserDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<HubUserDto> GetMe([FromQuery] string subjectId)
+    public async Task<ActionResult<HubUserDto>> GetMe([FromQuery] string subjectId, CancellationToken cancellationToken)
     {
-        var user = _accounts.GetBySubject(subjectId);
-        return user is null ? NotFound() : Ok(user);
+        try
+        {
+            var subject = await _identity.RequireMatchingSubjectAsync(Request, subjectId, cancellationToken);
+            var user = _accounts.GetBySubject(subject.SubjectId);
+            return user is null ? NotFound() : Ok(user);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpPost("me/profile")]
     [ProducesResponseType<HubUserDto>(StatusCodes.Status200OK)]
-    public ActionResult<HubUserDto> UpsertProfile([FromBody] UpsertHubUserProfileRequest? request)
+    public async Task<ActionResult<HubUserDto>> UpsertProfile([FromBody] UpsertHubUserProfileRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
         {
             return BadRequest("profile payload is required.");
         }
 
-        return Ok(_accounts.UpsertProfile(request));
+        try
+        {
+            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
+            return Ok(_accounts.UpsertProfile(request with { SubjectId = subject.SubjectId }));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 }

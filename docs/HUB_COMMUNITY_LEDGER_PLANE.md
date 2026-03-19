@@ -29,6 +29,13 @@ Hub keeps three distinct accounting layers:
 
 Points and perks come from validated receipts after meaningful work. They do not come from merely linking an account or idling in device auth.
 
+Receipt ingest requires both:
+
+- `X-Fleet-Receipt-Signature` on the inbound request
+- a matching `signed_by_fleet` payload field computed with `FLEET_RECEIPT_SIGNING_SECRET`
+
+Hub rejects unsigned or mismatched receipts before they can mint rewards, badges, or entitlements.
+
 ## Current hosted surfaces
 
 Community/account controllers in `Chummer.Run.Api`:
@@ -51,6 +58,8 @@ Community services in `Chummer.Run.Api/Services/Community`:
 - `EntitlementService`
 - `LeaderboardService`
 - `CommunityStore`
+- `HubIdentityClient`
+- `FleetReceiptVerifier`
 
 Current durability posture:
 
@@ -62,10 +71,12 @@ AI-side receipt/projection surfaces in `Chummer.Run.AI`:
 
 - `BoosterReceiptsController`
 - `BoosterReceiptProjectionService`
+- `BoosterReceiptVerifier`
 
 ## Boundary rules
 
 - Hub owns canonical user/group/ledger/reward/entitlement truth.
+- Caller-supplied `subjectId` values must match an active bearer-bound identity session before Hub will read or mutate private account, group, or sponsor-session state.
 - Fleet may cache sponsor metadata for lane execution, but it is not the canonical community ledger.
 - Git commits, Fleet telemetry files, and EA provider health are evidence sources, not the product reward ledger.
 - Sponsored lanes never receive direct merge authority; `jury` still lands protected work.

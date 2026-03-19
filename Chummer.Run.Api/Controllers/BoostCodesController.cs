@@ -1,3 +1,4 @@
+using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Boosters;
 using Microsoft.AspNetCore.Mvc;
@@ -9,15 +10,17 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class BoostCodesController : ControllerBase
 {
     private readonly GroupService _groups;
+    private readonly HubIdentityClient _identity;
 
-    public BoostCodesController(GroupService groups)
+    public BoostCodesController(GroupService groups, HubIdentityClient identity)
     {
         _groups = groups;
+        _identity = identity;
     }
 
     [HttpPost]
     [ProducesResponseType<BoostCodeDto>(StatusCodes.Status200OK)]
-    public ActionResult<BoostCodeDto> Create([FromBody] CreateBoostCodeRequest? request)
+    public async Task<ActionResult<BoostCodeDto>> Create([FromBody] CreateBoostCodeRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
         {
@@ -26,7 +29,12 @@ public sealed class BoostCodesController : ControllerBase
 
         try
         {
-            return Ok(_groups.CreateBoostCode(request));
+            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
+            return Ok(_groups.CreateBoostCode(request with { SubjectId = subject.SubjectId }));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
         {
@@ -36,7 +44,7 @@ public sealed class BoostCodesController : ControllerBase
 
     [HttpPost("redeem")]
     [ProducesResponseType<BoostCodeDto>(StatusCodes.Status200OK)]
-    public ActionResult<BoostCodeDto> Redeem([FromBody] RedeemBoostCodeRequest? request)
+    public async Task<ActionResult<BoostCodeDto>> Redeem([FromBody] RedeemBoostCodeRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
         {
@@ -45,7 +53,12 @@ public sealed class BoostCodesController : ControllerBase
 
         try
         {
-            return Ok(_groups.RedeemBoostCode(request));
+            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
+            return Ok(_groups.RedeemBoostCode(request with { SubjectId = subject.SubjectId }));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
         {
