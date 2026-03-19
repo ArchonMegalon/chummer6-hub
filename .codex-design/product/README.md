@@ -80,6 +80,8 @@ These inform the program but are not part of the main release train:
 4. Purify `chummer6-core` and `chummer6-hub` further by deleting remaining legacy cargo rather than arguing about it.
 5. Complete release hardening: accessibility, localization, performance, observability, DR, migration certification, and final release proof.
 
+The current open-program follow-through is materialized in `WORKLIST.md` as `WL-D019` through `WL-D038` so the remaining closure wave is tracked as executable backlog instead of latent milestone prose.
+
 ## Non-goal
 
 The immediate goal is not to add endless new features while the architecture is still blurry.

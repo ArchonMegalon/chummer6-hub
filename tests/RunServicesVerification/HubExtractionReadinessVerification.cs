@@ -12,6 +12,10 @@ internal static class HubExtractionReadinessVerification
     {
         VerifyRegistryBoundaryReadiness();
         VerifyMediaBoundaryReadiness();
+        VerifyHostedAdapterAuthority();
+        VerifyAssistantPlaneAuthority();
+        VerifyDocsHelpConsumerRule();
+        VerifyFeedbackAndOperatorConsumerRule();
         VerifyDesignMirrorReadiness();
         VerifyAcceptanceDocument();
         VerifyLegacyRootBoundaryMoves();
@@ -180,6 +184,471 @@ internal static class HubExtractionReadinessVerification
             VerificationAssert.True(
                 !File.Exists(retiredMediaService),
                 $"Run-services must not keep retired local media execution ownership: {Path.GetFileName(retiredMediaService)}");
+        }
+    }
+
+    private static void VerifyHostedAdapterAuthority()
+    {
+        var authorityPath = Path.Combine(RepoRoot, "docs", "HOSTED_ADAPTER_AUTHORITY.md");
+        VerificationAssert.True(File.Exists(authorityPath), "Hosted adapter authority document must exist.");
+        var authorityText = File.ReadAllText(authorityPath);
+        foreach (var requiredToken in new[]
+                 {
+                     "BrowserActGatewayAdapter",
+                     "MarkupGoGatewayAdapter",
+                     "PeekShotGatewayAdapter",
+                     "SessionProjectionSkillToolAdapter",
+                     "LoreSearchSkillToolAdapter",
+                     "PromptRegistry",
+                     "GmOpsBoardService",
+                     "CreativeAssetsController",
+                     "SpiderController",
+                     "DirectorPolicyEngine",
+                     "InteropController",
+                     "AiDirectorController",
+                     "survey adapters are not live yet",
+                     "AiMagicx",
+                     "OneMinAi",
+                     "PromptingSystems",
+                     "AiGatewayService",
+                     "AiGatewayController"
+                 })
+        {
+            VerificationAssert.True(
+                authorityText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Hosted adapter authority document must mention '{requiredToken}'.");
+        }
+
+        var programText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Program.cs"));
+        foreach (var registrationToken in new[]
+                 {
+                     "AddSingleton<IProviderAdapter, BrowserActGatewayAdapter>()",
+                     "AddSingleton<IProviderAdapter, MarkupGoGatewayAdapter>()",
+                     "AddSingleton<IProviderAdapter, PeekShotGatewayAdapter>()",
+                     "AddSingleton<ISkillToolAdapter, SessionProjectionSkillToolAdapter>()",
+                     "AddSingleton<ISkillToolAdapter, LoreSearchSkillToolAdapter>()",
+                     "AddSingleton<IGmOpsBoardService, GmOpsBoardService>()",
+                     "AddSingleton<IFastSignalDetector, FastSignalDetector>()",
+                     "AddSingleton<IDirectorPolicyEngine, DirectorPolicyEngine>()",
+                     "AddSingleton<ISpiderCardActionService, SpiderCardActionService>()"
+                 })
+        {
+            VerificationAssert.True(
+                programText.Contains(registrationToken, StringComparison.Ordinal),
+                $"Hosted runtime registration must keep '{registrationToken}' in Program.cs.");
+        }
+
+        var adapterSourceText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Gateway", "HttpProviderAdapters.cs"));
+        foreach (var implementationToken in new[]
+                 {
+                     "public sealed class BrowserActGatewayAdapter",
+                     "public sealed class MarkupGoGatewayAdapter",
+                     "public sealed class PeekShotGatewayAdapter",
+                     "ResolveProviderEnabled"
+                 })
+        {
+            VerificationAssert.True(
+                adapterSourceText.Contains(implementationToken, StringComparison.Ordinal),
+                $"Hosted gateway adapter implementation must keep '{implementationToken}'.");
+        }
+
+        var skillAdapterSourceText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Gateway", "GovernedSkillRuntimeService.cs"));
+        foreach (var implementationToken in new[]
+                 {
+                     "public sealed class SessionProjectionSkillToolAdapter",
+                     "public sealed class LoreSearchSkillToolAdapter",
+                     "SkillApprovalClass"
+                 })
+        {
+            VerificationAssert.True(
+                skillAdapterSourceText.Contains(implementationToken, StringComparison.Ordinal),
+                $"Hosted skill adapter implementation must keep '{implementationToken}'.");
+        }
+
+        var promptRegistryText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Gateway", "PromptRegistry.cs"));
+        VerificationAssert.True(
+            promptRegistryText.Contains("public sealed class PromptRegistry", StringComparison.Ordinal),
+            "Hosted prompt/help registry surface must remain explicit.");
+
+        var opsText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Ops", "GmOpsBoardService.cs"));
+        foreach (var implementationToken in new[]
+                 {
+                     "public sealed class GmOpsBoardService",
+                     "OpsBoardProjection",
+                     "Reveal"
+                 })
+        {
+            VerificationAssert.True(
+                opsText.Contains(implementationToken, StringComparison.Ordinal),
+                $"Hosted ops surface must keep '{implementationToken}'.");
+        }
+
+        var directorText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Spider", "DirectorPolicyEngine.cs"));
+        foreach (var implementationToken in new[]
+                 {
+                     "public sealed class DirectorPolicyEngine",
+                     "PolicyDecision",
+                     "SpiderTacticalAction"
+                 })
+        {
+            VerificationAssert.True(
+                directorText.Contains(implementationToken, StringComparison.Ordinal),
+                $"Hosted automation policy surface must keep '{implementationToken}'.");
+        }
+
+        var spiderControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Controllers", "SpiderController.cs"));
+        foreach (var implementationToken in new[]
+                 {
+                     "public sealed class SpiderController",
+                     "IFastSignalDetector",
+                     "IDirectorPolicyEngine",
+                     "ISpiderCardActionService"
+                 })
+        {
+            VerificationAssert.True(
+                spiderControllerText.Contains(implementationToken, StringComparison.Ordinal),
+                $"Hosted spider controller must keep '{implementationToken}'.");
+        }
+
+        var creativeControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Controllers", "CreativeAssetsController.cs"));
+        foreach (var implementationToken in new[]
+                 {
+                     "public sealed class CreativeAssetsController",
+                     "ApprovePortraitDraft",
+                     "ApplyAssetLifecycle",
+                     "CreatePacket"
+                 })
+        {
+            VerificationAssert.True(
+                creativeControllerText.Contains(implementationToken, StringComparison.Ordinal),
+                $"Hosted creative controller must keep '{implementationToken}'.");
+        }
+
+        var interopControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Controllers", "InteropController.cs"));
+        foreach (var implementationToken in new[]
+                 {
+                     "public sealed class InteropController",
+                     "Export(",
+                     "Import(",
+                     "RoundTrip("
+                 })
+        {
+            VerificationAssert.True(
+                interopControllerText.Contains(implementationToken, StringComparison.Ordinal),
+                $"Hosted interop bridge must keep '{implementationToken}'.");
+        }
+
+        var directorControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Controllers", "AiDirectorController.cs"));
+        VerificationAssert.True(
+            directorControllerText.Contains("public sealed class AiDirectorController", StringComparison.Ordinal),
+            "Hosted director intake controller must remain explicit.");
+
+        var siblingRoots = new[]
+        {
+            Path.Combine(RepoRoot, "..", "chummer-core-engine"),
+            Path.Combine(RepoRoot, "..", "chummer-play"),
+            Path.Combine(RepoRoot, "..", "chummer-presentation"),
+            Path.Combine(RepoRoot, "..", "chummer-ui-kit"),
+            Path.Combine(RepoRoot, "..", "chummer-hub-registry"),
+            Path.Combine(RepoRoot, "..", "..", "fleet", "repos", "chummer-media-factory")
+        };
+
+        foreach (var root in siblingRoots)
+        {
+            if (!Directory.Exists(root))
+            {
+                continue;
+            }
+
+            var sourceFiles = Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+
+            foreach (var sourceFile in sourceFiles)
+            {
+                var text = File.ReadAllText(sourceFile);
+                foreach (var forbiddenToken in new[]
+                         {
+                             "class BrowserActGatewayAdapter",
+                             "class MarkupGoGatewayAdapter",
+                             "class PeekShotGatewayAdapter",
+                             "class SessionProjectionSkillToolAdapter",
+                             "class LoreSearchSkillToolAdapter"
+                         })
+                {
+                    VerificationAssert.True(
+                        !text.Contains(forbiddenToken, StringComparison.Ordinal),
+                        $"Hosted adapter authority must not leak '{forbiddenToken}' into sibling repo file '{sourceFile}'.");
+                }
+            }
+        }
+    }
+
+    private static void VerifyAssistantPlaneAuthority()
+    {
+        var authorityPath = Path.Combine(RepoRoot, "docs", "ASSISTANT_PLANE_AUTHORITY.md");
+        VerificationAssert.True(File.Exists(authorityPath), "Assistant-plane authority document must exist.");
+        var authorityText = File.ReadAllText(authorityPath);
+        foreach (var requiredToken in new[]
+                 {
+                     "coach.system",
+                     "PromptRegistry",
+                     "LoreService",
+                     "PersonaMemoryService",
+                     "SessionMemoryService",
+                     "AiGatewayService",
+                     "EvaluationStore",
+                     "FastSignalDetector",
+                     "SpiderDeepIngestionService",
+                     "DirectorPolicyEngine",
+                     "InterruptionBudgetService",
+                     "SpiderCardActionService",
+                     "GmOpsBoardService",
+                     "AiDirectorController",
+                     "PipelineObservabilityController"
+                 })
+        {
+            VerificationAssert.True(
+                authorityText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Assistant-plane authority document must mention '{requiredToken}'.");
+        }
+
+        var gatewayControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Controllers", "AiGatewayController.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "RunEvaluations",
+                     "SearchLore",
+                     "QueryPersonaMemory",
+                     "DraftFromSession"
+                 })
+        {
+            VerificationAssert.True(
+                gatewayControllerText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Coach gateway surface must keep '{requiredToken}'.");
+        }
+
+        var promptRegistryText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Gateway", "PromptRegistry.cs"));
+        VerificationAssert.True(
+            promptRegistryText.Contains("coach.system", StringComparison.Ordinal),
+            "Coach prompt registry must keep the grounded coach template surface.");
+
+        var deepIngestionText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Spider", "SpiderDeepIngestionService.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "public sealed class SpiderDeepIngestionService",
+                     "PromptLineage",
+                     "ISessionLedgerService",
+                     "SessionRuntimeBundleDto"
+                 })
+        {
+            VerificationAssert.True(
+                deepIngestionText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Spider grounding surface must keep '{requiredToken}'.");
+        }
+
+        var spiderActionsText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Spider", "SpiderCardActionService.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "approval-required",
+                     "DeliveryOutboxCreateRequest",
+                     "SpiderActionExecutionState"
+                 })
+        {
+            VerificationAssert.True(
+                spiderActionsText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Spider review/action loop must keep '{requiredToken}'.");
+        }
+
+        var observabilityText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Controllers", "PipelineObservabilityController.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "GetGatewayPipelineProjection",
+                     "GetApprovalPipelineProjection",
+                     "GetMediaPipelineProjection"
+                 })
+        {
+            VerificationAssert.True(
+                observabilityText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Assistant-plane observability surface must keep '{requiredToken}'.");
+        }
+    }
+
+    private static void VerifyDocsHelpConsumerRule()
+    {
+        var docsHelpPath = Path.Combine(RepoRoot, "docs", "HOSTED_DOCS_HELP_CONSUMERS.md");
+        VerificationAssert.True(File.Exists(docsHelpPath), "Hosted docs/help consumer document must exist.");
+        var docsHelpText = File.ReadAllText(docsHelpPath);
+        foreach (var requiredToken in new[]
+                 {
+                     "Chummer.Play.Contracts.Docs.RuntimeDocQuery",
+                     "Chummer.Play.Contracts.Docs.RuntimeDocResult",
+                     "PromptTemplates",
+                     "PreviewPrompt",
+                     "SearchLore",
+                     "QueryPersonaMemory",
+                     "DraftFromSession",
+                     "compatibility-only",
+                     "second system of record"
+                 })
+        {
+            VerificationAssert.True(
+                docsHelpText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Hosted docs/help consumer document must mention '{requiredToken}'.");
+        }
+
+        var globalUsingsText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "GlobalUsings.cs"));
+        VerificationAssert.True(
+            globalUsingsText.Contains("global using Chummer.Play.Contracts.Docs;", StringComparison.Ordinal),
+            "Hosted docs/help lane must consume the canonical play docs contract namespace.");
+
+        var docsCompatibilityText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Compatibility", "DocsCompatibilityContracts.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "Use Chummer.Play.Contracts.Docs.RuntimeDocQuery.",
+                     "Use Chummer.Play.Contracts.Docs.RuntimeDocResult."
+                 })
+        {
+            VerificationAssert.True(
+                docsCompatibilityText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Docs compatibility wrapper must stay compatibility-only with token '{requiredToken}'.");
+        }
+
+        var gatewayControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Controllers", "AiGatewayController.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "PromptTemplates",
+                     "PreviewPrompt",
+                     "SearchLore",
+                     "QueryPersonaMemory",
+                     "DraftFromSession"
+                 })
+        {
+            VerificationAssert.True(
+                gatewayControllerText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Hosted docs/help consumer surface must keep '{requiredToken}'.");
+        }
+
+        var runContractsAssembly = AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(static assembly => string.Equals(assembly.GetName().Name, "Chummer.Run.Contracts", StringComparison.Ordinal))
+            ?? TryLoadAssembly("Chummer.Run.Contracts");
+        VerificationAssert.NotNull(runContractsAssembly, "RunServicesVerification should be able to load Chummer.Run.Contracts for docs/help boundary checks.");
+        VerificationAssert.True(
+            runContractsAssembly!.GetType("Chummer.Run.Contracts.Docs.RuntimeDocQuery") is null,
+            "Chummer.Run.Contracts must not regrow canonical docs query ownership.");
+        VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Docs.RuntimeDocResult") is null,
+            "Chummer.Run.Contracts must not regrow canonical docs result ownership.");
+    }
+
+    private static void VerifyFeedbackAndOperatorConsumerRule()
+    {
+        var feedbackPath = Path.Combine(RepoRoot, "docs", "HOSTED_FEEDBACK_AND_OPERATOR_CONSUMERS.md");
+        VerificationAssert.True(File.Exists(feedbackPath), "Hosted feedback/operator consumer document must exist.");
+        var feedbackText = File.ReadAllText(feedbackPath);
+        foreach (var requiredToken in new[]
+                 {
+                     "HubRegistryController.AddReview",
+                     "PublicationsController.Review",
+                     "PublicationsController.Moderate",
+                     "GmOpsBoardController.GetProjection",
+                     "GmOpsBoardController.UpdateChecklist",
+                     "GmOpsBoardController.Reveal",
+                     "SpiderController.QueueManual",
+                     "SpiderController.ExecuteAction",
+                     "DeliveryOutboxService.RecordAction",
+                     "PipelineObservabilityController.GetProjection",
+                     "advisory input with receipts",
+                     "hidden write-owning side systems"
+                 })
+        {
+            VerificationAssert.True(
+                feedbackText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Hosted feedback/operator consumer document must mention '{requiredToken}'.");
+        }
+
+        var gmOpsControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Controllers", "GmOpsBoardController.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "GetProjection",
+                     "UpdateChecklist",
+                     "Reveal"
+                 })
+        {
+            VerificationAssert.True(
+                gmOpsControllerText.Contains(requiredToken, StringComparison.Ordinal),
+                $"GM ops board controller must keep '{requiredToken}'.");
+        }
+
+        var gmOpsServiceText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Ops", "GmOpsBoardService.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "GetProjection",
+                     "UpdateChecklist",
+                     "Reveal",
+                     "IDeliveryOutboxService"
+                 })
+        {
+            VerificationAssert.True(
+                gmOpsServiceText.Contains(requiredToken, StringComparison.Ordinal),
+                $"GM ops board service must keep '{requiredToken}'.");
+        }
+
+        var spiderControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Controllers", "SpiderController.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "QueueManual",
+                     "ExecuteAction",
+                     "GetOutbox"
+                 })
+        {
+            VerificationAssert.True(
+                spiderControllerText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Spider operator surface must keep '{requiredToken}'.");
+        }
+
+        var outboxText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Spider", "DeliveryOutboxService.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "RecordAction",
+                     "ApprovalState",
+                     "ProjectionFingerprint"
+                 })
+        {
+            VerificationAssert.True(
+                outboxText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Delivery outbox must keep '{requiredToken}'.");
+        }
+
+        var pipelineText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Controllers", "PipelineObservabilityController.cs"));
+        VerificationAssert.True(
+            pipelineText.Contains("GetProjection", StringComparison.Ordinal),
+            "Hosted operator pipeline surface must keep the projection endpoint.");
+
+        var siblingRegistryRoot = Path.Combine(RepoRoot, "..", "chummer-hub-registry", "Chummer.Run.Registry", "Controllers");
+        var registryControllerText = File.ReadAllText(Path.Combine(siblingRegistryRoot, "HubRegistryController.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "AddReview",
+                     "ListProjections",
+                     "GetPipelineProjection"
+                 })
+        {
+            VerificationAssert.True(
+                registryControllerText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Sibling registry controller must keep '{requiredToken}'.");
+        }
+
+        var publicationsControllerText = File.ReadAllText(Path.Combine(siblingRegistryRoot, "PublicationsController.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "Review",
+                     "Moderate",
+                     "List"
+                 })
+        {
+            VerificationAssert.True(
+                publicationsControllerText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Sibling publication controller must keep '{requiredToken}'.");
         }
     }
 
