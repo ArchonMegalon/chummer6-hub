@@ -86,19 +86,29 @@ public sealed class IdentityAccessService : IIdentityAccessService
     private readonly object _mutate = new();
     private readonly string _storagePath;
     private readonly ILogger<IdentityAccessService> _logger;
+    private readonly IIdentityEmailDeliveryService _emailDelivery;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
     };
 
     public IdentityAccessService()
-        : this(new ConfigurationBuilder().Build(), NullLogger<IdentityAccessService>.Instance)
+        : this(
+            new ConfigurationBuilder().Build(),
+            NullLogger<IdentityAccessService>.Instance,
+            new IdentityEmailDeliveryService(new ConfigurationBuilder().Build(), NullLogger<IdentityEmailDeliveryService>.Instance))
     {
     }
 
     public IdentityAccessService(IConfiguration configuration, ILogger<IdentityAccessService> logger)
+        : this(configuration, logger, new IdentityEmailDeliveryService(configuration, NullLogger<IdentityEmailDeliveryService>.Instance))
+    {
+    }
+
+    public IdentityAccessService(IConfiguration configuration, ILogger<IdentityAccessService> logger, IIdentityEmailDeliveryService emailDelivery)
     {
         _logger = logger ?? NullLogger<IdentityAccessService>.Instance;
+        _emailDelivery = emailDelivery;
         _storagePath = ResolveStoragePath(configuration);
         LoadSnapshot();
     }
@@ -146,6 +156,7 @@ public sealed class IdentityAccessService : IIdentityAccessService
             };
             _emailTickets[ticket.TicketId] = ticket;
             PersistLocked();
+            var delivery = _emailDelivery.DeliverMagicLink(ticket.Email, ticket.DisplayName, ticket.TicketId, ticket.NextPath, ticket.ExpiresAtUtc);
             return new EmailAuthStartResponse(
                 TicketId: ticket.TicketId,
                 SubjectId: ticket.SubjectId,
@@ -154,8 +165,8 @@ public sealed class IdentityAccessService : IIdentityAccessService
                 NextPath: ticket.NextPath,
                 CreatedAtUtc: ticket.CreatedAtUtc,
                 ExpiresAtUtc: ticket.ExpiresAtUtc,
-                DeliveryMode: "preview_inline_link",
-                PreviewNote: "Transactional email is not configured in this build, so the callback link is shown directly after submit.");
+                DeliveryMode: delivery.DeliveryMode,
+                PreviewNote: delivery.PreviewNote);
         }
     }
 
