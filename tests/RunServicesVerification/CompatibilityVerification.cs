@@ -23,9 +23,6 @@ using RegistryArtifactKind = Chummer.Run.Contracts.Registry.HubArtifactKind;
 using RegistryArtifactMetadata = Chummer.Run.Contracts.Registry.HubArtifactMetadata;
 using RegistryArtifactState = Chummer.Run.Contracts.Registry.HubArtifactState;
 using RegistryArtifactCreateRequest = Chummer.Run.Contracts.Registry.HubArtifactCreateRequest;
-using RegistryHubInstallEvent = Chummer.Run.Contracts.Registry.HubInstallEvent;
-using RegistryHubReviewRequest = Chummer.Run.Contracts.Registry.HubReviewRequest;
-using RegistryHubReviewResponse = Chummer.Run.Contracts.Registry.HubReviewResponse;
 using RegistryRuntimeBundleHeadKind = Chummer.Run.Contracts.Registry.RuntimeBundleHeadKind;
 using RegistryRuntimeBundleIssueRequest = Chummer.Run.Contracts.Registry.RuntimeBundleIssueRequest;
 using RunGatewayContracts = Chummer.Run.Contracts.Gateway;
@@ -44,7 +41,6 @@ internal static class CompatibilityVerification
         VerifyHostedCanonicalShapes();
         VerifyLegacyAiCompatibilityShapes();
         VerifyMediaCompatibilityShapes();
-        VerifyRegistryCompatibilityShapes();
         VerifyRegistryRequestBackCompat();
         VerifyHubRegistryPublicationBoundary();
         VerifySessionOverlayWrapperIsServerOnly();
@@ -130,6 +126,12 @@ internal static class CompatibilityVerification
             runContractsAssembly.GetType("Chummer.Run.Contracts.Memory.SessionMemoryDraftRequest") is null,
             "Chummer.Run.Contracts must not shadow shared memory DTOs.");
         VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Registry.HubArtifactCreateRequest") is null,
+            "Chummer.Run.Contracts must not shadow extracted registry DTOs.");
+        VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Publication.PublicationRecordResponse") is null,
+            "Chummer.Run.Contracts must not shadow extracted publication DTOs.");
+        VerificationAssert.True(
             typeof(RunMemoryContracts.SessionMemoryIngestionResult).GetProperty(nameof(RunMemoryContracts.SessionMemoryIngestionResult.Draft))?.PropertyType == typeof(SessionMemoryDraftResult),
             "Run-specific memory ingestion should point back to canonical play-memory draft results.");
 
@@ -193,13 +195,6 @@ internal static class CompatibilityVerification
         VerificationAssert.True(
             Enum.GetNames(typeof(MediaRouteCinemaArtifactRole)).SequenceEqual(Enum.GetNames(typeof(RunAiContracts.RouteCinemaArtifactRole)), StringComparer.Ordinal),
             "Route cinema artifact role compatibility enums should remain aligned.");
-    }
-
-    private static void VerifyRegistryCompatibilityShapes()
-    {
-        AssertEquivalentShape(typeof(RegistryHubInstallEvent), typeof(RunAiContracts.HubInstallEvent));
-        AssertEquivalentShape(typeof(RegistryHubReviewRequest), typeof(RunAiContracts.HubReviewRequest));
-        AssertEquivalentShape(typeof(RegistryHubReviewResponse), typeof(RunAiContracts.HubReviewResponse));
     }
 
     private static void VerifyRegistryRequestBackCompat()
@@ -370,15 +365,16 @@ internal static class CompatibilityVerification
                 "Chummer.Run.AI",
                 "Chummer.Run.Api",
                 "Chummer.Run.Contracts",
-                "Chummer.Run.Identity",
-                "Chummer.Run.Registry"
+                "Chummer.Run.Identity"
             }
             .OrderBy(static entry => entry, StringComparer.Ordinal)
             .ToArray();
         var canonicalExternalOwnerPackages = new[]
             {
                 "Chummer.Hub.Registry.Contracts",
-                "Chummer.Media.Contracts"
+                "Chummer.Media.Contracts",
+                "Chummer.Media.Factory.Runtime",
+                "Chummer.Run.Registry"
             }
             .OrderBy(static entry => entry, StringComparer.Ordinal)
             .ToArray();
@@ -398,7 +394,7 @@ internal static class CompatibilityVerification
 
         VerificationAssert.True(
             expectedHostedProjects.SequenceEqual(canonicalHostedProjects, StringComparer.Ordinal),
-            "Boundary manifest must keep the canonical hosted project set for identity, registry, relay/Spider/media orchestration, and hosted APIs.");
+            "Boundary manifest must keep the canonical hosted project set for identity, relay/Spider/media orchestration, and hosted APIs.");
         VerificationAssert.True(
             externalOwnerPackages.SequenceEqual(canonicalExternalOwnerPackages, StringComparer.Ordinal),
             "Boundary manifest must declare the canonical external owner packages for media-factory and hub-registry seams.");
@@ -476,6 +472,17 @@ internal static class CompatibilityVerification
                 !buildScript.Contains(retiredBuildPrefix, StringComparison.Ordinal),
                 $"Clean-room build script must not target retired hosted-clutter root '{retiredRoot}'.");
         }
+
+        var compatibilityAssembly = typeof(RunAiContracts.GatewayStatus).Assembly;
+        VerificationAssert.True(
+            compatibilityAssembly.GetType("Chummer.Run.AI.Compatibility.HubInstallEvent") is null,
+            "Run AI compatibility shims must not source-own registry install events after extraction.");
+        VerificationAssert.True(
+            compatibilityAssembly.GetType("Chummer.Run.AI.Compatibility.HubReviewRequest") is null,
+            "Run AI compatibility shims must not source-own registry review requests after extraction.");
+        VerificationAssert.True(
+            compatibilityAssembly.GetType("Chummer.Run.AI.Compatibility.HubReviewResponse") is null,
+            "Run AI compatibility shims must not source-own registry review responses after extraction.");
     }
 
     private static string[] SplitManifestList(string value)

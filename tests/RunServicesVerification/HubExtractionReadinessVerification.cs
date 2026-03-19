@@ -20,7 +20,23 @@ internal static class HubExtractionReadinessVerification
 
     private static void VerifyRegistryBoundaryReadiness()
     {
-        var registryProject = XDocument.Load(Path.Combine(RepoRoot, "Chummer.Run.Registry", "Chummer.Run.Registry.csproj"));
+        VerificationAssert.True(
+            !Directory.Exists(Path.Combine(RepoRoot, "Chummer.Run.Registry")),
+            "Run-services must not keep the registry service source-owned after owner transfer to chummer6-hub-registry.");
+
+        foreach (var retiredFile in new[]
+                 {
+                     Path.Combine(RepoRoot, "Chummer.Run.Contracts", "HubRegistryContracts.cs"),
+                     Path.Combine(RepoRoot, "Chummer.Run.Contracts", "RegistryContracts.cs"),
+                     Path.Combine(RepoRoot, "Chummer.Run.Contracts", "PublicationContracts.cs")
+                 })
+        {
+            VerificationAssert.True(
+                !File.Exists(retiredFile),
+                $"Run-services must not keep retired local registry/publication contract shadows: {Path.GetFileName(retiredFile)}");
+        }
+
+        var registryProject = XDocument.Load(Path.Combine(RepoRoot, "..", "chummer-hub-registry", "Chummer.Run.Registry", "Chummer.Run.Registry.csproj"));
         var projectReferences = registryProject
             .Descendants("ProjectReference")
             .Select(static element => (string?)element.Attribute("Include"))
@@ -42,11 +58,23 @@ internal static class HubExtractionReadinessVerification
         VerificationAssert.True(
             assemblyReferences.Any(static entry =>
                 string.Equals(entry.Include, "Chummer.Hub.Registry.Contracts", StringComparison.Ordinal)
-                && string.Equals(entry.HintPath, @"..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\bin\$(Configuration)\net10.0\Chummer.Hub.Registry.Contracts.dll", StringComparison.Ordinal)),
+                && string.Equals(entry.HintPath, @"..\Chummer.Hub.Registry.Contracts\bin\$(Configuration)\net10.0\Chummer.Hub.Registry.Contracts.dll", StringComparison.Ordinal)),
             "Chummer.Run.Registry should consume registry/publication DTOs through the sibling hub-registry owner package.");
         VerificationAssert.True(
             assemblyReferences.All(static entry => !string.Equals(entry.Include, "Chummer.Run.Contracts", StringComparison.Ordinal)),
             "Chummer.Run.Registry must not keep a local Chummer.Run.Contracts assembly seam for registry/publication ownership.");
+
+        var runContractsAssembly = AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(static assembly => string.Equals(assembly.GetName().Name, "Chummer.Run.Contracts", StringComparison.Ordinal))
+            ?? TryLoadAssembly("Chummer.Run.Contracts");
+        VerificationAssert.NotNull(runContractsAssembly, "RunServicesVerification should be able to load Chummer.Run.Contracts for boundary checks.");
+
+        VerificationAssert.True(
+            runContractsAssembly!.GetType("Chummer.Run.Contracts.Registry.HubArtifactCreateRequest") is null,
+            "Chummer.Run.Contracts must not ship registry contract types after hub-registry owner transfer.");
+        VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Publication.PublicationRecordResponse") is null,
+            "Chummer.Run.Contracts must not ship publication contract types after hub-registry owner transfer.");
 
         var runApiAssembly = AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(static assembly => string.Equals(assembly.GetName().Name, "Chummer.Run.Api", StringComparison.Ordinal))
@@ -125,6 +153,30 @@ internal static class HubExtractionReadinessVerification
         VerificationAssert.True(
             string.Equals(mediaReference!.HintPath, @"..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll", StringComparison.Ordinal),
             "Chummer.Run.AI must consume Chummer.Media.Contracts through the sibling media-factory owner package.");
+
+        var mediaRuntimeReference = runAiProject
+            .Descendants("Reference")
+            .Select(static element => new
+            {
+                Include = (string?)element.Attribute("Include"),
+                HintPath = (string?)element.Element("HintPath")
+            })
+            .FirstOrDefault(static entry => string.Equals(entry.Include, "Chummer.Media.Factory.Runtime", StringComparison.Ordinal));
+        VerificationAssert.NotNull(mediaRuntimeReference, "Chummer.Run.AI must reference the media-factory runtime assembly.");
+        VerificationAssert.True(
+            string.Equals(mediaRuntimeReference!.HintPath, @"..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Factory.Runtime\bin\$(Configuration)\net10.0\Chummer.Media.Factory.Runtime.dll", StringComparison.Ordinal),
+            "Chummer.Run.AI must consume media execution through the sibling media-factory runtime assembly.");
+
+        foreach (var retiredMediaService in new[]
+                 {
+                     Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Assets", "AssetLifecycleService.cs"),
+                     Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Assets", "MediaRenderJobService.cs")
+                 })
+        {
+            VerificationAssert.True(
+                !File.Exists(retiredMediaService),
+                $"Run-services must not keep retired local media execution ownership: {Path.GetFileName(retiredMediaService)}");
+        }
     }
 
     private static void VerifyDesignMirrorReadiness()

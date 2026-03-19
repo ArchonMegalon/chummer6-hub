@@ -8,7 +8,6 @@ This inventory captures non-hosted surfaces still visible at the `run-services` 
 - `Chummer.Run.AI`
 - `Chummer.Run.Contracts`
 - `Chummer.Run.Identity`
-- `Chummer.Run.Registry`
 - `Chummer.Play.Contracts`
 - `docs/`
 - `tests/`
@@ -17,7 +16,9 @@ This inventory captures non-hosted surfaces still visible at the `run-services` 
 ## External owner packages consumed from sibling repos
 
 - `Chummer.Media.Contracts` via `chummer6-media-factory`
+- `Chummer.Media.Factory.Runtime` via `chummer6-media-factory`
 - `Chummer.Hub.Registry.Contracts` via `chummer6-hub-registry`
+- `Chummer.Run.Registry` via `chummer6-hub-registry`
 
 ## Boundary moves completed
 

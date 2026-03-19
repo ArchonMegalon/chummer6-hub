@@ -30,9 +30,9 @@ The job here is shrink-to-fit:
 
 Current honesty clause:
 
-- the hosted boundary story is good
-- the physical repo body is still broader than that story
-- closing `A2`, `A3`, `C0`, and `C1` requires more shrinkage, not more adjectives
+- registry and render-only execution ownership are now physically out-of-repo
+- the remaining shrinkage is orchestration polish, not hidden service ownership
+- closing the remaining hosted milestones is now about contract cleanup and adapter depth, not where registry/media code lives
 
 ## Go deeper
 

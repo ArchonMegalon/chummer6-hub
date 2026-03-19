@@ -11,8 +11,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Run.Api", "Chummer.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Run.Identity", "Chummer.Run.Identity\Chummer.Run.Identity.csproj", "{36440FA7-93FE-4B12-B5BC-E31DF48F7580}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Run.Registry", "Chummer.Run.Registry\Chummer.Run.Registry.csproj", "{7BF2164E-FB95-49C8-B0F6-8B43E2DE7279}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Run.AI", "Chummer.Run.AI\Chummer.Run.AI.csproj", "{8C50A2B6-CBCB-47CA-8743-585BB1404045}"
 EndProject
 Global
@@ -40,10 +38,6 @@ Global
 		{36440FA7-93FE-4B12-B5BC-E31DF48F7580}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{36440FA7-93FE-4B12-B5BC-E31DF48F7580}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{36440FA7-93FE-4B12-B5BC-E31DF48F7580}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7BF2164E-FB95-49C8-B0F6-8B43E2DE7279}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7BF2164E-FB95-49C8-B0F6-8B43E2DE7279}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7BF2164E-FB95-49C8-B0F6-8B43E2DE7279}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7BF2164E-FB95-49C8-B0F6-8B43E2DE7279}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8C50A2B6-CBCB-47CA-8743-585BB1404045}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8C50A2B6-CBCB-47CA-8743-585BB1404045}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8C50A2B6-CBCB-47CA-8743-585BB1404045}.Release|Any CPU.ActiveCfg = Release|Any CPU
