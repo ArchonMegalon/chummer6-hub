@@ -289,6 +289,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         {
             ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json"),
             ["FLEET_RECEIPT_SIGNING_SECRET"] = "smoke-secret",
+            ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
         })
         .Build();
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
@@ -296,8 +297,10 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var accounts = new AccountService(store);
     var groups = new GroupService(store, accounts);
     var rewards = new RewardService(store);
+    var leaderboards = new LeaderboardService(store);
     var entitlements = new EntitlementService(store);
     var ledger = new LedgerService(store, rewards, entitlements);
+    var identityLinks = new IdentityLinkService(store, accounts);
     var ledgerVerifier = new FleetReceiptVerifier(configuration);
     var projectionVerifier = new BoosterReceiptVerifier(configuration);
     var projectionAccess = new BoosterProjectionAccessGuard(configuration);
@@ -329,6 +332,44 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var currentAccountResult = currentAccount.Result as OkObjectResult;
     Assert(currentAccountResult?.Value is HubUserDto { UserId: not null }, "authenticated account endpoints should allow matching subjects.");
 
+    var emailLink = identityLinks.LinkEmail(new LinkEmailIdentityRequest(
+        SubjectId: "subject.demo",
+        Email: "runner@example.invalid",
+        MakePrimary: true));
+    Assert(string.Equals(emailLink.Status, "pending_verification", StringComparison.OrdinalIgnoreCase), "email links should begin pending verification.");
+
+    var confirmedEmail = identityLinks.ConfirmIdentityLink(new ConfirmIdentityLinkRequest(
+        SubjectId: "subject.demo",
+        IdentityLinkId: emailLink.IdentityLinkId));
+    Assert(string.Equals(confirmedEmail.Status, "verified", StringComparison.OrdinalIgnoreCase), "email links should become verified after confirmation.");
+
+    var googleLink = identityLinks.LinkExternalIdentity(new LinkExternalIdentityRequest(
+        SubjectId: "subject.demo",
+        Provider: "google",
+        ProviderSubject: "google-oauth-subject",
+        DisplayLabel: "Runner Google",
+        MakePrimary: true));
+    Assert(string.Equals(googleLink.Status, "provider_backed", StringComparison.OrdinalIgnoreCase), "Google links should be treated as provider-backed auth.");
+
+    var officialTelegram = identityLinks.LinkChannel(new LinkChannelRequest(
+        SubjectId: "subject.demo",
+        ChannelKind: "telegram_official_bot",
+        ChannelHandle: "@hubbrain",
+        NotificationsEnabled: true));
+    Assert(string.Equals(officialTelegram.Status, "active", StringComparison.OrdinalIgnoreCase), "official Telegram companion channel should be active when linked.");
+
+    var byoTelegram = identityLinks.LinkChannel(new LinkChannelRequest(
+        SubjectId: "subject.demo",
+        ChannelKind: "telegram_user_bot",
+        ChannelHandle: "@runner_sidecar",
+        NotificationsEnabled: false));
+    Assert(string.Equals(byoTelegram.Status, "future_capability", StringComparison.OrdinalIgnoreCase), "bring-your-own Telegram bot links should stay explicitly future-bound.");
+
+    var linkSummary = identityLinks.GetSummary("subject.demo");
+    Assert(string.Equals(linkSummary.RecommendedPrimaryAuth, "google", StringComparison.OrdinalIgnoreCase), "linked identity summary should prefer Google once provider-backed auth exists.");
+    Assert(string.Equals(linkSummary.OrchestratorBrain, "EA", StringComparison.OrdinalIgnoreCase), "identity/channel summary should keep EA as the orchestrator brain.");
+    Assert(linkSummary.ChannelLinks.Any(static link => string.Equals(link.ChannelKind, "telegram_official_bot", StringComparison.OrdinalIgnoreCase)), "identity/channel summary should expose the official Telegram companion link.");
+
     var signedLaneReceipt = BuildSignedReceiptElement("smoke-secret", new Dictionary<string, object?>
     {
         ["receipt_id"] = "rcpt-signed-001",
@@ -355,7 +396,9 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         ["files_touched"] = 2,
         ["diff_size"] = 64,
         ["issue_fingerprints"] = new[] { "lint" },
-        ["credit_burn_estimate"] = 0
+        ["credit_burn_estimate"] = 0,
+        ["authorization_tier_at_receipt"] = "pro",
+        ["tier_source"] = "fleet_detected",
     });
     var forgedReceipt = BuildSignedReceiptElement("wrong-secret", new Dictionary<string, object?>
     {
@@ -436,9 +479,75 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     Assert(string.Equals(locallyStopped.Session.Status, "stopped", StringComparison.OrdinalIgnoreCase), "sessions without Fleet lanes should stop locally.");
     Assert(locallyStopped.Session.ActivatedAtUtc is null, "sessions stopped before auth should never report activation.");
     Assert(
-        boostSessions.ListBadgesForSessionUser(pendingSession.SponsorSessionId).Any(static badge => string.Equals(badge.Key, "chickend-out", StringComparison.OrdinalIgnoreCase)),
-        "stopping after consent but before activation should award the Chickend Out badge.");
+        boostSessions.ListBadgesForSessionUser(pendingSession.SponsorSessionId).Any(static badge => string.Equals(badge.Key, "chickened-out", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)),
+        "stopping after consent but before activation should award the Chickened Out badge.");
     Assert(fleetCallCount == 0, "stopping a session before lane creation should not call Fleet.");
+
+    var laterBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/internal/participant-lanes")
+        {
+            return JsonResponse(new
+            {
+                lane = new
+                {
+                    lane_id = "participant-auth-success",
+                    status = "pending_auth",
+                    authorization_tier = "pro",
+                    tier_source = "fleet_detected",
+                    telemetry = new
+                    {
+                        auth_ready = false,
+                    },
+                },
+            });
+        }
+
+        if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/internal/participant-lanes/participant-auth-success/device-auth/start")
+        {
+            return JsonResponse(new
+            {
+                lane = new
+                {
+                    lane_id = "participant-auth-success",
+                    status = "pending_auth",
+                    authorization_tier = "pro",
+                    tier_source = "fleet_detected",
+                    device_auth = new
+                    {
+                        verification_uri = "https://example.com/device",
+                        user_code = "ABCD-EFGH",
+                        auth_ready = true,
+                    },
+                    telemetry = new
+                    {
+                        auth_ready = true,
+                        authorization_tier = "pro",
+                        tier_source = "fleet_detected",
+                    },
+                },
+            });
+        }
+
+        return JsonResponse(new { detail = "unexpected fleet call" }, HttpStatusCode.InternalServerError);
+    })), configuration);
+    var laterSessions = new BoostSessionService(store, accounts, groups, laterBridge, rewards);
+    var laterSession = laterSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.demo",
+        ProjectId: "fleet",
+        GroupId: ownerGroup.GroupId,
+        SubjectLabel: "Runner Demo",
+        AuthorizationTier: "pro",
+        TierSource: "user_declared"));
+    laterSessions.RecordConsent(laterSession.SponsorSessionId);
+    var authStarted = await laterSessions.StartDeviceAuthAsync(laterSession.SponsorSessionId, CancellationToken.None);
+    Assert(authStarted.Session.AuthorizedAtUtc is not null, "auth-ready device auth should mark the sponsor session as authorized.");
+    var laterBadges = laterSessions.ListBadgesForSessionUser(laterSession.SponsorSessionId);
+    Assert(!laterBadges.Any(static badge => string.Equals(badge.Key, "chickened-out", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)), "later successful authorization should revoke the Chickened Out badge.");
+    Assert(laterBadges.Any(static badge => string.Equals(badge.Key, "pro-sponsor-active", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)), "current sponsor tier should award a transient active-tier badge.");
+    var recognition = leaderboards.UserRecognitionSummary(createdUser.UserId);
+    Assert(string.Equals(recognition.CurrentAuthorizationTier, "pro", StringComparison.OrdinalIgnoreCase), "recognition summary should report the current sponsor tier.");
+    Assert(recognition.CurrentSponsorRankScore > recognition.LifetimePoints, "current sponsor rank should include a derived active-tier bonus without rewriting lifetime points.");
 
     var laneCreationBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
     {

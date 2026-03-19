@@ -9,6 +9,7 @@
 * hosted orchestration and relay seams
 * identity, approvals, memory, and delivery on the hosted side
 * principal-to-user mapping and user-profile truth
+* linked identities, verified-email hygiene, and social/channel adapter policy
 * generic groups, memberships, join codes, and boost codes
 * sponsorship / participation UX for Fleet premium burst lanes
 * fact ledger, reward journal, and entitlement journal for community participation
@@ -58,6 +59,7 @@ The remaining work is future product depth and physical cleanup, not pretending 
 Participation UX for premium burst lanes belongs here, but the resulting Codex auth cache stays lane-local on Fleet rather than being stored in hub identity or hub databases.
 
 The first-class sponsor/consent/device-auth/lane/receipt lifecycle is defined centrally in `products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md`.
+The first-class linked-identity and channel-linking posture is defined centrally in `products/chummer/IDENTITY_AND_CHANNEL_LINKING_MODEL.md`.
 
 ## Sequencing rule
 
@@ -87,6 +89,14 @@ Canonical Hub concepts:
 * sponsor session: bounded premium-burst sponsorship lifecycle
 
 User accounts must not collapse into raw identity subjects, and group types must stay generic enough for `booster`, `campaign`, `gm_circle`, `creator_team`, `guild`, and future org-like surfaces.
+
+Linked identities and linked channels are separate records:
+
+* identity links cover email hygiene, social auth bootstrap, and recovery posture
+* channel links cover official bot routing, notifications, and future advanced bot integrations
+
+Telegram may appear in both planes, but it does not become the account core or a replacement for Hub-owned permissions.
+EA remains the orchestration brain behind official companion channels.
 
 The generic group system exists so later GM and campaign tooling can reuse the same account, role, and entitlement substrate rather than introducing a second social/authority model.
 

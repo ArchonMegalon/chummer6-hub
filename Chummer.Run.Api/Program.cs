@@ -29,6 +29,7 @@ builder.Services.AddSingleton<CommunityStore>();
 builder.Services.AddSingleton<PublicLandingService>();
 builder.Services.AddSingleton<FleetReceiptVerifier>();
 builder.Services.AddSingleton<AccountService>();
+builder.Services.AddSingleton<IdentityLinkService>();
 builder.Services.AddSingleton<GroupService>();
 builder.Services.AddSingleton<RewardService>();
 builder.Services.AddSingleton<EntitlementService>();

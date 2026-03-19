@@ -34,6 +34,8 @@ public sealed class CommunityStore
     public Dictionary<string, BoostCampaignDto> CampaignsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, BoostCodeDto> BoostCodesByValue { get; } = new(StringComparer.OrdinalIgnoreCase);
     internal Dictionary<string, SponsorSessionState> SponsorSessionsById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<LinkedIdentityDto> LinkedIdentities { get; } = new();
+    public List<ChannelLinkDto> ChannelLinks { get; } = new();
     public List<ContributionReceiptDto> Receipts { get; } = new();
     public List<LedgerEntryDto> LedgerEntries { get; } = new();
     public List<RewardJournalEntryDto> RewardEntries { get; } = new();
@@ -52,6 +54,8 @@ public sealed class CommunityStore
                 .OrderBy(static session => session.SponsorSessionId, StringComparer.OrdinalIgnoreCase)
                 .Select(SponsorSessionStateSnapshot.FromState)
                 .ToArray(),
+            LinkedIdentities: LinkedIdentities.ToArray(),
+            ChannelLinks: ChannelLinks.ToArray(),
             Receipts: Receipts.ToArray(),
             LedgerEntries: LedgerEntries.ToArray(),
             RewardEntries: RewardEntries.ToArray(),
@@ -96,6 +100,8 @@ public sealed class CommunityStore
         CampaignsById.Clear();
         BoostCodesByValue.Clear();
         SponsorSessionsById.Clear();
+        LinkedIdentities.Clear();
+        ChannelLinks.Clear();
         Receipts.Clear();
         LedgerEntries.Clear();
         RewardEntries.Clear();
@@ -141,6 +147,8 @@ public sealed class CommunityStore
             SponsorSessionsById[state.SponsorSessionId] = state;
         }
 
+        LinkedIdentities.AddRange(snapshot.LinkedIdentities ?? Array.Empty<LinkedIdentityDto>());
+        ChannelLinks.AddRange(snapshot.ChannelLinks ?? Array.Empty<ChannelLinkDto>());
         Receipts.AddRange(snapshot.Receipts ?? Array.Empty<ContributionReceiptDto>());
         LedgerEntries.AddRange(snapshot.LedgerEntries ?? Array.Empty<LedgerEntryDto>());
         RewardEntries.AddRange(snapshot.RewardEntries ?? Array.Empty<RewardJournalEntryDto>());
@@ -175,9 +183,12 @@ internal sealed class SponsorSessionState
     public string? BoostCodeId { get; set; }
     public string? DeviceAuthVerificationUri { get; set; }
     public string? DeviceAuthUserCode { get; set; }
+    public string AuthorizationTier { get; set; } = "unknown";
+    public string TierSource { get; set; } = "unknown";
     public DateTimeOffset CreatedAtUtc { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? ConsentedAtUtc { get; set; }
+    public DateTimeOffset? AuthorizedAtUtc { get; set; }
     public DateTimeOffset? ActivatedAtUtc { get; set; }
     public DateTimeOffset? StoppedAtUtc { get; set; }
     public List<SponsorSessionEventDto> Events { get; } = new();
@@ -202,7 +213,10 @@ internal sealed class SponsorSessionState
             ConsentedAtUtc,
             ActivatedAtUtc,
             StoppedAtUtc,
-            Events.ToArray());
+            Events.ToArray(),
+            AuthorizationTier,
+            TierSource,
+            AuthorizedAtUtc);
 }
 
 internal sealed record CommunityStoreSnapshot(
@@ -212,6 +226,8 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<BoostCampaignDto> Campaigns,
     IReadOnlyList<BoostCodeDto> BoostCodes,
     IReadOnlyList<SponsorSessionStateSnapshot> SponsorSessions,
+    IReadOnlyList<LinkedIdentityDto>? LinkedIdentities,
+    IReadOnlyList<ChannelLinkDto>? ChannelLinks,
     IReadOnlyList<ContributionReceiptDto> Receipts,
     IReadOnlyList<LedgerEntryDto> LedgerEntries,
     IReadOnlyList<RewardJournalEntryDto> RewardEntries,
@@ -237,7 +253,10 @@ internal sealed record SponsorSessionStateSnapshot(
     DateTimeOffset? ConsentedAtUtc,
     DateTimeOffset? ActivatedAtUtc,
     DateTimeOffset? StoppedAtUtc,
-    IReadOnlyList<SponsorSessionEventDto> Events)
+    IReadOnlyList<SponsorSessionEventDto> Events,
+    string AuthorizationTier = "unknown",
+    string TierSource = "unknown",
+    DateTimeOffset? AuthorizedAtUtc = null)
 {
     public static SponsorSessionStateSnapshot FromState(SponsorSessionState state)
         => new(
@@ -259,7 +278,10 @@ internal sealed record SponsorSessionStateSnapshot(
             state.ConsentedAtUtc,
             state.ActivatedAtUtc,
             state.StoppedAtUtc,
-            state.Events.ToArray());
+            state.Events.ToArray(),
+            state.AuthorizationTier,
+            state.TierSource,
+            state.AuthorizedAtUtc);
 
     public SponsorSessionState ToState()
     {
@@ -281,8 +303,11 @@ internal sealed record SponsorSessionStateSnapshot(
             CreatedAtUtc = CreatedAtUtc,
             UpdatedAtUtc = UpdatedAtUtc,
             ConsentedAtUtc = ConsentedAtUtc,
+            AuthorizedAtUtc = AuthorizedAtUtc,
             ActivatedAtUtc = ActivatedAtUtc,
             StoppedAtUtc = StoppedAtUtc,
+            AuthorizationTier = SponsorStatusPolicy.NormalizeAuthorizationTier(AuthorizationTier),
+            TierSource = SponsorStatusPolicy.NormalizeTierSource(TierSource),
         };
         if (Events is not null)
         {

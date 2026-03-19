@@ -39,15 +39,18 @@ Current honesty clause:
 The public-facing community spine now lives here too:
 
 - `Chummer.Run.Api` owns product-level users, groups, join/boost codes, sponsor sessions, leaderboards, rewards, and entitlements
+- `Chummer.Run.Api` also owns linked identity and channel-link state for email hygiene, Google/Facebook social bootstrap, and official Telegram companion routing
 - `Chummer.Run.Identity` remains the principal/session boundary below that account layer
 - `Chummer.Run.AI` ingests sponsor receipts and projects sponsored-lane activity
 - Fleet executes sponsored participant lanes, but Hub owns the canonical community/accounting truth
+- EA remains the orchestrator brain behind companion and assistant channels; Telegram, Google, Facebook, and transactional email are adapters around that hub-owned account plane
 
 ## Go deeper
 
 - `docs/HOSTED_BOUNDARY.md`
 - `docs/HUB_EXTRACTION_ACCEPTANCE.md`
 - `docs/HUB_COMMUNITY_LEDGER_PLANE.md`
+- `docs/HUB_IDENTITY_AND_CHANNEL_MODEL.md`
 - `docs/PUBLIC_LANDING_SURFACE.md`
 - `.codex-design/repo/IMPLEMENTATION_SCOPE.md`
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Boosters;
@@ -12,12 +13,14 @@ public sealed class BoostSessionsController : ControllerBase
 {
     private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
+    private readonly LeaderboardService _leaderboards;
     private readonly BoostSessionService _sessions;
 
-    public BoostSessionsController(AccountService accounts, HubIdentityClient identity, BoostSessionService sessions)
+    public BoostSessionsController(AccountService accounts, HubIdentityClient identity, LeaderboardService leaderboards, BoostSessionService sessions)
     {
         _accounts = accounts;
         _identity = identity;
+        _leaderboards = leaderboards;
         _sessions = sessions;
     }
 
@@ -71,13 +74,7 @@ public sealed class BoostSessionsController : ControllerBase
             }
 
             var refreshed = await _sessions.RefreshAsync(sponsorSessionId, cancellationToken);
-            return Ok(new
-            {
-                sponsorSession = refreshed.Session,
-                fleet = refreshed.Fleet,
-                receipts = _sessions.ListReceipts(sponsorSessionId),
-                badges = _sessions.ListBadgesForSessionUser(sponsorSessionId)
-            });
+            return Ok(BuildSessionEnvelope(refreshed.Session, refreshed.Fleet));
         }
         catch (HubRequestAuthException ex)
         {
@@ -133,7 +130,7 @@ public sealed class BoostSessionsController : ControllerBase
             }
 
             var result = await _sessions.StartDeviceAuthAsync(sponsorSessionId, cancellationToken);
-            return Ok(new { sponsorSession = result.Session, fleet = result.Fleet });
+            return Ok(BuildSessionEnvelope(result.Session, result.Fleet));
         }
         catch (HubRequestAuthException ex)
         {
@@ -167,7 +164,7 @@ public sealed class BoostSessionsController : ControllerBase
             }
 
             var result = await _sessions.ActivateAsync(sponsorSessionId, cancellationToken);
-            return Ok(new { sponsorSession = result.Session, fleet = result.Fleet });
+            return Ok(BuildSessionEnvelope(result.Session, result.Fleet));
         }
         catch (HubRequestAuthException ex)
         {
@@ -201,7 +198,7 @@ public sealed class BoostSessionsController : ControllerBase
             }
 
             var result = await _sessions.StopAsync(sponsorSessionId, revoke: false, cancellationToken);
-            return Ok(new { sponsorSession = result.Session, fleet = result.Fleet });
+            return Ok(BuildSessionEnvelope(result.Session, result.Fleet));
         }
         catch (HubRequestAuthException ex)
         {
@@ -235,7 +232,7 @@ public sealed class BoostSessionsController : ControllerBase
             }
 
             var result = await _sessions.StopAsync(sponsorSessionId, revoke: true, cancellationToken);
-            return Ok(new { sponsorSession = result.Session, fleet = result.Fleet });
+            return Ok(BuildSessionEnvelope(result.Session, result.Fleet));
         }
         catch (HubRequestAuthException ex)
         {
@@ -269,4 +266,14 @@ public sealed class BoostSessionsController : ControllerBase
 
         return session;
     }
+
+    private object BuildSessionEnvelope(SponsorSessionStatusDto session, JsonObject? fleet)
+        => new
+        {
+            sponsorSession = session,
+            fleet,
+            receipts = _sessions.ListReceipts(session.SponsorSessionId),
+            badges = _sessions.ListBadgesForSessionUser(session.SponsorSessionId),
+            recognition = _leaderboards.UserRecognitionSummary(session.UserId)
+        };
 }

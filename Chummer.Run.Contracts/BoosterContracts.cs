@@ -46,7 +46,10 @@ public sealed record SponsorSessionStatusDto(
     DateTimeOffset? ConsentedAtUtc,
     DateTimeOffset? ActivatedAtUtc,
     DateTimeOffset? StoppedAtUtc,
-    IReadOnlyList<SponsorSessionEventDto> Events);
+    IReadOnlyList<SponsorSessionEventDto> Events,
+    string AuthorizationTier = "unknown",
+    string TierSource = "unknown",
+    DateTimeOffset? AuthorizedAtUtc = null);
 
 public sealed record SponsorSessionProjectionDto(
     string SponsorSessionId,
@@ -83,4 +86,6 @@ public sealed record CreateSponsorSessionRequest(
     string? BoostCode = null,
     string? CampaignId = null,
     string Visibility = "group",
-    string RequestedLaneType = "participant_burst");
+    string RequestedLaneType = "participant_burst",
+    string? AuthorizationTier = null,
+    string? TierSource = null);

@@ -14,12 +14,14 @@ public sealed class CodexParticipationController : ControllerBase
 {
     private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
+    private readonly LeaderboardService _leaderboards;
     private readonly BoostSessionService _sessions;
 
-    public CodexParticipationController(AccountService accounts, HubIdentityClient identity, BoostSessionService sessions)
+    public CodexParticipationController(AccountService accounts, HubIdentityClient identity, LeaderboardService leaderboards, BoostSessionService sessions)
     {
         _accounts = accounts;
         _identity = identity;
+        _leaderboards = leaderboards;
         _sessions = sessions;
     }
 
@@ -81,6 +83,17 @@ public sealed class CodexParticipationController : ControllerBase
       <input id="groupId" placeholder="optional grp-..." />
       <label for="boostCode">Boost code</label>
       <input id="boostCode" placeholder="optional BOOST-..." />
+      <label for="authorizationTier">Current authorization tier</label>
+      <select id="authorizationTier">
+        <option value="unknown" selected>Unknown</option>
+        <option value="free">Free</option>
+        <option value="go">Go</option>
+        <option value="plus">Plus</option>
+        <option value="pro">Pro</option>
+        <option value="business">Business</option>
+        <option value="edu">Edu</option>
+        <option value="enterprise">Enterprise</option>
+      </select>
       <label><input id="consent1" type="checkbox" /> I understand my ChatGPT/Codex entitlement will be used for project work.</label>
       <label><input id="consent2" type="checkbox" /> I understand this creates a temporary worker lane.</label>
       <label><input id="consent3" type="checkbox" /> I understand final merge is still controlled by Fleet review and jury.</label>
@@ -115,6 +128,11 @@ public sealed class CodexParticipationController : ControllerBase
     <section class="panel">
       <h2>Badges</h2>
       <pre id="badgeState">No badges yet.</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Recognition Summary</h2>
+      <pre id="recognitionState">No recognition summary yet.</pre>
     </section>
   </main>
 
@@ -152,7 +170,9 @@ public sealed class CodexParticipationController : ControllerBase
         projectId: document.getElementById("projectId").value,
         groupId: document.getElementById("groupId").value || null,
         boostCode: document.getElementById("boostCode").value || null,
-        visibility: "group"
+        visibility: "group",
+        authorizationTier: document.getElementById("authorizationTier").value || null,
+        tierSource: document.getElementById("authorizationTier").value !== "unknown" ? "user_declared" : null
       };
       const data = await api("/api/v1/participation/intents", { method: "POST", body: JSON.stringify(payload) });
       currentIntentId = data.intent.intentId || data.intent.sponsorSessionId || "";
@@ -201,6 +221,7 @@ public sealed class CodexParticipationController : ControllerBase
       const fleet = data.fleet || {};
       const receipts = data.receipts || [];
       const badges = data.badges || [];
+      const recognition = data.recognition || null;
       currentIntentId = intent.intentId || intent.sponsorSessionId || currentIntentId;
       document.getElementById("intentState").textContent = JSON.stringify(intent, null, 2);
       const lane = fleet.lane || {};
@@ -209,6 +230,7 @@ public sealed class CodexParticipationController : ControllerBase
       document.getElementById("deviceState").textContent = JSON.stringify({ lane, deviceAuth: auth, sponsorSession: data.sponsorSession || null }, null, 2);
       document.getElementById("receiptState").textContent = JSON.stringify(receipts, null, 2);
       document.getElementById("badgeState").textContent = JSON.stringify(badges, null, 2);
+      document.getElementById("recognitionState").textContent = JSON.stringify(recognition, null, 2);
     }
   </script>
 </body>
@@ -239,8 +261,10 @@ public sealed class CodexParticipationController : ControllerBase
                 BoostCode: request.BoostCode,
                 CampaignId: request.CampaignId,
                 Visibility: request.Visibility ?? "group",
-                RequestedLaneType: request.RequestedLaneType ?? "participant_burst"));
-            return Ok(BuildIntentEnvelope(session, receipts: _sessions.ListReceipts(session.SponsorSessionId), badges: _sessions.ListBadgesForSessionUser(session.SponsorSessionId)));
+                RequestedLaneType: request.RequestedLaneType ?? "participant_burst",
+                AuthorizationTier: request.AuthorizationTier,
+                TierSource: request.TierSource));
+            return Ok(BuildIntentEnvelope(session, receipts: _sessions.ListReceipts(session.SponsorSessionId), badges: _sessions.ListBadgesForSessionUser(session.SponsorSessionId), recognition: _leaderboards.UserRecognitionSummary(session.UserId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -271,7 +295,7 @@ public sealed class CodexParticipationController : ControllerBase
             }
 
             var session = _sessions.RecordConsent(intentId);
-            return Ok(BuildIntentEnvelope(session, receipts: _sessions.ListReceipts(session.SponsorSessionId), badges: _sessions.ListBadgesForSessionUser(session.SponsorSessionId)));
+            return Ok(BuildIntentEnvelope(session, receipts: _sessions.ListReceipts(session.SponsorSessionId), badges: _sessions.ListBadgesForSessionUser(session.SponsorSessionId), recognition: _leaderboards.UserRecognitionSummary(session.UserId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -302,7 +326,7 @@ public sealed class CodexParticipationController : ControllerBase
             }
 
             var result = await _sessions.StartDeviceAuthAsync(intentId, cancellationToken);
-            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId)));
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId), _leaderboards.UserRecognitionSummary(result.Session.UserId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -337,7 +361,7 @@ public sealed class CodexParticipationController : ControllerBase
             }
 
             var result = await _sessions.ActivateAsync(intentId, cancellationToken);
-            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId)));
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId), _leaderboards.UserRecognitionSummary(result.Session.UserId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -372,7 +396,7 @@ public sealed class CodexParticipationController : ControllerBase
             }
 
             var refreshed = await _sessions.RefreshAsync(intentId, cancellationToken);
-            return Ok(BuildIntentEnvelope(refreshed.Session, refreshed.Fleet, _sessions.ListReceipts(intentId), _sessions.ListBadgesForSessionUser(intentId)));
+            return Ok(BuildIntentEnvelope(refreshed.Session, refreshed.Fleet, _sessions.ListReceipts(intentId), _sessions.ListBadgesForSessionUser(intentId), _leaderboards.UserRecognitionSummary(refreshed.Session.UserId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -442,7 +466,7 @@ public sealed class CodexParticipationController : ControllerBase
             }
 
             var result = await _sessions.StopAsync(intentId, revoke: false, cancellationToken);
-            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId)));
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId), _leaderboards.UserRecognitionSummary(result.Session.UserId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -477,7 +501,7 @@ public sealed class CodexParticipationController : ControllerBase
             }
 
             var result = await _sessions.StopAsync(intentId, revoke: true, cancellationToken);
-            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId)));
+            return Ok(BuildIntentEnvelope(result.Session, result.Fleet, _sessions.ListReceipts(result.Session.SponsorSessionId), _sessions.ListBadgesForSessionUser(result.Session.SponsorSessionId), _leaderboards.UserRecognitionSummary(result.Session.UserId)));
         }
         catch (HubRequestAuthException ex)
         {
@@ -498,7 +522,8 @@ public sealed class CodexParticipationController : ControllerBase
         SponsorSessionStatusDto session,
         JsonObject? fleet = null,
         IReadOnlyList<ContributionReceiptDto>? receipts = null,
-        IReadOnlyList<BadgeDto>? badges = null)
+        IReadOnlyList<BadgeDto>? badges = null,
+        UserRecognitionSummaryDto? recognition = null)
         => new
         {
             intent = new
@@ -515,18 +540,22 @@ public sealed class CodexParticipationController : ControllerBase
                 fleetLaneId = session.FleetLaneId,
                 boostCampaignId = session.BoostCampaignId,
                 boostCodeId = session.BoostCodeId,
+                authorizationTier = session.AuthorizationTier,
+                tierSource = session.TierSource,
                 deviceAuthVerificationUri = session.DeviceAuthVerificationUri,
                 deviceAuthUserCode = session.DeviceAuthUserCode,
                 createdAtUtc = session.CreatedAtUtc,
                 updatedAtUtc = session.UpdatedAtUtc,
                 consentedAtUtc = session.ConsentedAtUtc,
+                authorizedAtUtc = session.AuthorizedAtUtc,
                 stoppedAtUtc = session.StoppedAtUtc,
                 events = session.Events
             },
             sponsorSession = session,
             fleet,
             receipts = receipts ?? Array.Empty<ContributionReceiptDto>(),
-            badges = badges ?? Array.Empty<BadgeDto>()
+            badges = badges ?? Array.Empty<BadgeDto>(),
+            recognition
         };
 
     private SponsorSessionStatusDto? TryGetOwnedSession(string sponsorSessionId, string subjectId, out ActionResult? denied)
@@ -557,4 +586,6 @@ public sealed record CreateCodexParticipationIntentRequest(
     string? BoostCode = null,
     string? CampaignId = null,
     string? Visibility = null,
-    string? RequestedLaneType = null);
+    string? RequestedLaneType = null,
+    string? AuthorizationTier = null,
+    string? TierSource = null);

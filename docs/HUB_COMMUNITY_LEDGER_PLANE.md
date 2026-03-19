@@ -6,6 +6,7 @@
 
 - Identity subject and session truth stays in `Chummer.Run.Identity`.
 - Product-level user, group, and sponsorship truth lives in `Chummer.Run.Api`.
+- Product-level linked identities and channel links also live in `Chummer.Run.Api`.
 - Sponsor-session receipt ingest and execution-side projections live in `Chummer.Run.AI`.
 - Fleet remains the sponsored worker executor.
 - EA remains the provider-aware telemetry substrate.
@@ -16,8 +17,14 @@
 - `user`: the product-level human account layered above raw principals
 - `group`: a reusable social/authority container with `group_type`, `visibility`, and capability flags
 - `membership`: the user's role inside a group
+- `linked identity`: a provider-backed or verification-backed auth/recovery identity attached to a product user
+- `channel link`: a user-approved messaging or companion channel bound to Hub policy
 - `sponsor session`: a consented participation session that can open a temporary sponsored Fleet lane
 - `entitlement`: a durable product right granted to a user or group
+
+Email verification is identity hygiene, not a separate product pillar.
+Google, Facebook, and Telegram are adapters around the Hub-owned account model.
+EA remains the orchestrator brain behind official companion channels; channel adapters do not replace that brain.
 
 ## Three ledgers, not one
 

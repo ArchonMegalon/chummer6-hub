@@ -236,6 +236,16 @@ program_phases:
     - "`/home` and `/account` give registered users a thin but real overlay above the public landing."
     - Follow/beta/participation overlays exist as product surfaces even if deeper workflows remain preview-bound."
     - Public and registered behavior matches `PUBLIC_USER_MODEL.md`."
+  - id: J3
+    title: Identity and channel linking posture becomes canonical
+    owners:
+    - chummer6-design
+    - chummer6-hub
+    status: in_progress
+    exit:
+    - "`IDENTITY_AND_CHANNEL_LINKING_MODEL.md` defines email hygiene, provider bootstrap priority, linked identities, linked channels, and official-versus-user-provided Telegram posture."
+    - Hub exposes a first real linked-identity and channel-link surface without inventing a second orchestration brain."
+    - EA remains the canonical companion/runtime brain behind official channel adapters."
 - id: B
   title: Surface split completion
   status: complete
