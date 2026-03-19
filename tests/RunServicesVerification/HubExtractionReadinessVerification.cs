@@ -91,6 +91,10 @@ internal static class HubExtractionReadinessVerification
 
     private static void VerifyMediaBoundaryReadiness()
     {
+        VerificationAssert.True(
+            !Directory.Exists(Path.Combine(RepoRoot, "Chummer.Media.Contracts")),
+            "Run-services must not keep a repo-local Chummer.Media.Contracts source project after media-factory owner transfer.");
+
         var mediaContractsAssembly = typeof(Chummer.Media.Contracts.AssetLifecyclePolicy).Assembly;
         var mediaContractsTypeNames = mediaContractsAssembly.GetTypes().Select(static type => type.Name).ToHashSet(StringComparer.Ordinal);
 

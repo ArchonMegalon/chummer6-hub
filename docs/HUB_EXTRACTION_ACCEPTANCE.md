@@ -94,6 +94,15 @@ Issue and migration anchors preserved in this acceptance narrative:
   - `tests/RunServicesVerification/CompatibilityVerification.cs`
   - `scripts/ai/verify.sh`
 
+## WL-231 media-contract mirror deletion follow-through
+
+- Scope: the repo-local `Chummer.Media.Contracts` source mirror must stay deleted now that hosted code consumes the owner-repo media contracts/runtime assemblies.
+- Acceptance rule: any media compatibility surface that remains here must be an explicit compatibility wrapper, not a second source-owned media contract project.
+- Executable proof path:
+  - `tests/RunServicesVerification/HubExtractionReadinessVerification.cs`
+  - `scripts/ai/run_services_verification.sh`
+  - `docs/HOSTED_BOUNDARY.md`
+
 ## WL-218 session semantic canon materialization (`D1`)
 
 - `D1` scope is semantic session canon alignment across play/run transport wrappers.
@@ -117,9 +126,12 @@ Issue and migration anchors preserved in this acceptance narrative:
 - `F1` scope is observability, disaster-recovery, restore, and replay-safety hardening.
 - Acceptance rule: restore, replay, runtime-bundle integrity, and verification-runbook flows must stay explicitly runnable and auditable.
 - Executable proof path:
+  - `scripts/ai/run_services_restore_drill.sh`
   - `scripts/ai/run_services_smoke.sh`
   - `scripts/ai/run_services_verification.sh`
   - `scripts/ai/verify.sh`
+- Operator runbook:
+  - `docs/HOSTED_RESTORE_RUNBOOK.md`
 - `tests/RunServicesVerification/StateStoreBackupVerification.cs`
 - `tests/RunServicesVerification/RuntimeBundleVerification.cs`
 

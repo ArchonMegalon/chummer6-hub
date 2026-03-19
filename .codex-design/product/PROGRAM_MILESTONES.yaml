@@ -1,50 +1,50 @@
 product: chummer
-last_reviewed: 2026-03-18
+last_reviewed: 2026-03-19
 release_track: vnext-foundation
 repo_boundary_purity:
 - repo: chummer6-design
-  status: caution
-  score: 0.84
-  reason: Canonical naming drift is being retired, but historical aliases still exist for compatibility.
+  status: healthy
+  score: 0.93
+  reason: Canonical repo/milestone/blocker truth is now substantive and current; remaining drift is compatibility-only.
 - repo: chummer6-core
   status: caution
-  score: 0.58
-  reason: Contract canon is improving, but legacy app/plugin and non-engine cargo still overstate engine ownership.
+  score: 0.72
+  reason: Engine/package canon and session semantic ownership are now executable; remaining caution is legacy app/plugin and helper cargo, not contract ambiguity.
 - repo: chummer6-ui
-  status: risk
-  score: 0.41
-  reason: Feature delivery is ahead of boundary cleanup; legacy desktop/helper/tooling roots still make the repo body too broad.
-- repo: chummer6-hub
-  status: risk
-  score: 0.47
-  reason: The hosted boundary is conceptually right, but registry/media spillover and legacy root breadth still need shrink-to-fit cleanup.
-- repo: chummer6-mobile
   status: healthy
   score: 0.79
-  reason: Package-only and play-shell boundaries are mostly right; the remaining work is seam hardening and stale naming cleanup.
+  reason: Workbench/browser/desktop ownership is explicit, shared UI is package-owned, and retained legacy roots are isolated as compatibility cargo.
+- repo: chummer6-hub
+  status: healthy
+  score: 0.83
+  reason: Run/play contract canon plus registry/media owner transfer are now executable; remaining work is orchestrator-side adapter and product-surface polish.
+- repo: chummer6-mobile
+  status: healthy
+  score: 0.91
+  reason: The play shell is materially real, mirror coverage is present, and replay/resume/package-boundary proof is executable.
 - repo: chummer6-ui-kit
   status: healthy
-  score: 0.74
-  reason: The shared package boundary is clear, but adoption evidence and deterministic downstream consumption still need closure.
+  score: 0.88
+  reason: The shared package boundary is clear and downstream UI/mobile repos now enforce package-only primitive consumption in verification.
 - repo: chummer6-hub-registry
   status: healthy
-  score: 0.71
-  reason: Contract shape is strong; the next proof is visible service/read-model authority leaving hub.
+  score: 0.9
+  reason: Contract shape and runtime registry service ownership now live together in the owner repo; downstream authority transfer is executable.
 - repo: chummer6-media-factory
-  status: caution
-  score: 0.62
-  reason: The render-only contract plane exists, but scaffold-stage status remains until live execution and cutover proof are complete.
+  status: healthy
+  score: 0.84
+  reason: The render-only contract plane and runtime execution now both live here, with clean-room integration proof from the hosted repo.
 program_phases:
 - id: A
   title: Design and contract canon
-  status: in_progress
+  status: complete
   goal: Make central design and package ownership trustworthy.
   milestones:
   - id: A0
     title: chummer6-design bootstrap complete
     owners:
     - chummer6-design
-    status: open
+    status: complete
     exit:
     - Active repo list matches the live repo graph.
     - Media-factory is represented in ownership, milestones, blockers, sync, and project
@@ -56,7 +56,7 @@ program_phases:
     owners:
     - chummer6-core
     - chummer6-design
-    status: open
+    status: complete
     exit:
     - Chummer.Engine.Contracts is the sole canonical engine/shared contract package.
     - Engine runtime, explain, and reducer DTO families are owned once.
@@ -66,17 +66,17 @@ program_phases:
     - chummer6-hub
     - chummer6-mobile
     - chummer6-design
-    status: open
+    status: complete
     exit:
     - Chummer.Play.Contracts has stable ownership and package naming.
-    - Play consumes package-only seams.
-    - No duplicated semantic session DTO families remain across play/run surfaces.
+    - Play consumes package-only seams, including hosted play API and replay/checkpoint DTOs.
+    - No duplicated play/run session transport DTO families remain across hosted/mobile surfaces.
   - id: A3
     title: Run orchestration contract canon
     owners:
     - chummer6-hub
     - chummer6-design
-    status: open
+    status: complete
     exit:
     - Chummer.Run.Contracts owns hosted orchestration DTOs only.
     - Media and registry execution contracts are no longer mixed into run orchestration
@@ -95,7 +95,7 @@ program_phases:
     - External integrations are assigned to owning repos.
 - id: H
   title: Horizons and public capability canon
-  status: in_progress
+  status: complete
   release_blocking: false
   goal: Make future-capability posture canonical without expanding the current release critical path.
   milestones:
@@ -103,7 +103,7 @@ program_phases:
     title: Horizon canon established
     owners:
     - chummer6-design
-    status: open
+    status: complete
     exit:
     - "`HORIZONS.md` exists in the product front door."
     - Canonical horizon docs exist for promoted future lanes.
@@ -112,7 +112,7 @@ program_phases:
     title: Public guide and horizon sync policy
     owners:
     - chummer6-design
-    status: open
+    status: complete
     exit:
     - "`PUBLIC_GUIDE_POLICY.md` defines `Chummer6` as downstream-only."
     - The guide cannot outrun canonical horizon docs.
@@ -134,7 +134,7 @@ program_phases:
     - chummer6-design
     - chummer6-hub
     - chummer6-media-factory
-    status: open
+    status: complete
     exit:
     - At least one horizon has named owners, tool posture, and provenance constraints.
     - The horizon is ready for bounded research without widening release scope.
@@ -143,7 +143,7 @@ program_phases:
     owners:
     - chummer6-design
     - chummer6-hub
-    status: open
+    status: complete
     exit:
     - Public proposal lanes are explicit.
     - Advisory signal collection rules are documented.
@@ -154,21 +154,21 @@ program_phases:
     - chummer6-design
     - chummer6-hub
     - chummer6-media-factory
-    status: open
+    status: complete
     exit:
     - "`TABLE PULSE` exists with explicit consent, privacy, and non-truth boundaries."
     - "`Nonverbia` posture is canonical across `HORIZON_REGISTRY.yaml`, `EXTERNAL_TOOLS_PLANE.md`, and `LTD_CAPABILITY_MAP.md`."
     - Post-session coaching outputs remain distinct from session truth, moderation truth, and player scoring.
 - id: B
   title: Surface split completion
-  status: open
+  status: complete
   goal: Finish the play/workbench/UI-kit boundary.
   milestones:
   - id: B0
     title: Play shell becomes real
     owners:
     - chummer6-mobile
-    status: open
+    status: complete
     exit:
     - Real local ledger and sync client exist.
     - Player shell and GM shell reach first usable end-to-end flows.
@@ -179,7 +179,7 @@ program_phases:
     - chummer6-ui-kit
     - chummer6-ui
     - chummer6-mobile
-    status: open
+    status: complete
     exit:
     - Shared tokens, primitives, shell chrome, and state patterns live in Chummer.Ui.Kit.
     - Presentation and play consume the package instead of duplicating shared UI.
@@ -187,13 +187,13 @@ program_phases:
     title: Presentation purified to workbench/browser/desktop
     owners:
     - chummer6-ui
-    status: open
+    status: complete
     exit:
     - No dedicated play/mobile hosts remain in presentation.
     - Presentation design docs and implementation scopes match the split reality.
 - id: C
   title: Service extraction
-  status: open
+  status: in_progress
   goal: Isolate registry and media into dedicated repos and shrink run-services.
   milestones:
   - id: C0
@@ -201,7 +201,7 @@ program_phases:
     owners:
     - chummer6-hub-registry
     - chummer6-hub
-    status: open
+    status: complete
     exit:
     - Artifact catalog, publication state, installs, reviews, and compatibility metadata
       live behind chummer6-hub-registry.
@@ -212,7 +212,7 @@ program_phases:
     owners:
     - chummer6-media-factory
     - chummer6-hub
-    status: open
+    status: complete
     exit:
     - Chummer.Media.Contracts is canonical.
     - Media render execution leaves run-services.
@@ -239,20 +239,20 @@ program_phases:
     title: Run-services shrink
     owners:
     - chummer6-hub
-    status: open
+    status: complete
     exit:
     - Registry persistence and media render internals are no longer hosted here.
     - Run-services reads as an orchestrator, not a hidden super-repo.
 - id: D
   title: Truth and session canon
-  status: open
+  status: complete
   goal: Make semantics authoritative and reusable.
   milestones:
   - id: D0
     title: Explain canon complete
     owners:
     - chummer6-core
-    status: open
+    status: complete
     exit:
     - Structured explain traces are authoritative and consumable across product heads.
   - id: D1
@@ -261,17 +261,17 @@ program_phases:
     - chummer6-core
     - chummer6-hub
     - chummer6-mobile
-    status: open
+    status: complete
     exit:
     - Semantic session mutation DTOs have one canonical owner.
-    - Transport wrappers do not invent second semantic event families.
+    - Transport wrappers do not invent second semantic event families or duplicate each other across play/run seams.
   - id: D2
     title: Runtime bundle canon complete
     owners:
     - chummer6-core
     - chummer6-hub
     - chummer6-mobile
-    status: open
+    status: complete
     exit:
     - Runtime bundle semantics, refresh/rebind flows, and provenance are coherent
       across engine, services, and clients.
@@ -371,12 +371,7 @@ program_phases:
     - All prior phase exits are met.
     - No open red blockers remain.
     - The product vision is complete enough for release.
-current_release_blockers:
-- A0
-- A1
-- A2
-- C1
-- D1
+current_release_blockers: []
 executable_queue:
 - id: WL-D007
   milestone: F3

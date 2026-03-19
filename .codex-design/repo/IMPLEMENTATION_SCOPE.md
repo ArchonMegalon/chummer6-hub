@@ -31,9 +31,9 @@ Mixed contract planes are temporary debt, not acceptable end state.
 
 ## Boundary truth
 
-Closing `A2`, `A3`, `C0`, and `C1` requires physical shrinkage, not only correct README wording.
+Closing `A2`, `A3`, `C0`, `C1`, and `C2` required physical shrinkage, not only correct README wording.
 
-The hub boundary is only considered clean when:
+The hub boundary is considered clean when:
 
 * registry persistence authority is visibly owned by `chummer6-hub-registry`
 * render-only media execution is visibly owned by `chummer6-media-factory`
@@ -42,7 +42,7 @@ The hub boundary is only considered clean when:
 
 ## Current reality
 
-The mission statement is correct.
-The repo body still carries more authority than the mission statement allows.
+The mission statement and the repo body are much closer now.
+Registry and media execution ownership are physically out of this repo.
 
-This repo should keep shrinking until the tree looks like the boundary story sounds.
+The remaining work is orchestrator-side adapters and product completion, not pretending hub still owns every hosted surface.

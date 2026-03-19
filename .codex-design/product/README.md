@@ -74,14 +74,11 @@ These inform the program but are not part of the main release train:
 
 ## Current program priorities
 
-1. Make `chummer6-design` trustworthy as the lead-designer repo.
-2. Finalize package/contract canon.
-3. Complete the play split with package-only dependency discipline in `chummer6-mobile`.
-4. Expand `chummer6-ui-kit` into the real shared UI boundary.
-5. Complete registry and media service extractions.
-6. Shrink `chummer6-hub` into orchestration-only ownership where appropriate.
-7. Purify `chummer6-core` into a true deterministic engine repo.
-8. Finish product surfaces and release hardening.
+1. Finish product completion across workbench, play, hub, assistant, and media heads.
+2. Close the remaining orchestration-side and media-side external adapter depth (`C1b`, `C1c`) without re-blurring ownership.
+3. Keep `chummer6-design` fresh enough that mirrors, Fleet status, and downstream public guides cannot drift from canon.
+4. Purify `chummer6-core` and `chummer6-hub` further by deleting remaining legacy cargo rather than arguing about it.
+5. Complete release hardening: accessibility, localization, performance, observability, DR, migration certification, and final release proof.
 
 ## Non-goal
 
