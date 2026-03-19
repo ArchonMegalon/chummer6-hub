@@ -51,18 +51,13 @@ public sealed class PublicLandingService
                 .ToArray(),
             SecondaryHighlights: ParseStringList(manifest, "secondary_highlights").ToArray(),
             PublicRoutes: ParseMapList(manifest, "public_routes")
-                .Select(static item => new PublicLandingRouteDto(
-                    Path: Required(item, "path"),
-                    Title: Required(item, "title"),
-                    Audience: Required(item, "audience"),
-                    Purpose: Required(item, "purpose")))
+                .Select(ParseRoute)
+                .ToArray(),
+            AuthRoutes: ParseMapList(manifest, "auth_routes")
+                .Select(ParseRoute)
                 .ToArray(),
             RegisteredRoutes: ParseMapList(manifest, "registered_routes")
-                .Select(static item => new PublicLandingRouteDto(
-                    Path: Required(item, "path"),
-                    Title: Required(item, "title"),
-                    Audience: Required(item, "audience"),
-                    Purpose: Required(item, "purpose")))
+                .Select(ParseRoute)
                 .ToArray(),
             Sections: ParseMapList(manifest, "sections")
                 .Select(static item => new PublicLandingSectionDto(
@@ -99,6 +94,18 @@ public sealed class PublicLandingService
         => surface.FeatureCards
             .Where(card => string.Equals(card.Bucket, bucket, StringComparison.Ordinal))
             .ToArray();
+
+    private static PublicLandingRouteDto ParseRoute(Dictionary<string, string> item)
+        => new(
+            Path: Required(item, "path"),
+            Title: Required(item, "title"),
+            Audience: Required(item, "audience"),
+            Purpose: Required(item, "purpose"),
+            RequiresAuth: ParseOptionalBool(item, "requires_auth") ?? false,
+            GuestFallback: Optional(item, "guest_fallback"),
+            MustExist: ParseOptionalBool(item, "must_exist") ?? true,
+            PlaceholderAllowed: ParseOptionalBool(item, "placeholder_allowed") ?? false,
+            PlaceholderRequirements: Optional(item, "placeholder_requirements"));
 
     private string ResolveRepoRoot()
     {
@@ -150,6 +157,11 @@ public sealed class PublicLandingService
 
         return null;
     }
+
+    private static bool? ParseOptionalBool(Dictionary<string, string> item, string key)
+        => item.TryGetValue(key, out var value)
+            ? ParseBool(value)
+            : null;
 
     private static IReadOnlyList<string> ParseStringList(IReadOnlyList<string> lines, string sectionName)
     {

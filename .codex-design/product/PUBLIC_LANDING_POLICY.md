@@ -27,6 +27,7 @@ The landing surface must let a normal person understand, in one visit:
 * If a feature is not live, the card must still explain what is coming and why it matters.
 * Landing meaning must compile from design-owned manifest and registry data rather than hub-local improvisation.
 * Public status is advisory and explanatory; it does not overrule canonical design truth.
+* Provider names may appear only on dedicated auth and account-security surfaces, not on the landing hero or proof cards.
 
 ## Surface split
 

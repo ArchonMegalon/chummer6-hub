@@ -263,7 +263,16 @@ void VerifyPublicationControllerHardening()
 
 void VerifyIdentityWorkflow()
 {
-    var identity = new IdentityAccessService();
+    var tempRoot = Path.Combine(Path.GetTempPath(), "run-services-smoke", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(tempRoot);
+    using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
+    var configuration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json")
+        })
+        .Build();
+    var identity = new IdentityAccessService(configuration, loggerFactory.CreateLogger<IdentityAccessService>());
     var issued = identity.IssueSession(new IdentitySessionIssueRequest(
         SubjectId: "runner.demo",
         DisplayName: "Runner Demo",
@@ -278,6 +287,18 @@ void VerifyIdentityWorkflow()
 
     var updated = identity.SetRoles("runner.demo", new IdentityRoleSetRequest(new[] { "publisher" }));
     Assert(updated.Roles.SequenceEqual(new[] { "publisher" }), "role updates should replace prior role grants");
+
+    var emailStart = identity.StartEmailEntry(new EmailAuthStartRequest(
+        Email: "runner@example.invalid",
+        DisplayName: "Runner Demo",
+        NextPath: "/home"));
+    Assert(emailStart.DeliveryMode == "preview_inline_link", "email-first entry should expose honest preview delivery mode without pretending transactional mail is configured.");
+
+    var emailSession = identity.CompleteEmailEntry(new EmailAuthCompleteRequest(emailStart.TicketId));
+    Assert(!string.IsNullOrWhiteSpace(emailSession.AccessToken), "email-first entry should complete into a real session.");
+
+    var revoked = identity.RevokeSession(new IdentitySessionRevokeRequest(emailSession.AccessToken));
+    Assert(revoked.Revoked, "identity service should revoke cookie-backed sessions.");
 }
 
 async Task VerifyHubCommunitySecurityAndDurabilityAsync()
@@ -595,6 +616,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/participate", StringComparison.Ordinal)), "landing surface should expose the participate entry route");
+    Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/login", StringComparison.Ordinal)), "landing surface should expose the login route");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Title, "KARMA FORGE", StringComparison.Ordinal) && string.Equals(card.Badge, "Booster first", StringComparison.Ordinal)), "landing feature registry should carry the booster-first posture for KARMA FORGE");
 
     var storePath = Path.Combine(Path.GetTempPath(), "run-services-smoke", Guid.NewGuid().ToString("N"), "community-store.json");
@@ -622,8 +644,37 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingHtml.Contains("Shadowrun rules truth, with receipts.", StringComparison.Ordinal), "landing page should render the canonical headline");
     Assert(landingHtml.Contains("/participate", StringComparison.Ordinal), "landing page should route people toward participate");
 
-    var homeHtml = (await controller.HomePage(CancellationToken.None)).Content ?? string.Empty;
-    Assert(homeHtml.Contains("Sign in to unlock overlays", StringComparison.Ordinal), "home page should render a clean signed-out overlay prompt");
+    var homeResult = await controller.HomePage(CancellationToken.None);
+    var homeRedirect = homeResult as RedirectResult;
+    Assert(homeRedirect is not null && string.Equals(homeRedirect.Url, "/login?next=/home", StringComparison.Ordinal), "home page should redirect signed-out guests to the login route.");
+
+    var authConfiguration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_PUBLIC_CANON_ROOT"] = "/docker/chummercomplete/chummer.run-services"
+        })
+        .Build();
+    var authService = new HubBrowserAuthService(new HttpClient(new StubHttpMessageHandler(_ =>
+        JsonResponse(new EmailAuthStartResponse(
+            TicketId: "eml_demo",
+            SubjectId: "subject.demo",
+            Email: "runner@example.invalid",
+            DisplayName: "Runner Demo",
+            NextPath: "/home",
+            CreatedAtUtc: DateTimeOffset.UtcNow,
+            ExpiresAtUtc: DateTimeOffset.UtcNow.AddMinutes(15),
+            DeliveryMode: "preview_inline_link",
+            PreviewNote: "preview"), HttpStatusCode.OK))), authConfiguration);
+    var authController = new AuthController(authService, identityClient, landing)
+    {
+        ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        }
+    };
+    var loginResult = await authController.LoginPage("/home", CancellationToken.None);
+    var loginHtml = (loginResult as ContentResult)?.Content ?? string.Empty;
+    Assert(loginHtml.Contains("Sign In", StringComparison.Ordinal) && loginHtml.Contains("/auth/email/start", StringComparison.Ordinal), "login page should render the email-first auth shell.");
 }
 
 void VerifyRegistryWorkflow()

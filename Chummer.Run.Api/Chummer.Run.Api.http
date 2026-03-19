@@ -1,6 +1,19 @@
 @Chummer.Run.Api_HostAddress = http://localhost:0
 
-GET {{Chummer.Run.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+GET {{Chummer.Run.Api_HostAddress}}/
+Accept: text/html
 
 ###
+
+GET {{Chummer.Run.Api_HostAddress}}/login?next=/home
+Accept: text/html
+
+###
+
+GET {{Chummer.Run.Api_HostAddress}}/status
+Accept: text/html
+
+###
+
+GET {{Chummer.Run.Api_HostAddress}}/participate
+Accept: text/html

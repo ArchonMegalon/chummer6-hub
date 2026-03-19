@@ -19,10 +19,14 @@
 - `/participate`
 - `/status`
 - `/artifacts`
+- `/login`
+- `/signup`
+- `/logout`
 - `/home`
 - `/account`
 
 `/participate/codex` remains the deeper preview booster flow behind the friendlier participate entry page.
+Guest access to `/home`, `/account`, and `/participate/codex` should fall back to `/login?next=...` rather than asking users to paste bearer tokens into product pages.
 
 ## Source of truth
 
@@ -52,6 +56,8 @@ Registered overlays may add:
 - account/profile
 - follow and beta-interest overlays
 - bounded participation state
+
+The first-wave hosted shell uses a boring browser session cookie over the identity boundary so account and participation pages stop doubling as ad hoc auth entrypoints.
 
 Thin overlays are acceptable in the POC, but the split must remain obvious.
 

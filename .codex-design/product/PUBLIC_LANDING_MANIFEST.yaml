@@ -14,7 +14,7 @@ hero_ctas:
     href: /downloads
     emphasis: primary
   - label: Sign in to follow what is coming
-    href: /home
+    href: /login?next=/home
     emphasis: secondary
 secondary_highlights:
   - Runs local-first.
@@ -25,43 +25,157 @@ public_routes:
     title: Landing
     audience: public
     purpose: product_front_door
+    requires_auth: false
+    guest_fallback: /
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public product story only
   - path: /what-is-chummer
     title: What is Chummer?
     audience: public
     purpose: product_story
+    requires_auth: false
+    guest_fallback: /what-is-chummer
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public product story only
   - path: /now
     title: What is real today
     audience: public
     purpose: proof_shelf
+    requires_auth: false
+    guest_fallback: /now
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: proof shelf honesty only
   - path: /horizons
     title: Coming next
     audience: public
     purpose: horizon_summary
+    requires_auth: false
+    guest_fallback: /horizons
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public horizon set only
   - path: /downloads
     title: Downloads
     audience: public
     purpose: release_shelf
+    requires_auth: false
+    guest_fallback: /downloads
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: proof shelf honesty only
   - path: /participate
     title: Participate
     audience: public
     purpose: help_and_booster_entry
+    requires_auth: false
+    guest_fallback: /participate
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public explainer only
   - path: /status
     title: Public status
     audience: public
     purpose: status_summary
+    requires_auth: false
+    guest_fallback: /status
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public status only
   - path: /artifacts
     title: Featured artifacts
     audience: public
     purpose: teaser_gallery
+    requires_auth: false
+    guest_fallback: /artifacts
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: teaser gallery only
+auth_routes:
+  - path: /login
+    title: Sign in
+    audience: public
+    purpose: guest_auth_entry
+    requires_auth: false
+    guest_fallback: /login
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-wave auth entry
+  - path: /signup
+    title: Create account
+    audience: public
+    purpose: guest_auth_entry
+    requires_auth: false
+    guest_fallback: /signup
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-wave auth entry
+  - path: /logout
+    title: Sign out
+    audience: registered
+    purpose: session_exit
+    requires_auth: true
+    guest_fallback: /
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: session exit only
+  - path: /auth/email/start
+    title: Start email entry
+    audience: public
+    purpose: auth_operation
+    requires_auth: false
+    guest_fallback: /login
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: email entry start
+  - path: /auth/email/callback
+    title: Complete email entry
+    audience: public
+    purpose: auth_operation
+    requires_auth: false
+    guest_fallback: /login
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: email entry callback
+  - path: /auth/google/start
+    title: Start Google sign-in
+    audience: public
+    purpose: auth_operation
+    requires_auth: false
+    guest_fallback: /login
+    must_exist: true
+    placeholder_allowed: true
+    placeholder_requirements: explain provider is not live until credentials exist
+  - path: /auth/google/callback
+    title: Complete Google sign-in
+    audience: public
+    purpose: auth_operation
+    requires_auth: false
+    guest_fallback: /login
+    must_exist: true
+    placeholder_allowed: true
+    placeholder_requirements: explain provider is not live until credentials exist
 registered_routes:
   - path: /home
     title: Home
     audience: registered
     purpose: signed_in_dashboard
+    requires_auth: true
+    guest_fallback: /login?next=/home
+    must_exist: true
+    placeholder_allowed: true
+    placeholder_requirements: signed-in dashboard with honest empty states
   - path: /account
     title: Account
     audience: registered
     purpose: profile_and_preferences
+    requires_auth: true
+    guest_fallback: /login?next=/account
+    must_exist: true
+    placeholder_allowed: true
+    placeholder_requirements: profile and linked-identity shell
 sections:
   - id: hero
     title: Shadowrun rules truth, with receipts.
