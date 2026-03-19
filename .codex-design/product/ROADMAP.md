@@ -4,8 +4,8 @@ This roadmap carries the program all the way to finished-state vision, not just 
 
 Current status on 2026-03-19:
 
-* package canon, split completion, explain canon, runtime-bundle canon, and horizon-governance foundations are materially complete
-* the active execution wave is now adapter depth (`C1b`, `C1c`), product completion (`E*`), and release hardening (`F*`)
+* package canon, split completion, explain canon, runtime-bundle canon, hub product-consumer planes, play-shell closure, assistant-plane governance, media capability closure, replay/DR hardening, legacy migration certification, and release-governance closure are materially complete
+* the foundational program is now in maintenance mode rather than split-wave closeout mode
 
 ## Phase A — Canon and package plane
 

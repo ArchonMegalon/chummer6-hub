@@ -44,7 +44,5 @@ None.
 
 ## GREEN candidates once current blockers clear
 
-* engine purification phase
-* orchestration and media adapter depth
-* product completion phase
-* release hardening phase
+* recurring canon freshness and mirror maintenance
+* additive product evolution beyond the foundational split/release wave

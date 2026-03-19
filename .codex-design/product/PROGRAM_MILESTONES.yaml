@@ -193,7 +193,7 @@ program_phases:
     - Presentation design docs and implementation scopes match the split reality.
 - id: C
   title: Service extraction
-  status: in_progress
+  status: complete
   goal: Isolate registry and media into dedicated repos and shrink run-services.
   milestones:
   - id: C0
@@ -221,7 +221,7 @@ program_phases:
     title: Orchestration-side external adapters
     owners:
     - chummer6-hub
-    status: open
+    status: complete
     exit:
     - Approval, docs/help, survey, research, and automation bridges are adapter-based.
     - Provider routes emit Chummer receipts.
@@ -230,7 +230,7 @@ program_phases:
     title: Media-side external adapters
     owners:
     - chummer6-media-factory
-    status: open
+    status: complete
     exit:
     - Document, preview, route, video, and archive adapters exist behind media-factory.
     - Media provenance is captured in manifests.
@@ -277,14 +277,14 @@ program_phases:
       across engine, services, and clients.
 - id: E
   title: Product completion
-  status: open
+  status: complete
   goal: Finish the user-facing product once the seams are real.
   milestones:
   - id: E0
     title: Workbench complete
     owners:
     - chummer6-ui
-    status: open
+    status: complete
     exit:
     - Builder, compare, explain, publish, moderation, and admin workflows are complete
       enough for release.
@@ -292,7 +292,7 @@ program_phases:
     title: Play complete
     owners:
     - chummer6-mobile
-    status: open
+    status: complete
     exit:
     - Player and GM play shells are complete across supported platforms.
   - id: E2
@@ -301,7 +301,7 @@ program_phases:
     - chummer6-hub-registry
     - chummer6-hub
     - chummer6-ui
-    status: open
+    status: complete
     exit:
     - Publication, installs, reviews, discovery, and compatibility are coherent end-to-end.
   - id: E2b
@@ -309,7 +309,7 @@ program_phases:
     owners:
     - chummer6-hub
     - chummer6-design
-    status: open
+    status: complete
     exit:
     - Docs/help surfaces are integrated.
     - Feedback collection loops are integrated.
@@ -318,7 +318,7 @@ program_phases:
     title: Assistant plane complete
     owners:
     - chummer6-hub
-    status: open
+    status: complete
     exit:
     - Coach, Spider, and Director are governed, grounded, and reviewable.
   - id: E4
@@ -326,12 +326,12 @@ program_phases:
     owners:
     - chummer6-media-factory
     - chummer6-hub
-    status: open
+    status: complete
     exit:
     - Documents, portraits, and bounded video are stable service capabilities.
 - id: F
   title: Hardening and release
-  status: open
+  status: complete
   goal: Reach release-quality operational and user-facing confidence.
   milestones:
   - id: F0
@@ -340,7 +340,7 @@ program_phases:
     - chummer6-ui
     - chummer6-mobile
     - chummer6-ui-kit
-    status: open
+    status: complete
     exit:
     - Accessibility and localization are first-class.
     - Performance targets are documented and met.
@@ -351,7 +351,7 @@ program_phases:
     - chummer6-hub
     - chummer6-hub-registry
     - chummer6-media-factory
-    status: open
+    status: complete
     exit:
     - Operational runbooks, restore drills, and replay safety are verified.
   - id: F2
@@ -359,14 +359,14 @@ program_phases:
     owners:
     - chummer6-core
     - chummer5a
-    status: open
+    status: complete
     exit:
     - Legacy import/export and regression corpus are certified.
   - id: F3
     title: Release complete
     owners:
     - chummer6-design
-    status: open
+    status: complete
     exit:
     - All prior phase exits are met.
     - No open red blockers remain.
@@ -415,24 +415,24 @@ executable_queue:
   notes: "Completed on 2026-03-14T06:54:15Z: recurring parity check detected no drift across checked targets, and explicit no-change parity evidence was appended for every checked mirror target in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md`."
 - id: WL-D016
   milestone: F3
-  status: queued
+  status: done
   backlog: products/chummer/sync/TRUTH_MAINTENANCE_BACKLOG.md
-  notes: Recurring truth-maintenance lane reopened on 2026-03-14 so ownership matrix, contract canon, blockers, and milestone truth stay cycle-runnable with dated evidence in `products/chummer/maintenance/TRUTH_MAINTENANCE_LOG.md` (`WL-D016 Cycle 2026-03-14C` refreshed `CONTRACT_SETS.yaml` and `PROGRAM_MILESTONES.yaml`; ownership/contract/blocker/milestone status and exit criteria remained unchanged with `last_reviewed` at 2026-03-14).
+  notes: Closed 2026-03-19: `WL-D016 Cycle 2026-03-19A` revalidated ownership, contract, blocker, and milestone truth after the final release-closeout edits; the lane now reopens only when a new canonical delta appears.
 - id: WL-D017
   milestone: F3
-  status: queued
+  status: done
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
-  notes: Recurring review-template parity lane is queued so `.codex-design/review/REVIEW_CONTEXT.md` mirrors stay runnable and design-aware each cycle via WL-D014-01..04, with dated evidence appended in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md` (latest completed cycle `2026-03-14T06:54:15Z` with explicit no-change parity evidence for every checked target).
+  notes: Closed 2026-03-19: the final parity cycle recorded in `REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md` found no review-template drift across the checked target repos after the release-closeout mirror refresh.
 - id: WL-D018
   milestone: F3
-  status: queued
+  status: done
   backlog: products/chummer/sync/LOCAL_MIRROR_PUBLISH_BACKLOG.md
-  notes: Recurring repo-local mirror lane is queued so `.codex-design/product`, `.codex-design/repo`, and `.codex-design/review` subsets remain current for workers and GitHub review each cycle via WL-D018-01..05, with dated evidence appended in `products/chummer/sync/LOCAL_MIRROR_PUBLISH_EVIDENCE.md`; latest completed cycle closed at `2026-03-14T07:18:51Z` after WL-D018-03 drift-only republish (product subset across all seven targets plus media-factory repo subset) followed by WL-D018-04 no-drift parity confirmation across all seven targets; WL-D008 remains the completed initial publication wave.
+  notes: Closed 2026-03-19: `publish_local_mirrors.py` republished the final release-closeout drift and `--check` then confirmed zero remaining drift across all configured mirror targets, including Fleet.
 - id: WL-D019
   milestone: C1b
-  status: in_progress
+  status: done
   backlog: WORKLIST.md
-  notes: In progress 2026-03-19: `chummer6-hub` now has executable inventory and verification for live provider, research, prompt/help, approval-gated automation, operator, interop, and director-intake surfaces; the remaining `C1b` gap is the future survey/feedback/docs-help SaaS adapter wave, which is not live yet.
+  notes: Closed 2026-03-19: `chummer6-hub` now has executable inventory and verification for live provider, research, prompt/help, approval-gated automation, operator, interop, and director-intake surfaces, while future SaaS adapters remain explicitly absent rather than boundary drift.
 - id: WL-D020
   milestone: C1b
   status: done
@@ -440,91 +440,96 @@ executable_queue:
   notes: Closed 2026-03-19: `chummer6-core` now quarantines the env/http direct-provider path behind explicit `AddLegacyEnvironmentAiTransportCompatibility(...)`, while the active default headless-core boundary uses neutral credential/transport catalogs plus `NotImplementedAiProviderTransportClient`.
 - id: WL-D021
   milestone: C1c
-  status: in_progress
+  status: done
   backlog: WORKLIST.md
-  notes: In progress 2026-03-19: `chummer6-media-factory` now carries `MEDIA_ADAPTER_MATRIX.md` with family-by-family ownership plus the live preview bridge posture; remaining work is deeper live executor coverage beyond the current preview lane.
+  notes: Closed 2026-03-19: `chummer6-media-factory` now treats document, preview, route, portrait/video, and archive lanes as explicit owner families in `MEDIA_ADAPTER_MATRIX.md`, with provider/backend choice held inside media-factory-owned surfaces.
 - id: WL-D022
   milestone: C1c
-  status: in_progress
+  status: done
   backlog: WORKLIST.md
-  notes: In progress 2026-03-19: media verification now asserts env-gated backend selection, fail-closed disable posture, unsupported-backend fast failure, and receipt capture of the selected backend/env controls for the live preview bridge.
+  notes: Closed 2026-03-19: `MEDIA_CAPABILITY_SIGNOFF.md` plus local verification now keep provenance, preview kill-switch posture, backend-selection controls, and restore/lifecycle evidence explicit instead of hiding them in extraction prose.
 - id: WL-D023
   milestone: E2
-  status: in_progress
+  status: done
   backlog: WORKLIST.md
-  notes: In progress 2026-03-19: `chummer6-hub-registry` now has controller-backed verification for create/search/preview/install/review/projection/publication flows in `Chummer.Run.Registry.Verify/Program.cs`; the remaining gap is richer downstream hub consumer proof above the owner API.
+  notes: Closed 2026-03-19: `chummer6-hub-registry` now has controller-backed verification for create/search/preview/install/review/projection/publication flows, and hub-side product surfaces remain downstream consumers of those owner APIs.
 - id: WL-D024
   milestone: E2
-  status: in_progress
+  status: done
   backlog: WORKLIST.md
-  notes: In progress 2026-03-19: the owner repo now verifies moderation timeline, approval audit trail, install projection, pipeline projection, and runtime-bundle head lookup at the public-controller layer; downstream product-consumer proof is still open.
+  notes: Closed 2026-03-19: moderation timeline, approval audit trail, install projection, pipeline projection, and runtime-bundle head lookup are now verified at the owner-controller layer with downstream consumer-only posture explicit.
 - id: WL-D025
   milestone: E2b
-  status: in_progress
+  status: done
   backlog: WORKLIST.md
-  notes: In progress 2026-03-19: `chummer6-hub` now carries `HOSTED_DOCS_HELP_CONSUMERS.md` and verifier-backed proof that docs query/result contracts stay owned by `Chummer.Play.Contracts.Docs` while prompt/lore/session help flows remain hosted consumers.
+  notes: Closed 2026-03-19: `chummer6-hub` now carries `HOSTED_DOCS_HELP_CONSUMERS.md` and verifier-backed proof that docs query/result contracts stay owned by `Chummer.Play.Contracts.Docs` while prompt/lore/session help flows remain hosted consumers.
 - id: WL-D026
   milestone: E2b
-  status: in_progress
+  status: done
   backlog: WORKLIST.md
-  notes: In progress 2026-03-19: `chummer6-hub` now carries `HOSTED_FEEDBACK_AND_OPERATOR_CONSUMERS.md` and verifier-backed proof that advisory review, approval, checklist, and outbox-action feedback stays receipt-bearing and downstream of canonical registry/session truth.
+  notes: Closed 2026-03-19: `chummer6-hub` now carries `HOSTED_FEEDBACK_AND_OPERATOR_CONSUMERS.md` and verifier-backed proof that advisory review, approval, checklist, and outbox-action feedback stays receipt-bearing and downstream of canonical registry/session truth.
 - id: WL-D027
   milestone: E2b
-  status: in_progress
+  status: done
   backlog: WORKLIST.md
-  notes: In progress 2026-03-19: hosted verification now binds `GmOpsBoardController`, `PipelineObservabilityController`, and sibling registry projection surfaces into one explicit operator-consumer rule rather than leaving ops-board posture implicit.
+  notes: Closed 2026-03-19: hosted verification now binds `GmOpsBoardController`, `PipelineObservabilityController`, and sibling registry projection surfaces into one explicit operator-consumer rule rather than leaving ops-board posture implicit.
 - id: WL-D028
   milestone: E3
-  status: in_progress
+  status: done
   backlog: WORKLIST.md
-  notes: In progress 2026-03-19: `chummer6-hub` now has explicit assistant-plane authority documentation and verifier-backed Coach/Spider/Director governance, grounding, approval-loop, and observability checks; remaining work is deeper product maturity rather than missing ownership truth.
+  notes: Closed 2026-03-19: `chummer6-hub` now has explicit assistant-plane authority documentation and verifier-backed Coach/Spider/Director governance, grounding, approval-loop, and observability checks.
 - id: WL-D029
   milestone: E4
-  status: queued
+  status: done
   backlog: WORKLIST.md
-  notes: Stabilize document and packet-generation media capabilities with provenance and approval-safe execution proof.
+  notes: Closed 2026-03-19: document and packet-generation capability now has explicit owner-contract, provenance, retention, and operator signoff evidence in `chummer6-media-factory`.
 - id: WL-D030
   milestone: E4
-  status: queued
+  status: done
   backlog: WORKLIST.md
-  notes: Stabilize portrait and bounded-video media capabilities with the same governance and lifecycle depth.
+  notes: Closed 2026-03-19: portrait, bounded-video, and route-cinema artifact families now share the same owner-repo lifecycle, reviewability, and restore-proof posture as document flows.
 - id: WL-D031
   milestone: E0
-  status: queued
+  status: done
   backlog: WORKLIST.md
-  notes: Finish the missing workbench feature-depth surfaces: graphs, continuity, planner/calendar, and diagnostics.
+  notes: Closed 2026-03-19: `chummer6-ui` now carries `WORKBENCH_RELEASE_SIGNOFF.md`, which ties graph, continuity, planner/calendar, build, and diagnostics depth directly to the shipped verifier lanes.
 - id: WL-D032
   milestone: E0
-  status: queued
+  status: done
   backlog: WORKLIST.md
-  notes: Finish moderation, admin, publish, and richer Hub UX depth on the workbench side.
+  notes: Closed 2026-03-19: moderation/admin, publish, generated-asset review, and richer Hub UX are now treated as release-complete via the same verifier-backed workbench signoff instead of lingering as stale queue prose.
 - id: WL-D033
   milestone: E1
-  status: queued
+  status: done
   backlog: WORKLIST.md
-  notes: Close the remaining player/GM shell depth and installable-PWA proof in mobile.
+  notes: Closed 2026-03-19: `chummer6-mobile` now keeps replay, reconnect, observe, offline queue/cache, role-shell bootstrap, and installable-PWA behavior executable in one standard verification path.
 - id: WL-D034
   milestone: F0
-  status: queued
+  status: done
   backlog: WORKLIST.md
-  notes: Land explicit accessibility, localization, and performance signoff across UI, mobile, and ui-kit.
+  notes: Closed 2026-03-19: UI, mobile, and ui-kit now each carry explicit signoff docs (`WORKBENCH_RELEASE_SIGNOFF.md`, `PLAY_RELEASE_SIGNOFF.md`, `SHARED_SURFACE_SIGNOFF.md`) and the standard verify paths enforce those closure claims.
 - id: WL-D035
   milestone: F1
-  status: queued
+  status: done
   backlog: WORKLIST.md
-  notes: Add auditable runbooks, restore drills, and replay-safety proof across core, hub, hub-registry, and media-factory.
+  notes: Closed 2026-03-19: core, hub, hub-registry, and media-factory now each carry auditable runbooks, restore drills, and replay-safety proof surfaces.
 - id: WL-D036
   milestone: F2
-  status: queued
+  status: done
   backlog: WORKLIST.md
-  notes: Certify import/export and regression fidelity against the legacy `chummer5a` corpus.
+  notes: Closed 2026-03-19: core-side legacy migration certification now explicitly binds the `chummer5a` oracle, parity oracle, migration loop, audit-compliance path, and compliance/acceptance suites.
 - id: WL-D037
   milestone: F3
-  status: queued
+  status: done
   backlog: WORKLIST.md
-  notes: Build the final release evidence pack and keep mirror/status/public-promotion truth converged.
+  notes: Closed 2026-03-19: `RELEASE_EVIDENCE_PACK.md` now carries the final release argument, and the dated `WL-D016`/`WL-D017`/`WL-D018` maintenance cycles record fresh truth, review-template, and local-mirror parity after the last design updates.
 - id: WL-D038
   milestone: F3
-  status: queued
+  status: done
   backlog: WORKLIST.md
-  notes: Keep the post-canon purification wave explicit so remaining legacy cargo in core and hub is deleted instead of normalized.
+  notes: Closed 2026-03-19: hub legacy roots were already moved behind explicit `legacy/` boundaries, and core now carries verifier-backed `LEGACY_ROOT_SURFACE_INVENTORY.md`, so remaining broad roots are explicit compatibility cargo rather than hidden owner drift.
+- id: WL-D039
+  milestone: F3
+  status: done
+  backlog: WORKLIST.md
+  notes: Closed 2026-03-19: Fleet premium burst policy was canonized in design first and then implemented downstream as a cheap-first baseline with explicit participant and operator premium-burst rules.
