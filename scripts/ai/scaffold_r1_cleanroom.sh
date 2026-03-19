@@ -26,14 +26,12 @@ create_project_if_missing() {
 create_project_if_missing classlib Chummer.Run.Contracts
 create_project_if_missing webapi Chummer.Run.Api --use-controllers --no-openapi
 create_project_if_missing webapi Chummer.Run.Identity --use-controllers --no-openapi
-create_project_if_missing webapi Chummer.Run.Registry --use-controllers --no-openapi
 create_project_if_missing webapi Chummer.Run.AI --use-controllers --no-openapi
 
 dotnet sln "$SLN_FILE" add \
   Chummer.Run.Contracts/Chummer.Run.Contracts.csproj \
   Chummer.Run.Api/Chummer.Run.Api.csproj \
   Chummer.Run.Identity/Chummer.Run.Identity.csproj \
-  Chummer.Run.Registry/Chummer.Run.Registry.csproj \
   Chummer.Run.AI/Chummer.Run.AI.csproj
 
 add_reference_if_missing() {
@@ -46,5 +44,4 @@ add_reference_if_missing() {
 
 add_reference_if_missing Chummer.Run.Api/Chummer.Run.Api.csproj Chummer.Run.Contracts/Chummer.Run.Contracts.csproj
 add_reference_if_missing Chummer.Run.Identity/Chummer.Run.Identity.csproj Chummer.Run.Contracts/Chummer.Run.Contracts.csproj
-add_reference_if_missing Chummer.Run.Registry/Chummer.Run.Registry.csproj Chummer.Run.Contracts/Chummer.Run.Contracts.csproj
 add_reference_if_missing Chummer.Run.AI/Chummer.Run.AI.csproj Chummer.Run.Contracts/Chummer.Run.Contracts.csproj

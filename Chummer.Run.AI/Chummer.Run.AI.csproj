@@ -7,6 +7,9 @@
     <Reference Include="Chummer.Media.Contracts">
       <HintPath>..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll</HintPath>
     </Reference>
+    <Reference Include="Chummer.Media.Factory.Runtime">
+      <HintPath>..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Factory.Runtime\bin\$(Configuration)\net10.0\Chummer.Media.Factory.Runtime.dll</HintPath>
+    </Reference>
     <ProjectReference Include="..\Chummer.Run.Contracts\Chummer.Run.Contracts.csproj" />
   </ItemGroup>
 
