@@ -165,6 +165,7 @@ public sealed class PublicLandingController : ControllerBase
     }
 
     [HttpGet("landing")]
+    [HttpGet("/api/public/landing")]
     [Produces("application/json")]
     public ActionResult<PublicLandingSurfaceDto> GetLanding() => Ok(_landing.LoadSurface());
 
