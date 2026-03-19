@@ -216,7 +216,16 @@ public sealed class CodexParticipationController : ControllerBase
         JsonObject fleet;
         if (string.IsNullOrWhiteSpace(intent.FleetLaneId))
         {
-            var created = await _fleetBridge.CreateParticipantLaneAsync(intent.SubjectId, intent.SubjectLabel, intent.ProjectId, cancellationToken);
+            var created = await _fleetBridge.CreateParticipantLaneAsync(
+                intent.SubjectId,
+                intent.SubjectLabel,
+                intent.ProjectId,
+                "",
+                "",
+                "",
+                intent.IntentId,
+                "private",
+                cancellationToken);
             var laneId = created["lane"]?["lane_id"]?.GetValue<string>() ?? "";
             intent = _participation.AttachFleetLane(intent.IntentId, laneId, $"Fleet lane {laneId} created.");
         }
