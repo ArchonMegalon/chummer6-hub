@@ -81,6 +81,7 @@ using TranscriptionRequest = Chummer.Run.Contracts.Transcription.TranscriptionRe
 await VerifyPublicationWorkflowAsync();
 VerifyPublicationControllerHardening();
 VerifyIdentityWorkflow();
+VerifyIdentityEmailDeliveryProviders();
 await VerifyHubCommunitySecurityAndDurabilityAsync();
 await VerifyPublicLandingProjectionAsync();
 VerifyRegistryWorkflow();
@@ -299,6 +300,78 @@ void VerifyIdentityWorkflow()
 
     var revoked = identity.RevokeSession(new IdentitySessionRevokeRequest(emailSession.AccessToken));
     Assert(revoked.Revoked, "identity service should revoke cookie-backed sessions.");
+}
+
+void VerifyIdentityEmailDeliveryProviders()
+{
+    using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
+    HttpRequestMessage? capturedRequest = null;
+    string? capturedBody = null;
+
+    var emailitConfig = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+            ["IDENTITY_EMAILIT_API_KEY"] = "secret-emailit-key",
+            ["IDENTITY_EMAILIT_FROM_EMAIL"] = "god@chummer.run",
+            ["IDENTITY_EMAILIT_FROM_NAME"] = "God",
+        })
+        .Build();
+
+    var emailitService = new IdentityEmailDeliveryService(
+        emailitConfig,
+        loggerFactory.CreateLogger<IdentityEmailDeliveryService>(),
+        new HttpClient(new StubHttpMessageHandler(request =>
+        {
+            capturedRequest = request;
+            capturedBody = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+            return JsonResponse(new { data = new { id = "email_123" } }, HttpStatusCode.Accepted);
+        })));
+
+    var delivered = emailitService.DeliverMagicLink(
+        email: "runner@example.invalid",
+        displayName: "Runner Demo",
+        ticketId: "ticket-emailit-123",
+        nextPath: "/home",
+        expiresAtUtc: DateTimeOffset.Parse("2026-03-20T10:00:00Z"));
+
+    Assert(delivered.Delivered, $"Emailit-backed delivery should report success on a 2xx API response. mode={delivered.DeliveryMode} note={delivered.PreviewNote} request={(capturedRequest is null ? "none" : capturedRequest.RequestUri?.ToString())}");
+    Assert(delivered.DeliveryMode == "emailit_api_magic_link", "Emailit-backed delivery should expose the Emailit delivery mode.");
+    Assert(capturedRequest is not null, "Emailit-backed delivery should issue an HTTP request.");
+    Assert(capturedRequest!.RequestUri?.ToString() == "https://api.emailit.com/v2/emails", "Emailit-backed delivery should target the v2 emails endpoint.");
+    Assert(capturedRequest.Headers.Authorization?.Scheme == "Bearer", "Emailit-backed delivery should send a bearer token.");
+    Assert(capturedRequest.Headers.Authorization?.Parameter == "secret-emailit-key", "Emailit-backed delivery should send the configured API key.");
+    Assert(capturedRequest.Headers.Contains("Idempotency-Key"), "Emailit-backed delivery should send an idempotency key.");
+    Assert(!string.IsNullOrWhiteSpace(capturedBody), "Emailit-backed delivery should send a JSON payload.");
+
+    using (var payload = JsonDocument.Parse(capturedBody!))
+    {
+        Assert(payload.RootElement.GetProperty("from").GetString() == "God <god@chummer.run>", "Emailit payload should preserve the configured sender label.");
+        Assert(payload.RootElement.GetProperty("to").GetString() == "runner@example.invalid", "Emailit payload should target the requested email.");
+        Assert(payload.RootElement.GetProperty("subject").GetString() == "Your Chummer sign-in link", "Emailit payload should keep the auth mail subject.");
+        Assert(payload.RootElement.GetProperty("tracking").GetBoolean() == false, "Emailit auth mail should disable tracking.");
+        Assert(payload.RootElement.GetProperty("text").GetString()?.Contains("/auth/email/callback?ticket=ticket-emailit-123", StringComparison.Ordinal) == true, "Emailit text body should contain the callback link.");
+        Assert(payload.RootElement.GetProperty("html").GetString()?.Contains("Open Chummer", StringComparison.Ordinal) == true, "Emailit html body should contain the CTA.");
+        Assert(payload.RootElement.GetProperty("meta").GetProperty("purpose").GetString() == "magic_link", "Emailit payload should mark the auth purpose.");
+    }
+
+    var failingEmailitService = new IdentityEmailDeliveryService(
+        emailitConfig,
+        loggerFactory.CreateLogger<IdentityEmailDeliveryService>(),
+        new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+        {
+            Content = new StringContent("{\"error\":\"Domain not verified\"}", Encoding.UTF8, "application/json")
+        })));
+
+    var failed = failingEmailitService.DeliverMagicLink(
+        email: "runner@example.invalid",
+        displayName: "Runner Demo",
+        ticketId: "ticket-emailit-fail",
+        nextPath: "/home",
+        expiresAtUtc: DateTimeOffset.Parse("2026-03-20T10:00:00Z"));
+
+    Assert(!failed.Delivered, "Emailit delivery failures should not pretend success.");
+    Assert(failed.DeliveryMode == "preview_inline_link", "Emailit delivery failures should fall back to honest preview mode when no SMTP fallback is configured.");
 }
 
 async Task VerifyHubCommunitySecurityAndDurabilityAsync()
