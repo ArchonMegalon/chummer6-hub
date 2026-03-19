@@ -1,0 +1,51 @@
+services:
+  chummer-run-identity:
+    image: chummer-run-identity:local
+    build:
+      context: /docker
+      dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Identity/Dockerfile
+    environment:
+      CHUMMER_IDENTITY_STORE_PATH: /app/state/identity-store.json
+    volumes:
+      - chummer-run-identity-state:/app/state
+    networks:
+      public-origin:
+        aliases:
+          - chummer-run-identity
+
+  chummer-portal:
+    image: chummer-run-api:local
+    build:
+      context: /docker
+      dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Api/Dockerfile
+    depends_on:
+      - chummer-run-identity
+    environment:
+      CHUMMER_PUBLIC_CANON_ROOT: /repo
+      CHUMMER_COMMUNITY_STORE_PATH: /app/state/community-store.json
+      IDENTITY_SERVICE_BASE_URL: http://chummer-run-identity:8080
+      FLEET_CONTROLLER_BASE_URL: ${FLEET_CONTROLLER_BASE_URL:-http://fleet-controller:8090}
+      CHUMMER_DOWNLOADS_SOURCE_ROOT: /downloads-source
+    volumes:
+      - chummer-run-api-state:/app/state
+      - ./:/repo:ro
+      - /docker/chummer5a/Docker/Downloads:/downloads-source:ro
+    ports:
+      - "${CHUMMER_PUBLIC_EDGE_PORT:-8091}:8080"
+    networks:
+      public-origin:
+        aliases:
+          - ${CHUMMER_PUBLIC_EDGE_ALIAS:-chummer-portal}
+      fleet-origin: {}
+
+volumes:
+  chummer-run-api-state:
+  chummer-run-identity-state:
+
+networks:
+  public-origin:
+    external: true
+    name: "${CHUMMER_RUN_TUNNEL_NETWORK:-chummer5a_default}"
+  fleet-origin:
+    external: true
+    name: "${CHUMMER_FLEET_NETWORK:-codex-fleet-net}"
