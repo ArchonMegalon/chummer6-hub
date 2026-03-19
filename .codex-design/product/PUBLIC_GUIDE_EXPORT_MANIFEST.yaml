@@ -72,6 +72,15 @@ pages:
     - bounded booster lane
     - privacy and review safety
     - free-later explanation when booster-first horizons exist
+  download_page:
+    source: generated release matrix artifact
+    include:
+      page_type: download_page
+    required_topics:
+    - current build matrix
+    - honest artifact format
+    - checksums
+    - raw release fallback
   deep_source_trail:
     source: products/chummer/PUBLIC_GUIDE_PAGE_REGISTRY.yaml
     include:

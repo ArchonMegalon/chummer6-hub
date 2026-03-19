@@ -12,6 +12,7 @@ public sealed record ContributionReceiptDto(
     string? SponsorSessionId,
     string AuthClass,
     string LaneType,
+    string LaneRole = "coding",
     DateTimeOffset? StartedAtUtc = null,
     DateTimeOffset? EndedAtUtc = null,
     string? SliceId = null,

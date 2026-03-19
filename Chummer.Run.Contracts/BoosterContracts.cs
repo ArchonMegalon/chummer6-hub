@@ -33,6 +33,7 @@ public sealed record SponsorSessionStatusDto(
     string GroupId,
     string ProjectId,
     string RequestedLaneType,
+    string RequestedLaneRole,
     string Visibility,
     string Status,
     bool Consented,
@@ -87,5 +88,6 @@ public sealed record CreateSponsorSessionRequest(
     string? CampaignId = null,
     string Visibility = "group",
     string RequestedLaneType = "participant_burst",
+    string RequestedLaneRole = "coding",
     string? AuthorizationTier = null,
     string? TierSource = null);

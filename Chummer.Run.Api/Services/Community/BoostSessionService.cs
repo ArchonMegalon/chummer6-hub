@@ -53,6 +53,7 @@ public sealed class BoostSessionService
             GroupId = group.GroupId,
             ProjectId = AccountService.NormalizeRequired(request.ProjectId, nameof(request.ProjectId)),
             RequestedLaneType = AccountService.NormalizeOptional(request.RequestedLaneType) ?? "participant_burst",
+            RequestedLaneRole = SponsorLaneRolePolicy.Normalize(request.RequestedLaneRole),
             Visibility = AccountService.NormalizeOptional(request.Visibility) ?? "group",
             Status = "intent_created",
             BoostCampaignId = campaignId,
@@ -62,6 +63,10 @@ public sealed class BoostSessionService
             CreatedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         };
+        if (!SponsorLaneRolePolicy.IsEligible(state.RequestedLaneRole, state.AuthorizationTier))
+        {
+            throw new InvalidOperationException($"{SponsorLaneRolePolicy.Label(state.RequestedLaneRole)} currently requires at least {SponsorLaneRolePolicy.MinimumTier(state.RequestedLaneRole)} tier authorization.");
+        }
         state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "intent_created", $"Created sponsor session for {state.ProjectId}.", DateTimeOffset.UtcNow));
         lock (_store.Gate)
         {
@@ -165,18 +170,41 @@ public sealed class BoostSessionService
 
         if (string.IsNullOrWhiteSpace(state.FleetLaneId))
         {
-            var created = await _fleetBridge.CreateParticipantLaneAsync(
-                subject.SubjectId,
-                subject.DisplayName,
-                state.ProjectId,
-                state.UserId,
-                state.GroupId,
-                state.BoostCampaignId ?? "",
-                state.SponsorSessionId,
-                state.Visibility,
-                state.AuthorizationTier,
-                state.TierSource,
-                cancellationToken);
+            JsonObject created;
+            try
+            {
+                created = await _fleetBridge.CreateParticipantLaneAsync(
+                    subject.SubjectId,
+                    subject.DisplayName,
+                    state.ProjectId,
+                    state.UserId,
+                    state.GroupId,
+                    state.BoostCampaignId ?? "",
+                    state.SponsorSessionId,
+                    state.Visibility,
+                    state.RequestedLaneRole,
+                    state.AuthorizationTier,
+                    state.TierSource,
+                    cancellationToken);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("(409)", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("capacity reached", StringComparison.OrdinalIgnoreCase))
+            {
+                lock (_store.Gate)
+                {
+                    state.Status = "waiting_for_slot";
+                    state.UpdatedAtUtc = DateTimeOffset.UtcNow;
+                    state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "waiting_for_slot", "Fleet is at sponsor-lane capacity. Your sponsor session is queued for the next available slot.", DateTimeOffset.UtcNow));
+                    _store.PersistLocked();
+                    return (state.Snapshot(), new JsonObject
+                    {
+                        ["lane"] = new JsonObject
+                        {
+                            ["status"] = "waiting_for_slot",
+                            ["lane_role"] = state.RequestedLaneRole,
+                        },
+                    });
+                }
+            }
             var laneId = AccountService.NormalizeOptional(created["lane"]?["lane_id"]?.GetValue<string>());
             if (laneId is null)
             {
@@ -221,7 +249,30 @@ public sealed class BoostSessionService
             throw new InvalidOperationException("no Fleet lane exists for this sponsor session.");
         }
 
-        var fleet = await _fleetBridge.ActivateParticipantLaneAsync(state.FleetLaneId!, cancellationToken);
+        JsonObject fleet;
+        try
+        {
+            fleet = await _fleetBridge.ActivateParticipantLaneAsync(state.FleetLaneId!, cancellationToken);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("(409)", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("capacity reached", StringComparison.OrdinalIgnoreCase))
+        {
+            lock (_store.Gate)
+            {
+                state.Status = "waiting_for_slot";
+                state.UpdatedAtUtc = DateTimeOffset.UtcNow;
+                state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "waiting_for_slot", "Fleet could not activate the lane yet because all sponsor slots are busy.", DateTimeOffset.UtcNow));
+                _store.PersistLocked();
+                return (state.Snapshot(), new JsonObject
+                {
+                    ["lane"] = new JsonObject
+                    {
+                        ["lane_id"] = state.FleetLaneId,
+                        ["status"] = "waiting_for_slot",
+                        ["lane_role"] = state.RequestedLaneRole,
+                    },
+                });
+            }
+        }
         lock (_store.Gate)
         {
             state.Status = "active";
@@ -312,7 +363,7 @@ public sealed class BoostSessionService
         throw new KeyNotFoundException($"Unknown sponsor session: {normalized}");
     }
 
-    private static string MapFleetLaneStatusToSessionStatus(string fleetStatus, bool authReady)
+    private static string MapFleetLaneStatusToSessionStatus(string fleetStatus, bool authReady, bool deviceCodeIssued)
         => fleetStatus switch
         {
             "active" => "active",
@@ -320,6 +371,7 @@ public sealed class BoostSessionService
             "revoked" => "revoked",
             "paused" => "paused",
             "pending_auth" when authReady => "lane_pending",
+            "pending_auth" when !deviceCodeIssued => "warming",
             "pending_auth" => "pending_auth",
             _ => string.IsNullOrWhiteSpace(fleetStatus) ? "intent_created" : fleetStatus,
         };
@@ -346,6 +398,8 @@ public sealed class BoostSessionService
             ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["authorization_tier"]?.GetValue<string>());
         var tierSource = AccountService.NormalizeOptional(lane["tier_source"]?.GetValue<string>())
             ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["tier_source"]?.GetValue<string>());
+        var laneRole = AccountService.NormalizeOptional(lane["lane_role"]?.GetValue<string>())
+            ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["lane_role"]?.GetValue<string>());
         if (!string.IsNullOrWhiteSpace(authorizationTier))
         {
             state.AuthorizationTier = SponsorStatusPolicy.NormalizeAuthorizationTier(authorizationTier);
@@ -354,8 +408,12 @@ public sealed class BoostSessionService
         {
             state.TierSource = SponsorStatusPolicy.NormalizeTierSource(tierSource);
         }
+        if (!string.IsNullOrWhiteSpace(laneRole))
+        {
+            state.RequestedLaneRole = SponsorLaneRolePolicy.Normalize(laneRole);
+        }
         var fleetStatus = AccountService.NormalizeOptional(lane["status"]?.GetValue<string>()) ?? state.Status;
-        state.Status = MapFleetLaneStatusToSessionStatus(fleetStatus, authReady);
+        state.Status = MapFleetLaneStatusToSessionStatus(fleetStatus, authReady, verificationUri is not null || userCode is not null);
         if (authReady)
         {
             state.AuthorizedAtUtc ??= DateTimeOffset.UtcNow;
