@@ -18,6 +18,9 @@ Project Chummer accepts future-capability ideas and public signal, but public si
 Signals, votes, survey responses, and community enthusiasm are advisory only.
 Canonical horizon posture is published in `chummer6-design`.
 
+Participation in a booster lane is a governed execution path, not a public idea-intake lane.
+Sponsoring temporary premium work does not create canonical product truth by itself.
+
 ## Tool posture
 
 * `MetaSurvey` is the primary structured collection lane.
@@ -27,3 +30,5 @@ Canonical horizon posture is published in `chummer6-design`.
 ## Publication rule
 
 When a public idea changes canonical horizon posture, the design update must land in `HORIZONS.md`, the relevant horizon doc, and the milestone or roadmap files in the same change.
+
+When a horizon gains `booster_first`, `protected_preview`, or recognition posture, the same change must update `HORIZON_REGISTRY.yaml` and `PARTICIPATION_AND_BOOSTER_WORKFLOW.md`.

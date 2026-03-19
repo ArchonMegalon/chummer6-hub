@@ -10,17 +10,18 @@ Read in this order:
 2. `HORIZONS.md`
 3. `HORIZON_REGISTRY.yaml`
 4. `ARCHITECTURE.md`
-5. `COMMUNITY_SPONSORSHIP_BACKLOG.md`
-6. `EXTERNAL_TOOLS_PLANE.md`
-7. `LTD_CAPABILITY_MAP.md`
-8. `PUBLIC_GUIDE_POLICY.md`
-9. `HORIZON_SIGNAL_POLICY.md`
-10. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
-11. `OWNERSHIP_MATRIX.md`
-12. `PROGRAM_MILESTONES.yaml`
-13. `CONTRACT_SETS.yaml`
-14. `GROUP_BLOCKERS.md`
-15. `projects/*.md` for repo-specific scope
+5. `PARTICIPATION_AND_BOOSTER_WORKFLOW.md`
+6. `COMMUNITY_SPONSORSHIP_BACKLOG.md`
+7. `EXTERNAL_TOOLS_PLANE.md`
+8. `LTD_CAPABILITY_MAP.md`
+9. `PUBLIC_GUIDE_POLICY.md`
+10. `HORIZON_SIGNAL_POLICY.md`
+11. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
+12. `OWNERSHIP_MATRIX.md`
+13. `PROGRAM_MILESTONES.yaml`
+14. `CONTRACT_SETS.yaml`
+15. `GROUP_BLOCKERS.md`
+16. `projects/*.md` for repo-specific scope
 
 `HORIZON_REGISTRY.yaml` is the machine-readable source for horizon existence, order, public-guide eligibility, and eventual build path.
 The current horizon set covers knowledge fabric, spatial/runsite artifacts, creator press, replay/forensics, and bounded table coaching in addition to the earlier continuity and simulation lanes.
@@ -83,6 +84,8 @@ These inform the program but are not part of the main release train:
 6. Keep sponsored participation generic: Hub grows the reusable user/group/ledger platform first, and Fleet stays the worker execution plane underneath it.
 
 The foundational closure wave is materially finished. Future design work is maintenance or net-new product evolution rather than unresolved split, contract, or release-governance debt.
+
+`PARTICIPATION_AND_BOOSTER_WORKFLOW.md` is the first-class canon for user language, ownership, state transitions, receipts, recognition, and package/bootstrap truth for the bounded participation lane.
 
 `COMMUNITY_SPONSORSHIP_BACKLOG.md` is the implementation-ordered source for the Hub-first community/accounting wave. It distinguishes what already landed in Hub/Fleet/EA from the remaining durable-storage, convergence, and product-depth deltas.
 

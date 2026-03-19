@@ -137,6 +137,22 @@ Public proposals and advisory prioritization routes are collected through govern
 
 `TABLE PULSE` becomes a bounded, privacy-safe post-session coaching lane with explicit owners, tool posture, and non-truth boundaries.
 
+## Non-blocking participation and bootstrap lane
+
+This lane makes the bounded participate/booster workflow and package bootstrap truth explicit without turning them into release-blocking gates.
+
+### I0 — Participation workflow canon established
+
+`chummer6-design` publishes first-class participation canon for sponsor sessions, consent, device auth, receipt semantics, recognition rules, and stop/revoke behavior.
+
+### I1 — Participation surfaces converge on central canon
+
+Hub, Fleet, `Chummer6`, and any EA helper compile from design-owned participation truth instead of carrying parallel README or helper-script interpretations.
+
+### I2 — Package bootstrap becomes boring
+
+`Chummer.Engine.Contracts` and `Chummer.Ui.Kit` restore through deterministic local/CI package feeds or explicit generated compatibility trees, not legacy ambient project references.
+
 ## Repo milestone spine
 
 ### `chummer6-design`

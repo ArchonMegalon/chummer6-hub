@@ -117,6 +117,31 @@ belongs in `chummer6-hub`.
 
 Boosting is the first use case of that platform, not a license to let Fleet absorb community-product ownership.
 
+### Rule 14 — Participation canon starts in design, not in guide copy or helper scripts
+
+The bounded participate/booster lane is a first-class product workflow.
+
+Canonical workflow truth lives in `products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md`, not in:
+
+* `Chummer6` copy alone
+* Fleet README prose alone
+* EA helper scripts
+* environment-variable folklore
+
+Downstream helpers may render or explain that canon, but they must not become the source of it.
+
+### Rule 15 — Package bootstrap must be deterministic
+
+Package-first boundaries are not considered healthy unless restore/bootstrap is boring.
+
+For `Chummer.Engine.Contracts` and `Chummer.Ui.Kit`, design canon must define:
+
+* the canonical package ids
+* the allowed local/CI feed posture
+* the explicit compatibility-tree fallback for legacy consumers
+
+Ambient monorepo-relative source references are not bootstrap truth.
+
 ## Repo graph
 
 ```text
@@ -251,6 +276,8 @@ Implementation order:
 6. Hub leaderboards, quests, badges, and entitlement-backed perks
 
 Do not invert that order by making Fleet the first home of boost-code product behavior.
+
+The detailed workflow, rollout posture, recognition rules, and bootstrap truth live in `PARTICIPATION_AND_BOOSTER_WORKFLOW.md`.
 
 
 ## External tools plane
