@@ -47,6 +47,7 @@ builder.Services.AddSingleton<IProviderAdapter, PeekShotGatewayAdapter>();
 builder.Services.AddSingleton<IPromptRegistry, PromptRegistry>();
 builder.Services.AddSingleton<IAiGatewayService, AiGatewayService>();
 builder.Services.AddSingleton<IAiBudgetService, AiBudgetService>();
+builder.Services.AddSingleton<BoosterReceiptVerifier>();
 builder.Services.AddSingleton<BoosterReceiptProjectionService>();
 builder.Services.AddSingleton<ISkillToolAdapter, SessionProjectionSkillToolAdapter>();
 builder.Services.AddSingleton<ISkillToolAdapter, LoreSearchSkillToolAdapter>();

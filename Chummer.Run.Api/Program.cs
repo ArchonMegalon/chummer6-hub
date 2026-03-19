@@ -24,7 +24,9 @@ builder.Services
         };
     });
 builder.Services.AddHttpClient<FleetBridgeService>();
+builder.Services.AddHttpClient<HubIdentityClient>();
 builder.Services.AddSingleton<CommunityStore>();
+builder.Services.AddSingleton<FleetReceiptVerifier>();
 builder.Services.AddSingleton<AccountService>();
 builder.Services.AddSingleton<GroupService>();
 builder.Services.AddSingleton<RewardService>();

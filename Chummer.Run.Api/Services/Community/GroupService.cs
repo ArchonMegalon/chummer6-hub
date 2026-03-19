@@ -253,6 +253,8 @@ public sealed class GroupService
                 UpdateUserGroupsLocked(user.UserId);
             }
 
+            _store.PersistLocked();
+
             return redeemed;
         }
     }

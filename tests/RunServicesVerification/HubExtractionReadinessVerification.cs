@@ -427,6 +427,46 @@ internal static class HubExtractionReadinessVerification
                 participationControllerText.Contains(requiredToken, StringComparison.Ordinal),
                 $"Codex participation controller must keep convergence token '{requiredToken}'.");
         }
+
+        var apiProgramText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Program.cs"));
+        foreach (var requiredToken in new[]
+                 {
+                     "AddHttpClient<HubIdentityClient>()",
+                     "AddSingleton<FleetReceiptVerifier>()"
+                 })
+        {
+            VerificationAssert.True(
+                apiProgramText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Chummer.Run.Api must keep community-plane security registration '{requiredToken}'.");
+        }
+
+        var accountsControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Controllers", "AccountsController.cs"));
+        var groupsControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Controllers", "GroupsController.cs"));
+        var ledgerControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Controllers", "LedgerController.cs"));
+        var boostSessionsControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Controllers", "BoostSessionsController.cs"));
+        var receiptVerifierText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Services", "FleetReceiptVerifier.cs"));
+        VerificationAssert.True(
+            accountsControllerText.Contains("RequireMatchingSubjectAsync", StringComparison.Ordinal)
+            && groupsControllerText.Contains("RequireMatchingSubjectAsync", StringComparison.Ordinal)
+            && boostSessionsControllerText.Contains("RequireSubjectAsync", StringComparison.Ordinal)
+            && ledgerControllerText.Contains("FleetReceiptVerifier", StringComparison.Ordinal)
+            && receiptVerifierText.Contains("X-Fleet-Receipt-Signature", StringComparison.Ordinal),
+            "Community controllers must keep bearer-bound subject auth and signed receipt verification.");
+
+        var communityPlaneText = File.ReadAllText(Path.Combine(RepoRoot, "docs", "HUB_COMMUNITY_LEDGER_PLANE.md"));
+        foreach (var requiredToken in new[]
+                 {
+                     "X-Fleet-Receipt-Signature",
+                     "FLEET_RECEIPT_SIGNING_SECRET",
+                     "HubIdentityClient",
+                     "FleetReceiptVerifier",
+                     "bearer-bound identity session"
+                 })
+        {
+            VerificationAssert.True(
+                communityPlaneText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Hub community-plane documentation must mention '{requiredToken}'.");
+        }
     }
 
     private static void VerifyAssistantPlaneAuthority()

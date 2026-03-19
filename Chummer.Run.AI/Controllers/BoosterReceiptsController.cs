@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Chummer.Run.AI.Services.Booster;
 using Chummer.Run.Contracts.Ledger;
 using Microsoft.AspNetCore.Mvc;
@@ -9,22 +10,27 @@ namespace Chummer.Run.AI.Controllers;
 public sealed class BoosterReceiptsController : ControllerBase
 {
     private readonly BoosterReceiptProjectionService _projections;
+    private readonly BoosterReceiptVerifier _verifier;
 
-    public BoosterReceiptsController(BoosterReceiptProjectionService projections)
+    public BoosterReceiptsController(BoosterReceiptProjectionService projections, BoosterReceiptVerifier verifier)
     {
         _projections = projections;
+        _verifier = verifier;
     }
 
     [HttpPost("receipts")]
     [ProducesResponseType<ReceiptIngestResultDto>(StatusCodes.Status200OK)]
-    public ActionResult<ReceiptIngestResultDto> IngestReceipt([FromBody] ContributionReceiptDto? receipt)
+    public ActionResult<ReceiptIngestResultDto> IngestReceipt([FromBody] JsonElement receipt)
     {
-        if (receipt is null)
+        try
         {
-            return BadRequest("receipt payload is required.");
+            var verifiedReceipt = _verifier.VerifyAndDeserialize(Request, receipt);
+            return Ok(_projections.Ingest(verifiedReceipt));
         }
-
-        return Ok(_projections.Ingest(receipt));
+        catch (BoosterReceiptAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpGet("sessions/{sponsorSessionId}")]

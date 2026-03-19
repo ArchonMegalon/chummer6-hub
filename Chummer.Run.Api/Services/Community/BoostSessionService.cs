@@ -118,7 +118,12 @@ public sealed class BoostSessionService
                 state.SponsorSessionId,
                 state.Visibility,
                 cancellationToken);
-            var laneId = created["lane"]?["lane_id"]?.GetValue<string>() ?? "";
+            var laneId = AccountService.NormalizeOptional(created["lane"]?["lane_id"]?.GetValue<string>());
+            if (laneId is null)
+            {
+                throw new InvalidOperationException("Fleet lane creation did not return a lane_id.");
+            }
+
             lock (_store.Gate)
             {
                 state.FleetLaneId = laneId;
@@ -169,7 +174,15 @@ public sealed class BoostSessionService
         var state = Require(sponsorSessionId);
         if (string.IsNullOrWhiteSpace(state.FleetLaneId))
         {
-            throw new InvalidOperationException("no Fleet lane exists for this sponsor session.");
+            lock (_store.Gate)
+            {
+                state.Status = revoke ? "revoked" : "stopped";
+                state.StoppedAtUtc ??= DateTimeOffset.UtcNow;
+                state.UpdatedAtUtc = DateTimeOffset.UtcNow;
+                state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), revoke ? "revoked" : "stopped", revoke ? "Sponsor session revoked before Fleet lane creation." : "Sponsor session stopped before Fleet lane creation.", DateTimeOffset.UtcNow));
+                _store.PersistLocked();
+                return (state.Snapshot(), new JsonObject());
+            }
         }
 
         var fleet = revoke

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.Mvc;
@@ -10,10 +11,12 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class GroupsController : ControllerBase
 {
     private readonly GroupService _groups;
+    private readonly HubIdentityClient _identity;
 
-    public GroupsController(GroupService groups)
+    public GroupsController(GroupService groups, HubIdentityClient identity)
     {
         _groups = groups;
+        _identity = identity;
     }
 
     [HttpGet("/groups")]
@@ -42,6 +45,8 @@ public sealed class GroupsController : ControllerBase
     <section class="panel">
       <h1>Groups</h1>
       <p>Groups are generic social and authority containers. Booster groups today can become campaign or GM-circle groups later without schema drift.</p>
+      <label for="accessToken">Bearer access token</label>
+      <input id="accessToken" placeholder="Paste a Hub access token from the identity surface" />
       <label for="subjectId">Subject id</label>
       <input id="subjectId" placeholder="subject-123" />
       <label for="groupName">Group name</label>
@@ -57,10 +62,16 @@ public sealed class GroupsController : ControllerBase
     </section>
   </main>
   <script>
+    function headers() {
+      const token = document.getElementById('accessToken').value.trim();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return headers;
+    }
     async function createGroup() {
       const response = await fetch('/api/v1/groups', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers(),
         body: JSON.stringify({ subjectId: subjectId.value, name: groupName.value, groupType: 'booster', visibility: 'group' })
       });
       const data = await response.json();
@@ -69,7 +80,7 @@ public sealed class GroupsController : ControllerBase
     async function joinGroup() {
       const response = await fetch('/api/v1/groups/join', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers(),
         body: JSON.stringify({ subjectId: subjectId.value, code: joinCode.value })
       });
       const data = await response.json();
@@ -103,8 +114,18 @@ public sealed class GroupsController : ControllerBase
 
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<GroupDto>), StatusCodes.Status200OK)]
-    public ActionResult<IReadOnlyList<GroupDto>> ListForSubject([FromQuery] string subjectId)
-        => Ok(_groups.ListGroupsForUser(subjectId));
+    public async Task<ActionResult<IReadOnlyList<GroupDto>>> ListForSubject([FromQuery] string subjectId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireMatchingSubjectAsync(Request, subjectId, cancellationToken);
+            return Ok(_groups.ListGroupsForUser(subject.SubjectId));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
 
     [HttpGet("{groupId}")]
     [ProducesResponseType<GroupDto>(StatusCodes.Status200OK)]
@@ -117,19 +138,27 @@ public sealed class GroupsController : ControllerBase
 
     [HttpPost]
     [ProducesResponseType<GroupDto>(StatusCodes.Status200OK)]
-    public ActionResult<GroupDto> Create([FromBody] CreateGroupRequest? request)
+    public async Task<ActionResult<GroupDto>> Create([FromBody] CreateGroupRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
         {
             return BadRequest("group payload is required.");
         }
 
-        return Ok(_groups.CreateGroup(request));
+        try
+        {
+            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
+            return Ok(_groups.CreateGroup(request with { SubjectId = subject.SubjectId }));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpPost("{groupId}/join-codes")]
     [ProducesResponseType<JoinCodeDto>(StatusCodes.Status200OK)]
-    public ActionResult<JoinCodeDto> CreateJoinCode([FromRoute] string groupId, [FromBody] CreateJoinCodeRequest? request)
+    public async Task<ActionResult<JoinCodeDto>> CreateJoinCode([FromRoute] string groupId, [FromBody] CreateJoinCodeRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
         {
@@ -138,7 +167,12 @@ public sealed class GroupsController : ControllerBase
 
         try
         {
-            return Ok(_groups.CreateJoinCode(groupId, request));
+            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
+            return Ok(_groups.CreateJoinCode(groupId, request with { SubjectId = subject.SubjectId }));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
         {
@@ -148,7 +182,7 @@ public sealed class GroupsController : ControllerBase
 
     [HttpPost("join")]
     [ProducesResponseType<GroupDto>(StatusCodes.Status200OK)]
-    public ActionResult<GroupDto> Join([FromBody] JoinGroupByCodeRequest? request)
+    public async Task<ActionResult<GroupDto>> Join([FromBody] JoinGroupByCodeRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
         {
@@ -157,7 +191,12 @@ public sealed class GroupsController : ControllerBase
 
         try
         {
-            return Ok(_groups.JoinGroup(request));
+            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
+            return Ok(_groups.JoinGroup(request with { SubjectId = subject.SubjectId }));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
         {
