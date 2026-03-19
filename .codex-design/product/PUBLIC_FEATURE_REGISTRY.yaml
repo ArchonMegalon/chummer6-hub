@@ -118,7 +118,7 @@ cards:
     bucket: coming_next
     title: NEXUS-PAN
     summary: Shared state survives device churn without the table losing trust.
-    href: /horizons#nexus-pan
+    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/nexus-pan.md
     badge: Horizon
     audience: public
     image_family: streetfront
@@ -128,7 +128,7 @@ cards:
     bucket: coming_next
     title: ALICE
     summary: Builders get grounded what-if analysis without trusting fuzzy assistants.
-    href: /horizons#alice
+    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/alice.md
     badge: Horizon
     audience: public
     image_family: simulation_bench
@@ -138,7 +138,7 @@ cards:
     bucket: coming_next
     title: KNOWLEDGE FABRIC
     summary: Ask a rules question and get a grounded answer with citations and receipts.
-    href: /horizons#knowledge-fabric
+    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/README.md
     badge: Horizon
     audience: public
     image_family: archive_stair
@@ -148,7 +148,7 @@ cards:
     bucket: coming_next
     title: KARMA FORGE
     summary: Governed rules evolution without unreadable fork chaos.
-    href: /horizons#karma-forge
+    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/karma-forge.md
     badge: Booster first
     audience: public
     image_family: boulevard_of_futures
@@ -158,7 +158,7 @@ cards:
     bucket: coming_next
     title: JACKPOINT
     summary: Dossiers, recaps, and briefings that feel finished without severing provenance.
-    href: /horizons#jackpoint
+    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/jackpoint.md
     badge: Horizon
     audience: public
     image_family: dossier_desk
@@ -168,7 +168,7 @@ cards:
     bucket: coming_next
     title: RUNSITE
     summary: Walk the job before the team walks into it.
-    href: /horizons#runsite
+    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/runsite.md
     badge: Horizon
     audience: public
     image_family: facility_exterior
@@ -178,7 +178,7 @@ cards:
     bucket: coming_next
     title: RUNBOOK PRESS
     summary: Bring new players in without the two-hour lecture.
-    href: /horizons#runbook-press
+    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/runbook-press.md
     badge: Horizon
     audience: public
     image_family: prop_cluster
@@ -188,7 +188,7 @@ cards:
     bucket: coming_next
     title: GHOSTWIRE
     summary: Replay and after-action truth that survives memory drift.
-    href: /horizons#ghostwire
+    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/README.md
     badge: Horizon
     audience: public
     image_family: boulevard_of_futures
@@ -198,7 +198,7 @@ cards:
     bucket: coming_next
     title: LOCAL CO-PROCESSOR
     summary: Optional local acceleration without turning the product into a black box.
-    href: /horizons#local-co-processor
+    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/README.md
     badge: Horizon
     audience: public
     image_family: solo_operator
