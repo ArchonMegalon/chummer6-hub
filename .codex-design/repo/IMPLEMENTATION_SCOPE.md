@@ -11,6 +11,7 @@
 * play API aggregation and hosted session coordination
 * orchestration-side Coach/Spider/Director surfaces
 * hosted external-integration routing that is not render-only media execution
+* participation consent and sponsorship UX for Fleet premium burst lanes
 
 ## Must not own
 
@@ -19,6 +20,7 @@
 * shared UI-kit primitives
 * long-term registry persistence ownership after the registry split
 * long-term render execution ownership after the media-factory split
+* raw participant Codex/OpenAI auth caches or device-auth secrets
 
 ## Package boundary
 
@@ -46,3 +48,4 @@ The mission statement and the repo body are much closer now.
 Registry and media execution ownership are physically out of this repo.
 
 The remaining work is orchestrator-side adapters and product completion, not pretending hub still owns every hosted surface.
+Participation UX for premium burst lanes belongs here, but the resulting Codex auth cache stays lane-local on Fleet rather than being stored in hub identity or hub databases.

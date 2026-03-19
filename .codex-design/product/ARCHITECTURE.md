@@ -71,6 +71,25 @@ Render jobs, manifests, previews, asset lifecycle, and provider adapters belong 
 
 `chummer5a` is a migration/regression oracle. It is not part of the active multi-repo architecture.
 
+### Rule 10 — Fleet is an execution plane, not product truth
+
+`fleet` may orchestrate work, review, and landing across Chummer repos, but it does not become the canonical source of Chummer architecture.
+
+Fleet may own:
+
+* cheap-first automation policy
+* worker account selection
+* premium burst scheduling
+* jury-gated landing control
+* execution telemetry for repo work
+
+Fleet must not own:
+
+* product architecture truth
+* product contract truth
+* Hub user identity truth
+* raw participant OpenAI auth state outside lane-local worker storage
+
 ## Repo graph
 
 ```text
@@ -110,6 +129,12 @@ chummer6-hub-registry
 
 chummer6-media-factory
   └─ publishes Chummer.Media.Contracts
+
+fleet
+  ├─ consumes mirrored Chummer canon from chummer6-design
+  ├─ orchestrates repo work across Chummer codebases
+  ├─ keeps cheap groundwork as the default execution plane
+  └─ may open explicit premium burst lanes that still land through review authority
 ```
 
 ## Allowed dependency directions
@@ -128,6 +153,8 @@ chummer6-media-factory
 * hub -> media contracts
 * hub-registry -> its own contracts
 * media-factory -> its own contracts
+* fleet -> mirrored design canon
+* fleet -> code repos via git/worktree orchestration
 
 ### Forbidden
 
@@ -141,6 +168,8 @@ chummer6-media-factory
 * media-factory -> play contracts
 * media-factory -> campaign/session DB semantics
 * hub -> duplicated engine semantic DTOs once canonical package owner exists
+* fleet -> canonical product design ownership
+* hub -> raw participant Codex/OpenAI auth caches
 
 ## New repo split gate
 
@@ -202,6 +231,7 @@ This plane exists to integrate owned third-party capabilities without allowing a
   * survey bridges
   * automation bridges
   * research/eval tooling
+  * participation consent and sponsorship UX for Fleet burst lanes
 
 * `chummer6-media-factory`
 
@@ -221,3 +251,4 @@ This plane exists to integrate owned third-party capabilities without allowing a
 * no third-party tool holds canonical approval state
 * no third-party tool owns Chummer media manifests
 * no third-party tool bypasses Chummer moderation or canonization
+* no hosted UX stores raw participant Codex/OpenAI auth caches; those stay lane-local on the execution host
