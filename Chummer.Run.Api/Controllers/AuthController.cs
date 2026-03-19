@@ -58,17 +58,26 @@ public sealed class AuthController : ControllerBase
         var nextPath = HubBrowserAuthService.SanitizeNextPath(next);
         var started = await _browserAuth.StartEmailEntryAsync(email, displayName, nextPath, cancellationToken);
         var callback = $"/auth/email/callback?ticket={WebUtility.UrlEncode(started.TicketId)}&next={WebUtility.UrlEncode(nextPath)}";
+        var previewFallback = string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase);
+        var deliveryPanel = previewFallback
+            ? $"""
+  <p><a class="cta" href="{EncodeHref(callback)}">Continue with preview magic link</a></p>
+  <p><a class="inline-link" href="/login?next={EncodeHref(nextPath)}">Start over</a></p>
+"""
+            : """
+  <p>Open your inbox and use the sign-in link there.</p>
+  <p><a class="inline-link" href="/login?next=/home">Return to sign in</a></p>
+""";
         var body = $$"""
 <section class="panel prose">
   <h2>Check your email</h2>
-  <p>In the full product this step sends a verification link. In this build, transactional mail is not configured, so the preview callback link is shown directly.</p>
+  <p>{{Encode(started.PreviewNote)}}</p>
   <ul>
     <li>Email: {{Encode(started.Email)}}</li>
     <li>Display name: {{Encode(started.DisplayName)}}</li>
     <li>Expires: {{Encode(started.ExpiresAtUtc.ToString("u"))}}</li>
   </ul>
-  <p><a class="cta" href="{{EncodeHref(callback)}}">Continue with preview magic link</a></p>
-  <p><a class="inline-link" href="/login?next={{EncodeHref(nextPath)}}">Start over</a></p>
+  {{deliveryPanel}}
 </section>
 """;
         return Content(RenderShell("Email Entry", "Email-first entry is the current boring fallback until richer provider adapters are fully wired.", body), "text/html");

@@ -6,6 +6,14 @@ services:
       dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Identity/Dockerfile
     environment:
       CHUMMER_IDENTITY_STORE_PATH: /app/state/identity-store.json
+      IDENTITY_PUBLIC_BASE_URL: ${IDENTITY_PUBLIC_BASE_URL:-https://chummer.run}
+      IDENTITY_SMTP_HOST: ${IDENTITY_SMTP_HOST:-}
+      IDENTITY_SMTP_PORT: ${IDENTITY_SMTP_PORT:-587}
+      IDENTITY_SMTP_USERNAME: ${IDENTITY_SMTP_USERNAME:-}
+      IDENTITY_SMTP_PASSWORD: ${IDENTITY_SMTP_PASSWORD:-}
+      IDENTITY_SMTP_FROM_EMAIL: ${IDENTITY_SMTP_FROM_EMAIL:-}
+      IDENTITY_SMTP_FROM_NAME: ${IDENTITY_SMTP_FROM_NAME:-Chummer}
+      IDENTITY_SMTP_USE_SSL: ${IDENTITY_SMTP_USE_SSL:-true}
     volumes:
       - chummer-run-identity-state:/app/state
     networks:
