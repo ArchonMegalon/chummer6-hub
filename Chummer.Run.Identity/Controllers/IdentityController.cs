@@ -1,6 +1,7 @@
 using Chummer.Run.Contracts.Identity;
 using Chummer.Run.Identity.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Chummer.Run.Identity.Controllers;
 
@@ -9,11 +10,13 @@ namespace Chummer.Run.Identity.Controllers;
 public sealed class IdentityController : ControllerBase
 {
     private readonly IIdentityAccessService _identity;
+    private readonly IIdentityEmailDeliveryService _emailDelivery;
     private readonly IConfiguration _configuration;
 
-    public IdentityController(IIdentityAccessService identity, IConfiguration configuration)
+    public IdentityController(IIdentityAccessService identity, IIdentityEmailDeliveryService emailDelivery, IConfiguration configuration)
     {
         _identity = identity;
+        _emailDelivery = emailDelivery;
         _configuration = configuration;
     }
 
@@ -47,6 +50,29 @@ public sealed class IdentityController : ControllerBase
         }
 
         return Ok(_identity.StartEmailEntry(request));
+    }
+
+    [HttpGet("email/delivery-status")]
+    [ProducesResponseType<IdentityEmailDeliveryStatusResponse>(StatusCodes.Status200OK)]
+    public ActionResult<IdentityEmailDeliveryStatusResponse> GetEmailDeliveryStatus()
+        => Ok(_emailDelivery.GetStatus());
+
+    [HttpPost("email/providers/emailit/webhook")]
+    [ProducesResponseType<IdentityEmailWebhookAckResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public ActionResult<IdentityEmailWebhookAckResponse> ReceiveEmailitWebhook([FromBody] JsonElement payload)
+    {
+        var configuredSecret = _configuration["IDENTITY_EMAILIT_WEBHOOK_SECRET"]?.Trim();
+        if (!string.IsNullOrWhiteSpace(configuredSecret))
+        {
+            var suppliedSecret = Request.Headers["X-Emailit-Webhook-Secret"].ToString();
+            if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+            {
+                return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "emailit webhook secret mismatch.");
+            }
+        }
+
+        return Ok(_emailDelivery.RecordEmailitWebhook(payload));
     }
 
     [HttpPost("email/complete")]

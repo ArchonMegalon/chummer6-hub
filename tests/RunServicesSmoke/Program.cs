@@ -337,6 +337,7 @@ void VerifyIdentityEmailDeliveryProviders()
 
     Assert(delivered.Delivered, $"Emailit-backed delivery should report success on a 2xx API response. mode={delivered.DeliveryMode} note={delivered.PreviewNote} request={(capturedRequest is null ? "none" : capturedRequest.RequestUri?.ToString())}");
     Assert(delivered.DeliveryMode == "emailit_api_magic_link", "Emailit-backed delivery should expose the Emailit delivery mode.");
+    Assert(delivered.ProviderMessageId == "email_123", "Emailit-backed delivery should surface the provider message id when the API returns one.");
     Assert(capturedRequest is not null, "Emailit-backed delivery should issue an HTTP request.");
     Assert(capturedRequest!.RequestUri?.ToString() == "https://api.emailit.com/v2/emails", "Emailit-backed delivery should target the v2 emails endpoint.");
     Assert(capturedRequest.Headers.Authorization?.Scheme == "Bearer", "Emailit-backed delivery should send a bearer token.");
@@ -354,6 +355,27 @@ void VerifyIdentityEmailDeliveryProviders()
         Assert(payload.RootElement.GetProperty("html").GetString()?.Contains("Open Chummer", StringComparison.Ordinal) == true, "Emailit html body should contain the CTA.");
         Assert(payload.RootElement.GetProperty("meta").GetProperty("purpose").GetString() == "magic_link", "Emailit payload should mark the auth purpose.");
     }
+
+    var deliveryStatus = emailitService.GetStatus();
+    Assert(deliveryStatus.RecentDeliveries.Any(static item => item.TransportKey == "emailit_api" && item.ProviderMessageId == "email_123" && item.Status == "accepted"), "Email delivery status should record accepted Emailit sends.");
+    Assert(deliveryStatus.Recipients.Any(static item => item.Email == "runner@example.invalid" && item.Provider == "emailit_api"), "Email delivery status should project recipient state.");
+
+    var webhookAck = emailitService.RecordEmailitWebhook(JsonDocument.Parse("""
+    {
+      "type": "email.delivered",
+      "data": {
+        "id": "email_123",
+        "to": "runner@example.invalid",
+        "created_at": "2026-03-20T10:05:00Z"
+      }
+    }
+    """).RootElement);
+    Assert(webhookAck.Provider == "emailit_api", "Emailit webhook ack should identify the provider.");
+    Assert(webhookAck.Status == "delivered", "Emailit webhook ack should normalize delivered events.");
+
+    var updatedStatus = emailitService.GetStatus();
+    Assert(updatedStatus.RecentDeliveries.Any(static item => item.TransportKey == "emailit_api" && item.DeliveryMode == "emailit_webhook" && item.Status == "delivered"), "Webhook delivery events should appear in email delivery history.");
+    Assert(updatedStatus.Recipients.Any(static item => item.Email == "runner@example.invalid" && item.State == "delivered"), "Webhook delivery events should update recipient state.");
 
     var failingEmailitService = new IdentityEmailDeliveryService(
         emailitConfig,

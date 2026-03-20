@@ -36,6 +36,37 @@ public sealed record EmailAuthStartResponse(
     string DeliveryMode,
     string PreviewNote);
 
+public sealed record IdentityEmailDeliveryEventResponse(
+    string DeliveryId,
+    string EmailKind,
+    string TransportKey,
+    string DeliveryMode,
+    string Status,
+    bool Delivered,
+    string RecipientEmail,
+    string? ProviderMessageId,
+    string? FailureReason,
+    DateTimeOffset OccurredAtUtc);
+
+public sealed record IdentityEmailRecipientStateResponse(
+    string Email,
+    string State,
+    string? LastEvent,
+    DateTimeOffset? LastEventAtUtc,
+    string? Provider,
+    string? ProviderDetail);
+
+public sealed record IdentityEmailDeliveryStatusResponse(
+    IReadOnlyList<IdentityEmailDeliveryEventResponse> RecentDeliveries,
+    IReadOnlyList<IdentityEmailRecipientStateResponse> Recipients,
+    DateTimeOffset GeneratedAtUtc);
+
+public sealed record IdentityEmailWebhookAckResponse(
+    string Provider,
+    string Status,
+    int RecordedEvents,
+    DateTimeOffset ReceivedAtUtc);
+
 public sealed record EmailAuthCompleteRequest(
     [Required(AllowEmptyStrings = false), StringLength(128)] string TicketId);
 
