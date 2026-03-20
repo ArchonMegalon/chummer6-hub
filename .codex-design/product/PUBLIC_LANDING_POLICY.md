@@ -25,6 +25,9 @@ The landing surface must let a normal person understand, in one visit:
 * Provider names and LTD names are implementation details and must not be named on the landing page.
 * Empty placeholder boxes are forbidden.
 * If a feature is not live, the card must still explain what is coming and why it matters.
+* Public guest chrome must expose both `Sign in` and `Create account`.
+* Public cards must not self-link back to the same route unless they are explicitly marked as non-clickable teasers.
+* External exits must be explicit and labeled as fallbacks or guide links, not disguised as first-party defaults.
 * Landing meaning must compile from design-owned manifest and registry data rather than hub-local improvisation.
 * Public status is advisory and explanatory; it does not overrule canonical design truth.
 * Provider names may appear only on dedicated auth and account-security surfaces, not on the landing hero or proof cards.
@@ -107,6 +110,9 @@ Do not lead with operator terms like:
 * participant burst lane
 * jury lane
 * worker topology
+* Fleet
+* device-code auth
+* worker host
 
 Those terms may appear only in deeper explainer surfaces where they are necessary.
 

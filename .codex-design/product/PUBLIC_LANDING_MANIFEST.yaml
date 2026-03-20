@@ -16,6 +16,13 @@ hero_ctas:
   - label: Sign in to follow what is coming
     href: /login?next=/home
     emphasis: secondary
+guest_shell_actions:
+  - label: Sign in
+    href: /login?next=/home
+    emphasis: primary
+  - label: Create account
+    href: /signup?next=/home
+    emphasis: secondary
 secondary_highlights:
   - Runs local-first.
   - Explains the math.

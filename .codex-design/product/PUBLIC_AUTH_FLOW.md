@@ -31,6 +31,13 @@ Registered routes:
 * guest access to `/participate/codex` must redirect or fall back to `/login?next=/participate/codex`
 * `/participate` remains the public explainer and must not require sign-in
 
+## Discoverability rule
+
+* guest-visible chrome must expose both `Sign in` and `Create account`
+* `/login` must link to `/signup`
+* `/signup` must link back to `/login`
+* guest waitlist or follow CTAs must prefer first-party guest targets such as `/signup?next=/home` over generic redirects to `/home`
+
 ## First-wave implemented posture
 
 Enabled now:

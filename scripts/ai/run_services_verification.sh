@@ -32,7 +32,7 @@ rg -n 'AccountsController|GroupsController|BoostCodesController|BoostSessionsCon
   docs/HUB_COMMUNITY_LEDGER_PLANE.md >/dev/null
 rg -n 'linked identities|channel links|Google|Facebook|Telegram|EA remains the orchestrator brain|/api/v1/accounts/me/links' \
   docs/HUB_IDENTITY_AND_CHANNEL_MODEL.md >/dev/null
-rg -n 'PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|/what-is-chummer|/downloads|/participate|/status|/artifacts|/login|/signup|/logout|product front door' \
+rg -n 'PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|PUBLIC_LANDING_ASSET_REGISTRY\.yaml|/what-is-chummer|/downloads|/participate|/status|/artifacts|/login|/signup|/logout|product front door|Create account|self-link|external fallback' \
   docs/PUBLIC_LANDING_SURFACE.md >/dev/null
 rg -n 'durable local snapshot|CHUMMER_COMMUNITY_STORE_PATH|parallel intent-only state model' \
   docs/HUB_COMMUNITY_LEDGER_PLANE.md >/dev/null
@@ -43,15 +43,15 @@ rg -n 'linked identity and channel-link state|EA remains the orchestrator brain 
 rg -n 'public sealed class AccountsController|public sealed class GroupsController|public sealed class BoostCodesController|public sealed class BoostSessionsController|public sealed class LedgerController|public sealed class LeaderboardsController|public sealed class EntitlementsController' \
   Chummer.Run.Api/Controllers/*.cs >/dev/null
 rg -n 'public sealed class AccountLinksController' Chummer.Run.Api/Controllers/AccountLinksController.cs >/dev/null
-rg -n 'public sealed class PublicLandingController|/what-is-chummer|/downloads|/participate|/status|/artifacts|GetLanding' \
+rg -n 'public sealed class PublicLandingController|PublicReleaseManifestService|/what-is-chummer|/downloads|/participate|/status|/artifacts|GetLanding|GuestShellActions|ResolveCardHref' \
   Chummer.Run.Api/Controllers/PublicLandingController.cs >/dev/null
-rg -n 'public sealed class AuthController|/login|/signup|/logout|/auth/email/start|/auth/email/callback|/auth/google/start|/auth/google/callback' \
+rg -n 'public sealed class AuthController|/login|/signup|/logout|/auth/email/start|/auth/email/callback|/auth/google/start|/auth/google/callback|Create Account|Sign in instead|shell-action' \
   Chummer.Run.Api/Controllers/AuthController.cs >/dev/null
 rg -n 'public sealed class AccountService|public sealed class GroupService|public sealed class BoostSessionService|public sealed class LedgerService|public sealed class RewardService|public sealed class EntitlementService|public sealed class LeaderboardService|public sealed class CommunityStore' \
   Chummer.Run.Api/Services/Community/*.cs >/dev/null
 rg -n 'public sealed class IdentityLinkService|Google|Facebook|Telegram|EA' \
   Chummer.Run.Api/Services/Community/IdentityLinkService.cs >/dev/null
-rg -n 'public sealed class PublicLandingService|PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|auth_routes|registered_overlays|feature registry' \
+rg -n 'public sealed class PublicLandingService|PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|PUBLIC_LANDING_ASSET_REGISTRY\.yaml|guest_shell_actions|asset_slot|auth_routes|registered_overlays|feature registry' \
   Chummer.Run.Api/Services/PublicLandingService.cs >/dev/null
 rg -n 'AddSingleton<PublicLandingService>\(\)|AddHttpClient<HubBrowserAuthService>\(\)' Chummer.Run.Api/Program.cs >/dev/null
 rg -n 'EmailAuthStartRequest|EmailAuthStartResponse|EmailAuthCompleteRequest|IdentitySessionRevokeRequest|IdentitySessionRevokeResponse' \

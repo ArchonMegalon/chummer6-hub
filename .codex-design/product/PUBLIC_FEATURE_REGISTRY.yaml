@@ -30,7 +30,7 @@ cards:
     bucket: what_you_can_do_today
     title: Sign in to follow the future
     summary: Keep an eye on the lanes you care about and unlock participation later.
-    href: /home
+    href: /login?next=/home
     badge: Registered soon
     audience: public
     image_family: boulevard_of_futures
@@ -94,10 +94,15 @@ cards:
     bucket: whats_real_now
     title: Public guide and horizons
     summary: There is already a real human guide and a governed horizon shelf.
-    href: https://github.com/ArchonMegalon/Chummer6
+    href: /what-is-chummer#public-guide
     badge: Available today
     audience: public
     image_family: archive_stair
+    cta_kind: route
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6
+    fallback_label: Open guide fallback
+    external_ok: true
   - id: real_mobile_prep
     bucket: whats_real_now
     title: Local-first prep and session posture
@@ -118,137 +123,181 @@ cards:
     bucket: coming_next
     title: NEXUS-PAN
     summary: Shared state survives device churn without the table losing trust.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/nexus-pan.md
+    href: /horizons#horizon-nexus-pan
     badge: Horizon
     audience: public
     image_family: streetfront
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/nexus-pan.md
+    fallback_label: Read the guide entry
+    external_ok: true
     pain: My devices drift and the table loses confidence.
     payoff: Shared state survives device churn without the GM rebuilding the run from memory.
   - id: horizon_alice
     bucket: coming_next
     title: ALICE
     summary: Builders get grounded what-if analysis without trusting fuzzy assistants.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/alice.md
+    href: /horizons#horizon-alice
     badge: Horizon
     audience: public
     image_family: simulation_bench
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/alice.md
+    fallback_label: Read the guide entry
+    external_ok: true
     pain: We only discover weak builds after they explode in public.
     payoff: Compare grounded tradeoffs with receipts instead of vibes.
   - id: horizon_knowledge_fabric
     bucket: coming_next
     title: KNOWLEDGE FABRIC
     summary: Ask a rules question and get a grounded answer with citations and receipts.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/README.md
+    href: /horizons#horizon-knowledge-fabric
     badge: Horizon
     audience: public
     image_family: archive_stair
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/README.md
+    fallback_label: Read the guide entry
+    external_ok: true
     pain: Rules answers are expensive, repetitive, and still easy to hallucinate.
     payoff: Derived projections stay grounded instead of becoming assistant folklore.
   - id: horizon_karma_forge
     bucket: coming_next
     title: KARMA FORGE
     summary: Governed rules evolution without unreadable fork chaos.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/karma-forge.md
+    href: /horizons#horizon-karma-forge
     badge: Booster first
     audience: public
     image_family: boulevard_of_futures
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/karma-forge.md
+    fallback_label: Read the guide entry
+    external_ok: true
     pain: I want house rules without forking trust.
     payoff: Rule-pack changes carry approvals, compatibility, and rollback posture.
   - id: horizon_jackpoint
     bucket: coming_next
     title: JACKPOINT
     summary: Dossiers, recaps, and briefings that feel finished without severing provenance.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/jackpoint.md
+    href: /horizons#horizon-jackpoint
     badge: Horizon
     audience: public
     image_family: dossier_desk
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/jackpoint.md
+    fallback_label: Read the guide entry
+    external_ok: true
     pain: I want mission packets that do not feel like a copy-paste graveyard.
     payoff: Grounded artifacts can feel polished without becoming fictional truth.
   - id: horizon_runsite
     bucket: coming_next
     title: RUNSITE
     summary: Walk the job before the team walks into it.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/runsite.md
+    href: /horizons#horizon-runsite
     badge: Horizon
     audience: public
     image_family: facility_exterior
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/runsite.md
+    fallback_label: Read the guide entry
+    external_ok: true
     pain: Spatial prep is tedious and scattered.
     payoff: The venue becomes a visible, inspectable run surface.
   - id: horizon_runbook_press
     bucket: coming_next
     title: RUNBOOK PRESS
     summary: Bring new players in without the two-hour lecture.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/runbook-press.md
+    href: /horizons#horizon-runbook-press
     badge: Horizon
     audience: public
     image_family: prop_cluster
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/runbook-press.md
+    fallback_label: Read the guide entry
+    external_ok: true
     pain: Table onboarding still depends on heroic patience.
     payoff: Grounded primers become first-class artifacts instead of random PDFs.
   - id: horizon_ghostwire
     bucket: coming_next
     title: GHOSTWIRE
     summary: Replay and after-action truth that survives memory drift.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/README.md
+    href: /horizons#horizon-ghostwire
     badge: Horizon
     audience: public
     image_family: boulevard_of_futures
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/README.md
+    fallback_label: Read the guide entry
+    external_ok: true
     pain: People remember the drama and forget the sequence.
     payoff: After-action review can point at the event trail instead of table folklore.
   - id: horizon_local_co_processor
     bucket: coming_next
     title: LOCAL CO-PROCESSOR
     summary: Optional local acceleration without turning the product into a black box.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/README.md
+    href: /horizons#horizon-local-co-processor
     badge: Horizon
     audience: public
     image_family: solo_operator
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/README.md
+    fallback_label: Read the guide entry
+    external_ok: true
     pain: Some heavy local workflows still need more muscle.
     payoff: Local acceleration stays optional and bounded instead of becoming a mystery dependency.
   - id: artifact_runsite_pack
     bucket: featured_artifacts
     title: Runsite pack
     summary: Walk the job before the team walks into it.
-    href: /artifacts
+    href: /horizons#horizon-runsite
     badge: Coming soon
     audience: public
     image_family: facility_exterior
+    detail_route: /horizons#horizon-runsite
   - id: artifact_dossier_brief
     bucket: featured_artifacts
     title: Dossier brief
     summary: Turn notes into a credible mission packet.
-    href: /artifacts
+    href: /horizons#horizon-jackpoint
     badge: Coming soon
     audience: public
     image_family: dossier_desk
+    detail_route: /horizons#horizon-jackpoint
   - id: artifact_campaign_primer
     bucket: featured_artifacts
     title: Campaign primer
     summary: Bring new players in without the two-hour lecture.
-    href: /artifacts
+    href: /horizons#horizon-runbook-press
     badge: Coming soon
     audience: public
     image_family: prop_cluster
+    detail_route: /horizons#horizon-runbook-press
   - id: artifact_after_action
     bucket: featured_artifacts
     title: Replay and after-action
     summary: See what happened, not just what people remember.
-    href: /artifacts
+    href: /horizons#horizon-ghostwire
     badge: Coming soon
     audience: public
     image_family: boulevard_of_futures
+    detail_route: /horizons#horizon-ghostwire
   - id: participate_feedback
     bucket: participate
     title: Report a problem
     summary: Use the public issue tracker when you want to file a bug or a concrete improvement.
-    href: https://github.com/ArchonMegalon/Chummer6/issues
+    href: /participate#report-a-problem
     badge: Public
     audience: public
     image_family: archive_stair
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/issues
+    fallback_label: Open the public issue tracker
+    external_ok: true
   - id: participate_future
     bucket: participate
     title: Suggest a future
     summary: Advisory signals are welcome even though canon still lives in design.
-    href: /participate
+    href: /participate#suggest-a-future
     badge: Public
     audience: public
     image_family: boulevard_of_futures
@@ -256,23 +305,33 @@ cards:
     bucket: participate
     title: I have a ChatGPT subscription
     summary: Open the bounded booster lane if you want to lend temporary premium capacity.
-    href: /participate
+    href: /login?next=/participate/codex
     badge: Registered
     audience: public
     image_family: solo_operator
+    cta_kind: login
+    guest_href: /login?next=/participate/codex
+    registered_href: /participate/codex
   - id: participate_beta
     bucket: participate
     title: Join the beta waitlist
     summary: Raise your hand for follow-up previews and future gated surfaces.
-    href: /home
+    href: /participate#beta-waitlist
     badge: Registered soon
     audience: public
     image_family: dossier_desk
+    cta_kind: signup
+    guest_href: /signup?next=/home
+    registered_href: /home#beta-interest
   - id: release_latest
     bucket: release_shelf
     title: Latest POC build
     summary: Current public drop, release notes, and integrity clues.
-    href: https://github.com/ArchonMegalon/Chummer6/releases
+    href: /downloads
     badge: POC
     audience: public
     image_family: facility_exterior
+    render_mode: external_explainer
+    fallback_route: https://github.com/ArchonMegalon/Chummer6/releases
+    fallback_label: Open GitHub releases
+    external_ok: true

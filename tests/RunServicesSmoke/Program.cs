@@ -28,6 +28,7 @@ using Chummer.Run.Contracts.Identity;
 using Chummer.Run.Contracts.Ledger;
 using Chummer.Run.Contracts.Leaderboards;
 using Chummer.Run.Contracts.Ops;
+using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Run.Contracts.Publication;
 using Chummer.Run.Contracts.Registry;
 using Chummer.Run.Identity.Services;
@@ -743,35 +744,61 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
 
 async Task VerifyPublicLandingProjectionAsync()
 {
+    var tempRoot = Path.Combine(Path.GetTempPath(), "run-services-smoke", Guid.NewGuid().ToString("N"));
+    var storePath = Path.Combine(tempRoot, "community-store.json");
+    var downloadsRoot = Path.Combine(tempRoot, "downloads");
+    var downloadsFilesRoot = Path.Combine(downloadsRoot, "files");
+    Directory.CreateDirectory(downloadsFilesRoot);
+    File.WriteAllText(Path.Combine(downloadsFilesRoot, "smoke-poc-linux-x64.zip"), "smoke");
+    File.WriteAllText(
+        Path.Combine(downloadsRoot, "releases.json"),
+        JsonSerializer.Serialize(
+            new PublicReleaseManifestDto(
+                Version: "0.6.1-smoke",
+                Channel: "preview",
+                PublishedAt: new DateTimeOffset(2026, 3, 20, 12, 0, 0, TimeSpan.Zero),
+                Downloads:
+                [
+                    new PublicReleaseArtifactDto(
+                        Id: "smoke-poc-linux-x64",
+                        Platform: "linux-x64",
+                        Url: "/downloads/files/smoke-poc-linux-x64.zip",
+                        Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                        SizeBytes: 4096)
+                ]),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+
     var configuration = new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["CHUMMER_PUBLIC_CANON_ROOT"] = "/docker/chummercomplete/chummer.run-services"
+            ["CHUMMER_PUBLIC_CANON_ROOT"] = "/docker/chummercomplete/chummer.run-services",
+            ["CHUMMER_COMMUNITY_STORE_PATH"] = storePath,
+            ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot
         })
         .Build();
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
     var landing = new PublicLandingService(configuration, loggerFactory.CreateLogger<PublicLandingService>());
+    var releases = new PublicReleaseManifestService(configuration);
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/participate", StringComparison.Ordinal)), "landing surface should expose the participate entry route");
     Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/login", StringComparison.Ordinal)), "landing surface should expose the login route");
+    Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/signup", StringComparison.Ordinal)), "landing surface should expose the signup route");
+    Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/login?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Sign in", StringComparison.Ordinal)), "landing guest shell should expose the sign-in action");
+    Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/signup?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Create account", StringComparison.Ordinal)), "landing guest shell should expose the create-account action");
+    Assert(surface.Assets.Any(static asset => string.Equals(asset.AssetSlot, "section_hero", StringComparison.Ordinal)), "landing surface should load the hero asset slot");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Title, "KARMA FORGE", StringComparison.Ordinal) && string.Equals(card.Badge, "Booster first", StringComparison.Ordinal)), "landing feature registry should carry the booster-first posture for KARMA FORGE");
-
-    var storePath = Path.Combine(Path.GetTempPath(), "run-services-smoke", Guid.NewGuid().ToString("N"), "community-store.json");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "real_public_guide", StringComparison.Ordinal) && string.Equals(card.Href, "/what-is-chummer#public-guide", StringComparison.Ordinal) && card.ExternalOk), "landing guide card should keep a first-party route with an explicit external fallback");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "artifact_runsite_pack", StringComparison.Ordinal) && string.Equals(card.Href, "/horizons#horizon-runsite", StringComparison.Ordinal)), "artifact cards should point at related horizon details instead of self-linking to the shelf");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/participate/codex", StringComparison.Ordinal)), "booster participation should split guest and registered destinations");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/signup?next=/home", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/home#beta-interest", StringComparison.Ordinal)), "beta waitlist should split guest signup from registered-home follow-up");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
-    var communityConfiguration = new ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["CHUMMER_PUBLIC_CANON_ROOT"] = "/docker/chummercomplete/chummer.run-services",
-            ["CHUMMER_COMMUNITY_STORE_PATH"] = storePath
-        })
-        .Build();
-    var store = new CommunityStore(communityConfiguration, loggerFactory.CreateLogger<CommunityStore>());
+    var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var accounts = new AccountService(store);
     var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
-        JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized))), communityConfiguration);
-    var controller = new PublicLandingController(landing, accounts, identityClient)
+        JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized))), configuration);
+    var controller = new PublicLandingController(landing, releases, accounts, identityClient)
     {
         ControllerContext = new ControllerContext
         {
@@ -782,17 +809,35 @@ async Task VerifyPublicLandingProjectionAsync()
     var landingHtml = controller.LandingPage().Content ?? string.Empty;
     Assert(landingHtml.Contains("Shadowrun rules truth, with receipts.", StringComparison.Ordinal), "landing page should render the canonical headline");
     Assert(landingHtml.Contains("/participate", StringComparison.Ordinal), "landing page should route people toward participate");
+    Assert(landingHtml.Contains("/signup?next=/home", StringComparison.Ordinal), "landing page chrome should expose create account beside sign in");
+    Assert(landingHtml.Contains("/what-is-chummer#public-guide", StringComparison.Ordinal), "landing page should keep the guide card first-party");
+    Assert(landingHtml.Contains("/horizons#horizon-runsite", StringComparison.Ordinal), "landing page should route artifact cards to related horizons");
+    Assert(!landingHtml.Contains("archive stair", StringComparison.OrdinalIgnoreCase), "landing page should not leak raw asset-family text into the visual layer");
+    Assert(!landingHtml.Contains("dossier desk", StringComparison.OrdinalIgnoreCase), "landing page should not leak raw asset-family text into the visual layer");
+    Assert(!landingHtml.Contains("boulevard of futures", StringComparison.OrdinalIgnoreCase), "landing page should not leak raw asset-family text into the visual layer");
+    Assert(!landingHtml.Contains("simulation bench", StringComparison.OrdinalIgnoreCase), "landing page should not leak raw asset-family text into the visual layer");
+
+    var storyHtml = controller.ProductStoryPage().Content ?? string.Empty;
+    Assert(storyHtml.Contains("id=\"public-guide\"", StringComparison.Ordinal) && storyHtml.Contains("Open the deeper guide fallback", StringComparison.Ordinal), "product story page should expose the first-party guide panel with an explicit fallback");
+
+    var downloadsHtml = controller.DownloadsPage().Content ?? string.Empty;
+    Assert(downloadsHtml.Contains("smoke-poc-linux-x64", StringComparison.Ordinal), "downloads page should render artifacts from the live release manifest");
+    Assert(downloadsHtml.Contains("/downloads/files/smoke-poc-linux-x64.zip", StringComparison.Ordinal), "downloads page should link directly to manifest-backed downloads");
+    Assert(downloadsHtml.Contains("0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
+
+    var artifactsHtml = controller.ArtifactsPage().Content ?? string.Empty;
+    Assert(artifactsHtml.Contains("Runsite pack", StringComparison.Ordinal) && artifactsHtml.Contains("/horizons#horizon-runsite", StringComparison.Ordinal), "artifacts shelf should point teaser cards at deliberate related detail pages");
+
+    var participateHtml = controller.ParticipatePage().Content ?? string.Empty;
+    Assert(participateHtml.Contains("/login?next=/participate/codex", StringComparison.Ordinal), "participate page should route the booster lane through login");
+    Assert(!participateHtml.Contains("device-code auth", StringComparison.OrdinalIgnoreCase), "public participate copy should not lead with operator auth jargon");
+    Assert(!participateHtml.Contains("worker host", StringComparison.OrdinalIgnoreCase), "public participate copy should not leak worker-host jargon");
+    Assert(!participateHtml.Contains("jury", StringComparison.OrdinalIgnoreCase), "public participate copy should not leak internal review labels");
 
     var homeResult = await controller.HomePage(CancellationToken.None);
     var homeRedirect = homeResult as RedirectResult;
     Assert(homeRedirect is not null && string.Equals(homeRedirect.Url, "/login?next=/home", StringComparison.Ordinal), "home page should redirect signed-out guests to the login route.");
 
-    var authConfiguration = new ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["CHUMMER_PUBLIC_CANON_ROOT"] = "/docker/chummercomplete/chummer.run-services"
-        })
-        .Build();
     var authService = new HubBrowserAuthService(new HttpClient(new StubHttpMessageHandler(_ =>
         JsonResponse(new EmailAuthStartResponse(
             TicketId: "eml_demo",
@@ -803,7 +848,7 @@ async Task VerifyPublicLandingProjectionAsync()
             CreatedAtUtc: DateTimeOffset.UtcNow,
             ExpiresAtUtc: DateTimeOffset.UtcNow.AddMinutes(15),
             DeliveryMode: "preview_inline_link",
-            PreviewNote: "preview"), HttpStatusCode.OK))), authConfiguration);
+            PreviewNote: "preview"), HttpStatusCode.OK))), configuration);
     var authController = new AuthController(authService, identityClient, landing)
     {
         ControllerContext = new ControllerContext
@@ -814,6 +859,11 @@ async Task VerifyPublicLandingProjectionAsync()
     var loginResult = await authController.LoginPage("/home", CancellationToken.None);
     var loginHtml = (loginResult as ContentResult)?.Content ?? string.Empty;
     Assert(loginHtml.Contains("Sign In", StringComparison.Ordinal) && loginHtml.Contains("/auth/email/start", StringComparison.Ordinal), "login page should render the email-first auth shell.");
+    Assert(loginHtml.Contains("/signup?next=/home", StringComparison.Ordinal) && loginHtml.Contains("Create account", StringComparison.Ordinal), "login page should expose the create-account lane from the guest auth shell.");
+
+    var signupResult = await authController.SignupPage("/home", CancellationToken.None);
+    var signupHtml = (signupResult as ContentResult)?.Content ?? string.Empty;
+    Assert(signupHtml.Contains("Create Account", StringComparison.Ordinal) && signupHtml.Contains("/login?next=/home", StringComparison.Ordinal), "signup page should link back to sign in and keep the reciprocal auth lane visible.");
 }
 
 void VerifyRegistryWorkflow()
