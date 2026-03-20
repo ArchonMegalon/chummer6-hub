@@ -20,13 +20,43 @@ public sealed record PublicLandingSectionDto(
     string Id,
     string Title,
     string Audience,
-    string Route);
+    string Route,
+    string? AssetSlot = null);
 
 public sealed record PublicLandingOverlayDto(
     string Id,
     string Path,
     string Title,
     string Summary);
+
+public sealed record PublicLandingAssetDto(
+    string AssetSlot,
+    string? SectionId,
+    string MediaKind,
+    string? PosterUrl,
+    string? MobilePosterUrl,
+    string? LoopUrl,
+    string Alt,
+    string Caption,
+    string MotionPolicy,
+    string FallbackStyle);
+
+public sealed record PublicReleaseArtifactDto(
+    string Id,
+    string Platform,
+    string Url,
+    string Sha256,
+    long? SizeBytes = null);
+
+public sealed record PublicReleaseManifestDto(
+    string Version,
+    string Channel,
+    DateTimeOffset PublishedAt,
+    IReadOnlyList<PublicReleaseArtifactDto> Downloads,
+    string Source = "manifest",
+    string Status = "published",
+    string? Message = null,
+    bool HasFallbackSource = false);
 
 public sealed record PublicFeatureCardDto(
     string Id,
@@ -37,6 +67,16 @@ public sealed record PublicFeatureCardDto(
     string Badge,
     string Audience,
     string ImageFamily,
+    string AssetSlot,
+    string CtaKind = "route",
+    string RenderMode = "action",
+    string? DetailRoute = null,
+    string? FallbackRoute = null,
+    string? FallbackLabel = null,
+    string? GuestHref = null,
+    string? RegisteredHref = null,
+    bool ExternalOk = false,
+    bool SelfLinkAllowed = false,
     string? Pain = null,
     string? Payoff = null);
 
@@ -50,12 +90,14 @@ public sealed record PublicLandingSurfaceDto(
     bool NoProviderNames,
     bool NoLtdNames,
     IReadOnlyList<PublicLandingActionDto> HeroCtas,
+    IReadOnlyList<PublicLandingActionDto> GuestShellActions,
     IReadOnlyList<string> SecondaryHighlights,
     IReadOnlyList<PublicLandingRouteDto> PublicRoutes,
     IReadOnlyList<PublicLandingRouteDto> AuthRoutes,
     IReadOnlyList<PublicLandingRouteDto> RegisteredRoutes,
     IReadOnlyList<PublicLandingSectionDto> Sections,
     IReadOnlyList<PublicLandingOverlayDto> RegisteredOverlays,
+    IReadOnlyList<PublicLandingAssetDto> Assets,
     string FooterCanonicalSource,
     string FooterGeneratedNote,
     IReadOnlyList<PublicFeatureCardDto> FeatureCards);

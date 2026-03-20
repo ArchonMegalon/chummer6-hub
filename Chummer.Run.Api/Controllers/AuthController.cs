@@ -29,7 +29,7 @@ public sealed class AuthController : ControllerBase
             return Redirect(nextPath);
         }
 
-        return Content(RenderAuthPage("Sign In", "Sign in to unlock follows, account settings, and the bounded participation console.", nextPath, createAccount: false), "text/html");
+        return Content(RenderAuthPage("Sign In", "Sign in to unlock follows, account settings, and the bounded participation console.", nextPath, createAccount: false, currentPath: "/login"), "text/html");
     }
 
     [HttpGet("/signup")]
@@ -42,7 +42,7 @@ public sealed class AuthController : ControllerBase
             return Redirect(nextPath);
         }
 
-        return Content(RenderAuthPage("Create Account", "The first wave is intentionally boring: email-first browser entry now, Google when provider credentials are configured.", nextPath, createAccount: true), "text/html");
+        return Content(RenderAuthPage("Create Account", "The first wave is intentionally boring: email-first browser entry now, Google when provider credentials are configured.", nextPath, createAccount: true, currentPath: "/signup"), "text/html");
     }
 
     [HttpPost("/auth/email/start")]
@@ -80,7 +80,7 @@ public sealed class AuthController : ControllerBase
   {{deliveryPanel}}
 </section>
 """;
-        return Content(RenderShell("Email Entry", "Email-first entry is the current boring fallback until richer provider adapters are fully wired.", body), "text/html");
+        return Content(RenderShell("Email Entry", "Email-first entry is the current boring fallback until richer provider adapters are fully wired.", body, "/login"), "text/html");
     }
 
     [HttpGet("/auth/email/callback")]
@@ -108,7 +108,7 @@ public sealed class AuthController : ControllerBase
   <p><a class="cta" href="/login?next={{EncodeHref(nextPath)}}">Use email-first sign in instead</a></p>
 </section>
 """;
-        return Content(RenderShell("Google Sign-In", "The route exists so the auth story is explicit, but it should not pretend the adapter is already live.", body), "text/html");
+        return Content(RenderShell("Google Sign-In", "The route exists so the auth story is explicit, but it should not pretend the adapter is already live.", body, "/login"), "text/html");
     }
 
     [HttpGet("/auth/google/callback")]
@@ -122,7 +122,7 @@ public sealed class AuthController : ControllerBase
   <p><a class="cta" href="/login?next=/home">Return to sign in</a></p>
 </section>
 """;
-        return Content(RenderShell("Google Callback", "Provider routes must not overpromise their readiness.", body), "text/html");
+        return Content(RenderShell("Google Callback", "Provider routes must not overpromise their readiness.", body, "/login"), "text/html");
     }
 
     [HttpGet("/logout")]
@@ -146,9 +146,15 @@ public sealed class AuthController : ControllerBase
         }
     }
 
-    private string RenderAuthPage(string title, string lead, string nextPath, bool createAccount)
+    private string RenderAuthPage(string title, string lead, string nextPath, bool createAccount, string currentPath)
     {
         var primaryCta = createAccount ? "Create account" : "Sign in";
+        var alternatePath = createAccount ? "/login" : "/signup";
+        var alternateLabel = createAccount ? "Already have an account?" : "Need an account first?";
+        var alternateCta = createAccount ? "Sign in instead" : "Create account";
+        var alternateLead = createAccount
+            ? "Use one account for follows, beta interest, and later participation surfaces."
+            : "If you are here for beta interest, future follows, or later participation, the account lane is live now.";
         var body = $$"""
 <section class="panel prose">
   <h2>{{Encode(title)}}</h2>
@@ -161,6 +167,12 @@ public sealed class AuthController : ControllerBase
     <input id="displayName" name="displayName" placeholder="Runner" />
     <button class="cta" type="submit">{{Encode(primaryCta)}} with email</button>
   </form>
+  <p class="auth-switch"><strong>{{Encode(alternateLabel)}}</strong> <a class="inline-link" href="{{EncodeHref(BuildAuthHref(alternatePath, nextPath))}}">{{Encode(alternateCta)}}</a></p>
+</section>
+<section class="panel prose">
+  <h2>{{(createAccount ? "What account creation unlocks" : "Need a different auth lane?")}}</h2>
+  <p>{{Encode(alternateLead)}}</p>
+  <p><a class="inline-link" href="{{EncodeHref(BuildAuthHref(alternatePath, nextPath))}}">{{Encode(alternateCta)}}</a></p>
 </section>
 <section class="panel prose">
   <h2>What is live now</h2>
@@ -172,13 +184,20 @@ public sealed class AuthController : ControllerBase
   <p><a class="inline-link" href="/auth/google/start?next={{EncodeHref(nextPath)}}">See Google sign-in status</a></p>
 </section>
 """;
-        return RenderShell(title, lead, body);
+        return RenderShell(title, lead, body, currentPath);
     }
 
-    private string RenderShell(string title, string lead, string body)
+    private string RenderShell(string title, string lead, string body, string currentPath)
     {
         var surface = _landing.LoadSurface();
         var nav = string.Join("", surface.PublicRoutes.Select(route => $"""<a href="{EncodeHref(route.Path)}">{Encode(route.Title)}</a>"""));
+        var authActions = string.Join("", surface.GuestShellActions.Select(action =>
+        {
+            var current = string.Equals(NormalizeRoute(currentPath), NormalizeRoute(action.Href), StringComparison.OrdinalIgnoreCase);
+            return current
+                ? $"""<span class="shell-action shell-action-current">{Encode(action.Label)}</span>"""
+                : $"""<a class="shell-action shell-action-{Encode(action.Emphasis)}" href="{EncodeHref(action.Href)}">{Encode(action.Label)}</a>""";
+        }));
         return $$"""
 <!doctype html>
 <html lang="en">
@@ -201,9 +220,10 @@ public sealed class AuthController : ControllerBase
     body { margin: 0; color: var(--ink); background: linear-gradient(180deg, #f5eedf 0%, var(--bg) 55%, #e7dac0 100%); font-family: Georgia, \"Iowan Old Style\", \"Palatino Linotype\", serif; }
     a { color: inherit; text-decoration: none; }
     .shell { max-width: 980px; margin: 0 auto; padding: 24px 18px 64px; }
-    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 22px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,0.72); box-shadow: var(--shadow); }
+    .topbar { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; margin-bottom: 22px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,0.72); box-shadow: var(--shadow); }
     .brand { font-size: 1.1rem; letter-spacing: 0.08em; text-transform: uppercase; }
     .nav { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 0.95rem; }
+    .topbar-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
     .intro { margin: 0 0 22px; color: var(--muted); max-width: 62ch; }
     .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 18px; }
     .prose h2 { margin-top: 0; }
@@ -211,9 +231,14 @@ public sealed class AuthController : ControllerBase
     .stack { display: grid; gap: 10px; }
     label { font-weight: 600; }
     input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(26, 23, 18, 0.18); background: rgba(255,255,255,0.92); }
-    .cta, .inline-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 16px; border-radius: 999px; background: var(--accent); color: white; border: 0; cursor: pointer; }
+    .shell-action, .cta, .inline-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 16px; border-radius: 999px; color: white; border: 0; cursor: pointer; }
+    .shell-action { padding: 10px 14px; }
+    .shell-action-primary, .cta { background: var(--accent); }
+    .shell-action-secondary, .inline-link { background: var(--warm); }
+    .shell-action-current { background: rgba(18, 90, 88, 0.12); color: var(--accent); border: 1px solid rgba(18, 90, 88, 0.18); }
     .inline-link { background: var(--warm); }
-    @media (max-width: 860px) { .topbar { border-radius: 22px; align-items: flex-start; flex-direction: column; } }
+    .auth-switch { margin-bottom: 0; }
+    @media (max-width: 860px) { .topbar { grid-template-columns: 1fr; border-radius: 22px; } .topbar-actions { justify-content: flex-start; } }
   </style>
 </head>
 <body>
@@ -221,6 +246,7 @@ public sealed class AuthController : ControllerBase
     <header class="topbar">
       <div class="brand">Chummer.run</div>
       <nav class="nav">{{nav}}</nav>
+      <div class="topbar-actions">{{authActions}}</div>
     </header>
     <p class="intro">{{Encode(lead)}}</p>
     {{body}}
@@ -228,6 +254,37 @@ public sealed class AuthController : ControllerBase
 </body>
 </html>
 """;
+    }
+
+    private static string BuildAuthHref(string path, string nextPath)
+        => $"{path}?next={WebUtility.UrlEncode(nextPath)}";
+
+    private static string NormalizeRoute(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "/";
+        }
+
+        var trimmed = value.Trim();
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute))
+        {
+            trimmed = absolute.AbsolutePath;
+        }
+
+        var hash = trimmed.IndexOf('#');
+        if (hash >= 0)
+        {
+            trimmed = trimmed[..hash];
+        }
+
+        var query = trimmed.IndexOf('?');
+        if (query >= 0)
+        {
+            trimmed = trimmed[..query];
+        }
+
+        return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
     }
 
     private static string Encode(string value) => WebUtility.HtmlEncode(value);

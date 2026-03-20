@@ -1,0 +1,94 @@
+product: chummer
+surface: chummer.run
+version: 1
+assets:
+  - asset_slot: section_hero
+    section_id: hero
+    media_kind: premium_still
+    poster_url:
+    mobile_poster_url:
+    loop_url:
+    alt: Night boulevard reflections, dossier glass, and grounded proof cards arranged as one deliberate front door.
+    caption: Proof shelf front door
+    motion_policy: premium_still_or_short_muted_loop
+    fallback_style: boulevard_glass
+  - asset_slot: scene_archive_stair
+    section_id: shared_card_media
+    media_kind: still
+    poster_url:
+    mobile_poster_url:
+    loop_url:
+    alt: Warm archive shelves and annotated guide cards arranged for a grounded first-pass explainer surface.
+    caption: Guide shelf still
+    motion_policy: stills_only
+    fallback_style: archive_paper
+  - asset_slot: scene_dossier_desk
+    section_id: shared_card_media
+    media_kind: still
+    poster_url:
+    mobile_poster_url:
+    loop_url:
+    alt: Desk spread of proof pages, mission notes, and release badges under a soft lamp.
+    caption: Proof packet still
+    motion_policy: stills_only
+    fallback_style: dossier_lamplight
+  - asset_slot: scene_facility_exterior
+    section_id: shared_card_media
+    media_kind: still
+    poster_url:
+    mobile_poster_url:
+    loop_url:
+    alt: Quiet runsite exterior with release-crate lighting and disciplined signage.
+    caption: Runsite approach still
+    motion_policy: stills_only
+    fallback_style: facility_cyan_night
+  - asset_slot: scene_boulevard_of_futures
+    section_id: shared_card_media
+    media_kind: still
+    poster_url:
+    mobile_poster_url:
+    loop_url:
+    alt: City reflections and disciplined horizon markers arranged like a believable future shelf.
+    caption: Future lanes still
+    motion_policy: stills_only
+    fallback_style: future_boulevard
+  - asset_slot: scene_simulation_bench
+    section_id: shared_card_media
+    media_kind: still
+    poster_url:
+    mobile_poster_url:
+    loop_url:
+    alt: Clean rules lab with receipts, measured overlays, and grounded instrument light.
+    caption: Rules lab still
+    motion_policy: stills_only
+    fallback_style: simulation_amber
+  - asset_slot: scene_streetfront
+    section_id: shared_card_media
+    media_kind: still
+    poster_url:
+    mobile_poster_url:
+    loop_url:
+    alt: Rain-lit continuity lane with subtle wayfinding for a local-first session shell.
+    caption: Continuity lane still
+    motion_policy: stills_only
+    fallback_style: streetfront_rain
+  - asset_slot: scene_solo_operator
+    section_id: shared_card_media
+    media_kind: still
+    poster_url:
+    mobile_poster_url:
+    loop_url:
+    alt: Focused participation workstation showing a calm account posture without maintainer jargon.
+    caption: Participation lane still
+    motion_policy: stills_only
+    fallback_style: solo_cockpit
+  - asset_slot: scene_prop_cluster
+    section_id: shared_card_media
+    media_kind: still
+    poster_url:
+    mobile_poster_url:
+    loop_url:
+    alt: Cluster of primers, props, and artifact mockups arranged like a finished teaser shelf.
+    caption: Artifact teaser still
+    motion_policy: stills_only
+    fallback_style: prop_table
