@@ -80,6 +80,28 @@ public sealed class BoostSessionService
         CreateSponsorSessionRequest request,
         CancellationToken cancellationToken)
     {
+        var reusable = FindReusableContributionForRequest(request);
+        if (reusable is not null)
+        {
+            if (!reusable.Consented)
+            {
+                reusable = RecordConsent(reusable.SponsorSessionId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(reusable.FleetLaneId))
+            {
+                var refreshed = await RefreshAsync(reusable.SponsorSessionId, cancellationToken);
+                if (!IsTerminalContributionStatus(refreshed.Session.Status))
+                {
+                    return (refreshed.Session, refreshed.Fleet ?? new JsonObject());
+                }
+            }
+            else
+            {
+                return await StartDeviceAuthAsync(reusable.SponsorSessionId, cancellationToken);
+            }
+        }
+
         var created = Create(request);
         RecordConsent(created.SponsorSessionId);
         return await StartDeviceAuthAsync(created.SponsorSessionId, cancellationToken);
@@ -364,6 +386,27 @@ public sealed class BoostSessionService
         return _groups.EnsurePersonalBoosterGroup(user);
     }
 
+    private SponsorSessionStatusDto? FindReusableContributionForRequest(CreateSponsorSessionRequest request)
+    {
+        var subjectId = AccountService.NormalizeRequired(request.SubjectId ?? string.Empty, nameof(request.SubjectId));
+        var projectId = AccountService.NormalizeRequired(request.ProjectId, nameof(request.ProjectId));
+        var laneRole = SponsorLaneRolePolicy.Normalize(request.RequestedLaneRole);
+        var user = _accounts.EnsureUser(subjectId, subjectId);
+        lock (_store.Gate)
+        {
+            return _store.SponsorSessionsById.Values
+                .Where(session => string.Equals(session.UserId, user.UserId, StringComparison.OrdinalIgnoreCase))
+                .Where(session => !IsTerminalContributionStatus(session.Status))
+                .Where(session => string.Equals(session.ProjectId, projectId, StringComparison.OrdinalIgnoreCase))
+                .Where(session => string.Equals(session.RequestedLaneRole, laneRole, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(SessionPriority)
+                .ThenByDescending(session => session.AuthorizedAtUtc ?? session.UpdatedAtUtc)
+                .ThenByDescending(session => session.CreatedAtUtc)
+                .Select(static session => session.Snapshot())
+                .FirstOrDefault();
+        }
+    }
+
     private HubUserSubject ResolveSubjectForUserLocked(string userId)
     {
         if (!_store.UsersById.TryGetValue(userId, out var user))
@@ -595,6 +638,10 @@ public sealed class BoostSessionService
             "revoked" => 0,
             _ => 1
         };
+
+    private static bool IsTerminalContributionStatus(string? status)
+        => string.Equals(status, "stopped", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "revoked", StringComparison.OrdinalIgnoreCase);
 
     private sealed record HubUserSubject(string SubjectId, string DisplayName);
 }

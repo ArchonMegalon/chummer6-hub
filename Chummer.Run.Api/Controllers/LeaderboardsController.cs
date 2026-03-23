@@ -1,51 +1,46 @@
 using System.Net;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services;
+using Chummer.Run.Api.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/leaderboards")]
-public sealed class LeaderboardsController : ControllerBase
+public sealed class LeaderboardsController : Controller
 {
     private readonly LeaderboardService _leaderboards;
+    private readonly AccountService _accounts;
+    private readonly HubIdentityClient _identity;
+    private readonly HubPageChromeService _chrome;
+    private readonly ILogger<LeaderboardsController> _logger;
 
-    public LeaderboardsController(LeaderboardService leaderboards)
+    public LeaderboardsController(
+        LeaderboardService leaderboards,
+        AccountService accounts,
+        HubIdentityClient identity,
+        HubPageChromeService chrome,
+        ILogger<LeaderboardsController> logger)
     {
         _leaderboards = leaderboards;
+        _accounts = accounts;
+        _identity = identity;
+        _chrome = chrome;
+        _logger = logger;
     }
 
     [HttpGet("/leaderboards")]
     [Produces("text/html")]
-    public ContentResult LeaderboardsPage()
+    public async Task<IActionResult> LeaderboardsPage(CancellationToken cancellationToken)
     {
-        var individuals = _leaderboards.IndividualLeaderboard(publicOnly: true);
-        var sponsorRanks = _leaderboards.SponsorRankLeaderboard(publicOnly: true);
-        var groups = _leaderboards.GroupLeaderboard(publicOnly: true);
-        var quests = _leaderboards.Quests();
-        var individualRows = string.Join("", individuals.Select(row => $"<tr><td>{row.Rank}</td><td>{WebUtility.HtmlEncode(row.DisplayName)}</td><td>{row.Points}</td><td>{row.LandedSlices}</td></tr>"));
-        var sponsorRows = string.Join("", sponsorRanks.Select(row => $"<tr><td>{row.Rank}</td><td>{WebUtility.HtmlEncode(row.DisplayName)}</td><td>{WebUtility.HtmlEncode(row.CurrentAuthorizationTier)}</td><td>{row.CurrentRankScore}</td><td>{row.LifetimePoints}</td></tr>"));
-        var groupRows = string.Join("", groups.Select(row => $"<tr><td>{row.Rank}</td><td>{WebUtility.HtmlEncode(row.GroupName)}</td><td>{row.Points}</td><td>{row.LandedSlices}</td></tr>"));
-        var questRows = string.Join("", quests.Select(quest => $"<li><strong>{WebUtility.HtmlEncode(quest.Title)}</strong>: {WebUtility.HtmlEncode(quest.Description)} ({quest.CurrentProgress}/{quest.TargetProgress})</li>"));
-        var html = $"""
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Leaderboards</title></head>
-<body style="font-family:Georgia,serif;background:#f5efe2;color:#1f1b16;padding:24px;">
-  <h1>Leaderboards</h1>
-  <p>Public boards show only users who opted into public recognition and groups that are not private.</p>
-  <h2>Individuals</h2>
-  <table style="width:100%;background:white;border-collapse:collapse;"><tr><th align="left">Rank</th><th align="left">User</th><th align="left">Points</th><th align="left">Landed</th></tr>{individualRows}</table>
-  <h2>Current sponsor rank</h2>
-  <table style="width:100%;background:white;border-collapse:collapse;"><tr><th align="left">Rank</th><th align="left">User</th><th align="left">Tier</th><th align="left">Current score</th><th align="left">Lifetime points</th></tr>{sponsorRows}</table>
-  <h2>Groups</h2>
-  <table style="width:100%;background:white;border-collapse:collapse;"><tr><th align="left">Rank</th><th align="left">Group</th><th align="left">Points</th><th align="left">Landed</th></tr>{groupRows}</table>
-  <h2>Quests</h2>
-  <ul>{questRows}</ul>
-</body>
-</html>
-""";
-        return Content(html, "text/html");
+        var model = new LeaderboardsPageViewModel(
+            Chrome: await BuildChromeAsync("Leaderboards", "Secondary community standings and quests, kept out of the front-door path.", "/leaderboards", cancellationToken),
+            Individuals: _leaderboards.IndividualLeaderboard(publicOnly: true),
+            SponsorRank: _leaderboards.SponsorRankLeaderboard(publicOnly: true),
+            Groups: _leaderboards.GroupLeaderboard(publicOnly: true),
+            Quests: _leaderboards.Quests());
+        return View("~/Views/Leaderboards/Index.cshtml", model);
     }
 
     [HttpGet]
@@ -58,4 +53,35 @@ public sealed class LeaderboardsController : ControllerBase
             groups = _leaderboards.GroupLeaderboard(publicOnly: true),
             quests = _leaderboards.Quests(),
         });
+
+    private async Task<SiteChromeViewModel> BuildChromeAsync(
+        string title,
+        string description,
+        string currentPath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return _chrome.BuildAuthenticatedChrome(title, description, currentPath, user.DisplayName);
+        }
+        catch (HubRequestAuthException)
+        {
+            return _chrome.BuildPublicChrome(title, description, currentPath);
+        }
+        catch (Exception ex) when (
+            ex is HttpRequestException
+            or System.Text.Json.JsonException
+            || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            _logger.LogWarning(ex, "Falling back while building leaderboard chrome.");
+            if (Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName))
+            {
+                return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
+            }
+
+            return _chrome.BuildPublicChrome(title, description, currentPath);
+        }
+    }
 }

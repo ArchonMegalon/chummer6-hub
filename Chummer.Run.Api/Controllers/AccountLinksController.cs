@@ -45,24 +45,10 @@ public sealed class AccountLinksController : ControllerBase
     }
 
     [HttpPost("links/email")]
-    [ProducesResponseType<LinkedIdentityDto>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<LinkedIdentityDto>> LinkEmail([FromBody] LinkEmailIdentityRequest? request, CancellationToken cancellationToken)
-    {
-        if (request is null)
-        {
-            return BadRequest("email identity payload is required.");
-        }
-
-        try
-        {
-            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
-            return Ok(_links.LinkEmail(request with { SubjectId = subject.SubjectId }));
-        }
-        catch (HubRequestAuthException ex)
-        {
-            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
-        }
-    }
+    public ActionResult LinkEmail()
+        => Problem(
+            statusCode: StatusCodes.Status410Gone,
+            detail: "Recovery email linking now starts through /api/v1/accounts/me/links/email/start so the address can be verified before Hub links it.");
 
     [HttpPost("links/confirm")]
     [ProducesResponseType<LinkedIdentityDto>(StatusCodes.Status200OK)]

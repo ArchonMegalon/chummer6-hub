@@ -17,6 +17,7 @@ public sealed class AuthController : Controller
     private readonly AccountService _accounts;
     private readonly IdentityLinkService _links;
     private readonly HubEmailLinkVerificationService _emailLinks;
+    private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         HubBrowserAuthService browserAuth,
@@ -26,7 +27,8 @@ public sealed class AuthController : Controller
         HubGoogleAuthService google,
         AccountService accounts,
         IdentityLinkService links,
-        HubEmailLinkVerificationService emailLinks)
+        HubEmailLinkVerificationService emailLinks,
+        ILogger<AuthController> logger)
     {
         _browserAuth = browserAuth;
         _identity = identity;
@@ -36,6 +38,7 @@ public sealed class AuthController : Controller
         _accounts = accounts;
         _links = links;
         _emailLinks = emailLinks;
+        _logger = logger;
     }
 
     [HttpGet("/login")]
@@ -367,9 +370,25 @@ public sealed class AuthController : Controller
     }
 
     [HttpGet("/logout")]
+    public IActionResult LogoutRedirect()
+        => Redirect("/");
+
+    [HttpPost("/logout")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
-        await _browserAuth.RevokeCookieSessionAsync(Request, cancellationToken);
+        try
+        {
+            await _browserAuth.RevokeCookieSessionAsync(Request, cancellationToken);
+        }
+        catch (Exception ex) when (
+            ex is HttpRequestException
+            or TaskCanceledException
+            or InvalidOperationException)
+        {
+            _logger.LogWarning(ex, "Identity session revoke failed during logout. Clearing the browser cookie locally.");
+        }
+
         _browserAuth.ClearCookie(Request, Response);
         return Redirect("/");
     }

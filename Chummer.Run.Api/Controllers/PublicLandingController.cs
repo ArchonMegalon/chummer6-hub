@@ -17,6 +17,7 @@ public sealed class PublicLandingController : Controller
     private readonly IdentityLinkService _links;
     private readonly UserExperienceService _experience;
     private readonly HubPageChromeService _chrome;
+    private readonly ILogger<PublicLandingController> _logger;
 
     public PublicLandingController(
         PublicLandingService landing,
@@ -25,7 +26,8 @@ public sealed class PublicLandingController : Controller
         HubIdentityClient identity,
         IdentityLinkService links,
         UserExperienceService experience,
-        HubPageChromeService chrome)
+        HubPageChromeService chrome,
+        ILogger<PublicLandingController> logger)
     {
         _landing = landing;
         _releases = releases;
@@ -34,15 +36,16 @@ public sealed class PublicLandingController : Controller
         _links = links;
         _experience = experience;
         _chrome = chrome;
+        _logger = logger;
     }
 
     [HttpGet("/")]
     [Produces("text/html")]
-    public IActionResult LandingPage()
+    public async Task<IActionResult> LandingPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
         var model = new LandingPageViewModel(
-            Chrome: _chrome.BuildPublicChrome("Chummer", surface.Subhead, "/"),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", surface.Subhead, "/", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             StartHere: _landing.CardsForBucket(surface, "start_here"),
@@ -53,11 +56,11 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/what-is-chummer")]
     [Produces("text/html")]
-    public IActionResult ProductStoryPage()
+    public async Task<IActionResult> ProductStoryPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
         var model = new StoryPageViewModel(
-            Chrome: _chrome.BuildPublicChrome("What Is Chummer?", surface.ProofLine, "/what-is-chummer"),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("What Is Chummer?", surface.ProofLine, "/what-is-chummer", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),
@@ -67,12 +70,12 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/now")]
     [Produces("text/html")]
-    public IActionResult NowPage()
+    public async Task<IActionResult> NowPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
         var model = new NowPageViewModel(
-            Chrome: _chrome.BuildPublicChrome("What Is Real Now", "A public proof shelf with readiness labels and direct evidence.", "/now"),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("What Is Real Now", "A public proof shelf with readiness labels and direct evidence.", "/now", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             AvailableToday: nowCards.Where(static card => string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(),
@@ -84,11 +87,11 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/horizons")]
     [Produces("text/html")]
-    public IActionResult HorizonsPage()
+    public async Task<IActionResult> HorizonsPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
         var model = new HorizonsPageViewModel(
-            Chrome: _chrome.BuildPublicChrome("Coming Next", "The named horizons, their pain, and the payoff they are aiming for.", "/horizons"),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Coming Next", "The named horizons, their pain, and the payoff they are aiming for.", "/horizons", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             Horizons: _landing.CardsForBucket(surface, "coming_next"));
@@ -97,11 +100,11 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/downloads")]
     [Produces("text/html")]
-    public IActionResult DownloadsPage()
+    public async Task<IActionResult> DownloadsPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
         var model = new DownloadsPageViewModel(
-            Chrome: _chrome.BuildPublicChrome("Downloads", "The live release shelf, integrity row, and direct artifact downloads.", "/downloads"),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Downloads", "The live release shelf, integrity row, and direct artifact downloads.", "/downloads", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             Manifest: _releases.LoadManifest());
@@ -110,12 +113,12 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/participate")]
     [Produces("text/html")]
-    public IActionResult ParticipatePage()
+    public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
         var cards = _landing.CardsForBucket(surface, "participate");
         var model = new ParticipatePageViewModel(
-            Chrome: _chrome.BuildPublicChrome("Participate", "Two clean lanes: public feedback and an optional signed-in booster path.", "/participate"),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Participate", "Two clean lanes: public feedback and an optional signed-in booster path.", "/participate", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             PublicLane: cards.Where(card => !string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && !string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(),
@@ -125,11 +128,11 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/status")]
     [Produces("text/html")]
-    public IActionResult StatusPage()
+    public async Task<IActionResult> StatusPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
         var model = new ShelfPageViewModel(
-            Chrome: _chrome.BuildPublicChrome("Status", "A compact public read on what is live and what still sits in horizon territory.", "/status"),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "A compact public read on what is live and what still sits in horizon territory.", "/status", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             Eyebrow: "Status",
@@ -141,11 +144,11 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/artifacts")]
     [Produces("text/html")]
-    public IActionResult ArtifactsPage()
+    public async Task<IActionResult> ArtifactsPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
         var model = new ShelfPageViewModel(
-            Chrome: _chrome.BuildPublicChrome("Artifacts", "A secondary teaser shelf for artifacts and future outputs.", "/artifacts"),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Artifacts", "A secondary teaser shelf for artifacts and future outputs.", "/artifacts", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             Eyebrow: "Artifacts",
@@ -192,5 +195,36 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         return Ok(_landing.CardsForBucket(surface, bucket));
+    }
+
+    private async Task<SiteChromeViewModel> BuildPublicOrAuthenticatedChromeAsync(
+        string title,
+        string description,
+        string currentPath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return _chrome.BuildAuthenticatedChrome(title, description, currentPath, user.DisplayName);
+        }
+        catch (HubRequestAuthException)
+        {
+            return _chrome.BuildPublicChrome(title, description, currentPath);
+        }
+        catch (Exception ex) when (
+            ex is HttpRequestException
+            or System.Text.Json.JsonException
+            || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            _logger.LogWarning(ex, "Falling back while building public chrome for {Path}.", currentPath);
+            if (Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName))
+            {
+                return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
+            }
+
+            return _chrome.BuildPublicChrome(title, description, currentPath);
+        }
     }
 }
