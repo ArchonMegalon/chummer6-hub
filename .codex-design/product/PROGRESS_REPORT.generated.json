@@ -5,7 +5,7 @@
   "brand": "Chummer6",
   "hero": {
     "headline": "Progress report for a product becoming a build machine.",
-    "support": "The project is moving from canon and architecture into scalable execution: package-scoped boosters, credit-aware control, cleaner public entry surfaces, and a clearer path toward parallel delivery.",
+    "support": "The project is moving from canon and architecture into a more coherent public product: clearer entry surfaces, hardened rules, stronger shared UI, and a more credible path toward release.",
     "ctas": [
       {
         "label": "See the program pulse",
@@ -24,7 +24,7 @@
       }
     ]
   },
-  "overall_progress_percent": 74,
+  "overall_progress_percent": 73,
   "phase_label": "Scale & stabilize",
   "next_checkpoint_eta_weeks_low": 2,
   "next_checkpoint_eta_weeks_high": 4,
@@ -35,114 +35,6 @@
     "eta_weeks_high": 14
   },
   "parts": [
-    {
-      "id": "mission-control",
-      "public_name": "Mission Control & AI Runtime",
-      "short_public_name": "Mission Control",
-      "mapped_projects": [
-        "fleet",
-        "ea"
-      ],
-      "progress_percent": 78,
-      "momentum_label": "Very high",
-      "eta_weeks_low": 2,
-      "eta_weeks_high": 4,
-      "summary": "Control plane, AI runtime, queue leasing, credit-aware scaling, and parallel booster orchestration.",
-      "milestones": [
-        {
-          "phase": "landed",
-          "title": "Package-scoped execution",
-          "body": "Package-scoped booster execution, credit authority routing, lease telemetry, and quartermaster enforcement."
-        },
-        {
-          "phase": "now",
-          "title": "Convergence wave",
-          "body": "Participation surfaces converge; package/bootstrap flow becomes boring; downstream status plane stays canonical."
-        },
-        {
-          "phase": "target",
-          "title": "Public-ready control plane",
-          "body": "Stable large-scale booster operation with public-ready progress reporting."
-        }
-      ],
-      "recent_commit_count_7d": 201,
-      "remaining_open_weight": 20,
-      "remaining_open_milestones": 3,
-      "uncovered_scope_count": 3,
-      "momentum_score": 40.2,
-      "eta_source": "config_override",
-      "formula": {
-        "weighted_units": 5.0,
-        "scope_multiplier": 1.38,
-        "center_weeks": 3.82
-      },
-      "source_status": {
-        "mapped_project_count": 2,
-        "dispatchable_truth_ready_count": 2,
-        "package_compile_count": 1,
-        "capacity_compile_count": 2,
-        "published_artifact_count": 4,
-        "lifecycle_counts": {
-          "live": 2
-        }
-      },
-      "source_projects": [
-        {
-          "id": "fleet",
-          "repo_slug": "fleet",
-          "path": "/docker/fleet",
-          "lifecycle": "live",
-          "recent_commit_count_7d": 117,
-          "design_total_weight": 36,
-          "remaining_open_weight": 20,
-          "remaining_open_milestones": 3,
-          "uncovered_scope_count": 3,
-          "compile": {
-            "published_at": "2026-03-23T16:53:52.966153Z",
-            "stages": {
-              "design_compile": true,
-              "policy_compile": true,
-              "execution_compile": true,
-              "package_compile": true,
-              "capacity_compile": true
-            },
-            "dispatchable_truth_ready": true,
-            "artifacts": [
-              "PROGRESS_REPORT.generated.json",
-              "QUEUE.generated.yaml",
-              "WORKPACKAGES.generated.yaml"
-            ],
-            "lifecycle": ""
-          }
-        },
-        {
-          "id": "ea",
-          "repo_slug": "executive-assistant",
-          "path": "/docker/EA",
-          "lifecycle": "live",
-          "recent_commit_count_7d": 84,
-          "design_total_weight": 54,
-          "remaining_open_weight": 0,
-          "remaining_open_milestones": 0,
-          "uncovered_scope_count": 0,
-          "compile": {
-            "published_at": "2026-03-23T15:27:59.749932Z",
-            "stages": {
-              "design_compile": true,
-              "policy_compile": true,
-              "execution_compile": true,
-              "package_compile": false,
-              "capacity_compile": true
-            },
-            "dispatchable_truth_ready": true,
-            "artifacts": [
-              "QUEUE.generated.yaml"
-            ],
-            "lifecycle": ""
-          }
-        }
-      ]
-    },
     {
       "id": "core-engine",
       "public_name": "Core Rules Engine",
@@ -231,7 +123,7 @@
         "ui-kit"
       ],
       "progress_percent": 76,
-      "momentum_label": "High",
+      "momentum_label": "Steady",
       "eta_weeks_low": 8,
       "eta_weeks_high": 12,
       "summary": "Character building, inspectors, dense data UX, and the reusable Chummer design system.",
@@ -337,7 +229,7 @@
         "mobile"
       ],
       "progress_percent": 84,
-      "momentum_label": "Steady",
+      "momentum_label": "Moderate",
       "eta_weeks_low": 4,
       "eta_weeks_high": 6,
       "summary": "Player and GM shell, local-first sync, browser session transport, and offline-resume play surfaces.",
@@ -439,11 +331,11 @@
           "body": "A cohesive hosted community and publication stack ready for real public participation."
         }
       ],
-      "recent_commit_count_7d": 72,
+      "recent_commit_count_7d": 74,
       "remaining_open_weight": 58,
       "remaining_open_milestones": 8,
       "uncovered_scope_count": 8,
-      "momentum_score": 4.97,
+      "momentum_score": 5.1,
       "eta_source": "config_override",
       "formula": {
         "weighted_units": 14.5,
@@ -467,7 +359,7 @@
           "repo_slug": "chummer6-hub",
           "path": "/docker/chummercomplete/chummer6-hub",
           "lifecycle": "live",
-          "recent_commit_count_7d": 28,
+          "recent_commit_count_7d": 30,
           "design_total_weight": 60,
           "remaining_open_weight": 30,
           "remaining_open_milestones": 4,
@@ -551,7 +443,7 @@
         "guide"
       ],
       "progress_percent": 82,
-      "momentum_label": "High",
+      "momentum_label": "Steady",
       "eta_weeks_low": 2,
       "eta_weeks_high": 4,
       "summary": "Product canon, horizons, participation workflow, public landing rules, and the public-facing guide bundle.",
@@ -572,16 +464,16 @@
           "body": "One authoritative public story, compiled cleanly into every downstream surface."
         }
       ],
-      "recent_commit_count_7d": 43,
+      "recent_commit_count_7d": 44,
       "remaining_open_weight": 8,
       "remaining_open_milestones": 1,
       "uncovered_scope_count": 2,
-      "momentum_score": 21.5,
+      "momentum_score": 22.0,
       "eta_source": "config_override",
       "formula": {
         "weighted_units": 2.0,
         "scope_multiplier": 1.25,
-        "center_weeks": 2.09
+        "center_weeks": 2.05
       },
       "source_status": {
         "mapped_project_count": 2,
@@ -600,7 +492,7 @@
           "repo_slug": "chummer6-design",
           "path": "/docker/chummercomplete/chummer-design",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 27,
+          "recent_commit_count_7d": 28,
           "design_total_weight": 44,
           "remaining_open_weight": 8,
           "remaining_open_milestones": 1,
@@ -650,16 +542,16 @@
   ],
   "recent_movement": [
     {
-      "title": "Mission Control got a harder backbone.",
-      "body": "Fleet shifted further toward package-scoped execution, stronger scope/capacity contracts, and a quartermaster that can reason about credits, work depth, review pressure, and drift instead of relying on ad hoc burst logic."
+      "title": "Delivery reporting got clearer.",
+      "body": "The public progress report, product-part grouping, and timeline view now read like one coherent status surface instead of scattered repo signals."
     },
     {
-      "title": "The AI runtime got better at seeing real capacity.",
-      "body": "The EA lane now exposes actual OneMinute credit posture and has been hardened around lease-aware routing, provider selection, occupancy, and review/audit scoping."
+      "title": "Public-facing product structure tightened.",
+      "body": "Public milestones, guide surfaces, and landing routes now line up more cleanly around user-visible product areas instead of internal execution seams."
     },
     {
       "title": "The public entry story became clearer.",
-      "body": "Design, Fleet, Hub, Registry, Media, and Mobile all refreshed public landing, auth, guide, and participation canon, reducing the chance that the public surface drifts away from the design source of truth."
+      "body": "Landing, auth, guide, and participation surfaces were tightened so the public front door stays closer to the actual product truth."
     },
     {
       "title": "Workbench scope got easier to see.",
@@ -676,12 +568,9 @@
   ],
   "participation": {
     "headline": "How to participate",
-    "body": "Lower sustained booster count directly slows visible progress. If you want the delivery curve to steepen, the next leverage point is more bounded participation through the public booster flow.",
+    "body": "If you want to follow the rollout or join future contribution waves, the participation page explains the current public entry path.",
     "cta_label": "Open the participation page",
-    "cta_href": "https://chummer.run/participate",
-    "average_active_boosters": 3.1,
-    "peak_active_boosters": 6,
-    "window_label": "Average active boosters in the most recent burst (today)"
+    "cta_href": "https://chummer.run/participate"
   },
   "method": {
     "progress_formula_version": "public_progress_v1",

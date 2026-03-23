@@ -835,7 +835,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(downloadsHtml.Contains("0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
 
     var progressHtml = progressController.ProgressPage().Content ?? string.Empty;
-    Assert(progressHtml.Contains("Mission Control &amp; AI Runtime", StringComparison.Ordinal), "progress page should render the generated product-part report");
+    Assert(progressHtml.Contains("Core Rules Engine", StringComparison.Ordinal), "progress page should render the generated product-part report");
     Assert(progressHtml.Contains("/api/public/progress-poster.svg", StringComparison.Ordinal), "progress page should render against the hosted poster route");
     Assert(progressHtml.Contains("How to participate", StringComparison.Ordinal), "progress page should expose the participation section");
     Assert(progressHtml.Contains("Chummer public navigation", StringComparison.Ordinal), "progress page should render inside the shared public shell");
