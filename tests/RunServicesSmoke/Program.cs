@@ -837,6 +837,36 @@ async Task VerifyPublicLandingProjectionAsync()
     Directory.CreateDirectory(downloadsFilesRoot);
     File.WriteAllText(Path.Combine(downloadsFilesRoot, "smoke-poc-linux-x64.zip"), "smoke");
     File.WriteAllText(
+        Path.Combine(downloadsRoot, "RELEASE_CHANNEL.generated.json"),
+        JsonSerializer.Serialize(
+            new
+            {
+                schemaVersion = 1,
+                product = "chummer6",
+                channelId = "preview",
+                version = "0.6.1-smoke",
+                publishedAt = "2026-03-20T12:00:00Z",
+                status = "published",
+                artifactSource = "ui_desktop_bundle",
+                artifacts = new[]
+                {
+                    new
+                    {
+                        artifactId = "smoke-poc-linux-x64",
+                        head = "avalonia",
+                        platform = "linux",
+                        arch = "x64",
+                        kind = "archive",
+                        fileName = "smoke-poc-linux-x64.zip",
+                        downloadUrl = "/downloads/files/smoke-poc-linux-x64.zip",
+                        sha256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                        sizeBytes = 4096,
+                        platformLabel = "Smoke Linux x64"
+                    }
+                }
+            },
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+    File.WriteAllText(
         Path.Combine(downloadsRoot, "releases.json"),
         JsonSerializer.Serialize(
             new PublicReleaseManifestDto(
@@ -901,6 +931,8 @@ async Task VerifyPublicLandingProjectionAsync()
             ExpiresAtUtc: DateTimeOffset.UtcNow.AddMinutes(15),
             DeliveryMode: "preview_inline_link",
             PreviewNote: "preview"), HttpStatusCode.OK))), configuration);
+    var emailLinks = new HubEmailLinkVerificationService(
+        DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(tempRoot, "email-links"))));
     var google = CreateGoogleService(configuration, authService, identityLinks, accounts, loggerFactory, tempRoot);
     var controller = new PublicLandingController(landing, releases, accounts, identityClient, identityLinks, experience, chrome)
     {
@@ -917,7 +949,7 @@ async Task VerifyPublicLandingProjectionAsync()
         }
     };
 
-    var landingView = controller.LandingPage() as ViewResult;
+    var landingView = await controller.LandingPage(CancellationToken.None) as ViewResult;
     var landingModel = landingView?.Model as LandingPageViewModel;
     Assert(landingModel is not null, "landing page should render through the MVC view layer.");
     Assert(string.Equals(landingModel.Surface.Headline, "Shadowrun rules truth, with receipts.", StringComparison.Ordinal), "landing page should render the canonical headline");
@@ -926,11 +958,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingModel.Lanes.Any(static card => string.Equals(card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
     Assert(!string.IsNullOrWhiteSpace(landingModel.Assets.BySlot("section_hero")?.PosterUrl), "landing hero should use a non-empty media asset.");
 
-    var storyView = controller.ProductStoryPage() as ViewResult;
+    var storyView = await controller.ProductStoryPage(CancellationToken.None) as ViewResult;
     var storyModel = storyView?.Model as StoryPageViewModel;
     Assert(storyModel is not null && storyModel.TrustPillars.Count == 3, "product story page should expose the three trust pillars.");
 
-    var downloadsView = controller.DownloadsPage() as ViewResult;
+    var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
     Assert(downloadsModel is not null && downloadsModel.Manifest.Downloads.Any(static item => string.Equals(item.Id, "smoke-poc-linux-x64", StringComparison.Ordinal)), "downloads page should render artifacts from the live release manifest");
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
@@ -940,7 +972,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(progressHtml.Contains("/api/public/progress-poster.svg", StringComparison.Ordinal), "progress page should render against the hosted poster route");
     Assert(progressHtml.Contains("How to participate", StringComparison.Ordinal), "progress page should expose the participation section");
     Assert(progressHtml.Contains("Chummer public navigation", StringComparison.Ordinal), "progress page should render inside the shared public shell");
-    Assert(progressHtml.Contains(">Progress report<", StringComparison.Ordinal), "progress page shell should mark the progress route as current in navigation");
+    Assert(progressHtml.Contains("progress-shell-nav-current", StringComparison.Ordinal) && progressHtml.Contains(">Progress<", StringComparison.Ordinal), "progress page shell should mark the progress route as current in navigation");
     Assert(progressHtml.Contains("href=\"/participate\"", StringComparison.Ordinal), "progress page navigation should link back into the public participation flow");
 
     var progressJson = progressController.ProgressReport().Content ?? string.Empty;
@@ -953,11 +985,11 @@ async Task VerifyPublicLandingProjectionAsync()
     var progressPoster = progressController.ProgressPoster().Content ?? string.Empty;
     Assert(progressPoster.Contains("<svg", StringComparison.OrdinalIgnoreCase), "progress poster endpoint should serve SVG content");
 
-    var artifactsView = controller.ArtifactsPage() as ViewResult;
+    var artifactsView = await controller.ArtifactsPage(CancellationToken.None) as ViewResult;
     var artifactsModel = artifactsView?.Model as ShelfPageViewModel;
     Assert(artifactsModel is not null && artifactsModel.Items.Any(static card => string.Equals(card.Href, "/horizons#horizon-runsite", StringComparison.Ordinal)), "artifacts shelf should point teaser cards at deliberate related detail pages");
 
-    var participateView = controller.ParticipatePage() as ViewResult;
+    var participateView = await controller.ParticipatePage(CancellationToken.None) as ViewResult;
     var participateModel = participateView?.Model as ParticipatePageViewModel;
     Assert(participateModel is not null, "participate page should render through the MVC view layer.");
     Assert(participateModel.SignedInLane.Any(static card => string.Equals(card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal)), "participate page should route the booster lane through login");
@@ -967,7 +999,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var homeRedirect = homeResult as RedirectResult;
     Assert(homeRedirect is not null && string.Equals(homeRedirect.Url, "/login?next=/home", StringComparison.Ordinal), "home page should redirect signed-out guests to the login route.");
 
-    var authController = new AuthController(authService, identityClient, landing, chrome, google, accounts, identityLinks)
+    var authController = new AuthController(authService, identityClient, landing, chrome, google, accounts, identityLinks, emailLinks)
     {
         ControllerContext = new ControllerContext
         {

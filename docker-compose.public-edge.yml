@@ -47,6 +47,7 @@ services:
       GOOGLE_OIDC_CLIENT_SECRET: ${GOOGLE_OIDC_CLIENT_SECRET:-}
       GOOGLE_OIDC_REDIRECT_URI: ${GOOGLE_OIDC_REDIRECT_URI:-https://chummer.run/auth/google/callback}
       FLEET_CONTROLLER_BASE_URL: ${FLEET_CONTROLLER_BASE_URL:-http://fleet-controller:8090}
+      FLEET_INTERNAL_API_TOKEN: ${FLEET_INTERNAL_API_TOKEN:-}
       CHUMMER_DOWNLOADS_SOURCE_ROOT: /downloads-source
     volumes:
       - chummer-run-api-state:/app/state

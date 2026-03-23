@@ -3,9 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-/docker/chummercomplete/chummer-hub-registry}"
 
 BUNDLE_DIR="${1:-${DOWNLOAD_BUNDLE_DIR:-$REPO_ROOT/dist}}"
 MANIFEST_SOURCE="$BUNDLE_DIR/releases.json"
+CANONICAL_MANIFEST_SOURCE="$BUNDLE_DIR/RELEASE_CHANNEL.generated.json"
 FILES_SOURCE="$BUNDLE_DIR/files"
 S3_TARGET_URI="${CHUMMER_PORTAL_DOWNLOADS_S3_URI:-}"
 S3_LATEST_URI="${CHUMMER_PORTAL_DOWNLOADS_S3_LATEST_URI:-}"
@@ -15,6 +17,17 @@ VERIFY_URL="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-}"
 if [[ ! -f "$MANIFEST_SOURCE" || ! -d "$FILES_SOURCE" ]]; then
   echo "Expected desktop-download-bundle layout: releases.json + files/chummer-*" >&2
   exit 1
+fi
+
+if [[ ! -f "$CANONICAL_MANIFEST_SOURCE" ]]; then
+  if [[ ! -f "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" ]]; then
+    echo "Missing registry materializer: $REGISTRY_ROOT/scripts/materialize_public_release_channel.py" >&2
+    exit 1
+  fi
+  python3 "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" \
+    --downloads-dir "$FILES_SOURCE" \
+    --output "$CANONICAL_MANIFEST_SOURCE" \
+    --compat-output "$MANIFEST_SOURCE" >/dev/null
 fi
 
 if [[ -z "$S3_TARGET_URI" ]]; then
@@ -43,6 +56,7 @@ copy_target() {
   local target_uri="$1"
   aws s3 cp "$FILES_SOURCE/" "$target_uri/files/" --recursive "${endpoint_args[@]}"
   aws s3 cp "$MANIFEST_SOURCE" "$target_uri/releases.json" "${endpoint_args[@]}"
+  aws s3 cp "$CANONICAL_MANIFEST_SOURCE" "$target_uri/RELEASE_CHANNEL.generated.json" "${endpoint_args[@]}"
 }
 
 copy_target "$S3_TARGET_URI"
