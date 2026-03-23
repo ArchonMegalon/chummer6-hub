@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
@@ -44,11 +43,32 @@ public sealed class GroupsController : ControllerBase
 
     [HttpGet("{groupId}")]
     [ProducesResponseType<GroupDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<GroupDto> GetGroup([FromRoute] string groupId)
+    public async Task<ActionResult<GroupDto>> GetGroup([FromRoute] string groupId, CancellationToken cancellationToken)
     {
-        var group = _groups.GetGroup(groupId);
-        return group is null ? NotFound() : Ok(group);
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var group = _groups.GetGroup(groupId);
+            if (group is null)
+            {
+                return NotFound();
+            }
+
+            var visibleGroup = _groups.ListGroupsForUser(subject.SubjectId)
+                .FirstOrDefault(item => string.Equals(item.GroupId, groupId, StringComparison.OrdinalIgnoreCase));
+            if (visibleGroup is null)
+            {
+                return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "group does not belong to the authenticated subject.");
+            }
+
+            return Ok(visibleGroup);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpPost]
@@ -84,6 +104,10 @@ public sealed class GroupsController : ControllerBase
         {
             var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
             return Ok(_groups.CreateJoinCode(groupId, request with { SubjectId = subject.SubjectId }));
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
         }
         catch (HubRequestAuthException ex)
         {
