@@ -16,6 +16,7 @@
 - `/now`
 - `/horizons`
 - `/downloads`
+- `/progress`
 - `/participate`
 - `/status`
 - `/artifacts`
@@ -35,6 +36,10 @@ The hosted landing surface reads mirrored design canon from:
 - `.codex-design/product/PUBLIC_LANDING_MANIFEST.yaml`
 - `.codex-design/product/PUBLIC_FEATURE_REGISTRY.yaml`
 - `.codex-design/product/PUBLIC_LANDING_ASSET_REGISTRY.yaml`
+- `.codex-design/product/PUBLIC_PROGRESS_PARTS.yaml`
+- `.codex-design/product/PROGRESS_REPORT.generated.json`
+- `.codex-design/product/PROGRESS_REPORT.generated.html`
+- `.codex-design/product/PROGRESS_REPORT_POSTER.svg`
 - related mirrored public-surface canon files
 
 The hosted surface must not invent a second feature map or public route story.
@@ -46,6 +51,7 @@ Public visitors get:
 
 - product story
 - proof shelf
+- progress report
 - horizons
 - downloads
 - participate entry

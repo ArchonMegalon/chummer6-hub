@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1200" viewBox="0 0 1800 1200" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="152" y1="84" x2="1611" y2="1089" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071018"/>
+      <stop offset="0.42" stop-color="#0B1724"/>
+      <stop offset="1" stop-color="#08111A"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(380 254) rotate(38.7345) scale(545.108 401.462)">
+      <stop stop-color="#2ED8B3" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#2ED8B3" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1432 228) rotate(137.87) scale(436.057 316.021)">
+      <stop stop-color="#7FAFFF" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#7FAFFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowC" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1112 798) rotate(106.671) scale(523.422 460.183)">
+      <stop stop-color="#F3A95D" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#F3A95D" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="copper" x1="202" y1="930" x2="1546" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F3A95D" stop-opacity="0.12"/>
+      <stop offset="0.5" stop-color="#F3A95D" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#89B6FF" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="tealLine" x1="294" y1="698" x2="1459" y2="284" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6BE0C1" stop-opacity="0"/>
+      <stop offset="0.45" stop-color="#6BE0C1" stop-opacity="1"/>
+      <stop offset="1" stop-color="#89B6FF" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="nodeGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#6BE0C1"/>
+      <stop offset="1" stop-color="#89B6FF"/>
+    </linearGradient>
+    <filter id="blur32" x="-120" y="-120" width="2040" height="1440" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="28"/>
+    </filter>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix in="noise" type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 0 0.035 0.05"/>
+      </feComponentTransfer>
+    </filter>
+    <pattern id="grid" width="56" height="56" patternUnits="userSpaceOnUse">
+      <path d="M56 0H0V56" stroke="white" stroke-opacity="0.055"/>
+    </pattern>
+  </defs>
+
+  <rect width="1800" height="1200" fill="url(#bg)"/>
+  <rect width="1800" height="1200" fill="url(#glowA)"/>
+  <rect width="1800" height="1200" fill="url(#glowB)"/>
+  <rect width="1800" height="1200" fill="url(#glowC)"/>
+  <rect width="1800" height="1200" fill="url(#grid)"/>
+  <g opacity="0.22" filter="url(#blur32)">
+    <ellipse cx="438" cy="280" rx="214" ry="134" fill="#2ED8B3"/>
+    <ellipse cx="1396" cy="208" rx="178" ry="120" fill="#7FAFFF"/>
+    <ellipse cx="1204" cy="838" rx="238" ry="168" fill="#F3A95D"/>
+  </g>
+
+  <g opacity="0.78">
+    <path d="M100 922C270 758 394 728 570 632C774 520 823 365 1044 339C1193 321 1320 372 1568 188" stroke="url(#tealLine)" stroke-width="3" stroke-linecap="round" filter="url(#softGlow)"/>
+    <path d="M180 248C352 300 472 295 652 238C812 188 925 147 1088 192C1234 232 1338 311 1562 258" stroke="url(#nodeGlow)" stroke-opacity="0.45" stroke-width="2"/>
+    <path d="M264 1016C434 882 612 874 802 952C970 1022 1136 1091 1396 916" stroke="url(#copper)" stroke-width="2"/>
+    <path d="M468 600L726 482" stroke="white" stroke-opacity="0.11" stroke-width="1.3"/>
+    <path d="M726 482L1042 338" stroke="white" stroke-opacity="0.11" stroke-width="1.3"/>
+    <path d="M1042 338L1324 410" stroke="white" stroke-opacity="0.11" stroke-width="1.3"/>
+  </g>
+
+  <g opacity="0.34" stroke="white" stroke-width="1.2">
+    <circle cx="394" cy="714" r="188"/>
+    <circle cx="858" cy="432" r="236"/>
+    <circle cx="1304" cy="594" r="208"/>
+  </g>
+
+  <g opacity="0.62" fill="#EDF3F7" font-family="Aptos, IBM Plex Sans, Segoe UI, sans-serif" font-size="34" letter-spacing="7">
+    <text x="292" y="644" opacity="0.34">CONTROL</text>
+    <text x="734" y="366" opacity="0.32">RUNTIME</text>
+    <text x="1220" y="532" opacity="0.3">CLOUD</text>
+    <text x="1084" y="228" opacity="0.2">GUIDE</text>
+    <text x="610" y="988" opacity="0.2">QUEUE</text>
+  </g>
+
+  <g opacity="0.9">
+    <g filter="url(#softGlow)">
+      <circle cx="390" cy="708" r="12" fill="#6BE0C1"/>
+      <circle cx="726" cy="482" r="10" fill="#89B6FF"/>
+      <circle cx="858" cy="432" r="15" fill="#6BE0C1"/>
+      <circle cx="1042" cy="338" r="11" fill="#F3A95D"/>
+      <circle cx="1304" cy="594" r="13" fill="#89B6FF"/>
+      <circle cx="1450" cy="210" r="9" fill="#6BE0C1"/>
+    </g>
+    <circle cx="390" cy="708" r="28" stroke="#6BE0C1" stroke-opacity="0.26"/>
+    <circle cx="858" cy="432" r="42" stroke="#89B6FF" stroke-opacity="0.22"/>
+    <circle cx="1304" cy="594" r="36" stroke="#F3A95D" stroke-opacity="0.18"/>
+  </g>
+
+  <g opacity="0.72">
+    <path d="M1160 170H1544" stroke="white" stroke-opacity="0.12"/>
+    <path d="M1158 188H1468" stroke="white" stroke-opacity="0.08"/>
+    <rect x="1124" y="132" width="374" height="92" rx="20" fill="#0D1824" fill-opacity="0.44" stroke="white" stroke-opacity="0.12"/>
+    <text x="1166" y="176" fill="#F6FBFF" font-family="Aptos, IBM Plex Sans, sans-serif" font-size="24" font-weight="700">Program Pulse</text>
+    <text x="1166" y="206" fill="#B8C8D6" font-family="Aptos, IBM Plex Sans, sans-serif" font-size="18">Capacity, canon, runtime, public entry</text>
+  </g>
+
+  <g opacity="0.74">
+    <rect x="144" y="156" width="312" height="124" rx="20" fill="#0D1824" fill-opacity="0.36" stroke="white" stroke-opacity="0.1"/>
+    <text x="182" y="204" fill="#D7FDF3" font-family="Aptos, IBM Plex Sans, sans-serif" font-size="18" letter-spacing="3">MISSION CONTROL</text>
+    <text x="182" y="242" fill="#F6FBFF" font-family="Aptos, IBM Plex Sans, sans-serif" font-size="44" font-weight="800">74%</text>
+    <text x="182" y="270" fill="#A7BAC9" font-family="Aptos, IBM Plex Sans, sans-serif" font-size="16">weighted completion across public parts</text>
+  </g>
+
+  <g opacity="0.6">
+    <path d="M108 1080H1692" stroke="white" stroke-opacity="0.12"/>
+    <path d="M108 1062H1692" stroke="white" stroke-opacity="0.06"/>
+    <text x="112" y="1040" fill="#A7BAC9" font-family="Aptos, IBM Plex Sans, sans-serif" font-size="18" letter-spacing="4">CHUMMER6 // PUBLIC PROGRESS POSTER</text>
+  </g>
+
+  <rect width="1800" height="1200" fill="white" filter="url(#grain)" opacity="0.32"/>
+</svg>

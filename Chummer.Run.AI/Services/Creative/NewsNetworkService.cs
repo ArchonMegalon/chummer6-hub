@@ -283,7 +283,7 @@ public sealed class NewsNetworkService : INewsNetworkService
                 FalloutSummary: state.FalloutSummary,
                 Facts: state.Facts,
                 RecapAssetId: state.RecapAssetId,
-                ApprovalState: recapAsset?.ApprovalState ?? AssetApprovalState.Draft,
+                ApprovalState: recapAsset?.ApprovalState ?? AssetApprovalState.Pending,
                 RetentionState: recapAsset?.RetentionState ?? AssetRetentionState.Expired,
                 ProjectionFingerprint: state.ProjectionFingerprint,
                 DeliveryState: state.DeliveryState,

@@ -36,7 +36,7 @@ internal static class ApprovalAndMediaVerification
                 StorageClass: AssetStorageClass.ObjectStorage,
                 AllowPersistentPinning: true));
 
-        VerificationAssert.Equal(AssetApprovalState.Draft, stored.ApprovalState, "Approval-gated assets should begin as draft.");
+        VerificationAssert.Equal(AssetApprovalState.Pending, stored.ApprovalState, "Approval-gated assets should begin pending approval.");
         VerificationAssert.Equal(AssetRetentionState.ApprovalPending, stored.RetentionState, "Approval-gated assets should begin pending.");
 
         var persistBlocked = false;
@@ -157,12 +157,11 @@ internal static class ApprovalAndMediaVerification
         var created = await packets.CreateAsync(new PacketFactoryRequest(
             Title: "Johnson packet",
             Subject: "Ares extraction",
-            SceneId: "scene-downtown",
             References: ["matrix log", "security still"],
             Attachments:
             [
-                new PacketAttachmentRequest(PacketAttachmentTargetKind.Campaign, "campaign-7", "Campaign"),
-                new PacketAttachmentRequest(PacketAttachmentTargetKind.Campaign, "campaign-7", "Campaign duplicate")
+                new PacketAttachmentRequest(PacketAttachmentTargetKind.Route, "campaign-7", "Campaign"),
+                new PacketAttachmentRequest(PacketAttachmentTargetKind.Route, "campaign-7", "Campaign duplicate")
             ]));
 
         VerificationAssert.Equal(3, created.Artifacts!.Count, "Packet factory should enqueue preview, PDF, and thumbnail artifacts.");

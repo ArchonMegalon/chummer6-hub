@@ -298,7 +298,7 @@ public sealed class NpcMessageVideoService : INpcMessageVideoService
         {
             if (asset is null)
             {
-                approvalState = AssetApprovalState.Draft;
+                approvalState = AssetApprovalState.Pending;
                 retentionState = AssetRetentionState.Expired;
                 expiresAtUtc = state.CreatedAtUtc + state.CacheTtl;
                 state.PublishState = state.Publishes.Count > 0 ? "expired" : "draft-expired";

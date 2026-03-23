@@ -17,7 +17,7 @@ public sealed record PortraitVariant(
     string? AssetId,
     string PromptLineage,
     string? StyleToken = null,
-    AssetApprovalState ApprovalState = AssetApprovalState.Draft,
+    AssetApprovalState ApprovalState = AssetApprovalState.Pending,
     AssetRetentionState RetentionState = AssetRetentionState.ApprovalPending,
     bool IsCanonical = false);
 

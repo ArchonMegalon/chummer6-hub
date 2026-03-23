@@ -356,7 +356,7 @@ public sealed class PortraitForgeService : IPortraitForgeService
             .Select(variant =>
             {
                 var asset = ResolveAsset(variant);
-                var approvalState = asset?.ApprovalState ?? AssetApprovalState.Draft;
+                var approvalState = asset?.ApprovalState ?? AssetApprovalState.Pending;
                 var retentionState = asset?.RetentionState ?? ResolvePendingRetention(variant);
                 return new PortraitVariant(
                     Variant: variant.Variant,
