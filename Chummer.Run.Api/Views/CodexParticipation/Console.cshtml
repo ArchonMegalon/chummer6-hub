@@ -52,6 +52,15 @@
                 </div>
             </div>
 
+            <div id="unavailableState" class="state-stack" hidden>
+                <div class="stacked-actions">
+                    <a id="unavailableHomeLink" class="button-like button-like--primary" href="/home">Back to home</a>
+                    <a id="unavailableAccountLink" class="button-like button-like--ghost" href="/account">Open account</a>
+                    <a id="unavailableExplainLink" class="inline-link" href="/participate">How it works</a>
+                </div>
+                <p class="privacy-note">Your account and saved participation history are still intact. Try again later.</p>
+            </div>
+
             <details id="technicalDetails" class="details-drawer" hidden>
                 <summary>Technical details</summary>
                 <dl class="detail-grid">
@@ -106,6 +115,11 @@ async function api(path, options = {}) {
     }
   }
   if (!response.ok) {
+    if (data && typeof data === "object" && data.phase) {
+      const error = new Error(data.support || data.detail || data.title || body || "Request failed.");
+      error.payload = data;
+      throw error;
+    }
     throw new Error(data.detail || data.title || body || "Request failed.");
   }
   return data;
@@ -144,13 +158,48 @@ function toggleState(phase) {
   document.getElementById("startState").hidden = phase !== "start";
   document.getElementById("authorizeState").hidden = phase !== "authorize";
   document.getElementById("completeState").hidden = phase !== "complete";
+  document.getElementById("unavailableState").hidden = phase !== "unavailable";
+}
+
+function normalizeParticipationError(error) {
+  if (error && error.payload && typeof error.payload === "object" && error.payload.phase) {
+    return error.payload;
+  }
+
+  const message = error?.message || "Participation is unavailable right now.";
+  if (message.includes("Participation is unavailable")) {
+    return {
+      unavailable: true,
+      status: "unavailable",
+      phase: "unavailable",
+      heading: "Participation is unavailable right now",
+      support: message,
+      statusLine: "Try again later. Your account and saved participation history are still intact.",
+      auth: {},
+      badge: null,
+      details: null,
+      actions: {
+        explainHref: "/participate",
+        homeHref: "/home",
+        accountHref: "/account"
+      }
+    };
+  }
+
+  return null;
 }
 
 function renderError(error) {
+  const unavailable = normalizeParticipationError(error);
+  if (unavailable) {
+    render(unavailable);
+    return;
+  }
+
   stopPolling();
   document.getElementById("stateTag").textContent = "Attention";
   document.getElementById("participationHeading").textContent = "Participation needs attention";
-  document.getElementById("stateSupport").textContent = error.message;
+  document.getElementById("stateSupport").textContent = error?.message || "Request failed.";
   document.getElementById("stateLine").textContent = "Fix the issue and try again.";
   toggleState("start");
 }
@@ -162,12 +211,15 @@ function render(data) {
   const badge = data.badge || null;
   const phase = data.phase || "start";
   const status = data.status || "ready_to_start";
+  const actions = data.actions || {};
   currentContributionId = contribution?.contributionId || "";
 
   document.getElementById("stateTag").textContent = phase === "complete"
     ? "Ready"
     : phase === "authorize"
       ? "Authorize"
+      : phase === "unavailable"
+        ? "Unavailable"
       : "Start";
   document.getElementById("participationHeading").textContent = data.heading || "Start contributing";
   document.getElementById("stateSupport").textContent = data.support || "";
@@ -183,6 +235,10 @@ function render(data) {
   copyCodeButton.disabled = !auth.userCode;
   authorizationCode.textContent = auth.userCode || "Authorization code will appear here as soon as Fleet finishes setup.";
 
+  document.getElementById("unavailableHomeLink").href = actions.homeHref || "/home";
+  document.getElementById("unavailableAccountLink").href = actions.accountHref || "/account";
+  document.getElementById("unavailableExplainLink").href = actions.explainHref || "/participate";
+
   const badgeReveal = document.getElementById("badgeReveal");
   badgeReveal.hidden = !(phase === "complete" && badge);
   document.getElementById("badgeLabel").textContent = badge?.label || "Contributor Ready";
@@ -197,10 +253,10 @@ function render(data) {
   document.getElementById("detailAuthorizationTier").textContent = details?.authorizationTier || "Unknown";
   document.getElementById("detailLaneRole").textContent = details?.requestedLaneRole || "coding";
 
-  const canCloseContribution = !!currentContributionId && status !== "stopped" && status !== "revoked";
+  const canCloseContribution = !!currentContributionId && phase !== "unavailable" && status !== "stopped" && status !== "revoked";
   document.getElementById("stopContributionButton").disabled = !canCloseContribution;
   document.getElementById("revokeContributionButton").disabled = !canCloseContribution;
-  document.getElementById("cancelContributionButton").hidden = !currentContributionId;
+  document.getElementById("cancelContributionButton").hidden = !currentContributionId || phase === "unavailable";
 
   if (phase === "authorize" && currentContributionId) {
     schedulePoll(auth.pollAfterMs || 3000);

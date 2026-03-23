@@ -29,7 +29,7 @@
                 <article class="rail-item" id="@card.Id.Replace('_', '-')">
                     <h3>@card.Title</h3>
                     <p>@card.Summary</p>
-                    <a class="inline-link" href="@(card.GuestHref ?? card.Href)">Continue</a>
+                    <a class="inline-link" href="@(Model.Chrome.Authenticated ? (card.RegisteredHref ?? card.Href) : (card.GuestHref ?? card.Href))">Continue</a>
                 </article>
             }
         </section>

@@ -808,6 +808,81 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     Assert(string.Equals(waitingResult.Session.Status, "waiting_for_slot", StringComparison.OrdinalIgnoreCase), "capacity pressure should move sponsor sessions into waiting_for_slot instead of throwing.");
     Assert(string.Equals(waitingResult.Session.RequestedLaneRole, "review", StringComparison.OrdinalIgnoreCase), "waiting sessions should keep the requested sponsor role.");
 
+    var reuseBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/internal/participant-lanes")
+        {
+            return JsonResponse(new
+            {
+                lane = new
+                {
+                    lane_id = "participant-reuse-check",
+                    status = "pending_auth",
+                    authorization_tier = "plus",
+                    tier_source = "fleet_detected",
+                    telemetry = new
+                    {
+                        auth_ready = false,
+                    },
+                },
+            });
+        }
+
+        if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/internal/participant-lanes/participant-reuse-check/device-auth/start")
+        {
+            return JsonResponse(new
+            {
+                lane = new
+                {
+                    lane_id = "participant-reuse-check",
+                    status = "pending_auth",
+                    authorization_tier = "plus",
+                    tier_source = "fleet_detected",
+                    device_auth = new
+                    {
+                        verification_uri = "https://example.com/device",
+                        user_code = "REUSE-CODE",
+                        auth_ready = false,
+                    },
+                    telemetry = new
+                    {
+                        auth_ready = false,
+                        authorization_tier = "plus",
+                        tier_source = "fleet_detected",
+                    },
+                },
+            });
+        }
+
+        return JsonResponse(new { detail = "unexpected fleet call" }, HttpStatusCode.InternalServerError);
+    })), configuration);
+    var reuseSessions = new BoostSessionService(store, accounts, groups, reuseBridge, rewards);
+    var reusableSession = reuseSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.demo",
+        ProjectId: "fleet",
+        GroupId: ownerGroup.GroupId,
+        SubjectLabel: "Runner Demo",
+        RequestedLaneRole: "coding"));
+    reuseSessions.RecordConsent(reusableSession.SponsorSessionId);
+    var distractorSession = reuseSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.demo",
+        ProjectId: "fleet",
+        GroupId: ownerGroup.GroupId,
+        SubjectLabel: "Runner Demo",
+        RequestedLaneRole: "review",
+        AuthorizationTier: "plus",
+        TierSource: "user_declared"));
+    reuseSessions.RecordConsent(distractorSession.SponsorSessionId);
+    var reusedContribution = await reuseSessions.StartContributionAsync(new CreateSponsorSessionRequest(
+        SubjectId: "subject.demo",
+        ProjectId: "fleet",
+        GroupId: ownerGroup.GroupId,
+        SubjectLabel: "Runner Demo",
+        RequestedLaneRole: "coding"), CancellationToken.None);
+    Assert(
+        string.Equals(reusedContribution.Session.SponsorSessionId, reusableSession.SponsorSessionId, StringComparison.OrdinalIgnoreCase),
+        "start contribution should reuse the matching open session even when a different-role session is more recent.");
+
     var invalidRoleThrown = false;
     try
     {

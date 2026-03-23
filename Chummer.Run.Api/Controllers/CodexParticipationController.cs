@@ -13,7 +13,7 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/participation/codex")]
 public sealed class CodexParticipationController : Controller
 {
-    private const string DefaultProjectId = "fleet";
+    private const string DefaultProjectId = "hub";
     private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
     private readonly LeaderboardService _leaderboards;
@@ -68,10 +68,11 @@ public sealed class CodexParticipationController : Controller
     [HttpGet("/api/v1/participation/contributions/current")]
     public async Task<ActionResult<object>> GetCurrentContribution(CancellationToken cancellationToken)
     {
+        SponsorSessionStatusDto? session = null;
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
-            var session = _sessions.FindMostRelevantForUser(subject.SubjectId);
+            session = _sessions.FindMostRelevantForUser(subject.SubjectId);
             if (session is null)
             {
                 return Ok(BuildContributionEnvelope(null));
@@ -87,6 +88,10 @@ public sealed class CodexParticipationController : Controller
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+        catch (ParticipationUnavailableException)
+        {
+            return BuildContributionUnavailableResult(session);
+        }
         catch (InvalidOperationException ex)
         {
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
@@ -97,9 +102,11 @@ public sealed class CodexParticipationController : Controller
     [HttpPost("/api/v1/participation/contributions/start")]
     public async Task<ActionResult<object>> StartContribution(CancellationToken cancellationToken)
     {
+        AuthenticatedHubSubject? subject = null;
+        SponsorSessionStatusDto? session = null;
         try
         {
-            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var started = await _sessions.StartContributionAsync(
                 new CreateSponsorSessionRequest(
                     SubjectId: subject.SubjectId,
@@ -112,6 +119,7 @@ public sealed class CodexParticipationController : Controller
                     AuthorizationTier: null,
                     TierSource: null),
                 cancellationToken);
+            session = started.Session;
             return Ok(BuildContributionEnvelope(
                 started.Session,
                 started.Fleet,
@@ -120,6 +128,11 @@ public sealed class CodexParticipationController : Controller
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (ParticipationUnavailableException)
+        {
+            session ??= subject is null ? null : _sessions.FindMostRelevantForUser(subject.SubjectId);
+            return BuildContributionUnavailableResult(session);
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
@@ -131,10 +144,11 @@ public sealed class CodexParticipationController : Controller
     [HttpGet("/api/v1/participation/contributions/{contributionId}")]
     public async Task<ActionResult<object>> GetContribution([FromRoute] string contributionId, CancellationToken cancellationToken)
     {
+        SponsorSessionStatusDto? session = null;
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
-            var session = TryGetOwnedSession(contributionId, subject.SubjectId, out var denied);
+            session = TryGetOwnedSession(contributionId, subject.SubjectId, out var denied);
             if (denied is not null)
             {
                 return denied;
@@ -155,6 +169,10 @@ public sealed class CodexParticipationController : Controller
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+        catch (ParticipationUnavailableException)
+        {
+            return BuildContributionUnavailableResult(session);
+        }
         catch (InvalidOperationException ex)
         {
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
@@ -165,10 +183,11 @@ public sealed class CodexParticipationController : Controller
     [HttpPost("/api/v1/participation/contributions/{contributionId}/stop")]
     public async Task<ActionResult<object>> StopContribution([FromRoute] string contributionId, CancellationToken cancellationToken)
     {
+        SponsorSessionStatusDto? session = null;
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
-            var session = TryGetOwnedSession(contributionId, subject.SubjectId, out var denied);
+            session = TryGetOwnedSession(contributionId, subject.SubjectId, out var denied);
             if (denied is not null)
             {
                 return denied;
@@ -189,6 +208,10 @@ public sealed class CodexParticipationController : Controller
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+        catch (ParticipationUnavailableException)
+        {
+            return BuildContributionUnavailableResult(session);
+        }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return BadRequest(ex.Message);
@@ -199,10 +222,11 @@ public sealed class CodexParticipationController : Controller
     [HttpPost("/api/v1/participation/contributions/{contributionId}/revoke")]
     public async Task<ActionResult<object>> RevokeContribution([FromRoute] string contributionId, CancellationToken cancellationToken)
     {
+        SponsorSessionStatusDto? session = null;
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
-            var session = TryGetOwnedSession(contributionId, subject.SubjectId, out var denied);
+            session = TryGetOwnedSession(contributionId, subject.SubjectId, out var denied);
             if (denied is not null)
             {
                 return denied;
@@ -222,6 +246,10 @@ public sealed class CodexParticipationController : Controller
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (ParticipationUnavailableException)
+        {
+            return BuildContributionUnavailableResult(session);
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
@@ -292,6 +320,10 @@ public sealed class CodexParticipationController : Controller
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+        catch (ParticipationUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
         catch (KeyNotFoundException)
         {
             return NotFound();
@@ -322,6 +354,10 @@ public sealed class CodexParticipationController : Controller
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (ParticipationUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -393,6 +429,10 @@ public sealed class CodexParticipationController : Controller
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+        catch (ParticipationUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
         catch (InvalidOperationException ex)
         {
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
@@ -432,6 +472,10 @@ public sealed class CodexParticipationController : Controller
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+        catch (ParticipationUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
         catch (InvalidOperationException ex)
         {
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
@@ -462,6 +506,10 @@ public sealed class CodexParticipationController : Controller
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (ParticipationUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -497,6 +545,10 @@ public sealed class CodexParticipationController : Controller
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (ParticipationUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
         catch (KeyNotFoundException)
         {
@@ -573,12 +625,7 @@ public sealed class CodexParticipationController : Controller
                 },
                 badge = (object?)null,
                 details = (object?)null,
-                actions = new
-                {
-                    explainHref = "/participate",
-                    homeHref = "/home",
-                    accountHref = "/account"
-                }
+                actions = BuildContributionActions()
             };
         }
 
@@ -590,16 +637,7 @@ public sealed class CodexParticipationController : Controller
 
         return new
         {
-            contribution = new
-            {
-                contributionId = session.SponsorSessionId,
-                sponsorSessionId = session.SponsorSessionId,
-                phase,
-                status = session.Status,
-                authReady = session.AuthorizedAtUtc is not null,
-                createdAtUtc = session.CreatedAtUtc,
-                updatedAtUtc = session.UpdatedAtUtc
-            },
+            contribution = BuildContributionSummary(session, phase),
             status = session.Status,
             phase,
             heading = ResolveContributionHeading(phase),
@@ -619,7 +657,56 @@ public sealed class CodexParticipationController : Controller
                     label = activeBadge.Label,
                     note = "This is a thank-you marker only. Contribution credit appears later after validated work."
                 },
-            details = new
+            details = BuildContributionDetails(session),
+            actions = BuildContributionActions(),
+            fleet
+        };
+    }
+
+    private ActionResult<object> BuildContributionUnavailableResult(SponsorSessionStatusDto? session)
+        => StatusCode(StatusCodes.Status503ServiceUnavailable, BuildContributionUnavailableEnvelope(session));
+
+    private static object BuildContributionUnavailableEnvelope(SponsorSessionStatusDto? session)
+        => new
+        {
+            contribution = BuildContributionSummary(session, "unavailable"),
+            unavailable = true,
+            status = session?.Status ?? "unavailable",
+            phase = "unavailable",
+            heading = "Participation is unavailable right now",
+            support = "This host can't open or refresh contribution lanes at the moment.",
+            statusLine = session is null
+                ? "Try again later. Your account is still signed in and nothing was lost."
+                : "Try again later. Your saved contribution record is still intact.",
+            auth = new
+            {
+                verificationUri = session?.DeviceAuthVerificationUri,
+                userCode = session?.DeviceAuthUserCode,
+                pollAfterMs = 3000
+            },
+            badge = (object?)null,
+            details = BuildContributionDetails(session),
+            actions = BuildContributionActions()
+        };
+
+    private static object? BuildContributionSummary(SponsorSessionStatusDto? session, string phase)
+        => session is null
+            ? null
+            : new
+            {
+                contributionId = session.SponsorSessionId,
+                sponsorSessionId = session.SponsorSessionId,
+                phase,
+                status = session.Status,
+                authReady = session.AuthorizedAtUtc is not null,
+                createdAtUtc = session.CreatedAtUtc,
+                updatedAtUtc = session.UpdatedAtUtc
+            };
+
+    private static object? BuildContributionDetails(SponsorSessionStatusDto? session)
+        => session is null
+            ? null
+            : new
             {
                 contributionId = session.SponsorSessionId,
                 fleetLaneId = session.FleetLaneId,
@@ -628,16 +715,15 @@ public sealed class CodexParticipationController : Controller
                 authorizationTier = session.AuthorizationTier,
                 requestedLaneRole = session.RequestedLaneRole,
                 projectId = session.ProjectId
-            },
-            actions = new
-            {
-                explainHref = "/participate",
-                homeHref = "/home",
-                accountHref = "/account"
-            },
-            fleet
+            };
+
+    private static object BuildContributionActions()
+        => new
+        {
+            explainHref = "/participate",
+            homeHref = "/home",
+            accountHref = "/account"
         };
-    }
 
     private static string ResolveContributionPhase(SponsorSessionStatusDto session)
         => session.Status switch

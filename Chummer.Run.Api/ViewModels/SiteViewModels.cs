@@ -1,5 +1,6 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Contracts.Leaderboards;
 using Chummer.Run.Contracts.PublicSurface;
 
 namespace Chummer.Run.Api.ViewModels;
@@ -89,6 +90,13 @@ public sealed record ParticipatePageViewModel(
     AssetCatalogViewModel Assets,
     IReadOnlyList<PublicFeatureCardDto> PublicLane,
     IReadOnlyList<PublicFeatureCardDto> SignedInLane);
+
+public sealed record LeaderboardsPageViewModel(
+    SiteChromeViewModel Chrome,
+    IReadOnlyList<LeaderboardRowDto> Individuals,
+    IReadOnlyList<SponsorRankLeaderboardRowDto> SponsorRank,
+    IReadOnlyList<GroupLeaderboardRowDto> Groups,
+    IReadOnlyList<QuestDto> Quests);
 
 public sealed record HomePageViewModel(
     SiteChromeViewModel Chrome,

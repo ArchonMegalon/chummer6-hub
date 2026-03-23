@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chummer.Run.Api.Services;
 
@@ -18,11 +19,13 @@ public sealed class FleetBridgeService
     private const string ParticipationUnavailableMessage = "Participation is unavailable on this host right now. Try again later.";
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<FleetBridgeService> _logger;
 
-    public FleetBridgeService(HttpClient httpClient, IConfiguration configuration)
+    public FleetBridgeService(HttpClient httpClient, IConfiguration configuration, ILogger<FleetBridgeService>? logger = null)
     {
         _httpClient = httpClient;
         _configuration = configuration;
+        _logger = logger ?? NullLogger<FleetBridgeService>.Instance;
     }
 
     private string BaseUrl =>
@@ -82,6 +85,7 @@ public sealed class FleetBridgeService
     {
         if (string.IsNullOrWhiteSpace(InternalApiToken))
         {
+            _logger.LogWarning("Fleet bridge is unavailable because FLEET_INTERNAL_API_TOKEN is not configured for {Path}.", path);
             throw new ParticipationUnavailableException(ParticipationUnavailableMessage);
         }
 
@@ -99,10 +103,12 @@ public sealed class FleetBridgeService
         }
         catch (HttpRequestException ex)
         {
+            _logger.LogWarning(ex, "Fleet bridge request failed for {Method} {Path}.", method, path);
             throw new ParticipationUnavailableException(ParticipationUnavailableMessage, ex);
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
+            _logger.LogWarning(ex, "Fleet bridge request timed out for {Method} {Path}.", method, path);
             throw new ParticipationUnavailableException(ParticipationUnavailableMessage, ex);
         }
 
@@ -118,6 +124,12 @@ public sealed class FleetBridgeService
                 var detail = json["detail"]?.GetValue<string>() ?? body;
                 if (ShouldMaskAsParticipationUnavailable(response.StatusCode, detail))
                 {
+                    _logger.LogWarning(
+                        "Masking Fleet bridge failure for {Method} {Path} with status {StatusCode}. Detail: {Detail}",
+                        method,
+                        path,
+                        (int)response.StatusCode,
+                        string.IsNullOrWhiteSpace(detail) ? "<empty>" : detail);
                     throw new ParticipationUnavailableException(ParticipationUnavailableMessage);
                 }
 

@@ -20,7 +20,20 @@
         <div class="hero-cta-row">
             @foreach (var action in Model.Surface.HeroCtas)
             {
-                <a class="cta-link cta-link--@(action.Emphasis == "secondary" ? "secondary" : "primary")" href="@action.Href">@action.Label</a>
+                var href = action.Href;
+                var label = action.Label;
+                if (Model.Chrome.Authenticated && string.Equals(action.Href, "/signup?next=/home", StringComparison.OrdinalIgnoreCase))
+                {
+                    href = "/home";
+                    label = "Open home";
+                }
+                else if (Model.Chrome.Authenticated && string.Equals(action.Href, "/login?next=/home", StringComparison.OrdinalIgnoreCase))
+                {
+                    href = "/account";
+                    label = "Open account";
+                }
+
+                <a class="cta-link cta-link--@(action.Emphasis == "secondary" ? "secondary" : "primary")" href="@href">@label</a>
             }
         </div>
     </div>
@@ -96,7 +109,15 @@
         <p class="section-copy">The signed-in shell is where follows, beta interest, and contribution setup live.</p>
     </div>
     <div class="stacked-actions">
-        <a class="cta-link cta-link--primary" href="/signup?next=/home">Create account</a>
-        <a class="cta-link cta-link--secondary" href="/login?next=/home">Sign in</a>
+        @if (Model.Chrome.Authenticated)
+        {
+            <a class="cta-link cta-link--primary" href="/home">Open home</a>
+            <a class="cta-link cta-link--secondary" href="/account">Open account</a>
+        }
+        else
+        {
+            <a class="cta-link cta-link--primary" href="/signup?next=/home">Create account</a>
+            <a class="cta-link cta-link--secondary" href="/login?next=/home">Sign in</a>
+        }
     </div>
 </section>

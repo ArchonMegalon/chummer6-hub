@@ -1,0 +1,112 @@
+@model LeaderboardsPageViewModel
+@{
+    ViewData["Title"] = "Leaderboards";
+    ViewData["Chrome"] = Model.Chrome;
+}
+
+<section class="section-band">
+    <div class="page-lead">
+        <p class="eyebrow">Community</p>
+        <h1 class="page-title">Leaderboards and quests</h1>
+        <p class="page-copy">These are secondary community surfaces. They show public recognition only, not private account state or proof of unfinished work.</p>
+    </div>
+
+    <div class="settings-grid">
+        <section class="settings-block">
+            <h2>Individuals</h2>
+            <div class="table-shell">
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Rank</th>
+                            <th scope="col">Runner</th>
+                            <th scope="col">Points</th>
+                            <th scope="col">Landed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Individuals)
+                    {
+                        <tr>
+                            <td>@row.Rank</td>
+                            <td>@row.DisplayName</td>
+                            <td>@row.Points</td>
+                            <td>@row.LandedSlices</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="settings-block">
+            <h2>Current sponsor rank</h2>
+            <div class="table-shell">
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Rank</th>
+                            <th scope="col">Runner</th>
+                            <th scope="col">Tier</th>
+                            <th scope="col">Current score</th>
+                            <th scope="col">Lifetime points</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.SponsorRank)
+                    {
+                        <tr>
+                            <td>@row.Rank</td>
+                            <td>@row.DisplayName</td>
+                            <td>@row.CurrentAuthorizationTier</td>
+                            <td>@row.CurrentRankScore</td>
+                            <td>@row.LifetimePoints</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="settings-block">
+            <h2>Groups</h2>
+            <div class="table-shell">
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Rank</th>
+                            <th scope="col">Group</th>
+                            <th scope="col">Points</th>
+                            <th scope="col">Landed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Groups)
+                    {
+                        <tr>
+                            <td>@row.Rank</td>
+                            <td>@row.GroupName</td>
+                            <td>@row.Points</td>
+                            <td>@row.LandedSlices</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="settings-block">
+            <h2>Quests</h2>
+            <div class="check-grid">
+            @foreach (var quest in Model.Quests)
+            {
+                <article class="rail-item">
+                    <h3>@quest.Title</h3>
+                    <p>@quest.Description</p>
+                    <p class="muted-copy">@quest.CurrentProgress / @quest.TargetProgress · @quest.Status.Replace('_', ' ')</p>
+                </article>
+            }
+            </div>
+        </section>
+    </div>
+</section>

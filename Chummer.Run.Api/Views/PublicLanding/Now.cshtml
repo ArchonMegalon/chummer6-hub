@@ -43,7 +43,9 @@
                 <article class="rail-item">
                     <h3>@overlay.Title</h3>
                     <p>@overlay.Summary</p>
-                    <a class="inline-link" href="/signup?next=/home">Create account</a>
+                    <a class="inline-link" href="@(Model.Chrome.Authenticated ? "/home" : "/signup?next=/home")">
+                        @(Model.Chrome.Authenticated ? "Open home" : "Create account")
+                    </a>
                 </article>
             }
         </section>

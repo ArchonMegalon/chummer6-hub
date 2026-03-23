@@ -47,7 +47,14 @@
                 }
                 @foreach (var action in chrome.HeaderActions)
                 {
-                    if (action.Current)
+                    if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <form method="post" action="/logout" class="action-form">
+                            @Html.AntiForgeryToken()
+                            <button class="action-pill action-pill--@action.Tone" type="submit">@action.Label</button>
+                        </form>
+                    }
+                    else if (action.Current)
                     {
                         <span class="action-pill action-pill--current">@action.Label</span>
                     }
@@ -69,7 +76,17 @@
                 <div class="site-nav-sheet__actions">
                     @foreach (var action in chrome.HeaderActions)
                     {
-                        <a class="action-pill action-pill--@action.Tone" href="@action.Href">@action.Label</a>
+                        if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <form method="post" action="/logout" class="action-form">
+                                @Html.AntiForgeryToken()
+                                <button class="action-pill action-pill--@action.Tone" type="submit">@action.Label</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <a class="action-pill action-pill--@action.Tone" href="@action.Href">@action.Label</a>
+                        }
                     }
                 </div>
             </div>
