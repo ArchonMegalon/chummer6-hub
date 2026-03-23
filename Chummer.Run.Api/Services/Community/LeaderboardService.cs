@@ -112,10 +112,12 @@ public sealed class LeaderboardService
         lock (_store.Gate)
         {
             var landed = _store.Receipts.Count(receipt => string.Equals(receipt.EventKind, "slice_landed", StringComparison.OrdinalIgnoreCase));
-            var activated = _store.Receipts.Count(receipt => string.Equals(receipt.EventKind, "lane_activated", StringComparison.OrdinalIgnoreCase));
+            var reviewed = _store.Receipts.Count(receipt =>
+                string.Equals(receipt.EventKind, "slice_reviewed", StringComparison.OrdinalIgnoreCase)
+                && receipt.Verified);
             return
             [
-                new QuestDto("quest-launch-lanes", "Launch 5 sponsor lanes", "Open and activate five community-sponsored premium burst lanes.", activated, 5, activated >= 5 ? "done" : "in_progress"),
+                new QuestDto("quest-review-slices", "Review 5 sponsored slices", "Complete five verified sponsor-backed review passes.", reviewed, 5, reviewed >= 5 ? "done" : "in_progress"),
                 new QuestDto("quest-land-slices", "Land 10 sponsored slices", "Help land ten verified sponsor-backed slices.", landed, 10, landed >= 10 ? "done" : "in_progress")
             ];
         }

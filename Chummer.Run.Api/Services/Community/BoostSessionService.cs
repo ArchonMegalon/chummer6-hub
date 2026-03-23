@@ -423,8 +423,14 @@ public sealed class BoostSessionService
             ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["authorization_tier"]?.GetValue<string>());
         var tierSource = AccountService.NormalizeOptional(lane["tier_source"]?.GetValue<string>())
             ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["tier_source"]?.GetValue<string>());
+        var credentialHandle = AccountService.NormalizeOptional(lane["credential_handle"]?.GetValue<string>())
+            ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["credential_handle"]?.GetValue<string>());
         var laneRole = AccountService.NormalizeOptional(lane["lane_role"]?.GetValue<string>())
             ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["lane_role"]?.GetValue<string>());
+        if (!string.IsNullOrWhiteSpace(credentialHandle))
+        {
+            state.FleetCredentialHandle = credentialHandle;
+        }
         if (!string.IsNullOrWhiteSpace(authorizationTier))
         {
             state.AuthorizationTier = SponsorStatusPolicy.NormalizeAuthorizationTier(authorizationTier);
