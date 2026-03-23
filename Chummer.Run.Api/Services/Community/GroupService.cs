@@ -5,6 +5,7 @@ namespace Chummer.Run.Api.Services.Community;
 
 public sealed class GroupService
 {
+    private const string DefaultCampaignProjectId = "hub";
     private static readonly IReadOnlyList<string> DefaultBoosterCapabilities =
     [
         "can_manage_members",
@@ -108,9 +109,9 @@ public sealed class GroupService
     {
         var requester = _accounts.EnsureUser(request.SubjectId, request.SubjectId);
         var group = RequireGroup(groupId);
-        if (!IsGroupMember(group, requester.UserId))
+        if (!CanIssueJoinCodes(group, requester.UserId))
         {
-            throw new InvalidOperationException("requester must be a group member to issue join codes.");
+            throw new CommunityAccessDeniedException("requester must be a group owner or manager to issue join codes.");
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -118,7 +119,7 @@ public sealed class GroupService
             JoinCodeId: AccountService.NewId("jcd"),
             Code: $"JOIN-{Guid.NewGuid():N}"[..13].ToUpperInvariant(),
             GroupId: group.GroupId,
-            Role: AccountService.NormalizeOptional(request.Role) ?? "member",
+            Role: NormalizeJoinRole(request.Role),
             CreatedAtUtc: now,
             ExpiresAtUtc: request.Ttl is { } ttl && ttl > TimeSpan.Zero ? now.Add(ttl) : null,
             Uses: 0);
@@ -182,15 +183,15 @@ public sealed class GroupService
     {
         var requester = _accounts.EnsureUser(request.SubjectId, request.SubjectId);
         var group = RequireGroup(request.GroupId);
-        if (!IsGroupMember(group, requester.UserId))
+        if (!CanIssueBoostCodes(group, requester.UserId))
         {
-            throw new InvalidOperationException("requester must be a group member to issue boost codes.");
+            throw new CommunityAccessDeniedException("requester must be a group owner or manager to issue boost codes.");
         }
 
         lock (_store.Gate)
         {
             var campaignId = AccountService.NormalizeOptional(request.CampaignId)
-                ?? EnsureCampaignLocked(group.GroupId, AccountService.NormalizeOptional(request.ProjectId) ?? "fleet", $"{group.Name} sponsorship").CampaignId;
+                ?? EnsureCampaignLocked(group.GroupId, AccountService.NormalizeOptional(request.ProjectId) ?? DefaultCampaignProjectId, $"{group.Name} sponsorship").CampaignId;
             var boostCode = new BoostCodeDto(
                 BoostCodeId: AccountService.NewId("bcd"),
                 Code: $"BOOST-{Guid.NewGuid():N}"[..14].ToUpperInvariant(),
@@ -282,11 +283,51 @@ public sealed class GroupService
         }
     }
 
+    public GroupDto RequireMemberGroup(string groupId, string userId)
+    {
+        var normalizedUserId = AccountService.NormalizeRequired(userId, nameof(userId));
+        var group = RequireGroup(groupId);
+        if (!IsGroupMember(group, normalizedUserId))
+        {
+            throw new CommunityAccessDeniedException("requester must belong to the group.");
+        }
+
+        return group;
+    }
+
     private GroupDto RequireGroup(string groupId)
         => GetGroup(groupId) ?? throw new KeyNotFoundException($"Unknown group: {groupId}");
 
     private static bool IsGroupMember(GroupDto group, string userId)
         => group.Memberships.Any(member => string.Equals(member.UserId, userId, StringComparison.OrdinalIgnoreCase));
+
+    private static bool CanIssueJoinCodes(GroupDto group, string userId)
+        => HasCapability(group, "can_issue_join_codes") && CanManageGroup(group, userId);
+
+    private static bool CanIssueBoostCodes(GroupDto group, string userId)
+        => HasCapability(group, "can_issue_boost_codes") && CanManageGroup(group, userId);
+
+    private static bool CanManageGroup(GroupDto group, string userId)
+        => string.Equals(group.OwnerUserId, userId, StringComparison.OrdinalIgnoreCase)
+            || group.Memberships.Any(member =>
+                string.Equals(member.UserId, userId, StringComparison.OrdinalIgnoreCase)
+                && IsElevatedRole(member.Role));
+
+    private static bool HasCapability(GroupDto group, string capability)
+        => group.Capabilities.Any(existing => string.Equals(existing, capability, StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsElevatedRole(string? role)
+        => string.Equals(AccountService.NormalizeOptional(role), "owner", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(AccountService.NormalizeOptional(role), "admin", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(AccountService.NormalizeOptional(role), "manager", StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeJoinRole(string? role)
+        => (AccountService.NormalizeOptional(role) ?? "member").ToLowerInvariant() switch
+        {
+            "member" => "member",
+            "booster" => "booster",
+            _ => throw new InvalidOperationException("join codes may only grant member or booster roles.")
+        };
 
     private BoostCampaignDto EnsureCampaignLocked(string groupId, string projectId, string title)
     {

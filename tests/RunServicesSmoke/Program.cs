@@ -630,11 +630,67 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         GroupType: "booster",
         Visibility: "group",
         Capabilities: null));
+    var ownerJoinCode = groups.CreateJoinCode(ownerGroup.GroupId, new CreateJoinCodeRequest(
+        SubjectId: "subject.demo",
+        Role: "member"));
+    accounts.UpsertProfile(new UpsertHubUserProfileRequest(
+        SubjectId: "subject.member",
+        DisplayName: "Member Demo",
+        Handle: "member-demo",
+        Visibility: "private",
+        Timezone: "UTC",
+        CountryCode: "AT"));
+    groups.JoinGroup(new JoinGroupByCodeRequest("subject.member", ownerJoinCode.Code));
+    var memberJoinCodeBlocked = false;
+    try
+    {
+        _ = groups.CreateJoinCode(ownerGroup.GroupId, new CreateJoinCodeRequest(
+            SubjectId: "subject.member",
+            Role: "member"));
+    }
+    catch (CommunityAccessDeniedException ex)
+    {
+        memberJoinCodeBlocked = ex.Message.Contains("owner or manager", StringComparison.OrdinalIgnoreCase);
+    }
+
+    Assert(memberJoinCodeBlocked, "non-manager members should not be allowed to mint join codes.");
+
+    var memberBoostCodeBlocked = false;
+    try
+    {
+        _ = groups.CreateBoostCode(new CreateBoostCodeRequest(
+            SubjectId: "subject.member",
+            GroupId: ownerGroup.GroupId,
+            CampaignId: null,
+            ProjectId: "hub",
+            Label: "beta"));
+    }
+    catch (CommunityAccessDeniedException ex)
+    {
+        memberBoostCodeBlocked = ex.Message.Contains("owner or manager", StringComparison.OrdinalIgnoreCase);
+    }
+
+    Assert(memberBoostCodeBlocked, "non-manager members should not be allowed to mint boost codes.");
+
+    var ownerRoleJoinCodeBlocked = false;
+    try
+    {
+        _ = groups.CreateJoinCode(ownerGroup.GroupId, new CreateJoinCodeRequest(
+            SubjectId: "subject.demo",
+            Role: "owner"));
+    }
+    catch (InvalidOperationException ex)
+    {
+        ownerRoleJoinCodeBlocked = ex.Message.Contains("member or booster", StringComparison.OrdinalIgnoreCase);
+    }
+
+    Assert(ownerRoleJoinCodeBlocked, "join codes should not be allowed to mint owner-level roles.");
+
     var boostCode = groups.CreateBoostCode(new CreateBoostCodeRequest(
         SubjectId: "subject.demo",
         GroupId: ownerGroup.GroupId,
         CampaignId: null,
-        ProjectId: "fleet",
+        ProjectId: "hub",
         Label: "alpha"));
     groups.RedeemBoostCode(new RedeemBoostCodeRequest("subject.demo", boostCode.Code));
     var reloadedStore = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
@@ -642,6 +698,56 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var reloadedGroups = new GroupService(reloadedStore, reloadedAccounts);
     var reloadedBoostCode = reloadedGroups.GetBoostCode(boostCode.Code);
     Assert(string.Equals(reloadedBoostCode?.Status, "redeemed", StringComparison.OrdinalIgnoreCase), "redeemed boost codes should stay redeemed after store reload even when the redeemer was already a member.");
+
+    var memberIdentityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        var body = request.Content is null ? string.Empty : request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        return body.Contains("member-token", StringComparison.Ordinal)
+            ? JsonResponse(new IdentityIntrospectionResponse(true, "session-member", "subject.member", new[] { "player" }, DateTimeOffset.UtcNow.AddHours(1)))
+            : JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized);
+    })), configuration);
+    var outsiderIdentityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        var body = request.Content is null ? string.Empty : request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        return body.Contains("outsider-token", StringComparison.Ordinal)
+            ? JsonResponse(new IdentityIntrospectionResponse(true, "session-outsider", "subject.outsider", new[] { "player" }, DateTimeOffset.UtcNow.AddHours(1)))
+            : JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized);
+    })), configuration);
+    accounts.UpsertProfile(new UpsertHubUserProfileRequest(
+        SubjectId: "subject.outsider",
+        DisplayName: "Outsider Demo",
+        Handle: "outsider-demo",
+        Visibility: "private",
+        Timezone: "UTC",
+        CountryCode: "AT"));
+    var memberGroupsController = new GroupsController(groups, memberIdentityClient)
+    {
+        ControllerContext = AuthenticatedControllerContext("member-token")
+    };
+    var memberJoinCodeResult = await memberGroupsController.CreateJoinCode(ownerGroup.GroupId, new CreateJoinCodeRequest(
+        SubjectId: "subject.member",
+        Role: "member"), CancellationToken.None);
+    Assert((memberJoinCodeResult.Result as ObjectResult)?.StatusCode == StatusCodes.Status403Forbidden, "join-code creation should return 403 for non-manager members.");
+
+    var memberBoostCodesController = new BoostCodesController(groups, memberIdentityClient)
+    {
+        ControllerContext = AuthenticatedControllerContext("member-token")
+    };
+    var memberBoostCodeResult = await memberBoostCodesController.Create(new CreateBoostCodeRequest(
+        SubjectId: "subject.member",
+        GroupId: ownerGroup.GroupId,
+        CampaignId: null,
+        ProjectId: "hub",
+        Label: "beta"), CancellationToken.None);
+    Assert((memberBoostCodeResult.Result as ObjectResult)?.StatusCode == StatusCodes.Status403Forbidden, "boost-code creation should return 403 for non-manager members.");
+
+    var groupsController = new GroupsController(groups, outsiderIdentityClient)
+    {
+        ControllerContext = AuthenticatedControllerContext("outsider-token")
+    };
+    var outsiderGroupAccess = await groupsController.GetGroup(ownerGroup.GroupId, CancellationToken.None);
+    var outsiderGroupProblem = outsiderGroupAccess.Result as ObjectResult;
+    Assert(outsiderGroupProblem?.StatusCode == StatusCodes.Status403Forbidden, "group lookup should reject authenticated outsiders.");
 
     var fleetCallCount = 0;
     var fleetBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
@@ -807,6 +913,38 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var waitingResult = await waitingSessions.StartDeviceAuthAsync(waitingSession.SponsorSessionId, CancellationToken.None);
     Assert(string.Equals(waitingResult.Session.Status, "waiting_for_slot", StringComparison.OrdinalIgnoreCase), "capacity pressure should move sponsor sessions into waiting_for_slot instead of throwing.");
     Assert(string.Equals(waitingResult.Session.RequestedLaneRole, "review", StringComparison.OrdinalIgnoreCase), "waiting sessions should keep the requested sponsor role.");
+
+    var outsiderSessionBlocked = false;
+    try
+    {
+        _ = waitingSessions.Create(new CreateSponsorSessionRequest(
+            SubjectId: "subject.outsider",
+            ProjectId: "hub",
+            GroupId: ownerGroup.GroupId,
+            SubjectLabel: "Outsider Demo"));
+    }
+    catch (CommunityAccessDeniedException ex)
+    {
+        outsiderSessionBlocked = ex.Message.Contains("belong to the group", StringComparison.OrdinalIgnoreCase);
+    }
+
+    Assert(outsiderSessionBlocked, "explicit sponsor-session groups should reject outsiders.");
+
+    var redeemedBoostCodeSessionBlocked = false;
+    try
+    {
+        _ = waitingSessions.Create(new CreateSponsorSessionRequest(
+            SubjectId: "subject.outsider",
+            ProjectId: "hub",
+            BoostCode: boostCode.Code,
+            SubjectLabel: "Outsider Demo"));
+    }
+    catch (CommunityAccessDeniedException ex)
+    {
+        redeemedBoostCodeSessionBlocked = ex.Message.Contains("belong to the group", StringComparison.OrdinalIgnoreCase);
+    }
+
+    Assert(redeemedBoostCodeSessionBlocked, "redeemed boost codes should not let outsiders bind sponsor sessions to the original group.");
 
     var reuseBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
     {

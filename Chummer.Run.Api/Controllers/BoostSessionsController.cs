@@ -44,6 +44,10 @@ public sealed class BoostSessionsController : ControllerBase
                 : await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
             return Ok(_sessions.Create(request with { SubjectId = subject.SubjectId }));
         }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);

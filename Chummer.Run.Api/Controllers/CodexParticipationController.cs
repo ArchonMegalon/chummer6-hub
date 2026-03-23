@@ -125,6 +125,10 @@ public sealed class CodexParticipationController : Controller
                 started.Fleet,
                 _sessions.ListBadgesForSessionUser(started.Session.SponsorSessionId)));
         }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
@@ -284,6 +288,10 @@ public sealed class CodexParticipationController : Controller
                 AuthorizationTier: request.AuthorizationTier,
                 TierSource: request.TierSource));
             return Ok(BuildIntentEnvelope(session, receipts: _sessions.ListReceipts(session.SponsorSessionId), badges: _sessions.ListBadgesForSessionUser(session.SponsorSessionId), recognition: _leaderboards.UserRecognitionSummary(session.UserId)));
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
         }
         catch (HubRequestAuthException ex)
         {

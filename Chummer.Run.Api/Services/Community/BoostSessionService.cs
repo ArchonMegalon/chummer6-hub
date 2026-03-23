@@ -32,15 +32,16 @@ public sealed class BoostSessionService
     {
         var subjectId = AccountService.NormalizeRequired(request.SubjectId ?? string.Empty, nameof(request.SubjectId));
         var user = _accounts.EnsureUser(subjectId, request.SubjectLabel ?? subjectId);
-        var group = ResolveGroupForSession(user, request);
         var boostCodeId = default(string);
         var campaignId = AccountService.NormalizeOptional(request.CampaignId);
+        BoostCodeDto? redeemedBoostCode = null;
         if (!string.IsNullOrWhiteSpace(request.BoostCode))
         {
-            var redeemed = _groups.RedeemBoostCode(new RedeemBoostCodeRequest(subjectId, request.BoostCode!));
-            boostCodeId = redeemed.BoostCodeId;
-            campaignId ??= redeemed.CampaignId;
+            redeemedBoostCode = _groups.RedeemBoostCode(new RedeemBoostCodeRequest(subjectId, request.BoostCode!));
+            boostCodeId = redeemedBoostCode.BoostCodeId;
+            campaignId ??= redeemedBoostCode.CampaignId;
         }
+        var group = ResolveGroupForSession(user, request, redeemedBoostCode);
         if (string.IsNullOrWhiteSpace(campaignId))
         {
             campaignId = _groups.GetOrCreateCampaign(group.GroupId, request.ProjectId, $"{group.Name} sponsor campaign").CampaignId;
@@ -368,19 +369,23 @@ public sealed class BoostSessionService
         }
     }
 
-    private GroupDto ResolveGroupForSession(HubUserDto user, CreateSponsorSessionRequest request)
+    private GroupDto ResolveGroupForSession(HubUserDto user, CreateSponsorSessionRequest request, BoostCodeDto? redeemedBoostCode)
     {
         var explicitGroupId = AccountService.NormalizeOptional(request.GroupId);
         if (!string.IsNullOrWhiteSpace(explicitGroupId))
         {
-            return _groups.GetGroup(explicitGroupId!) ?? throw new KeyNotFoundException($"Unknown group: {explicitGroupId}");
+            if (redeemedBoostCode is not null
+                && !string.Equals(redeemedBoostCode.GroupId, explicitGroupId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("boost code group does not match the selected group.");
+            }
+
+            return _groups.RequireMemberGroup(explicitGroupId!, user.UserId);
         }
 
-        if (!string.IsNullOrWhiteSpace(request.BoostCode))
+        if (redeemedBoostCode is not null)
         {
-            var existing = _groups.GetBoostCode(request.BoostCode)
-                ?? throw new KeyNotFoundException($"Unknown boost code: {request.BoostCode}");
-            return _groups.GetGroup(existing.GroupId) ?? throw new KeyNotFoundException($"Unknown group: {existing.GroupId}");
+            return _groups.RequireMemberGroup(redeemedBoostCode.GroupId, user.UserId);
         }
 
         return _groups.EnsurePersonalBoosterGroup(user);

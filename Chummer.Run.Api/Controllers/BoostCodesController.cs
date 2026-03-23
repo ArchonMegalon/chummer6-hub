@@ -32,6 +32,10 @@ public sealed class BoostCodesController : ControllerBase
             var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
             return Ok(_groups.CreateBoostCode(request with { SubjectId = subject.SubjectId }));
         }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
