@@ -201,30 +201,6 @@
       backdrop-filter: blur(14px);
       box-shadow: var(--shadow);
     }
-    .booster-note {
-      width: min(var(--max), calc(100vw - 56px));
-      margin: 18px auto 0;
-      padding: 20px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 18px;
-      border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-      color: rgba(246,251,255,.84);
-    }
-    .booster-note strong {
-      color: var(--text);
-      letter-spacing: -.02em;
-    }
-    .booster-note a {
-      color: #d7fff3;
-      text-decoration: none;
-      border-bottom: 1px solid rgba(107,224,193,.38);
-    }
-    .booster-note a:hover {
-      border-color: rgba(107,224,193,.72);
-    }
     .pulse-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -492,7 +468,6 @@
       .pulse-cell { border-right: 0; border-bottom: 1px solid var(--line); }
       .pulse-cell:last-child { border-bottom: 0; }
       .brand { letter-spacing: .06em; }
-      .booster-note { width: min(var(--max), calc(100vw - 36px)); flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
@@ -505,7 +480,7 @@
       <div class="hero-copy">
         <div class="brand">Chummer6</div>
         <h1>Progress report for a product becoming a build machine.</h1>
-        <p>The project is moving from canon and architecture into scalable execution: package-scoped boosters, credit-aware control, cleaner public entry surfaces, and a clearer path toward parallel delivery.</p>
+        <p>The project is moving from canon and architecture into a more coherent public product: clearer entry surfaces, hardened rules, stronger shared UI, and a more credible path toward release.</p>
         <div class="cta-group">
           <a class="cta primary" href="#program">See the program pulse</a><a class="cta" href="#timeline">Read the timeline</a><a class="cta" href="#method">How the ETA works</a>
         </div>
@@ -516,8 +491,8 @@
       <div class="pulse-grid">
         <div class="pulse-cell">
           <span class="pulse-label">Overall progress</span>
-          <span class="pulse-value">74%</span>
-          <span class="pulse-copy">Weighted milestone completion across the six public product parts.</span>
+          <span class="pulse-value">73%</span>
+          <span class="pulse-copy">Weighted milestone completion across the 5 public product parts.</span>
         </div>
         <div class="pulse-cell">
           <span class="pulse-label">Current phase</span>
@@ -527,7 +502,7 @@
         <div class="pulse-cell">
           <span class="pulse-label">Next checkpoint</span>
           <span class="pulse-value">2-4 weeks</span>
-          <span class="pulse-copy">Fastest-moving areas are Mission Control, Live Play, and Canon.</span>
+          <span class="pulse-copy">Fastest-moving areas are Canon &amp; Guide, Core Engine, and Live Play.</span>
         </div>
         <div class="pulse-cell">
           <span class="pulse-label">Longest pole</span>
@@ -535,11 +510,6 @@
           <span class="pulse-copy">Hosted account, registry, and media surfaces still carry the deepest remaining completion wave.</span>
         </div>
       </div>
-    </section>
-
-    <section class="booster-note" aria-label="Booster participation note">
-      <div><strong>Average active boosters in the most recent burst (today):</strong> 3.1. Lower sustained booster count directly slows progress.</div>
-      <a href="#participate">See how to participate</a>
     </section>
 
     <section class="section">
@@ -550,25 +520,6 @@
       </div>
       <div class="part-list">
 
-      <article class="part-row">
-        <div class="part-head">
-          <div>
-            <h3>Mission Control &amp; AI Runtime</h3>
-            <p>Control plane, AI runtime, queue leasing, credit-aware scaling, and parallel booster orchestration.</p>
-          </div>
-          <div class="part-meta">
-            <div class="meta-chip">Very high momentum</div>
-            <div class="meta-eta">ETA 2-4 weeks</div>
-          </div>
-        </div>
-        <div class="progress-line" role="img" aria-label="Mission Control &amp; AI Runtime progress 78 percent">
-          <span style="width:78%"></span>
-        </div>
-        <div class="part-foot">
-          <strong>78%</strong>
-          <span>weighted milestone progress</span>
-        </div>
-      </article>
       <article class="part-row">
         <div class="part-head">
           <div>
@@ -595,7 +546,7 @@
             <p>Character building, inspectors, dense data UX, and the reusable Chummer design system.</p>
           </div>
           <div class="part-meta">
-            <div class="meta-chip">High momentum</div>
+            <div class="meta-chip">Steady momentum</div>
             <div class="meta-eta">ETA 8-12 weeks</div>
           </div>
         </div>
@@ -614,7 +565,7 @@
             <p>Player and GM shell, local-first sync, browser session transport, and offline-resume play surfaces.</p>
           </div>
           <div class="part-meta">
-            <div class="meta-chip">Steady momentum</div>
+            <div class="meta-chip">Moderate momentum</div>
             <div class="meta-eta">ETA 4-6 weeks</div>
           </div>
         </div>
@@ -652,7 +603,7 @@
             <p>Product canon, horizons, participation workflow, public landing rules, and the public-facing guide bundle.</p>
           </div>
           <div class="part-meta">
-            <div class="meta-chip">High momentum</div>
+            <div class="meta-chip">Steady momentum</div>
             <div class="meta-eta">ETA 2-4 weeks</div>
           </div>
         </div>
@@ -675,27 +626,6 @@
       </div>
       <div class="timeline-wrap">
 
-      <section class="timeline-row">
-        <div class="timeline-title">
-          <h3>Mission Control &amp; AI Runtime</h3>
-          <div class="timeline-eta">ETA 2-4 weeks</div>
-        </div>
-        <div class="timeline-track">
-
-          <div class="timeline-step">
-            <span class="step-kicker">Landed</span>
-            <p><strong>Package-scoped execution</strong>. Package-scoped booster execution, credit authority routing, lease telemetry, and quartermaster enforcement.</p>
-          </div>
-          <div class="timeline-step current">
-            <span class="step-kicker">Now</span>
-            <p><strong>Convergence wave</strong>. Participation surfaces converge; package/bootstrap flow becomes boring; downstream status plane stays canonical.</p>
-          </div>
-          <div class="timeline-step">
-            <span class="step-kicker">Target</span>
-            <p><strong>Public-ready control plane</strong>. Stable large-scale booster operation with public-ready progress reporting.</p>
-          </div>
-        </div>
-      </section>
       <section class="timeline-row">
         <div class="timeline-title">
           <h3>Core Rules Engine</h3>
@@ -812,16 +742,16 @@
       <div class="weekly-list">
 
         <div class="weekly-item">
-          <strong>Mission Control got a harder backbone.</strong>
-          <p>Fleet shifted further toward package-scoped execution, stronger scope/capacity contracts, and a quartermaster that can reason about credits, work depth, review pressure, and drift instead of relying on ad hoc burst logic.</p>
+          <strong>Delivery reporting got clearer.</strong>
+          <p>The public progress report, product-part grouping, and timeline view now read like one coherent status surface instead of scattered repo signals.</p>
         </div>
         <div class="weekly-item">
-          <strong>The AI runtime got better at seeing real capacity.</strong>
-          <p>The EA lane now exposes actual OneMinute credit posture and has been hardened around lease-aware routing, provider selection, occupancy, and review/audit scoping.</p>
+          <strong>Public-facing product structure tightened.</strong>
+          <p>Public milestones, guide surfaces, and landing routes now line up more cleanly around user-visible product areas instead of internal execution seams.</p>
         </div>
         <div class="weekly-item">
           <strong>The public entry story became clearer.</strong>
-          <p>Design, Fleet, Hub, Registry, Media, and Mobile all refreshed public landing, auth, guide, and participation canon, reducing the chance that the public surface drifts away from the design source of truth.</p>
+          <p>Landing, auth, guide, and participation surfaces were tightened so the public front door stays closer to the actual product truth.</p>
         </div>
         <div class="weekly-item">
           <strong>Workbench scope got easier to see.</strong>
@@ -854,7 +784,7 @@
         <h2>How to participate</h2>
       </div>
       <div class="method">
-        <p>Lower sustained booster count directly slows visible progress. If you want the delivery curve to steepen, the next leverage point is more bounded participation through the public booster flow. <a class="cta primary" href="https://chummer.run/participate" style="margin-left: 0.75rem; display: inline-flex; align-items: center;">Open the participation page</a></p>
+        <p>If you want to follow the rollout or join future contribution waves, the participation page explains the current public entry path. <a class="cta primary" href="https://chummer.run/participate" style="margin-left: 0.75rem; display: inline-flex; align-items: center;">Open the participation page</a></p>
       </div>
     </section>
 
