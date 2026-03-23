@@ -1,0 +1,75 @@
+{
+  "contract_name": "fleet.public_progress_history",
+  "contract_version": "2026-03-23",
+  "generated_at": "2026-03-23T20:29:30Z",
+  "snapshot_count": 1,
+  "snapshots": [
+    {
+      "as_of": "2026-03-23",
+      "overall_progress_percent": 73,
+      "phase_label": "Scale & stabilize",
+      "parts": [
+        {
+          "id": "core-engine",
+          "public_name": "Core Rules Engine",
+          "progress_percent": 80,
+          "remaining_open_weight": 8,
+          "remaining_open_milestones": 1,
+          "recent_commit_count_7d": 56,
+          "uncovered_scope_count": 3,
+          "eta_weeks_low": 3,
+          "eta_weeks_high": 5,
+          "eta_source": "config_override"
+        },
+        {
+          "id": "workbench-ui",
+          "public_name": "Workbench & Shared UI",
+          "progress_percent": 76,
+          "remaining_open_weight": 23,
+          "remaining_open_milestones": 3,
+          "recent_commit_count_7d": 113,
+          "uncovered_scope_count": 11,
+          "eta_weeks_low": 8,
+          "eta_weeks_high": 12,
+          "eta_source": "config_override"
+        },
+        {
+          "id": "live-play",
+          "public_name": "Live Play",
+          "progress_percent": 84,
+          "remaining_open_weight": 7,
+          "remaining_open_milestones": 1,
+          "recent_commit_count_7d": 19,
+          "uncovered_scope_count": 3,
+          "eta_weeks_low": 4,
+          "eta_weeks_high": 6,
+          "eta_source": "config_override"
+        },
+        {
+          "id": "community-cloud",
+          "public_name": "Community Cloud & Publishing",
+          "progress_percent": 63,
+          "remaining_open_weight": 58,
+          "remaining_open_milestones": 8,
+          "recent_commit_count_7d": 77,
+          "uncovered_scope_count": 8,
+          "eta_weeks_low": 10,
+          "eta_weeks_high": 14,
+          "eta_source": "config_override"
+        },
+        {
+          "id": "canon-guide",
+          "public_name": "Canon & Public Guide",
+          "progress_percent": 82,
+          "remaining_open_weight": 8,
+          "remaining_open_milestones": 1,
+          "recent_commit_count_7d": 45,
+          "uncovered_scope_count": 2,
+          "eta_weeks_low": 2,
+          "eta_weeks_high": 4,
+          "eta_source": "config_override"
+        }
+      ]
+    }
+  ]
+}

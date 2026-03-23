@@ -1,0 +1,23 @@
+mode: prepend
+items:
+- Publish or append runnable backlog for The missing `Chummer.Media.Contracts` package still prevents a dedicated media-factory repo from becoming a real package-only seam..
+- Publish or append runnable backlog for The `chummer-media-factory` split exists as a scaffold, but not yet as a render-only asset/job boundary separated from orchestration and narrative-authoring DTOs..
+- Add milestone mapping or executable queue work for The `chummer-media-factory` split exists as a scaffold, but not yet as a render-only asset/job boundary separated from orchestration and narrative-authoring DTOs..
+- Publish or append runnable backlog for The `chummer-hub-registry` split exists as a scaffold, but not yet as a clean repo/package boundary around catalog, publication, installs, and runtime bundle heads..
+- Add milestone mapping or executable queue work for The `chummer-hub-registry` split exists as a scaffold, but not yet as a clean repo/package boundary around catalog, publication, installs, and runtime bundle heads..
+- Publish or append runnable backlog for Dedicated `Chummer.Play.Contracts` and `/api/play/*` seams are not yet public package/API reality for the new play repo..
+- Add milestone mapping or executable queue work for Dedicated `Chummer.Play.Contracts` and `/api/play/*` seams are not yet public package/API reality for the new play repo..
+- Isolate renderer/storage/job surfaces so the dedicated media-factory repo can own assets, jobs, previews, TTL, retention, and lineage without Spider, lore, or session relay code.
+- Publish or append runnable backlog for Group-level asset review and publication seams still need explicit milestone mapping..
+- Add milestone mapping or executable queue work for Group-level asset review and publication seams still need explicit milestone mapping..
+- Keep finalized render requests/results, manifests, and lifecycle state in the future media package; keep news/shadowfeed/NPC message drafting, approvals policy, and delivery state in run-services orchestration contracts.
+- Publish or append runnable backlog for Additional Hub milestone families beyond the current queued work remain unmaterialized..
+- Add milestone mapping or executable queue work for Additional Hub milestone families beyond the current queued work remain unmaterialized..
+- Move asset/job/render/lifecycle DTOs into `Chummer.Media.Contracts` and keep the package dependency-light with no play, UI, or session-policy dependencies.
+- Publish or append runnable backlog for Contract reset and relay/runtime alignment are not yet represented as explicit Hub milestones..
+- Finish milestone coverage modeling for hub so ETA and completion truth are no longer partial.
+- Add milestone mapping or executable queue work for Contract reset and relay/runtime alignment are not yet represented as explicit Hub milestones..
+- Sync the approved Chummer design bundle into `hub` under `.codex-design/` and refresh repo-local review context.
+- Keep registry, relay, Spider, media, and identity in the hosted repo and move legacy app/tooling surfaces into a separate legacy or interoperability boundary.
+- Keep compatibility wrappers server-side only during migration and stop exposing them as a peer contract surface.
+- Break the catch-all contract file into narrower hosted contract families for relay, memory, media, docs, and AI gateway surfaces.

@@ -1,11 +1,21 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
 
 namespace Chummer.Run.Api.Services;
 
+public sealed class ParticipationUnavailableException : InvalidOperationException
+{
+    public ParticipationUnavailableException(string message, Exception? innerException = null)
+        : base(message, innerException)
+    {
+    }
+}
+
 public sealed class FleetBridgeService
 {
+    private const string ParticipationUnavailableMessage = "Participation is unavailable on this host right now. Try again later.";
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
 
@@ -72,7 +82,7 @@ public sealed class FleetBridgeService
     {
         if (string.IsNullOrWhiteSpace(InternalApiToken))
         {
-            throw new InvalidOperationException("FLEET_INTERNAL_API_TOKEN is required for Fleet participant-lane bridge calls.");
+            throw new ParticipationUnavailableException(ParticipationUnavailableMessage);
         }
 
         using var request = new HttpRequestMessage(method, $"{BaseUrl}{path}");
@@ -82,18 +92,65 @@ public sealed class FleetBridgeService
             request.Content = JsonContent.Create(payload);
         }
 
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        var json = string.IsNullOrWhiteSpace(body)
-            ? new JsonObject()
-            : JsonNode.Parse(body)?.AsObject() ?? new JsonObject();
-
-        if (!response.IsSuccessStatusCode)
+        HttpResponseMessage response;
+        try
         {
-            var detail = json["detail"]?.GetValue<string>() ?? body;
-            throw new InvalidOperationException($"Fleet bridge request failed ({(int)response.StatusCode}): {detail}");
+            response = await _httpClient.SendAsync(request, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new ParticipationUnavailableException(ParticipationUnavailableMessage, ex);
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new ParticipationUnavailableException(ParticipationUnavailableMessage, ex);
         }
 
-        return json;
+        using (response)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var json = string.IsNullOrWhiteSpace(body)
+                ? new JsonObject()
+                : JsonNode.Parse(body)?.AsObject() ?? new JsonObject();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var detail = json["detail"]?.GetValue<string>() ?? body;
+                if (ShouldMaskAsParticipationUnavailable(response.StatusCode, detail))
+                {
+                    throw new ParticipationUnavailableException(ParticipationUnavailableMessage);
+                }
+
+                throw new InvalidOperationException($"Fleet bridge request failed ({(int)response.StatusCode}): {detail}");
+            }
+
+            return json;
+        }
     }
+
+    private static bool ShouldMaskAsParticipationUnavailable(HttpStatusCode statusCode, string? detail)
+        => statusCode switch
+        {
+            HttpStatusCode.Conflict => !IsCapacityConflict(detail),
+            HttpStatusCode.BadRequest
+                or HttpStatusCode.Unauthorized
+                or HttpStatusCode.Forbidden
+                or HttpStatusCode.NotFound
+                or HttpStatusCode.TooManyRequests
+                or HttpStatusCode.BadGateway
+                or HttpStatusCode.ServiceUnavailable
+                or HttpStatusCode.GatewayTimeout
+                or HttpStatusCode.InternalServerError => true,
+            _ => ((int)statusCode >= 500) || ContainsInternalBridgeDetail(detail)
+        };
+
+    private static bool IsCapacityConflict(string? detail)
+        => !string.IsNullOrWhiteSpace(detail)
+            && detail.Contains("capacity reached", StringComparison.OrdinalIgnoreCase);
+
+    private static bool ContainsInternalBridgeDetail(string? detail)
+        => !string.IsNullOrWhiteSpace(detail)
+            && (detail.Contains("participant lane internal auth is not configured", StringComparison.OrdinalIgnoreCase)
+                || detail.Contains("participant-lane bridge", StringComparison.OrdinalIgnoreCase)
+                || detail.Contains("FLEET_INTERNAL_API_TOKEN", StringComparison.OrdinalIgnoreCase));
 }

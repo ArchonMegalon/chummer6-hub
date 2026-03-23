@@ -75,6 +75,7 @@
         "scope_multiplier": 1.38,
         "center_weeks": 1.77
       },
+      "history_velocity_weight_points_per_week": 0.0,
       "source_status": {
         "mapped_project_count": 1,
         "dispatchable_truth_ready_count": 1,
@@ -97,7 +98,7 @@
           "remaining_open_milestones": 1,
           "uncovered_scope_count": 3,
           "compile": {
-            "published_at": "2026-03-23T08:35:13.064766Z",
+            "published_at": "2026-03-23T19:59:15.067783Z",
             "stages": {
               "design_compile": true,
               "policy_compile": true,
@@ -144,23 +145,24 @@
           "body": "Complete desktop/browser workbench with accessibility, localization, and polished shared components."
         }
       ],
-      "recent_commit_count_7d": 111,
+      "recent_commit_count_7d": 113,
       "remaining_open_weight": 23,
       "remaining_open_milestones": 3,
       "uncovered_scope_count": 11,
-      "momentum_score": 19.3,
+      "momentum_score": 19.65,
       "eta_source": "config_override",
       "formula": {
         "weighted_units": 5.75,
         "scope_multiplier": 2.38,
-        "center_weeks": 12.73
+        "center_weeks": 12.51
       },
+      "history_velocity_weight_points_per_week": 0.0,
       "source_status": {
         "mapped_project_count": 2,
         "dispatchable_truth_ready_count": 2,
-        "package_compile_count": 0,
+        "package_compile_count": 2,
         "capacity_compile_count": 2,
-        "published_artifact_count": 2,
+        "published_artifact_count": 4,
         "lifecycle_counts": {
           "live": 1,
           "scaffold": 1
@@ -172,23 +174,24 @@
           "repo_slug": "chummer6-ui",
           "path": "/docker/chummercomplete/chummer6-ui",
           "lifecycle": "live",
-          "recent_commit_count_7d": 81,
+          "recent_commit_count_7d": 83,
           "design_total_weight": 56,
           "remaining_open_weight": 16,
           "remaining_open_milestones": 2,
           "uncovered_scope_count": 9,
           "compile": {
-            "published_at": "2026-03-23T07:59:40.271792Z",
+            "published_at": "2026-03-23T20:24:20.052766Z",
             "stages": {
               "design_compile": true,
               "policy_compile": true,
               "execution_compile": true,
-              "package_compile": false,
+              "package_compile": true,
               "capacity_compile": true
             },
             "dispatchable_truth_ready": true,
             "artifacts": [
-              "QUEUE.generated.yaml"
+              "QUEUE.generated.yaml",
+              "WORKPACKAGES.generated.yaml"
             ],
             "lifecycle": ""
           }
@@ -204,17 +207,18 @@
           "remaining_open_milestones": 1,
           "uncovered_scope_count": 2,
           "compile": {
-            "published_at": "2026-03-19T15:43:59.808358Z",
+            "published_at": "2026-03-23T20:24:20.040766Z",
             "stages": {
               "design_compile": true,
               "policy_compile": true,
               "execution_compile": true,
-              "package_compile": false,
+              "package_compile": true,
               "capacity_compile": true
             },
             "dispatchable_truth_ready": true,
             "artifacts": [
-              "QUEUE.generated.yaml"
+              "QUEUE.generated.yaml",
+              "WORKPACKAGES.generated.yaml"
             ],
             "lifecycle": ""
           }
@@ -261,12 +265,13 @@
         "scope_multiplier": 1.38,
         "center_weeks": 3.99
       },
+      "history_velocity_weight_points_per_week": 0.0,
       "source_status": {
         "mapped_project_count": 1,
         "dispatchable_truth_ready_count": 1,
-        "package_compile_count": 0,
+        "package_compile_count": 1,
         "capacity_compile_count": 1,
-        "published_artifact_count": 1,
+        "published_artifact_count": 2,
         "lifecycle_counts": {
           "dispatchable": 1
         }
@@ -283,17 +288,18 @@
           "remaining_open_milestones": 1,
           "uncovered_scope_count": 3,
           "compile": {
-            "published_at": "2026-03-23T14:12:08.138187Z",
+            "published_at": "2026-03-23T20:24:20.070766Z",
             "stages": {
               "design_compile": true,
               "policy_compile": true,
               "execution_compile": true,
-              "package_compile": false,
+              "package_compile": true,
               "capacity_compile": true
             },
             "dispatchable_truth_ready": true,
             "artifacts": [
-              "QUEUE.generated.yaml"
+              "QUEUE.generated.yaml",
+              "WORKPACKAGES.generated.yaml"
             ],
             "lifecycle": ""
           }
@@ -331,23 +337,24 @@
           "body": "A cohesive hosted community and publication stack ready for real public participation."
         }
       ],
-      "recent_commit_count_7d": 74,
+      "recent_commit_count_7d": 77,
       "remaining_open_weight": 58,
       "remaining_open_milestones": 8,
       "uncovered_scope_count": 8,
-      "momentum_score": 5.1,
+      "momentum_score": 5.31,
       "eta_source": "config_override",
       "formula": {
         "weighted_units": 14.5,
         "scope_multiplier": 2.0,
         "center_weeks": 48.33
       },
+      "history_velocity_weight_points_per_week": 0.0,
       "source_status": {
         "mapped_project_count": 3,
         "dispatchable_truth_ready_count": 3,
-        "package_compile_count": 0,
+        "package_compile_count": 2,
         "capacity_compile_count": 3,
-        "published_artifact_count": 3,
+        "published_artifact_count": 7,
         "lifecycle_counts": {
           "live": 1,
           "scaffold": 2
@@ -359,23 +366,24 @@
           "repo_slug": "chummer6-hub",
           "path": "/docker/chummercomplete/chummer6-hub",
           "lifecycle": "live",
-          "recent_commit_count_7d": 30,
+          "recent_commit_count_7d": 33,
           "design_total_weight": 60,
           "remaining_open_weight": 30,
           "remaining_open_milestones": 4,
           "uncovered_scope_count": 4,
           "compile": {
-            "published_at": "2026-03-23T13:54:08.639239Z",
+            "published_at": "2026-03-23T20:24:20.064766Z",
             "stages": {
               "design_compile": true,
               "policy_compile": true,
               "execution_compile": true,
-              "package_compile": false,
+              "package_compile": true,
               "capacity_compile": true
             },
             "dispatchable_truth_ready": true,
             "artifacts": [
-              "QUEUE.generated.yaml"
+              "QUEUE.generated.yaml",
+              "WORKPACKAGES.generated.yaml"
             ],
             "lifecycle": ""
           }
@@ -391,17 +399,20 @@
           "remaining_open_milestones": 2,
           "uncovered_scope_count": 2,
           "compile": {
-            "published_at": "2026-03-19T16:27:30.786381Z",
+            "published_at": "2026-03-23T20:29:01.044855Z",
             "stages": {
               "design_compile": true,
               "policy_compile": true,
               "execution_compile": true,
-              "package_compile": false,
+              "package_compile": true,
               "capacity_compile": true
             },
             "dispatchable_truth_ready": true,
             "artifacts": [
-              "QUEUE.generated.yaml"
+              "QUEUE.generated.yaml",
+              "RELEASE_CHANNEL.generated.json",
+              "WORKPACKAGES.generated.yaml",
+              "releases.json"
             ],
             "lifecycle": ""
           }
@@ -464,23 +475,24 @@
           "body": "One authoritative public story, compiled cleanly into every downstream surface."
         }
       ],
-      "recent_commit_count_7d": 44,
+      "recent_commit_count_7d": 45,
       "remaining_open_weight": 8,
       "remaining_open_milestones": 1,
       "uncovered_scope_count": 2,
-      "momentum_score": 22.0,
+      "momentum_score": 22.5,
       "eta_source": "config_override",
       "formula": {
         "weighted_units": 2.0,
         "scope_multiplier": 1.25,
-        "center_weeks": 2.05
+        "center_weeks": 2.0
       },
+      "history_velocity_weight_points_per_week": 0.0,
       "source_status": {
         "mapped_project_count": 2,
         "dispatchable_truth_ready_count": 1,
-        "package_compile_count": 0,
+        "package_compile_count": 1,
         "capacity_compile_count": 1,
-        "published_artifact_count": 1,
+        "published_artifact_count": 2,
         "lifecycle_counts": {
           "dispatchable": 1,
           "signoff_only": 1
@@ -492,23 +504,24 @@
           "repo_slug": "chummer6-design",
           "path": "/docker/chummercomplete/chummer-design",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 28,
+          "recent_commit_count_7d": 29,
           "design_total_weight": 44,
           "remaining_open_weight": 8,
           "remaining_open_milestones": 1,
           "uncovered_scope_count": 2,
           "compile": {
-            "published_at": "2026-03-19T15:43:59.806358Z",
+            "published_at": "2026-03-23T20:24:20.012766Z",
             "stages": {
               "design_compile": true,
               "policy_compile": true,
               "execution_compile": true,
-              "package_compile": false,
+              "package_compile": true,
               "capacity_compile": true
             },
             "dispatchable_truth_ready": true,
             "artifacts": [
-              "QUEUE.generated.yaml"
+              "QUEUE.generated.yaml",
+              "WORKPACKAGES.generated.yaml"
             ],
             "lifecycle": ""
           }
@@ -524,7 +537,7 @@
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-03-23T06:58:10.463849Z",
+            "published_at": "2026-03-23T19:59:15.068783Z",
             "stages": {
               "design_compile": true,
               "policy_compile": false,
@@ -579,7 +592,8 @@
     "limitations": [
       "ETA is a momentum-based planning band, not a delivery promise.",
       "The current repo state does not yet expose a durable public weekly progress history, so recent momentum is used as a proxy."
-    ]
+    ],
+    "history_snapshot_count": 1
   },
   "closing": {
     "headline": "The project no longer looks like a concept sketch.",

@@ -16,6 +16,12 @@ public sealed class PublicReleaseManifestService
     public PublicReleaseManifestDto LoadManifest()
     {
         var root = ResolveDownloadsRoot();
+        var registryManifestPath = ResolveRegistryManifestPath(root);
+        if (File.Exists(registryManifestPath))
+        {
+            return LoadRegistryReleaseManifest(registryManifestPath);
+        }
+
         var manifestPath = Path.Combine(root, "releases.json");
         if (!File.Exists(manifestPath))
         {
@@ -61,6 +67,11 @@ public sealed class PublicReleaseManifestService
             ? configured
             : DefaultRoot;
 
+    private string ResolveRegistryManifestPath(string downloadsRoot)
+        => _configuration["CHUMMER_RELEASE_REGISTRY_MANIFEST_FILE"]?.Trim() is { Length: > 0 } configured
+            ? configured
+            : Path.Combine(downloadsRoot, "RELEASE_CHANNEL.generated.json");
+
     private static PublicReleaseManifestDto LoadReleaseManifest(string manifestPath)
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
@@ -101,4 +112,76 @@ public sealed class PublicReleaseManifestService
             HasFallbackSource = false
         };
     }
+
+    private static PublicReleaseManifestDto LoadRegistryReleaseManifest(string manifestPath)
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        var json = File.ReadAllText(manifestPath);
+        var parsed = JsonSerializer.Deserialize<RegistryReleaseChannelManifest>(json, options);
+        if (parsed is null)
+        {
+            return new PublicReleaseManifestDto(
+                Version: "unpublished",
+                Channel: "preview",
+                PublishedAt: DateTimeOffset.UtcNow,
+                Downloads: [],
+                Source: "registry",
+                Status: "manifest-error",
+                Message: "Registry release manifest exists but could not be parsed.",
+                HasFallbackSource: false);
+        }
+
+        var downloads = (parsed.Artifacts ?? [])
+            .Where(item => !string.IsNullOrWhiteSpace(item.DownloadUrl))
+            .Select(item => new PublicReleaseArtifactDto(
+                Id: item.ArtifactId ?? item.FileName ?? "artifact",
+                Platform: item.PlatformLabel ?? item.Platform ?? "Preview build",
+                Url: item.DownloadUrl ?? "",
+                Sha256: item.Sha256 ?? "",
+                SizeBytes: item.SizeBytes))
+            .ToList();
+
+        var status = downloads.Count > 0
+            ? "published"
+            : string.Equals(parsed.Status, "manifest-empty", StringComparison.OrdinalIgnoreCase)
+                ? "manifest-empty"
+                : "unpublished";
+        var message = downloads.Count > 0
+            ? parsed.Message
+            : status == "unpublished"
+                ? "No published desktop builds are available yet."
+                : "Registry release manifest is present but contains no downloadable artifacts.";
+
+        return new PublicReleaseManifestDto(
+            Version: parsed.Version ?? "unpublished",
+            Channel: parsed.ChannelId ?? "preview",
+            PublishedAt: parsed.PublishedAt ?? DateTimeOffset.UtcNow,
+            Downloads: downloads,
+            Source: "registry",
+            Status: status,
+            Message: message,
+            HasFallbackSource: false);
+    }
+
+    private sealed record RegistryReleaseChannelManifest(
+        string? Product,
+        string? ChannelId,
+        string? Version,
+        DateTimeOffset? PublishedAt,
+        string? Status,
+        string? Message,
+        IReadOnlyList<RegistryReleaseArtifact>? Artifacts);
+
+    private sealed record RegistryReleaseArtifact(
+        string? ArtifactId,
+        string? Platform,
+        string? PlatformLabel,
+        string? FileName,
+        string? DownloadUrl,
+        string? Sha256,
+        long? SizeBytes);
 }
