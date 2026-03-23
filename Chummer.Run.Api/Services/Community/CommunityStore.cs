@@ -189,6 +189,7 @@ internal sealed class SponsorSessionState
     public string Status { get; set; } = "intent_created";
     public bool Consented { get; set; }
     public string? FleetLaneId { get; set; }
+    public string? FleetCredentialHandle { get; set; }
     public string? BoostCampaignId { get; set; }
     public string? BoostCodeId { get; set; }
     public string? DeviceAuthVerificationUri { get; set; }
@@ -257,6 +258,7 @@ internal sealed record SponsorSessionStateSnapshot(
     string Status,
     bool Consented,
     string? FleetLaneId,
+    string? FleetCredentialHandle,
     string? BoostCampaignId,
     string? BoostCodeId,
     string? DeviceAuthVerificationUri,
@@ -283,6 +285,7 @@ internal sealed record SponsorSessionStateSnapshot(
             state.Status,
             state.Consented,
             state.FleetLaneId,
+            state.FleetCredentialHandle,
             state.BoostCampaignId,
             state.BoostCodeId,
             state.DeviceAuthVerificationUri,
@@ -311,6 +314,7 @@ internal sealed record SponsorSessionStateSnapshot(
             Status = Status,
             Consented = Consented,
             FleetLaneId = FleetLaneId,
+            FleetCredentialHandle = FleetCredentialHandle,
             BoostCampaignId = BoostCampaignId,
             BoostCodeId = BoostCodeId,
             DeviceAuthVerificationUri = DeviceAuthVerificationUri,

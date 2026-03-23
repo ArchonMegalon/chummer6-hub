@@ -195,7 +195,6 @@ public sealed class RewardService
         var eventKind = (receipt.EventKind ?? string.Empty).Trim().ToLowerInvariant();
         var points = eventKind switch
         {
-            "lane_activated" => 1,
             "slice_reviewed" when receipt.Verified => 5,
             "slice_landed" when receipt.Verified => 15,
             _ => 0,
@@ -234,20 +233,6 @@ public sealed class RewardService
         }
 
         var userId = receipt.UserId!;
-        if (string.Equals(receipt.EventKind, "lane_activated", StringComparison.OrdinalIgnoreCase)
-            && TryFindActiveBadgeLocked(userId, "booster-starter", null) is null)
-        {
-            _store.Badges.Add(new BadgeDto(
-                BadgeId: $"badge-booster-starter-{Guid.NewGuid():N}",
-                UserId: userId,
-                Key: "booster-starter",
-                Label: "Booster Starter",
-                AwardedAtUtc: DateTimeOffset.UtcNow,
-                BadgeScope: "user",
-                BadgeKind: "persistent",
-                Status: "active"));
-        }
-
         if (string.Equals(receipt.EventKind, "slice_landed", StringComparison.OrdinalIgnoreCase)
             && receipt.Verified
             && TryFindActiveBadgeLocked(userId, "jury-finisher", null) is null)

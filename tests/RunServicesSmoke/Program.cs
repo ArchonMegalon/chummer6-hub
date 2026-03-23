@@ -503,6 +503,54 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     Assert(string.Equals(linkSummary.OrchestratorBrain, "EA", StringComparison.OrdinalIgnoreCase), "identity/channel summary should keep EA as the orchestrator brain.");
     Assert(linkSummary.ChannelLinks.Any(static link => string.Equals(link.ChannelKind, "telegram_official_bot", StringComparison.OrdinalIgnoreCase)), "identity/channel summary should expose the official Telegram companion link.");
 
+    var activationReceipt = new ContributionReceiptDto(
+        ReceiptId: "rcpt-lane-activated-001",
+        EventKind: "lane_activated",
+        LaneId: "participant-activation-01",
+        ProjectId: "fleet",
+        UserId: createdUser.UserId,
+        GroupId: "grp-demo",
+        SponsorSessionId: "sps-demo",
+        AuthClass: "chatgpt_auth_json",
+        LaneType: "participant_burst",
+        LaneRole: "coding",
+        Verified: true,
+        SignedByFleet: "hmac-sha256:activation",
+        AuthorizationTierAtReceipt: "plus",
+        TierSource: "fleet_detected");
+    var activationPoints = rewards.ApplyReceipt(activationReceipt);
+    Assert(activationPoints == 0, "lane activation should not mint contribution points on its own.");
+    Assert(
+        !rewards.ListBadgesForUser(createdUser.UserId).Any(static badge => string.Equals(badge.Key, "booster-starter", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)),
+        "lane activation should not mint the old Booster Starter badge.");
+
+    var reviewReceipt = new ContributionReceiptDto(
+        ReceiptId: "rcpt-slice-reviewed-001",
+        EventKind: "slice_reviewed",
+        LaneId: "participant-review-01",
+        ProjectId: "fleet",
+        UserId: createdUser.UserId,
+        GroupId: "grp-demo",
+        SponsorSessionId: "sps-demo",
+        AuthClass: "chatgpt_auth_json",
+        LaneType: "participant_burst",
+        LaneRole: "review",
+        Verified: true,
+        SignedByFleet: "hmac-sha256:review",
+        AuthorizationTierAtReceipt: "plus",
+        TierSource: "fleet_detected");
+    var reviewPoints = rewards.ApplyReceipt(reviewReceipt);
+    Assert(reviewPoints == 5, "verified review receipts should still mint contribution points.");
+    lock (store.Gate)
+    {
+        store.Receipts.Add(reviewReceipt);
+    }
+    Assert(
+        leaderboards.Quests().Any(static quest =>
+            string.Equals(quest.QuestId, "quest-review-slices", StringComparison.OrdinalIgnoreCase)
+            && quest.CurrentProgress == 1),
+        "review quests should progress from validated review work rather than lane activation.");
+
     var signedLaneReceipt = BuildSignedReceiptElement("smoke-secret", new Dictionary<string, object?>
     {
         ["receipt_id"] = "rcpt-signed-001",

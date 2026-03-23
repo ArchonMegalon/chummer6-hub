@@ -245,6 +245,8 @@ Bad scoring inputs:
 * raw prompt/turn volume
 * auth completion without validated work
 
+Auth completion may unlock a cosmetic ready-state badge, but it must not mint leaderboard points or persistent contribution-credit badges by itself.
+
 Recognition should stay:
 
 * opt-in
