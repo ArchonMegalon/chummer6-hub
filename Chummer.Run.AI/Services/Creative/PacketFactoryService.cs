@@ -57,10 +57,9 @@ public sealed class PacketFactoryService : IPacketFactoryService
             ? "No external references were passed."
             : string.Join(", ", request.References);
 
-        var html = BuildHtml(request.Title, request.Subject, request.SceneId, referenceText);
+        var html = BuildHtml(request.Title, request.Subject, referenceText);
         var evidence = new List<string>
         {
-            $"scene={request.SceneId ?? "n/a"}",
             $"references={request.References?.Count ?? 0}",
             $"attachments={request.Attachments?.Count ?? 0}"
         };
@@ -98,7 +97,7 @@ public sealed class PacketFactoryService : IPacketFactoryService
                 JobType: MediaRenderJobType.DocumentThumbnailImage,
                 DeduplicationKey: $"packet-thumbnail::{packetId}",
                 Category: "packet/thumbnail",
-                Payload: BuildThumbnailPayload(request.Title, request.Subject, request.SceneId),
+                Payload: BuildThumbnailPayload(request.Title, request.Subject),
                 Source: packetId,
                 CacheTtl: TimeSpan.FromDays(30),
                 MaxBytes: 1_000_000,
@@ -185,17 +184,15 @@ public sealed class PacketFactoryService : IPacketFactoryService
         }
     }
 
-    private static string BuildHtml(string title, string subject, string? sceneId, string references)
+    private static string BuildHtml(string title, string subject, string references)
     {
         var safeTitle = WebUtility.HtmlEncode(title);
         var safeSubject = WebUtility.HtmlEncode(subject);
-        var safeScene = WebUtility.HtmlEncode(sceneId ?? "unbound");
         var body = new StringBuilder()
             .Append("<html><head><meta charset='utf-8' />")
             .Append($"<title>{safeTitle}</title></head><body>")
             .Append($"<h1>{safeTitle}</h1>")
             .Append($"<p><strong>{safeSubject}</strong></p>")
-            .Append($"<p>Scene context: {safeScene}</p>")
             .Append($"<p>{references}</p>")
             .Append("</body></html>")
             .ToString();
@@ -303,9 +300,8 @@ public sealed class PacketFactoryService : IPacketFactoryService
         return payload;
     }
 
-    private static string BuildThumbnailPayload(string title, string subject, string? sceneId)
+    private static string BuildThumbnailPayload(string title, string subject)
     {
-        var safeScene = WebUtility.HtmlEncode(sceneId ?? "unbound");
-        return $"<packet-thumbnail source=\"peekshot\"><title>{WebUtility.HtmlEncode(title)}</title><subject>{WebUtility.HtmlEncode(subject)}</subject><scene>{safeScene}</scene></packet-thumbnail>";
+        return $"<packet-thumbnail source=\"peekshot\"><title>{WebUtility.HtmlEncode(title)}</title><subject>{WebUtility.HtmlEncode(subject)}</subject></packet-thumbnail>";
     }
 }

@@ -28,6 +28,7 @@ builder.Services.AddHttpClient<HubIdentityClient>();
 builder.Services.AddHttpClient<HubBrowserAuthService>();
 builder.Services.AddSingleton<CommunityStore>();
 builder.Services.AddSingleton<PublicLandingService>();
+builder.Services.AddSingleton<PublicProgressService>();
 builder.Services.AddSingleton<PublicReleaseManifestService>();
 builder.Services.AddSingleton<FleetReceiptVerifier>();
 builder.Services.AddSingleton<AccountService>();

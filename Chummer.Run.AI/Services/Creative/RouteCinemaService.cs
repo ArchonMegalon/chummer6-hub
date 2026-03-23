@@ -22,10 +22,8 @@ public sealed class RouteCinemaService : IRouteCinemaService
     private sealed class RouteCinemaState
     {
         public required string RouteCinemaId { get; init; }
-        public required string CampaignId { get; init; }
         public required string SourceNode { get; init; }
         public required string TargetNode { get; init; }
-        public required string SceneContext { get; init; }
         public required IReadOnlyList<string> Waypoints { get; init; }
         public required IReadOnlyList<string> WaypointScript { get; init; }
         public required string TravelSummary { get; init; }
@@ -80,7 +78,7 @@ public sealed class RouteCinemaService : IRouteCinemaService
                 DeduplicationKey: $"{deduplicationKey}::preview",
                 Category: "route-cinema/preview",
                 Payload: BuildPreviewPayload(normalized, waypoints, travelSummary),
-                Source: normalized.CampaignId,
+                Source: deduplicationKey,
                 CacheTtl: cacheTtl,
                 MaxBytes: 1_500_000,
                 RequiresApproval: true,
@@ -90,10 +88,8 @@ public sealed class RouteCinemaService : IRouteCinemaService
 
         var routePayload = JsonSerializer.Serialize(new
         {
-            normalized.CampaignId,
             normalized.SourceNode,
             normalized.TargetNode,
-            normalized.SceneContext,
             projectionFingerprint,
             Waypoints = waypoints,
             Script = script,
@@ -106,7 +102,7 @@ public sealed class RouteCinemaService : IRouteCinemaService
                 DeduplicationKey: $"{deduplicationKey}::video",
                 Category: "route-cinema/video",
                 Payload: routePayload,
-                Source: normalized.CampaignId,
+                Source: deduplicationKey,
                 CacheTtl: cacheTtl,
                 MaxBytes: 5_000_000,
                 RequiresApproval: true,
@@ -125,10 +121,8 @@ public sealed class RouteCinemaService : IRouteCinemaService
             var state = new RouteCinemaState
             {
                 RouteCinemaId = $"route_{Guid.NewGuid():N}",
-                CampaignId = normalized.CampaignId,
                 SourceNode = normalized.SourceNode,
                 TargetNode = normalized.TargetNode,
-                SceneContext = normalized.SceneContext,
                 Waypoints = waypoints,
                 WaypointScript = script,
                 TravelSummary = travelSummary,
@@ -159,13 +153,7 @@ public sealed class RouteCinemaService : IRouteCinemaService
 
     public IReadOnlyList<RouteCinemaResult> List(string campaignId)
     {
-        if (string.IsNullOrWhiteSpace(campaignId))
-        {
-            return Array.Empty<RouteCinemaResult>();
-        }
-
         return _routes.Values
-            .Where(state => string.Equals(state.CampaignId, campaignId.Trim(), StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(static state => state.CreatedAtUtc)
             .Select(BuildResult)
             .ToArray();
@@ -191,7 +179,7 @@ public sealed class RouteCinemaService : IRouteCinemaService
         var videoAsset = string.IsNullOrWhiteSpace(videoArtifact.AssetId) ? null : _assets.Resolve(videoArtifact.AssetId);
         var previewAsset = string.IsNullOrWhiteSpace(previewArtifact.AssetId) ? null : _assets.Resolve(previewArtifact.AssetId);
 
-        var approvalState = videoAsset?.ApprovalState ?? previewAsset?.ApprovalState ?? AssetApprovalState.Draft;
+        var approvalState = videoAsset?.ApprovalState ?? previewAsset?.ApprovalState ?? AssetApprovalState.Pending;
         var retentionState = videoAsset?.RetentionState ?? previewAsset?.RetentionState ?? AssetRetentionState.Expired;
         var expiresAtUtc = videoAsset?.ExpiresAtUtc ?? previewAsset?.ExpiresAtUtc ?? state.CreatedAtUtc + state.CacheTtl;
         var reviewState = ResolveReviewState(videoArtifact, videoAsset, previewAsset);
@@ -206,10 +194,8 @@ public sealed class RouteCinemaService : IRouteCinemaService
 
         return new RouteCinemaResult(
             RouteCinemaId: state.RouteCinemaId,
-            CampaignId: state.CampaignId,
             SourceNode: state.SourceNode,
             TargetNode: state.TargetNode,
-            SceneContext: state.SceneContext,
             Waypoints: state.Waypoints,
             WaypointScript: state.WaypointScript,
             TravelSummary: state.TravelSummary,
@@ -247,32 +233,20 @@ public sealed class RouteCinemaService : IRouteCinemaService
 
     private static RouteCinemaRequest Normalize(RouteCinemaRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.CampaignId))
-        {
-            throw new ArgumentException("CampaignId is required.", nameof(request));
-        }
-
         if (string.IsNullOrWhiteSpace(request.SourceNode) || string.IsNullOrWhiteSpace(request.TargetNode))
         {
             throw new ArgumentException("SourceNode and TargetNode are required.", nameof(request));
         }
 
-        if (string.IsNullOrWhiteSpace(request.SceneContext))
-        {
-            throw new ArgumentException("SceneContext is required.", nameof(request));
-        }
-
         return request with
         {
-            CampaignId = request.CampaignId.Trim(),
             SourceNode = request.SourceNode.Trim(),
-            TargetNode = request.TargetNode.Trim(),
-            SceneContext = request.SceneContext.Trim()
+            TargetNode = request.TargetNode.Trim()
         };
     }
 
     private static string BuildDeduplicationKey(RouteCinemaRequest request) =>
-        $"route-cinema::{request.CampaignId}::{request.SourceNode}::{request.TargetNode}::{request.SceneContext}";
+        $"route-cinema::{request.SourceNode}::{request.TargetNode}";
 
     private static List<string> BuildWaypoints(string source, string target)
     {
@@ -296,24 +270,21 @@ public sealed class RouteCinemaService : IRouteCinemaService
     private static List<string> BuildScript(RouteCinemaRequest request, IReadOnlyList<string> waypoints)
     {
         var points = waypoints.Select((point, index) => $"[SEGMENT {index + 1}] {point}").ToList();
-        points.Add($"Context cue: {request.SceneContext}");
         points.Add($"End at {request.TargetNode}");
         return points;
     }
 
     private static string BuildTravelSummary(RouteCinemaRequest request, IReadOnlyList<string> waypoints) =>
-        $"{request.SourceNode} to {request.TargetNode} under {request.SceneContext}; {waypoints.Count} travel beats queued for review.";
+        $"{request.SourceNode} to {request.TargetNode}; {waypoints.Count} travel beats queued for review.";
 
     private static string BuildProjectionFingerprint(RouteCinemaRequest request, IReadOnlyList<string> waypoints) =>
-        $"route-cinema::{request.CampaignId}::{request.SourceNode}::{request.TargetNode}::{waypoints.Count}";
+        $"route-cinema::{request.SourceNode}::{request.TargetNode}::{waypoints.Count}";
 
     private static string BuildPreviewPayload(RouteCinemaRequest request, IReadOnlyList<string> waypoints, string travelSummary) =>
         JsonSerializer.Serialize(new
         {
-            request.CampaignId,
             request.SourceNode,
             request.TargetNode,
-            request.SceneContext,
             Preview = new
             {
                 travelSummary,

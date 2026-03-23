@@ -73,6 +73,15 @@ public_routes:
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: proof shelf honesty only
+  - path: /progress
+    title: Progress report
+    audience: public
+    purpose: program_progress
+    requires_auth: false
+    guest_fallback: /progress
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: generated public progress report only
   - path: /participate
     title: Participate
     audience: public

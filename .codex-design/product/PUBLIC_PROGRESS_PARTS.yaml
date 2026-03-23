@@ -1,0 +1,201 @@
+as_of: 2026-03-23
+brand: Chummer6
+hero:
+  headline: Progress report for a product becoming a build machine.
+  support: >-
+    The project is moving from canon and architecture into scalable execution:
+    package-scoped boosters, credit-aware control, cleaner public entry surfaces,
+    and a clearer path toward parallel delivery.
+  ctas:
+    - label: See the program pulse
+      href: "#program"
+      kind: primary
+    - label: Read the timeline
+      href: "#timeline"
+      kind: secondary
+    - label: How the ETA works
+      href: "#method"
+      kind: secondary
+phase_labels:
+  - min_progress_percent: 0
+    label: Foundations
+  - min_progress_percent: 55
+    label: Scale & stabilize
+  - min_progress_percent: 85
+    label: Public-fit polish
+momentum_labels:
+  - min_score: 18
+    label: Very high
+  - min_score: 10
+    label: High
+  - min_score: 4
+    label: Steady
+  - min_score: 1.5
+    label: Moderate
+  - min_score: 0.25
+    label: Low
+  - min_score: 0
+    label: Quiet
+eta_formula:
+  remaining_weight_unit: 4.0
+  scope_multiplier_divisor: 8.0
+  activity_divisor: 18.0
+  min_velocity: 0.6
+  max_velocity: 1.8
+  low_multiplier: 0.8
+  high_multiplier: 1.35
+  min_low_weeks: 1
+  max_high_weeks: 16
+method:
+  progress_formula_version: public_progress_v1
+  eta_formula_version: momentum_proxy_v1
+  copy: >-
+    Progress is a weighted estimate built from the current milestone map, grouped
+    into public-facing product parts instead of repo names. The ETA is a
+    momentum-based planning band, not a promise: it uses remaining milestone
+    weight, recent repo activity, and uncovered scope breadth as a public proxy
+    until weekly historical snapshots are published.
+  limitations:
+    - ETA is a momentum-based planning band, not a delivery promise.
+    - The current repo state does not yet expose a durable public weekly progress history, so recent momentum is used as a proxy.
+recent_movement:
+  - Mission Control got a harder backbone.
+  - The AI runtime got better at seeing real capacity.
+  - The public entry story became clearer.
+  - Workbench scope got easier to see.
+  - Core is moving from split-state cleanup toward hardening.
+  - Cloud and publishing are now the clearest long pole.
+recent_movement_copy:
+  Mission Control got a harder backbone.: Fleet shifted further toward package-scoped execution, stronger scope/capacity contracts, and a quartermaster that can reason about credits, work depth, review pressure, and drift instead of relying on ad hoc burst logic.
+  The AI runtime got better at seeing real capacity.: The EA lane now exposes actual OneMinute credit posture and has been hardened around lease-aware routing, provider selection, occupancy, and review/audit scoping.
+  The public entry story became clearer.: Design, Fleet, Hub, Registry, Media, and Mobile all refreshed public landing, auth, guide, and participation canon, reducing the chance that the public surface drifts away from the design source of truth.
+  Workbench scope got easier to see.: The remaining desktop/browser UX work has been sliced into concrete milestone- and backlog-shaped queues instead of sitting as fuzzy later work.
+  Core is moving from split-state cleanup toward hardening.: The current core wave is no longer about who owns what; it is about observability, disaster recovery, replay safety, retention, and finishing the last legacy purification passes.
+  Cloud and publishing are now the clearest long pole.: The hosted stack is visibly moving, especially around public entry and email identity, but it still carries the largest remaining completion wave because registry depth, media execution, adapters, and broader hub product surfaces remain open.
+closing:
+  headline: The project no longer looks like a concept sketch.
+  body: The most interesting change is not a single feature. It is that architecture, execution, public entry, and product canon are starting to reinforce each other. That is the point where a serious internal system turns into something people can eventually use, trust, and follow.
+participation:
+  headline: How to participate
+  body: Lower sustained booster count directly slows visible progress. If you want the delivery curve to steepen, the next leverage point is more bounded participation through the public booster flow.
+  cta_label: Open the participation page
+parts:
+  - id: mission-control
+    public_name: Mission Control & AI Runtime
+    short_public_name: Mission Control
+    mapped_projects:
+      - fleet
+      - ea
+    summary: Control plane, AI runtime, queue leasing, credit-aware scaling, and parallel booster orchestration.
+    momentum_label_override: Very high
+    eta_weeks_low_override: 2
+    eta_weeks_high_override: 4
+    milestones:
+      - phase: landed
+        title: Package-scoped execution
+        body: Package-scoped booster execution, credit authority routing, lease telemetry, and quartermaster enforcement.
+      - phase: now
+        title: Convergence wave
+        body: Participation surfaces converge; package/bootstrap flow becomes boring; downstream status plane stays canonical.
+      - phase: target
+        title: Public-ready control plane
+        body: Stable large-scale booster operation with public-ready progress reporting.
+  - id: core-engine
+    public_name: Core Rules Engine
+    short_public_name: Core Engine
+    mapped_projects:
+      - core
+    summary: Deterministic mechanics, reducer truth, and compatibility-safe runtime hardening.
+    momentum_label_override: High
+    eta_weeks_low_override: 3
+    eta_weeks_high_override: 5
+    milestones:
+      - phase: landed
+        title: Hardening wave
+        body: Legacy purification, retention controls, observability slices, and stronger verifier guardrails moved forward.
+      - phase: now
+        title: F1 closure
+        body: Finish observability, disaster recovery, and replay-safety proof.
+      - phase: target
+        title: Auditable boring runtime
+        body: A boring, auditable core runtime with no hidden legacy cargo.
+  - id: workbench-ui
+    public_name: Workbench & Shared UI
+    short_public_name: Workbench
+    mapped_projects:
+      - ui
+      - ui-kit
+    summary: Character building, inspectors, dense data UX, and the reusable Chummer design system.
+    momentum_label_override: High
+    eta_weeks_low_override: 8
+    eta_weeks_high_override: 12
+    milestones:
+      - phase: landed
+        title: Scope clarified
+        body: Remaining work was sliced into concrete queues for relationship graph, heat/favor, calendar, inspector, hub UX, portrait, and NPC persona.
+      - phase: now
+        title: Workbench complete
+        body: Close workbench-complete and quality-hardening waves; centralize reusable UI primitives.
+      - phase: target
+        title: Polished workbench
+        body: Complete desktop/browser workbench with accessibility, localization, and polished shared components.
+  - id: live-play
+    public_name: Live Play
+    short_public_name: Live Play
+    mapped_projects:
+      - mobile
+    summary: Player and GM shell, local-first sync, browser session transport, and offline-resume play surfaces.
+    momentum_label_override: Steady
+    eta_weeks_low_override: 4
+    eta_weeks_high_override: 6
+    milestones:
+      - phase: landed
+        title: Play-shell hardening
+        body: Play-shell hardening and browser transport/offline resume work was republished as runnable backlog.
+      - phase: now
+        title: E1 closure
+        body: Drive the final Play complete milestone across live-session depth and installable hardening.
+      - phase: target
+        title: Reliable session shell
+        body: A reliable session shell that survives weak networks and resumes cleanly.
+  - id: community-cloud
+    public_name: Community Cloud & Publishing
+    short_public_name: Cloud & Publishing
+    mapped_projects:
+      - hub
+      - hub-registry
+      - media-factory
+    summary: Accounts, groups, sponsorship, public entry, publishing, registry, and media execution services.
+    momentum_label_override: Moderate
+    eta_weeks_low_override: 10
+    eta_weeks_high_override: 14
+    milestones:
+      - phase: landed
+        title: Public entry wave
+        body: Public landing shell, email auth delivery, sponsor tiers/account linking, and canon refreshes across registry/media moved forward.
+      - phase: now
+        title: Completion wave
+        body: Finish adapter waves, hub-complete surfaces, docs/operator projection, assistant plane, and media-plane completion.
+      - phase: target
+        title: Public participation stack
+        body: A cohesive hosted community and publication stack ready for real public participation.
+  - id: canon-guide
+    public_name: Canon & Public Guide
+    short_public_name: Canon & Guide
+    mapped_projects:
+      - design
+      - guide
+    summary: Product canon, horizons, participation workflow, public landing rules, and the public-facing guide bundle.
+    momentum_label_override: High
+    eta_weeks_low_override: 2
+    eta_weeks_high_override: 4
+    milestones:
+      - phase: landed
+        title: Canon tightened
+        body: Public landing/auth/download canon, participation workflow, sponsorship backlog, and release-governance wave were tightened.
+      - phase: now
+        title: Validator convergence
+        body: Finish release-completion proof and stronger validator-backed convergence across downstream consumers.
+      - phase: target
+        title: One public story
+        body: One authoritative public story, compiled cleanly into every downstream surface.

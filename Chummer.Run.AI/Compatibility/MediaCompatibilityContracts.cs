@@ -18,7 +18,7 @@ internal sealed record PortraitVariant(
     string? AssetId,
     string PromptLineage,
     string? StyleToken = null,
-    AssetApprovalState ApprovalState = AssetApprovalState.Draft,
+    AssetApprovalState ApprovalState = AssetApprovalState.Pending,
     AssetRetentionState RetentionState = AssetRetentionState.ApprovalPending,
     bool IsCanonical = false);
 
@@ -66,7 +66,7 @@ internal enum AssetStorageClass
 [Obsolete("Use Chummer.Media.Contracts.AssetApprovalState.")]
 internal enum AssetApprovalState
 {
-    Draft,
+    Pending,
     Approved,
     Rejected
 }
@@ -104,7 +104,7 @@ internal sealed record AssetCatalogItem(
     DateTimeOffset? ExpiresAtUtc,
     string? StorageKey = null,
     AssetStorageClass StorageClass = AssetStorageClass.ObjectStorage,
-    AssetApprovalState ApprovalState = AssetApprovalState.Draft,
+    AssetApprovalState ApprovalState = AssetApprovalState.Pending,
     AssetRetentionState RetentionState = AssetRetentionState.CacheOnly,
     bool IsPinned = false,
     int CacheHitCount = 0,
@@ -116,7 +116,7 @@ internal sealed record AssetRenderResult(
     string AssetId,
     string Url,
     AssetLifecyclePolicy? Policy = null,
-    AssetApprovalState ApprovalState = AssetApprovalState.Draft,
+    AssetApprovalState ApprovalState = AssetApprovalState.Pending,
     AssetRetentionState RetentionState = AssetRetentionState.CacheOnly,
     string? StorageKey = null,
     AssetStorageClass StorageClass = AssetStorageClass.ObjectStorage,
@@ -187,7 +187,6 @@ internal sealed record MediaRenderJobStatus(
 internal sealed record PacketFactoryRequest(
     string Title,
     string Subject,
-    string? SceneId = null,
     IReadOnlyList<string>? References = null,
     IReadOnlyList<PacketAttachmentRequest>? Attachments = null);
 
@@ -202,7 +201,7 @@ internal enum PacketArtifactRole
 [Obsolete("Use Chummer.Media.Contracts.PacketAttachmentTargetKind.")]
 internal enum PacketAttachmentTargetKind
 {
-    Campaign,
+    Route,
     Message,
     Export
 }
@@ -251,10 +250,8 @@ internal sealed record PacketFactoryResult(
 
 [Obsolete("Use Chummer.Media.Contracts.RouteCinemaRequest.")]
 internal sealed record RouteCinemaRequest(
-    string CampaignId,
     string SourceNode,
-    string TargetNode,
-    string SceneContext);
+    string TargetNode);
 
 [Obsolete("Use Chummer.Media.Contracts.RouteCinemaArtifactRole.")]
 internal enum RouteCinemaArtifactRole
@@ -275,10 +272,8 @@ internal sealed record RouteCinemaArtifactHandle(
 [Obsolete("Use Chummer.Media.Contracts.RouteCinemaResult.")]
 internal sealed record RouteCinemaResult(
     string RouteCinemaId,
-    string CampaignId,
     string SourceNode,
     string TargetNode,
-    string SceneContext,
     IReadOnlyList<string> Waypoints,
     IReadOnlyList<string> WaypointScript,
     string TravelSummary,

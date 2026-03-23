@@ -38,6 +38,7 @@ The landing surface must let a normal person understand, in one visit:
 
 * homepage / product front door
 * public proof shelf
+* public progress report
 * current-state summary
 * coming-next summary
 * participate entry route
@@ -61,6 +62,7 @@ Public visitors may access:
 * `/now`
 * `/horizons`
 * `/downloads`
+* `/progress`
 * `/participate`
 * `/status`
 * `/artifacts`

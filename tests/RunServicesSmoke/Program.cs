@@ -778,10 +778,12 @@ async Task VerifyPublicLandingProjectionAsync()
         .Build();
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
     var landing = new PublicLandingService(configuration, loggerFactory.CreateLogger<PublicLandingService>());
+    var progress = new PublicProgressService(configuration, loggerFactory.CreateLogger<PublicProgressService>());
     var releases = new PublicReleaseManifestService(configuration);
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
+    Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/progress", StringComparison.Ordinal)), "landing surface should expose the progress report route");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/participate", StringComparison.Ordinal)), "landing surface should expose the participate entry route");
     Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/login", StringComparison.Ordinal)), "landing surface should expose the login route");
     Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/signup", StringComparison.Ordinal)), "landing surface should expose the signup route");
@@ -799,6 +801,13 @@ async Task VerifyPublicLandingProjectionAsync()
     var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
         JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized))), configuration);
     var controller = new PublicLandingController(landing, releases, accounts, identityClient)
+    {
+        ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        }
+    };
+    var progressController = new PublicProgressController(progress)
     {
         ControllerContext = new ControllerContext
         {
@@ -824,6 +833,21 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(downloadsHtml.Contains("smoke-poc-linux-x64", StringComparison.Ordinal), "downloads page should render artifacts from the live release manifest");
     Assert(downloadsHtml.Contains("/downloads/files/smoke-poc-linux-x64.zip", StringComparison.Ordinal), "downloads page should link directly to manifest-backed downloads");
     Assert(downloadsHtml.Contains("0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
+
+    var progressHtml = progressController.ProgressPage().Content ?? string.Empty;
+    Assert(progressHtml.Contains("Mission Control &amp; AI Runtime", StringComparison.Ordinal), "progress page should render the generated product-part report");
+    Assert(progressHtml.Contains("/api/public/progress-poster.svg", StringComparison.Ordinal), "progress page should render against the hosted poster route");
+    Assert(progressHtml.Contains("How to participate", StringComparison.Ordinal), "progress page should expose the participation section");
+
+    var progressJson = progressController.ProgressReport().Content ?? string.Empty;
+    using (var progressDocument = JsonDocument.Parse(progressJson))
+    {
+        Assert(progressDocument.RootElement.GetProperty("overall_progress_percent").GetInt32() > 0, "progress report JSON should expose weighted progress");
+        Assert(progressDocument.RootElement.GetProperty("parts").GetArrayLength() >= 1, "progress report JSON should expose public product parts");
+    }
+
+    var progressPoster = progressController.ProgressPoster().Content ?? string.Empty;
+    Assert(progressPoster.Contains("<svg", StringComparison.OrdinalIgnoreCase), "progress poster endpoint should serve SVG content");
 
     var artifactsHtml = controller.ArtifactsPage().Content ?? string.Empty;
     Assert(artifactsHtml.Contains("Runsite pack", StringComparison.Ordinal) && artifactsHtml.Contains("/horizons#horizon-runsite", StringComparison.Ordinal), "artifacts shelf should point teaser cards at deliberate related detail pages");
@@ -1990,10 +2014,8 @@ async Task VerifyCreativeWorkflowAsync()
     });
 
     var route = await routeCinema.GenerateAsync(new RouteCinemaRequest(
-        CampaignId: "cmp_demo",
         SourceNode: "Tacoma Docks",
-        TargetNode: "Auburn Safehouse",
-        SceneContext: "stealth extraction"));
+        TargetNode: "Auburn Safehouse"));
     Assert(!string.IsNullOrWhiteSpace(route.RouteVideoJobId), "route cinema should enqueue a render job");
     Assert(!string.IsNullOrWhiteSpace(route.PreviewJobId), "route cinema should enqueue a review preview job");
     Assert(!string.IsNullOrWhiteSpace(route.RouteCinemaId), "route cinema should project a stable orchestration id");
@@ -2001,10 +2023,8 @@ async Task VerifyCreativeWorkflowAsync()
     Assert(route.ReviewState == "draft", "route cinema should begin in draft review state");
 
     var routeAgain = await routeCinema.GenerateAsync(new RouteCinemaRequest(
-        CampaignId: "cmp_demo",
         SourceNode: "Tacoma Docks",
-        TargetNode: "Auburn Safehouse",
-        SceneContext: "stealth extraction"));
+        TargetNode: "Auburn Safehouse"));
     Assert(route.RouteVideoJobId == routeAgain.RouteVideoJobId, "route cinema should deduplicate identical render jobs");
     Assert(route.PreviewJobId == routeAgain.PreviewJobId, "route cinema should deduplicate identical preview jobs");
     Assert(route.RouteCinemaId == routeAgain.RouteCinemaId, "route cinema should deduplicate identical orchestration records");
@@ -2046,7 +2066,7 @@ async Task VerifyCreativeWorkflowAsync()
     Assert(!string.IsNullOrWhiteSpace(briefing.NewsBriefId), "news briefs should project a persistent brief id");
     Assert(briefing.Facts.Count >= 3, "news briefs should ground recap output on multiple facts");
     Assert(!string.IsNullOrWhiteSpace(briefing.RecapAssetId), "news briefs should store a reviewable recap asset");
-    Assert(briefing.ApprovalState == AssetApprovalState.Draft, "news recap assets should begin in draft approval state");
+    Assert(briefing.ApprovalState == AssetApprovalState.Pending, "news recap assets should begin pending approval");
     Assert(!string.IsNullOrWhiteSpace(briefing.VideoJobId), "news briefs should enqueue a render job when video is enabled");
 
     var pendingNewsDelivery = await news.DeliverAsync(
@@ -2072,11 +2092,10 @@ async Task VerifyCreativeWorkflowAsync()
     var packet = await packets.CreateAsync(new PacketFactoryRequest(
         Title: "Johnson Briefing Packet",
         Subject: "Recover the stolen commlink before dawn.",
-        SceneId: "scene_01",
         References: new[] { "npc_johnson", "cargo_manifest_a12" },
         Attachments: new[]
         {
-            new PacketAttachmentRequest(PacketAttachmentTargetKind.Campaign, "cmp_demo", "Campaign briefcase"),
+            new PacketAttachmentRequest(PacketAttachmentTargetKind.Route, "cmp_demo", "Campaign briefcase"),
             new PacketAttachmentRequest(PacketAttachmentTargetKind.Message, "msg_0042", "Johnson ping")
         }));
     var packetArtifacts = NotNull(packet.Artifacts, "packet factory should return artifact projections");
@@ -2166,7 +2185,7 @@ async Task VerifyCreativeWorkflowAsync()
         new PacketAttachmentBatchRequest(new[]
         {
             new PacketAttachmentRequest(PacketAttachmentTargetKind.Export, "export_bundle_01", "GM export"),
-            new PacketAttachmentRequest(PacketAttachmentTargetKind.Campaign, "cmp_demo", "duplicate ignored")
+            new PacketAttachmentRequest(PacketAttachmentTargetKind.Route, "cmp_demo", "duplicate ignored")
         }));
     Assert(exportAttachments.Count == 3, "packet attachments should deduplicate repeated targets while allowing later export attachment");
 
@@ -2198,13 +2217,13 @@ async Task VerifyCreativeWorkflowAsync()
     var resolvedRouteAsset = NotNull(routeAsset, "route cinema asset should resolve before TTL expiry");
     var resolvedNewsRecapAsset = NotNull(newsRecapAsset, "news recap asset should resolve before approval");
     var resolvedNpcAsset = NotNull(npcAsset, "npc video asset should resolve before TTL expiry");
-    Assert(resolvedRoutePreviewAsset.ApprovalState == AssetApprovalState.Draft, "route cinema preview assets should begin as drafts before approval");
+    Assert(resolvedRoutePreviewAsset.ApprovalState == AssetApprovalState.Pending, "route cinema preview assets should begin pending approval");
     Assert(resolvedRouteAsset.StorageKey?.StartsWith("r2://creative-assets/active/", StringComparison.Ordinal) == true, "heavy assets should project object-storage keys instead of app-server blobs");
-    Assert(resolvedRouteAsset.ApprovalState == AssetApprovalState.Draft, "generated heavy assets should begin as drafts before approval");
+    Assert(resolvedRouteAsset.ApprovalState == AssetApprovalState.Pending, "generated heavy assets should begin pending approval");
     Assert(resolvedRouteAsset.RetentionState == AssetRetentionState.ApprovalPending, "generated heavy assets should remain evictable until approved");
-    Assert(resolvedNpcAsset.ApprovalState == AssetApprovalState.Draft, "npc message videos should begin in draft approval state");
+    Assert(resolvedNpcAsset.ApprovalState == AssetApprovalState.Pending, "npc message videos should begin pending approval");
     Assert(resolvedNpcAsset.RetentionState == AssetRetentionState.ApprovalPending, "npc message videos should remain disposable until approved");
-    Assert(resolvedNewsRecapAsset.ApprovalState == AssetApprovalState.Draft, "news recap packages should require approval before delivery");
+    Assert(resolvedNewsRecapAsset.ApprovalState == AssetApprovalState.Pending, "news recap packages should require approval before delivery");
     Assert(resolvedNewsRecapAsset.RetentionState == AssetRetentionState.ApprovalPending, "news recap packages should remain pending until approved");
 
     var approvedNpc = await assets.ApplyLifecycleAsync(
