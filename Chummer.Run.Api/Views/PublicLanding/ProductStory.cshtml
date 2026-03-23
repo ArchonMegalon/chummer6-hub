@@ -1,0 +1,61 @@
+@model StoryPageViewModel
+@{
+    ViewData["Title"] = "What Is Chummer?";
+    ViewData["Chrome"] = Model.Chrome;
+    var leadAsset = Model.Assets.BySlot("scene_archive_stair");
+}
+
+<section class="story-band">
+    <div class="page-lead">
+        <p class="eyebrow">What is Chummer</p>
+        <h1 class="page-title">A Shadowrun product front door with evidence attached.</h1>
+        <p class="page-copy">Chummer makes deterministic rules truth, explainable receipts, local-first continuity, and future artifact lanes feel like one coherent product instead of a pile of unrelated utilities.</p>
+    </div>
+    @if (leadAsset is not null)
+    {
+        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", leadAsset)
+    }
+</section>
+
+<section class="section-band">
+    <div class="section-band__header">
+        <p class="eyebrow">Trust pillars</p>
+        <h2 class="section-title">What the product keeps promising on purpose</h2>
+    </div>
+    <div class="trust-grid">
+        @foreach (var card in Model.TrustPillars)
+        {
+            <article class="link-block">
+                <span class="tag">@card.Badge</span>
+                <h3>@card.Title</h3>
+                <p>@card.Summary</p>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-band__header">
+        <p class="eyebrow">Lane explainer</p>
+        <h2 class="section-title">Built for different table roles without splitting the product story</h2>
+    </div>
+    <div class="link-grid">
+        @foreach (var card in Model.Lanes)
+        {
+            <article class="lane-block">
+                <h3>@card.Title</h3>
+                <p>@card.Summary</p>
+                <a class="inline-link" href="@card.Href">See more</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section id="public-guide" class="section-band">
+    <div class="section-band__header">
+        <p class="eyebrow">Deeper guide</p>
+        <h2 class="section-title">Longer reading stays secondary</h2>
+        <p class="section-copy">The deeper guide still exists, but it should feel like an extension of the product story rather than the real front door hiding off-site.</p>
+    </div>
+    <a class="cta-link cta-link--secondary" href="https://github.com/ArchonMegalon/Chummer6">Open the deeper guide fallback</a>
+</section>

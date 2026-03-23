@@ -11,11 +11,22 @@ public sealed class AccountLinksController : ControllerBase
 {
     private readonly IdentityLinkService _links;
     private readonly HubIdentityClient _identity;
+    private readonly AccountService _accounts;
+    private readonly HubBrowserAuthService _browserAuth;
+    private readonly HubEmailLinkVerificationService _emailLinks;
 
-    public AccountLinksController(IdentityLinkService links, HubIdentityClient identity)
+    public AccountLinksController(
+        IdentityLinkService links,
+        HubIdentityClient identity,
+        AccountService accounts,
+        HubBrowserAuthService browserAuth,
+        HubEmailLinkVerificationService emailLinks)
     {
         _links = links;
         _identity = identity;
+        _accounts = accounts;
+        _browserAuth = browserAuth;
+        _emailLinks = emailLinks;
     }
 
     [HttpGet("links")]
@@ -55,17 +66,62 @@ public sealed class AccountLinksController : ControllerBase
 
     [HttpPost("links/confirm")]
     [ProducesResponseType<LinkedIdentityDto>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<LinkedIdentityDto>> ConfirmLink([FromBody] ConfirmIdentityLinkRequest? request, CancellationToken cancellationToken)
+    public ActionResult<LinkedIdentityDto> ConfirmLink([FromBody] ConfirmIdentityLinkRequest? request)
+    {
+        return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "Identity links are confirmed through provider callbacks or email verification, not this API.");
+    }
+
+    [HttpPost("links/email/start")]
+    [ProducesResponseType<RecoveryEmailLinkStartResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<RecoveryEmailLinkStartResponse>> StartRecoveryEmailLink([FromBody] StartRecoveryEmailLinkRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
         {
-            return BadRequest("identity confirmation payload is required.");
+            return BadRequest("recovery email payload is required.");
         }
 
         try
         {
             var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
-            return Ok(_links.ConfirmIdentityLink(request with { SubjectId = subject.SubjectId }));
+            var currentUser = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            var existingEmailLink = _links.FindLinkedIdentity("email", normalizedEmail);
+            if (existingEmailLink is not null
+                && !string.Equals(existingEmailLink.UserId, currentUser.UserId, StringComparison.OrdinalIgnoreCase))
+            {
+                return Conflict(new ProblemDetails
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Title = "Recovery email already linked",
+                    Detail = "That email address is already linked to a different Chummer account."
+                });
+            }
+
+            var nextPath = HubBrowserAuthService.SanitizeNextPath(request.NextPath, "/account");
+            var link = _links.LinkEmail(new LinkEmailIdentityRequest(subject.SubjectId, normalizedEmail, MakePrimary: false));
+            var verificationToken = _emailLinks.CreateVerificationToken(subject.SubjectId, normalizedEmail, nextPath);
+            var verificationNextPath = _emailLinks.BuildVerificationCallbackPath(verificationToken);
+            var started = await _browserAuth.StartEmailEntryAsync(normalizedEmail, currentUser.DisplayName, verificationNextPath, cancellationToken);
+            var previewHref = string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
+                ? $"/auth/email/callback?ticket={Uri.EscapeDataString(started.TicketId)}&next={Uri.EscapeDataString(verificationNextPath)}"
+                : null;
+
+            return Ok(new RecoveryEmailLinkStartResponse(
+                Email: normalizedEmail,
+                LinkStatus: link.Status,
+                DeliveryMode: started.DeliveryMode,
+                PreviewNote: started.PreviewNote,
+                PreviewHref: previewHref,
+                ExpiresAtUtc: started.ExpiresAtUtc));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Recovery email could not be linked",
+                Detail = ex.Message
+            });
         }
         catch (HubRequestAuthException ex)
         {
@@ -86,6 +142,15 @@ public sealed class AccountLinksController : ControllerBase
         {
             var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
             return Ok(_links.LinkExternalIdentity(request with { SubjectId = subject.SubjectId }));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "External identity already linked",
+                Detail = ex.Message
+            });
         }
         catch (ArgumentException ex)
         {

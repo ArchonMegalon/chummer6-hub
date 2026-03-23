@@ -13,8 +13,8 @@ hero_ctas:
   - label: Get the POC
     href: /downloads
     emphasis: primary
-  - label: Sign in to follow what is coming
-    href: /login?next=/home
+  - label: Create account
+    href: /signup?next=/home
     emphasis: secondary
 guest_shell_actions:
   - label: Sign in
@@ -162,8 +162,8 @@ auth_routes:
     requires_auth: false
     guest_fallback: /login
     must_exist: true
-    placeholder_allowed: true
-    placeholder_requirements: explain provider is not live until credentials exist
+    placeholder_allowed: false
+    placeholder_requirements: Google OIDC start route
   - path: /auth/google/callback
     title: Complete Google sign-in
     audience: public
@@ -171,8 +171,8 @@ auth_routes:
     requires_auth: false
     guest_fallback: /login
     must_exist: true
-    placeholder_allowed: true
-    placeholder_requirements: explain provider is not live until credentials exist
+    placeholder_allowed: false
+    placeholder_requirements: Google OIDC callback route
 registered_routes:
   - path: /home
     title: Home
@@ -197,16 +197,20 @@ sections:
     title: Shadowrun rules truth, with receipts.
     audience: public
     route: /
-  - id: what_you_can_do_today
-    title: What you can do today
+  - id: start_here
+    title: Start here
     audience: public
     route: /
-  - id: why_this_feels_different
-    title: Why this feels different
+  - id: why_trust_it
+    title: Why trust it
     audience: public
     route: /
   - id: choose_your_lane
     title: Choose your lane
+    audience: public
+    route: /
+  - id: closing_cta
+    title: Follow what opens next
     audience: public
     route: /
   - id: whats_real_now

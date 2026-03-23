@@ -1,0 +1,172 @@
+@model AccountPageViewModel
+@{
+    ViewData["Title"] = "Account";
+    ViewData["Chrome"] = Model.Chrome;
+    var emailLink = Model.Links.LinkedIdentities.FirstOrDefault(link => string.Equals(link.Provider, "email", StringComparison.OrdinalIgnoreCase));
+    var googleLink = Model.Links.LinkedIdentities.FirstOrDefault(link => string.Equals(link.Provider, "google", StringComparison.OrdinalIgnoreCase));
+    var telegramChannel = Model.Links.ChannelLinks.FirstOrDefault(link => string.Equals(link.ChannelKind, "telegram_official_bot", StringComparison.OrdinalIgnoreCase));
+    var laneInterests = Model.Experience.LaneInterests.ToHashSet(StringComparer.OrdinalIgnoreCase);
+}
+
+<section class="settings-surface">
+    <div class="page-lead">
+        <p class="eyebrow">Account</p>
+        <h1 class="settings-title">Settings, not system plumbing</h1>
+        <p class="page-copy">Primary sign-in, recovery posture, linked channels, privacy, and participation preferences all live here.</p>
+    </div>
+
+    <div class="settings-grid">
+        <section class="settings-block">
+            <h2>Profile</h2>
+            <form id="profileForm" class="settings-form">
+                <div class="field">
+                    <label for="displayName">Display name</label>
+                    <input id="displayName" value="@Model.User.DisplayName" />
+                </div>
+                <div class="field">
+                    <label for="handle">Handle</label>
+                    <input id="handle" value="@Model.User.Handle" />
+                </div>
+                <div class="field">
+                    <label for="timezone">Timezone</label>
+                    <input id="timezone" value="@Model.User.Timezone" />
+                </div>
+                <button class="button-like button-like--primary" type="submit">Save profile</button>
+            </form>
+        </section>
+
+        <section class="settings-block">
+            <h2>Sign-in methods</h2>
+            <p><strong>Primary sign-in:</strong> @Model.Links.RecommendedPrimaryAuth</p>
+            <p><strong>Google:</strong> @(googleLink is null ? (Model.GoogleAvailable ? "not linked" : "unavailable on this host") : $"connected ({googleLink.Status})")</p>
+            <p><strong>Email:</strong> @(emailLink is null ? "not linked" : $"{emailLink.DisplayLabel} ({emailLink.Status})")</p>
+            @if (Model.GoogleAvailable)
+            {
+                <a class="button-like button-like--secondary" href="/auth/google/link?next=/account">@(googleLink is null ? "Link Google" : "Refresh Google link")</a>
+            }
+        </section>
+
+        <section class="settings-block">
+            <h2>Recovery</h2>
+            <p><strong>Recovery email:</strong> <span id="recoveryEmailStatus">@(emailLink is null ? "missing" : emailLink.Status)</span></p>
+            <form id="recoveryForm" class="settings-form">
+                <div class="field">
+                    <label for="recoveryEmail">Add recovery email</label>
+                    <input id="recoveryEmail" type="email" placeholder="runner@example.com" />
+                </div>
+                <button class="button-like button-like--secondary" type="submit">Save recovery email</button>
+                <p id="recoveryStatusNotice" class="muted-copy" hidden></p>
+            </form>
+        </section>
+
+        <section class="settings-block">
+            <h2>Linked channels</h2>
+            <p><strong>Telegram companion:</strong> @(telegramChannel is null ? "not connected" : $"{telegramChannel.DisplayLabel} ({telegramChannel.Status})")</p>
+            <form id="telegramForm" class="settings-form">
+                <div class="field">
+                    <label for="telegramHandle">Official Telegram companion</label>
+                    <input id="telegramHandle" placeholder="@@hubbrain" value="@(telegramChannel?.DisplayLabel ?? string.Empty)" />
+                </div>
+                <button class="button-like button-like--secondary" type="submit">Connect Telegram</button>
+            </form>
+        </section>
+
+        <section class="settings-block">
+            <h2>Privacy and visibility</h2>
+            <p><strong>Visibility:</strong> @Model.User.Visibility</p>
+            <p><strong>Recovery posture:</strong> @Model.Links.RecoveryPosture</p>
+            <p>Raw provider subject ids stay hidden unless you open diagnostics.</p>
+        </section>
+
+        <section class="settings-block">
+            <h2>Participation settings</h2>
+            <form id="experienceForm" class="settings-form">
+                <div class="check-grid">
+                    <label class="check-row"><input type="checkbox" value="player" @(laneInterests.Contains("player") ? "checked" : null) /> <span>Player lane</span></label>
+                    <label class="check-row"><input type="checkbox" value="gm" @(laneInterests.Contains("gm") ? "checked" : null) /> <span>GM lane</span></label>
+                    <label class="check-row"><input type="checkbox" value="creator" @(laneInterests.Contains("creator") ? "checked" : null) /> <span>Creator lane</span></label>
+                    <label class="check-row"><input id="followHorizons" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow horizons</span></label>
+                    <label class="check-row"><input id="betaInterest" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Raise beta interest</span></label>
+                </div>
+                <button class="button-like button-like--primary" type="submit">Save participation settings</button>
+            </form>
+        </section>
+    </div>
+
+    <details class="details-drawer">
+        <summary>Advanced diagnostics</summary>
+        <pre class="data-box mono-receipt">@System.Text.Json.JsonSerializer.Serialize(Model.Links, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+    </details>
+</section>
+
+@section Scripts {
+<script>
+(() => {
+  const jsonHeaders = { "Content-Type": "application/json" };
+  const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
+
+  const call = async (url, body) => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify(body)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
+    return data;
+  };
+
+  document.getElementById("profileForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await call("/api/v1/accounts/me/profile", {
+      subjectId,
+      displayName: document.getElementById("displayName").value,
+      handle: document.getElementById("handle").value,
+      timezone: document.getElementById("timezone").value,
+      visibility: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.Visibility))
+    });
+    window.location.reload();
+  });
+
+  document.getElementById("recoveryForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = await call("/api/v1/accounts/me/links/email/start", {
+      subjectId,
+      email: document.getElementById("recoveryEmail").value,
+      nextPath: "/account"
+    });
+    const notice = document.getElementById("recoveryStatusNotice");
+    document.getElementById("recoveryEmailStatus").textContent = data.linkStatus || "pending_verification";
+    notice.hidden = false;
+    notice.textContent = data.previewNote || "Check your email to finish verifying the recovery address.";
+    if (data.previewHref) {
+      window.location.href = data.previewHref;
+    }
+  });
+
+  document.getElementById("telegramForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await call("/api/v1/accounts/me/channels", {
+      subjectId,
+      channelKind: "telegram_official_bot",
+      channelHandle: document.getElementById("telegramHandle").value,
+      notificationsEnabled: true
+    });
+    window.location.reload();
+  });
+
+  document.getElementById("experienceForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const laneInterests = Array.from(document.querySelectorAll("#experienceForm input[type='checkbox'][value]:checked")).map((input) => input.value);
+    await call("/api/v1/accounts/me/preferences", {
+      subjectId,
+      laneInterests,
+      followHorizons: document.getElementById("followHorizons").checked,
+      betaInterest: document.getElementById("betaInterest").checked,
+      onboardingCompleted: true
+    });
+    window.location.reload();
+  });
+})();
+</script>
+}

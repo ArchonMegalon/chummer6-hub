@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using Chummer.Run.Contracts.Identity;
 using Microsoft.AspNetCore.Http;
@@ -6,6 +7,8 @@ namespace Chummer.Run.Api.Services;
 
 public sealed record AuthenticatedHubSubject(
     string SubjectId,
+    string? DisplayName,
+    string? Email,
     IReadOnlyList<string> Roles,
     string AccessToken);
 
@@ -43,8 +46,11 @@ public sealed class HubIdentityClient
             throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "active identity session required.");
         }
 
+        var profile = await TryGetSubjectAsync(introspection.SubjectId!, cancellationToken);
         return new AuthenticatedHubSubject(
             introspection.SubjectId!,
+            profile?.DisplayName,
+            profile?.Email,
             introspection.Roles ?? Array.Empty<string>(),
             accessToken);
     }
@@ -77,6 +83,19 @@ public sealed class HubIdentityClient
 
         var payload = await response.Content.ReadFromJsonAsync<IdentityIntrospectionResponse>(cancellationToken: cancellationToken);
         return payload ?? new IdentityIntrospectionResponse(false, null, null, null, null);
+    }
+
+    private async Task<IdentitySubjectResponse?> TryGetSubjectAsync(string subjectId, CancellationToken cancellationToken)
+    {
+        using var response = await _httpClient.GetAsync(
+            $"{BaseUrl}/api/v1/identity/subjects/{Uri.EscapeDataString(subjectId)}",
+            cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound || !response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<IdentitySubjectResponse>(cancellationToken: cancellationToken);
     }
 
     private static string ExtractBearerToken(HttpRequest request)

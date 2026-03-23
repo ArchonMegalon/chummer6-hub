@@ -1,0 +1,232 @@
+@model HomePageViewModel
+@{
+    ViewData["Title"] = "Home";
+    ViewData["Chrome"] = Model.Chrome;
+    var showOnboarding = !Model.Experience.OnboardingCompleted;
+    var googlePrimary = string.Equals(Model.Links.RecommendedPrimaryAuth, "google", StringComparison.OrdinalIgnoreCase);
+}
+
+<section class="section-band">
+    <div class="page-lead">
+        <p class="eyebrow">Signed-in home</p>
+        <h1 class="page-title">Welcome back, @Model.User.DisplayName</h1>
+        <p class="page-copy">This is the next-action shell: account polish, follows, participation, and a compact read on what is opening next.</p>
+    </div>
+    <div class="compact-grid">
+        <article class="rail-item">
+            <h3>@(showOnboarding ? "Continue setup" : "Setup complete")</h3>
+            <p>@(showOnboarding ? "Finish the three-step onboarding overlay and land in a usable home surface." : "Your account basics and follow preferences are already in place.")</p>
+            @if (showOnboarding)
+            {
+                <button class="button-like button-like--primary" type="button" data-open-onboarding>Continue setup</button>
+            }
+        </article>
+        <article class="rail-item">
+            <h3>Follow horizons</h3>
+            <p>@(Model.Experience.FollowHorizons ? "You are following what opens next." : "Keep an eye on future lanes without turning follows into design authority.")</p>
+            <a class="inline-link" href="/account">Manage follows</a>
+        </article>
+        <article class="rail-item">
+            <h3>Participate</h3>
+            <p>Optional and signed-in. Start contributing when you want to lend focused help with receipt-backed work.</p>
+            <a class="inline-link" href="/participate/codex">Start contributing</a>
+        </article>
+        <article class="rail-item">
+            <h3>Open account</h3>
+            <p>Profile, recovery posture, linked channels, and visibility live in one settings surface.</p>
+            <a class="inline-link" href="/account">Open account</a>
+        </article>
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-band__header">
+        <p class="eyebrow">What’s real now</p>
+        <h2 class="section-title">Compact proof rail</h2>
+    </div>
+    <div class="rails-grid">
+        @foreach (var card in Model.NowRail)
+        {
+            <article class="rail-item">
+                <span class="tag">@card.Badge</span>
+                <h3>@card.Title</h3>
+                <p>@card.Summary</p>
+                <a class="inline-link" href="@card.Href">Open</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-band__header">
+        <p class="eyebrow">Coming next</p>
+        <h2 class="section-title">Horizon rail</h2>
+    </div>
+    <div class="rails-grid">
+        @foreach (var card in Model.HorizonRail)
+        {
+            <article class="rail-item">
+                <span class="tag tag--amber">@card.Badge</span>
+                <h3>@card.Title</h3>
+                <p>@card.Summary</p>
+                <a class="inline-link" href="@card.Href">Read more</a>
+            </article>
+        }
+    </div>
+</section>
+
+<div class="onboarding-dialog" id="home-onboarding" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" @(showOnboarding ? "" : "hidden")>
+    <div class="onboarding-dialog__panel">
+        <div class="onboarding-steps">
+            <span class="onboarding-step">1. Identity polish</span>
+            <span class="onboarding-step">2. Lane interests</span>
+            <span class="onboarding-step">3. Recovery and follows</span>
+        </div>
+        <div id="onboardingError" class="muted-copy"></div>
+        <form id="onboardingForm" class="settings-form">
+            <section data-step-panel="1">
+                <p class="eyebrow">Step 1</p>
+                <h2 id="onboarding-title">Identity polish</h2>
+                <div class="field">
+                    <label for="onboardingDisplayName">Display name</label>
+                    <input id="onboardingDisplayName" value="@Model.User.DisplayName" />
+                </div>
+                <div class="field">
+                    <label for="onboardingHandle">Handle</label>
+                    <input id="onboardingHandle" value="@Model.User.Handle" />
+                </div>
+                <div class="field">
+                    <label for="onboardingTimezone">Timezone</label>
+                    <input id="onboardingTimezone" value="@Model.User.Timezone" />
+                </div>
+            </section>
+            <section data-step-panel="2" hidden>
+                <p class="eyebrow">Step 2</p>
+                <h2>Lane interests</h2>
+                <div class="check-grid">
+                    @{
+                        var currentLanes = Model.Experience.LaneInterests.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    }
+                    <label class="check-row"><input type="checkbox" value="player" @(currentLanes.Contains("player") ? "checked" : null) /> <span>Player</span></label>
+                    <label class="check-row"><input type="checkbox" value="gm" @(currentLanes.Contains("gm") ? "checked" : null) /> <span>GM</span></label>
+                    <label class="check-row"><input type="checkbox" value="creator" @(currentLanes.Contains("creator") ? "checked" : null) /> <span>Creator</span></label>
+                </div>
+            </section>
+            <section data-step-panel="3" hidden>
+                <p class="eyebrow">Step 3</p>
+                <h2>Recovery and follows</h2>
+                @if (googlePrimary)
+                {
+                    <div class="field">
+                        <label for="onboardingRecoveryEmail">Recovery email</label>
+                        <input id="onboardingRecoveryEmail" type="email" placeholder="runner@example.com" />
+                    </div>
+                }
+                else
+                {
+                    <p class="muted-copy">Email is already your primary sign-in. Link Google later if you want a second mainstream sign-in method.</p>
+                    <a class="button-like button-like--secondary" href="/auth/google/link?next=/home">Link Google</a>
+                }
+                <div class="check-grid">
+                    <label class="check-row"><input id="onboardingFollow" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow horizons</span></label>
+                    <label class="check-row"><input id="onboardingBeta" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Raise beta interest</span></label>
+                </div>
+            </section>
+            <div class="stacked-actions">
+                <button class="button-like button-like--ghost" type="button" data-onboarding-back hidden>Back</button>
+                <button class="button-like button-like--primary" type="button" data-onboarding-next>Next</button>
+                <button class="button-like button-like--primary" type="submit" data-onboarding-submit hidden>Finish</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(() => {
+  const dialog = document.getElementById("home-onboarding");
+  if (!dialog) return;
+  const panels = Array.from(dialog.querySelectorAll("[data-step-panel]"));
+  const nextButton = dialog.querySelector("[data-onboarding-next]");
+  const backButton = dialog.querySelector("[data-onboarding-back]");
+  const submitButton = dialog.querySelector("[data-onboarding-submit]");
+  const openButtons = document.querySelectorAll("[data-open-onboarding]");
+  const errorNode = document.getElementById("onboardingError");
+  let step = 0;
+
+  const showStep = (index) => {
+    step = index;
+    panels.forEach((panel, panelIndex) => panel.hidden = panelIndex !== index);
+    backButton.hidden = index === 0;
+    nextButton.hidden = index === panels.length - 1;
+    submitButton.hidden = index !== panels.length - 1;
+  };
+
+  openButtons.forEach((button) => button.addEventListener("click", () => dialog.hidden = false));
+  nextButton.addEventListener("click", () => showStep(Math.min(step + 1, panels.length - 1)));
+  backButton.addEventListener("click", () => showStep(Math.max(step - 1, 0)));
+  showStep(step);
+
+  dialog.querySelector("#onboardingForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    errorNode.textContent = "";
+    const jsonHeaders = { "Content-Type": "application/json" };
+    const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
+    const laneInterests = Array.from(dialog.querySelectorAll("[data-step-panel='2'] input[type='checkbox']:checked")).map((input) => input.value);
+
+    try {
+      await fetch("/api/v1/accounts/me/profile", {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          subjectId,
+          displayName: document.getElementById("onboardingDisplayName").value,
+          handle: document.getElementById("onboardingHandle").value,
+          timezone: document.getElementById("onboardingTimezone").value,
+          visibility: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.Visibility))
+        })
+      }).then(async (response) => {
+        if (!response.ok) throw new Error((await response.json()).detail || "Profile save failed.");
+      });
+
+      const recoveryField = document.getElementById("onboardingRecoveryEmail");
+      if (recoveryField && recoveryField.value.trim().length > 0) {
+        const recoveryResponse = await fetch("/api/v1/accounts/me/links/email/start", {
+          method: "POST",
+          headers: jsonHeaders,
+          body: JSON.stringify({
+            subjectId,
+            email: recoveryField.value.trim(),
+            nextPath: "/home"
+          })
+        });
+        const recoveryPayload = await recoveryResponse.json();
+        if (!recoveryResponse.ok) throw new Error(recoveryPayload.detail || "Recovery email save failed.");
+        if (recoveryPayload.previewHref) {
+          window.location.href = recoveryPayload.previewHref;
+          return;
+        }
+      }
+
+      await fetch("/api/v1/accounts/me/preferences", {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          subjectId,
+          laneInterests,
+          followHorizons: document.getElementById("onboardingFollow").checked,
+          betaInterest: document.getElementById("onboardingBeta").checked,
+          onboardingCompleted: true
+        })
+      }).then(async (response) => {
+        if (!response.ok) throw new Error((await response.json()).detail || "Preference save failed.");
+      });
+
+      window.location.reload();
+    } catch (error) {
+      errorNode.textContent = error.message;
+    }
+  });
+})();
+</script>
+}

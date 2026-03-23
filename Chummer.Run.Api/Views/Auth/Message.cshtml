@@ -1,0 +1,26 @@
+@model AuthMessagePageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+}
+
+<section class="auth-stage">
+    <div class="auth-shell">
+        <div class="auth-shell__story">
+            <p class="eyebrow">Auth status</p>
+            <h1 class="hero-brand">CHUMMER</h1>
+            <h2 class="hero-headline">@Model.Heading</h2>
+            <p>@Model.SupportLine</p>
+        </div>
+        <div class="auth-panel">
+            @if (!string.IsNullOrWhiteSpace(Model.Notice))
+            {
+                <p class="muted-copy">@Model.Notice</p>
+            }
+            <div class="stacked-actions">
+                <a class="button-like button-like--primary" href="@Model.PrimaryHref">@Model.PrimaryLabel</a>
+                <a class="button-like button-like--secondary" href="@Model.SecondaryHref">@Model.SecondaryLabel</a>
+            </div>
+        </div>
+    </div>
+</section>

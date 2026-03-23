@@ -1,0 +1,63 @@
+@model NowPageViewModel
+@{
+    ViewData["Title"] = "What Is Real Now";
+    ViewData["Chrome"] = Model.Chrome;
+}
+
+<section class="section-band">
+    <div class="page-lead">
+        <p class="eyebrow">Public proof shelf</p>
+        <h1 class="page-title">What is real now</h1>
+        <p class="page-copy">This page sorts the product by readiness labels so people can inspect what exists without reading apology prose.</p>
+    </div>
+    <div class="shelf-stack">
+        <section class="shelf-item">
+            <span class="readiness-tag">Live now</span>
+            <h2>Available today</h2>
+            @foreach (var card in Model.AvailableToday)
+            {
+                <article class="rail-item">
+                    <h3>@card.Title</h3>
+                    <p>@card.Summary</p>
+                    <a class="inline-link" href="@card.Href">Inspect</a>
+                </article>
+            }
+        </section>
+        <section class="shelf-item">
+            <span class="readiness-tag tag--amber">Inspectable</span>
+            <h2>Inspectable preview</h2>
+            @foreach (var card in Model.Inspectable)
+            {
+                <article class="rail-item">
+                    <h3>@card.Title</h3>
+                    <p>@card.Summary</p>
+                    <a class="inline-link" href="@card.Href">Inspect</a>
+                </article>
+            }
+        </section>
+        <section class="shelf-item">
+            <span class="readiness-tag">Signed-in preview</span>
+            <h2>Registered-only preview</h2>
+            @foreach (var overlay in Model.SignedInPreview)
+            {
+                <article class="rail-item">
+                    <h3>@overlay.Title</h3>
+                    <p>@overlay.Summary</p>
+                    <a class="inline-link" href="/signup?next=/home">Create account</a>
+                </article>
+            }
+        </section>
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-band__header">
+        <p class="eyebrow">Release shelf</p>
+        <h2 class="section-title">@Model.Manifest.Version · @Model.Manifest.Channel</h2>
+        <p class="section-copy">Published @Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd") · integrity stays visible instead of hiding behind a release note wall.</p>
+    </div>
+    <div class="stacked-actions">
+        <a class="cta-link cta-link--primary" href="/downloads">Open downloads</a>
+        <a class="cta-link cta-link--secondary" href="/what-is-chummer">Read the product story</a>
+    </div>
+</section>

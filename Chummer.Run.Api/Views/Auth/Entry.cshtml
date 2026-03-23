@@ -1,0 +1,53 @@
+@model AuthPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+}
+
+<section class="auth-stage">
+    <div class="auth-shell">
+        <div class="auth-shell__story">
+            <p class="eyebrow">Account</p>
+            <h1 class="hero-brand">CHUMMER</h1>
+            <h2 class="hero-headline">@Model.Heading</h2>
+            <p>@Model.SupportLine</p>
+            <p class="privacy-note">A Chummer account unlocks follows, settings, the signed-in home shell, and optional participation later.</p>
+        </div>
+        <div class="auth-panel">
+            <h2>@Model.Heading</h2>
+            @if (Model.GoogleAvailable)
+            {
+                <a class="button-like button-like--primary" href="@Model.GoogleStartHref">Continue with Google</a>
+            }
+            else
+            {
+                <button class="button-like button-like--ghost" type="button" disabled>Google unavailable</button>
+                <p class="muted-copy">@Model.GoogleUnavailableReason</p>
+            }
+
+            <div class="stacked-actions" style="margin-top: 1rem;">
+                <button class="button-like button-like--secondary" type="button" data-email-toggle="emailAuthPanel">Continue with email</button>
+                <a class="inline-link" href="@(Model.CreateAccount ? $"/login?next={Uri.EscapeDataString(Model.NextPath)}" : $"/signup?next={Uri.EscapeDataString(Model.NextPath)}")">
+                    @(Model.CreateAccount ? "Already have an account?" : "Need an account?")
+                </a>
+            </div>
+
+            <div id="emailAuthPanel" hidden>
+                <form class="auth-form" method="post" action="/auth/email/start">
+                    <input type="hidden" name="next" value="@Model.NextPath" />
+                    <div class="field">
+                        <label for="email">Email</label>
+                        <input id="email" name="email" type="email" placeholder="runner@example.com" required />
+                    </div>
+                    <div class="field">
+                        <label for="displayName">Display name</label>
+                        <input id="displayName" name="displayName" placeholder="Runner" />
+                    </div>
+                    <button class="button-like button-like--secondary" type="submit">Send magic link</button>
+                </form>
+            </div>
+
+            <p class="privacy-note">Browser session cookie only. Google stays primary, email stays fallback, Facebook stays out of the first-wave UI, and Telegram links later inside account settings.</p>
+        </div>
+    </div>
+</section>

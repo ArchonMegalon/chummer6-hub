@@ -1,6 +1,7 @@
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.ViewModels;
 using Chummer.Run.AI.Services.Assets;
 using Chummer.Run.AI.Services.Booster;
 using Chummer.Run.AI.Services.Creative;
@@ -32,6 +33,7 @@ using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Run.Contracts.Publication;
 using Chummer.Run.Contracts.Registry;
 using Chummer.Run.Identity.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -422,6 +424,19 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var projectionVerifier = new BoosterReceiptVerifier(configuration);
     var projectionAccess = new BoosterProjectionAccessGuard(configuration);
     var projections = new BoosterReceiptProjectionService();
+    var chrome = CreateChromeService(configuration, loggerFactory);
+    var browserAuth = new HubBrowserAuthService(new HttpClient(new StubHttpMessageHandler(_ =>
+        JsonResponse(new IdentitySessionIssueResponse(
+            SessionId: "sid-smoke",
+            SubjectId: "subject.demo",
+            DisplayName: "Runner Demo",
+            Email: "runner@example.invalid",
+            Roles: new[] { "player" },
+            AccessToken: "subject-token",
+            RefreshToken: "refresh-token",
+            IssuedAtUtc: DateTimeOffset.UtcNow,
+            ExpiresAtUtc: DateTimeOffset.UtcNow.AddHours(1))))), configuration);
+    var google = CreateGoogleService(configuration, browserAuth, identityLinks, accounts, loggerFactory, tempRoot);
     var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(request =>
     {
         var body = request.Content is null ? string.Empty : request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
@@ -437,7 +452,8 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         Visibility: "private",
         Timezone: "UTC",
         CountryCode: "AT"));
-    var accountController = new AccountsController(accounts, identityClient)
+    var experience = new UserExperienceService(store, accounts);
+    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, chrome, google)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -646,6 +662,26 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
             });
         }
 
+        if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/internal/participant-lanes/participant-auth-success/activate")
+        {
+            return JsonResponse(new
+            {
+                lane = new
+                {
+                    lane_id = "participant-auth-success",
+                    status = "active",
+                    authorization_tier = "pro",
+                    tier_source = "fleet_detected",
+                    telemetry = new
+                    {
+                        auth_ready = true,
+                        authorization_tier = "pro",
+                        tier_source = "fleet_detected",
+                    },
+                },
+            });
+        }
+
         return JsonResponse(new { detail = "unexpected fleet call" }, HttpStatusCode.InternalServerError);
     })), configuration);
     var laterSessions = new BoostSessionService(store, accounts, groups, laterBridge, rewards);
@@ -660,9 +696,11 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     laterSessions.RecordConsent(laterSession.SponsorSessionId);
     var authStarted = await laterSessions.StartDeviceAuthAsync(laterSession.SponsorSessionId, CancellationToken.None);
     Assert(authStarted.Session.AuthorizedAtUtc is not null, "auth-ready device auth should mark the sponsor session as authorized.");
+    Assert(string.Equals(authStarted.Session.Status, "active", StringComparison.OrdinalIgnoreCase), "auth-ready device auth should auto-activate the contribution lane.");
     Assert(string.Equals(authStarted.Session.RequestedLaneRole, "deep_review", StringComparison.OrdinalIgnoreCase), "sponsor sessions should preserve the requested participation role.");
     var laterBadges = laterSessions.ListBadgesForSessionUser(laterSession.SponsorSessionId);
     Assert(!laterBadges.Any(static badge => string.Equals(badge.Key, "chickened-out", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)), "later successful authorization should revoke the Chickened Out badge.");
+    Assert(laterBadges.Any(static badge => string.Equals(badge.Key, "contributor-ready", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)), "auth-ready contribution lanes should award the non-scoring contributor-ready badge.");
     Assert(laterBadges.Any(static badge => string.Equals(badge.Key, "pro-sponsor-active", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)), "current sponsor tier should award a transient active-tier badge.");
     var recognition = leaderboards.UserRecognitionSummary(createdUser.UserId);
     Assert(string.Equals(recognition.CurrentAuthorizationTier, "pro", StringComparison.OrdinalIgnoreCase), "recognition summary should report the current sponsor tier.");
@@ -778,6 +816,8 @@ async Task VerifyPublicLandingProjectionAsync()
         .Build();
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
     var landing = new PublicLandingService(configuration, loggerFactory.CreateLogger<PublicLandingService>());
+    var navigation = new PublicNavigationService(configuration);
+    var chrome = new HubPageChromeService(landing, navigation);
     var progress = new PublicProgressService(configuration, loggerFactory.CreateLogger<PublicProgressService>());
     var releases = new PublicReleaseManifestService(configuration);
     var surface = landing.LoadSurface();
@@ -798,16 +838,30 @@ async Task VerifyPublicLandingProjectionAsync()
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var accounts = new AccountService(store);
+    var identityLinks = new IdentityLinkService(store, accounts);
+    var experience = new UserExperienceService(store, accounts);
     var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
         JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized))), configuration);
-    var controller = new PublicLandingController(landing, releases, accounts, identityClient)
+    var authService = new HubBrowserAuthService(new HttpClient(new StubHttpMessageHandler(_ =>
+        JsonResponse(new EmailAuthStartResponse(
+            TicketId: "eml_demo",
+            SubjectId: "subject.demo",
+            Email: "runner@example.invalid",
+            DisplayName: "Runner Demo",
+            NextPath: "/home",
+            CreatedAtUtc: DateTimeOffset.UtcNow,
+            ExpiresAtUtc: DateTimeOffset.UtcNow.AddMinutes(15),
+            DeliveryMode: "preview_inline_link",
+            PreviewNote: "preview"), HttpStatusCode.OK))), configuration);
+    var google = CreateGoogleService(configuration, authService, identityLinks, accounts, loggerFactory, tempRoot);
+    var controller = new PublicLandingController(landing, releases, accounts, identityClient, identityLinks, experience, chrome)
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var progressController = new PublicProgressController(progress, landing)
+    var progressController = new PublicProgressController(progress, landing, navigation)
     {
         ControllerContext = new ControllerContext
         {
@@ -815,24 +869,23 @@ async Task VerifyPublicLandingProjectionAsync()
         }
     };
 
-    var landingHtml = controller.LandingPage().Content ?? string.Empty;
-    Assert(landingHtml.Contains("Shadowrun rules truth, with receipts.", StringComparison.Ordinal), "landing page should render the canonical headline");
-    Assert(landingHtml.Contains("/participate", StringComparison.Ordinal), "landing page should route people toward participate");
-    Assert(landingHtml.Contains("/signup?next=/home", StringComparison.Ordinal), "landing page chrome should expose create account beside sign in");
-    Assert(landingHtml.Contains("/what-is-chummer#public-guide", StringComparison.Ordinal), "landing page should keep the guide card first-party");
-    Assert(landingHtml.Contains("/horizons#horizon-runsite", StringComparison.Ordinal), "landing page should route artifact cards to related horizons");
-    Assert(!landingHtml.Contains("archive stair", StringComparison.OrdinalIgnoreCase), "landing page should not leak raw asset-family text into the visual layer");
-    Assert(!landingHtml.Contains("dossier desk", StringComparison.OrdinalIgnoreCase), "landing page should not leak raw asset-family text into the visual layer");
-    Assert(!landingHtml.Contains("boulevard of futures", StringComparison.OrdinalIgnoreCase), "landing page should not leak raw asset-family text into the visual layer");
-    Assert(!landingHtml.Contains("simulation bench", StringComparison.OrdinalIgnoreCase), "landing page should not leak raw asset-family text into the visual layer");
+    var landingView = controller.LandingPage() as ViewResult;
+    var landingModel = landingView?.Model as LandingPageViewModel;
+    Assert(landingModel is not null, "landing page should render through the MVC view layer.");
+    Assert(string.Equals(landingModel.Surface.Headline, "Shadowrun rules truth, with receipts.", StringComparison.Ordinal), "landing page should render the canonical headline");
+    Assert(landingModel.StartHere.Any(static card => string.Equals(card.Href, "/what-is-chummer", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
+    Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Href, "/signup?next=/home", StringComparison.Ordinal)), "landing page chrome should expose create account beside sign in");
+    Assert(landingModel.Lanes.Any(static card => string.Equals(card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
+    Assert(!string.IsNullOrWhiteSpace(landingModel.Assets.BySlot("section_hero")?.PosterUrl), "landing hero should use a non-empty media asset.");
 
-    var storyHtml = controller.ProductStoryPage().Content ?? string.Empty;
-    Assert(storyHtml.Contains("id=\"public-guide\"", StringComparison.Ordinal) && storyHtml.Contains("Open the deeper guide fallback", StringComparison.Ordinal), "product story page should expose the first-party guide panel with an explicit fallback");
+    var storyView = controller.ProductStoryPage() as ViewResult;
+    var storyModel = storyView?.Model as StoryPageViewModel;
+    Assert(storyModel is not null && storyModel.TrustPillars.Count == 3, "product story page should expose the three trust pillars.");
 
-    var downloadsHtml = controller.DownloadsPage().Content ?? string.Empty;
-    Assert(downloadsHtml.Contains("smoke-poc-linux-x64", StringComparison.Ordinal), "downloads page should render artifacts from the live release manifest");
-    Assert(downloadsHtml.Contains("/downloads/files/smoke-poc-linux-x64.zip", StringComparison.Ordinal), "downloads page should link directly to manifest-backed downloads");
-    Assert(downloadsHtml.Contains("0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
+    var downloadsView = controller.DownloadsPage() as ViewResult;
+    var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
+    Assert(downloadsModel is not null && downloadsModel.Manifest.Downloads.Any(static item => string.Equals(item.Id, "smoke-poc-linux-x64", StringComparison.Ordinal)), "downloads page should render artifacts from the live release manifest");
+    Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
 
     var progressHtml = progressController.ProgressPage().Content ?? string.Empty;
     Assert(progressHtml.Contains("Core Rules Engine", StringComparison.Ordinal), "progress page should render the generated product-part report");
@@ -852,31 +905,21 @@ async Task VerifyPublicLandingProjectionAsync()
     var progressPoster = progressController.ProgressPoster().Content ?? string.Empty;
     Assert(progressPoster.Contains("<svg", StringComparison.OrdinalIgnoreCase), "progress poster endpoint should serve SVG content");
 
-    var artifactsHtml = controller.ArtifactsPage().Content ?? string.Empty;
-    Assert(artifactsHtml.Contains("Runsite pack", StringComparison.Ordinal) && artifactsHtml.Contains("/horizons#horizon-runsite", StringComparison.Ordinal), "artifacts shelf should point teaser cards at deliberate related detail pages");
+    var artifactsView = controller.ArtifactsPage() as ViewResult;
+    var artifactsModel = artifactsView?.Model as ShelfPageViewModel;
+    Assert(artifactsModel is not null && artifactsModel.Items.Any(static card => string.Equals(card.Href, "/horizons#horizon-runsite", StringComparison.Ordinal)), "artifacts shelf should point teaser cards at deliberate related detail pages");
 
-    var participateHtml = controller.ParticipatePage().Content ?? string.Empty;
-    Assert(participateHtml.Contains("/login?next=/participate/codex", StringComparison.Ordinal), "participate page should route the booster lane through login");
-    Assert(!participateHtml.Contains("device-code auth", StringComparison.OrdinalIgnoreCase), "public participate copy should not lead with operator auth jargon");
-    Assert(!participateHtml.Contains("worker host", StringComparison.OrdinalIgnoreCase), "public participate copy should not leak worker-host jargon");
-    Assert(!participateHtml.Contains("jury", StringComparison.OrdinalIgnoreCase), "public participate copy should not leak internal review labels");
+    var participateView = controller.ParticipatePage() as ViewResult;
+    var participateModel = participateView?.Model as ParticipatePageViewModel;
+    Assert(participateModel is not null, "participate page should render through the MVC view layer.");
+    Assert(participateModel.SignedInLane.Any(static card => string.Equals(card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal)), "participate page should route the booster lane through login");
+    Assert(!participateModel.PublicLane.Any(static card => card.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
 
     var homeResult = await controller.HomePage(CancellationToken.None);
     var homeRedirect = homeResult as RedirectResult;
     Assert(homeRedirect is not null && string.Equals(homeRedirect.Url, "/login?next=/home", StringComparison.Ordinal), "home page should redirect signed-out guests to the login route.");
 
-    var authService = new HubBrowserAuthService(new HttpClient(new StubHttpMessageHandler(_ =>
-        JsonResponse(new EmailAuthStartResponse(
-            TicketId: "eml_demo",
-            SubjectId: "subject.demo",
-            Email: "runner@example.invalid",
-            DisplayName: "Runner Demo",
-            NextPath: "/home",
-            CreatedAtUtc: DateTimeOffset.UtcNow,
-            ExpiresAtUtc: DateTimeOffset.UtcNow.AddMinutes(15),
-            DeliveryMode: "preview_inline_link",
-            PreviewNote: "preview"), HttpStatusCode.OK))), configuration);
-    var authController = new AuthController(authService, identityClient, landing)
+    var authController = new AuthController(authService, identityClient, landing, chrome, google, accounts, identityLinks)
     {
         ControllerContext = new ControllerContext
         {
@@ -884,13 +927,13 @@ async Task VerifyPublicLandingProjectionAsync()
         }
     };
     var loginResult = await authController.LoginPage("/home", CancellationToken.None);
-    var loginHtml = (loginResult as ContentResult)?.Content ?? string.Empty;
-    Assert(loginHtml.Contains("Sign In", StringComparison.Ordinal) && loginHtml.Contains("/auth/email/start", StringComparison.Ordinal), "login page should render the email-first auth shell.");
-    Assert(loginHtml.Contains("/signup?next=/home", StringComparison.Ordinal) && loginHtml.Contains("Create account", StringComparison.Ordinal), "login page should expose the create-account lane from the guest auth shell.");
+    var loginModel = (loginResult as ViewResult)?.Model as AuthPageViewModel;
+    Assert(loginModel is not null && loginModel.GoogleStartHref.Contains("/auth/google/start", StringComparison.Ordinal), "login page should render the Google-first auth shell.");
+    Assert(string.Equals(loginModel.NextPath, "/home", StringComparison.Ordinal), "login page should preserve the guest next path.");
 
     var signupResult = await authController.SignupPage("/home", CancellationToken.None);
-    var signupHtml = (signupResult as ContentResult)?.Content ?? string.Empty;
-    Assert(signupHtml.Contains("Create Account", StringComparison.Ordinal) && signupHtml.Contains("/login?next=/home", StringComparison.Ordinal), "signup page should link back to sign in and keep the reciprocal auth lane visible.");
+    var signupModel = (signupResult as ViewResult)?.Model as AuthPageViewModel;
+    Assert(signupModel is not null && signupModel.CreateAccount, "signup page should keep the reciprocal auth lane visible.");
 }
 
 void VerifyRegistryWorkflow()
@@ -2458,6 +2501,38 @@ HttpResponseMessage JsonResponse<T>(T payload, HttpStatusCode statusCode = HttpS
     {
         Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
     };
+}
+
+HubPageChromeService CreateChromeService(IConfiguration configuration, ILoggerFactory loggerFactory)
+{
+    var landing = new PublicLandingService(configuration, loggerFactory.CreateLogger<PublicLandingService>());
+    var navigation = new PublicNavigationService(configuration);
+    return new HubPageChromeService(landing, navigation);
+}
+
+HubGoogleAuthService CreateGoogleService(
+    IConfiguration configuration,
+    HubBrowserAuthService browserAuth,
+    IdentityLinkService identityLinks,
+    AccountService accounts,
+    ILoggerFactory loggerFactory,
+    string keyRoot)
+{
+    return new HubGoogleAuthService(
+        new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { error = "not-configured" }, HttpStatusCode.BadRequest))),
+        configuration,
+        browserAuth,
+        identityLinks,
+        accounts,
+        DataProtectionProvider.Create(keyRoot),
+        loggerFactory.CreateLogger<HubGoogleAuthService>(),
+        new SmokeWebHostEnvironment
+        {
+            EnvironmentName = "Development",
+            ApplicationName = "RunServicesSmoke",
+            ContentRootPath = keyRoot,
+            WebRootPath = Path.Combine(keyRoot, "wwwroot")
+        });
 }
 
 JsonElement BuildSignedReceiptElement(string secret, IReadOnlyDictionary<string, object?> payload)

@@ -1,0 +1,102 @@
+@model LandingPageViewModel
+@{
+    ViewData["Title"] = "Chummer";
+    ViewData["Chrome"] = Model.Chrome;
+    var hero = Model.Assets.BySlot("section_hero");
+}
+
+<section class="hero-composition">
+    @if (hero is not null)
+    {
+        <div class="hero-composition__media">
+            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", hero)
+        </div>
+    }
+    <div class="hero-composition__content">
+        <p class="eyebrow">Public front door</p>
+        <h1 class="hero-brand">CHUMMER</h1>
+        <h2 class="hero-headline">@Model.Surface.Headline</h2>
+        <p class="hero-support">@Model.Surface.Subhead</p>
+        <div class="hero-cta-row">
+            @foreach (var action in Model.Surface.HeroCtas)
+            {
+                <a class="cta-link cta-link--@(action.Emphasis == "secondary" ? "secondary" : "primary")" href="@action.Href">@action.Label</a>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-band__header">
+        <p class="eyebrow">Start here</p>
+        <h2 class="section-title">Three ways into the product story</h2>
+        <p class="section-copy">No route dump. No dashboard. Just the three questions a new person needs answered first.</p>
+    </div>
+    <div class="link-grid">
+        @foreach (var card in Model.StartHere)
+        {
+            var asset = Model.Assets.ForCard(card);
+            <article class="link-block">
+                @if (asset is not null)
+                {
+                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                }
+                <span class="tag">@card.Badge</span>
+                <h3>@card.Title</h3>
+                <p>@card.Summary</p>
+                <a class="inline-link" href="@card.Href">Open</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-band__header">
+        <p class="eyebrow">Why trust it</p>
+        <h2 class="section-title">Conviction, not repo archaeology</h2>
+    </div>
+    <div class="trust-grid">
+        @foreach (var card in Model.TrustPillars)
+        {
+            <article class="link-block">
+                <span class="tag">@card.Badge</span>
+                <h3>@card.Title</h3>
+                <p>@card.Summary</p>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-band__header">
+        <p class="eyebrow">Choose your lane</p>
+        <h2 class="section-title">Player, GM, or creator</h2>
+    </div>
+    <div class="link-grid">
+        @foreach (var card in Model.Lanes)
+        {
+            var asset = Model.Assets.ForCard(card);
+            <article class="lane-block">
+                @if (asset is not null)
+                {
+                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                }
+                <h3>@card.Title</h3>
+                <p>@card.Summary</p>
+                <a class="inline-link" href="@card.Href">See the lane</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-band__header">
+        <p class="eyebrow">Follow what opens next</p>
+        <h2 class="section-title">Make the account before the future arrives</h2>
+        <p class="section-copy">The signed-in shell is where follows, beta interest, and contribution setup live.</p>
+    </div>
+    <div class="stacked-actions">
+        <a class="cta-link cta-link--primary" href="/signup?next=/home">Create account</a>
+        <a class="cta-link cta-link--secondary" href="/login?next=/home">Sign in</a>
+    </div>
+</section>

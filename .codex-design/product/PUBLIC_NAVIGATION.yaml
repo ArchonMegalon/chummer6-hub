@@ -1,0 +1,23 @@
+product: chummer
+surface: chummer.run
+version: 1
+primary_nav:
+  - label: What is Chummer
+    href: /what-is-chummer
+  - label: What is real now
+    href: /now
+  - label: Coming next
+    href: /horizons
+  - label: Downloads
+    href: /downloads
+  - label: Participate
+    href: /participate
+secondary_nav:
+  - label: Progress
+    href: /progress
+  - label: Status
+    href: /status
+  - label: Artifacts
+    href: /artifacts
+  - label: Leaderboards
+    href: /leaderboards

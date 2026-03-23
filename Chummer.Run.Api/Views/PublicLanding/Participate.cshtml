@@ -1,0 +1,37 @@
+@model ParticipatePageViewModel
+@{
+    ViewData["Title"] = "Participate";
+    ViewData["Chrome"] = Model.Chrome;
+}
+
+<section class="section-band">
+    <div class="page-lead">
+        <p class="eyebrow">Participate</p>
+        <h1 class="page-title">Two lanes, cleanly split</h1>
+        <p class="page-copy">Public reporting stays public. The optional booster path appears only after sign-in, with plain-language guardrails instead of operator jargon.</p>
+    </div>
+    <div class="settings-grid">
+        <section class="settings-block">
+            <h2>Public lane</h2>
+            @foreach (var card in Model.PublicLane)
+            {
+                <article class="rail-item" id="@card.Id.Replace('_', '-')">
+                    <h3>@card.Title</h3>
+                    <p>@card.Summary</p>
+                    <a class="inline-link" href="@(card.FallbackRoute ?? card.Href)">Open</a>
+                </article>
+            }
+        </section>
+        <section class="settings-block">
+            <h2>Signed-in lane</h2>
+            @foreach (var card in Model.SignedInLane)
+            {
+                <article class="rail-item" id="@card.Id.Replace('_', '-')">
+                    <h3>@card.Title</h3>
+                    <p>@card.Summary</p>
+                    <a class="inline-link" href="@(card.GuestHref ?? card.Href)">Continue</a>
+                </article>
+            }
+        </section>
+    </div>
+</section>

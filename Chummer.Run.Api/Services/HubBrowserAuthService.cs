@@ -22,6 +22,11 @@ public sealed class HubBrowserAuthService
     private string BaseUrl =>
         (_configuration["IDENTITY_SERVICE_BASE_URL"] ?? "http://chummer-run-identity:8080").TrimEnd('/');
 
+    private string? AdminKey =>
+        string.IsNullOrWhiteSpace(_configuration["IDENTITY_ADMIN_KEY"])
+            ? null
+            : _configuration["IDENTITY_ADMIN_KEY"]!.Trim();
+
     public async Task<EmailAuthStartResponse> StartEmailEntryAsync(string email, string? displayName, string? nextPath, CancellationToken cancellationToken)
     {
         using var response = await _httpClient.PostAsJsonAsync(
@@ -44,6 +49,34 @@ public sealed class HubBrowserAuthService
             ?? throw new InvalidOperationException("Identity email-complete response was empty.");
     }
 
+    public async Task<IdentitySessionIssueResponse> IssueSessionAsync(
+        string subjectId,
+        string? displayName,
+        string? email,
+        IReadOnlyList<string>? requestedRoles,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(AdminKey))
+        {
+            throw new InvalidOperationException("IDENTITY_ADMIN_KEY must be configured before Hub can issue browser sessions for external auth.");
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/api/v1/identity/sessions")
+        {
+            Content = JsonContent.Create(new IdentitySessionIssueRequest(
+                SubjectId: subjectId,
+                DisplayName: displayName,
+                Email: email,
+                RequestedRoles: requestedRoles))
+        };
+        request.Headers.Add("X-Identity-Admin-Key", AdminKey);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IdentitySessionIssueResponse>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Identity session issuance response was empty.");
+    }
+
     public async Task RevokeCookieSessionAsync(HttpRequest request, CancellationToken cancellationToken)
     {
         if (!request.Cookies.TryGetValue(HubBrowserAuthConstants.AccessTokenCookieName, out var accessToken)
@@ -59,15 +92,17 @@ public sealed class HubBrowserAuthService
         response.EnsureSuccessStatusCode();
     }
 
-    public void WriteCookie(HttpResponse response, IdentitySessionIssueResponse session)
+    public void WriteCookie(HttpRequest request, HttpResponse response, IdentitySessionIssueResponse session)
     {
+        var secure = request.IsHttps
+            || !string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase);
         response.Cookies.Append(
             HubBrowserAuthConstants.AccessTokenCookieName,
             session.AccessToken,
             new CookieOptions
             {
                 HttpOnly = true,
-                Secure = false,
+                Secure = secure,
                 SameSite = SameSiteMode.Lax,
                 Expires = session.ExpiresAtUtc.UtcDateTime,
                 IsEssential = true,
@@ -75,8 +110,10 @@ public sealed class HubBrowserAuthService
             });
     }
 
-    public void ClearCookie(HttpResponse response)
+    public void ClearCookie(HttpRequest request, HttpResponse response)
     {
+        var secure = request.IsHttps
+            || !string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase);
         response.Cookies.Delete(
             HubBrowserAuthConstants.AccessTokenCookieName,
             new CookieOptions
@@ -84,7 +121,7 @@ public sealed class HubBrowserAuthService
                 Path = "/",
                 SameSite = SameSiteMode.Lax,
                 HttpOnly = true,
-                Secure = false,
+                Secure = secure,
                 IsEssential = true
             });
     }

@@ -11,11 +11,13 @@ public sealed class PublicProgressController : ControllerBase
 {
     private readonly PublicProgressService _progress;
     private readonly PublicLandingService _landing;
+    private readonly PublicNavigationService _navigation;
 
-    public PublicProgressController(PublicProgressService progress, PublicLandingService landing)
+    public PublicProgressController(PublicProgressService progress, PublicLandingService landing, PublicNavigationService navigation)
     {
         _progress = progress;
         _landing = landing;
+        _navigation = navigation;
     }
 
     [HttpGet("/progress")]
@@ -38,12 +40,13 @@ public sealed class PublicProgressController : ControllerBase
     private string RenderShell(string reportHtml)
     {
         var surface = _landing.LoadSurface();
-        var nav = string.Join("", surface.PublicRoutes.Select(route =>
+        var navigation = _navigation.LoadNavigation();
+        var nav = string.Join("", navigation.Primary.Append(new PublicNavigationLink("Progress", "/progress")).Select(route =>
         {
-            var current = string.Equals(route.Path, "/progress", StringComparison.OrdinalIgnoreCase);
+            var current = string.Equals(route.Href, "/progress", StringComparison.OrdinalIgnoreCase);
             return current
-                ? $"""<span class="progress-shell-nav-current">{Encode(route.Title)}</span>"""
-                : $"""<a href="{EncodeHref(route.Path)}">{Encode(route.Title)}</a>""";
+                ? $"""<span class="progress-shell-nav-current">{Encode(route.Label)}</span>"""
+                : $"""<a href="{EncodeHref(route.Href)}">{Encode(route.Label)}</a>""";
         }));
         var authActions = string.Join("", surface.GuestShellActions.Select(action =>
             $"""<a class="progress-shell-action progress-shell-action-{Encode(action.Emphasis)}" href="{EncodeHref(action.Href)}">{Encode(action.Label)}</a>"""));
