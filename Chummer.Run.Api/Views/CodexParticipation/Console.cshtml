@@ -1,0 +1,280 @@
+@model ParticipationConsolePageViewModel
+@{
+    ViewData["Title"] = "Participate";
+    ViewData["Chrome"] = Model.Chrome;
+}
+
+<section class="auth-stage participation-stage">
+    <div class="auth-shell participation-shell">
+        <div class="auth-shell__story participation-shell__story">
+            <p class="eyebrow">Participation</p>
+            <h1 class="hero-headline">Start contributing</h1>
+            <p>Authorize a temporary Codex contribution lane in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review.</p>
+            <p class="privacy-note">Signed in as @Model.User.DisplayName. You can stop or revoke this later from your account.</p>
+        </div>
+
+        <section class="auth-panel participation-panel" aria-labelledby="participationHeading">
+            <p id="stateTag" class="tag">Loading</p>
+            <h2 id="participationHeading">Checking current contribution state...</h2>
+            <p id="stateSupport">Looking for an active contribution lane and any pending ChatGPT authorization challenge.</p>
+            <p id="stateLine" class="muted-copy" aria-live="polite"></p>
+
+            <div id="startState" class="state-stack" hidden>
+                <div class="stacked-actions">
+                    <button id="startContributionButton" class="button-like button-like--primary" type="button">Yes, I want to contribute</button>
+                    <a class="inline-link" href="/participate">How it works</a>
+                </div>
+                <p class="privacy-note">This opens a temporary contribution lane only. Credit appears later from validated receipts, not from authorization alone.</p>
+            </div>
+
+            <div id="authorizeState" class="state-stack" hidden>
+                <div class="stacked-actions">
+                    <a id="openAuthorizationLink" class="button-like button-like--primary" href="#" target="_blank" rel="noreferrer noopener">Open authorization page</a>
+                    <button id="copyCodeButton" class="button-like button-like--secondary" type="button">Copy code</button>
+                </div>
+                <div class="code-panel">
+                    <span class="code-panel__label">One-time code</span>
+                    <div id="authorizationCode" class="code-panel__value mono-receipt">Waiting for a code...</div>
+                </div>
+                <p class="privacy-note">Keep this page open while Chummer watches for confirmation.</p>
+                <button id="cancelContributionButton" class="inline-link inline-link--button" type="button">Cancel this contribution</button>
+            </div>
+
+            <div id="completeState" class="state-stack" hidden>
+                <div id="badgeReveal" class="badge-reveal" hidden>
+                    <span class="tag">Thank you</span>
+                    <h3 id="badgeLabel">Contributor Ready</h3>
+                    <p id="badgeNote" class="muted-copy">This is a thank-you marker only. Contribution credit appears later after validated work.</p>
+                </div>
+                <div class="stacked-actions">
+                    <a class="button-like button-like--primary" href="/home">Back to home</a>
+                    <a class="button-like button-like--ghost" href="/account">Open account</a>
+                </div>
+            </div>
+
+            <details id="technicalDetails" class="details-drawer" hidden>
+                <summary>Technical details</summary>
+                <dl class="detail-grid">
+                    <div>
+                        <dt>Contribution id</dt>
+                        <dd id="detailContributionId">None</dd>
+                    </div>
+                    <div>
+                        <dt>Fleet lane id</dt>
+                        <dd id="detailFleetLaneId">Not created yet</dd>
+                    </div>
+                    <div>
+                        <dt>Auth status</dt>
+                        <dd id="detailAuthStatus">Not started</dd>
+                    </div>
+                    <div>
+                        <dt>Auth-ready</dt>
+                        <dd id="detailAuthReadyAt">Not yet</dd>
+                    </div>
+                    <div>
+                        <dt>Authorization tier</dt>
+                        <dd id="detailAuthorizationTier">Unknown</dd>
+                    </div>
+                    <div>
+                        <dt>Role</dt>
+                        <dd id="detailLaneRole">Coding</dd>
+                    </div>
+                </dl>
+                <div class="stacked-actions">
+                    <button id="stopContributionButton" class="button-like button-like--secondary" type="button">Stop</button>
+                    <button id="revokeContributionButton" class="button-like button-like--ghost" type="button">Revoke</button>
+                </div>
+            </details>
+        </section>
+    </div>
+</section>
+
+@section Scripts {
+<script>
+let currentContributionId = "";
+let pollHandle = 0;
+
+async function api(path, options = {}) {
+  const response = await fetch(path, { ...options });
+  const body = await response.text();
+  let data = {};
+  if (body) {
+    try {
+      data = JSON.parse(body);
+    } catch {
+      data = { detail: body };
+    }
+  }
+  if (!response.ok) {
+    throw new Error(data.detail || data.title || body || "Request failed.");
+  }
+  return data;
+}
+
+function setButtonBusy(button, busy, busyLabel) {
+  if (!button) return;
+  if (!button.dataset.defaultLabel) {
+    button.dataset.defaultLabel = button.textContent || "";
+  }
+  button.disabled = busy;
+  button.textContent = busy ? busyLabel : button.dataset.defaultLabel;
+}
+
+function stopPolling() {
+  if (pollHandle) {
+    window.clearTimeout(pollHandle);
+    pollHandle = 0;
+  }
+}
+
+function schedulePoll(delayMs) {
+  stopPolling();
+  pollHandle = window.setTimeout(() => {
+    refreshCurrent().catch(renderError);
+  }, delayMs);
+}
+
+function formatDate(value) {
+  if (!value) return "Not yet";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function toggleState(phase) {
+  document.getElementById("startState").hidden = phase !== "start";
+  document.getElementById("authorizeState").hidden = phase !== "authorize";
+  document.getElementById("completeState").hidden = phase !== "complete";
+}
+
+function renderError(error) {
+  stopPolling();
+  document.getElementById("stateTag").textContent = "Attention";
+  document.getElementById("participationHeading").textContent = "Participation needs attention";
+  document.getElementById("stateSupport").textContent = error.message;
+  document.getElementById("stateLine").textContent = "Fix the issue and try again.";
+  toggleState("start");
+}
+
+function render(data) {
+  const contribution = data.contribution || null;
+  const details = data.details || null;
+  const auth = data.auth || {};
+  const badge = data.badge || null;
+  const phase = data.phase || "start";
+  const status = data.status || "ready_to_start";
+  currentContributionId = contribution?.contributionId || "";
+
+  document.getElementById("stateTag").textContent = phase === "complete"
+    ? "Ready"
+    : phase === "authorize"
+      ? "Authorize"
+      : "Start";
+  document.getElementById("participationHeading").textContent = data.heading || "Start contributing";
+  document.getElementById("stateSupport").textContent = data.support || "";
+  document.getElementById("stateLine").textContent = data.statusLine || "";
+  toggleState(phase);
+
+  const authorizationLink = document.getElementById("openAuthorizationLink");
+  const copyCodeButton = document.getElementById("copyCodeButton");
+  const authorizationCode = document.getElementById("authorizationCode");
+  authorizationLink.href = auth.verificationUri || "#";
+  authorizationLink.setAttribute("aria-disabled", auth.verificationUri ? "false" : "true");
+  authorizationLink.classList.toggle("button-like--disabled", !auth.verificationUri);
+  copyCodeButton.disabled = !auth.userCode;
+  authorizationCode.textContent = auth.userCode || "Authorization code will appear here as soon as Fleet finishes setup.";
+
+  const badgeReveal = document.getElementById("badgeReveal");
+  badgeReveal.hidden = !(phase === "complete" && badge);
+  document.getElementById("badgeLabel").textContent = badge?.label || "Contributor Ready";
+  document.getElementById("badgeNote").textContent = badge?.note || "This is a thank-you marker only. Contribution credit appears later after validated work.";
+
+  const technicalDetails = document.getElementById("technicalDetails");
+  technicalDetails.hidden = !contribution;
+  document.getElementById("detailContributionId").textContent = details?.contributionId || "None";
+  document.getElementById("detailFleetLaneId").textContent = details?.fleetLaneId || "Not created yet";
+  document.getElementById("detailAuthStatus").textContent = details?.authStatus || "Not started";
+  document.getElementById("detailAuthReadyAt").textContent = formatDate(details?.authReadyAtUtc);
+  document.getElementById("detailAuthorizationTier").textContent = details?.authorizationTier || "Unknown";
+  document.getElementById("detailLaneRole").textContent = details?.requestedLaneRole || "coding";
+
+  const canCloseContribution = !!currentContributionId && status !== "stopped" && status !== "revoked";
+  document.getElementById("stopContributionButton").disabled = !canCloseContribution;
+  document.getElementById("revokeContributionButton").disabled = !canCloseContribution;
+  document.getElementById("cancelContributionButton").hidden = !currentContributionId;
+
+  if (phase === "authorize" && currentContributionId) {
+    schedulePoll(auth.pollAfterMs || 3000);
+    return;
+  }
+
+  stopPolling();
+}
+
+async function refreshCurrent() {
+  const data = currentContributionId
+    ? await api(`/api/v1/participation/contributions/${currentContributionId}`)
+    : await api("/api/v1/participation/contributions/current");
+  render(data);
+}
+
+async function startContribution() {
+  const button = document.getElementById("startContributionButton");
+  setButtonBusy(button, true, "Starting...");
+  try {
+    const data = await api("/api/v1/participation/contributions/start", { method: "POST" });
+    render(data);
+  } finally {
+    setButtonBusy(button, false, "Starting...");
+  }
+}
+
+async function stopContribution(revoke) {
+  if (!currentContributionId) return;
+  const button = revoke
+    ? document.getElementById("revokeContributionButton")
+    : document.getElementById("stopContributionButton");
+  setButtonBusy(button, true, revoke ? "Revoking..." : "Stopping...");
+  try {
+    const path = revoke
+      ? `/api/v1/participation/contributions/${currentContributionId}/revoke`
+      : `/api/v1/participation/contributions/${currentContributionId}/stop`;
+    const data = await api(path, { method: "POST" });
+    render(data);
+  } finally {
+    setButtonBusy(button, false, revoke ? "Revoking..." : "Stopping...");
+  }
+}
+
+async function copyCode() {
+  const code = document.getElementById("authorizationCode").textContent || "";
+  if (!code || code.startsWith("Authorization code will appear")) return;
+  await navigator.clipboard.writeText(code);
+  const button = document.getElementById("copyCodeButton");
+  setButtonBusy(button, true, "Copied");
+  window.setTimeout(() => setButtonBusy(button, false, "Copied"), 1200);
+}
+
+document.getElementById("startContributionButton").addEventListener("click", () => {
+  startContribution().catch(renderError);
+});
+document.getElementById("copyCodeButton").addEventListener("click", () => {
+  copyCode().catch(renderError);
+});
+document.getElementById("cancelContributionButton").addEventListener("click", () => {
+  stopContribution(false).catch(renderError);
+});
+document.getElementById("stopContributionButton").addEventListener("click", () => {
+  stopContribution(false).catch(renderError);
+});
+document.getElementById("revokeContributionButton").addEventListener("click", () => {
+  stopContribution(true).catch(renderError);
+});
+document.getElementById("openAuthorizationLink").addEventListener("click", (event) => {
+  if (!event.currentTarget.getAttribute("href") || event.currentTarget.getAttribute("href") === "#") {
+    event.preventDefault();
+  }
+});
+
+refreshCurrent().catch(renderError);
+</script>
+}

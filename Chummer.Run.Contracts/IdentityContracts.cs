@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Chummer.Run.Contracts.Identity;
 
@@ -99,3 +101,32 @@ public sealed record IdentitySessionRevokeResponse(
     string? SessionId,
     string? SubjectId,
     DateTimeOffset RevokedAtUtc);
+
+public static class IdentitySubjectDerivation
+{
+    public static string FromEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new ArgumentException("email is required.", nameof(email));
+        }
+
+        return BuildHashedSubject("subject.email", email.Trim().ToLowerInvariant());
+    }
+
+    public static string FromGoogleSubject(string providerSubject)
+    {
+        if (string.IsNullOrWhiteSpace(providerSubject))
+        {
+            throw new ArgumentException("providerSubject is required.", nameof(providerSubject));
+        }
+
+        return BuildHashedSubject("subject.google", providerSubject.Trim());
+    }
+
+    private static string BuildHashedSubject(string prefix, string value)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return $"{prefix}.{Convert.ToHexString(hash[..8]).ToLowerInvariant()}";
+    }
+}

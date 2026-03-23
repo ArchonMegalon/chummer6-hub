@@ -62,6 +62,42 @@ public sealed class IdentityLinkService
         }
     }
 
+    public LinkedIdentityDto? FindLinkedIdentity(string provider, string providerSubject)
+    {
+        var normalizedProvider = NormalizeProvider(provider);
+        var normalizedSubject = AccountService.NormalizeOptional(providerSubject);
+        if (normalizedSubject is null)
+        {
+            return null;
+        }
+
+        lock (_store.Gate)
+        {
+            return _store.LinkedIdentities.FirstOrDefault(link =>
+                string.Equals(link.Provider, normalizedProvider, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(link.ProviderSubject, normalizedSubject, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(link.Status, "revoked", StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    public LinkedIdentityDto? FindLinkedIdentityForUser(string userId, string provider)
+    {
+        var normalizedUserId = AccountService.NormalizeOptional(userId);
+        if (normalizedUserId is null)
+        {
+            return null;
+        }
+
+        var normalizedProvider = NormalizeProvider(provider);
+        lock (_store.Gate)
+        {
+            return _store.LinkedIdentities.FirstOrDefault(link =>
+                string.Equals(link.UserId, normalizedUserId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(link.Provider, normalizedProvider, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(link.Status, "revoked", StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
     public LinkedIdentityDto LinkEmail(LinkEmailIdentityRequest request)
     {
         var subjectId = AccountService.NormalizeRequired(request.SubjectId, nameof(request.SubjectId));
@@ -169,6 +205,16 @@ public sealed class IdentityLinkService
 
         lock (_store.Gate)
         {
+            var conflictingIndex = _store.LinkedIdentities.FindIndex(link =>
+                string.Equals(link.Provider, provider, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(link.ProviderSubject, providerSubject, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(link.Status, "revoked", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase));
+            if (conflictingIndex >= 0)
+            {
+                throw new InvalidOperationException($"This {provider} identity is already linked to another Chummer account.");
+            }
+
             var existingIndex = _store.LinkedIdentities.FindIndex(link =>
                 string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(link.Provider, provider, StringComparison.OrdinalIgnoreCase)

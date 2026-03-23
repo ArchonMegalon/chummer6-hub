@@ -1,0 +1,12 @@
+@model PublicLandingAssetDto
+
+<figure class="scene-frame">
+    <picture class="scene-picture">
+        @if (!string.IsNullOrWhiteSpace(Model.MobilePosterUrl))
+        {
+            <source media="(max-width: 720px)" srcset="@Model.MobilePosterUrl" />
+        }
+        <img src="@Model.PosterUrl" alt="@Model.Alt" loading="lazy" />
+    </picture>
+    <figcaption>@Model.Caption</figcaption>
+</figure>

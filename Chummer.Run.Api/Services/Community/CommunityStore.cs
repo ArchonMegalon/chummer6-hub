@@ -41,6 +41,7 @@ public sealed class CommunityStore
     public List<RewardJournalEntryDto> RewardEntries { get; } = new();
     public List<EntitlementGrantDto> EntitlementEntries { get; } = new();
     public List<BadgeDto> Badges { get; } = new();
+    public Dictionary<string, HubUserExperienceDto> UserExperienceByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void PersistLocked()
     {
@@ -60,7 +61,10 @@ public sealed class CommunityStore
             LedgerEntries: LedgerEntries.ToArray(),
             RewardEntries: RewardEntries.ToArray(),
             EntitlementEntries: EntitlementEntries.ToArray(),
-            Badges: Badges.ToArray());
+            Badges: Badges.ToArray(),
+            UserExperience: UserExperienceByUserId.Values
+                .OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase)
+                .ToArray());
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var tempPath = $"{_storagePath}.tmp";
@@ -107,6 +111,7 @@ public sealed class CommunityStore
         RewardEntries.Clear();
         EntitlementEntries.Clear();
         Badges.Clear();
+        UserExperienceByUserId.Clear();
 
         foreach (var user in snapshot.Users ?? Array.Empty<HubUserDto>())
         {
@@ -154,6 +159,10 @@ public sealed class CommunityStore
         RewardEntries.AddRange(snapshot.RewardEntries ?? Array.Empty<RewardJournalEntryDto>());
         EntitlementEntries.AddRange(snapshot.EntitlementEntries ?? Array.Empty<EntitlementGrantDto>());
         Badges.AddRange(snapshot.Badges ?? Array.Empty<BadgeDto>());
+        foreach (var experience in snapshot.UserExperience ?? Array.Empty<HubUserExperienceDto>())
+        {
+            UserExperienceByUserId[experience.UserId] = experience;
+        }
     }
 
     private static string ResolveStoragePath(IConfiguration configuration)
@@ -234,7 +243,8 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<LedgerEntryDto> LedgerEntries,
     IReadOnlyList<RewardJournalEntryDto> RewardEntries,
     IReadOnlyList<EntitlementGrantDto> EntitlementEntries,
-    IReadOnlyList<BadgeDto> Badges);
+    IReadOnlyList<BadgeDto> Badges,
+    IReadOnlyList<HubUserExperienceDto>? UserExperience = null);
 
 internal sealed record SponsorSessionStateSnapshot(
     string SponsorSessionId,

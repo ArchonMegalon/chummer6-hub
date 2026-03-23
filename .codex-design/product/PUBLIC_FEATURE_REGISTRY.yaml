@@ -3,39 +3,31 @@ surface: chummer.run
 version: 1
 cards:
   - id: product_story
-    bucket: what_you_can_do_today
+    bucket: start_here
     title: What is Chummer?
     summary: Start with the product story instead of repo history.
     href: /what-is-chummer
-    badge: Read first
+    badge: Start here
     audience: public
     image_family: archive_stair
   - id: see_whats_real
-    bucket: what_you_can_do_today
+    bucket: start_here
     title: See what is real now
     summary: Check the live proof shelf before you fall in love with a promise.
     href: /now
-    badge: Available today
+    badge: Evidence
     audience: public
     image_family: dossier_desk
   - id: get_the_poc
-    bucket: what_you_can_do_today
+    bucket: start_here
     title: Get the POC
     summary: Grab the current drop, notes, and integrity hints.
     href: /downloads
-    badge: POC
+    badge: Download
     audience: public
     image_family: facility_exterior
-  - id: sign_in_follow
-    bucket: what_you_can_do_today
-    title: Sign in to follow the future
-    summary: Keep an eye on the lanes you care about and unlock participation later.
-    href: /login?next=/home
-    badge: Registered soon
-    audience: public
-    image_family: boulevard_of_futures
   - id: deterministic_truth
-    bucket: why_this_feels_different
+    bucket: why_trust_it
     title: Deterministic rules truth
     summary: No fuzzy math. Core-owned receipts stay attached to the answer.
     href: /what-is-chummer
@@ -43,7 +35,7 @@ cards:
     audience: public
     image_family: simulation_bench
   - id: receipts_and_provenance
-    bucket: why_this_feels_different
+    bucket: why_trust_it
     title: Receipts and provenance
     summary: Show the work, keep the evidence, and stop asking people to trust vibes.
     href: /now
@@ -51,7 +43,7 @@ cards:
     audience: public
     image_family: dossier_desk
   - id: local_first_continuity
-    bucket: why_this_feels_different
+    bucket: why_trust_it
     title: Local-first session continuity
     summary: The table should not panic just because the network does.
     href: /what-is-chummer
@@ -87,7 +79,7 @@ cards:
     title: Deterministic rules truth
     summary: Core-owned math and receipts are already the trust anchor.
     href: /now
-    badge: Available today
+    badge: Live now
     audience: public
     image_family: simulation_bench
   - id: real_public_guide
@@ -95,7 +87,7 @@ cards:
     title: Public guide and horizons
     summary: There is already a real human guide and a governed horizon shelf.
     href: /what-is-chummer#public-guide
-    badge: Available today
+    badge: Live now
     audience: public
     image_family: archive_stair
     cta_kind: route
@@ -108,7 +100,7 @@ cards:
     title: Local-first prep and session posture
     summary: Mobile and session continuity are treated as real product surfaces, not hand-wavy add-ons.
     href: /now
-    badge: Preview
+    badge: Inspectable
     audience: public
     image_family: streetfront
   - id: real_release_shelf
@@ -116,7 +108,7 @@ cards:
     title: Release shelf
     summary: Public drops, notes, and integrity clues live on one shelf.
     href: /downloads
-    badge: POC
+    badge: Live now
     audience: public
     image_family: facility_exterior
   - id: horizon_nexus_pan

@@ -137,7 +137,7 @@ public sealed class IdentityAccessService : IIdentityAccessService
         var now = DateTimeOffset.UtcNow;
         var email = NormalizeRequired(request.Email).ToLowerInvariant();
         var displayName = NormalizeOptional(request.DisplayName) ?? DeriveDisplayNameFromEmail(email);
-        var subjectId = BuildSubjectIdFromEmail(email);
+        var subjectId = IdentitySubjectDerivation.FromEmail(email);
         var nextPath = SanitizeNextPath(request.NextPath);
 
         lock (_mutate)
@@ -531,12 +531,6 @@ public sealed class IdentityAccessService : IIdentityAccessService
         }
 
         return Path.Combine(Path.GetTempPath(), "chummer-run-identity", "identity-store.json");
-    }
-
-    private static string BuildSubjectIdFromEmail(string email)
-    {
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(email.ToLowerInvariant()));
-        return $"subject.email.{Convert.ToHexString(hash[..8]).ToLowerInvariant()}";
     }
 
     private static string DeriveDisplayNameFromEmail(string email)

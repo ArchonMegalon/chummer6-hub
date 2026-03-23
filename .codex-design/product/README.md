@@ -12,33 +12,34 @@ Read in this order:
 4. `ARCHITECTURE.md`
 5. `PUBLIC_LANDING_POLICY.md`
 6. `PUBLIC_LANDING_MANIFEST.yaml`
-7. `PUBLIC_FEATURE_REGISTRY.yaml`
-8. `PUBLIC_LANDING_ASSET_REGISTRY.yaml`
-9. `PUBLIC_USER_MODEL.md`
-10. `PUBLIC_AUTH_FLOW.md`
-11. `IDENTITY_AND_CHANNEL_LINKING_MODEL.md`
-12. `PUBLIC_MEDIA_BRIEFS.yaml`
-13. `PARTICIPATION_AND_BOOSTER_WORKFLOW.md`
-14. `COMMUNITY_SPONSORSHIP_BACKLOG.md`
-15. `EXTERNAL_TOOLS_PLANE.md`
-16. `LTD_CAPABILITY_MAP.md`
-17. `PUBLIC_GUIDE_POLICY.md`
-18. `PUBLIC_GUIDE_PAGE_REGISTRY.yaml`
-19. `PUBLIC_PART_REGISTRY.yaml`
-20. `PUBLIC_FAQ_REGISTRY.yaml`
-21. `PUBLIC_HELP_COPY.md`
-22. `PUBLIC_GUIDE_EXPORT_MANIFEST.yaml`
-23. `HORIZON_SIGNAL_POLICY.md`
-24. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
-25. `OWNERSHIP_MATRIX.md`
-26. `PROGRAM_MILESTONES.yaml`
-27. `CONTRACT_SETS.yaml`
-28. `GROUP_BLOCKERS.md`
-29. `projects/*.md` for repo-specific scope
+7. `PUBLIC_NAVIGATION.yaml`
+8. `PUBLIC_FEATURE_REGISTRY.yaml`
+9. `PUBLIC_LANDING_ASSET_REGISTRY.yaml`
+10. `PUBLIC_USER_MODEL.md`
+11. `PUBLIC_AUTH_FLOW.md`
+12. `IDENTITY_AND_CHANNEL_LINKING_MODEL.md`
+13. `PUBLIC_MEDIA_BRIEFS.yaml`
+14. `PARTICIPATION_AND_BOOSTER_WORKFLOW.md`
+15. `COMMUNITY_SPONSORSHIP_BACKLOG.md`
+16. `EXTERNAL_TOOLS_PLANE.md`
+17. `LTD_CAPABILITY_MAP.md`
+18. `PUBLIC_GUIDE_POLICY.md`
+19. `PUBLIC_GUIDE_PAGE_REGISTRY.yaml`
+20. `PUBLIC_PART_REGISTRY.yaml`
+21. `PUBLIC_FAQ_REGISTRY.yaml`
+22. `PUBLIC_HELP_COPY.md`
+23. `PUBLIC_GUIDE_EXPORT_MANIFEST.yaml`
+24. `HORIZON_SIGNAL_POLICY.md`
+25. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
+26. `OWNERSHIP_MATRIX.md`
+27. `PROGRAM_MILESTONES.yaml`
+28. `CONTRACT_SETS.yaml`
+29. `GROUP_BLOCKERS.md`
+30. `projects/*.md` for repo-specific scope
 
 `HORIZON_REGISTRY.yaml` is the machine-readable source for horizon existence, order, public-guide eligibility, and eventual build path.
 The current horizon set covers knowledge fabric, spatial/runsite artifacts, creator press, replay/forensics, and bounded table coaching in addition to the earlier continuity and simulation lanes.
-`PUBLIC_LANDING_MANIFEST.yaml`, `PUBLIC_FEATURE_REGISTRY.yaml`, and `PUBLIC_LANDING_ASSET_REGISTRY.yaml` are the machine-readable source for the `chummer.run` landing structure, CTA routing, public proof shelf, asset slots, and signed-in overlay posture.
+`PUBLIC_LANDING_MANIFEST.yaml`, `PUBLIC_NAVIGATION.yaml`, `PUBLIC_FEATURE_REGISTRY.yaml`, and `PUBLIC_LANDING_ASSET_REGISTRY.yaml` are the machine-readable source for the `chummer.run` landing structure, curated top-level IA, CTA routing, public proof shelf, asset slots, and signed-in overlay posture.
 `PUBLIC_PROGRESS_PARTS.yaml` is the canonical product-part mapping, public copy registry, and ETA/momentum policy input for the hosted `/progress` report, while `PROGRESS_REPORT.generated.json`, `PROGRESS_REPORT.generated.html`, and `PROGRESS_REPORT_POSTER.svg` are generated downstream projections that Hub may serve directly.
 `PUBLIC_AUTH_FLOW.md` defines the first-wave login/signup/logout posture, guest fallbacks, and which provider surfaces may appear publicly in the hosted shell.
 `IDENTITY_AND_CHANNEL_LINKING_MODEL.md` is the canonical source for email hygiene, social bootstrap, linked identities, official companion channels, and the rule that EA stays the orchestrator brain behind those channels.

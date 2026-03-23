@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Ledger;
 using Chummer.Run.Contracts.Leaderboards;
@@ -10,19 +11,36 @@ namespace Chummer.Run.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/participation/codex")]
-public sealed class CodexParticipationController : ControllerBase
+public sealed class CodexParticipationController : Controller
 {
+    private const string DefaultProjectId = "fleet";
     private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
     private readonly LeaderboardService _leaderboards;
     private readonly BoostSessionService _sessions;
+    private readonly IdentityLinkService _links;
+    private readonly UserExperienceService _experience;
+    private readonly HubPageChromeService _chrome;
+    private readonly IConfiguration _configuration;
 
-    public CodexParticipationController(AccountService accounts, HubIdentityClient identity, LeaderboardService leaderboards, BoostSessionService sessions)
+    public CodexParticipationController(
+        AccountService accounts,
+        HubIdentityClient identity,
+        LeaderboardService leaderboards,
+        BoostSessionService sessions,
+        IdentityLinkService links,
+        UserExperienceService experience,
+        HubPageChromeService chrome,
+        IConfiguration configuration)
     {
         _accounts = accounts;
         _identity = identity;
         _leaderboards = leaderboards;
         _sessions = sessions;
+        _links = links;
+        _experience = experience;
+        _chrome = chrome;
+        _configuration = configuration;
     }
 
     [HttpGet("/participate/codex")]
@@ -31,250 +49,184 @@ public sealed class CodexParticipationController : ControllerBase
     {
         try
         {
-            await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var model = new ParticipationConsolePageViewModel(
+                Chrome: _chrome.BuildAuthenticatedChrome("Participate", "Start contributing from one signed-in surface, authorize in ChatGPT, then leave with a clean status and account trail.", "/participate/codex", user.DisplayName),
+                User: user,
+                Links: _links.GetSummary(subject.SubjectId),
+                Experience: _experience.GetOrCreate(subject.SubjectId));
+            return View("~/Views/CodexParticipation/Console.cshtml", model);
         }
         catch (HubRequestAuthException)
         {
             return Redirect("/login?next=/participate/codex");
         }
-
-        var html = """
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Participate · Chummer</title>
-  <style>
-    :root {
-      --bg: #efe6d2;
-      --paper: rgba(255, 251, 242, 0.82);
-      --ink: #1a1712;
-      --muted: #665d52;
-      --accent: #125a58;
-      --warm: #8d5932;
-      --line: rgba(26, 23, 18, 0.12);
-      --shadow: 0 18px 40px rgba(26, 23, 18, 0.08);
-    }
-    body { font-family: Georgia, serif; background: linear-gradient(180deg, #f4efe3 0%, #e6dcc3 100%); color: #1e1b16; margin: 0; }
-    main { max-width: 980px; margin: 0 auto; padding: 28px 20px 60px; }
-    .topbar { display:flex; justify-content:space-between; align-items:center; gap:18px; margin-bottom:22px; padding:14px 18px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.72); box-shadow:var(--shadow); }
-    .nav { display:flex; flex-wrap:wrap; gap:14px; color:var(--muted); font-size:.95rem; }
-    .brand { font-size:1.1rem; letter-spacing:.08em; text-transform:uppercase; }
-    h1, h2 { margin: 0 0 12px; }
-    .panel { background: rgba(255,255,255,0.75); border: 1px solid rgba(30,27,22,0.12); border-radius: 16px; padding: 18px; margin: 16px 0; box-shadow: 0 8px 20px rgba(30,27,22,0.08); }
-    label { display: block; margin: 12px 0 6px; font-weight: 600; }
-    input, select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(30,27,22,0.2); background: #fffaf0; }
-    button { margin: 8px 8px 0 0; padding: 10px 14px; border-radius: 999px; border: 0; background: #1f5f4a; color: white; cursor: pointer; }
-    button.secondary { background: #7a5532; }
-    .muted { color: #5d564e; }
-    .codebox { font-family: monospace; font-size: 1.1rem; background: #1e1b16; color: #f8f2e6; padding: 12px; border-radius: 12px; }
-    pre { white-space: pre-wrap; word-break: break-word; background: #fff8eb; padding: 12px; border-radius: 12px; border: 1px solid rgba(30,27,22,0.12); }
-  </style>
-</head>
-<body>
-  <main>
-    <header class="topbar">
-      <div class="brand">Chummer.run</div>
-      <nav class="nav">
-        <a href="/">Landing</a>
-        <a href="/home">Home</a>
-        <a href="/account">Account</a>
-        <a href="/leaderboards">Leaderboards</a>
-        <a href="/logout">Sign out</a>
-      </nav>
-    </header>
-    <h1>Participate Through Hub</h1>
-    <p class="muted">Hub owns the user, group, receipt, reward, and privacy truth. Fleet opens the temporary worker lane. Final landing still goes through review.</p>
-
-    <section class="panel">
-      <h2>How this works</h2>
-      <ol>
-        <li>The cheap baseline remains the default path for the project.</li>
-        <li>If you opt in here, Hub opens a sponsor session and asks Fleet for a temporary help lane.</li>
-        <li>Fleet runs the device-auth step on the worker host and returns a verification URL plus one-time code.</li>
-        <li>Your auth cache stays lane-local on Fleet. Hub stores the product metadata, receipts, badges, and privacy settings.</li>
-        <li>Participation is additive, temporary, and still review-safe. Your lane never merges independently.</li>
-      </ol>
-      <p><a href="https://developers.openai.com/codex/auth/" target="_blank" rel="noreferrer">OpenAI Codex auth documentation</a></p>
-    </section>
-
-    <section class="panel">
-      <h2>1. Confirm who you are</h2>
-      <p class="muted">This page already runs behind the hosted sign-in shell. Refresh your account state below if you want to confirm which groups and visibility settings are active.</p>
-      <button onclick="loadAccount()">Refresh my Hub account</button>
-      <pre id="accountState">Loading authenticated account…</pre>
-    </section>
-
-    <section class="panel">
-      <h2>2. Choose your help mode</h2>
-      <label for="projectId">Project id</label>
-      <input id="projectId" value="fleet" />
-      <label for="groupId">Existing group id</label>
-      <input id="groupId" placeholder="optional grp-..." />
-      <label for="boostCode">Boost code</label>
-      <input id="boostCode" placeholder="optional BOOST-..." />
-      <label for="authorizationTier">Current authorization tier</label>
-      <select id="authorizationTier">
-        <option value="unknown" selected>Unknown</option>
-        <option value="free">Free</option>
-        <option value="go">Go</option>
-        <option value="plus">Plus</option>
-        <option value="pro">Pro</option>
-        <option value="business">Business</option>
-        <option value="edu">Edu</option>
-        <option value="enterprise">Enterprise</option>
-      </select>
-      <label for="requestedLaneRole">What should your sponsor lane help with?</label>
-      <select id="requestedLaneRole">
-        <option value="coding" selected>Boost Coding</option>
-        <option value="review">Boost Review</option>
-        <option value="deep_review">Boost Deep Review</option>
-      </select>
-      <p class="muted">Coding accelerates implementation. Review helps acceptance throughput. Deep review is reserved for tougher final checks and expects a higher sponsor tier.</p>
-      <label><input id="consent1" type="checkbox" /> I understand my ChatGPT/Codex entitlement will be used for project work.</label>
-      <label><input id="consent2" type="checkbox" /> I understand this creates a temporary worker lane.</label>
-      <label><input id="consent3" type="checkbox" /> I understand final merge is still controlled by Fleet review and jury.</label>
-      <label><input id="consent4" type="checkbox" /> I want to participate.</label>
-      <div>
-        <button onclick="createIntent()">Create Intent</button>
-        <button class="secondary" onclick="recordConsent()">Record Consent</button>
-        <button onclick="startAuth()">Start Device Auth</button>
-        <button onclick="activateLane()">Activate Lane</button>
-        <button class="secondary" onclick="refreshIntent()">Refresh</button>
-        <button class="secondary" onclick="stopLane()">Stop</button>
-        <button class="secondary" onclick="revokeLane()">Revoke</button>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>Current sponsor session</h2>
-      <pre id="intentState">No intent created yet.</pre>
-    </section>
-
-    <section class="panel">
-      <h2>Device Auth</h2>
-      <div class="codebox" id="deviceCode">No device code issued yet.</div>
-      <pre id="deviceState">Waiting for Fleet lane state.</pre>
-    </section>
-
-    <section class="panel">
-      <h2>Receipt History</h2>
-      <pre id="receiptState">No contribution receipts yet.</pre>
-    </section>
-
-    <section class="panel">
-      <h2>Badges</h2>
-      <pre id="badgeState">No badges yet.</pre>
-    </section>
-
-    <section class="panel">
-      <h2>Recognition Summary</h2>
-      <pre id="recognitionState">No recognition summary yet.</pre>
-    </section>
-  </main>
-
-  <script>
-    let currentIntentId = "";
-
-    const headers = { "Content-Type": "application/json" };
-
-    async function api(path, options = {}) {
-      const response = await fetch(path, { headers, ...options });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
-      return data;
     }
 
-    async function loadAccount() {
-      const data = await api("/api/v1/accounts/me");
-      document.getElementById("accountState").textContent = JSON.stringify(data, null, 2);
-      if (!document.getElementById("groupId").value && Array.isArray(data.groupIds) && data.groupIds.length > 0) {
-        document.getElementById("groupId").value = data.groupIds[0];
-      }
+    [HttpGet("contributions/current")]
+    [HttpGet("/api/v1/participation/contributions/current")]
+    public async Task<ActionResult<object>> GetCurrentContribution(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = _sessions.FindMostRelevantForUser(subject.SubjectId);
+            if (session is null)
+            {
+                return Ok(BuildContributionEnvelope(null));
+            }
+
+            var refreshed = await _sessions.RefreshAsync(session.SponsorSessionId, cancellationToken);
+            return Ok(BuildContributionEnvelope(
+                refreshed.Session,
+                refreshed.Fleet,
+                _sessions.ListBadgesForSessionUser(refreshed.Session.SponsorSessionId)));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
     }
 
-    function consentReady() {
-      return ["consent1", "consent2", "consent3", "consent4"].every(id => document.getElementById(id).checked);
+    [HttpPost("contributions/start")]
+    [HttpPost("/api/v1/participation/contributions/start")]
+    public async Task<ActionResult<object>> StartContribution(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var started = await _sessions.StartContributionAsync(
+                new CreateSponsorSessionRequest(
+                    SubjectId: subject.SubjectId,
+                    ProjectId: _configuration["CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID"] ?? DefaultProjectId,
+                    SubjectLabel: subject.DisplayName,
+                    GroupId: null,
+                    Visibility: "group",
+                    RequestedLaneType: "participant_burst",
+                    RequestedLaneRole: "coding",
+                    AuthorizationTier: null,
+                    TierSource: null),
+                cancellationToken);
+            return Ok(BuildContributionEnvelope(
+                started.Session,
+                started.Fleet,
+                _sessions.ListBadgesForSessionUser(started.Session.SponsorSessionId)));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
-    async function createIntent() {
-      const payload = {
-        projectId: document.getElementById("projectId").value,
-        groupId: document.getElementById("groupId").value || null,
-        boostCode: document.getElementById("boostCode").value || null,
-        visibility: "group",
-        requestedLaneRole: document.getElementById("requestedLaneRole").value || "coding",
-        authorizationTier: document.getElementById("authorizationTier").value || null,
-        tierSource: document.getElementById("authorizationTier").value !== "unknown" ? "user_declared" : null
-      };
-      const data = await api("/api/v1/participation/intents", { method: "POST", body: JSON.stringify(payload) });
-      currentIntentId = data.intent.intentId || data.intent.sponsorSessionId || "";
-      render(data);
+    [HttpGet("contributions/{contributionId}")]
+    [HttpGet("/api/v1/participation/contributions/{contributionId}")]
+    public async Task<ActionResult<object>> GetContribution([FromRoute] string contributionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(contributionId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (session is null)
+            {
+                return NotFound();
+            }
+
+            var refreshed = await _sessions.RefreshAsync(contributionId, cancellationToken);
+            return Ok(BuildContributionEnvelope(
+                refreshed.Session,
+                refreshed.Fleet,
+                _sessions.ListBadgesForSessionUser(refreshed.Session.SponsorSessionId)));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
     }
 
-    async function recordConsent() {
-      if (!currentIntentId) return;
-      if (!consentReady()) throw new Error("all consent checkboxes must be checked");
-      const data = await api(`/api/v1/participation/intents/${currentIntentId}/consent`, { method: "POST" });
-      render(data);
+    [HttpPost("contributions/{contributionId}/stop")]
+    [HttpPost("/api/v1/participation/contributions/{contributionId}/stop")]
+    public async Task<ActionResult<object>> StopContribution([FromRoute] string contributionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(contributionId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            if (session is null)
+            {
+                return NotFound();
+            }
+
+            var stopped = await _sessions.StopAsync(contributionId, revoke: false, cancellationToken);
+            return Ok(BuildContributionEnvelope(
+                stopped.Session,
+                stopped.Fleet,
+                _sessions.ListBadgesForSessionUser(stopped.Session.SponsorSessionId)));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
-    async function startAuth() {
-      if (!currentIntentId) return;
-      const data = await api(`/api/v1/participation/intents/${currentIntentId}/device-auth/start`, { method: "POST" });
-      render(data);
-    }
+    [HttpPost("contributions/{contributionId}/revoke")]
+    [HttpPost("/api/v1/participation/contributions/{contributionId}/revoke")]
+    public async Task<ActionResult<object>> RevokeContribution([FromRoute] string contributionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var session = TryGetOwnedSession(contributionId, subject.SubjectId, out var denied);
+            if (denied is not null)
+            {
+                return denied;
+            }
 
-    async function activateLane() {
-      if (!currentIntentId) return;
-      const data = await api(`/api/v1/participation/intents/${currentIntentId}/activate`, { method: "POST" });
-      render(data);
-    }
+            if (session is null)
+            {
+                return NotFound();
+            }
 
-    async function refreshIntent() {
-      if (!currentIntentId) return;
-      const data = await api(`/api/v1/participation/intents/${currentIntentId}`);
-      render(data);
-    }
-
-    async function stopLane() {
-      if (!currentIntentId) return;
-      const data = await api(`/api/v1/participation/intents/${currentIntentId}/stop`, { method: "POST" });
-      render(data);
-    }
-
-    async function revokeLane() {
-      if (!currentIntentId) return;
-      const data = await api(`/api/v1/participation/intents/${currentIntentId}`, { method: "DELETE" });
-      render(data);
-    }
-
-    function render(data) {
-      const intent = data.intent || data.sponsorSession || {};
-      const fleet = data.fleet || {};
-      const receipts = data.receipts || [];
-      const badges = data.badges || [];
-      const recognition = data.recognition || null;
-      currentIntentId = intent.intentId || intent.sponsorSessionId || currentIntentId;
-      document.getElementById("intentState").textContent = JSON.stringify(intent, null, 2);
-      const lane = fleet.lane || {};
-      const auth = lane.device_auth || {};
-      document.getElementById("deviceCode").textContent = auth.user_code || intent.deviceAuthUserCode || "No device code issued yet.";
-      document.getElementById("deviceState").textContent = JSON.stringify({ lane, deviceAuth: auth, sponsorSession: data.sponsorSession || null }, null, 2);
-      document.getElementById("receiptState").textContent = JSON.stringify(receipts, null, 2);
-      document.getElementById("badgeState").textContent = JSON.stringify(badges, null, 2);
-      document.getElementById("recognitionState").textContent = JSON.stringify(recognition, null, 2);
-    }
-
-    loadAccount().catch(error => {
-      document.getElementById("accountState").textContent = error.message;
-    });
-  </script>
-</body>
-</html>
-""";
-        return Content(html, "text/html");
+            var revoked = await _sessions.StopAsync(contributionId, revoke: true, cancellationToken);
+            return Ok(BuildContributionEnvelope(
+                revoked.Session,
+                revoked.Fleet,
+                _sessions.ListBadgesForSessionUser(revoked.Session.SponsorSessionId)));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("intents")]
@@ -596,6 +548,131 @@ public sealed class CodexParticipationController : ControllerBase
             receipts = receipts ?? Array.Empty<ContributionReceiptDto>(),
             badges = badges ?? Array.Empty<BadgeDto>(),
             recognition
+        };
+
+    private static object BuildContributionEnvelope(
+        SponsorSessionStatusDto? session,
+        JsonObject? fleet = null,
+        IReadOnlyList<BadgeDto>? badges = null)
+    {
+        if (session is null)
+        {
+            return new
+            {
+                contribution = (object?)null,
+                status = "ready_to_start",
+                phase = "start",
+                heading = "Start contributing",
+                support = "Authorize a temporary Codex contribution lane in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review.",
+                statusLine = "You can stop or revoke this later from your account.",
+                auth = new
+                {
+                    verificationUri = (string?)null,
+                    userCode = (string?)null,
+                    pollAfterMs = 3000
+                },
+                badge = (object?)null,
+                details = (object?)null,
+                actions = new
+                {
+                    explainHref = "/participate",
+                    homeHref = "/home",
+                    accountHref = "/account"
+                }
+            };
+        }
+
+        var phase = ResolveContributionPhase(session);
+        var activeBadge = badges?
+            .FirstOrDefault(badge =>
+                string.Equals(badge.Key, "contributor-ready", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase));
+
+        return new
+        {
+            contribution = new
+            {
+                contributionId = session.SponsorSessionId,
+                sponsorSessionId = session.SponsorSessionId,
+                phase,
+                status = session.Status,
+                authReady = session.AuthorizedAtUtc is not null,
+                createdAtUtc = session.CreatedAtUtc,
+                updatedAtUtc = session.UpdatedAtUtc
+            },
+            status = session.Status,
+            phase,
+            heading = ResolveContributionHeading(phase),
+            support = ResolveContributionSupport(phase),
+            statusLine = ResolveContributionStatusLine(session),
+            auth = new
+            {
+                verificationUri = session.DeviceAuthVerificationUri,
+                userCode = session.DeviceAuthUserCode,
+                pollAfterMs = 3000
+            },
+            badge = activeBadge is null
+                ? null
+                : new
+                {
+                    key = activeBadge.Key,
+                    label = activeBadge.Label,
+                    note = "This is a thank-you marker only. Contribution credit appears later after validated work."
+                },
+            details = new
+            {
+                contributionId = session.SponsorSessionId,
+                fleetLaneId = session.FleetLaneId,
+                authStatus = session.Status,
+                authReadyAtUtc = session.AuthorizedAtUtc,
+                authorizationTier = session.AuthorizationTier,
+                requestedLaneRole = session.RequestedLaneRole,
+                projectId = session.ProjectId
+            },
+            actions = new
+            {
+                explainHref = "/participate",
+                homeHref = "/home",
+                accountHref = "/account"
+            },
+            fleet
+        };
+    }
+
+    private static string ResolveContributionPhase(SponsorSessionStatusDto session)
+        => session.Status switch
+        {
+            "active" => "complete",
+            "stopped" => "start",
+            "revoked" => "start",
+            _ => "authorize"
+        };
+
+    private static string ResolveContributionHeading(string phase)
+        => phase switch
+        {
+            "complete" => "Thanks, you're set",
+            "authorize" => "Authorize in ChatGPT",
+            _ => "Start contributing"
+        };
+
+    private static string ResolveContributionSupport(string phase)
+        => phase switch
+        {
+            "complete" => "Your contribution lane is linked. Chummer will only count receipt-backed work after validation and review.",
+            "authorize" => "Open the authorization page, enter the one-time code, and keep this page open while Chummer watches for confirmation.",
+            _ => "Authorize a temporary Codex contribution lane in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review."
+        };
+
+    private static string ResolveContributionStatusLine(SponsorSessionStatusDto session)
+        => session.Status switch
+        {
+            "lane_pending" => "Authorization is confirmed. Chummer is finishing lane setup.",
+            "active" => "You can leave this page now. Stop or revoke later from your account or technical details.",
+            "waiting_for_slot" => "Authorization is complete. Fleet is waiting for the next available contribution slot.",
+            "stopped" => "This contribution lane has been stopped. You can start again whenever you want.",
+            "revoked" => "This contribution lane has been revoked. Start a new one if you want to contribute again.",
+            _ => "Waiting for confirmation from ChatGPT..."
         };
 
     private SponsorSessionStatusDto? TryGetOwnedSession(string sponsorSessionId, string subjectId, out ActionResult? denied)

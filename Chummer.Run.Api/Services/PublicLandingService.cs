@@ -42,7 +42,7 @@ public sealed class PublicLandingService
         var featureRegistry = File.ReadAllLines(featureRegistryPath);
         var assetRegistry = File.ReadAllLines(assetRegistryPath);
 
-        return new PublicLandingSurfaceDto(
+        var surface = new PublicLandingSurfaceDto(
             Product: RequiredScalar(manifest, "product"),
             Surface: RequiredScalar(manifest, "surface"),
             Version: ParseInt(RequiredScalar(manifest, "version"), "version"),
@@ -116,6 +116,9 @@ public sealed class PublicLandingService
                     Pain: Optional(item, "pain"),
                     Payoff: Optional(item, "payoff")))
                 .ToArray());
+
+        ValidateAssets(surface, repoRoot);
+        return surface;
     }
 
     public IReadOnlyList<PublicFeatureCardDto> CardsForBucket(PublicLandingSurfaceDto surface, string bucket)
@@ -172,6 +175,55 @@ public sealed class PublicLandingService
         }
 
         throw new DirectoryNotFoundException("Unable to resolve a repo root that contains the mirrored public landing manifest.");
+    }
+
+    private static void ValidateAssets(PublicLandingSurfaceDto surface, string repoRoot)
+    {
+        var webRoot = Path.Combine(repoRoot, "Chummer.Run.Api", "wwwroot");
+        ValidateAsset(surface.Assets.FirstOrDefault(static asset => string.Equals(asset.AssetSlot, "section_hero", StringComparison.Ordinal)), "section_hero", webRoot, requireMobilePoster: true);
+
+        foreach (var slot in surface.FeatureCards
+                     .Select(static card => card.AssetSlot)
+                     .Distinct(StringComparer.Ordinal))
+        {
+            ValidateAsset(surface.Assets.FirstOrDefault(asset => string.Equals(asset.AssetSlot, slot, StringComparison.Ordinal)), slot, webRoot, requireMobilePoster: true);
+        }
+    }
+
+    private static void ValidateAsset(PublicLandingAssetDto? asset, string slot, string webRoot, bool requireMobilePoster)
+    {
+        if (asset is null)
+        {
+            throw new InvalidOperationException($"missing public landing asset slot: {slot}");
+        }
+
+        if (string.IsNullOrWhiteSpace(asset.PosterUrl))
+        {
+            throw new InvalidOperationException($"public landing asset '{slot}' is missing poster_url.");
+        }
+
+        if (requireMobilePoster && string.IsNullOrWhiteSpace(asset.MobilePosterUrl))
+        {
+            throw new InvalidOperationException($"public landing asset '{slot}' is missing mobile_poster_url.");
+        }
+
+        ValidateStaticAssetPath(asset.PosterUrl, webRoot, slot, "poster_url");
+        ValidateStaticAssetPath(asset.MobilePosterUrl, webRoot, slot, "mobile_poster_url");
+    }
+
+    private static void ValidateStaticAssetPath(string? url, string webRoot, string slot, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(url) || Uri.TryCreate(url, UriKind.Absolute, out _))
+        {
+            return;
+        }
+
+        var relative = url.Trim().TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var candidate = Path.GetFullPath(Path.Combine(webRoot, relative));
+        if (!candidate.StartsWith(webRoot, StringComparison.Ordinal) || !File.Exists(candidate))
+        {
+            throw new InvalidOperationException($"public landing asset '{slot}' references missing {fieldName}: {url}");
+        }
     }
 
     private static string RequiredScalar(IReadOnlyList<string> lines, string key)

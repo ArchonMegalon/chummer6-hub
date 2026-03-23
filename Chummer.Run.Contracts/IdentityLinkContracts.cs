@@ -46,6 +46,19 @@ public sealed record LinkEmailIdentityRequest(
     [Required(AllowEmptyStrings = false), EmailAddress, StringLength(256)] string Email,
     bool MakePrimary = true);
 
+public sealed record StartRecoveryEmailLinkRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), EmailAddress, StringLength(256)] string Email,
+    string? NextPath = null);
+
+public sealed record RecoveryEmailLinkStartResponse(
+    string Email,
+    string LinkStatus,
+    string DeliveryMode,
+    string PreviewNote,
+    string? PreviewHref,
+    DateTimeOffset ExpiresAtUtc);
+
 public sealed record ConfirmIdentityLinkRequest(
     [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
     [Required(AllowEmptyStrings = false), StringLength(128)] string IdentityLinkId);

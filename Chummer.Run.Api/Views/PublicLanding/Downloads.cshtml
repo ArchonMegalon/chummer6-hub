@@ -1,0 +1,48 @@
+@model DownloadsPageViewModel
+@{
+    ViewData["Title"] = "Downloads";
+    ViewData["Chrome"] = Model.Chrome;
+}
+
+<section class="section-band">
+    <div class="page-lead">
+        <p class="eyebrow">Downloads</p>
+        <h1 class="page-title">@Model.Manifest.Version</h1>
+        <p class="page-copy">@Model.Manifest.Channel channel · published @Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd")</p>
+        <p class="muted-copy">Every row keeps the artifact name, size, checksum, and direct button in one clean shelf.</p>
+    </div>
+    <div class="table-shell">
+        <table>
+            <thead>
+                <tr>
+                    <th>Platform</th>
+                    <th>Artifact</th>
+                    <th>Size</th>
+                    <th>Checksum</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Manifest.Downloads.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5">@Model.Manifest.Message</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var download in Model.Manifest.Downloads)
+                    {
+                        <tr>
+                            <td>@download.Platform</td>
+                            <td>@download.Id</td>
+                            <td>@(download.SizeBytes is long size ? $"{Math.Round(size / 1024d, 1)} KB" : "Unknown")</td>
+                            <td><code class="privacy-note">@download.Sha256[..Math.Min(download.Sha256.Length, 16)]…</code></td>
+                            <td><a class="button-like button-like--primary" href="@download.Url">Download</a></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>

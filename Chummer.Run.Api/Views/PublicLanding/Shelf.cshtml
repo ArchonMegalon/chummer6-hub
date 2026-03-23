@@ -1,0 +1,29 @@
+@model ShelfPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+}
+
+<section class="section-band">
+    <div class="page-lead">
+        <p class="eyebrow">@Model.Eyebrow</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+    </div>
+    <div class="shelf-stack">
+        @foreach (var card in Model.Items)
+        {
+            var asset = Model.Assets.ForCard(card);
+            <article class="shelf-item">
+                @if (asset is not null)
+                {
+                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                }
+                <span class="tag">@card.Badge</span>
+                <h2>@card.Title</h2>
+                <p>@card.Summary</p>
+                <a class="inline-link" href="@card.Href">Open</a>
+            </article>
+        }
+    </div>
+</section>

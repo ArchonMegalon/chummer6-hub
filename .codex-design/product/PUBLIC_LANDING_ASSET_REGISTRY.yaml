@@ -5,8 +5,8 @@ assets:
   - asset_slot: section_hero
     section_id: hero
     media_kind: premium_still
-    poster_url:
-    mobile_poster_url:
+    poster_url: /media/landing/hero-dossier-glass.svg
+    mobile_poster_url: /media/landing/hero-dossier-glass.svg
     loop_url:
     alt: Night boulevard reflections, dossier glass, and grounded proof cards arranged as one deliberate front door.
     caption: Proof shelf front door
@@ -15,8 +15,8 @@ assets:
   - asset_slot: scene_archive_stair
     section_id: shared_card_media
     media_kind: still
-    poster_url:
-    mobile_poster_url:
+    poster_url: /media/landing/scene-archive-stair.svg
+    mobile_poster_url: /media/landing/scene-archive-stair.svg
     loop_url:
     alt: Warm archive shelves and annotated guide cards arranged for a grounded first-pass explainer surface.
     caption: Guide shelf still
@@ -25,8 +25,8 @@ assets:
   - asset_slot: scene_dossier_desk
     section_id: shared_card_media
     media_kind: still
-    poster_url:
-    mobile_poster_url:
+    poster_url: /media/landing/scene-dossier-desk.svg
+    mobile_poster_url: /media/landing/scene-dossier-desk.svg
     loop_url:
     alt: Desk spread of proof pages, mission notes, and release badges under a soft lamp.
     caption: Proof packet still
@@ -35,8 +35,8 @@ assets:
   - asset_slot: scene_facility_exterior
     section_id: shared_card_media
     media_kind: still
-    poster_url:
-    mobile_poster_url:
+    poster_url: /media/landing/scene-facility-exterior.svg
+    mobile_poster_url: /media/landing/scene-facility-exterior.svg
     loop_url:
     alt: Quiet runsite exterior with release-crate lighting and disciplined signage.
     caption: Runsite approach still
@@ -45,8 +45,8 @@ assets:
   - asset_slot: scene_boulevard_of_futures
     section_id: shared_card_media
     media_kind: still
-    poster_url:
-    mobile_poster_url:
+    poster_url: /media/landing/scene-boulevard-of-futures.svg
+    mobile_poster_url: /media/landing/scene-boulevard-of-futures.svg
     loop_url:
     alt: City reflections and disciplined horizon markers arranged like a believable future shelf.
     caption: Future lanes still
@@ -55,8 +55,8 @@ assets:
   - asset_slot: scene_simulation_bench
     section_id: shared_card_media
     media_kind: still
-    poster_url:
-    mobile_poster_url:
+    poster_url: /media/landing/scene-simulation-bench.svg
+    mobile_poster_url: /media/landing/scene-simulation-bench.svg
     loop_url:
     alt: Clean rules lab with receipts, measured overlays, and grounded instrument light.
     caption: Rules lab still
@@ -65,8 +65,8 @@ assets:
   - asset_slot: scene_streetfront
     section_id: shared_card_media
     media_kind: still
-    poster_url:
-    mobile_poster_url:
+    poster_url: /media/landing/scene-streetfront.svg
+    mobile_poster_url: /media/landing/scene-streetfront.svg
     loop_url:
     alt: Rain-lit continuity lane with subtle wayfinding for a local-first session shell.
     caption: Continuity lane still
@@ -75,8 +75,8 @@ assets:
   - asset_slot: scene_solo_operator
     section_id: shared_card_media
     media_kind: still
-    poster_url:
-    mobile_poster_url:
+    poster_url: /media/landing/scene-solo-operator.svg
+    mobile_poster_url: /media/landing/scene-solo-operator.svg
     loop_url:
     alt: Focused participation workstation showing a calm account posture without maintainer jargon.
     caption: Participation lane still
@@ -85,8 +85,8 @@ assets:
   - asset_slot: scene_prop_cluster
     section_id: shared_card_media
     media_kind: still
-    poster_url:
-    mobile_poster_url:
+    poster_url: /media/landing/scene-prop-cluster.svg
+    mobile_poster_url: /media/landing/scene-prop-cluster.svg
     loop_url:
     alt: Cluster of primers, props, and artifact mockups arranged like a finished teaser shelf.
     caption: Artifact teaser still

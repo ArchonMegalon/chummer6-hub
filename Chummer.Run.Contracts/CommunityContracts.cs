@@ -23,6 +23,22 @@ public sealed record UpsertHubUserProfileRequest(
     string? Timezone = null,
     string? CountryCode = null);
 
+public sealed record HubUserExperienceDto(
+    string UserId,
+    IReadOnlyList<string> LaneInterests,
+    bool FollowHorizons,
+    bool BetaInterest,
+    bool OnboardingCompleted,
+    DateTimeOffset? OnboardingCompletedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record UpsertHubUserExperienceRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    IReadOnlyList<string>? LaneInterests = null,
+    bool? FollowHorizons = null,
+    bool? BetaInterest = null,
+    bool? OnboardingCompleted = null);
+
 public sealed record GroupRoleDto(
     string Role,
     string DisplayName,
