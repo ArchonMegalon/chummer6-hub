@@ -807,7 +807,7 @@ async Task VerifyPublicLandingProjectionAsync()
             HttpContext = new DefaultHttpContext()
         }
     };
-    var progressController = new PublicProgressController(progress)
+    var progressController = new PublicProgressController(progress, landing)
     {
         ControllerContext = new ControllerContext
         {
@@ -838,6 +838,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(progressHtml.Contains("Mission Control &amp; AI Runtime", StringComparison.Ordinal), "progress page should render the generated product-part report");
     Assert(progressHtml.Contains("/api/public/progress-poster.svg", StringComparison.Ordinal), "progress page should render against the hosted poster route");
     Assert(progressHtml.Contains("How to participate", StringComparison.Ordinal), "progress page should expose the participation section");
+    Assert(progressHtml.Contains("Chummer public navigation", StringComparison.Ordinal), "progress page should render inside the shared public shell");
+    Assert(progressHtml.Contains(">Progress report<", StringComparison.Ordinal), "progress page shell should mark the progress route as current in navigation");
+    Assert(progressHtml.Contains("href=\"/participate\"", StringComparison.Ordinal), "progress page navigation should link back into the public participation flow");
 
     var progressJson = progressController.ProgressReport().Content ?? string.Empty;
     using (var progressDocument = JsonDocument.Parse(progressJson))
