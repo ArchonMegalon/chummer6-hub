@@ -1,6 +1,6 @@
 product: chummer
 surface: chummer.run
-version: 1
+version: 2
 assets:
   - asset_slot: section_hero
     section_id: hero
@@ -61,15 +61,15 @@ assets:
   - asset_slot: scene_archive_stair
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/campaign/capability-check-rules.png
-    poster_avif_url: /media/campaign/capability-check-rules.avif
-    poster_webp_url: /media/campaign/capability-check-rules.webp
-    mobile_poster_url: /media/campaign/capability-check-rules.png
-    mobile_poster_avif_url: /media/campaign/capability-check-rules.avif
-    mobile_poster_webp_url: /media/campaign/capability-check-rules.webp
+    poster_url: /media/campaign/scene-archive-stair.png
+    poster_avif_url: /media/campaign/scene-archive-stair.avif
+    poster_webp_url: /media/campaign/scene-archive-stair.webp
+    mobile_poster_url: /media/campaign/scene-archive-stair.png
+    mobile_poster_avif_url: /media/campaign/scene-archive-stair.avif
+    mobile_poster_webp_url: /media/campaign/scene-archive-stair.webp
     loop_url:
-    alt: Product story still with grounded source review, quiet desk objects, and blue-lit verification detail.
-    caption: Product story image
+    alt: Knowledge archive interior with dossier drawers, proof objects, and two people moving through the product story.
+    caption: Archive story image
     motion_policy: stills_only
     fallback_style: archive_paper
   - asset_slot: scene_dossier_desk
@@ -89,15 +89,15 @@ assets:
   - asset_slot: scene_facility_exterior
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/campaign/release-current-build.png
-    poster_avif_url: /media/campaign/release-current-build.avif
-    poster_webp_url: /media/campaign/release-current-build.webp
-    mobile_poster_url: /media/campaign/release-current-build.png
-    mobile_poster_avif_url: /media/campaign/release-current-build.avif
-    mobile_poster_webp_url: /media/campaign/release-current-build.webp
+    poster_url: /media/campaign/scene-facility-exterior.png
+    poster_avif_url: /media/campaign/scene-facility-exterior.avif
+    poster_webp_url: /media/campaign/scene-facility-exterior.webp
+    mobile_poster_url: /media/campaign/scene-facility-exterior.png
+    mobile_poster_avif_url: /media/campaign/scene-facility-exterior.avif
+    mobile_poster_webp_url: /media/campaign/scene-facility-exterior.webp
     loop_url:
-    alt: Blue-toned release environment with disciplined packaging and quiet integrity cues.
-    caption: Release shelf image
+    alt: Night exterior of a controlled release facility with a courier transfer and disciplined rollout cues.
+    caption: Release facility image
     motion_policy: stills_only
     fallback_style: facility_cyan_night
   - asset_slot: scene_boulevard_of_futures
@@ -117,15 +117,15 @@ assets:
   - asset_slot: scene_simulation_bench
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/campaign/capability-check-rules.png
-    poster_avif_url: /media/campaign/capability-check-rules.avif
-    poster_webp_url: /media/campaign/capability-check-rules.webp
-    mobile_poster_url: /media/campaign/capability-check-rules.png
-    mobile_poster_avif_url: /media/campaign/capability-check-rules.avif
-    mobile_poster_webp_url: /media/campaign/capability-check-rules.webp
+    poster_url: /media/campaign/scene-simulation-bench.png
+    poster_avif_url: /media/campaign/scene-simulation-bench.avif
+    poster_webp_url: /media/campaign/scene-simulation-bench.webp
+    mobile_poster_url: /media/campaign/scene-simulation-bench.png
+    mobile_poster_avif_url: /media/campaign/scene-simulation-bench.avif
+    mobile_poster_webp_url: /media/campaign/scene-simulation-bench.webp
     loop_url:
-    alt: Precision rules lab with receipt traces, measured overlays, and calm blue instrument light.
-    caption: Rules lab image
+    alt: Simulation bench with cyberware parts, magical focus objects, measured traces, and paired review posture.
+    caption: Simulation bench image
     motion_policy: stills_only
     fallback_style: simulation_amber
   - asset_slot: scene_streetfront
@@ -159,15 +159,15 @@ assets:
   - asset_slot: scene_prop_cluster
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/campaign/lane-creator.png
-    poster_avif_url: /media/campaign/lane-creator.avif
-    poster_webp_url: /media/campaign/lane-creator.webp
-    mobile_poster_url: /media/campaign/lane-creator.png
-    mobile_poster_avif_url: /media/campaign/lane-creator.avif
-    mobile_poster_webp_url: /media/campaign/lane-creator.webp
+    poster_url: /media/campaign/scene-prop-cluster.png
+    poster_avif_url: /media/campaign/scene-prop-cluster.avif
+    poster_webp_url: /media/campaign/scene-prop-cluster.webp
+    mobile_poster_url: /media/campaign/scene-prop-cluster.png
+    mobile_poster_avif_url: /media/campaign/scene-prop-cluster.avif
+    mobile_poster_webp_url: /media/campaign/scene-prop-cluster.webp
     loop_url:
-    alt: Creator workstation with package fragments, media elements, and receipt-linked artifacts under calm blue light.
-    caption: Creator image
+    alt: Creator proof cluster with scanner, camera, sealed proofs, and careful publishing review under blue desk light.
+    caption: Creator proof image
     motion_policy: stills_only
     fallback_style: prop_table
   - asset_slot: lane_player
