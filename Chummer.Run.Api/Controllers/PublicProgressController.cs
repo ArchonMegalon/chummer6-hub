@@ -124,6 +124,7 @@ public sealed class PublicProgressController : ControllerBase
       letter-spacing: .16em;
       text-transform: uppercase;
       font-weight: 700;
+      transition: color .18s ease, transform .18s ease;
     }
     .progress-shell-nav {
       display: flex;
@@ -135,6 +136,16 @@ public sealed class PublicProgressController : ControllerBase
     .progress-shell-nav a {
       color: inherit;
       text-decoration: none;
+      transition: color .18s ease;
+    }
+    .progress-shell-brand:hover,
+    .progress-shell-brand:focus-visible {
+      color: #fff;
+      transform: translateY(-1px);
+    }
+    .progress-shell-nav a:hover,
+    .progress-shell-nav a:focus-visible {
+      color: #fff;
     }
     .progress-shell-nav-current {
       color: var(--text);
@@ -184,7 +195,8 @@ public sealed class PublicProgressController : ControllerBase
       background: rgba(255,255,255,.06);
       border-color: rgba(255,255,255,.16);
     }
-    .progress-shell-action:hover {
+    .progress-shell-action:hover,
+    .progress-shell-action:focus-visible {
       transform: translateY(-1px);
       border-color: rgba(255,255,255,.42);
       background: rgba(255,255,255,.07);
