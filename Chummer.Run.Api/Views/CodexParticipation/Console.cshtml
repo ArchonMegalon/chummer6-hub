@@ -138,7 +138,7 @@
                 <p>Open the authorization page, sign in to ChatGPT, and enter the one-time code shown below. If the code expires, ask for a fresh one.</p>
             </div>
             <div class="stacked-actions">
-                <a id="openAuthorizationLink" class="button-like button-like--primary" href="#" target="_blank" rel="noreferrer noopener">Open authorization page</a>
+                <button id="openAuthorizationLink" class="button-like button-like--primary" type="button" disabled>Open authorization page</button>
                 <button id="copyCodeButton" class="button-like button-like--secondary" type="button">Copy code</button>
                 <button id="refreshAuthorizationButton" class="button-like button-like--ghost" type="button">Get a fresh code</button>
             </div>
@@ -420,7 +420,8 @@ function render(data) {
   const authorizationLink = document.getElementById("openAuthorizationLink");
   const copyCodeButton = document.getElementById("copyCodeButton");
   const authorizationCode = document.getElementById("authorizationCode");
-  authorizationLink.href = auth.verificationUri || "#";
+  authorizationLink.dataset.href = auth.verificationUri || "";
+  authorizationLink.disabled = !auth.verificationUri;
   authorizationLink.setAttribute("aria-disabled", auth.verificationUri ? "false" : "true");
   authorizationLink.classList.toggle("button-like--disabled", !auth.verificationUri);
   copyCodeButton.disabled = !auth.userCode;
@@ -540,9 +541,12 @@ document.querySelector("[data-close-participation-dialog]").addEventListener("cl
   setDialogOpen(false);
 });
 document.getElementById("openAuthorizationLink").addEventListener("click", (event) => {
-  if (!event.currentTarget.getAttribute("href") || event.currentTarget.getAttribute("href") === "#") {
-    event.preventDefault();
+  const href = event.currentTarget.dataset.href;
+  if (!href) {
+    return;
   }
+
+  window.open(href, "_blank", "noopener,noreferrer");
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !dialog.hidden) {
