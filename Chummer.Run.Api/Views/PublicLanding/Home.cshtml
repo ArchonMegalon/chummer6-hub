@@ -210,9 +210,9 @@
 @section Scripts {
 <script>
 (() => {
+  const ui = window.ChummerUi;
   const dialog = document.getElementById("home-onboarding");
   if (!dialog) return;
-  const antiForgeryToken = document.querySelector("input[name='__RequestVerificationToken']")?.value || "";
   const panels = Array.from(dialog.querySelectorAll("[data-step-panel]"));
   const nextButton = dialog.querySelector("[data-onboarding-next]");
   const backButton = dialog.querySelector("[data-onboarding-back]");
@@ -241,23 +241,6 @@
     errorNode.textContent = "";
     errorNode.classList.remove("status-copy--error", "status-copy--success");
   };
-  const setBusy = (button, busy, busyLabel) => {
-    if (!button) return;
-    if (!button.dataset.defaultLabel) {
-      button.dataset.defaultLabel = button.textContent || "";
-    }
-    button.disabled = busy;
-    button.textContent = busy ? busyLabel : button.dataset.defaultLabel;
-  };
-  const parseJson = async (response) => {
-    const text = await response.text();
-    if (!text) return {};
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { detail: text };
-    }
-  };
 
   const showStep = (index) => {
     step = index;
@@ -276,61 +259,48 @@
   dialog.querySelector("#onboardingForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     clearStatus();
-    const jsonHeaders = {
-      "Content-Type": "application/json",
-      ...(antiForgeryToken ? { "RequestVerificationToken": antiForgeryToken } : {})
-    };
     const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
     const laneInterests = Array.from(dialog.querySelectorAll("[data-step-panel='2'] input[type='checkbox']:checked")).map((input) => input.value);
-    setBusy(submitButton, true, "Saving...");
+    ui.setButtonBusy(submitButton, true, "Saving...");
 
     try {
-      const profileResponse = await fetch("/api/v1/accounts/me/profile", {
+      await ui.requestJson("/api/v1/accounts/me/profile", {
         method: "POST",
-        headers: jsonHeaders,
-        body: JSON.stringify({
+        json: {
           subjectId,
           displayName: document.getElementById("onboardingDisplayName").value,
           handle: document.getElementById("onboardingHandle").value,
           timezone: document.getElementById("onboardingTimezone").value,
           visibility: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.Visibility))
-        })
+        }
       });
-      const profilePayload = await parseJson(profileResponse);
-      if (!profileResponse.ok) throw new Error(profilePayload.detail || "Profile save failed.");
 
       const recoveryField = document.getElementById("onboardingRecoveryEmail");
       if (recoveryField && recoveryField.value.trim().length > 0) {
-        const recoveryResponse = await fetch("/api/v1/accounts/me/links/email/start", {
+        const recoveryPayload = await ui.requestJson("/api/v1/accounts/me/links/email/start", {
           method: "POST",
-          headers: jsonHeaders,
-          body: JSON.stringify({
+          json: {
             subjectId,
             email: recoveryField.value.trim(),
             nextPath: "/home"
-          })
+          }
         });
-        const recoveryPayload = await parseJson(recoveryResponse);
-        if (!recoveryResponse.ok) throw new Error(recoveryPayload.detail || "Recovery email save failed.");
         if (recoveryPayload.previewHref) {
           window.location.href = recoveryPayload.previewHref;
           return;
         }
       }
 
-      const preferencesResponse = await fetch("/api/v1/accounts/me/preferences", {
+      const preferencesPayload = await ui.requestJson("/api/v1/accounts/me/preferences", {
         method: "POST",
-        headers: jsonHeaders,
-        body: JSON.stringify({
+        json: {
           subjectId,
           laneInterests,
           followHorizons: document.getElementById("onboardingFollow").checked,
           betaInterest: document.getElementById("onboardingBeta").checked,
           onboardingCompleted: true
-        })
+        }
       });
-      const preferencesPayload = await parseJson(preferencesResponse);
-      if (!preferencesResponse.ok) throw new Error(preferencesPayload.detail || "Preference save failed.");
 
       const followCount = (preferencesPayload.followHorizons ? 1 : 0) + (preferencesPayload.betaInterest ? 1 : 0);
       setupState.textContent = "Ready";
@@ -351,9 +321,9 @@
         clearStatus();
       }, 900);
     } catch (error) {
-      setStatus(error.message || "Setup could not be saved right now.", true);
+      setStatus(ui.describeError(error, "Setup could not be saved right now."), true);
     } finally {
-      setBusy(submitButton, false, "");
+      ui.setButtonBusy(submitButton, false, "Saving...");
     }
   });
 })();

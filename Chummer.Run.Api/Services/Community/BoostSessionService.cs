@@ -243,18 +243,20 @@ public sealed class BoostSessionService
             {
                 lock (_store.Gate)
                 {
-                    state.Status = "waiting_for_slot";
-                    state.UpdatedAtUtc = DateTimeOffset.UtcNow;
-                    state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "waiting_for_slot", "Fleet is at sponsor-lane capacity. Your sponsor session is queued for the next available slot.", DateTimeOffset.UtcNow));
-                    _store.PersistLocked();
-                    return (state.Snapshot(), new JsonObject
-                    {
-                        ["lane"] = new JsonObject
-                        {
-                            ["status"] = "waiting_for_slot",
-                            ["lane_role"] = state.RequestedLaneRole,
-                        },
-                    });
+                    return QueueForCapacityLocked(
+                        state,
+                        "Fleet is at sponsor-lane capacity. Your sponsor session is queued for the next available slot.",
+                        includeLaneId: false);
+                }
+            }
+            catch (ParticipationUnavailableException) when (ShouldQueueAfterCreateFailure(state))
+            {
+                lock (_store.Gate)
+                {
+                    return QueueForCapacityLocked(
+                        state,
+                        "Another contribution lane is already occupying the current project slot. Your sponsor session is queued for the next available slot.",
+                        includeLaneId: false);
                 }
             }
             catch (InvalidOperationException ex) when (IsInfrastructureLaneFailure(ex))
@@ -315,19 +317,20 @@ public sealed class BoostSessionService
         {
             lock (_store.Gate)
             {
-                state.Status = "waiting_for_slot";
-                state.UpdatedAtUtc = DateTimeOffset.UtcNow;
-                state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "waiting_for_slot", "Fleet could not activate the lane yet because all sponsor slots are busy.", DateTimeOffset.UtcNow));
-                _store.PersistLocked();
-                return (state.Snapshot(), new JsonObject
-                {
-                    ["lane"] = new JsonObject
-                    {
-                        ["lane_id"] = state.FleetLaneId,
-                        ["status"] = "waiting_for_slot",
-                        ["lane_role"] = state.RequestedLaneRole,
-                    },
-                });
+                return QueueForCapacityLocked(
+                    state,
+                    "Fleet could not activate the lane yet because all sponsor slots are busy.",
+                    includeLaneId: true);
+            }
+        }
+        catch (ParticipationUnavailableException) when (ShouldQueueAfterActivationFailure(state))
+        {
+            lock (_store.Gate)
+            {
+                return QueueForCapacityLocked(
+                    state,
+                    "Another contribution lane is already occupying the current project slot. Chummer will finish activation when the next slot opens.",
+                    includeLaneId: true);
             }
         }
         catch (InvalidOperationException ex) when (IsInfrastructureLaneFailure(ex))
@@ -687,6 +690,59 @@ public sealed class BoostSessionService
             || string.Equals(status, "warming", StringComparison.OrdinalIgnoreCase)
             || string.Equals(status, "consented", StringComparison.OrdinalIgnoreCase)
             || string.Equals(status, "intent_created", StringComparison.OrdinalIgnoreCase);
+
+    private bool ShouldQueueAfterCreateFailure(SponsorSessionState state)
+    {
+        lock (_store.Gate)
+        {
+            return HasProjectCapacityPressureLocked(state, includeCurrentLane: false);
+        }
+    }
+
+    private bool ShouldQueueAfterActivationFailure(SponsorSessionState state)
+    {
+        lock (_store.Gate)
+        {
+            return HasProjectCapacityPressureLocked(state, includeCurrentLane: true);
+        }
+    }
+
+    private bool HasProjectCapacityPressureLocked(SponsorSessionState state, bool includeCurrentLane)
+        => _store.SponsorSessionsById.Values.Any(session =>
+            !string.Equals(session.SponsorSessionId, state.SponsorSessionId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(session.ProjectId, state.ProjectId, StringComparison.OrdinalIgnoreCase)
+            && session.StoppedAtUtc is null
+            && !IsTerminalContributionStatus(session.Status)
+            && (string.Equals(session.Status, "active", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(session.Status, "pending_auth", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(session.Status, "lane_pending", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(session.Status, "waiting_for_slot", StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrWhiteSpace(session.FleetLaneId) && includeCurrentLane)));
+
+    private (SponsorSessionStatusDto Session, JsonObject Fleet) QueueForCapacityLocked(
+        SponsorSessionState state,
+        string message,
+        bool includeLaneId)
+    {
+        state.Status = "waiting_for_slot";
+        state.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "waiting_for_slot", message, DateTimeOffset.UtcNow));
+        _store.PersistLocked();
+        var lane = new JsonObject
+        {
+            ["status"] = "waiting_for_slot",
+            ["lane_role"] = state.RequestedLaneRole,
+        };
+        if (includeLaneId && !string.IsNullOrWhiteSpace(state.FleetLaneId))
+        {
+            lane["lane_id"] = state.FleetLaneId;
+        }
+
+        return (state.Snapshot(), new JsonObject
+        {
+            ["lane"] = lane,
+        });
+    }
 
     private sealed record HubUserSubject(string SubjectId, string DisplayName);
 }

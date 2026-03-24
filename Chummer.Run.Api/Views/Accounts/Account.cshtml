@@ -238,106 +238,34 @@
 @section Scripts {
 <script>
 (() => {
-  const antiForgeryToken = document.querySelector("input[name='__RequestVerificationToken']")?.value || "";
-  const jsonHeaders = {
-    "Content-Type": "application/json",
-    ...(antiForgeryToken ? { "RequestVerificationToken": antiForgeryToken } : {})
-  };
+  const ui = window.ChummerUi;
   const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
-  const humanizeStatus = (value, fallback) => {
-    if (!value) return fallback;
-    const normalized = String(value).trim().toLowerCase();
-    switch (normalized) {
-      case "active":
-      case "linked":
-        return "Ready";
-      case "pending":
-        return "Pending";
-      case "pending_verification":
-        return "Verification sent";
-      case "verified":
-        return "Verified";
-      case "revoked":
-        return "Revoked";
-      default:
-        return String(value).replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
-    }
-  };
-
-  const setNotice = (node, message, isError = false) => {
-    if (!node) return;
-    node.hidden = false;
-    node.textContent = message;
-    node.classList.toggle("status-copy--error", isError);
-    node.classList.toggle("status-copy--success", !isError);
-  };
-
-  const clearNotice = (node) => {
-    if (!node) return;
-    node.hidden = true;
-    node.textContent = "";
-    node.classList.remove("status-copy--error", "status-copy--success");
-  };
-
-  const normalizeError = async (error, fallback) => {
-    if (error instanceof Error && error.message) {
-      return error.message;
-    }
-
-    return fallback;
-  };
-
-  const setBusy = (button, busy, busyLabel) => {
-    if (!button) return;
-    if (!button.dataset.defaultLabel) {
-      button.dataset.defaultLabel = button.textContent || "";
-    }
-
-    button.disabled = busy;
-    button.textContent = busy ? busyLabel : button.dataset.defaultLabel;
-  };
-
-  const call = async (url, body) => {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: jsonHeaders,
-      body: JSON.stringify(body)
-    });
-    const text = await response.text();
-    let data = {};
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = { detail: text };
-      }
-    }
-    if (!response.ok) throw new Error(data.detail || data.title || "Request failed.");
-    return data;
-  };
 
   document.getElementById("profileForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const notice = document.getElementById("profileStatusNotice");
     const button = event.currentTarget.querySelector("button[type='submit']");
-    clearNotice(notice);
-    setBusy(button, true, "Saving...");
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Saving...");
     try {
-      const profile = await call("/api/v1/accounts/me/profile", {
+      const profile = await ui.requestJson("/api/v1/accounts/me/profile", {
+        method: "POST",
+        json: {
         subjectId,
         displayName: document.getElementById("displayName").value,
         handle: document.getElementById("handle").value,
         timezone: document.getElementById("timezone").value,
         visibility: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.Visibility))
+        }
       });
       document.getElementById("displayName").value = profile.displayName || "";
       document.getElementById("handle").value = profile.handle || "";
       document.getElementById("timezone").value = profile.timezone || "";
-      setNotice(notice, "Profile saved.");
+      ui.setNotice(notice, "Profile saved.");
     } catch (error) {
-      setNotice(notice, await normalizeError(error, "Profile could not be saved right now."), true);
+      ui.setNotice(notice, ui.describeError(error, "Profile could not be saved right now."), true);
     } finally {
-      setBusy(button, false, "");
+      ui.setButtonBusy(button, false, "Saving...");
     }
   });
 
@@ -345,23 +273,26 @@
     event.preventDefault();
     const notice = document.getElementById("recoveryStatusNotice");
     const button = event.currentTarget.querySelector("button[type='submit']");
-    clearNotice(notice);
-    setBusy(button, true, "Starting...");
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Starting...");
     try {
-      const data = await call("/api/v1/accounts/me/links/email/start", {
+      const data = await ui.requestJson("/api/v1/accounts/me/links/email/start", {
+        method: "POST",
+        json: {
         subjectId,
         email: document.getElementById("recoveryEmail").value,
         nextPath: "/account"
+        }
       });
-      document.getElementById("recoveryEmailStatus").textContent = humanizeStatus(data.linkStatus, "Verification sent");
-      setNotice(notice, data.previewNote || "Check your email to finish verifying the recovery address.");
+      document.getElementById("recoveryEmailStatus").textContent = ui.humanizeStatus(data.linkStatus, "Verification sent");
+      ui.setNotice(notice, data.previewNote || "Check your email to finish verifying the recovery address.");
       if (data.previewHref) {
         window.location.href = data.previewHref;
       }
     } catch (error) {
-      setNotice(notice, await normalizeError(error, "Recovery email could not be started right now."), true);
+      ui.setNotice(notice, ui.describeError(error, "Recovery email could not be started right now."), true);
     } finally {
-      setBusy(button, false, "");
+      ui.setButtonBusy(button, false, "Starting...");
     }
   });
 
@@ -369,20 +300,23 @@
     event.preventDefault();
     const notice = document.getElementById("telegramStatusNotice");
     const button = event.currentTarget.querySelector("button[type='submit']");
-    clearNotice(notice);
-    setBusy(button, true, "Saving...");
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Saving...");
     try {
-      await call("/api/v1/accounts/me/channels", {
+      await ui.requestJson("/api/v1/accounts/me/channels", {
+        method: "POST",
+        json: {
         subjectId,
         channelKind: "telegram_official_bot",
         channelHandle: document.getElementById("telegramHandle").value,
         notificationsEnabled: true
+        }
       });
-      setNotice(notice, "Telegram companion settings saved.");
+      ui.setNotice(notice, "Telegram companion settings saved.");
     } catch (error) {
-      setNotice(notice, await normalizeError(error, "Telegram companion settings could not be saved."), true);
+      ui.setNotice(notice, ui.describeError(error, "Telegram companion settings could not be saved."), true);
     } finally {
-      setBusy(button, false, "");
+      ui.setButtonBusy(button, false, "Saving...");
     }
   });
 
@@ -391,22 +325,25 @@
     const notice = document.getElementById("experienceStatusNotice");
     const laneInterests = Array.from(document.querySelectorAll("#experienceForm input[type='checkbox'][value]:checked")).map((input) => input.value);
     const button = event.currentTarget.querySelector("button[type='submit']");
-    clearNotice(notice);
-    setBusy(button, true, "Saving...");
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Saving...");
     try {
-      await call("/api/v1/accounts/me/preferences", {
+      await ui.requestJson("/api/v1/accounts/me/preferences", {
+        method: "POST",
+        json: {
         subjectId,
         laneInterests,
         followHorizons: document.getElementById("followHorizons").checked,
         betaInterest: document.getElementById("betaInterest").checked,
         onboardingCompleted: true
+        }
       });
       document.getElementById("participationOverviewState").textContent = "Configured";
-      setNotice(notice, "Participation settings saved.");
+      ui.setNotice(notice, "Participation settings saved.");
     } catch (error) {
-      setNotice(notice, await normalizeError(error, "Participation settings could not be saved."), true);
+      ui.setNotice(notice, ui.describeError(error, "Participation settings could not be saved."), true);
     } finally {
-      setBusy(button, false, "");
+      ui.setButtonBusy(button, false, "Saving...");
     }
   });
 })();

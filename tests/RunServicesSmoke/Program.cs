@@ -1156,6 +1156,69 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     Assert(string.Equals(waitingResult.Session.Status, "waiting_for_slot", StringComparison.OrdinalIgnoreCase), "capacity pressure should move sponsor sessions into waiting_for_slot instead of throwing.");
     Assert(string.Equals(waitingResult.Session.RequestedLaneRole, "review", StringComparison.OrdinalIgnoreCase), "waiting sessions should keep the requested sponsor role.");
 
+    var occupiedBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/internal/participant-lanes")
+        {
+            return JsonResponse(new
+            {
+                lane = new
+                {
+                    lane_id = "participant-occupied",
+                    status = "pending_auth",
+                    authorization_tier = "unknown",
+                    tier_source = "unknown",
+                    telemetry = new
+                    {
+                        auth_ready = false,
+                    },
+                },
+            });
+        }
+
+        if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == "/api/internal/participant-lanes/participant-occupied/device-auth/start")
+        {
+            return JsonResponse(new
+            {
+                lane = new
+                {
+                    lane_id = "participant-occupied",
+                    status = "pending_auth",
+                    device_auth = new
+                    {
+                        verification_uri = "https://example.com/device",
+                        user_code = "OCCUPIED-CODE",
+                        auth_ready = false,
+                    },
+                    telemetry = new
+                    {
+                        auth_ready = false,
+                    },
+                },
+            });
+        }
+
+        return JsonResponse(new { detail = "unexpected fleet call" }, HttpStatusCode.InternalServerError);
+    })), configuration);
+    var occupiedSessions = new BoostSessionService(store, accounts, groups, occupiedBridge, rewards);
+    var occupiedSession = occupiedSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.demo",
+        ProjectId: "hub",
+        SubjectLabel: "Runner Demo"));
+    occupiedSessions.RecordConsent(occupiedSession.SponsorSessionId);
+    var occupiedResult = await occupiedSessions.StartDeviceAuthAsync(occupiedSession.SponsorSessionId, CancellationToken.None);
+    Assert(string.Equals(occupiedResult.Session.Status, "pending_auth", StringComparison.OrdinalIgnoreCase), "occupied project setup should keep the existing lane in pending auth.");
+
+    var timeoutBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(_ => throw new TaskCanceledException("simulated timeout"))), configuration);
+    var timeoutSessions = new BoostSessionService(store, accounts, groups, timeoutBridge, rewards);
+    var timeoutSession = timeoutSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.member",
+        ProjectId: "hub",
+        SubjectLabel: "Member Demo"));
+    timeoutSessions.RecordConsent(timeoutSession.SponsorSessionId);
+    var timeoutResult = await timeoutSessions.StartDeviceAuthAsync(timeoutSession.SponsorSessionId, CancellationToken.None);
+    Assert(string.Equals(timeoutResult.Session.Status, "waiting_for_slot", StringComparison.OrdinalIgnoreCase), "lane creation timeouts should fall back to waiting_for_slot when the project already has another live participant lane.");
+
     var outsiderSessionBlocked = false;
     try
     {
