@@ -21,7 +21,10 @@
                 <div class="compact-rail">
                     @foreach (var card in Model.PublicLane)
                     {
-                        <article class="compact-rail__item" id="@card.Id.Replace('_', '-')">
+                        var sectionId = card.Href.Contains('#', StringComparison.Ordinal)
+                            ? card.Href[(card.Href.LastIndexOf('#') + 1)..]
+                            : card.Id.Replace('_', '-');
+                        <article class="compact-rail__item" id="@sectionId">
                             <div class="compact-rail__copy">
                                 <h3>@card.Title</h3>
                                 <p>@card.Summary</p>
@@ -41,7 +44,10 @@
                 <div class="compact-rail">
                     @foreach (var card in Model.SignedInLane)
                     {
-                        <article class="compact-rail__item" id="@card.Id.Replace('_', '-')">
+                        var sectionId = card.Href.Contains('#', StringComparison.Ordinal)
+                            ? card.Href[(card.Href.LastIndexOf('#') + 1)..]
+                            : card.Id.Replace('_', '-');
+                        <article class="compact-rail__item" id="@sectionId">
                             <div class="compact-rail__copy">
                                 <h3>@card.Title</h3>
                                 <p>@card.Summary</p>
