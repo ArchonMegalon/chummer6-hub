@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Chummer.Run.Api.Controllers;
 
 [ApiController]
+[AutoValidateAntiforgeryToken]
 public sealed class AuthController : Controller
 {
     private readonly HubBrowserAuthService _browserAuth;

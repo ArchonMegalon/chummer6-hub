@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Chummer.Run.Api.Controllers;
 
 [ApiController]
+[AutoValidateAntiforgeryToken]
 [Route("api/v1/accounts/me")]
 public sealed class AccountLinksController : ControllerBase
 {
