@@ -992,20 +992,36 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         GroupId: ownerGroup.GroupId,
         SubjectLabel: "Runner Demo"));
     laneCreationSessions.RecordConsent(laneCreationSession.SponsorSessionId);
-    var missingLaneThrown = false;
+    var missingLaneUnavailable = false;
     try
     {
         await laneCreationSessions.StartDeviceAuthAsync(laneCreationSession.SponsorSessionId, CancellationToken.None);
     }
-    catch (InvalidOperationException ex)
+    catch (ParticipationUnavailableException ex)
     {
-        missingLaneThrown = ex.Message.Contains("lane", StringComparison.OrdinalIgnoreCase)
-            || ex.Message.Contains("Fleet bridge request failed", StringComparison.OrdinalIgnoreCase);
+        missingLaneUnavailable = ex.Message.Contains("Participation is unavailable", StringComparison.OrdinalIgnoreCase);
     }
 
-    Assert(missingLaneThrown, "device-auth startup should fail fast when Fleet does not return a lane_id.");
+    Assert(missingLaneUnavailable, "device-auth startup should treat missing Fleet lane ids as infrastructure unavailability instead of a client error.");
     var failedLaneSession = laneCreationSessions.Get(laneCreationSession.SponsorSessionId);
     Assert(string.IsNullOrWhiteSpace(failedLaneSession?.FleetLaneId), "failed lane creation should not persist an empty Fleet lane id.");
+
+    var missingLaneController = new CodexParticipationController(
+        accounts,
+        identityClient,
+        leaderboards,
+        laneCreationSessions,
+        identityLinks,
+        experience,
+        chrome,
+        configuration,
+        loggerFactory.CreateLogger<CodexParticipationController>())
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var unavailableContributionStart = await missingLaneController.StartContribution(CancellationToken.None);
+    var unavailableContributionStartProblem = unavailableContributionStart.Result as ObjectResult;
+    Assert(unavailableContributionStartProblem?.StatusCode == StatusCodes.Status503ServiceUnavailable, "contribution start should report missing Fleet lane ids as 503 instead of bad request.");
 
     var waitingBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
     {
@@ -1281,7 +1297,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var landingView = await controller.LandingPage(CancellationToken.None) as ViewResult;
     var landingModel = landingView?.Model as LandingPageViewModel;
     Assert(landingModel is not null, "landing page should render through the MVC view layer.");
-    Assert(string.Equals(landingModel.Surface.Headline, "Shadowrun rules truth, with receipts.", StringComparison.Ordinal), "landing page should render the canonical headline");
+    Assert(string.Equals(landingModel.Surface.Headline, "Shadowrun that shows its work.", StringComparison.Ordinal), "landing page should render the canonical headline");
     Assert(landingModel.StartHere.Any(static card => string.Equals(card.Href, "/what-is-chummer", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
     Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Href, "/signup?next=/home", StringComparison.Ordinal)), "landing page chrome should expose create account beside sign in");
     Assert(landingModel.Lanes.Any(static card => string.Equals(card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
@@ -1353,9 +1369,23 @@ async Task VerifyPublicLandingProjectionAsync()
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
+    unavailableLandingController.ControllerContext.HttpContext.Request.Headers.Cookie = $"{HubBrowserAuthConstants.AccessTokenCookieName}=subject-token";
+    var unavailableLandingView = await unavailableLandingController.LandingPage(CancellationToken.None) as ViewResult;
+    var unavailableLandingModel = unavailableLandingView?.Model as LandingPageViewModel;
+    Assert(unavailableLandingModel?.Chrome.Authenticated == true, "public landing chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
+    Assert(unavailableLandingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Sign out", StringComparison.Ordinal)), "authenticated public landing chrome should keep the signed-in actions during identity outages.");
     var unavailableHomeResult = await unavailableLandingController.HomePage(CancellationToken.None);
     var unavailableHomeModel = (unavailableHomeResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableHomeModel?.Heading, "Home is unavailable right now", StringComparison.Ordinal), "home page should show an unavailable message when identity is down instead of redirecting to login.");
+
+    var unavailableLeaderboardsController = new LeaderboardsController(leaderboards, accounts, unavailableIdentityClient, chrome, loggerFactory.CreateLogger<LeaderboardsController>())
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    unavailableLeaderboardsController.ControllerContext.HttpContext.Request.Headers.Cookie = $"{HubBrowserAuthConstants.AccessTokenCookieName}=subject-token";
+    var unavailableLeaderboardsView = await unavailableLeaderboardsController.LeaderboardsPage(CancellationToken.None) as ViewResult;
+    var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
+    Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
     var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {

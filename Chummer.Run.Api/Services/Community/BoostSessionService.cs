@@ -234,6 +234,10 @@ public sealed class BoostSessionService
                     state.TierSource,
                     cancellationToken);
             }
+            catch (InvalidOperationException ex) when (IsInfrastructureLaneFailure(ex))
+            {
+                throw new ParticipationUnavailableException("Participation is unavailable on this host right now. Try again later.", ex);
+            }
             catch (InvalidOperationException ex) when (ex.Message.Contains("(409)", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("capacity reached", StringComparison.OrdinalIgnoreCase))
             {
                 lock (_store.Gate)
@@ -255,7 +259,7 @@ public sealed class BoostSessionService
             var laneId = AccountService.NormalizeOptional(created["lane"]?["lane_id"]?.GetValue<string>());
             if (laneId is null)
             {
-                throw new InvalidOperationException("Fleet lane creation did not return a lane_id.");
+                throw new ParticipationUnavailableException("Participation is unavailable on this host right now. Try again later.");
             }
 
             lock (_store.Gate)
@@ -301,6 +305,10 @@ public sealed class BoostSessionService
         try
         {
             fleet = await _fleetBridge.ActivateParticipantLaneAsync(state.FleetLaneId!, cancellationToken);
+        }
+        catch (InvalidOperationException ex) when (IsInfrastructureLaneFailure(ex))
+        {
+            throw new ParticipationUnavailableException("Participation is unavailable on this host right now. Try again later.", ex);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("(409)", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("capacity reached", StringComparison.OrdinalIgnoreCase))
         {
@@ -546,6 +554,10 @@ public sealed class BoostSessionService
             && state.ActivatedAtUtc is null
             && state.StoppedAtUtc is null
             && string.Equals(state.Status, "lane_pending", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsInfrastructureLaneFailure(InvalidOperationException ex)
+        => ex.Message.Contains("Fleet bridge request failed", StringComparison.OrdinalIgnoreCase)
+            || ex.Message.Contains("did not return a lane_id", StringComparison.OrdinalIgnoreCase);
 
     private static void ClearDeviceAuthChallengeLocked(SponsorSessionState state)
     {
