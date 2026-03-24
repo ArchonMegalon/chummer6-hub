@@ -148,6 +148,7 @@ textarea {
 .site-nav__current {
   position: relative;
   padding-bottom: 0.2rem;
+  transition: color 180ms ease;
 }
 
 .site-nav a::after,
@@ -172,6 +173,11 @@ textarea {
 .cta-link:hover::after,
 .cta-link:focus-visible::after {
   transform: scaleX(1);
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible {
+  color: var(--ink-strong);
 }
 
 .site-nav__current {
@@ -1883,6 +1889,7 @@ td {
 .site-actions__link {
   color: inherit;
   font-size: 0.95rem;
+  transition: color 180ms ease, text-decoration-color 180ms ease;
 }
 
 .site-actions__link:hover,
@@ -2054,6 +2061,7 @@ td {
 .artifact-card {
   display: grid;
   overflow: hidden;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 
 .workflow-card__media,
@@ -2127,6 +2135,25 @@ td {
   font-size: 0.78rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.workflow-card:hover,
+.workflow-card:focus-within,
+.audience-card:hover,
+.audience-card:focus-within,
+.artifact-card:hover,
+.artifact-card:focus-within,
+.app-action-card:hover,
+.app-action-card:focus-within,
+.app-side-card:hover,
+.app-side-card:focus-within,
+.works-item:hover,
+.works-item:focus-within,
+.compact-rail__item:hover,
+.compact-rail__item:focus-within {
+  transform: translateY(-2px);
+  border-color: rgba(45, 114, 255, 0.24);
+  box-shadow: 0 22px 44px rgba(7, 23, 45, 0.12);
 }
 
 .trust-claims {
