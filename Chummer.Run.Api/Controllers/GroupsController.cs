@@ -115,7 +115,7 @@ public sealed class GroupsController : ControllerBase
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
         {
-            return BadRequest(ex.Message);
+            return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
@@ -139,7 +139,7 @@ public sealed class GroupsController : ControllerBase
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
         {
-            return BadRequest(ex.Message);
+            return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 }

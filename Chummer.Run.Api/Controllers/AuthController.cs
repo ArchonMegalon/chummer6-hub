@@ -111,7 +111,7 @@ public sealed class AuthController : Controller
 
         var callback = $"/auth/email/callback?ticket={Uri.EscapeDataString(started.TicketId)}&next={Uri.EscapeDataString(nextPath)}";
         var model = new AuthMessagePageViewModel(
-            Chrome: _chrome.BuildPublicChrome("Check your email", "Finish the magic-link step and come back to the signed-in shell.", "/login"),
+            Chrome: _chrome.BuildPublicChrome("Check your email", "Finish the magic-link step and come back to your account.", "/login"),
             Heading: "Check your email",
             SupportLine: started.PreviewNote,
             Notice: $"Email: {started.Email} · expires {started.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC",

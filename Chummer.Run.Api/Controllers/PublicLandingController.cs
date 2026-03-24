@@ -75,7 +75,7 @@ public sealed class PublicLandingController : Controller
         var surface = _landing.LoadSurface();
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
         var model = new NowPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("What Is Real Now", "A public proof shelf with readiness labels and direct evidence.", "/now", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("What Is Real Now", "Readiness labels and direct evidence for what you can use today.", "/now", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             AvailableToday: nowCards.Where(static card => string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(),
@@ -137,7 +137,7 @@ public sealed class PublicLandingController : Controller
             Assets: new AssetCatalogViewModel(surface.Assets),
             Eyebrow: "Status",
             Heading: "Public status",
-            Intro: "This summary is derived from the design mirror and the live proof shelf, not from internal operator dashboards.",
+            Intro: "This summary comes from the live public surface and stays focused on what people can actually use or inspect.",
             Items: _landing.CardsForBucket(surface, "whats_real_now"));
         return View("~/Views/PublicLanding/Shelf.cshtml", model);
     }

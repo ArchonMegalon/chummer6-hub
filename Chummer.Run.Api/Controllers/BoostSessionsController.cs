@@ -54,7 +54,7 @@ public sealed class BoostSessionsController : ControllerBase
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
-            return BadRequest(ex.Message);
+            return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
@@ -90,7 +90,7 @@ public sealed class BoostSessionsController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(ex.Message);
+            return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
@@ -158,7 +158,7 @@ public sealed class BoostSessionsController : ControllerBase
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            return BadRequest(ex.Message);
+            return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
@@ -196,7 +196,7 @@ public sealed class BoostSessionsController : ControllerBase
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            return BadRequest(ex.Message);
+            return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
@@ -234,7 +234,7 @@ public sealed class BoostSessionsController : ControllerBase
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            return BadRequest(ex.Message);
+            return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
@@ -272,7 +272,7 @@ public sealed class BoostSessionsController : ControllerBase
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            return BadRequest(ex.Message);
+            return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 

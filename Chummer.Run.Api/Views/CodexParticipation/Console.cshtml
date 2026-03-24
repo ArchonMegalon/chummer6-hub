@@ -279,9 +279,9 @@ function renderError(error) {
   stopPolling();
   currentContributionId = "";
   document.getElementById("stateTag").textContent = "Attention";
-  document.getElementById("participationHeading").textContent = "Participation needs attention";
-  document.getElementById("stateSupport").textContent = error?.message || "Request failed.";
-  document.getElementById("stateLine").textContent = "Fix the issue and try again.";
+  document.getElementById("participationHeading").textContent = "The contribution flow could not continue";
+  document.getElementById("stateSupport").textContent = error?.message || "Something interrupted the current request.";
+  document.getElementById("stateLine").textContent = "Try again in a moment.";
   document.getElementById("technicalDetails").hidden = true;
   setWizardStep("start");
   toggleState("start");
@@ -317,7 +317,7 @@ function render(data) {
   authorizationLink.setAttribute("aria-disabled", auth.verificationUri ? "false" : "true");
   authorizationLink.classList.toggle("button-like--disabled", !auth.verificationUri);
   copyCodeButton.disabled = !auth.userCode;
-  authorizationCode.textContent = auth.userCode || "Authorization code will appear here as soon as Fleet finishes setup.";
+  authorizationCode.textContent = auth.userCode || "Authorization code will appear here as soon as the lane is ready.";
 
   document.getElementById("unavailableHomeLink").href = actions.homeHref || "/home";
   document.getElementById("unavailableAccountLink").href = actions.accountHref || "/account";
