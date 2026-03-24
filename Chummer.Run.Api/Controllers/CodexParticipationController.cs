@@ -22,6 +22,7 @@ public sealed class CodexParticipationController : Controller
     private readonly UserExperienceService _experience;
     private readonly HubPageChromeService _chrome;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<CodexParticipationController> _logger;
 
     public CodexParticipationController(
         AccountService accounts,
@@ -31,7 +32,8 @@ public sealed class CodexParticipationController : Controller
         IdentityLinkService links,
         UserExperienceService experience,
         HubPageChromeService chrome,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ILogger<CodexParticipationController> logger)
     {
         _accounts = accounts;
         _identity = identity;
@@ -41,6 +43,7 @@ public sealed class CodexParticipationController : Controller
         _experience = experience;
         _chrome = chrome;
         _configuration = configuration;
+        _logger = logger;
     }
 
     [HttpGet("/participate/codex")]
@@ -58,9 +61,22 @@ public sealed class CodexParticipationController : Controller
                 Experience: _experience.GetOrCreate(subject.SubjectId));
             return View("~/Views/CodexParticipation/Console.cshtml", model);
         }
-        catch (HubRequestAuthException)
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             return Redirect("/login?next=/participate/codex");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Participation page could not confirm the signed-in identity.");
+            return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
+                Chrome: _chrome.BuildPublicChrome("Participation unavailable", "Hub could not confirm the signed-in participation surface right now.", "/participate/codex"),
+                Heading: "Participation is unavailable right now",
+                SupportLine: ex.Message,
+                Notice: null,
+                PrimaryLabel: "Return home",
+                PrimaryHref: "/home",
+                SecondaryLabel: "Open account",
+                SecondaryHref: "/account"));
         }
     }
 

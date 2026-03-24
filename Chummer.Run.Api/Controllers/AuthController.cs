@@ -86,7 +86,29 @@ public sealed class AuthController : Controller
         }
 
         var nextPath = HubBrowserAuthService.SanitizeNextPath(next);
-        var started = await _browserAuth.StartEmailEntryAsync(email, displayName, nextPath, cancellationToken);
+        var started = default(Chummer.Run.Contracts.Identity.EmailAuthStartResponse)!;
+        try
+        {
+            started = await _browserAuth.StartEmailEntryAsync(email, displayName, nextPath, cancellationToken);
+        }
+        catch (HubBrowserAuthUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "Email sign-in could not be started for {Email}.", email);
+            return BuildAuthMessage(
+                chromeTitle: "Email sign-in unavailable",
+                chromeDescription: "The email sign-in flow could not be started right now.",
+                currentPath: "/login",
+                heading: "Email sign-in is unavailable",
+                supportLine: ex.Message,
+                notice: null,
+                primaryLabel: _google.IsConfigured() ? "Continue with Google" : "Return to sign in",
+                primaryHref: _google.IsConfigured()
+                    ? $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}"
+                    : $"/login?next={Uri.EscapeDataString(nextPath)}",
+                secondaryLabel: "Use a different email",
+                secondaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}");
+        }
+
         var callback = $"/auth/email/callback?ticket={Uri.EscapeDataString(started.TicketId)}&next={Uri.EscapeDataString(nextPath)}";
         var model = new AuthMessagePageViewModel(
             Chrome: _chrome.BuildPublicChrome("Check your email", "Finish the magic-link step and come back to the signed-in shell.", "/login"),
@@ -113,7 +135,27 @@ public sealed class AuthController : Controller
         }
 
         var nextPath = HubBrowserAuthService.SanitizeNextPath(next);
-        var session = await _browserAuth.CompleteEmailEntryAsync(ticket, cancellationToken);
+        var session = default(Chummer.Run.Contracts.Identity.IdentitySessionIssueResponse)!;
+        try
+        {
+            session = await _browserAuth.CompleteEmailEntryAsync(ticket, cancellationToken);
+        }
+        catch (HubBrowserAuthUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "Email sign-in callback could not be completed for next path {NextPath}.", nextPath);
+            return BuildAuthMessage(
+                chromeTitle: "Email sign-in unavailable",
+                chromeDescription: "The email sign-in callback could not be completed right now.",
+                currentPath: "/login",
+                heading: "Email sign-in could not be completed",
+                supportLine: ex.Message,
+                notice: null,
+                primaryLabel: "Return to sign in",
+                primaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}",
+                secondaryLabel: "Create account",
+                secondaryHref: $"/signup?next={Uri.EscapeDataString(nextPath)}");
+        }
+
         _browserAuth.WriteCookie(Request, Response, session);
         var isRecoveryVerification = nextPath.StartsWith("/auth/email/link/callback", StringComparison.OrdinalIgnoreCase);
         if (!isRecoveryVerification)
@@ -158,7 +200,7 @@ public sealed class AuthController : Controller
         {
             verifiedEmailSubject = await _identity.RequireSubjectAsync(Request, cancellationToken);
         }
-        catch (HubRequestAuthException)
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
                 Chrome: _chrome.BuildPublicChrome("Recovery email verification failed", "The verification email was opened without an active verified-email session.", "/login"),
@@ -170,11 +212,25 @@ public sealed class AuthController : Controller
                 SecondaryLabel: "Sign in",
                 SecondaryHref: "/login?next=/account"));
         }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Recovery email verification could not confirm the active identity session.");
+            return BuildAuthMessage(
+                chromeTitle: "Recovery email unavailable",
+                chromeDescription: "The recovery-email verification flow could not confirm the active identity session right now.",
+                currentPath: "/account",
+                heading: "Recovery email verification is unavailable",
+                supportLine: ex.Message,
+                notice: null,
+                primaryLabel: "Open account",
+                primaryHref: "/account",
+                secondaryLabel: "Return home",
+                secondaryHref: "/home");
+        }
 
         if (!_emailLinks.MatchesVerifiedEmailSubject(payload, verifiedEmailSubject.SubjectId))
         {
-            await _browserAuth.RevokeCookieSessionAsync(Request, cancellationToken);
-            _browserAuth.ClearCookie(Request, Response);
+            await TryClearBrowserSessionAsync(cancellationToken);
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
                 Chrome: _chrome.BuildPublicChrome("Recovery email verification failed", "The browser session did not match the recovery email that was verified.", "/account"),
                 Heading: "Recovery email verification failed",
@@ -191,8 +247,7 @@ public sealed class AuthController : Controller
         if (existingEmailLink is not null
             && !string.Equals(existingEmailLink.UserId, accountUser.UserId, StringComparison.OrdinalIgnoreCase))
         {
-            await _browserAuth.RevokeCookieSessionAsync(Request, cancellationToken);
-            _browserAuth.ClearCookie(Request, Response);
+            await TryClearBrowserSessionAsync(cancellationToken);
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
                 Chrome: _chrome.BuildPublicChrome("Recovery email already linked", "That recovery email now belongs to a different Chummer account.", "/account"),
                 Heading: "Recovery email already linked",
@@ -210,14 +265,33 @@ public sealed class AuthController : Controller
             MakePrimary: false));
         _links.ConfirmIdentityLink(new ConfirmIdentityLinkRequest(payload.AccountSubjectId, linked.IdentityLinkId));
 
-        await _browserAuth.RevokeCookieSessionAsync(Request, cancellationToken);
-        var restoredSession = await _browserAuth.IssueSessionAsync(
-            payload.AccountSubjectId,
-            displayName: accountUser.DisplayName,
-            email: null,
-            requestedRoles: null,
-            cancellationToken);
-        _browserAuth.WriteCookie(Request, Response, restoredSession);
+        try
+        {
+            await _browserAuth.RevokeCookieSessionAsync(Request, cancellationToken);
+            var restoredSession = await _browserAuth.IssueSessionAsync(
+                payload.AccountSubjectId,
+                displayName: accountUser.DisplayName,
+                email: null,
+                requestedRoles: null,
+                cancellationToken);
+            _browserAuth.WriteCookie(Request, Response, restoredSession);
+        }
+        catch (HubBrowserAuthUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "Recovery email verification could not restore the primary Hub session for {SubjectId}.", payload.AccountSubjectId);
+            return BuildAuthMessage(
+                chromeTitle: "Recovery email unavailable",
+                chromeDescription: "The recovery-email verification flow could not finish the signed-in browser session right now.",
+                currentPath: "/account",
+                heading: "Recovery email verification is unavailable",
+                supportLine: ex.Message,
+                notice: null,
+                primaryLabel: "Open account",
+                primaryHref: "/account",
+                secondaryLabel: "Return home",
+                secondaryHref: "/home");
+        }
+
         return Redirect(payload.NextPath);
     }
 
@@ -256,9 +330,24 @@ public sealed class AuthController : Controller
         {
             subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
         }
-        catch (HubRequestAuthException)
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             return Redirect($"/login?next={Uri.EscapeDataString(nextPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Google account linking could not confirm the current Hub session.");
+            return BuildAuthMessage(
+                chromeTitle: "Google link unavailable",
+                chromeDescription: "Hub could not confirm the current signed-in session for Google linking.",
+                currentPath: "/account",
+                heading: "Google account linking is unavailable",
+                supportLine: ex.Message,
+                notice: null,
+                primaryLabel: "Open account",
+                primaryHref: nextPath,
+                secondaryLabel: "Return home",
+                secondaryHref: "/home");
         }
 
         if (!_google.IsConfigured())
@@ -292,11 +381,12 @@ public sealed class AuthController : Controller
         }
         catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Google sign-in callback failed.");
             result = new GoogleAuthCompletionResult(
                 Session: null,
                 NextPath: "/login?next=/home",
                 ErrorTitle: "Google sign-in failed",
-                ErrorDetail: ex.Message);
+                ErrorDetail: "Chummer could not complete the Google sign-in handshake right now. Start the flow again in a moment.");
         }
 
         Response.Cookies.Delete(HubGoogleAuthConstants.StateCookieName, _google.BuildStateCookie(Request, DateTimeOffset.UtcNow));
@@ -345,11 +435,12 @@ public sealed class AuthController : Controller
         }
         catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Google account merge confirmation failed.");
             result = new GoogleAuthCompletionResult(
                 Session: null,
                 NextPath: "/login?next=/home",
                 ErrorTitle: "Google account link failed",
-                ErrorDetail: ex.Message);
+                ErrorDetail: "Chummer could not complete the Google account link right now. Start the flow again in a moment.");
         }
 
         if (result.Session is not null)
@@ -400,10 +491,50 @@ public sealed class AuthController : Controller
             await _identity.RequireSubjectAsync(Request, cancellationToken);
             return true;
         }
-        catch (HubRequestAuthException)
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             return false;
         }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Identity check failed while rendering the auth entry page.");
+            return false;
+        }
+    }
+
+    private ViewResult BuildAuthMessage(
+        string chromeTitle,
+        string chromeDescription,
+        string currentPath,
+        string heading,
+        string supportLine,
+        string? notice,
+        string primaryLabel,
+        string primaryHref,
+        string secondaryLabel,
+        string secondaryHref)
+        => View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
+            Chrome: _chrome.BuildPublicChrome(chromeTitle, chromeDescription, currentPath),
+            Heading: heading,
+            SupportLine: supportLine,
+            Notice: notice,
+            PrimaryLabel: primaryLabel,
+            PrimaryHref: primaryHref,
+            SecondaryLabel: secondaryLabel,
+            SecondaryHref: secondaryHref));
+
+    private async Task TryClearBrowserSessionAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _browserAuth.RevokeCookieSessionAsync(Request, cancellationToken);
+        }
+        catch (HubBrowserAuthUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "Hub could not revoke the browser session while rendering an auth failure page. Clearing the cookie locally.");
+        }
+
+        _browserAuth.ClearCookie(Request, Response);
     }
 
     private AuthPageViewModel BuildAuthModel(string heading, string supportLine, string nextPath, bool createAccount)

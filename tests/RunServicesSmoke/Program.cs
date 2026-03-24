@@ -453,7 +453,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         Timezone: "UTC",
         CountryCode: "AT"));
     var experience = new UserExperienceService(store, accounts);
-    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, chrome, google)
+    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -520,6 +520,57 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     };
     var retiredProviderLink = accountLinksController.LinkProvider();
     Assert((retiredProviderLink as ObjectResult)?.StatusCode == StatusCodes.Status410Gone, "self-asserted provider linking should stay retired.");
+
+    var unavailableBrowserAuth = new HubBrowserAuthService(new HttpClient(new StubHttpMessageHandler(_ =>
+        new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+        {
+            Content = new StringContent("{\"detail\":\"identity-mailer-secret\"}", Encoding.UTF8, "application/json")
+        })), configuration);
+    var unavailableRecoveryLinksController = new AccountLinksController(
+        identityLinks,
+        identityClient,
+        accounts,
+        unavailableBrowserAuth,
+        new HubEmailLinkVerificationService(DataProtectionProvider.Create("smoke-recovery-failure")))
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var unavailableRecoveryStart = await unavailableRecoveryLinksController.StartRecoveryEmailLink(
+        new StartRecoveryEmailLinkRequest(
+            SubjectId: "subject.demo",
+            Email: "recovery@example.invalid",
+            NextPath: "/account"),
+        CancellationToken.None);
+    var unavailableRecoveryStartProblem = unavailableRecoveryStart.Result as ObjectResult;
+    Assert(unavailableRecoveryStartProblem?.StatusCode == StatusCodes.Status503ServiceUnavailable, "recovery email start should report browser-auth outages as 503 instead of conflict.");
+
+    var unavailableIdentityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
+        new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+        {
+            Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
+        })), configuration);
+    var unavailableParticipationSessions = new BoostSessionService(
+        store,
+        accounts,
+        groups,
+        new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { detail = "unused" }, HttpStatusCode.OK))), configuration),
+        rewards);
+    var unavailableParticipationController = new CodexParticipationController(
+        accounts,
+        unavailableIdentityClient,
+        leaderboards,
+        unavailableParticipationSessions,
+        identityLinks,
+        experience,
+        chrome,
+        configuration,
+        loggerFactory.CreateLogger<CodexParticipationController>())
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var unavailableParticipationResult = await unavailableParticipationController.ParticipationPage(CancellationToken.None);
+    var unavailableParticipationModel = (unavailableParticipationResult as ViewResult)?.Model as AuthMessagePageViewModel;
+    Assert(string.Equals(unavailableParticipationModel?.Heading, "Participation is unavailable right now", StringComparison.Ordinal), "participation page should show an unavailable message when identity is down instead of redirecting to login.");
 
     var activationReceipt = new ContributionReceiptDto(
         ReceiptId: "rcpt-lane-activated-001",
@@ -1185,7 +1236,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var emailLinks = new HubEmailLinkVerificationService(
         DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(tempRoot, "email-links"))));
     var google = CreateGoogleService(configuration, authService, identityLinks, accounts, loggerFactory, tempRoot);
-    var controller = new PublicLandingController(landing, releases, accounts, identityClient, identityLinks, experience, chrome)
+    var controller = new PublicLandingController(landing, releases, accounts, identityClient, identityLinks, experience, chrome, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
@@ -1250,7 +1301,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var homeRedirect = homeResult as RedirectResult;
     Assert(homeRedirect is not null && string.Equals(homeRedirect.Url, "/login?next=/home", StringComparison.Ordinal), "home page should redirect signed-out guests to the login route.");
 
-    var authController = new AuthController(authService, identityClient, landing, chrome, google, accounts, identityLinks, emailLinks)
+    var authController = new AuthController(authService, identityClient, landing, chrome, google, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
     {
         ControllerContext = new ControllerContext
         {
@@ -1265,6 +1316,90 @@ async Task VerifyPublicLandingProjectionAsync()
     var signupResult = await authController.SignupPage("/home", CancellationToken.None);
     var signupModel = (signupResult as ViewResult)?.Model as AuthPageViewModel;
     Assert(signupModel is not null && signupModel.CreateAccount, "signup page should keep the reciprocal auth lane visible.");
+
+    var unavailableIdentityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
+        new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+        {
+            Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
+        })), configuration);
+    var unavailableLandingController = new PublicLandingController(landing, releases, accounts, unavailableIdentityClient, identityLinks, experience, chrome, loggerFactory.CreateLogger<PublicLandingController>())
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var unavailableHomeResult = await unavailableLandingController.HomePage(CancellationToken.None);
+    var unavailableHomeModel = (unavailableHomeResult as ViewResult)?.Model as AuthMessagePageViewModel;
+    Assert(string.Equals(unavailableHomeModel?.Heading, "Home is unavailable right now", StringComparison.Ordinal), "home page should show an unavailable message when identity is down instead of redirecting to login.");
+
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var unavailableAccountResult = await unavailableAccountController.AccountPage(CancellationToken.None);
+    var unavailableAccountModel = (unavailableAccountResult as ViewResult)?.Model as AuthMessagePageViewModel;
+    Assert(string.Equals(unavailableAccountModel?.Heading, "Account is unavailable right now", StringComparison.Ordinal), "account page should show an unavailable message when identity is down instead of redirecting to login.");
+
+    var failingAuthService = new HubBrowserAuthService(new HttpClient(new StubHttpMessageHandler(_ =>
+        new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+        {
+            Content = new StringContent("{\"detail\":\"identity-mailer-secret\"}", Encoding.UTF8, "application/json")
+        })), configuration);
+    var failingEmailAuthController = new AuthController(failingAuthService, identityClient, landing, chrome, google, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
+    {
+        ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        }
+    };
+    var unavailableEmailStart = await failingEmailAuthController.StartEmail("runner@example.invalid", "Runner Demo", "/home", CancellationToken.None);
+    var unavailableEmailStartModel = (unavailableEmailStart as ViewResult)?.Model as AuthMessagePageViewModel;
+    Assert(string.Equals(unavailableEmailStartModel?.Heading, "Email sign-in is unavailable", StringComparison.Ordinal), "email sign-in start should render an unavailable message when identity mail transport is down.");
+    Assert(!(unavailableEmailStartModel?.SupportLine?.Contains("identity-mailer-secret", StringComparison.OrdinalIgnoreCase) ?? false), "email sign-in start should not leak raw identity transport details.");
+
+    var googleFailureConfiguration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["IDENTITY_SERVICE_BASE_URL"] = "http://identity.test",
+            ["GOOGLE_OIDC_CLIENT_ID"] = "smoke-google-client",
+            ["GOOGLE_OIDC_CLIENT_SECRET"] = "smoke-google-secret",
+            ["GOOGLE_OIDC_REDIRECT_URI"] = "https://hub.example.test/auth/google/callback"
+        })
+        .Build();
+    var failingGoogle = new HubGoogleAuthService(
+        new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError)
+        {
+            Content = new StringContent("{\"error\":\"provider-secret-raw-detail\"}", Encoding.UTF8, "application/json")
+        })),
+        googleFailureConfiguration,
+        authService,
+        identityLinks,
+        accounts,
+        DataProtectionProvider.Create(Path.Combine(tempRoot, "google-failure")),
+        loggerFactory.CreateLogger<HubGoogleAuthService>(),
+        new SmokeWebHostEnvironment
+        {
+            EnvironmentName = "Development",
+            ApplicationName = "RunServicesSmoke",
+            ContentRootPath = tempRoot,
+            WebRootPath = Path.Combine(tempRoot, "wwwroot")
+        });
+    var googleFailureContext = new DefaultHttpContext();
+    googleFailureContext.Request.Scheme = "https";
+    googleFailureContext.Request.Host = new HostString("hub.example.test");
+    var googleChallenge = failingGoogle.CreateChallenge(googleFailureContext.Request, "/home");
+    var googleState = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(googleChallenge.RedirectUrl).Query)["state"].ToString();
+    googleFailureContext.Request.Headers.Cookie = $"{HubGoogleAuthConstants.StateCookieName}={googleChallenge.StateCookieValue}";
+    googleFailureContext.Request.QueryString = new QueryString($"?state={Uri.EscapeDataString(googleState)}&code=smoke-auth-code");
+    var failingGoogleAuthController = new AuthController(authService, identityClient, landing, chrome, failingGoogle, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
+    {
+        ControllerContext = new ControllerContext
+        {
+            HttpContext = googleFailureContext
+        }
+    };
+    var unavailableGoogleResult = await failingGoogleAuthController.GoogleCallback(CancellationToken.None);
+    var unavailableGoogleModel = (unavailableGoogleResult as ViewResult)?.Model as AuthMessagePageViewModel;
+    Assert(string.Equals(unavailableGoogleModel?.Heading, "Google sign-in failed", StringComparison.Ordinal), "google callback should render a stable failure message when upstream token exchange fails.");
+    Assert(!(unavailableGoogleModel?.SupportLine?.Contains("provider-secret-raw-detail", StringComparison.OrdinalIgnoreCase) ?? false), "google callback should not leak raw provider failure details.");
 }
 
 void VerifyRegistryWorkflow()

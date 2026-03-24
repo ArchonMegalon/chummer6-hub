@@ -208,9 +208,7 @@ public sealed class HubGoogleAuthService
                     Session: null,
                     NextPath: "/login?next=/home",
                     ErrorTitle: "Google sign-in was cancelled",
-                    ErrorDetail: query["error_description"].ToString() is { Length: > 0 } description
-                        ? description
-                        : "Google returned an authorization error before Chummer could complete the sign-in.");
+                    ErrorDetail: "Return to Chummer and start the Google sign-in flow again if you still want to continue.");
             }
 
             if (!request.Cookies.TryGetValue(HubGoogleAuthConstants.StateCookieName, out var protectedState)
@@ -417,14 +415,18 @@ public sealed class HubGoogleAuthService
         if (!tokenResponse.IsSuccessStatusCode)
         {
             var detail = await tokenResponse.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException($"Google token exchange failed: {(int)tokenResponse.StatusCode} {detail}");
+            _logger.LogWarning(
+                "Google token exchange failed with status {StatusCode}. Detail: {Detail}",
+                (int)tokenResponse.StatusCode,
+                string.IsNullOrWhiteSpace(detail) ? "<empty>" : detail);
+            throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
         }
 
         var tokens = await tokenResponse.Content.ReadFromJsonAsync<GoogleTokenResponse>(cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("Google token payload was empty.");
+            ?? throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
         if (string.IsNullOrWhiteSpace(tokens.AccessToken))
         {
-            throw new InvalidOperationException("Google token payload was missing the access token.");
+            throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
         }
 
         using var userInfoRequest = new HttpRequestMessage(HttpMethod.Get, UserInfoEndpoint);
@@ -433,14 +435,18 @@ public sealed class HubGoogleAuthService
         if (!userInfoResponse.IsSuccessStatusCode)
         {
             var detail = await userInfoResponse.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException($"Google userinfo failed: {(int)userInfoResponse.StatusCode} {detail}");
+            _logger.LogWarning(
+                "Google userinfo fetch failed with status {StatusCode}. Detail: {Detail}",
+                (int)userInfoResponse.StatusCode,
+                string.IsNullOrWhiteSpace(detail) ? "<empty>" : detail);
+            throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
         }
 
         var userInfo = await userInfoResponse.Content.ReadFromJsonAsync<GoogleUserInfoResponse>(cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("Google userinfo payload was empty.");
+            ?? throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
         if (string.IsNullOrWhiteSpace(userInfo.Sub) || string.IsNullOrWhiteSpace(userInfo.Email))
         {
-            throw new InvalidOperationException("Google userinfo did not include the required subject and email fields.");
+            throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
         }
 
         return new GoogleIdentityClaims(
