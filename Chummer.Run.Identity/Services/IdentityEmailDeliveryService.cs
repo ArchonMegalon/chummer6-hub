@@ -355,16 +355,12 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
         var eventType = TryReadString(payload, "type")
             ?? TryReadString(payload, "event")
             ?? "unknown";
-        var envelope = payload.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == JsonValueKind.Object
-            ? dataElement
-            : payload.TryGetProperty("object", out var objectElement) && objectElement.ValueKind == JsonValueKind.Object
-                ? objectElement
-                : payload;
+        var envelope = ExtractWebhookEnvelope(payload);
         var providerMessageId = TryReadString(envelope, "id") ?? TryReadString(payload, "id");
-        var recipient = NormalizeWebhookRecipient(envelope);
-        var occurredAtUtc = TryReadDateTimeOffset(envelope, "created_at")
-            ?? TryReadDateTimeOffset(payload, "created_at")
-            ?? DateTimeOffset.UtcNow;
+        var recipient = NormalizeWebhookRecipient(envelope) ?? NormalizeWebhookRecipient(payload);
+        var receivedAtUtc = DateTimeOffset.UtcNow;
+        var providerOccurredAtUtc = TryReadDateTimeOffset(envelope, "created_at")
+            ?? TryReadDateTimeOffset(payload, "created_at");
         var status = NormalizeEventStatus(eventType);
 
         lock (_mutate)
@@ -384,7 +380,7 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
                     Email: recipient,
                     State: status,
                     LastEvent: eventType,
-                    LastEventAtUtc: occurredAtUtc,
+                    LastEventAtUtc: receivedAtUtc,
                     Provider: "emailit_api",
                     ProviderDetail: providerMessageId);
             }
@@ -398,8 +394,8 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
                 Delivered: string.Equals(status, "delivered", StringComparison.OrdinalIgnoreCase),
                 RecipientEmail: recipient ?? "(unknown)",
                 ProviderMessageId: providerMessageId,
-                FailureReason: null,
-                OccurredAtUtc: occurredAtUtc));
+                FailureReason: providerOccurredAtUtc is null ? null : $"provider_occurred_at={providerOccurredAtUtc.Value:O}",
+                OccurredAtUtc: receivedAtUtc));
             TrimRecentDeliveries();
             PersistLocked();
         }
@@ -408,7 +404,7 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
             Provider: "emailit_api",
             Status: status,
             RecordedEvents: 1,
-            ReceivedAtUtc: occurredAtUtc);
+            ReceivedAtUtc: receivedAtUtc);
     }
 
     private IdentityEmailMessage BuildMagicLinkMessage(string email, string displayName, string ticketId, string? nextPath, DateTimeOffset expiresAtUtc)
@@ -703,6 +699,21 @@ If you did not request this, you can ignore this email.
         return string.IsNullOrWhiteSpace(lowered) ? "unknown" : lowered;
     }
 
+    private static JsonElement ExtractWebhookEnvelope(JsonElement payload)
+    {
+        if (payload.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == JsonValueKind.Object)
+        {
+            return dataElement;
+        }
+
+        if (payload.TryGetProperty("object", out var objectElement) && objectElement.ValueKind == JsonValueKind.Object)
+        {
+            return objectElement;
+        }
+
+        return payload;
+    }
+
     private static string? NormalizeWebhookRecipient(JsonElement payload)
     {
         var recipient = TryReadString(payload, "to")
@@ -723,6 +734,16 @@ If you did not request this, you can ignore this email.
                     return value.Trim().ToLowerInvariant();
                 }
             }
+        }
+
+        if (payload.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == JsonValueKind.Object)
+        {
+            return NormalizeWebhookRecipient(dataElement);
+        }
+
+        if (payload.TryGetProperty("object", out var objectElement) && objectElement.ValueKind == JsonValueKind.Object)
+        {
+            return NormalizeWebhookRecipient(objectElement);
         }
 
         return null;

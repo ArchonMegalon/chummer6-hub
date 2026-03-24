@@ -9,6 +9,7 @@ await GmOpsBoardVerification.RunAsync();
 await InteropExportVerification.RunAsync();
 await OfflineSyncVerification.RunAsync();
 await PipelineProjectionVerification.RunAsync();
+await SupportCrashVerification.RunAsync();
 await StateStoreBackupVerification.RunAsync();
 CompatibilityVerification.Run();
 HubExtractionReadinessVerification.Run();

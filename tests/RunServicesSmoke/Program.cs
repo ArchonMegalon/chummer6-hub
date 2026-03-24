@@ -1,6 +1,7 @@
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.AI.Services.Assets;
 using Chummer.Run.AI.Services.Booster;
@@ -32,7 +33,9 @@ using Chummer.Run.Contracts.Ops;
 using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Run.Contracts.Publication;
 using Chummer.Run.Contracts.Registry;
+using Chummer.Run.Contracts.Support;
 using Chummer.Run.Identity.Services;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -95,6 +98,7 @@ await VerifyNewspaperGatewayRoutingAsync();
 await VerifySessionWorkflowAsync();
 VerifySpiderWorkflow();
 VerifyLoreAndPersonaWorkflow();
+await VerifySupportCrashWorkflowAsync();
 await VerifyGmOpsBoardWorkflowAsync();
 VerifyInteropWorkflow();
 await VerifyCreativeWorkflowAsync();
@@ -214,6 +218,74 @@ async Task VerifyPublicationWorkflowAsync()
     await Task.CompletedTask;
 }
 
+async Task VerifySupportCrashWorkflowAsync()
+{
+    string tempRoot = Path.Combine(Path.GetTempPath(), "run-services-smoke", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(tempRoot);
+
+    try
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json")
+            })
+            .Build();
+
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static builder => { });
+        SupportStore store = new(configuration, loggerFactory.CreateLogger<SupportStore>());
+        CrashSupportService service = new(store, loggerFactory.CreateLogger<CrashSupportService>());
+        SupportCrashesController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        ActionResult<CrashIntakeAcceptedResponse> created = controller.Submit(new CrashEnvelope(
+            CrashId: "smoke-crash-1",
+            HeadId: "avalonia",
+            ApplicationVersion: "0.9.4",
+            RuntimeVersion: ".NET 10",
+            OperatingSystem: "Linux",
+            ProcessArchitecture: "X64",
+            CrashFingerprint: "smoke-fingerprint",
+            ExceptionType: "System.Exception",
+            ExceptionMessage: "smoke",
+            ExceptionDetail: "System.Exception: smoke",
+            CapturedAtUtc: DateTimeOffset.UtcNow,
+            ReleaseChannel: "stable",
+            Platform: "linux",
+            DesktopHead: "avalonia",
+            RuntimeHead: "desktop-runtime",
+            LastActionCategory: "startup",
+            LogTail: ["smoke"]));
+
+        AcceptedAtActionResult accepted = created.Result as AcceptedAtActionResult
+            ?? throw new InvalidOperationException("Support crash controller should accept valid envelopes.");
+        CrashIntakeAcceptedResponse payload = accepted.Value as CrashIntakeAcceptedResponse
+            ?? throw new InvalidOperationException("Support crash controller should return a typed payload.");
+        Assert(payload.ForwardedForAutomation, "support crash intake should mark envelopes as automation-ready");
+
+        var list = controller.ListWorkItems(candidateOwnerRepo: "chummer6-ui");
+        OkObjectResult listed = list.Result as OkObjectResult
+            ?? throw new InvalidOperationException("Support crash controller should return work item projections.");
+        CrashWorkItemListResponse response = listed.Value as CrashWorkItemListResponse
+            ?? throw new InvalidOperationException("Support crash controller should return a typed work item response.");
+        Assert(response.TotalCount == 1, "support crash work-item list should include the newly accepted crash");
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    await Task.CompletedTask;
+}
+
 void VerifyPublicationControllerHardening()
 {
     var workflow = new PublicationWorkflowService();
@@ -310,93 +382,106 @@ void VerifyIdentityEmailDeliveryProviders()
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
     HttpRequestMessage? capturedRequest = null;
     string? capturedBody = null;
+    var tempRoot = Path.Combine(Path.GetTempPath(), "run-services-smoke", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(tempRoot);
 
-    var emailitConfig = new ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
-            ["IDENTITY_EMAILIT_API_KEY"] = "secret-emailit-key",
-            ["IDENTITY_EMAILIT_FROM_EMAIL"] = "god@chummer.run",
-            ["IDENTITY_EMAILIT_FROM_NAME"] = "God",
-        })
-        .Build();
-
-    var emailitService = new IdentityEmailDeliveryService(
-        emailitConfig,
-        loggerFactory.CreateLogger<IdentityEmailDeliveryService>(),
-        new HttpClient(new StubHttpMessageHandler(request =>
-        {
-            capturedRequest = request;
-            capturedBody = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
-            return JsonResponse(new { data = new { id = "email_123" } }, HttpStatusCode.Accepted);
-        })));
-
-    var delivered = emailitService.DeliverMagicLink(
-        email: "runner@example.invalid",
-        displayName: "Runner Demo",
-        ticketId: "ticket-emailit-123",
-        nextPath: "/home",
-        expiresAtUtc: DateTimeOffset.Parse("2026-03-20T10:00:00Z"));
-
-    Assert(delivered.Delivered, $"Emailit-backed delivery should report success on a 2xx API response. mode={delivered.DeliveryMode} note={delivered.PreviewNote} request={(capturedRequest is null ? "none" : capturedRequest.RequestUri?.ToString())}");
-    Assert(delivered.DeliveryMode == "emailit_api_magic_link", "Emailit-backed delivery should expose the Emailit delivery mode.");
-    Assert(delivered.ProviderMessageId == "email_123", "Emailit-backed delivery should surface the provider message id when the API returns one.");
-    Assert(capturedRequest is not null, "Emailit-backed delivery should issue an HTTP request.");
-    Assert(capturedRequest!.RequestUri?.ToString() == "https://api.emailit.com/v2/emails", "Emailit-backed delivery should target the v2 emails endpoint.");
-    Assert(capturedRequest.Headers.Authorization?.Scheme == "Bearer", "Emailit-backed delivery should send a bearer token.");
-    Assert(capturedRequest.Headers.Authorization?.Parameter == "secret-emailit-key", "Emailit-backed delivery should send the configured API key.");
-    Assert(capturedRequest.Headers.Contains("Idempotency-Key"), "Emailit-backed delivery should send an idempotency key.");
-    Assert(!string.IsNullOrWhiteSpace(capturedBody), "Emailit-backed delivery should send a JSON payload.");
-
-    using (var payload = JsonDocument.Parse(capturedBody!))
+    try
     {
-        Assert(payload.RootElement.GetProperty("from").GetString() == "God <god@chummer.run>", "Emailit payload should preserve the configured sender label.");
-        Assert(payload.RootElement.GetProperty("to").GetString() == "runner@example.invalid", "Emailit payload should target the requested email.");
-        Assert(payload.RootElement.GetProperty("subject").GetString() == "Your Chummer sign-in link", "Emailit payload should keep the auth mail subject.");
-        Assert(payload.RootElement.GetProperty("tracking").GetBoolean() == false, "Emailit auth mail should disable tracking.");
-        Assert(payload.RootElement.GetProperty("text").GetString()?.Contains("/auth/email/callback?ticket=ticket-emailit-123", StringComparison.Ordinal) == true, "Emailit text body should contain the callback link.");
-        Assert(payload.RootElement.GetProperty("html").GetString()?.Contains("Open Chummer", StringComparison.Ordinal) == true, "Emailit html body should contain the CTA.");
-        Assert(payload.RootElement.GetProperty("meta").GetProperty("purpose").GetString() == "magic_link", "Emailit payload should mark the auth purpose.");
-    }
+        var emailitConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                ["IDENTITY_EMAILIT_API_KEY"] = "secret-emailit-key",
+                ["IDENTITY_EMAILIT_FROM_EMAIL"] = "god@chummer.run",
+                ["IDENTITY_EMAILIT_FROM_NAME"] = "God",
+                ["CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH"] = Path.Combine(tempRoot, "identity-email-delivery.json")
+            })
+            .Build();
 
-    var deliveryStatus = emailitService.GetStatus();
-    Assert(deliveryStatus.RecentDeliveries.Any(static item => item.TransportKey == "emailit_api" && item.ProviderMessageId == "email_123" && item.Status == "accepted"), "Email delivery status should record accepted Emailit sends.");
-    Assert(deliveryStatus.Recipients.Any(static item => item.Email == "runner@example.invalid" && item.Provider == "emailit_api"), "Email delivery status should project recipient state.");
+        var emailitService = new IdentityEmailDeliveryService(
+            emailitConfig,
+            loggerFactory.CreateLogger<IdentityEmailDeliveryService>(),
+            new HttpClient(new StubHttpMessageHandler(request =>
+            {
+                capturedRequest = request;
+                capturedBody = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+                return JsonResponse(new { data = new { id = "email_123" } }, HttpStatusCode.Accepted);
+            })));
 
-    var webhookAck = emailitService.RecordEmailitWebhook(JsonDocument.Parse("""
-    {
-      "type": "email.delivered",
-      "data": {
-        "id": "email_123",
-        "to": "runner@example.invalid",
-        "created_at": "2026-03-20T10:05:00Z"
-      }
-    }
-    """).RootElement);
-    Assert(webhookAck.Provider == "emailit_api", "Emailit webhook ack should identify the provider.");
-    Assert(webhookAck.Status == "delivered", "Emailit webhook ack should normalize delivered events.");
+        var delivered = emailitService.DeliverMagicLink(
+            email: "runner@example.invalid",
+            displayName: "Runner Demo",
+            ticketId: "ticket-emailit-123",
+            nextPath: "/home",
+            expiresAtUtc: DateTimeOffset.Parse("2026-03-20T10:00:00Z"));
 
-    var updatedStatus = emailitService.GetStatus();
-    Assert(updatedStatus.RecentDeliveries.Any(static item => item.TransportKey == "emailit_api" && item.DeliveryMode == "emailit_webhook" && item.Status == "delivered"), "Webhook delivery events should appear in email delivery history.");
-    Assert(updatedStatus.Recipients.Any(static item => item.Email == "runner@example.invalid" && item.State == "delivered"), "Webhook delivery events should update recipient state.");
+        Assert(delivered.Delivered, $"Emailit-backed delivery should report success on a 2xx API response. mode={delivered.DeliveryMode} note={delivered.PreviewNote} request={(capturedRequest is null ? "none" : capturedRequest.RequestUri?.ToString())}");
+        Assert(delivered.DeliveryMode == "emailit_api_magic_link", "Emailit-backed delivery should expose the Emailit delivery mode.");
+        Assert(delivered.ProviderMessageId == "email_123", "Emailit-backed delivery should surface the provider message id when the API returns one.");
+        Assert(capturedRequest is not null, "Emailit-backed delivery should issue an HTTP request.");
+        Assert(capturedRequest!.RequestUri?.ToString() == "https://api.emailit.com/v2/emails", "Emailit-backed delivery should target the v2 emails endpoint.");
+        Assert(capturedRequest.Headers.Authorization?.Scheme == "Bearer", "Emailit-backed delivery should send a bearer token.");
+        Assert(capturedRequest.Headers.Authorization?.Parameter == "secret-emailit-key", "Emailit-backed delivery should send the configured API key.");
+        Assert(capturedRequest.Headers.Contains("Idempotency-Key"), "Emailit-backed delivery should send an idempotency key.");
+        Assert(!string.IsNullOrWhiteSpace(capturedBody), "Emailit-backed delivery should send a JSON payload.");
 
-    var failingEmailitService = new IdentityEmailDeliveryService(
-        emailitConfig,
-        loggerFactory.CreateLogger<IdentityEmailDeliveryService>(),
-        new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+        using (var payload = JsonDocument.Parse(capturedBody!))
         {
-            Content = new StringContent("{\"error\":\"Domain not verified\"}", Encoding.UTF8, "application/json")
-        })));
+            Assert(payload.RootElement.GetProperty("from").GetString() == "God <god@chummer.run>", "Emailit payload should preserve the configured sender label.");
+            Assert(payload.RootElement.GetProperty("to").GetString() == "runner@example.invalid", "Emailit payload should target the requested email.");
+            Assert(payload.RootElement.GetProperty("subject").GetString() == "Your Chummer sign-in link", "Emailit payload should keep the auth mail subject.");
+            Assert(payload.RootElement.GetProperty("tracking").GetBoolean() == false, "Emailit auth mail should disable tracking.");
+            Assert(payload.RootElement.GetProperty("text").GetString()?.Contains("/auth/email/callback?ticket=ticket-emailit-123", StringComparison.Ordinal) == true, "Emailit text body should contain the callback link.");
+            Assert(payload.RootElement.GetProperty("html").GetString()?.Contains("Open Chummer", StringComparison.Ordinal) == true, "Emailit html body should contain the CTA.");
+            Assert(payload.RootElement.GetProperty("meta").GetProperty("purpose").GetString() == "magic_link", "Emailit payload should mark the auth purpose.");
+        }
 
-    var failed = failingEmailitService.DeliverMagicLink(
-        email: "runner@example.invalid",
-        displayName: "Runner Demo",
-        ticketId: "ticket-emailit-fail",
-        nextPath: "/home",
-        expiresAtUtc: DateTimeOffset.Parse("2026-03-20T10:00:00Z"));
+        var deliveryStatus = emailitService.GetStatus();
+        Assert(deliveryStatus.RecentDeliveries.Any(static item => item.TransportKey == "emailit_api" && item.ProviderMessageId == "email_123" && item.Status == "accepted"), "Email delivery status should record accepted Emailit sends.");
+        Assert(deliveryStatus.Recipients.Any(static item => item.Email == "runner@example.invalid" && item.Provider == "emailit_api"), "Email delivery status should project recipient state.");
 
-    Assert(!failed.Delivered, "Emailit delivery failures should not pretend success.");
-    Assert(failed.DeliveryMode == "preview_inline_link", "Emailit delivery failures should fall back to honest preview mode when no SMTP fallback is configured.");
+        var webhookAck = emailitService.RecordEmailitWebhook(JsonDocument.Parse("""
+        {
+          "type": "email.delivered",
+          "data": {
+            "id": "email_123",
+            "to": "runner@example.invalid",
+            "created_at": "2026-03-20T10:05:00Z"
+          }
+        }
+        """).RootElement);
+        Assert(webhookAck.Provider == "emailit_api", "Emailit webhook ack should identify the provider.");
+        Assert(webhookAck.Status == "delivered", "Emailit webhook ack should normalize delivered events.");
+
+        var updatedStatus = emailitService.GetStatus();
+        Assert(updatedStatus.RecentDeliveries.Any(static item => item.TransportKey == "emailit_api" && item.DeliveryMode == "emailit_webhook" && item.Status == "delivered"), "Webhook delivery events should appear in email delivery history.");
+        Assert(updatedStatus.Recipients.Any(static item => item.Email == "runner@example.invalid" && item.State == "delivered"), "Webhook delivery events should update recipient state.");
+
+        var failingEmailitService = new IdentityEmailDeliveryService(
+            emailitConfig,
+            loggerFactory.CreateLogger<IdentityEmailDeliveryService>(),
+            new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+            {
+                Content = new StringContent("{\"error\":\"Domain not verified\"}", Encoding.UTF8, "application/json")
+            })));
+
+        var failed = failingEmailitService.DeliverMagicLink(
+            email: "runner@example.invalid",
+            displayName: "Runner Demo",
+            ticketId: "ticket-emailit-fail",
+            nextPath: "/home",
+            expiresAtUtc: DateTimeOffset.Parse("2026-03-20T10:00:00Z"));
+
+        Assert(!failed.Delivered, "Emailit delivery failures should not pretend success.");
+        Assert(failed.DeliveryMode == "preview_inline_link", "Emailit delivery failures should fall back to honest preview mode when no SMTP fallback is configured.");
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
 }
 
 async Task VerifyHubCommunitySecurityAndDurabilityAsync()
@@ -579,6 +664,12 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
             ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json")
         })
         .Build();
+    var bootstrapGroup = groups.CreateGroup(new CreateGroupRequest(
+        SubjectId: "subject.demo",
+        Name: "Bootstrap Group",
+        GroupType: "booster",
+        Visibility: "group",
+        Capabilities: null));
     var unavailableBridgeSessions = new BoostSessionService(
         store,
         accounts,
@@ -588,7 +679,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var unavailableBridgeSession = unavailableBridgeSessions.Create(new CreateSponsorSessionRequest(
         SubjectId: "subject.demo",
         ProjectId: "hub",
-        GroupId: ownerGroup.GroupId,
+        GroupId: bootstrapGroup.GroupId,
         SubjectLabel: "Runner Demo"));
     unavailableBridgeSessions.RecordConsent(unavailableBridgeSession.SponsorSessionId);
     var unavailableBoostSessionsController = new BoostSessionsController(accounts, identityClient, leaderboards, unavailableBridgeSessions)
@@ -1259,9 +1350,9 @@ async Task VerifyPublicLandingProjectionAsync()
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
     var landing = new PublicLandingService(configuration, loggerFactory.CreateLogger<PublicLandingService>());
     var navigation = new PublicNavigationService(configuration);
-    var chrome = new HubPageChromeService(landing, navigation);
-    var progress = new PublicProgressService(configuration, loggerFactory.CreateLogger<PublicProgressService>());
     var releases = new PublicReleaseManifestService(configuration);
+    var chrome = new HubPageChromeService(landing, navigation, releases);
+    var progress = new PublicProgressService(configuration, loggerFactory.CreateLogger<PublicProgressService>());
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
@@ -1282,6 +1373,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var accounts = new AccountService(store);
     var identityLinks = new IdentityLinkService(store, accounts);
     var experience = new UserExperienceService(store, accounts);
+    var leaderboards = new LeaderboardService(store);
     var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
         JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized))), configuration);
     var authService = new HubBrowserAuthService(new HttpClient(new StubHttpMessageHandler(_ =>
@@ -1305,7 +1397,14 @@ async Task VerifyPublicLandingProjectionAsync()
             HttpContext = new DefaultHttpContext()
         }
     };
-    var progressController = new PublicProgressController(progress, landing, navigation)
+    var progressController = new PublicProgressController(
+        progress,
+        navigation,
+        chrome,
+        accounts,
+        identityClient,
+        new NoopAntiforgery(),
+        loggerFactory.CreateLogger<PublicProgressController>())
     {
         ControllerContext = new ControllerContext
         {
@@ -1316,8 +1415,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var landingView = await controller.LandingPage(CancellationToken.None) as ViewResult;
     var landingModel = landingView?.Model as LandingPageViewModel;
     Assert(landingModel is not null, "landing page should render through the MVC view layer.");
-    Assert(string.Equals(landingModel.Surface.Headline, "Shadowrun that shows its work.", StringComparison.Ordinal), "landing page should render the canonical headline");
-    Assert(landingModel.StartHere.Any(static card => string.Equals(card.Href, "/what-is-chummer", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
+    Assert(string.Equals(landingModel!.Surface.Headline, "Shadowrun that shows its work.", StringComparison.Ordinal), "landing page should render the canonical headline");
+    Assert(landingModel.Workflows.Any(static card => string.Equals(card.Href, "/what-is-chummer", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
     Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Href, "/signup?next=/home", StringComparison.Ordinal)), "landing page chrome should expose create account beside sign in");
     Assert(landingModel.Lanes.Any(static card => string.Equals(card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
     Assert(!string.IsNullOrWhiteSpace(landingModel.Assets.BySlot("section_hero")?.PosterUrl), "landing hero should use a non-empty media asset.");
@@ -1331,7 +1430,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(downloadsModel is not null && downloadsModel.Manifest.Downloads.Any(static item => string.Equals(item.Id, "smoke-poc-linux-x64", StringComparison.Ordinal)), "downloads page should render artifacts from the live release manifest");
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
 
-    var progressHtml = progressController.ProgressPage().Content ?? string.Empty;
+    var progressHtml = (await progressController.ProgressPage(CancellationToken.None)).Content ?? string.Empty;
     Assert(progressHtml.Contains("Core Rules Engine", StringComparison.Ordinal), "progress page should render the generated product-part report");
     Assert(progressHtml.Contains("/api/public/progress-poster.svg", StringComparison.Ordinal), "progress page should render against the hosted poster route");
     Assert(progressHtml.Contains("How to participate", StringComparison.Ordinal), "progress page should expose the participation section");
@@ -1356,7 +1455,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var participateView = await controller.ParticipatePage(CancellationToken.None) as ViewResult;
     var participateModel = participateView?.Model as ParticipatePageViewModel;
     Assert(participateModel is not null, "participate page should render through the MVC view layer.");
-    Assert(participateModel.SignedInLane.Any(static card => string.Equals(card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal)), "participate page should route the booster lane through login");
+    Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal)), "participate page should route the booster lane through login");
     Assert(!participateModel.PublicLane.Any(static card => card.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
 
     var homeResult = await controller.HomePage(CancellationToken.None);
@@ -1373,7 +1472,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var loginResult = await authController.LoginPage("/home", CancellationToken.None);
     var loginModel = (loginResult as ViewResult)?.Model as AuthPageViewModel;
     Assert(loginModel is not null && loginModel.GoogleStartHref.Contains("/auth/google/start", StringComparison.Ordinal), "login page should render the Google-first auth shell.");
-    Assert(string.Equals(loginModel.NextPath, "/home", StringComparison.Ordinal), "login page should preserve the guest next path.");
+    Assert(string.Equals(loginModel!.NextPath, "/home", StringComparison.Ordinal), "login page should preserve the guest next path.");
 
     var signupResult = await authController.SignupPage("/home", CancellationToken.None);
     var signupModel = (signupResult as ViewResult)?.Model as AuthPageViewModel;
@@ -1392,7 +1491,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLandingView = await unavailableLandingController.LandingPage(CancellationToken.None) as ViewResult;
     var unavailableLandingModel = unavailableLandingView?.Model as LandingPageViewModel;
     Assert(unavailableLandingModel?.Chrome.Authenticated == true, "public landing chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
-    Assert(unavailableLandingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Sign out", StringComparison.Ordinal)), "authenticated public landing chrome should keep the signed-in actions during identity outages.");
+    Assert(unavailableLandingModel!.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Sign out", StringComparison.Ordinal)), "authenticated public landing chrome should keep the signed-in actions during identity outages.");
     var unavailableHomeResult = await unavailableLandingController.HomePage(CancellationToken.None);
     var unavailableHomeModel = (unavailableHomeResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableHomeModel?.Heading, "Home is unavailable right now", StringComparison.Ordinal), "home page should show an unavailable message when identity is down instead of redirecting to login.");
@@ -3049,7 +3148,8 @@ HubPageChromeService CreateChromeService(IConfiguration configuration, ILoggerFa
 {
     var landing = new PublicLandingService(configuration, loggerFactory.CreateLogger<PublicLandingService>());
     var navigation = new PublicNavigationService(configuration);
-    return new HubPageChromeService(landing, navigation);
+    var releases = new PublicReleaseManifestService(configuration);
+    return new HubPageChromeService(landing, navigation, releases);
 }
 
 HubGoogleAuthService CreateGoogleService(
@@ -3142,4 +3242,15 @@ sealed class SmokeWebHostEnvironment : IWebHostEnvironment
     public string EnvironmentName { get; set; } = "Development";
     public string ContentRootPath { get; set; } = string.Empty;
     public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+}
+
+sealed class NoopAntiforgery : IAntiforgery
+{
+    private static readonly AntiforgeryTokenSet TokenSet = new("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN");
+
+    public AntiforgeryTokenSet GetAndStoreTokens(HttpContext httpContext) => TokenSet;
+    public AntiforgeryTokenSet GetTokens(HttpContext httpContext) => TokenSet;
+    public Task<bool> IsRequestValidAsync(HttpContext httpContext) => Task.FromResult(true);
+    public Task ValidateRequestAsync(HttpContext httpContext) => Task.CompletedTask;
+    public void SetCookieTokenAndHeader(HttpContext httpContext) { }
 }

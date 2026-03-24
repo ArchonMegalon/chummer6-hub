@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace Chummer.Run.Contracts.Boosters;
 
@@ -50,7 +51,8 @@ public sealed record SponsorSessionStatusDto(
     IReadOnlyList<SponsorSessionEventDto> Events,
     string AuthorizationTier = "unknown",
     string TierSource = "unknown",
-    DateTimeOffset? AuthorizedAtUtc = null);
+    DateTimeOffset? AuthorizedAtUtc = null,
+    [property: JsonPropertyName("credentialHandlePresent")] bool CredentialHandlePresent = false);
 
 public sealed record SponsorSessionProjectionDto(
     string SponsorSessionId,

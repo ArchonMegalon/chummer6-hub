@@ -23,13 +23,21 @@ public sealed class HubPageChromeService
         var signInAction = surface.GuestShellActions
             .FirstOrDefault(action => string.Equals(NormalizeRoute(action.Href), "/login", StringComparison.OrdinalIgnoreCase))
             ?? new PublicLandingActionDto("Sign in", "/login?next=/home", "secondary");
+        var createAccountAction = surface.GuestShellActions
+            .FirstOrDefault(action => string.Equals(NormalizeRoute(action.Href), "/signup", StringComparison.OrdinalIgnoreCase))
+            ?? new PublicLandingActionDto("Create account", "/signup?next=/home", "primary");
         var actions = new[]
         {
             new SiteChromeActionViewModel(
                 signInAction.Label,
                 signInAction.Href,
                 "link",
-                Current: string.Equals(NormalizeRoute(currentPath), NormalizeRoute(signInAction.Href), StringComparison.OrdinalIgnoreCase))
+                Current: string.Equals(NormalizeRoute(currentPath), NormalizeRoute(signInAction.Href), StringComparison.OrdinalIgnoreCase)),
+            new SiteChromeActionViewModel(
+                createAccountAction.Label,
+                createAccountAction.Href,
+                createAccountAction.Emphasis,
+                Current: string.Equals(NormalizeRoute(currentPath), NormalizeRoute(createAccountAction.Href), StringComparison.OrdinalIgnoreCase))
         };
 
         return new SiteChromeViewModel(

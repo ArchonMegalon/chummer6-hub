@@ -2,6 +2,7 @@ using System.IO;
 using System.Net;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.Support;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
@@ -41,7 +42,9 @@ builder.Services.AddHttpClient<HubIdentityClient>();
 builder.Services.AddHttpClient<HubBrowserAuthService>();
 builder.Services.AddHttpClient<HubGoogleAuthService>();
 builder.Services.AddSingleton<CommunityStore>();
+builder.Services.AddSingleton<SupportStore>();
 builder.Services.AddSingleton<PublicLandingService>();
+builder.Services.AddSingleton<PublicTrustContentService>();
 builder.Services.AddSingleton<PublicNavigationService>();
 builder.Services.AddSingleton<HubPageChromeService>();
 builder.Services.AddSingleton<HubEmailLinkVerificationService>();
@@ -56,6 +59,7 @@ builder.Services.AddSingleton<RewardService>();
 builder.Services.AddSingleton<EntitlementService>();
 builder.Services.AddSingleton<LeaderboardService>();
 builder.Services.AddSingleton<LedgerService>();
+builder.Services.AddSingleton<CrashSupportService>();
 builder.Services.AddScoped<BoostSessionService>();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
