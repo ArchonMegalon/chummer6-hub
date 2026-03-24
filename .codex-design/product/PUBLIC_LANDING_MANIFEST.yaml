@@ -2,31 +2,25 @@ product: chummer
 surface: chummer.run
 version: 1
 headline: Shadowrun that shows its work.
-subhead: Build, inspect, play, and follow what opens next without mystery math or empty promises.
-proof_line: Local-first continuity, deterministic explainability, and visible receipts belong on the same front door.
+subhead: Build characters, inspect rulings, and keep sessions moving with explainable math, durable state, and clear proof of what works today.
+proof_line: Preview product. Honest status. No mystery roadmap.
 no_provider_names: true
 no_ltd_names: true
 hero_ctas:
-  - label: See what is real now
-    href: /now
-    emphasis: primary
-  - label: Download installer
+  - label: Get preview build
     href: /downloads
     emphasis: primary
-  - label: Create account
-    href: /signup?next=/home
+  - label: See what works today
+    href: /now
     emphasis: secondary
 guest_shell_actions:
   - label: Sign in
     href: /login?next=/home
-    emphasis: primary
-  - label: Create account
-    href: /signup?next=/home
     emphasis: secondary
 secondary_highlights:
-  - Runs local-first.
-  - Explains the math.
-  - Grows into runsites, dossiers, creator tools, and replay.
+  - Deterministic engine
+  - Rules receipts
+  - Local-first continuity
 public_routes:
   - path: /
     title: Landing
@@ -38,7 +32,7 @@ public_routes:
     placeholder_allowed: false
     placeholder_requirements: public product story only
   - path: /what-is-chummer
-    title: What is Chummer?
+    title: Product
     audience: public
     purpose: product_story
     requires_auth: false
@@ -47,7 +41,7 @@ public_routes:
     placeholder_allowed: false
     placeholder_requirements: public product story only
   - path: /now
-    title: What is real today
+    title: What works today
     audience: public
     purpose: proof_shelf
     requires_auth: false
@@ -56,7 +50,7 @@ public_routes:
     placeholder_allowed: false
     placeholder_requirements: proof shelf honesty only
   - path: /horizons
-    title: Coming next
+    title: Roadmap
     audience: public
     purpose: horizon_summary
     requires_auth: false
@@ -198,7 +192,7 @@ sections:
     audience: public
     route: /
   - id: start_here
-    title: Start here
+    title: How Chummer helps at the table
     audience: public
     route: /
   - id: why_trust_it
@@ -206,15 +200,15 @@ sections:
     audience: public
     route: /
   - id: choose_your_lane
-    title: Choose your lane
+    title: Who this is for
     audience: public
     route: /
   - id: closing_cta
-    title: Follow what opens next
+    title: Early access
     audience: public
     route: /
   - id: whats_real_now
-    title: What is real now
+    title: What works today
     audience: public
     route: /now
   - id: coming_next

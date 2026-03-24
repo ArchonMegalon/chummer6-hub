@@ -2,22 +2,22 @@ product: chummer
 surface: chummer.run
 version: 1
 primary_nav:
-  - label: What is Chummer
+  - label: Product
     href: /what-is-chummer
-  - label: What is real now
+  - label: What works today
     href: /now
-  - label: Coming next
+  - label: Roadmap
     href: /horizons
-  - label: Downloads
-    href: /downloads
+  - label: Artifacts
+    href: /artifacts
   - label: Participate
     href: /participate
 secondary_nav:
+  - label: Downloads
+    href: /downloads
   - label: Progress
     href: /progress
   - label: Status
     href: /status
-  - label: Artifacts
-    href: /artifacts
   - label: Leaderboards
     href: /leaderboards

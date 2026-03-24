@@ -4,130 +4,258 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing";
     var hero = Model.Assets.BySlot("section_hero");
+
+    string[] TrustProofs(string cardId) => cardId switch
+    {
+        "deterministic_truth" => new[] { "Deterministic engine", "Repeatable totals", "Clean audit trail" },
+        "receipts_and_provenance" => new[] { "Modifier trail", "Source trace", "Visible evidence" },
+        "local_first_continuity" => new[] { "Durable state", "Offline posture", "Clean recovery" },
+        _ => new[] { "Visible output", "Traceable state", "Clear status" }
+    };
+
+    string WorkflowProof(string cardId) => cardId switch
+    {
+        "product_story" => "Proof: clean dossiers and visible tradeoffs.",
+        "see_whats_real" => "Proof: source traces and repeatable output.",
+        "get_the_poc" => "Proof: durable state across devices.",
+        _ => "Proof: visible output and clear status."
+    };
+
+    string LaneStatus(string badge) => badge switch
+    {
+        "Available now" => "Available now",
+        "Mixed" => "Mixed",
+        _ => "Coming next"
+    };
 }
 
-<section class="landing-film">
-    @if (hero is not null)
-    {
-        <div class="landing-film__media">
-            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", hero)
-        </div>
-    }
-    <div class="landing-film__content">
-        <h1 class="landing-film__brand">CHUMMER</h1>
-        <p class="landing-film__headline">@Model.Surface.Headline</p>
-        <p class="landing-film__support">@Model.Surface.Subhead</p>
-        <div class="landing-film__actions">
-            @foreach (var action in Model.Surface.HeroCtas)
-            {
-                var href = action.Href;
-                var label = action.Label;
-                if (Model.Chrome.Authenticated && string.Equals(action.Href, "/signup?next=/home", StringComparison.OrdinalIgnoreCase))
+<section class="launch-hero">
+    <div class="launch-hero__shell">
+        <div class="launch-hero__copy">
+            <p class="eyebrow">Explainable Shadowrun</p>
+            <h1 class="launch-hero__title">Shadowrun rules truth, with receipts.</h1>
+            <p class="launch-hero__support">@Model.Surface.Subhead</p>
+            <div class="launch-hero__actions">
+                <a class="button-like button-like--primary" href="@Model.PrimaryHeroAction.Href">@Model.PrimaryHeroAction.Label</a>
+                <a class="button-like button-like--secondary" href="@Model.SecondaryHeroAction.Href">@Model.SecondaryHeroAction.Label</a>
+            </div>
+            <div class="proof-chip-row" aria-label="Trust anchors">
+                @foreach (var chip in Model.Surface.SecondaryHighlights)
                 {
-                    href = "/home";
-                    label = "Open home";
+                    <span class="proof-chip">@chip</span>
                 }
-                else if (Model.Chrome.Authenticated && string.Equals(action.Href, "/login?next=/home", StringComparison.OrdinalIgnoreCase))
-                {
-                    href = "/account";
-                    label = "Open account";
-                }
-
-                <a class="cta-link cta-link--@(action.Emphasis == "secondary" ? "secondary" : "primary")" href="@href">@label</a>
-            }
+            </div>
+            <p class="launch-hero__trustline">@Model.Surface.ProofLine</p>
         </div>
+        @if (hero is not null)
+        {
+            <div class="launch-hero__media">
+                @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", hero)
+            </div>
+        }
     </div>
 </section>
 
-<section class="editorial-block editorial-block--strips">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Start here</p>
-        <h2 class="editorial-title">Three clean ways into Chummer</h2>
-        <p class="editorial-copy">Start with the product story, the current state, or the build you can download today.</p>
+<section class="workflow-band">
+    <div class="workflow-band__lead">
+        <p class="eyebrow">How Chummer helps at the table</p>
+        <h2 class="editorial-title">Build, explain, and keep the table moving</h2>
+        <p class="editorial-copy">See the product in motion first: build a runner, inspect the ruling, and keep a session moving without losing trust.</p>
     </div>
-    <div class="editorial-strip-list">
-        @foreach (var card in Model.StartHere)
+    <div class="workflow-grid">
+        @foreach (var card in Model.Workflows)
         {
             var asset = Model.Assets.ForCard(card);
-            <article class="editorial-strip">
+            <article class="workflow-card">
                 @if (asset is not null)
                 {
-                    <div class="editorial-strip__media">
+                    <div class="workflow-card__media">
                         @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
                     </div>
                 }
-                <div class="editorial-strip__copy">
+                <div class="workflow-card__copy">
                     <span class="tag">@card.Badge</span>
                     <h3>@card.Title</h3>
                     <p>@card.Summary</p>
+                    <ul class="workflow-card__points">
+                        @if (!string.IsNullOrWhiteSpace(card.Pain))
+                        {
+                            <li>@card.Pain</li>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(card.Payoff))
+                        {
+                            <li>@card.Payoff</li>
+                        }
+                    </ul>
+                    <p class="workflow-card__proof">@WorkflowProof(card.Id)</p>
+                    <a class="inline-link" href="@card.Href">Learn more</a>
                 </div>
-                <a class="editorial-strip__action" href="@card.Href">Open</a>
             </article>
         }
     </div>
 </section>
 
-<section class="proof-band">
-    <div class="proof-band__lead">
-        <p class="eyebrow">Why trust it</p>
-        <h2 class="editorial-title">Why trust Chummer</h2>
+<section class="trust-claims">
+    <div class="trust-claims__lead">
+        <p class="eyebrow">Why trust Chummer</p>
+        <h2 class="editorial-title">Product claims backed by evidence</h2>
+        <p class="editorial-copy">The trust model is simple: deterministic rules truth, visible receipts, and local-first continuity.</p>
     </div>
-    <div class="proof-band__grid">
+    <div class="trust-claims__grid">
         @foreach (var card in Model.TrustPillars)
         {
-            <article class="proof-statement">
+            <article class="trust-claim">
                 <span class="tag">@card.Badge</span>
                 <h3>@card.Title</h3>
                 <p>@card.Summary</p>
+                <div class="trust-claim__microproof">
+                    @foreach (var item in TrustProofs(card.Id))
+                    {
+                        <span>@item</span>
+                    }
+                </div>
             </article>
         }
     </div>
 </section>
 
-<section class="editorial-block editorial-block--lanes">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Choose your lane</p>
-        <h2 class="editorial-title">Player, GM, or creator</h2>
-        <p class="editorial-copy">Choose the role that matches the way you use the game.</p>
+<section class="audience-fit">
+    <div class="audience-fit__lead">
+        <p class="eyebrow">Who this is for</p>
+        <h2 class="editorial-title">Player, GM, and creator fit</h2>
+        <p class="editorial-copy">Choose the lane that matches how you come to the table.</p>
     </div>
-    <div class="lane-strip-list">
+    <div class="audience-fit__grid">
         @foreach (var card in Model.Lanes)
         {
             var asset = Model.Assets.ForCard(card);
-            <article class="lane-strip">
-                <div class="lane-strip__copy">
-                    <span class="tag tag--amber">@card.Badge</span>
-                    <h3>@card.Title</h3>
-                    <p>@card.Summary</p>
-                    <a class="editorial-strip__action" href="@card.Href">See the lane</a>
-                </div>
+            <article class="audience-card">
                 @if (asset is not null)
                 {
-                    <div class="lane-strip__media">
+                    <div class="audience-card__media">
                         @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
                     </div>
                 }
+                <div class="audience-card__copy">
+                    <span class="tag tag--amber">@LaneStatus(card.Badge)</span>
+                    <h3>@card.Title</h3>
+                    <p>@card.Summary</p>
+                    <a class="inline-link" href="@card.Href">Read the fit</a>
+                </div>
             </article>
         }
     </div>
 </section>
 
-<section class="landing-closing-band">
-    <div>
-        <p class="eyebrow">Follow what opens next</p>
-        <h2 class="editorial-title">Keep your place as more opens up</h2>
-        <p class="editorial-copy">An account keeps your follows, settings, and contribution access together.</p>
+<section class="works-matrix">
+    <div class="works-matrix__lead">
+        <p class="eyebrow">What is real today, what is preview, what is next</p>
+        <h2 class="editorial-title">What works today</h2>
+        <p class="editorial-copy">See what is available now, what you can preview, and what is opening next.</p>
     </div>
-    <div class="landing-closing-band__actions">
+    <div class="works-matrix__columns">
+        <article class="works-column">
+            <div class="works-column__header">
+                <span class="tag">Available today</span>
+                <h3>Available today</h3>
+            </div>
+            <div class="works-column__list">
+                @foreach (var card in Model.AvailableToday)
+                {
+                    <article class="works-item">
+                        <h4>@card.Title</h4>
+                        <p>@card.Summary</p>
+                        <a class="inline-link" href="@card.Href">Open</a>
+                    </article>
+                }
+            </div>
+        </article>
+        <article class="works-column">
+            <div class="works-column__header">
+                <span class="tag tag--amber">Preview</span>
+                <h3>Preview</h3>
+            </div>
+            <div class="works-column__list">
+                @foreach (var card in Model.PreviewItems)
+                {
+                    <article class="works-item">
+                        <h4>@card.Title</h4>
+                        <p>@card.Summary</p>
+                        <a class="inline-link" href="@card.Href">Inspect</a>
+                    </article>
+                }
+            </div>
+        </article>
+        <article class="works-column">
+            <div class="works-column__header">
+                <span class="tag tag--quiet">Coming next</span>
+                <h3>Coming next</h3>
+            </div>
+            <div class="works-column__list">
+                @foreach (var card in Model.ComingNext)
+                {
+                    <article class="works-item">
+                        <h4>@card.Title</h4>
+                        <p>@card.Summary</p>
+                        <a class="inline-link" href="@card.Href">Read more</a>
+                    </article>
+                }
+            </div>
+        </article>
+    </div>
+</section>
+
+<section class="artifact-gallery">
+    <div class="artifact-gallery__lead">
+        <p class="eyebrow">Proof, not promises</p>
+        <h2 class="editorial-title">Artifacts that make the product tangible</h2>
+        <p class="editorial-copy">Runsite packs, dossiers, primers, and after-action surfaces keep the preview grounded in real output.</p>
+    </div>
+    <div class="artifact-gallery__grid">
+        @foreach (var card in Model.Artifacts)
+        {
+            var asset = Model.Assets.ForCard(card);
+            <article class="artifact-card">
+                @if (asset is not null)
+                {
+                    <div class="artifact-card__media">
+                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                    </div>
+                }
+                <div class="artifact-card__copy">
+                    <span class="tag tag--quiet">@card.Badge</span>
+                    <h3>@card.Title</h3>
+                    <p>@card.Summary</p>
+                    <a class="inline-link" href="@(card.DetailRoute ?? card.Href)">See the proof trail</a>
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="access-band">
+    <div class="access-band__copy">
+        <p class="eyebrow">Get on the list that matches your interest</p>
+        <h2 class="editorial-title">Create the account that keeps your place</h2>
+        <p class="editorial-copy">Tell Chummer what you care about and get invited into the right lane as it opens.</p>
+        <div class="interest-grid" aria-label="Interest options">
+            <span class="interest-pill">I’m here for play</span>
+            <span class="interest-pill">I want GM tools</span>
+            <span class="interest-pill">I want creator tools</span>
+            <span class="interest-pill">Send me roadmap updates</span>
+            <span class="interest-pill">Consider me for beta access</span>
+        </div>
+    </div>
+    <div class="access-band__actions">
         @if (Model.Chrome.Authenticated)
         {
-            <a class="cta-link cta-link--primary" href="/home">Open home</a>
-            <a class="cta-link cta-link--secondary" href="/account">Open account</a>
+            <a class="button-like button-like--primary" href="/home">Open home</a>
+            <p class="muted-copy">Your follows, setup, and access state already live in the signed-in product.</p>
         }
         else
         {
-            <a class="cta-link cta-link--primary" href="/signup?next=/home">Create account</a>
-            <a class="cta-link cta-link--secondary" href="/login?next=/home">Sign in</a>
+            <a class="button-like button-like--primary" href="/signup?next=/home">Create account</a>
+            <p class="muted-copy">Already have one? <a class="inline-link" href="/login?next=/home">Sign in</a></p>
         }
     </div>
 </section>

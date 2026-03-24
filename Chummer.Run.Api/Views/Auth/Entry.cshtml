@@ -5,41 +5,78 @@
     ViewData["SurfaceClass"] = "surface-auth";
 }
 
-<section class="auth-stage">
-    <div class="auth-shell auth-shell--entry">
-        <div class="auth-shell__story auth-visual">
-            <p class="auth-visual__eyebrow">Chummer account</p>
-            <h1 class="hero-brand">CHUMMER</h1>
-            <h2 class="hero-headline">@Model.Heading</h2>
-            <p class="auth-visual__copy">@Model.SupportLine</p>
+<section class="auth-entry">
+    <div class="auth-entry__story auth-entry__story--visual">
+        <p class="eyebrow">Explainable Shadowrun</p>
+        <h1 class="hero-brand">CHUMMER</h1>
+        <h2 class="hero-headline">@Model.Heading</h2>
+        <p class="auth-entry__copy">@Model.SupportLine</p>
+        <p class="auth-entry__trust">One account keeps preview access, follows, and contribution status together.</p>
+    </div>
+
+    <div class="auth-entry__panel auth-panel auth-panel--entry">
+        <div class="auth-panel__mode-row">
+            @if (Model.CreateAccount)
+            {
+                <span class="action-pill action-pill--current">Create account</span>
+                <a class="action-pill action-pill--ghost" href="/login?next=@Uri.EscapeDataString(Model.NextPath)">Sign in</a>
+            }
+            else
+            {
+                <span class="action-pill action-pill--current">Sign in</span>
+                <a class="action-pill action-pill--ghost" href="/signup?next=@Uri.EscapeDataString(Model.NextPath)">Create account</a>
+            }
         </div>
-        <div class="auth-panel auth-panel--entry">
-            <div class="auth-panel__mode-row">
-                @if (Model.CreateAccount)
-                {
-                    <span class="action-pill action-pill--current">Create account</span>
-                    <a class="action-pill action-pill--ghost" href="/login?next=@Uri.EscapeDataString(Model.NextPath)">Sign in</a>
-                }
-                else
-                {
-                    <span class="action-pill action-pill--current">Sign in</span>
-                    <a class="action-pill action-pill--ghost" href="/signup?next=@Uri.EscapeDataString(Model.NextPath)">Create account</a>
-                }
+
+        @if (Model.CreateAccount)
+        {
+            <div class="auth-panel__intro">
+                <h3>Email first</h3>
+                <p>Use email to request access and keep the first product step simple. Google is still available if you prefer it.</p>
+            </div>
+            <form class="auth-form" method="post" action="/auth/email/start">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="next" value="@Model.NextPath" />
+                <div class="field">
+                    <label for="email">Email</label>
+                    <input id="email" name="email" type="email" placeholder="runner@example.com" required />
+                </div>
+                <div class="field">
+                    <label for="displayName">Display name</label>
+                    <input id="displayName" name="displayName" placeholder="Runner" />
+                </div>
+                <button class="button-like button-like--primary" type="submit">Continue with email</button>
+            </form>
+
+            <div class="auth-divider"><span>Or use Google</span></div>
+            @if (Model.GoogleAvailable)
+            {
+                <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
+            }
+            else
+            {
+                <button class="button-like button-like--ghost auth-panel__primary" type="button" disabled>Google unavailable</button>
+                <p class="muted-copy">@Model.GoogleUnavailableReason</p>
+            }
+        }
+        else
+        {
+            <div class="auth-panel__intro">
+                <h3>Fastest way back in</h3>
+                <p>Use Google for the fastest browser sign-in, or switch to a magic link if you want the quieter path.</p>
             </div>
 
-            <div class="auth-panel__stack">
-                @if (Model.GoogleAvailable)
-                {
-                    <a class="button-like button-like--primary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
-                }
-                else
-                {
-                    <button class="button-like button-like--ghost auth-panel__primary" type="button" disabled>Google unavailable</button>
-                    <p class="muted-copy">@Model.GoogleUnavailableReason</p>
-                }
+            @if (Model.GoogleAvailable)
+            {
+                <a class="button-like button-like--primary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
+            }
+            else
+            {
+                <button class="button-like button-like--ghost auth-panel__primary" type="button" disabled>Google unavailable</button>
+                <p class="muted-copy">@Model.GoogleUnavailableReason</p>
+            }
 
-                <button class="button-like button-like--secondary" type="button" data-email-toggle="emailAuthPanel">Continue with email</button>
-            </div>
+            <button class="button-like button-like--secondary" type="button" data-email-toggle="emailAuthPanel">Continue with email</button>
 
             <div id="emailAuthPanel" class="auth-panel__email" hidden>
                 <form class="auth-form" method="post" action="/auth/email/start">
@@ -56,8 +93,8 @@
                     <button class="button-like button-like--secondary" type="submit">Send magic link</button>
                 </form>
             </div>
+        }
 
-            <p class="privacy-note">Google is the fastest way in. Email is still available if you prefer a magic link.</p>
-        </div>
+        <p class="privacy-note">The account keeps preview access, follows, and contribution status together.</p>
     </div>
 </section>

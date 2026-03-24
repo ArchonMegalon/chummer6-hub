@@ -66,8 +66,15 @@
                     }
                     else
                     {
-                        <a class="action-pill action-pill--@action.Tone" href="@action.Href">@action.Label</a>
+                        var actionClass = string.Equals(action.Tone, "link", StringComparison.OrdinalIgnoreCase)
+                            ? "site-actions__link"
+                            : $"action-pill action-pill--{action.Tone}";
+                        <a class="@actionClass" href="@action.Href">@action.Label</a>
                     }
+                }
+                @if (!chrome.Authenticated && chrome.PublicPrimaryCta is not null)
+                {
+                    <a class="action-pill action-pill--@chrome.PublicPrimaryCta.Tone" href="@chrome.PublicPrimaryCta.Href">@chrome.PublicPrimaryCta.Label</a>
                 }
             </div>
         </div>
@@ -91,8 +98,15 @@
                         }
                         else
                         {
-                            <a class="action-pill action-pill--@action.Tone" href="@action.Href">@action.Label</a>
+                            var actionClass = string.Equals(action.Tone, "link", StringComparison.OrdinalIgnoreCase)
+                                ? "site-actions__link"
+                                : $"action-pill action-pill--{action.Tone}";
+                            <a class="@actionClass" href="@action.Href">@action.Label</a>
                         }
+                    }
+                    @if (!chrome.Authenticated && chrome.PublicPrimaryCta is not null)
+                    {
+                        <a class="action-pill action-pill--@chrome.PublicPrimaryCta.Tone" href="@chrome.PublicPrimaryCta.Href">@chrome.PublicPrimaryCta.Label</a>
                     }
                 </div>
             </div>
@@ -107,7 +121,7 @@
         <div class="site-footer__inner">
             <div class="site-footer__brand">
                 <a class="site-footer__wordmark" href="/">CHUMMER</a>
-                <p class="site-footer__copy">Rules truth, current builds, account access, and contribution lanes in one place.</p>
+                <p class="site-footer__copy">Explainable Shadowrun platform in early access.</p>
             </div>
             <nav class="site-footer__nav" aria-label="Secondary navigation">
                 <div class="site-footer__links">
@@ -124,7 +138,7 @@
                 }
                 else
                 {
-                    <p>Shadowrun that shows its work.</p>
+                    <p>Preview product. Honest status.</p>
                 }
             </div>
         </div>

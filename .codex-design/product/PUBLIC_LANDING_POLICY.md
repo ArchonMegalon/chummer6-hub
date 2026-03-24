@@ -25,7 +25,7 @@ The landing surface must let a normal person understand, in one visit:
 * Provider names and LTD names are implementation details and must not be named on the landing page.
 * Empty placeholder boxes are forbidden.
 * If a feature is not live, the card must still explain what is coming and why it matters.
-* Public guest chrome must expose both `Sign in` and `Create account`.
+* Public guest chrome must expose `Sign in` plus one primary acquisition action.
 * Public cards must not self-link back to the same route unless they are explicitly marked as non-clickable teasers.
 * External exits must be explicit and labeled as fallbacks or guide links, not disguised as first-party defaults.
 * Landing meaning must compile from design-owned manifest and registry data rather than hub-local improvisation.
@@ -83,10 +83,21 @@ The POC may keep registered overlays thin, but the split must be visible and can
 
 The landing page must always provide at least these public actions:
 
-* see what is real now
-* download installer
+* one primary acquisition action such as `Get preview build` or `Request early access`
+* one proof action such as `See what works today`
 * participate / help
-* sign in to follow what is coming
+* sign in
+
+## Flow rule
+
+The landing page should read in this order:
+
+* value
+* proof
+* fit
+* access
+
+It should not read like a route index.
 
 ## Proof rule
 
