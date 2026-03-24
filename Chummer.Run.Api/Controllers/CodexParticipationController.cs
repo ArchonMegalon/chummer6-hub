@@ -471,7 +471,7 @@ public sealed class CodexParticipationController : Controller
                 intentId = refreshed.Session.SponsorSessionId,
                 sponsorSessionId = refreshed.Session.SponsorSessionId,
                 events = refreshed.Session.Events,
-                fleet = refreshed.Fleet,
+                fleet = FleetProjectionSanitizer.Build(refreshed.Fleet),
                 receipts = _sessions.ListReceipts(intentId),
                 badges = _sessions.ListBadgesForSessionUser(intentId)
             });
@@ -604,7 +604,7 @@ public sealed class CodexParticipationController : Controller
                 events = session.Events
             },
             sponsorSession = session,
-            fleet,
+            fleet = FleetProjectionSanitizer.Build(fleet),
             receipts = receipts ?? Array.Empty<ContributionReceiptDto>(),
             badges = badges ?? Array.Empty<BadgeDto>(),
             recognition
@@ -667,7 +667,7 @@ public sealed class CodexParticipationController : Controller
                 },
             details = BuildContributionDetails(session),
             actions = BuildContributionActions(),
-            fleet
+            fleet = FleetProjectionSanitizer.Build(fleet)
         };
     }
 

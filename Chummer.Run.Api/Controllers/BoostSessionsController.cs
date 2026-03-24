@@ -275,7 +275,7 @@ public sealed class BoostSessionsController : ControllerBase
         => new
         {
             sponsorSession = session,
-            fleet,
+            fleet = FleetProjectionSanitizer.Build(fleet),
             receipts = _sessions.ListReceipts(session.SponsorSessionId),
             badges = _sessions.ListBadgesForSessionUser(session.SponsorSessionId),
             recognition = _leaderboards.UserRecognitionSummary(session.UserId)
