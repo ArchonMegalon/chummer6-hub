@@ -2,37 +2,51 @@
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-auth";
 }
 
 <section class="auth-stage">
-    <div class="auth-shell">
-        <div class="auth-shell__story">
-            <p class="eyebrow">Account</p>
+    <div class="auth-shell auth-shell--entry">
+        <div class="auth-shell__story auth-visual">
+            <p class="auth-visual__eyebrow">Chummer account</p>
             <h1 class="hero-brand">CHUMMER</h1>
             <h2 class="hero-headline">@Model.Heading</h2>
-            <p>@Model.SupportLine</p>
-            <p class="privacy-note">A Chummer account unlocks follows, settings, the signed-in home shell, and optional participation later.</p>
+            <p class="auth-visual__copy">@Model.SupportLine</p>
+            <div class="auth-visual__highlights">
+                <span>Home</span>
+                <span>Account</span>
+                <span>Contribution access</span>
+            </div>
         </div>
-        <div class="auth-panel">
-            <h2>@Model.Heading</h2>
-            @if (Model.GoogleAvailable)
-            {
-                <a class="button-like button-like--primary" href="@Model.GoogleStartHref">Continue with Google</a>
-            }
-            else
-            {
-                <button class="button-like button-like--ghost" type="button" disabled>Google unavailable</button>
-                <p class="muted-copy">@Model.GoogleUnavailableReason</p>
-            }
-
-            <div class="stacked-actions" style="margin-top: 1rem;">
-                <button class="button-like button-like--secondary" type="button" data-email-toggle="emailAuthPanel">Continue with email</button>
-                <a class="inline-link" href="@(Model.CreateAccount ? $"/login?next={Uri.EscapeDataString(Model.NextPath)}" : $"/signup?next={Uri.EscapeDataString(Model.NextPath)}")">
-                    @(Model.CreateAccount ? "Already have an account?" : "Need an account?")
-                </a>
+        <div class="auth-panel auth-panel--entry">
+            <div class="auth-panel__mode-row">
+                @if (Model.CreateAccount)
+                {
+                    <span class="action-pill action-pill--current">Create account</span>
+                    <a class="action-pill action-pill--ghost" href="/login?next=@Uri.EscapeDataString(Model.NextPath)">Sign in</a>
+                }
+                else
+                {
+                    <span class="action-pill action-pill--current">Sign in</span>
+                    <a class="action-pill action-pill--ghost" href="/signup?next=@Uri.EscapeDataString(Model.NextPath)">Create account</a>
+                }
             </div>
 
-            <div id="emailAuthPanel" hidden>
+            <div class="auth-panel__stack">
+                @if (Model.GoogleAvailable)
+                {
+                    <a class="button-like button-like--primary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
+                }
+                else
+                {
+                    <button class="button-like button-like--ghost auth-panel__primary" type="button" disabled>Google unavailable</button>
+                    <p class="muted-copy">@Model.GoogleUnavailableReason</p>
+                }
+
+                <button class="button-like button-like--secondary" type="button" data-email-toggle="emailAuthPanel">Continue with email</button>
+            </div>
+
+            <div id="emailAuthPanel" class="auth-panel__email" hidden>
                 <form class="auth-form" method="post" action="/auth/email/start">
                     <input type="hidden" name="next" value="@Model.NextPath" />
                     <div class="field">
@@ -47,7 +61,7 @@
                 </form>
             </div>
 
-            <p class="privacy-note">Browser session cookie only. Google stays primary, email stays fallback, Facebook stays out of the first-wave UI, and Telegram links later inside account settings.</p>
+            <p class="privacy-note">Google is primary, email stays fallback, and the browser session stays inside this product shell.</p>
         </div>
     </div>
 </section>

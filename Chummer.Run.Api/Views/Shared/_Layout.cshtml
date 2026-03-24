@@ -2,6 +2,12 @@
 @{
     var chrome = ViewData["Chrome"] as SiteChromeViewModel ?? throw new InvalidOperationException("Site chrome was not provided to the layout.");
     var pageTitle = ViewData["Title"] as string ?? chrome.Title;
+    var routeKey = string.IsNullOrWhiteSpace(chrome.CurrentPath) || string.Equals(chrome.CurrentPath, "/", StringComparison.Ordinal)
+        ? "landing"
+        : chrome.CurrentPath.Trim('/').Replace("/", "-", StringComparison.Ordinal).Replace("?", "-", StringComparison.Ordinal).Replace("&", "-", StringComparison.Ordinal).Replace("=", "-", StringComparison.Ordinal).Replace(".", "-", StringComparison.Ordinal);
+    var surfaceClass = ViewData["SurfaceClass"] as string ?? string.Empty;
+    var headerClass = routeKey is "landing" or "login" or "signup" ? "site-header site-header--immersive" : "site-header";
+    var bodyClass = $"shell-body {(chrome.Authenticated ? "shell-authenticated" : "shell-public")} route-{routeKey} {surfaceClass}".Trim();
 }
 <!doctype html>
 <html lang="en" data-theme="hub-front-door">
@@ -15,9 +21,9 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body class="shell-body @(chrome.Authenticated ? "shell-authenticated" : "shell-public")">
+<body class="@bodyClass">
     <a class="skip-link" href="#main">Skip to content</a>
-    <header class="site-header" data-site-header>
+    <header class="@headerClass" data-site-header>
         <div class="site-header__inner">
             <a class="site-brand" href="/" aria-label="Chummer home">
                 <span class="site-brand__wordmark">CHUMMER</span>
@@ -99,18 +105,27 @@
 
     <footer class="site-footer">
         <div class="site-footer__inner">
-            <div>
-                <p class="site-footer__eyebrow">Secondary surfaces</p>
+            <div class="site-footer__brand">
+                <a class="site-footer__wordmark" href="/">CHUMMER</a>
+                <p class="site-footer__copy">Dossier-grade Shadowrun truth, current builds, account access, and contribution lanes in one front door.</p>
+            </div>
+            <nav class="site-footer__nav" aria-label="Secondary navigation">
                 <div class="site-footer__links">
                     @foreach (var link in chrome.SecondaryNavigation)
                     {
                         <a href="@link.Href">@link.Label</a>
                     }
                 </div>
-            </div>
-            <div class="site-footer__note">
-                <p>Canonical source: @chrome.FooterCanonicalSource</p>
-                <p>@chrome.FooterGeneratedNote</p>
+            </nav>
+            <div class="site-footer__meta">
+                @if (chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel))
+                {
+                    <p>Signed in as @chrome.SignedInLabel</p>
+                }
+                else
+                {
+                    <p>Shadowrun that shows its work.</p>
+                }
             </div>
         </div>
     </footer>

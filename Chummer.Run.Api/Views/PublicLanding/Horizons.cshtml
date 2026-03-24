@@ -2,38 +2,51 @@
 @{
     ViewData["Title"] = "Coming Next";
     ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-horizons";
 }
 
-<section class="section-band">
-    <div class="page-lead">
-        <p class="eyebrow">Horizons</p>
-        <h1 class="page-title">Coming next</h1>
-        <p class="page-copy">Each horizon gets a pain statement, a payoff statement, and a deliberate route deeper. No card dump.</p>
-    </div>
-    <div class="horizon-stack">
-        @foreach (var card in Model.Horizons)
-        {
-            var asset = Model.Assets.ForCard(card);
-            <article class="horizon-panel" id="@card.Id.ToLowerInvariant().Replace('_', '-')">
-                <div>
-                    <span class="readiness-tag readiness-tag--horizon">@card.Badge</span>
-                    <h2>@card.Title</h2>
-                    <p>@card.Summary</p>
+<section class="horizons-intro">
+    <p class="eyebrow">Coming next</p>
+    <h1 class="page-title">A futures deck, not a card dump</h1>
+    <p class="page-copy">Each horizon names the pain, the payoff, and the route deeper so the future reads like a product direction instead of a bucket list.</p>
+</section>
+
+<div class="horizon-longscroll">
+    @for (var index = 0; index < Model.Horizons.Count; index++)
+    {
+        var card = Model.Horizons[index];
+        var asset = Model.Assets.ForCard(card);
+        var reverseClass = index % 2 == 1 ? " horizon-band--reverse" : string.Empty;
+
+        <article class="horizon-band@reverseClass" id="@card.Id.ToLowerInvariant().Replace('_', '-')">
+            @if (asset is not null)
+            {
+                <div class="horizon-band__media">
+                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                </div>
+            }
+            <div class="horizon-band__copy">
+                <span class="readiness-tag readiness-tag--horizon">@card.Badge</span>
+                <h2>@card.Title</h2>
+                <p>@card.Summary</p>
+                <div class="horizon-band__claims">
                     @if (!string.IsNullOrWhiteSpace(card.Pain))
                     {
-                        <p><strong>Pain:</strong> @card.Pain</p>
+                        <div>
+                            <span class="horizon-band__label">Pain</span>
+                            <p>@card.Pain</p>
+                        </div>
                     }
                     @if (!string.IsNullOrWhiteSpace(card.Payoff))
                     {
-                        <p><strong>Payoff:</strong> @card.Payoff</p>
+                        <div>
+                            <span class="horizon-band__label">Payoff</span>
+                            <p>@card.Payoff</p>
+                        </div>
                     }
-                    <a class="inline-link" href="@card.Href">Read more</a>
                 </div>
-                @if (asset is not null)
-                {
-                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
-                }
-            </article>
-        }
-    </div>
-</section>
+                <a class="editorial-strip__action" href="@card.Href">Read more</a>
+            </div>
+        </article>
+    }
+</div>

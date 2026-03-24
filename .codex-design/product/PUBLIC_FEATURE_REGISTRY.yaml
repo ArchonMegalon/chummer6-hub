@@ -13,15 +13,15 @@ cards:
   - id: see_whats_real
     bucket: start_here
     title: See what is real now
-    summary: Check the live proof shelf before you fall in love with a promise.
+    summary: See what is already live before you fall in love with a promise.
     href: /now
     badge: Evidence
     audience: public
     image_family: dossier_desk
   - id: get_the_poc
     bucket: start_here
-    title: Get the POC
-    summary: Grab the current drop, notes, and integrity hints.
+    title: Download current build
+    summary: Grab the current build, release notes, and integrity details.
     href: /downloads
     badge: Download
     audience: public
@@ -85,7 +85,7 @@ cards:
   - id: real_public_guide
     bucket: whats_real_now
     title: Public guide and horizons
-    summary: There is already a real human guide and a governed horizon shelf.
+    summary: The product story and horizon deck are already readable without guesswork.
     href: /what-is-chummer#public-guide
     badge: Live now
     audience: public
@@ -288,15 +288,15 @@ cards:
   - id: participate_future
     bucket: participate
     title: Suggest a future
-    summary: Advisory signals are welcome even though canon still lives in design.
+    summary: Tell us what you want explained or opened next.
     href: /participate#suggest-a-future
     badge: Public
     audience: public
     image_family: boulevard_of_futures
   - id: participate_booster
     bucket: participate
-    title: I have a ChatGPT subscription
-    summary: Open the bounded booster lane if you want to lend temporary premium capacity.
+    title: Start contributing
+    summary: Open a signed-in contribution lane if you want to lend bounded premium capacity.
     href: /login?next=/participate/codex
     badge: Registered
     audience: public
@@ -317,8 +317,8 @@ cards:
     registered_href: /home#beta-interest
   - id: release_latest
     bucket: release_shelf
-    title: Latest POC build
-    summary: Current public drop, release notes, and integrity clues.
+    title: Current build
+    summary: Latest public build, release notes, and integrity details.
     href: /downloads
     badge: POC
     audience: public

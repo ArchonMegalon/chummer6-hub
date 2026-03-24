@@ -2,74 +2,82 @@
 @{
     ViewData["Title"] = "Home";
     ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-home";
     var showOnboarding = !Model.Experience.OnboardingCompleted;
     var googlePrimary = string.Equals(Model.Links.RecommendedPrimaryAuth, "google", StringComparison.OrdinalIgnoreCase);
+    var hero = Model.Assets.BySlot("section_hero");
 }
 
-<section class="section-band">
-    <div class="page-lead">
-        <p class="eyebrow">Signed-in home</p>
+<section class="home-hero">
+    @if (hero is not null)
+    {
+        <div class="home-hero__media">
+            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", hero)
+        </div>
+    }
+    <div class="home-hero__content">
+        <p class="eyebrow">Home</p>
         <h1 class="page-title">Welcome back, @Model.User.DisplayName</h1>
-        <p class="page-copy">This is the next-action shell: account polish, follows, participation, and a compact read on what is opening next.</p>
-    </div>
-    <div class="compact-grid">
-        <article class="rail-item">
-            <h3>@(showOnboarding ? "Continue setup" : "Setup complete")</h3>
-            <p>@(showOnboarding ? "Finish the three-step onboarding overlay and land in a usable home surface." : "Your account basics and follow preferences are already in place.")</p>
-            @if (showOnboarding)
-            {
-                <button class="button-like button-like--primary" type="button" data-open-onboarding>Continue setup</button>
-            }
-        </article>
-        <article class="rail-item">
-            <h3>Follow horizons</h3>
-            <p>@(Model.Experience.FollowHorizons ? "You are following what opens next." : "Keep an eye on future lanes without turning follows into design authority.")</p>
-            <a class="inline-link" href="/account">Manage follows</a>
-        </article>
-        <article class="rail-item">
-            <h3>Participate</h3>
-            <p>Optional and signed-in. Start contributing when you want to lend focused help with receipt-backed work.</p>
-            <a class="inline-link" href="/participate/codex">Start contributing</a>
-        </article>
-        <article class="rail-item">
-            <h3>Open account</h3>
-            <p>Profile, recovery posture, linked channels, and visibility live in one settings surface.</p>
-            <a class="inline-link" href="/account">Open account</a>
-        </article>
+        <p class="page-copy">Your account, follows, and contribution access live here. Keep the next move obvious.</p>
     </div>
 </section>
 
-<section class="section-band">
-    <div class="section-band__header">
-        <p class="eyebrow">What’s real now</p>
-        <h2 class="section-title">Compact proof rail</h2>
+<section class="home-actions">
+    <article class="home-action-card">
+        <span class="tag">Setup</span>
+        <h2>@(showOnboarding ? "Continue setup" : "Review setup")</h2>
+        <p>@(showOnboarding ? "Finish the three short steps so the signed-in side of Chummer feels personal instead of generic." : "Reopen the setup sheet whenever you want to tune profile, lanes, and follow posture.")</p>
+        <button class="button-like button-like--primary" type="button" data-open-onboarding>@(showOnboarding ? "Continue setup" : "Review setup")</button>
+    </article>
+    <article class="home-action-card">
+        <span class="tag tag--amber">Contribute</span>
+        <h2>Participate</h2>
+        <p>Start a bounded contribution lane when you want to lend focused help with receipt-backed work.</p>
+        <a class="button-like button-like--secondary" href="/participate/codex">Start contributing</a>
+    </article>
+    <article class="home-action-card">
+        <span class="tag">Account</span>
+        <h2>Open account</h2>
+        <p>Manage sign-in methods, recovery, linked channels, privacy, and participation settings in one place.</p>
+        <a class="button-like button-like--ghost" href="/account">Open account</a>
+    </article>
+</section>
+
+<section class="home-rail-section">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">What is real now</p>
+        <h2 class="editorial-title">A compact read on the current surface</h2>
     </div>
-    <div class="rails-grid">
+    <div class="compact-rail">
         @foreach (var card in Model.NowRail)
         {
-            <article class="rail-item">
+            <article class="compact-rail__item">
                 <span class="tag">@card.Badge</span>
-                <h3>@card.Title</h3>
-                <p>@card.Summary</p>
-                <a class="inline-link" href="@card.Href">Open</a>
+                <div class="compact-rail__copy">
+                    <h3>@card.Title</h3>
+                    <p>@card.Summary</p>
+                </div>
+                <a class="editorial-strip__action" href="@card.Href">Open</a>
             </article>
         }
     </div>
 </section>
 
-<section class="section-band">
-    <div class="section-band__header">
+<section class="home-rail-section">
+    <div class="editorial-block__lead">
         <p class="eyebrow">Coming next</p>
-        <h2 class="section-title">Horizon rail</h2>
+        <h2 class="editorial-title">Keep an eye on the future without drowning in it</h2>
     </div>
-    <div class="rails-grid">
+    <div class="compact-rail">
         @foreach (var card in Model.HorizonRail)
         {
-            <article class="rail-item">
+            <article class="compact-rail__item">
                 <span class="tag tag--amber">@card.Badge</span>
-                <h3>@card.Title</h3>
-                <p>@card.Summary</p>
-                <a class="inline-link" href="@card.Href">Read more</a>
+                <div class="compact-rail__copy">
+                    <h3>@card.Title</h3>
+                    <p>@card.Summary</p>
+                </div>
+                <a class="editorial-strip__action" href="@card.Href">Read more</a>
             </article>
         }
     </div>
@@ -77,16 +85,23 @@
 
 <div class="onboarding-dialog" id="home-onboarding" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" @(showOnboarding ? "" : "hidden")>
     <div class="onboarding-dialog__panel">
+        <div class="onboarding-dialog__topline">
+            <div>
+                <p class="eyebrow">Setup</p>
+                <h2 id="onboarding-title">Finish your account setup</h2>
+            </div>
+            <button class="button-like button-like--ghost" type="button" data-close-onboarding>Close</button>
+        </div>
         <div class="onboarding-steps">
-            <span class="onboarding-step">1. Identity polish</span>
-            <span class="onboarding-step">2. Lane interests</span>
-            <span class="onboarding-step">3. Recovery and follows</span>
+            <span class="onboarding-step">1. Identity</span>
+            <span class="onboarding-step">2. Lanes</span>
+            <span class="onboarding-step">3. Recovery</span>
         </div>
         <div id="onboardingError" class="muted-copy"></div>
         <form id="onboardingForm" class="settings-form">
             <section data-step-panel="1">
                 <p class="eyebrow">Step 1</p>
-                <h2 id="onboarding-title">Identity polish</h2>
+                <h2>Identity polish</h2>
                 <div class="field">
                     <label for="onboardingDisplayName">Display name</label>
                     <input id="onboardingDisplayName" value="@Model.User.DisplayName" />
@@ -151,8 +166,12 @@
   const backButton = dialog.querySelector("[data-onboarding-back]");
   const submitButton = dialog.querySelector("[data-onboarding-submit]");
   const openButtons = document.querySelectorAll("[data-open-onboarding]");
+  const closeButtons = dialog.querySelectorAll("[data-close-onboarding]");
   const errorNode = document.getElementById("onboardingError");
   let step = 0;
+
+  const openDialog = () => { dialog.hidden = false; };
+  const closeDialog = () => { dialog.hidden = true; };
 
   const showStep = (index) => {
     step = index;
@@ -162,7 +181,8 @@
     submitButton.hidden = index !== panels.length - 1;
   };
 
-  openButtons.forEach((button) => button.addEventListener("click", () => dialog.hidden = false));
+  openButtons.forEach((button) => button.addEventListener("click", openDialog));
+  closeButtons.forEach((button) => button.addEventListener("click", closeDialog));
   nextButton.addEventListener("click", () => showStep(Math.min(step + 1, panels.length - 1)));
   backButton.addEventListener("click", () => showStep(Math.max(step - 1, 0)));
   showStep(step);

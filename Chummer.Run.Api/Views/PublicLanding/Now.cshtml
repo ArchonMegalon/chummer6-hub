@@ -2,62 +2,97 @@
 @{
     ViewData["Title"] = "What Is Real Now";
     ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-now";
 }
 
-<section class="section-band">
+<section class="evidence-header">
     <div class="page-lead">
-        <p class="eyebrow">Public proof shelf</p>
-        <h1 class="page-title">What is real now</h1>
-        <p class="page-copy">This page sorts the product by readiness labels so people can inspect what exists without reading apology prose.</p>
+        <p class="eyebrow">What is real now</p>
+        <h1 class="page-title">Evidence before promises</h1>
+        <p class="page-copy">Read the current build, the active channel, and the readiness labels in one place without apology prose or guesswork.</p>
     </div>
-    <div class="shelf-stack">
-        <section class="shelf-item">
+    <div class="evidence-header__stats">
+        <div>
+            <span class="evidence-header__label">Current version</span>
+            <strong>@Model.Manifest.Version</strong>
+        </div>
+        <div>
+            <span class="evidence-header__label">Channel</span>
+            <strong>@Model.Manifest.Channel</strong>
+        </div>
+        <div>
+            <span class="evidence-header__label">Published</span>
+            <strong>@Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd")</strong>
+        </div>
+    </div>
+</section>
+
+<section class="evidence-wall">
+    <article class="evidence-group">
+        <div class="evidence-group__header">
             <span class="readiness-tag">Live now</span>
             <h2>Available today</h2>
+        </div>
+        <div class="evidence-row-list">
             @foreach (var card in Model.AvailableToday)
             {
-                <article class="rail-item">
-                    <h3>@card.Title</h3>
-                    <p>@card.Summary</p>
-                    <a class="inline-link" href="@card.Href">Inspect</a>
+                <article class="evidence-row">
+                    <div class="evidence-row__copy">
+                        <h3>@card.Title</h3>
+                        <p>@card.Summary</p>
+                    </div>
+                    <span class="readiness-tag">@card.Badge</span>
+                    <a class="button-like button-like--ghost" href="@card.Href">Open</a>
                 </article>
             }
-        </section>
-        <section class="shelf-item">
+        </div>
+    </article>
+
+    <article class="evidence-group">
+        <div class="evidence-group__header">
             <span class="readiness-tag tag--amber">Inspectable</span>
-            <h2>Inspectable preview</h2>
+            <h2>Inspectable</h2>
+        </div>
+        <div class="evidence-row-list">
             @foreach (var card in Model.Inspectable)
             {
-                <article class="rail-item">
-                    <h3>@card.Title</h3>
-                    <p>@card.Summary</p>
-                    <a class="inline-link" href="@card.Href">Inspect</a>
+                <article class="evidence-row">
+                    <div class="evidence-row__copy">
+                        <h3>@card.Title</h3>
+                        <p>@card.Summary</p>
+                    </div>
+                    <span class="readiness-tag tag--amber">@card.Badge</span>
+                    <a class="button-like button-like--ghost" href="@card.Href">Inspect</a>
                 </article>
             }
-        </section>
-        <section class="shelf-item">
-            <span class="readiness-tag">Signed-in preview</span>
-            <h2>Registered-only preview</h2>
+        </div>
+    </article>
+
+    <article class="evidence-group">
+        <div class="evidence-group__header">
+            <span class="readiness-tag readiness-tag--horizon">Signed-in preview</span>
+            <h2>Signed-in preview</h2>
+        </div>
+        <div class="evidence-row-list">
             @foreach (var overlay in Model.SignedInPreview)
             {
-                <article class="rail-item">
-                    <h3>@overlay.Title</h3>
-                    <p>@overlay.Summary</p>
-                    <a class="inline-link" href="@(Model.Chrome.Authenticated ? "/home" : "/signup?next=/home")">
+                <article class="evidence-row">
+                    <div class="evidence-row__copy">
+                        <h3>@overlay.Title</h3>
+                        <p>@overlay.Summary</p>
+                    </div>
+                    <span class="readiness-tag readiness-tag--horizon">Signed-in preview</span>
+                    <a class="button-like button-like--ghost" href="@(Model.Chrome.Authenticated ? "/home" : "/signup?next=/home")">
                         @(Model.Chrome.Authenticated ? "Open home" : "Create account")
                     </a>
                 </article>
             }
-        </section>
-    </div>
+        </div>
+    </article>
 </section>
 
-<section class="section-band">
-    <div class="section-band__header">
-        <p class="eyebrow">Release shelf</p>
-        <h2 class="section-title">@Model.Manifest.Version · @Model.Manifest.Channel</h2>
-        <p class="section-copy">Published @Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd") · integrity stays visible instead of hiding behind a release note wall.</p>
-    </div>
+<section class="evidence-tail">
+    <p class="editorial-copy">Integrity stays visible. Downloads and the fuller product story sit one click away.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="/downloads">Open downloads</a>
         <a class="cta-link cta-link--secondary" href="/what-is-chummer">Read the product story</a>

@@ -1,8 +1,8 @@
 product: chummer
 surface: chummer.run
 version: 1
-headline: Shadowrun rules truth, with receipts.
-subhead: Build, inspect, play, and follow what is coming next without mystery math or empty promises.
+headline: Shadowrun that shows its work.
+subhead: Build, inspect, play, and follow what opens next without mystery math or empty promises.
 proof_line: Local-first continuity, deterministic explainability, and a real public proof shelf belong on the same front door.
 no_provider_names: true
 no_ltd_names: true
@@ -10,7 +10,7 @@ hero_ctas:
   - label: See what is real now
     href: /now
     emphasis: primary
-  - label: Get the POC
+  - label: Download current build
     href: /downloads
     emphasis: primary
   - label: Create account
@@ -244,8 +244,8 @@ registered_overlays:
     summary: Raise your hand for future player, GM, or creator previews.
   - id: participate_booster
     path: /participate
-    title: Booster path
-    summary: Signed-in users can unlock the bounded booster flow and see sponsor-session state.
+    title: Contribution access
+    summary: Signed-in users can start a bounded contribution lane and follow what happens next.
   - id: vote_placeholder
     path: /home
     title: Future vote placeholder

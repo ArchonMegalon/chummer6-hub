@@ -2,95 +2,149 @@
 @{
     ViewData["Title"] = "Account";
     ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account";
     var emailLink = Model.Links.LinkedIdentities.FirstOrDefault(link => string.Equals(link.Provider, "email", StringComparison.OrdinalIgnoreCase));
     var googleLink = Model.Links.LinkedIdentities.FirstOrDefault(link => string.Equals(link.Provider, "google", StringComparison.OrdinalIgnoreCase));
     var telegramChannel = Model.Links.ChannelLinks.FirstOrDefault(link => string.Equals(link.ChannelKind, "telegram_official_bot", StringComparison.OrdinalIgnoreCase));
     var laneInterests = Model.Experience.LaneInterests.ToHashSet(StringComparer.OrdinalIgnoreCase);
 }
 
-<section class="settings-surface">
-    <div class="page-lead">
+<section class="account-stage">
+    <div class="account-stage__lead">
         <p class="eyebrow">Account</p>
-        <h1 class="settings-title">Settings, not system plumbing</h1>
-        <p class="page-copy">Primary sign-in, recovery posture, linked channels, privacy, and participation preferences all live here.</p>
+        <h1 class="page-title">Account</h1>
+        <p class="page-copy">Sign-in, recovery, channels, privacy, and participation settings stay separated so the page reads like product settings instead of diagnostics.</p>
     </div>
 
-    <div class="settings-grid">
-        <section class="settings-block">
-            <h2>Profile</h2>
-            <form id="profileForm" class="settings-form">
-                <div class="field">
-                    <label for="displayName">Display name</label>
-                    <input id="displayName" value="@Model.User.DisplayName" />
-                </div>
-                <div class="field">
-                    <label for="handle">Handle</label>
-                    <input id="handle" value="@Model.User.Handle" />
-                </div>
-                <div class="field">
-                    <label for="timezone">Timezone</label>
-                    <input id="timezone" value="@Model.User.Timezone" />
-                </div>
-                <button class="button-like button-like--primary" type="submit">Save profile</button>
-            </form>
-        </section>
+    <div class="account-shell">
+        <aside class="account-nav" aria-label="Account sections">
+            <a href="#profile">Profile</a>
+            <a href="#sign-in">Primary sign-in</a>
+            <a href="#recovery">Recovery email</a>
+            <a href="#channels">Linked channels</a>
+            <a href="#privacy">Privacy</a>
+            <a href="#participation">Participation</a>
+        </aside>
 
-        <section class="settings-block">
-            <h2>Sign-in methods</h2>
-            <p><strong>Primary sign-in:</strong> @Model.Links.RecommendedPrimaryAuth</p>
-            <p><strong>Google:</strong> @(googleLink is null ? (Model.GoogleAvailable ? "not linked" : "unavailable on this host") : $"connected ({googleLink.Status})")</p>
-            <p><strong>Email:</strong> @(emailLink is null ? "not linked" : $"{emailLink.DisplayLabel} ({emailLink.Status})")</p>
-            @if (Model.GoogleAvailable)
-            {
-                <a class="button-like button-like--secondary" href="/auth/google/link?next=/account">@(googleLink is null ? "Link Google" : "Refresh Google link")</a>
-            }
-        </section>
-
-        <section class="settings-block">
-            <h2>Recovery</h2>
-            <p><strong>Recovery email:</strong> <span id="recoveryEmailStatus">@(emailLink is null ? "missing" : emailLink.Status)</span></p>
-            <form id="recoveryForm" class="settings-form">
-                <div class="field">
-                    <label for="recoveryEmail">Add recovery email</label>
-                    <input id="recoveryEmail" type="email" placeholder="runner@example.com" />
+        <div class="account-pane">
+            <section id="profile" class="settings-section">
+                <div class="settings-section__header">
+                    <h2>Profile</h2>
+                    <p>Keep the visible identity polished before anything else.</p>
                 </div>
-                <button class="button-like button-like--secondary" type="submit">Save recovery email</button>
-                <p id="recoveryStatusNotice" class="muted-copy" hidden></p>
-            </form>
-        </section>
+                <form id="profileForm" class="settings-form">
+                    <div class="field">
+                        <label for="displayName">Display name</label>
+                        <input id="displayName" value="@Model.User.DisplayName" />
+                    </div>
+                    <div class="field">
+                        <label for="handle">Handle</label>
+                        <input id="handle" value="@Model.User.Handle" />
+                    </div>
+                    <div class="field">
+                        <label for="timezone">Timezone</label>
+                        <input id="timezone" value="@Model.User.Timezone" />
+                    </div>
+                    <button class="button-like button-like--primary" type="submit">Save profile</button>
+                </form>
+            </section>
 
-        <section class="settings-block">
-            <h2>Linked channels</h2>
-            <p><strong>Telegram companion:</strong> @(telegramChannel is null ? "not connected" : $"{telegramChannel.DisplayLabel} ({telegramChannel.Status})")</p>
-            <form id="telegramForm" class="settings-form">
-                <div class="field">
-                    <label for="telegramHandle">Official Telegram companion</label>
-                    <input id="telegramHandle" placeholder="@@hubbrain" value="@(telegramChannel?.DisplayLabel ?? string.Empty)" />
+            <section id="sign-in" class="settings-section">
+                <div class="settings-section__header">
+                    <h2>Primary sign-in</h2>
+                    <p>Google stays the preferred mainstream path, with email available as fallback and recovery.</p>
                 </div>
-                <button class="button-like button-like--secondary" type="submit">Connect Telegram</button>
-            </form>
-        </section>
-
-        <section class="settings-block">
-            <h2>Privacy and visibility</h2>
-            <p><strong>Visibility:</strong> @Model.User.Visibility</p>
-            <p><strong>Recovery posture:</strong> @Model.Links.RecoveryPosture</p>
-            <p>Raw provider subject ids stay hidden unless you open diagnostics.</p>
-        </section>
-
-        <section class="settings-block">
-            <h2>Participation settings</h2>
-            <form id="experienceForm" class="settings-form">
-                <div class="check-grid">
-                    <label class="check-row"><input type="checkbox" value="player" @(laneInterests.Contains("player") ? "checked" : null) /> <span>Player lane</span></label>
-                    <label class="check-row"><input type="checkbox" value="gm" @(laneInterests.Contains("gm") ? "checked" : null) /> <span>GM lane</span></label>
-                    <label class="check-row"><input type="checkbox" value="creator" @(laneInterests.Contains("creator") ? "checked" : null) /> <span>Creator lane</span></label>
-                    <label class="check-row"><input id="followHorizons" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow horizons</span></label>
-                    <label class="check-row"><input id="betaInterest" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Raise beta interest</span></label>
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Primary sign-in</span>
+                        <strong>@Model.Links.RecommendedPrimaryAuth</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Google</span>
+                        <strong>@(googleLink is null ? (Model.GoogleAvailable ? "Not linked" : "Unavailable on this host") : $"Connected ({googleLink.Status})")</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Email</span>
+                        <strong>@(emailLink is null ? "Not linked" : $"{emailLink.DisplayLabel} ({emailLink.Status})")</strong>
+                    </div>
                 </div>
-                <button class="button-like button-like--primary" type="submit">Save participation settings</button>
-            </form>
-        </section>
+                @if (Model.GoogleAvailable)
+                {
+                    <a class="button-like button-like--secondary" href="/auth/google/link?next=/account">@(googleLink is null ? "Link Google" : "Refresh Google link")</a>
+                }
+            </section>
+
+            <section id="recovery" class="settings-section">
+                <div class="settings-section__header">
+                    <h2>Recovery email</h2>
+                    <p>Add a verified recovery address so you are not pinned to one sign-in path.</p>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Status</span>
+                    <strong id="recoveryEmailStatus">@(emailLink is null ? "Missing" : emailLink.Status)</strong>
+                </div>
+                <form id="recoveryForm" class="settings-form">
+                    <div class="field">
+                        <label for="recoveryEmail">Recovery email</label>
+                        <input id="recoveryEmail" type="email" placeholder="runner@example.com" />
+                    </div>
+                    <button class="button-like button-like--secondary" type="submit">Start verification</button>
+                    <p id="recoveryStatusNotice" class="muted-copy" hidden></p>
+                </form>
+            </section>
+
+            <section id="channels" class="settings-section">
+                <div class="settings-section__header">
+                    <h2>Linked channels</h2>
+                    <p>Keep companion routing separate from sign-in identity.</p>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Telegram companion</span>
+                    <strong>@(telegramChannel is null ? "Not connected" : $"{telegramChannel.DisplayLabel} ({telegramChannel.Status})")</strong>
+                </div>
+                <form id="telegramForm" class="settings-form">
+                    <div class="field">
+                        <label for="telegramHandle">Telegram handle</label>
+                        <input id="telegramHandle" placeholder="@@hubbrain" value="@(telegramChannel?.DisplayLabel ?? string.Empty)" />
+                    </div>
+                    <button class="button-like button-like--secondary" type="submit">Connect Telegram</button>
+                </form>
+            </section>
+
+            <section id="privacy" class="settings-section">
+                <div class="settings-section__header">
+                    <h2>Privacy</h2>
+                    <p>Product labels stay plain. Advanced identifiers stay behind the drawer below.</p>
+                </div>
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Visibility</span>
+                        <strong>@Model.User.Visibility</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Recovery posture</span>
+                        <strong>@Model.Links.RecoveryPosture</strong>
+                    </div>
+                </div>
+            </section>
+
+            <section id="participation" class="settings-section">
+                <div class="settings-section__header">
+                    <h2>Participation</h2>
+                    <p>Tell Chummer which lanes matter to you and whether you want horizon or beta follow-up.</p>
+                </div>
+                <form id="experienceForm" class="settings-form">
+                    <div class="check-grid">
+                        <label class="check-row"><input type="checkbox" value="player" @(laneInterests.Contains("player") ? "checked" : null) /> <span>Player</span></label>
+                        <label class="check-row"><input type="checkbox" value="gm" @(laneInterests.Contains("gm") ? "checked" : null) /> <span>GM</span></label>
+                        <label class="check-row"><input type="checkbox" value="creator" @(laneInterests.Contains("creator") ? "checked" : null) /> <span>Creator</span></label>
+                        <label class="check-row"><input id="followHorizons" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow horizons</span></label>
+                        <label class="check-row"><input id="betaInterest" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Raise beta interest</span></label>
+                    </div>
+                    <button class="button-like button-like--primary" type="submit">Save participation settings</button>
+                </form>
+            </section>
+        </div>
     </div>
 
     <details class="details-drawer">
