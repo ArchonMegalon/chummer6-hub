@@ -14,20 +14,60 @@
         </div>
 
         <section class="auth-panel participation-panel" aria-labelledby="participationHeading">
-            <p id="stateTag" class="tag">Loading</p>
+            <div class="wizard-shell">
+                <div class="wizard-intro">
+                    <p id="stateTag" class="tag">Loading</p>
+                    <p id="wizardStepLabel" class="wizard-step-label">Preparing contribution flow</p>
+                </div>
+
+                <ol class="wizard-rail" aria-label="Contribution steps">
+                    <li id="wizardStepStart" class="wizard-step wizard-step--current">
+                        <span class="wizard-step__index">1</span>
+                        <div>
+                            <strong>Start contributing</strong>
+                            <p>Confirm you want a temporary contribution lane.</p>
+                        </div>
+                    </li>
+                    <li id="wizardStepAuthorize" class="wizard-step">
+                        <span class="wizard-step__index">2</span>
+                        <div>
+                            <strong>Authorize in ChatGPT</strong>
+                            <p>Open the verification page and enter the code.</p>
+                        </div>
+                    </li>
+                    <li id="wizardStepComplete" class="wizard-step">
+                        <span class="wizard-step__index">3</span>
+                        <div>
+                            <strong>You're set</strong>
+                            <p>Chummer records the lane and waits for validated work.</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+
             <h2 id="participationHeading">Checking current contribution state...</h2>
             <p id="stateSupport">Looking for an active contribution lane and any pending ChatGPT authorization challenge.</p>
-            <p id="stateLine" class="muted-copy" aria-live="polite"></p>
+            <div id="stateLine" class="wizard-status" aria-live="polite"></div>
 
             <div id="startState" class="state-stack" hidden>
+                <div class="wizard-card">
+                    <p class="wizard-card__eyebrow">Step 1</p>
+                    <h3>Start contributing</h3>
+                    <p>Ask Chummer to prepare a bounded contribution lane. No contribution credit is granted from authorization alone.</p>
+                </div>
                 <div class="stacked-actions">
                     <button id="startContributionButton" class="button-like button-like--primary" type="button">Yes, I want to contribute</button>
                     <a class="inline-link" href="/participate">How it works</a>
                 </div>
-                <p class="privacy-note">This opens a temporary contribution lane only. Credit appears later from validated receipts, not from authorization alone.</p>
+                <p class="privacy-note">You can stop later. Final contribution credit appears only after validated receipts land.</p>
             </div>
 
             <div id="authorizeState" class="state-stack" hidden>
+                <div class="wizard-card">
+                    <p class="wizard-card__eyebrow">Step 2</p>
+                    <h3>Authorize in ChatGPT</h3>
+                    <p>Open the authorization page, sign in to ChatGPT, and enter the one-time code shown below.</p>
+                </div>
                 <div class="stacked-actions">
                     <a id="openAuthorizationLink" class="button-like button-like--primary" href="#" target="_blank" rel="noreferrer noopener">Open authorization page</a>
                     <button id="copyCodeButton" class="button-like button-like--secondary" type="button">Copy code</button>
@@ -36,11 +76,19 @@
                     <span class="code-panel__label">One-time code</span>
                     <div id="authorizationCode" class="code-panel__value mono-receipt">Waiting for a code...</div>
                 </div>
-                <p class="privacy-note">Keep this page open while Chummer watches for confirmation.</p>
-                <button id="cancelContributionButton" class="inline-link inline-link--button" type="button">Cancel this contribution</button>
+                <div class="wizard-note-band">
+                    <strong>Keep this page open.</strong>
+                    <span>Chummer will keep checking for confirmation and automatically move you forward when the lane is ready.</span>
+                </div>
+                <button id="cancelContributionButton" class="inline-link inline-link--button" type="button">Stop this contribution for now</button>
             </div>
 
             <div id="completeState" class="state-stack" hidden>
+                <div class="wizard-card">
+                    <p class="wizard-card__eyebrow">Step 3</p>
+                    <h3>Thanks, you're set</h3>
+                    <p>Your contribution lane is ready. Chummer will use it only for bounded project work, and recognition still depends on validated receipts.</p>
+                </div>
                 <div id="badgeReveal" class="badge-reveal" hidden>
                     <span class="tag">Thank you</span>
                     <h3 id="badgeLabel">Contributor Ready</h3>
@@ -53,16 +101,20 @@
             </div>
 
             <div id="unavailableState" class="state-stack" hidden>
+                <div class="wizard-card wizard-card--soft">
+                    <p class="wizard-card__eyebrow">Unavailable</p>
+                    <h3>Participation is unavailable right now</h3>
+                    <p>Chummer could not open or refresh a contribution lane on this host. Your account and participation history are still intact.</p>
+                </div>
                 <div class="stacked-actions">
                     <a id="unavailableHomeLink" class="button-like button-like--primary" href="/home">Back to home</a>
                     <a id="unavailableAccountLink" class="button-like button-like--ghost" href="/account">Open account</a>
                     <a id="unavailableExplainLink" class="inline-link" href="/participate">How it works</a>
                 </div>
-                <p class="privacy-note">Your account and saved participation history are still intact. Try again later.</p>
             </div>
 
             <details id="technicalDetails" class="details-drawer" hidden>
-                <summary>Technical details</summary>
+                <summary>Technical details and lane controls</summary>
                 <dl class="detail-grid">
                     <div>
                         <dt>Contribution id</dt>
@@ -161,6 +213,34 @@ function toggleState(phase) {
   document.getElementById("unavailableState").hidden = phase !== "unavailable";
 }
 
+function setWizardStep(phase) {
+  const steps = {
+    start: ["wizardStepStart"],
+    authorize: ["wizardStepStart", "wizardStepAuthorize"],
+    complete: ["wizardStepStart", "wizardStepAuthorize", "wizardStepComplete"],
+    unavailable: []
+  };
+  const current = {
+    start: "wizardStepStart",
+    authorize: "wizardStepAuthorize",
+    complete: "wizardStepComplete",
+    unavailable: ""
+  };
+  const label = {
+    start: "Step 1 of 3",
+    authorize: "Step 2 of 3",
+    complete: "Step 3 of 3",
+    unavailable: "Flow unavailable"
+  };
+  document.getElementById("wizardStepLabel").textContent = label[phase] || "Preparing contribution flow";
+  for (const id of ["wizardStepStart", "wizardStepAuthorize", "wizardStepComplete"]) {
+    const element = document.getElementById(id);
+    element.classList.toggle("wizard-step--complete", (steps[phase] || []).includes(id) && id !== current[phase]);
+    element.classList.toggle("wizard-step--current", id === current[phase]);
+    element.classList.toggle("wizard-step--pending", !(steps[phase] || []).includes(id));
+  }
+}
+
 function normalizeParticipationError(error) {
   if (error && error.payload && typeof error.payload === "object" && error.payload.phase) {
     return error.payload;
@@ -197,10 +277,13 @@ function renderError(error) {
   }
 
   stopPolling();
+  currentContributionId = "";
   document.getElementById("stateTag").textContent = "Attention";
   document.getElementById("participationHeading").textContent = "Participation needs attention";
   document.getElementById("stateSupport").textContent = error?.message || "Request failed.";
   document.getElementById("stateLine").textContent = "Fix the issue and try again.";
+  document.getElementById("technicalDetails").hidden = true;
+  setWizardStep("start");
   toggleState("start");
 }
 
@@ -224,6 +307,7 @@ function render(data) {
   document.getElementById("participationHeading").textContent = data.heading || "Start contributing";
   document.getElementById("stateSupport").textContent = data.support || "";
   document.getElementById("stateLine").textContent = data.statusLine || "";
+  setWizardStep(phase);
   toggleState(phase);
 
   const authorizationLink = document.getElementById("openAuthorizationLink");
