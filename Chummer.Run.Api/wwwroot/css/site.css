@@ -654,6 +654,190 @@ button.button-like {
   gap: 1rem;
 }
 
+.participation-entry {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.participation-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 36px;
+  min-height: clamp(420px, 58vw, 620px);
+  background:
+    radial-gradient(circle at 78% 18%, rgba(135, 200, 255, 0.28), transparent 28%),
+    radial-gradient(circle at 18% 82%, rgba(45, 114, 255, 0.24), transparent 32%),
+    linear-gradient(140deg, rgba(7, 23, 45, 0.98), rgba(8, 31, 61, 0.94) 48%, rgba(13, 47, 92, 0.92));
+  box-shadow: var(--shadow-hero);
+}
+
+.participation-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto -10% -18% 42%;
+  height: 72%;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(135, 200, 255, 0.04));
+  transform: rotate(-18deg);
+  opacity: 0.72;
+}
+
+.participation-hero__content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-content: end;
+  gap: 1rem;
+  min-height: inherit;
+  padding: clamp(1.6rem, 4vw, 3rem);
+  color: #edf4ff;
+  max-width: 42rem;
+}
+
+.participation-hero__content .eyebrow,
+.participation-hero__content .privacy-note {
+  color: rgba(237, 244, 255, 0.76);
+}
+
+.participation-lead {
+  max-width: 36rem;
+  font-size: 1.04rem;
+  color: rgba(237, 244, 255, 0.86);
+}
+
+.participation-answer-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.participation-answer {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.2rem;
+  border-radius: 26px;
+  border: 1px solid var(--line-subtle);
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: var(--shadow-soft);
+}
+
+.participation-answer__eyebrow {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.participation-answer h3,
+.participation-step h3 {
+  margin: 0;
+  font-family: var(--font-family-display);
+}
+
+.participation-answer p,
+.participation-step p,
+.participation-journey__intro p {
+  margin: 0;
+}
+
+.participation-journey {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.4rem;
+  border-radius: 30px;
+  border: 1px solid rgba(15, 39, 74, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(241, 247, 255, 0.94));
+  box-shadow: var(--shadow-soft);
+}
+
+.participation-journey__intro {
+  display: grid;
+  gap: 0.7rem;
+  max-width: 42rem;
+}
+
+.participation-journey__steps {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.participation-step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.9rem;
+  align-items: start;
+  padding: 1.05rem 1.1rem;
+  border-radius: 24px;
+  border: 1px solid var(--line-subtle);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.participation-step__index {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(45, 114, 255, 0.24);
+  background: rgba(45, 114, 255, 0.08);
+  color: var(--accent-cyan);
+  font-family: var(--font-family-mono);
+  font-size: 0.84rem;
+}
+
+.participation-dialog[hidden] {
+  display: none;
+}
+
+.participation-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.participation-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 15, 28, 0.58);
+  backdrop-filter: blur(12px);
+}
+
+.participation-dialog__panel {
+  position: relative;
+  z-index: 1;
+  width: min(780px, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  margin: 0;
+  padding: 1.35rem;
+  border-radius: 30px;
+  box-shadow: var(--shadow-hero);
+}
+
+.participation-dialog__close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+  margin-bottom: 0.5rem;
+  display: inline-flex;
+  justify-self: end;
+}
+
+.wizard-shell--modal {
+  margin-bottom: 0.4rem;
+}
+
 .wizard-shell {
   display: grid;
   gap: 1rem;
@@ -865,6 +1049,10 @@ button.button-like {
 .mono-receipt {
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+body.dialog-open {
+  overflow: hidden;
 }
 
 .data-box {
@@ -1696,6 +1884,7 @@ td {
   .evidence-header,
   .release-stage,
   .account-shell,
+  .participation-answer-grid,
   .landing-closing-band,
   .horizon-band,
   .home-shell-grid {
@@ -1739,12 +1928,14 @@ td {
   .editorial-strip,
   .lane-strip,
   .compact-rail__item,
-  .evidence-row {
+  .evidence-row,
+  .participation-step {
     grid-template-columns: 1fr;
   }
 
   .evidence-header__stats,
-  .horizon-band__claims {
+  .horizon-band__claims,
+  .participation-journey__steps {
     grid-template-columns: 1fr;
   }
 
@@ -1777,6 +1968,13 @@ td {
     border-radius: 28px;
   }
 
+  .participation-hero,
+  .participation-journey,
+  .participation-answer,
+  .participation-dialog__panel {
+    border-radius: 28px;
+  }
+
   .hero-brand {
     font-size: clamp(3rem, 18vw, 4.6rem);
   }
@@ -1797,7 +1995,8 @@ td {
 
   .landing-film__content,
   .home-hero__content,
-  .auth-visual {
+  .auth-visual,
+  .participation-hero__content {
     padding: 1.4rem;
   }
 
@@ -1822,6 +2021,10 @@ td {
   .wizard-step__index {
     width: 1.8rem;
     height: 1.8rem;
+  }
+
+  .participation-dialog {
+    padding: 0.75rem;
   }
 }
 

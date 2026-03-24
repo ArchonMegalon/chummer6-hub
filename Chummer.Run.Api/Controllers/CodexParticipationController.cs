@@ -667,8 +667,8 @@ public sealed class CodexParticipationController : Controller
             contribution = BuildContributionSummary(session, phase),
             status = session.Status,
             phase,
-            heading = ResolveContributionHeading(phase),
-            support = ResolveContributionSupport(phase),
+            heading = ResolveContributionHeading(session, phase),
+            support = ResolveContributionSupport(session, phase),
             statusLine = ResolveContributionStatusLine(session),
             auth = new
             {
@@ -761,21 +761,39 @@ public sealed class CodexParticipationController : Controller
             _ => "authorize"
         };
 
-    private static string ResolveContributionHeading(string phase)
-        => phase switch
+    private static string ResolveContributionHeading(SponsorSessionStatusDto session, string phase)
+    {
+        if (string.Equals(session.Status, "waiting_for_slot", StringComparison.OrdinalIgnoreCase))
+        {
+            return session.AuthorizedAtUtc is null
+                ? "Waiting for an available slot"
+                : "Finishing contribution setup";
+        }
+
+        return phase switch
         {
             "complete" => "Thanks, you're set",
             "authorize" => "Authorize in ChatGPT",
             _ => "Start contributing"
         };
+    }
 
-    private static string ResolveContributionSupport(string phase)
-        => phase switch
+    private static string ResolveContributionSupport(SponsorSessionStatusDto session, string phase)
+    {
+        if (string.Equals(session.Status, "waiting_for_slot", StringComparison.OrdinalIgnoreCase))
+        {
+            return session.AuthorizedAtUtc is null
+                ? "All contribution slots are busy right now. Chummer saved your request, and you can ask for a fresh code again as soon as a slot opens."
+                : "Your authorization is already complete. Chummer is waiting for the next available contribution slot to finish setup.";
+        }
+
+        return phase switch
         {
             "complete" => "Your contribution lane is linked. Chummer will only count receipt-backed work after validation and review.",
-            "authorize" => "Open the authorization page, enter the one-time code, and keep this page open while Chummer watches for confirmation.",
+            "authorize" => "Open the authorization page, enter the one-time code, and keep this page open while Chummer watches for confirmation. If the code expires, ask for a fresh one here.",
             _ => "Authorize a temporary Codex contribution lane in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review."
         };
+    }
 
     private static string ResolveContributionStatusLine(SponsorSessionStatusDto session)
         => session.Status switch

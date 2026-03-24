@@ -4,160 +4,227 @@
     ViewData["Chrome"] = Model.Chrome;
 }
 
-<section class="auth-stage participation-stage">
+<section class="participation-entry">
     <div class="sr-only" aria-hidden="true">
         @Html.AntiForgeryToken()
     </div>
-    <div class="auth-shell participation-shell">
-        <div class="auth-shell__story participation-shell__story">
+
+    <section class="participation-hero">
+        <div class="participation-hero__content">
             <p class="eyebrow">Participation</p>
-            <h1 class="hero-headline">Start contributing</h1>
-            <p>Authorize a temporary Codex contribution lane in ChatGPT. Chummer uses it only for bounded project work, and final landing still goes through review.</p>
-            <p class="privacy-note">Signed in as @Model.User.DisplayName. You can stop or revoke this later from your account.</p>
+            <h1 class="hero-brand">Help Chummer show its work.</h1>
+            <h2 class="hero-headline">Open a temporary contribution lane only when you are ready to use it.</h2>
+            <p class="participation-lead">Chummer uses ChatGPT device auth for bounded contribution work. Final landing still goes through review, and authorization by itself does not count as contribution credit.</p>
+            <div class="stacked-actions">
+                <button id="openParticipationWizardButton" class="button-like button-like--primary" type="button">I want to participate</button>
+                <a class="button-like button-like--ghost" href="/account">Open account</a>
+            </div>
+            <p class="privacy-note">Signed in as @Model.User.DisplayName. Codes expire quickly, so Chummer only generates a fresh one when you explicitly start.</p>
+        </div>
+    </section>
+
+    <section class="participation-answer-grid" aria-label="Participation questions">
+        <article class="participation-answer">
+            <p class="participation-answer__eyebrow">What you are authorizing</p>
+            <h3>A temporary ChatGPT contribution lane</h3>
+            <p>Chummer asks Fleet to open a short-lived contribution lane that is scoped to bounded Hub work. It is not a blank check to act on your behalf anywhere else.</p>
+        </article>
+        <article class="participation-answer">
+            <p class="participation-answer__eyebrow">What you need ready</p>
+            <h3>Your browser and your ChatGPT account</h3>
+            <p>When you start, Chummer requests a fresh device-auth code, opens the verification page, and waits for confirmation. If the code expires, you can request a new one from the wizard.</p>
+        </article>
+        <article class="participation-answer">
+            <p class="participation-answer__eyebrow">What Chummer stores</p>
+            <h3>Consent, lane status, and receipts</h3>
+            <p>Hub keeps the participation record, badge state, and receipt history. Fleet keeps the lane-local auth material. Raw ChatGPT auth cache does not belong in Hub.</p>
+        </article>
+        <article class="participation-answer">
+            <p class="participation-answer__eyebrow">When credit appears</p>
+            <h3>After validated work lands</h3>
+            <p>Authorization gets you ready to contribute, but it is not scored as contribution credit. Recognition only appears after signed, validated work receipts arrive.</p>
+        </article>
+    </section>
+
+    <section class="participation-journey" aria-label="How participation works">
+        <div class="participation-journey__intro">
+            <p class="eyebrow">How it works</p>
+            <h2 class="page-title">One decision, one code, one clean handoff</h2>
+            <p>Read the terms here, then open the wizard only when you are ready. Chummer generates a fresh code on demand, walks you through authorization, and leaves you with a clean account trail.</p>
+        </div>
+        <div class="participation-journey__steps">
+            <article class="participation-step">
+                <span class="participation-step__index">1</span>
+                <div>
+                    <h3>Decide to participate</h3>
+                    <p>Start from this page only when you want a fresh authorization challenge.</p>
+                </div>
+            </article>
+            <article class="participation-step">
+                <span class="participation-step__index">2</span>
+                <div>
+                    <h3>Authorize in ChatGPT</h3>
+                    <p>Use the one-time code Chummer generates for that session and keep the wizard open while confirmation lands.</p>
+                </div>
+            </article>
+            <article class="participation-step">
+                <span class="participation-step__index">3</span>
+                <div>
+                    <h3>Leave with a clear status</h3>
+                    <p>You end with a ready state, a queue state, or a clean stop. Nothing here is hidden behind operator language.</p>
+                </div>
+            </article>
+        </div>
+    </section>
+</section>
+
+<div id="participationWizardDialog" class="participation-dialog" hidden>
+    <div class="participation-dialog__backdrop" data-close-participation-dialog></div>
+    <section class="participation-dialog__panel auth-panel participation-panel" role="dialog" aria-modal="true" aria-labelledby="participationHeading">
+        <button id="closeParticipationWizardButton" class="participation-dialog__close" type="button" aria-label="Close participation wizard">Close</button>
+
+        <div class="wizard-shell wizard-shell--modal">
+            <div class="wizard-intro">
+                <p id="stateTag" class="tag">Ready</p>
+                <p id="wizardStepLabel" class="wizard-step-label">Fresh authorization on demand</p>
+            </div>
+
+            <ol class="wizard-rail" aria-label="Contribution steps">
+                <li id="wizardStepStart" class="wizard-step wizard-step--current">
+                    <span class="wizard-step__index">1</span>
+                    <div>
+                        <strong>Open the lane</strong>
+                        <p>Ask Chummer for a fresh authorization challenge only when you need it.</p>
+                    </div>
+                </li>
+                <li id="wizardStepAuthorize" class="wizard-step">
+                    <span class="wizard-step__index">2</span>
+                    <div>
+                        <strong>Authorize in ChatGPT</strong>
+                        <p>Open the verification page and enter the one-time code.</p>
+                    </div>
+                </li>
+                <li id="wizardStepComplete" class="wizard-step">
+                    <span class="wizard-step__index">3</span>
+                    <div>
+                        <strong>You're set</strong>
+                        <p>Chummer keeps the record and waits for validated work.</p>
+                    </div>
+                </li>
+            </ol>
         </div>
 
-        <section class="auth-panel participation-panel" aria-labelledby="participationHeading">
-            <div class="wizard-shell">
-                <div class="wizard-intro">
-                    <p id="stateTag" class="tag">Loading</p>
-                    <p id="wizardStepLabel" class="wizard-step-label">Preparing contribution flow</p>
-                </div>
+        <h2 id="participationHeading">Open a fresh contribution lane</h2>
+        <p id="stateSupport">Chummer only generates a device-auth code after you explicitly start, because those codes expire quickly.</p>
+        <div id="stateLine" class="wizard-status" aria-live="polite"></div>
 
-                <ol class="wizard-rail" aria-label="Contribution steps">
-                    <li id="wizardStepStart" class="wizard-step wizard-step--current">
-                        <span class="wizard-step__index">1</span>
-                        <div>
-                            <strong>Start contributing</strong>
-                            <p>Confirm you want a temporary contribution lane.</p>
-                        </div>
-                    </li>
-                    <li id="wizardStepAuthorize" class="wizard-step">
-                        <span class="wizard-step__index">2</span>
-                        <div>
-                            <strong>Authorize in ChatGPT</strong>
-                            <p>Open the verification page and enter the code.</p>
-                        </div>
-                    </li>
-                    <li id="wizardStepComplete" class="wizard-step">
-                        <span class="wizard-step__index">3</span>
-                        <div>
-                            <strong>You're set</strong>
-                            <p>Chummer records the lane and waits for validated work.</p>
-                        </div>
-                    </li>
-                </ol>
+        <div id="startState" class="state-stack">
+            <div class="wizard-card">
+                <p class="wizard-card__eyebrow">Step 1</p>
+                <h3>Generate a fresh code</h3>
+                <p>When you continue, Chummer will request a new one-time ChatGPT code for this session. If you do not use it in time, ask for another one here.</p>
             </div>
-
-            <h2 id="participationHeading">Checking current contribution state...</h2>
-            <p id="stateSupport">Looking for an active contribution lane and any pending ChatGPT authorization challenge.</p>
-            <div id="stateLine" class="wizard-status" aria-live="polite"></div>
-
-            <div id="startState" class="state-stack" hidden>
-                <div class="wizard-card">
-                    <p class="wizard-card__eyebrow">Step 1</p>
-                    <h3>Start contributing</h3>
-                    <p>Ask Chummer to prepare a bounded contribution lane. No contribution credit is granted from authorization alone.</p>
-                </div>
-                <div class="stacked-actions">
-                    <button id="startContributionButton" class="button-like button-like--primary" type="button">Yes, I want to contribute</button>
-                    <a class="inline-link" href="/participate">How it works</a>
-                </div>
-                <p class="privacy-note">You can stop later. Final contribution credit appears only after validated receipts land.</p>
+            <div class="stacked-actions">
+                <button id="startContributionButton" class="button-like button-like--primary" type="button">Generate fresh code</button>
+                <button id="closeStartStateButton" class="inline-link inline-link--button" type="button">Not now</button>
             </div>
+            <p class="privacy-note">You can stop later. Final contribution credit appears only after validated receipts land.</p>
+        </div>
 
-            <div id="authorizeState" class="state-stack" hidden>
-                <div class="wizard-card">
-                    <p class="wizard-card__eyebrow">Step 2</p>
-                    <h3>Authorize in ChatGPT</h3>
-                    <p>Open the authorization page, sign in to ChatGPT, and enter the one-time code shown below.</p>
-                </div>
-                <div class="stacked-actions">
-                    <a id="openAuthorizationLink" class="button-like button-like--primary" href="#" target="_blank" rel="noreferrer noopener">Open authorization page</a>
-                    <button id="copyCodeButton" class="button-like button-like--secondary" type="button">Copy code</button>
-                </div>
-                <div class="code-panel">
-                    <span class="code-panel__label">One-time code</span>
-                    <div id="authorizationCode" class="code-panel__value mono-receipt">Waiting for a code...</div>
-                </div>
-                <div class="wizard-note-band">
-                    <strong>Keep this page open.</strong>
-                    <span>Chummer will keep checking for confirmation and automatically move you forward when the lane is ready.</span>
-                </div>
-                <button id="cancelContributionButton" class="inline-link inline-link--button" type="button">Stop this contribution for now</button>
+        <div id="authorizeState" class="state-stack" hidden>
+            <div class="wizard-card">
+                <p class="wizard-card__eyebrow">Step 2</p>
+                <h3>Authorize in ChatGPT</h3>
+                <p>Open the authorization page, sign in to ChatGPT, and enter the one-time code shown below. If the code expires, ask for a fresh one.</p>
             </div>
-
-            <div id="completeState" class="state-stack" hidden>
-                <div class="wizard-card">
-                    <p class="wizard-card__eyebrow">Step 3</p>
-                    <h3>Thanks, you're set</h3>
-                    <p>Your contribution lane is ready. Chummer will use it only for bounded project work, and recognition still depends on validated receipts.</p>
-                </div>
-                <div id="badgeReveal" class="badge-reveal" hidden>
-                    <span class="tag">Thank you</span>
-                    <h3 id="badgeLabel">Contributor Ready</h3>
-                    <p id="badgeNote" class="muted-copy">This is a thank-you marker only. Contribution credit appears later after validated work.</p>
-                </div>
-                <div class="stacked-actions">
-                    <a class="button-like button-like--primary" href="/home">Back to home</a>
-                    <a class="button-like button-like--ghost" href="/account">Open account</a>
-                </div>
+            <div class="stacked-actions">
+                <a id="openAuthorizationLink" class="button-like button-like--primary" href="#" target="_blank" rel="noreferrer noopener">Open authorization page</a>
+                <button id="copyCodeButton" class="button-like button-like--secondary" type="button">Copy code</button>
+                <button id="refreshAuthorizationButton" class="button-like button-like--ghost" type="button">Get a fresh code</button>
             </div>
-
-            <div id="unavailableState" class="state-stack" hidden>
-                <div class="wizard-card wizard-card--soft">
-                    <p class="wizard-card__eyebrow">Unavailable</p>
-                    <h3>Participation is unavailable right now</h3>
-                    <p>Chummer could not open or refresh a contribution lane on this host. Your account and participation history are still intact.</p>
-                </div>
-                <div class="stacked-actions">
-                    <a id="unavailableHomeLink" class="button-like button-like--primary" href="/home">Back to home</a>
-                    <a id="unavailableAccountLink" class="button-like button-like--ghost" href="/account">Open account</a>
-                    <a id="unavailableExplainLink" class="inline-link" href="/participate">How it works</a>
-                </div>
+            <div class="code-panel">
+                <span class="code-panel__label">One-time code</span>
+                <div id="authorizationCode" class="code-panel__value mono-receipt">A fresh code will appear here after you start.</div>
             </div>
+            <div class="wizard-note-band">
+                <strong>Keep this page open.</strong>
+                <span>Chummer keeps checking for confirmation and will move you forward automatically when the lane is ready.</span>
+            </div>
+            <button id="cancelContributionButton" class="inline-link inline-link--button" type="button">Stop this contribution for now</button>
+        </div>
 
-            <details id="technicalDetails" class="details-drawer" hidden>
-                <summary>Technical details and lane controls</summary>
-                <dl class="detail-grid">
-                    <div>
-                        <dt>Contribution id</dt>
-                        <dd id="detailContributionId">None</dd>
-                    </div>
-                    <div>
-                        <dt>Fleet lane id</dt>
-                        <dd id="detailFleetLaneId">Not created yet</dd>
-                    </div>
-                    <div>
-                        <dt>Auth status</dt>
-                        <dd id="detailAuthStatus">Not started</dd>
-                    </div>
-                    <div>
-                        <dt>Auth-ready</dt>
-                        <dd id="detailAuthReadyAt">Not yet</dd>
-                    </div>
-                    <div>
-                        <dt>Authorization tier</dt>
-                        <dd id="detailAuthorizationTier">Unknown</dd>
-                    </div>
-                    <div>
-                        <dt>Role</dt>
-                        <dd id="detailLaneRole">Coding</dd>
-                    </div>
-                </dl>
-                <div class="stacked-actions">
-                    <button id="stopContributionButton" class="button-like button-like--secondary" type="button">Stop</button>
-                    <button id="revokeContributionButton" class="button-like button-like--ghost" type="button">Revoke</button>
+        <div id="completeState" class="state-stack" hidden>
+            <div class="wizard-card">
+                <p class="wizard-card__eyebrow">Step 3</p>
+                <h3>Thanks, you're set</h3>
+                <p>Your contribution lane is ready. Chummer uses it only for bounded project work, and recognition still depends on validated receipts.</p>
+            </div>
+            <div id="badgeReveal" class="badge-reveal" hidden>
+                <span class="tag">Thank you</span>
+                <h3 id="badgeLabel">Contributor Ready</h3>
+                <p id="badgeNote" class="muted-copy">This is a thank-you marker only. Contribution credit appears later after validated work.</p>
+            </div>
+            <div class="stacked-actions">
+                <a class="button-like button-like--primary" href="/home">Back to home</a>
+                <a class="button-like button-like--ghost" href="/account">Open account</a>
+            </div>
+        </div>
+
+        <div id="unavailableState" class="state-stack" hidden>
+            <div class="wizard-card wizard-card--soft">
+                <p class="wizard-card__eyebrow">Unavailable</p>
+                <h3>Participation is unavailable right now</h3>
+                <p>Chummer could not open or refresh a contribution lane on this host. Your account and participation history are still intact.</p>
+            </div>
+            <div class="stacked-actions">
+                <a id="unavailableHomeLink" class="button-like button-like--primary" href="/home">Back to home</a>
+                <a id="unavailableAccountLink" class="button-like button-like--ghost" href="/account">Open account</a>
+                <a id="unavailableExplainLink" class="inline-link" href="/participate">How it works</a>
+            </div>
+        </div>
+
+        <details id="technicalDetails" class="details-drawer" hidden>
+            <summary>Technical details and lane controls</summary>
+            <dl class="detail-grid">
+                <div>
+                    <dt>Contribution id</dt>
+                    <dd id="detailContributionId">None</dd>
                 </div>
-            </details>
-        </section>
-    </div>
-</section>
+                <div>
+                    <dt>Fleet lane id</dt>
+                    <dd id="detailFleetLaneId">Not created yet</dd>
+                </div>
+                <div>
+                    <dt>Auth status</dt>
+                    <dd id="detailAuthStatus">Not started</dd>
+                </div>
+                <div>
+                    <dt>Auth-ready</dt>
+                    <dd id="detailAuthReadyAt">Not yet</dd>
+                </div>
+                <div>
+                    <dt>Authorization tier</dt>
+                    <dd id="detailAuthorizationTier">Unknown</dd>
+                </div>
+                <div>
+                    <dt>Role</dt>
+                    <dd id="detailLaneRole">Coding</dd>
+                </div>
+            </dl>
+            <div class="stacked-actions">
+                <button id="stopContributionButton" class="button-like button-like--secondary" type="button">Stop</button>
+                <button id="revokeContributionButton" class="button-like button-like--ghost" type="button">Revoke</button>
+            </div>
+        </details>
+    </section>
+</div>
 
 @section Scripts {
 <script>
 let currentContributionId = "";
 let pollHandle = 0;
 const antiForgeryToken = document.querySelector("input[name='__RequestVerificationToken']")?.value || "";
+const dialog = document.getElementById("participationWizardDialog");
 
 async function api(path, options = {}) {
   const method = (options.method || "GET").toUpperCase();
@@ -215,6 +282,14 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function setDialogOpen(open) {
+  dialog.hidden = !open;
+  document.body.classList.toggle("dialog-open", open);
+  if (!open) {
+    stopPolling();
+  }
+}
+
 function toggleState(phase) {
   document.getElementById("startState").hidden = phase !== "start";
   document.getElementById("authorizeState").hidden = phase !== "authorize";
@@ -222,7 +297,7 @@ function toggleState(phase) {
   document.getElementById("unavailableState").hidden = phase !== "unavailable";
 }
 
-function setWizardStep(phase) {
+function setWizardStep(phase, status) {
   const steps = {
     start: ["wizardStepStart"],
     authorize: ["wizardStepStart", "wizardStepAuthorize"],
@@ -235,13 +310,20 @@ function setWizardStep(phase) {
     complete: "wizardStepComplete",
     unavailable: ""
   };
-  const label = {
+  let label = {
     start: "Step 1 of 3",
     authorize: "Step 2 of 3",
     complete: "Step 3 of 3",
     unavailable: "Flow unavailable"
-  };
-  document.getElementById("wizardStepLabel").textContent = label[phase] || "Preparing contribution flow";
+  }[phase] || "Preparing contribution flow";
+
+  if (status === "waiting_for_slot") {
+    label = "Waiting for an available slot";
+  } else if (status === "pending_auth") {
+    label = "Fresh code ready";
+  }
+
+  document.getElementById("wizardStepLabel").textContent = label;
   for (const id of ["wizardStepStart", "wizardStepAuthorize", "wizardStepComplete"]) {
     const element = document.getElementById(id);
     element.classList.toggle("wizard-step--complete", (steps[phase] || []).includes(id) && id !== current[phase]);
@@ -278,6 +360,18 @@ function normalizeParticipationError(error) {
   return null;
 }
 
+function showPreparingState() {
+  currentContributionId = "";
+  setWizardStep("start", "starting");
+  toggleState("start");
+  document.getElementById("stateTag").textContent = "Preparing";
+  document.getElementById("participationHeading").textContent = "Preparing a fresh authorization code";
+  document.getElementById("stateSupport").textContent = "Chummer is opening a fresh participation challenge for this session.";
+  document.getElementById("stateLine").textContent = "Codes are only generated after you explicitly start.";
+  document.getElementById("technicalDetails").hidden = true;
+  document.getElementById("badgeReveal").hidden = true;
+}
+
 function renderError(error) {
   const unavailable = normalizeParticipationError(error);
   if (unavailable) {
@@ -287,12 +381,13 @@ function renderError(error) {
 
   stopPolling();
   currentContributionId = "";
+  setDialogOpen(true);
   document.getElementById("stateTag").textContent = "Attention";
   document.getElementById("participationHeading").textContent = "The contribution flow could not continue";
   document.getElementById("stateSupport").textContent = error?.message || "Something interrupted the current request.";
   document.getElementById("stateLine").textContent = "Try again in a moment.";
   document.getElementById("technicalDetails").hidden = true;
-  setWizardStep("start");
+  setWizardStep("start", "error");
   toggleState("start");
 }
 
@@ -306,17 +401,20 @@ function render(data) {
   const actions = data.actions || {};
   currentContributionId = contribution?.contributionId || "";
 
-  document.getElementById("stateTag").textContent = phase === "complete"
-    ? "Ready"
-    : phase === "authorize"
-      ? "Authorize"
-      : phase === "unavailable"
-        ? "Unavailable"
-      : "Start";
-  document.getElementById("participationHeading").textContent = data.heading || "Start contributing";
+  setDialogOpen(true);
+  document.getElementById("stateTag").textContent = status === "waiting_for_slot"
+    ? "Queued"
+    : phase === "complete"
+      ? "Ready"
+      : phase === "authorize"
+        ? "Authorize"
+        : phase === "unavailable"
+          ? "Unavailable"
+          : "Start";
+  document.getElementById("participationHeading").textContent = data.heading || "Open a fresh contribution lane";
   document.getElementById("stateSupport").textContent = data.support || "";
   document.getElementById("stateLine").textContent = data.statusLine || "";
-  setWizardStep(phase);
+  setWizardStep(phase, status);
   toggleState(phase);
 
   const authorizationLink = document.getElementById("openAuthorizationLink");
@@ -326,7 +424,10 @@ function render(data) {
   authorizationLink.setAttribute("aria-disabled", auth.verificationUri ? "false" : "true");
   authorizationLink.classList.toggle("button-like--disabled", !auth.verificationUri);
   copyCodeButton.disabled = !auth.userCode;
-  authorizationCode.textContent = auth.userCode || "Authorization code will appear here as soon as the lane is ready.";
+  authorizationCode.textContent = auth.userCode
+    || (status === "waiting_for_slot"
+      ? "No code yet. Chummer is waiting for a contribution slot to open."
+      : "A fresh code will appear here as soon as Chummer receives it.");
 
   document.getElementById("unavailableHomeLink").href = actions.homeHref || "/home";
   document.getElementById("unavailableAccountLink").href = actions.accountHref || "/account";
@@ -368,12 +469,17 @@ async function refreshCurrent() {
 
 async function startContribution() {
   const button = document.getElementById("startContributionButton");
-  setButtonBusy(button, true, "Starting...");
+  const refreshButton = document.getElementById("refreshAuthorizationButton");
+  setDialogOpen(true);
+  showPreparingState();
+  setButtonBusy(button, true, "Preparing...");
+  setButtonBusy(refreshButton, true, "Preparing...");
   try {
     const data = await api("/api/v1/participation/contributions/start", { method: "POST" });
     render(data);
   } finally {
-    setButtonBusy(button, false, "Starting...");
+    setButtonBusy(button, false, "Preparing...");
+    setButtonBusy(refreshButton, false, "Preparing...");
   }
 }
 
@@ -396,14 +502,20 @@ async function stopContribution(revoke) {
 
 async function copyCode() {
   const code = document.getElementById("authorizationCode").textContent || "";
-  if (!code || code.startsWith("Authorization code will appear")) return;
+  if (!code || code.startsWith("A fresh code will appear") || code.startsWith("No code yet")) return;
   await navigator.clipboard.writeText(code);
   const button = document.getElementById("copyCodeButton");
   setButtonBusy(button, true, "Copied");
   window.setTimeout(() => setButtonBusy(button, false, "Copied"), 1200);
 }
 
+document.getElementById("openParticipationWizardButton").addEventListener("click", () => {
+  startContribution().catch(renderError);
+});
 document.getElementById("startContributionButton").addEventListener("click", () => {
+  startContribution().catch(renderError);
+});
+document.getElementById("refreshAuthorizationButton").addEventListener("click", () => {
   startContribution().catch(renderError);
 });
 document.getElementById("copyCodeButton").addEventListener("click", () => {
@@ -418,12 +530,24 @@ document.getElementById("stopContributionButton").addEventListener("click", () =
 document.getElementById("revokeContributionButton").addEventListener("click", () => {
   stopContribution(true).catch(renderError);
 });
+document.getElementById("closeParticipationWizardButton").addEventListener("click", () => {
+  setDialogOpen(false);
+});
+document.getElementById("closeStartStateButton").addEventListener("click", () => {
+  setDialogOpen(false);
+});
+document.querySelector("[data-close-participation-dialog]").addEventListener("click", () => {
+  setDialogOpen(false);
+});
 document.getElementById("openAuthorizationLink").addEventListener("click", (event) => {
   if (!event.currentTarget.getAttribute("href") || event.currentTarget.getAttribute("href") === "#") {
     event.preventDefault();
   }
 });
-
-refreshCurrent().catch(renderError);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !dialog.hidden) {
+    setDialogOpen(false);
+  }
+});
 </script>
 }
