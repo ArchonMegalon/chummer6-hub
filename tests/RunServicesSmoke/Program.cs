@@ -837,6 +837,25 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         Label: "beta"), CancellationToken.None);
     Assert((memberBoostCodeResult.Result as ObjectResult)?.StatusCode == StatusCodes.Status403Forbidden, "boost-code creation should return 403 for non-manager members.");
 
+    var missingGroupJoinCodeResult = await memberGroupsController.CreateJoinCode("grp-missing", new CreateJoinCodeRequest(
+        SubjectId: "subject.member",
+        Role: "member"), CancellationToken.None);
+    Assert((missingGroupJoinCodeResult.Result as StatusCodeResult)?.StatusCode == StatusCodes.Status404NotFound, "join-code creation should return 404 when the target group does not exist.");
+
+    var missingGroupBoostCodeResult = await memberBoostCodesController.Create(new CreateBoostCodeRequest(
+        SubjectId: "subject.member",
+        GroupId: "grp-missing",
+        CampaignId: null,
+        ProjectId: "hub",
+        Label: "missing"), CancellationToken.None);
+    Assert((missingGroupBoostCodeResult.Result as StatusCodeResult)?.StatusCode == StatusCodes.Status404NotFound, "boost-code creation should return 404 when the target group does not exist.");
+
+    var missingJoinResult = await memberGroupsController.Join(new JoinGroupByCodeRequest("subject.member", "JOIN-MISSING"), CancellationToken.None);
+    Assert((missingJoinResult.Result as StatusCodeResult)?.StatusCode == StatusCodes.Status404NotFound, "joining with an unknown join code should return 404.");
+
+    var missingBoostRedeemResult = await memberBoostCodesController.Redeem(new RedeemBoostCodeRequest("subject.member", "BOOST-MISSING"), CancellationToken.None);
+    Assert((missingBoostRedeemResult.Result as StatusCodeResult)?.StatusCode == StatusCodes.Status404NotFound, "redeeming an unknown boost code should return 404.");
+
     var groupsController = new GroupsController(groups, outsiderIdentityClient)
     {
         ControllerContext = AuthenticatedControllerContext("outsider-token")
