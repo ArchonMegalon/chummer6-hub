@@ -234,10 +234,6 @@ public sealed class BoostSessionService
                     state.TierSource,
                     cancellationToken);
             }
-            catch (InvalidOperationException ex) when (IsInfrastructureLaneFailure(ex))
-            {
-                throw new ParticipationUnavailableException("Participation is unavailable on this host right now. Try again later.", ex);
-            }
             catch (InvalidOperationException ex) when (ex.Message.Contains("(409)", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("capacity reached", StringComparison.OrdinalIgnoreCase))
             {
                 lock (_store.Gate)
@@ -255,6 +251,10 @@ public sealed class BoostSessionService
                         },
                     });
                 }
+            }
+            catch (InvalidOperationException ex) when (IsInfrastructureLaneFailure(ex))
+            {
+                throw new ParticipationUnavailableException("Participation is unavailable on this host right now. Try again later.", ex);
             }
             var laneId = AccountService.NormalizeOptional(created["lane"]?["lane_id"]?.GetValue<string>());
             if (laneId is null)
@@ -306,10 +306,6 @@ public sealed class BoostSessionService
         {
             fleet = await _fleetBridge.ActivateParticipantLaneAsync(state.FleetLaneId!, cancellationToken);
         }
-        catch (InvalidOperationException ex) when (IsInfrastructureLaneFailure(ex))
-        {
-            throw new ParticipationUnavailableException("Participation is unavailable on this host right now. Try again later.", ex);
-        }
         catch (InvalidOperationException ex) when (ex.Message.Contains("(409)", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("capacity reached", StringComparison.OrdinalIgnoreCase))
         {
             lock (_store.Gate)
@@ -328,6 +324,10 @@ public sealed class BoostSessionService
                     },
                 });
             }
+        }
+        catch (InvalidOperationException ex) when (IsInfrastructureLaneFailure(ex))
+        {
+            throw new ParticipationUnavailableException("Participation is unavailable on this host right now. Try again later.", ex);
         }
         lock (_store.Gate)
         {

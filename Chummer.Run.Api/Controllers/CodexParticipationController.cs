@@ -782,7 +782,9 @@ public sealed class CodexParticipationController : Controller
         {
             "lane_pending" => "Authorization is confirmed. Chummer is finishing lane setup.",
             "active" => "You can leave this page now. Stop or revoke later from your account or technical details.",
-            "waiting_for_slot" => "Authorization is complete. Chummer is waiting for the next available contribution slot.",
+            "waiting_for_slot" => session.AuthorizedAtUtc is null
+                ? "All contribution slots are currently busy. Chummer saved your request and will move you forward when a slot opens."
+                : "Authorization is complete. Chummer is waiting for the next available contribution slot.",
             "stopped" => "This contribution lane has been stopped. You can start again whenever you want.",
             "revoked" => "This contribution lane has been revoked. Start a new one if you want to contribute again.",
             _ => "Waiting for confirmation from ChatGPT..."

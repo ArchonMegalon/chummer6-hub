@@ -46,7 +46,7 @@ public sealed class UserExperienceService
 
     public HubUserExperienceDto Upsert(UpsertHubUserExperienceRequest request)
     {
-        var subjectId = AccountService.NormalizeRequired(request.SubjectId, nameof(request.SubjectId));
+        var subjectId = AccountService.NormalizeRequired(request.SubjectId ?? string.Empty, nameof(request.SubjectId));
         var user = _accounts.EnsureUser(subjectId, subjectId);
         var now = DateTimeOffset.UtcNow;
         lock (_store.Gate)
