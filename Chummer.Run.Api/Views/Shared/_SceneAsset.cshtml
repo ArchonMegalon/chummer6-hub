@@ -6,9 +6,25 @@
 
 <figure class="scene-frame @(frameClass)">
     <picture class="scene-picture">
+        @if (!string.IsNullOrWhiteSpace(Model.MobilePosterAvifUrl))
+        {
+            <source media="(max-width: 720px)" srcset="@Model.MobilePosterAvifUrl" type="image/avif" />
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.MobilePosterWebpUrl))
+        {
+            <source media="(max-width: 720px)" srcset="@Model.MobilePosterWebpUrl" type="image/webp" />
+        }
         @if (!string.IsNullOrWhiteSpace(Model.MobilePosterUrl))
         {
             <source media="(max-width: 720px)" srcset="@Model.MobilePosterUrl" />
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.PosterAvifUrl))
+        {
+            <source srcset="@Model.PosterAvifUrl" type="image/avif" />
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.PosterWebpUrl))
+        {
+            <source srcset="@Model.PosterWebpUrl" type="image/webp" />
         }
         <img src="@Model.PosterUrl" alt="@Model.Alt" loading="lazy" />
     </picture>

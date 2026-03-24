@@ -144,7 +144,11 @@ public sealed class PublicLandingService
             SectionId: Optional(item, "section_id"),
             MediaKind: Required(item, "media_kind"),
             PosterUrl: Optional(item, "poster_url"),
+            PosterAvifUrl: Optional(item, "poster_avif_url"),
+            PosterWebpUrl: Optional(item, "poster_webp_url"),
             MobilePosterUrl: Optional(item, "mobile_poster_url"),
+            MobilePosterAvifUrl: Optional(item, "mobile_poster_avif_url"),
+            MobilePosterWebpUrl: Optional(item, "mobile_poster_webp_url"),
             LoopUrl: Optional(item, "loop_url"),
             Alt: Required(item, "alt"),
             Caption: Required(item, "caption"),
@@ -208,7 +212,11 @@ public sealed class PublicLandingService
         }
 
         ValidateStaticAssetPath(asset.PosterUrl, webRoot, slot, "poster_url");
+        ValidateStaticAssetPath(asset.PosterAvifUrl, webRoot, slot, "poster_avif_url");
+        ValidateStaticAssetPath(asset.PosterWebpUrl, webRoot, slot, "poster_webp_url");
         ValidateStaticAssetPath(asset.MobilePosterUrl, webRoot, slot, "mobile_poster_url");
+        ValidateStaticAssetPath(asset.MobilePosterAvifUrl, webRoot, slot, "mobile_poster_avif_url");
+        ValidateStaticAssetPath(asset.MobilePosterWebpUrl, webRoot, slot, "mobile_poster_webp_url");
     }
 
     private static void ValidateStaticAssetPath(string? url, string webRoot, string slot, string fieldName)
@@ -219,6 +227,11 @@ public sealed class PublicLandingService
         }
 
         var relative = url.Trim().TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        if (Path.GetExtension(relative).Equals(".svg", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"public landing asset '{slot}' uses SVG in {fieldName}: {url}. Raster delivery is required.");
+        }
+
         var candidate = Path.GetFullPath(Path.Combine(webRoot, relative));
         if (!candidate.StartsWith(webRoot, StringComparison.Ordinal) || !File.Exists(candidate))
         {

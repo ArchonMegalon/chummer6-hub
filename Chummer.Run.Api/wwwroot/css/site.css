@@ -665,9 +665,17 @@ button.button-like {
   border-radius: 36px;
   min-height: clamp(420px, 58vw, 620px);
   background:
-    radial-gradient(circle at 78% 18%, rgba(135, 200, 255, 0.28), transparent 28%),
-    radial-gradient(circle at 18% 82%, rgba(45, 114, 255, 0.24), transparent 32%),
+    linear-gradient(180deg, rgba(7, 23, 45, 0.24), rgba(7, 23, 45, 0.74)),
+    radial-gradient(circle at 78% 18%, rgba(135, 200, 255, 0.22), transparent 28%),
+    radial-gradient(circle at 18% 82%, rgba(45, 114, 255, 0.18), transparent 32%),
+    image-set(
+      url("/media/campaign/participation-ops-lane.avif") type("image/avif"),
+      url("/media/campaign/participation-ops-lane.webp") type("image/webp"),
+      url("/media/campaign/participation-ops-lane.png") type("image/png")
+    ),
     linear-gradient(140deg, rgba(7, 23, 45, 0.98), rgba(8, 31, 61, 0.94) 48%, rgba(13, 47, 92, 0.92));
+  background-size: auto, auto, auto, cover, auto;
+  background-position: center, center, center, center, center;
   box-shadow: var(--shadow-hero);
 }
 
@@ -1664,10 +1672,17 @@ td {
   gap: 1rem;
   padding: clamp(1.8rem, 4vw, 3rem);
   background:
-    linear-gradient(180deg, rgba(7, 23, 45, 0.2), rgba(7, 23, 45, 0.72)),
-    radial-gradient(circle at top right, rgba(135, 200, 255, 0.3), transparent 36%),
-    radial-gradient(circle at bottom left, rgba(45, 114, 255, 0.22), transparent 30%),
+    linear-gradient(180deg, rgba(7, 23, 45, 0.22), rgba(7, 23, 45, 0.76)),
+    radial-gradient(circle at top right, rgba(135, 200, 255, 0.2), transparent 36%),
+    radial-gradient(circle at bottom left, rgba(45, 114, 255, 0.16), transparent 30%),
+    image-set(
+      url("/media/campaign/auth-entry-blueglass.avif") type("image/avif"),
+      url("/media/campaign/auth-entry-blueglass.webp") type("image/webp"),
+      url("/media/campaign/auth-entry-blueglass.png") type("image/png")
+    ),
     linear-gradient(135deg, rgba(7, 23, 45, 0.98), rgba(12, 37, 71, 0.92));
+  background-size: auto, auto, auto, cover, auto;
+  background-position: center, top right, bottom left, center, center;
   color: #edf4ff;
 }
 

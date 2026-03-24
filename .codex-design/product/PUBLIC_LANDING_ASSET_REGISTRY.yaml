@@ -5,90 +5,224 @@ assets:
   - asset_slot: section_hero
     section_id: hero
     media_kind: premium_still
-    poster_url: /media/landing/hero-dossier-glass.svg
-    mobile_poster_url: /media/landing/hero-dossier-glass.svg
+    poster_url: /media/campaign/hero-shadowrun-assistant-nightdesk.png
+    poster_avif_url: /media/campaign/hero-shadowrun-assistant-nightdesk.avif
+    poster_webp_url: /media/campaign/hero-shadowrun-assistant-nightdesk.webp
+    mobile_poster_url: /media/campaign/hero-shadowrun-assistant-nightdesk.png
+    mobile_poster_avif_url: /media/campaign/hero-shadowrun-assistant-nightdesk.avif
+    mobile_poster_webp_url: /media/campaign/hero-shadowrun-assistant-nightdesk.webp
     loop_url:
-    alt: Night boulevard reflections and dossier glass framing the Chummer front door.
-    caption: Chummer front door
+    alt: Calm night workstation with rain on glass, dossiers, and blue-lit city depth behind the Chummer front door.
+    caption: Landing hero image
     motion_policy: premium_still_or_short_muted_loop
     fallback_style: boulevard_glass
+  - asset_slot: capability_build_runner
+    section_id: start_here
+    media_kind: still
+    poster_url: /media/campaign/capability-build-runner.png
+    poster_avif_url: /media/campaign/capability-build-runner.avif
+    poster_webp_url: /media/campaign/capability-build-runner.webp
+    mobile_poster_url: /media/campaign/capability-build-runner.png
+    mobile_poster_avif_url: /media/campaign/capability-build-runner.avif
+    mobile_poster_webp_url: /media/campaign/capability-build-runner.webp
+    loop_url:
+    alt: Professional build workspace with runner dossier fragments, calm desk analysis, and blue-lit assistant cues.
+    caption: Build runner image
+    motion_policy: stills_only
+    fallback_style: dossier_lamplight
+  - asset_slot: capability_check_rules
+    section_id: shared_card_media
+    media_kind: still
+    poster_url: /media/campaign/capability-check-rules.png
+    poster_avif_url: /media/campaign/capability-check-rules.avif
+    poster_webp_url: /media/campaign/capability-check-rules.webp
+    mobile_poster_url: /media/campaign/capability-check-rules.png
+    mobile_poster_avif_url: /media/campaign/capability-check-rules.avif
+    mobile_poster_webp_url: /media/campaign/capability-check-rules.webp
+    loop_url:
+    alt: Rules verification desk with source fragments, evidence markers, and grounded blue lighting.
+    caption: Rules verification image
+    motion_policy: stills_only
+    fallback_style: simulation_amber
+  - asset_slot: release_current_build
+    section_id: shared_card_media
+    media_kind: still
+    poster_url: /media/campaign/release-current-build.png
+    poster_avif_url: /media/campaign/release-current-build.avif
+    poster_webp_url: /media/campaign/release-current-build.webp
+    mobile_poster_url: /media/campaign/release-current-build.png
+    mobile_poster_avif_url: /media/campaign/release-current-build.avif
+    mobile_poster_webp_url: /media/campaign/release-current-build.webp
+    loop_url:
+    alt: Premium software release shelf with integrity markers, polished surfaces, and cool blue logistics light.
+    caption: Current build image
+    motion_policy: stills_only
+    fallback_style: facility_cyan_night
   - asset_slot: scene_archive_stair
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/landing/scene-archive-stair.svg
-    mobile_poster_url: /media/landing/scene-archive-stair.svg
+    poster_url: /media/campaign/capability-check-rules.png
+    poster_avif_url: /media/campaign/capability-check-rules.avif
+    poster_webp_url: /media/campaign/capability-check-rules.webp
+    mobile_poster_url: /media/campaign/capability-check-rules.png
+    mobile_poster_avif_url: /media/campaign/capability-check-rules.avif
+    mobile_poster_webp_url: /media/campaign/capability-check-rules.webp
     loop_url:
-    alt: Archive stairs, printed guides, and marked pages arranged for a calm first read.
-    caption: Guide still
+    alt: Product story still with grounded source review, quiet desk objects, and blue-lit verification detail.
+    caption: Product story image
     motion_policy: stills_only
     fallback_style: archive_paper
   - asset_slot: scene_dossier_desk
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/landing/scene-dossier-desk.svg
-    mobile_poster_url: /media/landing/scene-dossier-desk.svg
+    poster_url: /media/campaign/capability-brief-run.png
+    poster_avif_url: /media/campaign/capability-brief-run.avif
+    poster_webp_url: /media/campaign/capability-brief-run.webp
+    mobile_poster_url: /media/campaign/capability-brief-run.png
+    mobile_poster_avif_url: /media/campaign/capability-brief-run.avif
+    mobile_poster_webp_url: /media/campaign/capability-brief-run.webp
     loop_url:
-    alt: Desk spread of proof pages, mission notes, and release badges under a soft lamp.
-    caption: Proof packet still
+    alt: Mission briefing desk with dossier fragments, route overlays, and premium planning posture.
+    caption: Mission briefing image
     motion_policy: stills_only
     fallback_style: dossier_lamplight
   - asset_slot: scene_facility_exterior
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/landing/scene-facility-exterior.svg
-    mobile_poster_url: /media/landing/scene-facility-exterior.svg
+    poster_url: /media/campaign/release-current-build.png
+    poster_avif_url: /media/campaign/release-current-build.avif
+    poster_webp_url: /media/campaign/release-current-build.webp
+    mobile_poster_url: /media/campaign/release-current-build.png
+    mobile_poster_avif_url: /media/campaign/release-current-build.avif
+    mobile_poster_webp_url: /media/campaign/release-current-build.webp
     loop_url:
-    alt: Quiet runsite exterior with release-crate lighting and disciplined signage.
-    caption: Runsite approach still
+    alt: Blue-toned release environment with disciplined packaging and quiet integrity cues.
+    caption: Release shelf image
     motion_policy: stills_only
     fallback_style: facility_cyan_night
   - asset_slot: scene_boulevard_of_futures
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/landing/scene-boulevard-of-futures.svg
-    mobile_poster_url: /media/landing/scene-boulevard-of-futures.svg
+    poster_url: /media/campaign/future-blue-boulevard.png
+    poster_avif_url: /media/campaign/future-blue-boulevard.avif
+    poster_webp_url: /media/campaign/future-blue-boulevard.webp
+    mobile_poster_url: /media/campaign/future-blue-boulevard.png
+    mobile_poster_avif_url: /media/campaign/future-blue-boulevard.avif
+    mobile_poster_webp_url: /media/campaign/future-blue-boulevard.webp
     loop_url:
-    alt: City reflections and horizon markers pointing toward future Chummer features.
-    caption: Future lanes still
+    alt: Blue boulevard reflections and horizon markers suggesting future Chummer lanes without entertainment-poster excess.
+    caption: Future lanes image
     motion_policy: stills_only
     fallback_style: future_boulevard
   - asset_slot: scene_simulation_bench
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/landing/scene-simulation-bench.svg
-    mobile_poster_url: /media/landing/scene-simulation-bench.svg
+    poster_url: /media/campaign/capability-check-rules.png
+    poster_avif_url: /media/campaign/capability-check-rules.avif
+    poster_webp_url: /media/campaign/capability-check-rules.webp
+    mobile_poster_url: /media/campaign/capability-check-rules.png
+    mobile_poster_avif_url: /media/campaign/capability-check-rules.avif
+    mobile_poster_webp_url: /media/campaign/capability-check-rules.webp
     loop_url:
-    alt: Clean rules lab with receipts, measured overlays, and grounded instrument light.
-    caption: Rules lab still
+    alt: Precision rules lab with receipt traces, measured overlays, and calm blue instrument light.
+    caption: Rules lab image
     motion_policy: stills_only
     fallback_style: simulation_amber
   - asset_slot: scene_streetfront
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/landing/scene-streetfront.svg
-    mobile_poster_url: /media/landing/scene-streetfront.svg
+    poster_url: /media/campaign/capability-carry-dossier.png
+    poster_avif_url: /media/campaign/capability-carry-dossier.avif
+    poster_webp_url: /media/campaign/capability-carry-dossier.webp
+    mobile_poster_url: /media/campaign/capability-carry-dossier.png
+    mobile_poster_avif_url: /media/campaign/capability-carry-dossier.avif
+    mobile_poster_webp_url: /media/campaign/capability-carry-dossier.webp
     loop_url:
-    alt: Rain-lit streetfront showing local-first continuity across devices.
-    caption: Continuity lane still
+    alt: Rain-lit continuity scene carrying the same dossier across devices and locations.
+    caption: Continuity image
     motion_policy: stills_only
     fallback_style: streetfront_rain
   - asset_slot: scene_solo_operator
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/landing/scene-solo-operator.svg
-    mobile_poster_url: /media/landing/scene-solo-operator.svg
+    poster_url: /media/campaign/participation-ops-lane.png
+    poster_avif_url: /media/campaign/participation-ops-lane.avif
+    poster_webp_url: /media/campaign/participation-ops-lane.webp
+    mobile_poster_url: /media/campaign/participation-ops-lane.png
+    mobile_poster_avif_url: /media/campaign/participation-ops-lane.avif
+    mobile_poster_webp_url: /media/campaign/participation-ops-lane.webp
     loop_url:
-    alt: Focused participation workstation showing a calm account posture without maintainer jargon.
-    caption: Participation lane still
+    alt: Focused contribution workstation with a calm operator, clean desk, and blue secure-session cues.
+    caption: Participation image
     motion_policy: stills_only
     fallback_style: solo_cockpit
   - asset_slot: scene_prop_cluster
     section_id: shared_card_media
     media_kind: still
-    poster_url: /media/landing/scene-prop-cluster.svg
-    mobile_poster_url: /media/landing/scene-prop-cluster.svg
+    poster_url: /media/campaign/lane-creator.png
+    poster_avif_url: /media/campaign/lane-creator.avif
+    poster_webp_url: /media/campaign/lane-creator.webp
+    mobile_poster_url: /media/campaign/lane-creator.png
+    mobile_poster_avif_url: /media/campaign/lane-creator.avif
+    mobile_poster_webp_url: /media/campaign/lane-creator.webp
     loop_url:
-    alt: Primers, props, and artifact mockups arranged like a finished release table.
-    caption: Artifact teaser still
+    alt: Creator workstation with package fragments, media elements, and receipt-linked artifacts under calm blue light.
+    caption: Creator image
     motion_policy: stills_only
     fallback_style: prop_table
+  - asset_slot: lane_player
+    section_id: choose_your_lane
+    media_kind: still
+    poster_url: /media/campaign/lane-player.png
+    poster_avif_url: /media/campaign/lane-player.avif
+    poster_webp_url: /media/campaign/lane-player.webp
+    mobile_poster_url: /media/campaign/lane-player.png
+    mobile_poster_avif_url: /media/campaign/lane-player.avif
+    mobile_poster_webp_url: /media/campaign/lane-player.webp
+    loop_url:
+    alt: Player prep scene with dossier review, gear planning, and calm blue-lit focus.
+    caption: Player lane image
+    motion_policy: stills_only
+    fallback_style: solo_cockpit
+  - asset_slot: lane_gm
+    section_id: choose_your_lane
+    media_kind: still
+    poster_url: /media/campaign/lane-gm.png
+    poster_avif_url: /media/campaign/lane-gm.avif
+    poster_webp_url: /media/campaign/lane-gm.webp
+    mobile_poster_url: /media/campaign/lane-gm.png
+    mobile_poster_avif_url: /media/campaign/lane-gm.avif
+    mobile_poster_webp_url: /media/campaign/lane-gm.webp
+    loop_url:
+    alt: GM planning scene with route overlays, threat markers, and composed run orchestration.
+    caption: GM lane image
+    motion_policy: stills_only
+    fallback_style: dossier_lamplight
+  - asset_slot: lane_creator
+    section_id: choose_your_lane
+    media_kind: still
+    poster_url: /media/campaign/lane-creator.png
+    poster_avif_url: /media/campaign/lane-creator.avif
+    poster_webp_url: /media/campaign/lane-creator.webp
+    mobile_poster_url: /media/campaign/lane-creator.png
+    mobile_poster_avif_url: /media/campaign/lane-creator.avif
+    mobile_poster_webp_url: /media/campaign/lane-creator.webp
+    loop_url:
+    alt: Creator workstation with package fragments, polished media pieces, and careful rules stewardship.
+    caption: Creator lane image
+    motion_policy: stills_only
+    fallback_style: prop_table
+  - asset_slot: participation_ops_lane
+    section_id: participate
+    media_kind: still
+    poster_url: /media/campaign/participation-ops-lane.png
+    poster_avif_url: /media/campaign/participation-ops-lane.avif
+    poster_webp_url: /media/campaign/participation-ops-lane.webp
+    mobile_poster_url: /media/campaign/participation-ops-lane.png
+    mobile_poster_avif_url: /media/campaign/participation-ops-lane.avif
+    mobile_poster_webp_url: /media/campaign/participation-ops-lane.webp
+    loop_url:
+    alt: Secure contribution lane setup with one operator, clean devices, and calm blue verification cues.
+    caption: Participation lane image
+    motion_policy: stills_only
+    fallback_style: solo_cockpit
