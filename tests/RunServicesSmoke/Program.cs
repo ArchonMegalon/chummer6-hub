@@ -543,6 +543,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         CancellationToken.None);
     var unavailableRecoveryStartProblem = unavailableRecoveryStart.Result as ObjectResult;
     Assert(unavailableRecoveryStartProblem?.StatusCode == StatusCodes.Status503ServiceUnavailable, "recovery email start should report browser-auth outages as 503 instead of conflict.");
+    Assert(identityLinks.FindLinkedIdentity("email", "recovery@example.invalid") is null, "failed recovery email starts should not leave behind a pending local email link.");
 
     var unavailableIdentityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
         new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
@@ -571,6 +572,32 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var unavailableParticipationResult = await unavailableParticipationController.ParticipationPage(CancellationToken.None);
     var unavailableParticipationModel = (unavailableParticipationResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableParticipationModel?.Heading, "Participation is unavailable right now", StringComparison.Ordinal), "participation page should show an unavailable message when identity is down instead of redirecting to login.");
+
+    var missingFleetTokenConfig = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json")
+        })
+        .Build();
+    var unavailableBridgeSessions = new BoostSessionService(
+        store,
+        accounts,
+        groups,
+        new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { detail = "unused" }, HttpStatusCode.OK))), missingFleetTokenConfig),
+        rewards);
+    var unavailableBridgeSession = unavailableBridgeSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.demo",
+        ProjectId: "hub",
+        GroupId: ownerGroup.GroupId,
+        SubjectLabel: "Runner Demo"));
+    unavailableBridgeSessions.RecordConsent(unavailableBridgeSession.SponsorSessionId);
+    var unavailableBoostSessionsController = new BoostSessionsController(accounts, identityClient, leaderboards, unavailableBridgeSessions)
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var unavailableBoostStart = await unavailableBoostSessionsController.StartDeviceAuth(unavailableBridgeSession.SponsorSessionId, CancellationToken.None);
+    var unavailableBoostStartProblem = unavailableBoostStart.Result as ObjectResult;
+    Assert(unavailableBoostStartProblem?.StatusCode == StatusCodes.Status503ServiceUnavailable, "legacy boost-session device-auth start should report bridge outages as 503 instead of bad request.");
 
     var activationReceipt = new ContributionReceiptDto(
         ReceiptId: "rcpt-lane-activated-001",

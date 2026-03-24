@@ -84,10 +84,10 @@ public sealed class AccountLinksController : ControllerBase
             }
 
             var nextPath = HubBrowserAuthService.SanitizeNextPath(request.NextPath, "/account");
-            var link = _links.LinkEmail(new LinkEmailIdentityRequest(subject.SubjectId, normalizedEmail, MakePrimary: false));
             var verificationToken = _emailLinks.CreateVerificationToken(subject.SubjectId, normalizedEmail, nextPath);
             var verificationNextPath = _emailLinks.BuildVerificationCallbackPath(verificationToken);
             var started = await _browserAuth.StartEmailEntryAsync(normalizedEmail, currentUser.DisplayName, verificationNextPath, cancellationToken);
+            var link = _links.LinkEmail(new LinkEmailIdentityRequest(subject.SubjectId, normalizedEmail, MakePrimary: false));
             var previewHref = string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
                 ? $"/auth/email/callback?ticket={Uri.EscapeDataString(started.TicketId)}&next={Uri.EscapeDataString(verificationNextPath)}"
                 : null;
