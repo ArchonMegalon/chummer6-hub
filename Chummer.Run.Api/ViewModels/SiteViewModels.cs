@@ -18,6 +18,7 @@ public sealed record SiteChromeViewModel(
     IReadOnlyList<PublicNavigationLink> PrimaryNavigation,
     IReadOnlyList<PublicNavigationLink> SecondaryNavigation,
     IReadOnlyList<SiteChromeActionViewModel> HeaderActions,
+    SiteChromeActionViewModel? PublicPrimaryCta,
     bool Authenticated,
     string? SignedInLabel,
     string FooterCanonicalSource,
@@ -43,9 +44,16 @@ public sealed record LandingPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
-    IReadOnlyList<PublicFeatureCardDto> StartHere,
+    PublicReleaseManifestDto Manifest,
+    PublicLandingActionDto PrimaryHeroAction,
+    PublicLandingActionDto SecondaryHeroAction,
+    IReadOnlyList<PublicFeatureCardDto> Workflows,
     IReadOnlyList<PublicFeatureCardDto> TrustPillars,
-    IReadOnlyList<PublicFeatureCardDto> Lanes);
+    IReadOnlyList<PublicFeatureCardDto> Lanes,
+    IReadOnlyList<PublicFeatureCardDto> AvailableToday,
+    IReadOnlyList<PublicFeatureCardDto> PreviewItems,
+    IReadOnlyList<PublicFeatureCardDto> ComingNext,
+    IReadOnlyList<PublicFeatureCardDto> Artifacts);
 
 public sealed record StoryPageViewModel(
     SiteChromeViewModel Chrome,

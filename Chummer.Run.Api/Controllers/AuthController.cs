@@ -69,7 +69,7 @@ public sealed class AuthController : Controller
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
             heading: "Sign in",
-            supportLine: "Step back into your account, settings, follows, and contribution access in one clean browser flow.",
+            supportLine: "Return to your account, follows, and contribution status in one browser flow.",
             nextPath,
             createAccount: false));
     }
@@ -101,7 +101,7 @@ public sealed class AuthController : Controller
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
             heading: "Create account",
-            supportLine: "Create the account that unlocks home, settings, follows, and later contribution access.",
+            supportLine: "Create the account that keeps preview access, follows, updates, and later contribution access together.",
             nextPath,
             createAccount: true));
     }

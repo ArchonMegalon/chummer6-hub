@@ -44,13 +44,26 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> LandingPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
+        var manifest = _releases.LoadManifest();
+        var hasPreviewBuild = manifest.Downloads.Count > 0;
+        var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
         var model = new LandingPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", surface.Subhead, "/", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
-            StartHere: _landing.CardsForBucket(surface, "start_here"),
+            Manifest: manifest,
+            PrimaryHeroAction: new PublicLandingActionDto(
+                hasPreviewBuild ? "Get preview build" : "Request early access",
+                hasPreviewBuild ? "/downloads" : "/signup?next=/home",
+                "primary"),
+            SecondaryHeroAction: new PublicLandingActionDto("See what works today", "/now", "secondary"),
+            Workflows: _landing.CardsForBucket(surface, "start_here"),
             TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),
-            Lanes: _landing.CardsForBucket(surface, "choose_your_lane"));
+            Lanes: _landing.CardsForBucket(surface, "choose_your_lane"),
+            AvailableToday: nowCards.Where(static card => string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(),
+            PreviewItems: nowCards.Where(static card => !string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(),
+            ComingNext: _landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(),
+            Artifacts: _landing.CardsForBucket(surface, "featured_artifacts"));
         return View("~/Views/PublicLanding/Landing.cshtml", model);
     }
 
@@ -148,12 +161,12 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         var model = new ShelfPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Artifacts", "A secondary teaser shelf for artifacts and future outputs.", "/artifacts", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Artifacts", "Artifacts, briefs, and proof surfaces connected to the current preview.", "/artifacts", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             Eyebrow: "Artifacts",
             Heading: "Artifact shelf",
-            Intro: "Artifact teasers stay secondary. They point to the related horizon instead of trying to become the front door.",
+            Intro: "Browse the packs, briefs, and proof surfaces that make the preview feel tangible.",
             Items: _landing.CardsForBucket(surface, "featured_artifacts"));
         return View("~/Views/PublicLanding/Shelf.cshtml", model);
     }

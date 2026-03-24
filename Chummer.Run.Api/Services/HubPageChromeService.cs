@@ -7,24 +7,30 @@ public sealed class HubPageChromeService
 {
     private readonly PublicLandingService _landing;
     private readonly PublicNavigationService _navigation;
+    private readonly PublicReleaseManifestService _releases;
 
-    public HubPageChromeService(PublicLandingService landing, PublicNavigationService navigation)
+    public HubPageChromeService(PublicLandingService landing, PublicNavigationService navigation, PublicReleaseManifestService releases)
     {
         _landing = landing;
         _navigation = navigation;
+        _releases = releases;
     }
 
     public SiteChromeViewModel BuildPublicChrome(string title, string description, string currentPath)
     {
         var surface = _landing.LoadSurface();
         var nav = _navigation.LoadNavigation();
-        var actions = surface.GuestShellActions
-            .Select(action => new SiteChromeActionViewModel(
-                action.Label,
-                action.Href,
-                action.Emphasis,
-                Current: string.Equals(NormalizeRoute(currentPath), NormalizeRoute(action.Href), StringComparison.OrdinalIgnoreCase)))
-            .ToArray();
+        var signInAction = surface.GuestShellActions
+            .FirstOrDefault(action => string.Equals(NormalizeRoute(action.Href), "/login", StringComparison.OrdinalIgnoreCase))
+            ?? new PublicLandingActionDto("Sign in", "/login?next=/home", "secondary");
+        var actions = new[]
+        {
+            new SiteChromeActionViewModel(
+                signInAction.Label,
+                signInAction.Href,
+                "link",
+                Current: string.Equals(NormalizeRoute(currentPath), NormalizeRoute(signInAction.Href), StringComparison.OrdinalIgnoreCase))
+        };
 
         return new SiteChromeViewModel(
             Title: title,
@@ -33,6 +39,7 @@ public sealed class HubPageChromeService
             PrimaryNavigation: nav.Primary,
             SecondaryNavigation: nav.Secondary,
             HeaderActions: actions,
+            PublicPrimaryCta: BuildPublicPrimaryCta(),
             Authenticated: false,
             SignedInLabel: null,
             FooterCanonicalSource: surface.FooterCanonicalSource,
@@ -57,10 +64,20 @@ public sealed class HubPageChromeService
             PrimaryNavigation: nav.Primary,
             SecondaryNavigation: nav.Secondary,
             HeaderActions: actions,
+            PublicPrimaryCta: null,
             Authenticated: true,
             SignedInLabel: signedInLabel,
             FooterCanonicalSource: surface.FooterCanonicalSource,
             FooterGeneratedNote: surface.FooterGeneratedNote);
+    }
+
+    private SiteChromeActionViewModel BuildPublicPrimaryCta()
+    {
+        var manifest = _releases.LoadManifest();
+        var hasPreviewBuild = manifest.Downloads.Count > 0;
+        return hasPreviewBuild
+            ? new SiteChromeActionViewModel("Get preview build", "/downloads", "primary")
+            : new SiteChromeActionViewModel("Request early access", "/signup?next=/home", "primary");
     }
 
     private static string NormalizeRoute(string value)

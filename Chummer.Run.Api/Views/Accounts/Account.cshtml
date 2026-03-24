@@ -16,7 +16,26 @@
     <div class="account-stage__lead">
         <p class="eyebrow">Account</p>
         <h1 class="page-title">Account</h1>
-        <p class="page-copy">Manage profile, sign-in, recovery, channels, privacy, and participation from one place.</p>
+        <p class="page-copy">Manage profile, sign-in, recovery, channels, privacy, and participation here.</p>
+    </div>
+
+    <div class="account-overview">
+        <article class="account-overview__card">
+            <span class="tag">Primary sign-in</span>
+            <strong>@Model.Links.RecommendedPrimaryAuth</strong>
+        </article>
+        <article class="account-overview__card">
+            <span class="tag">Recovery</span>
+            <strong>@(emailLink is null ? "Missing" : emailLink.Status)</strong>
+        </article>
+        <article class="account-overview__card">
+            <span class="tag">Channels</span>
+            <strong>@(telegramChannel is null ? "None linked" : "Telegram connected")</strong>
+        </article>
+        <article class="account-overview__card">
+            <span class="tag">Participation</span>
+            <strong>@(Model.Experience.OnboardingCompleted ? "Configured" : "Setup pending")</strong>
+        </article>
     </div>
 
     <div class="account-shell">
@@ -33,7 +52,7 @@
             <section id="profile" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Profile</h2>
-                    <p>Keep the visible identity polished before anything else.</p>
+                    <p>Keep the visible identity clean and easy to use.</p>
                 </div>
                 <form id="profileForm" class="settings-form">
                     <div class="field">
@@ -55,7 +74,7 @@
             <section id="sign-in" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Primary sign-in</h2>
-                    <p>Google is the preferred sign-in, with email available for recovery or a simpler link-based path.</p>
+                    <p>Choose the sign-in posture that feels stable, then keep recovery separate.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -80,7 +99,7 @@
             <section id="recovery" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Recovery email</h2>
-                    <p>Add a verified recovery address so you are not pinned to one sign-in path.</p>
+                    <p>Add a verified backup path so one sign-in method is never the whole story.</p>
                 </div>
                 <div class="settings-summary-row">
                     <span>Status</span>
@@ -99,7 +118,7 @@
             <section id="channels" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Linked channels</h2>
-                    <p>Keep companion channels separate from sign-in.</p>
+                    <p>Companion channels stay separate from account access.</p>
                 </div>
                 <div class="settings-summary-row">
                     <span>Telegram companion</span>
@@ -117,7 +136,7 @@
             <section id="privacy" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Privacy</h2>
-                    <p>Choose what stays visible and keep deeper account details behind the advanced drawer.</p>
+                    <p>Choose what stays visible while deeper identifiers remain tucked away.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -134,7 +153,7 @@
             <section id="participation" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Participation</h2>
-                    <p>Tell Chummer which lanes matter to you and whether you want horizon or beta follow-up.</p>
+                    <p>Tell Chummer which lanes matter to you and which future updates you want.</p>
                 </div>
                 <form id="experienceForm" class="settings-form">
                     <div class="check-grid">
