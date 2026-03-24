@@ -489,7 +489,15 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         ChannelKind: "telegram_official_bot",
         ChannelHandle: "@hubbrain",
         NotificationsEnabled: true));
-    Assert(string.Equals(officialTelegram.Status, "active", StringComparison.OrdinalIgnoreCase), "official Telegram companion channel should be active when linked.");
+    Assert(string.Equals(officialTelegram.Status, "pending_verification", StringComparison.OrdinalIgnoreCase), "official Telegram companion channel should stay pending until the bot handshake verifies it.");
+
+    var updatedTelegram = identityLinks.LinkChannel(new LinkChannelRequest(
+        SubjectId: "subject.demo",
+        ChannelKind: "telegram_official_bot",
+        ChannelHandle: "@hubbrain-updated",
+        NotificationsEnabled: false));
+    Assert(string.Equals(updatedTelegram.ChannelLinkId, officialTelegram.ChannelLinkId, StringComparison.OrdinalIgnoreCase), "official Telegram companion linking should update the existing channel record instead of minting duplicates.");
+    Assert(string.Equals(updatedTelegram.DisplayLabel, "@hubbrain-updated", StringComparison.OrdinalIgnoreCase), "official Telegram companion relinks should update the visible handle.");
 
     var byoTelegram = identityLinks.LinkChannel(new LinkChannelRequest(
         SubjectId: "subject.demo",
@@ -502,6 +510,16 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     Assert(string.Equals(linkSummary.RecommendedPrimaryAuth, "google", StringComparison.OrdinalIgnoreCase), "linked identity summary should prefer Google once provider-backed auth exists.");
     Assert(string.Equals(linkSummary.OrchestratorBrain, "EA", StringComparison.OrdinalIgnoreCase), "identity/channel summary should keep EA as the orchestrator brain.");
     Assert(linkSummary.ChannelLinks.Any(static link => string.Equals(link.ChannelKind, "telegram_official_bot", StringComparison.OrdinalIgnoreCase)), "identity/channel summary should expose the official Telegram companion link.");
+    Assert(linkSummary.LinkedIdentities.Any(static link => string.Equals(link.Provider, "google", StringComparison.OrdinalIgnoreCase) && string.Equals(link.ProviderSubject, "hidden", StringComparison.OrdinalIgnoreCase)), "linked identity summary should redact raw provider subject values.");
+    Assert(linkSummary.LinkedIdentities.All(static link => string.IsNullOrWhiteSpace(link.Note)), "linked identity summary should not leak provider-policy notes.");
+    Assert(linkSummary.ChannelLinks.All(static link => string.IsNullOrWhiteSpace(link.Note)), "channel summary should not leak policy notes.");
+
+    var accountLinksController = new AccountLinksController(identityLinks, identityClient, accounts, browserAuth, new HubEmailLinkVerificationService(DataProtectionProvider.Create("smoke")))
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var retiredProviderLink = accountLinksController.LinkProvider();
+    Assert((retiredProviderLink as ObjectResult)?.StatusCode == StatusCodes.Status410Gone, "self-asserted provider linking should stay retired.");
 
     var activationReceipt = new ContributionReceiptDto(
         ReceiptId: "rcpt-lane-activated-001",
