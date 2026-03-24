@@ -3,58 +3,172 @@
     ViewData["Title"] = "Downloads";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads";
+
+    static bool IsInstaller(PublicReleaseArtifactDto download)
+        => download.Url.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+           || download.Url.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)
+           || download.Url.EndsWith(".dmg", StringComparison.OrdinalIgnoreCase)
+           || download.Url.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase)
+           || download.Id.Contains("installer", StringComparison.OrdinalIgnoreCase);
+
+    static bool IsArchive(PublicReleaseArtifactDto download)
+        => download.Url.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+           || download.Url.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)
+           || download.Id.Contains("archive", StringComparison.OrdinalIgnoreCase);
+
+    static string KindLabel(PublicReleaseArtifactDto download)
+        => IsInstaller(download)
+            ? "Installer"
+            : IsArchive(download)
+                ? "Manual archive"
+                : "Download";
+
+    static string ActionLabel(PublicReleaseArtifactDto download)
+        => IsInstaller(download) ? "Download installer" : "Download file";
+
+    static string SupportNote(PublicReleaseArtifactDto download)
+        => IsInstaller(download)
+            ? "Recommended for most people. Use this when you want the cleanest setup path."
+            : "Manual path. Use this when you specifically want the raw archive.";
+
+    static string SizeLabel(long? sizeBytes)
+        => sizeBytes is long size
+            ? $"{Math.Round(size / 1024d / 1024d, 1)} MB"
+            : "Unknown size";
+
+    var installers = Model.Manifest.Downloads.Where(IsInstaller).ToArray();
+    var manualDownloads = Model.Manifest.Downloads.Where(download => !IsInstaller(download)).ToArray();
+    var primaryDownloads = installers.Length > 0 ? installers : Model.Manifest.Downloads.Take(2).ToArray();
 }
 
 <section class="release-stage">
     <div class="release-stage__lead">
         <p class="eyebrow">Downloads</p>
-        <h1 class="page-title">@Model.Manifest.Version</h1>
-        <p class="page-copy">@Model.Manifest.Channel channel, published @Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd").</p>
-        <p class="release-stage__note">Current channel, integrity, and next step in one place.</p>
+        <h1 class="page-title">Install the current preview</h1>
+        <p class="page-copy">@Model.Manifest.Channel channel, version @Model.Manifest.Version, published @Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd").</p>
+        <p class="release-stage__note">Use an installer when you see one. Manual archives stay available as the fallback path for people who explicitly want the raw package.</p>
     </div>
     <div class="release-stage__integrity">
-        <span class="tag">Integrity</span>
-        <p>Checksums stay visible beside every public package.</p>
+        <span class="tag">Install and update</span>
+        <p>Checksums stay visible beside every package, installers stay clearly marked, and manual archives never pretend to be the default path.</p>
     </div>
 </section>
 
-<section class="release-shelf">
-    <div class="table-shell">
-        <table class="release-table">
-            <thead>
-                <tr>
-                    <th>Platform</th>
-                    <th>Artifact</th>
-                    <th>Size</th>
-                    <th>Checksum</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (Model.Manifest.Downloads.Count == 0)
-                {
-                    <tr>
-                        <td colspan="5">@Model.Manifest.Message</td>
-                    </tr>
-                }
-                else
-                {
-                    @foreach (var download in Model.Manifest.Downloads)
-                    {
-                        <tr>
-                            <td><span class="platform-pill">@download.Platform</span></td>
-                            <td>@download.Id</td>
-                            <td>@(download.SizeBytes is long size ? $"{Math.Round(size / 1024d, 1)} KB" : "Unknown")</td>
-                            <td><code class="mono-receipt">@download.Sha256[..Math.Min(download.Sha256.Length, 16)]...</code></td>
-                            <td><a class="button-like button-like--primary" href="@download.Url">Get preview</a></td>
-                        </tr>
-                    }
-                }
-            </tbody>
-        </table>
-    </div>
+<section class="release-guidance">
+    <article class="release-guidance__item">
+        <span class="tag">Recommended</span>
+        <h2>Installer-first</h2>
+        <p>When an installer exists for your platform, start there. That is the cleanest setup path and the one the product front is optimized around.</p>
+    </article>
+    <article class="release-guidance__item">
+        <span class="tag tag--quiet">Manual</span>
+        <h2>Archives stay honest</h2>
+        <p>ZIP and tarball packages remain available for manual use, but they are the self-service path and may require you to replace the build yourself later.</p>
+    </article>
+    <article class="release-guidance__item">
+        <span class="tag">Updates</span>
+        <h2>Keep the channel visible</h2>
+        <p>Use this page as the release truth. If your host does not yet self-update, install the next preview from here instead of guessing from old files.</p>
+    </article>
 </section>
+
+@if (Model.Manifest.Downloads.Count == 0)
+{
+    <section class="release-shelf">
+        <article class="release-empty">
+            <h2>No published build is on the shelf yet</h2>
+            <p>@Model.Manifest.Message</p>
+            <div class="stacked-actions">
+                <a class="button-like button-like--primary" href="/signup?next=/home">Request early access</a>
+                <a class="button-like button-like--secondary" href="/now">See what works today</a>
+            </div>
+        </article>
+    </section>
+}
+else
+{
+    <section class="download-highlights">
+        @foreach (var download in primaryDownloads)
+        {
+            <article class="download-highlight">
+                <span class="tag @(IsInstaller(download) ? string.Empty : "tag--quiet")">@KindLabel(download)</span>
+                <h2>@download.Platform</h2>
+                <p>@SupportNote(download)</p>
+                <div class="download-highlight__meta">
+                    <span>@download.Platform</span>
+                    <span>@SizeLabel(download.SizeBytes)</span>
+                    <span>Checksum <code class="mono-receipt">@download.Sha256[..Math.Min(download.Sha256.Length, 16)]...</code></span>
+                </div>
+                <div class="stacked-actions">
+                    <a class="button-like button-like--primary" href="@download.Url">@ActionLabel(download)</a>
+                </div>
+            </article>
+        }
+    </section>
+
+    @if (installers.Length > 0)
+    {
+        <section class="release-shelf">
+            <div class="release-shelf__lead">
+                <p class="eyebrow">Recommended</p>
+                <h2 class="editorial-title">Installer shelf</h2>
+                <p class="editorial-copy">These are the cleanest setup paths for the current preview.</p>
+            </div>
+            <div class="evidence-row-list">
+                @foreach (var download in installers)
+                {
+                    <article class="evidence-row evidence-row--download">
+                        <div class="evidence-row__copy">
+                            <h3>@download.Platform</h3>
+                            <p>@SupportNote(download)</p>
+                        </div>
+                        <div class="download-row__meta">
+                            <span class="platform-pill">@KindLabel(download)</span>
+                            <span class="muted-copy">@download.Platform</span>
+                            <span class="muted-copy">@SizeLabel(download.SizeBytes)</span>
+                            <code class="mono-receipt">SHA @download.Sha256[..Math.Min(download.Sha256.Length, 16)]...</code>
+                        </div>
+                        <a class="button-like button-like--primary" href="@download.Url">@ActionLabel(download)</a>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    @if (manualDownloads.Length > 0)
+    {
+        <section class="release-shelf release-shelf--manual">
+            <div class="release-shelf__lead">
+                <p class="eyebrow">Manual fallback</p>
+                <h2 class="editorial-title">Archives and raw packages</h2>
+                <p class="editorial-copy">Use these only when you specifically want the unpack-it-yourself path.</p>
+            </div>
+            <div class="evidence-row-list">
+                @foreach (var download in manualDownloads)
+                {
+                    <article class="evidence-row evidence-row--download">
+                        <div class="evidence-row__copy">
+                            <h3>@download.Platform</h3>
+                            <p>@SupportNote(download)</p>
+                        </div>
+                        <div class="download-row__meta">
+                            <span class="platform-pill">@KindLabel(download)</span>
+                            <span class="muted-copy">@download.Platform</span>
+                            <span class="muted-copy">@SizeLabel(download.SizeBytes)</span>
+                            <code class="mono-receipt">SHA @download.Sha256[..Math.Min(download.Sha256.Length, 16)]...</code>
+                        </div>
+                        <a class="button-like button-like--ghost" href="@download.Url">@ActionLabel(download)</a>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+}
 
 <section class="release-footnote">
-    <p class="muted-copy">Release notes and channel behavior stay with the current release.</p>
+    <p class="muted-copy">Need help choosing? Start with the installer when available, then use the help and contact pages when the package choice or update posture is not obvious.</p>
+    <div class="stacked-actions">
+        <a class="button-like button-like--secondary" href="/help">Open help</a>
+        <a class="button-like button-like--ghost" href="/contact">Contact Chummer</a>
+    </div>
 </section>

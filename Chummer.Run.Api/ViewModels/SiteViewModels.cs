@@ -17,6 +17,7 @@ public sealed record SiteChromeViewModel(
     string CurrentPath,
     IReadOnlyList<PublicNavigationLink> PrimaryNavigation,
     IReadOnlyList<PublicNavigationLink> SecondaryNavigation,
+    IReadOnlyList<PublicNavigationLink> UtilityNavigation,
     IReadOnlyList<SiteChromeActionViewModel> HeaderActions,
     SiteChromeActionViewModel? PublicPrimaryCta,
     bool Authenticated,
@@ -91,6 +92,41 @@ public sealed record DownloadsPageViewModel(
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
     PublicReleaseManifestDto Manifest);
+
+public sealed record TrustPageSectionViewModel(
+    string Eyebrow,
+    string Heading,
+    string Body,
+    IReadOnlyList<string>? Bullets = null);
+
+public sealed record TrustPageActionViewModel(
+    string Label,
+    string Href,
+    string Tone);
+
+public sealed record TrustPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    IReadOnlyList<TrustPageSectionViewModel> Sections,
+    IReadOnlyList<TrustPageActionViewModel> Actions);
+
+public sealed record FaqEntryViewModel(
+    string Question,
+    string Answer);
+
+public sealed record FaqSectionViewModel(
+    string Title,
+    IReadOnlyList<FaqEntryViewModel> Entries);
+
+public sealed record FaqPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    IReadOnlyList<FaqSectionViewModel> Sections,
+    IReadOnlyList<TrustPageActionViewModel> Actions);
 
 public sealed record ParticipatePageViewModel(
     SiteChromeViewModel Chrome,

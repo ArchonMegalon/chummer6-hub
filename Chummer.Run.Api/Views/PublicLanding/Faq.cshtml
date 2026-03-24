@@ -1,0 +1,38 @@
+@model FaqPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-faq";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">@Model.Eyebrow</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+    </div>
+    <div class="stacked-actions">
+        @foreach (var action in Model.Actions)
+        {
+            <a class="button-like button-like--@action.Tone" href="@action.Href">@action.Label</a>
+        }
+    </div>
+</section>
+
+<section class="faq-stack">
+    @foreach (var faqSection in Model.Sections)
+    {
+        <article class="faq-block">
+            <p class="eyebrow">@faqSection.Title</p>
+            <div class="faq-list">
+                @foreach (var entry in faqSection.Entries)
+                {
+                    <details class="faq-item">
+                        <summary>@entry.Question</summary>
+                        <p>@entry.Answer</p>
+                    </details>
+                }
+            </div>
+        </article>
+    }
+</section>

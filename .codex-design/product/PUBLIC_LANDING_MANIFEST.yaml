@@ -17,6 +17,9 @@ guest_shell_actions:
   - label: Sign in
     href: /login?next=/home
     emphasis: secondary
+  - label: Create account
+    href: /signup?next=/home
+    emphasis: primary
 secondary_highlights:
   - Deterministic engine
   - Rules receipts
@@ -67,6 +70,51 @@ public_routes:
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: proof shelf honesty only
+  - path: /help
+    title: Help
+    audience: public
+    purpose: support_entry
+    requires_auth: false
+    guest_fallback: /help
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public support framing only
+  - path: /faq
+    title: FAQ
+    audience: public
+    purpose: support_entry
+    requires_auth: false
+    guest_fallback: /faq
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public product questions only
+  - path: /privacy
+    title: Privacy
+    audience: public
+    purpose: trust_surface
+    requires_auth: false
+    guest_fallback: /privacy
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: current hosted data-handling posture only
+  - path: /terms
+    title: Terms
+    audience: public
+    purpose: trust_surface
+    requires_auth: false
+    guest_fallback: /terms
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: plain-language preview terms only
+  - path: /contact
+    title: Contact
+    audience: public
+    purpose: support_entry
+    requires_auth: false
+    guest_fallback: /contact
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: current public support/contact path only
   - path: /progress
     title: Progress report
     audience: public

@@ -63,7 +63,7 @@ public sealed class AccountsController : Controller
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
                 Chrome: _chrome.BuildPublicChrome("Account unavailable", "Hub could not confirm the signed-in account surface right now.", "/account"),
                 Heading: "Account is unavailable right now",
-                SupportLine: ex.Message,
+                SupportLine: "Chummer could not open the signed-in account surface right now. Your account details were not changed.",
                 Notice: null,
                 PrimaryLabel: "Try account again",
                 PrimaryHref: "/account",

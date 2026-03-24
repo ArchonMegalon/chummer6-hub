@@ -69,7 +69,7 @@ public sealed class AuthController : Controller
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
             heading: "Sign in",
-            supportLine: "Return to your account, follows, and contribution status in one browser flow.",
+            supportLine: "Return to your account, updates, and contribution status in one browser flow.",
             nextPath,
             createAccount: false));
     }
@@ -101,7 +101,7 @@ public sealed class AuthController : Controller
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
             heading: "Create account",
-            supportLine: "Create the account that keeps preview access, follows, updates, and later contribution access together.",
+            supportLine: "Create the account that keeps preview access, updates, and later contribution access together.",
             nextPath,
             createAccount: true));
     }
@@ -131,7 +131,7 @@ public sealed class AuthController : Controller
                 chromeDescription: "The email sign-in flow could not be started right now.",
                 currentPath: "/login",
                 heading: "Email sign-in is unavailable",
-                supportLine: ex.Message,
+                supportLine: "Chummer could not start the email sign-in step right now. Try again in a moment or use Google if it is available on this host.",
                 notice: null,
                 primaryLabel: _google.IsConfigured() ? "Continue with Google" : "Return to sign in",
                 primaryHref: _google.IsConfigured()
@@ -180,7 +180,7 @@ public sealed class AuthController : Controller
                 chromeDescription: "The email sign-in callback could not be completed right now.",
                 currentPath: "/login",
                 heading: "Email sign-in could not be completed",
-                supportLine: ex.Message,
+                supportLine: "Chummer could not finish the email sign-in step right now. Start again from sign in and use a fresh link.",
                 notice: null,
                 primaryLabel: "Return to sign in",
                 primaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}",
@@ -252,7 +252,7 @@ public sealed class AuthController : Controller
                 chromeDescription: "The recovery-email verification flow could not confirm the active identity session right now.",
                 currentPath: "/account",
                 heading: "Recovery email verification is unavailable",
-                supportLine: ex.Message,
+                supportLine: "Chummer could not confirm the active sign-in session for recovery-email verification right now. Start again from Account.",
                 notice: null,
                 primaryLabel: "Open account",
                 primaryHref: "/account",
@@ -316,7 +316,7 @@ public sealed class AuthController : Controller
                 chromeDescription: "The recovery-email verification flow could not finish the signed-in browser session right now.",
                 currentPath: "/account",
                 heading: "Recovery email verification is unavailable",
-                supportLine: ex.Message,
+                supportLine: "Chummer verified the recovery email but could not finish the signed-in browser session right now. Return to Account and try the final step again.",
                 notice: null,
                 primaryLabel: "Open account",
                 primaryHref: "/account",
@@ -374,7 +374,7 @@ public sealed class AuthController : Controller
                 chromeDescription: "Hub could not confirm the current signed-in session for Google linking.",
                 currentPath: "/account",
                 heading: "Google account linking is unavailable",
-                supportLine: ex.Message,
+                supportLine: "Chummer could not confirm the current signed-in session for Google linking right now. Open Account and try again in a moment.",
                 notice: null,
                 primaryLabel: "Open account",
                 primaryHref: nextPath,

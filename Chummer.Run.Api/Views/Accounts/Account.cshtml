@@ -7,6 +7,25 @@
     var googleLink = Model.Links.LinkedIdentities.FirstOrDefault(link => string.Equals(link.Provider, "google", StringComparison.OrdinalIgnoreCase));
     var telegramChannel = Model.Links.ChannelLinks.FirstOrDefault(link => string.Equals(link.ChannelKind, "telegram_official_bot", StringComparison.OrdinalIgnoreCase));
     var laneInterests = Model.Experience.LaneInterests.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    static string HumanizeStatus(string? value, string fallback = "Not connected")
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "active" => "Ready",
+            "linked" => "Ready",
+            "pending" => "Pending",
+            "pending_verification" => "Verification sent",
+            "verified" => "Verified",
+            "revoked" => "Revoked",
+            _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '))
+        };
+    }
 }
 
 <section class="account-stage">
@@ -16,25 +35,25 @@
     <div class="account-stage__lead">
         <p class="eyebrow">Account</p>
         <h1 class="page-title">Account</h1>
-        <p class="page-copy">Manage profile, sign-in, recovery, channels, privacy, and participation here.</p>
+        <p class="page-copy">Keep your sign-in, backup recovery, channels, privacy, and participation settings in one calm place.</p>
     </div>
 
     <div class="account-overview">
         <article class="account-overview__card">
             <span class="tag">Primary sign-in</span>
-            <strong>@Model.Links.RecommendedPrimaryAuth</strong>
+            <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
         </article>
         <article class="account-overview__card">
             <span class="tag">Recovery</span>
-            <strong>@(emailLink is null ? "Missing" : emailLink.Status)</strong>
+            <strong>@(emailLink is null ? "Add one" : HumanizeStatus(emailLink.Status, "Add one"))</strong>
         </article>
         <article class="account-overview__card">
             <span class="tag">Channels</span>
-            <strong>@(telegramChannel is null ? "None linked" : "Telegram connected")</strong>
+            <strong>@(telegramChannel is null ? "Optional" : "Telegram connected")</strong>
         </article>
         <article class="account-overview__card">
             <span class="tag">Participation</span>
-            <strong>@(Model.Experience.OnboardingCompleted ? "Configured" : "Setup pending")</strong>
+            <strong id="participationOverviewState">@(Model.Experience.OnboardingCompleted ? "Configured" : "Needs setup")</strong>
         </article>
     </div>
 
@@ -52,7 +71,7 @@
             <section id="profile" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Profile</h2>
-                    <p>Keep the visible identity clean and easy to use.</p>
+                    <p>Keep the visible identity clear, stable, and easy to recognize.</p>
                 </div>
                 <form id="profileForm" class="settings-form">
                     <div class="field">
@@ -68,26 +87,27 @@
                         <input id="timezone" value="@Model.User.Timezone" />
                     </div>
                     <button class="button-like button-like--primary" type="submit">Save profile</button>
+                    <p id="profileStatusNotice" class="muted-copy" hidden></p>
                 </form>
             </section>
 
             <section id="sign-in" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Primary sign-in</h2>
-                    <p>Choose the sign-in posture that feels stable, then keep recovery separate.</p>
+                    <p>Choose the sign-in path that feels stable for daily use, then keep recovery separate.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
                         <span>Primary sign-in</span>
-                        <strong>@Model.Links.RecommendedPrimaryAuth</strong>
+                        <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
                     </div>
                     <div class="settings-summary-row">
                         <span>Google</span>
-                        <strong>@(googleLink is null ? (Model.GoogleAvailable ? "Not linked" : "Unavailable on this host") : $"Connected ({googleLink.Status})")</strong>
+                        <strong>@(googleLink is null ? (Model.GoogleAvailable ? "Not linked" : "Unavailable on this host") : $"Connected ({HumanizeStatus(googleLink.Status, "Ready")})")</strong>
                     </div>
                     <div class="settings-summary-row">
                         <span>Email</span>
-                        <strong>@(emailLink is null ? "Not linked" : $"{emailLink.DisplayLabel} ({emailLink.Status})")</strong>
+                        <strong>@(emailLink is null ? "Not linked" : $"{emailLink.DisplayLabel} ({HumanizeStatus(emailLink.Status, "Ready")})")</strong>
                     </div>
                 </div>
                 @if (Model.GoogleAvailable)
@@ -103,7 +123,7 @@
                 </div>
                 <div class="settings-summary-row">
                     <span>Status</span>
-                    <strong id="recoveryEmailStatus">@(emailLink is null ? "Missing" : emailLink.Status)</strong>
+                    <strong id="recoveryEmailStatus">@(emailLink is null ? "Missing" : HumanizeStatus(emailLink.Status, "Missing"))</strong>
                 </div>
                 <form id="recoveryForm" class="settings-form">
                     <div class="field">
@@ -118,11 +138,11 @@
             <section id="channels" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Linked channels</h2>
-                    <p>Companion channels stay separate from account access.</p>
+                    <p>Companion channels stay separate from account access and recovery.</p>
                 </div>
                 <div class="settings-summary-row">
                     <span>Telegram companion</span>
-                    <strong>@(telegramChannel is null ? "Not connected" : $"{telegramChannel.DisplayLabel} ({telegramChannel.Status})")</strong>
+                    <strong>@(telegramChannel is null ? "Not connected" : $"{telegramChannel.DisplayLabel} ({HumanizeStatus(telegramChannel.Status, "Ready")})")</strong>
                 </div>
                 <form id="telegramForm" class="settings-form">
                     <div class="field">
@@ -130,6 +150,7 @@
                         <input id="telegramHandle" placeholder="@@hubbrain" value="@(telegramChannel?.DisplayLabel ?? string.Empty)" />
                     </div>
                     <button class="button-like button-like--secondary" type="submit">Connect Telegram</button>
+                    <p id="telegramStatusNotice" class="muted-copy" hidden></p>
                 </form>
             </section>
 
@@ -141,11 +162,11 @@
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
                         <span>Visibility</span>
-                        <strong>@Model.User.Visibility</strong>
+                        <strong>@HumanizeStatus(Model.User.Visibility, "Private")</strong>
                     </div>
                     <div class="settings-summary-row">
                         <span>Recovery posture</span>
-                        <strong>@Model.Links.RecoveryPosture</strong>
+                        <strong>@HumanizeStatus(Model.Links.RecoveryPosture, "Single method")</strong>
                     </div>
                 </div>
             </section>
@@ -153,24 +174,38 @@
             <section id="participation" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Participation</h2>
-                    <p>Tell Chummer which lanes matter to you and which future updates you want.</p>
+                    <p>Tell Chummer which lanes matter to you and which updates you actually want to hear about.</p>
                 </div>
                 <form id="experienceForm" class="settings-form">
                     <div class="check-grid">
                         <label class="check-row"><input type="checkbox" value="player" @(laneInterests.Contains("player") ? "checked" : null) /> <span>Player</span></label>
                         <label class="check-row"><input type="checkbox" value="gm" @(laneInterests.Contains("gm") ? "checked" : null) /> <span>GM</span></label>
                         <label class="check-row"><input type="checkbox" value="creator" @(laneInterests.Contains("creator") ? "checked" : null) /> <span>Creator</span></label>
-                        <label class="check-row"><input id="followHorizons" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow horizons</span></label>
-                        <label class="check-row"><input id="betaInterest" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Raise beta interest</span></label>
+                        <label class="check-row"><input id="followHorizons" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow roadmap updates</span></label>
+                        <label class="check-row"><input id="betaInterest" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Invite me when the right beta opens</span></label>
                     </div>
                     <button class="button-like button-like--primary" type="submit">Save participation settings</button>
+                    <p id="experienceStatusNotice" class="muted-copy" hidden></p>
                 </form>
+            </section>
+
+            <section class="settings-section">
+                <div class="settings-section__header">
+                    <h2>Help and policy</h2>
+                    <p>When you need support, privacy, or preview-use guidance, use the first-party pages instead of guessing.</p>
+                </div>
+                <div class="stacked-actions">
+                    <a class="button-like button-like--secondary" href="/help">Open help</a>
+                    <a class="button-like button-like--ghost" href="/privacy">Read privacy</a>
+                    <a class="button-like button-like--ghost" href="/terms">Read terms</a>
+                    <a class="button-like button-like--ghost" href="/contact">Contact Chummer</a>
+                </div>
             </section>
         </div>
     </div>
 
     <details class="details-drawer">
-        <summary>Advanced</summary>
+        <summary>Account details</summary>
         <dl class="detail-grid detail-grid--account">
             <div>
                 <dt>Hub account id</dt>
@@ -178,7 +213,7 @@
             </div>
             <div>
                 <dt>Primary auth</dt>
-                <dd>@Model.Links.RecommendedPrimaryAuth</dd>
+                <dd>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</dd>
             </div>
             <div>
                 <dt>Linked identities</dt>
@@ -209,6 +244,58 @@
     ...(antiForgeryToken ? { "RequestVerificationToken": antiForgeryToken } : {})
   };
   const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
+  const humanizeStatus = (value, fallback) => {
+    if (!value) return fallback;
+    const normalized = String(value).trim().toLowerCase();
+    switch (normalized) {
+      case "active":
+      case "linked":
+        return "Ready";
+      case "pending":
+        return "Pending";
+      case "pending_verification":
+        return "Verification sent";
+      case "verified":
+        return "Verified";
+      case "revoked":
+        return "Revoked";
+      default:
+        return String(value).replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
+    }
+  };
+
+  const setNotice = (node, message, isError = false) => {
+    if (!node) return;
+    node.hidden = false;
+    node.textContent = message;
+    node.classList.toggle("status-copy--error", isError);
+    node.classList.toggle("status-copy--success", !isError);
+  };
+
+  const clearNotice = (node) => {
+    if (!node) return;
+    node.hidden = true;
+    node.textContent = "";
+    node.classList.remove("status-copy--error", "status-copy--success");
+  };
+
+  const normalizeError = async (error, fallback) => {
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+
+    return fallback;
+  };
+
+  const setBusy = (button, busy, busyLabel) => {
+    if (!button) return;
+    if (!button.dataset.defaultLabel) {
+      button.dataset.defaultLabel = button.textContent || "";
+    }
+
+    button.disabled = busy;
+    button.textContent = busy ? busyLabel : button.dataset.defaultLabel;
+  };
 
   const call = async (url, body) => {
     const response = await fetch(url, {
@@ -216,61 +303,111 @@
       headers: jsonHeaders,
       body: JSON.stringify(body)
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || JSON.stringify(data));
+    const text = await response.text();
+    let data = {};
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { detail: text };
+      }
+    }
+    if (!response.ok) throw new Error(data.detail || data.title || "Request failed.");
     return data;
   };
 
   document.getElementById("profileForm").addEventListener("submit", async (event) => {
     event.preventDefault();
-    await call("/api/v1/accounts/me/profile", {
-      subjectId,
-      displayName: document.getElementById("displayName").value,
-      handle: document.getElementById("handle").value,
-      timezone: document.getElementById("timezone").value,
-      visibility: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.Visibility))
-    });
-    window.location.reload();
+    const notice = document.getElementById("profileStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    clearNotice(notice);
+    setBusy(button, true, "Saving...");
+    try {
+      const profile = await call("/api/v1/accounts/me/profile", {
+        subjectId,
+        displayName: document.getElementById("displayName").value,
+        handle: document.getElementById("handle").value,
+        timezone: document.getElementById("timezone").value,
+        visibility: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.Visibility))
+      });
+      document.getElementById("displayName").value = profile.displayName || "";
+      document.getElementById("handle").value = profile.handle || "";
+      document.getElementById("timezone").value = profile.timezone || "";
+      setNotice(notice, "Profile saved.");
+    } catch (error) {
+      setNotice(notice, await normalizeError(error, "Profile could not be saved right now."), true);
+    } finally {
+      setBusy(button, false, "");
+    }
   });
 
   document.getElementById("recoveryForm").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const data = await call("/api/v1/accounts/me/links/email/start", {
-      subjectId,
-      email: document.getElementById("recoveryEmail").value,
-      nextPath: "/account"
-    });
     const notice = document.getElementById("recoveryStatusNotice");
-    document.getElementById("recoveryEmailStatus").textContent = data.linkStatus || "pending_verification";
-    notice.hidden = false;
-    notice.textContent = data.previewNote || "Check your email to finish verifying the recovery address.";
-    if (data.previewHref) {
-      window.location.href = data.previewHref;
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    clearNotice(notice);
+    setBusy(button, true, "Starting...");
+    try {
+      const data = await call("/api/v1/accounts/me/links/email/start", {
+        subjectId,
+        email: document.getElementById("recoveryEmail").value,
+        nextPath: "/account"
+      });
+      document.getElementById("recoveryEmailStatus").textContent = humanizeStatus(data.linkStatus, "Verification sent");
+      setNotice(notice, data.previewNote || "Check your email to finish verifying the recovery address.");
+      if (data.previewHref) {
+        window.location.href = data.previewHref;
+      }
+    } catch (error) {
+      setNotice(notice, await normalizeError(error, "Recovery email could not be started right now."), true);
+    } finally {
+      setBusy(button, false, "");
     }
   });
 
   document.getElementById("telegramForm").addEventListener("submit", async (event) => {
     event.preventDefault();
-    await call("/api/v1/accounts/me/channels", {
-      subjectId,
-      channelKind: "telegram_official_bot",
-      channelHandle: document.getElementById("telegramHandle").value,
-      notificationsEnabled: true
-    });
-    window.location.reload();
+    const notice = document.getElementById("telegramStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    clearNotice(notice);
+    setBusy(button, true, "Saving...");
+    try {
+      await call("/api/v1/accounts/me/channels", {
+        subjectId,
+        channelKind: "telegram_official_bot",
+        channelHandle: document.getElementById("telegramHandle").value,
+        notificationsEnabled: true
+      });
+      setNotice(notice, "Telegram companion settings saved.");
+    } catch (error) {
+      setNotice(notice, await normalizeError(error, "Telegram companion settings could not be saved."), true);
+    } finally {
+      setBusy(button, false, "");
+    }
   });
 
   document.getElementById("experienceForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const notice = document.getElementById("experienceStatusNotice");
     const laneInterests = Array.from(document.querySelectorAll("#experienceForm input[type='checkbox'][value]:checked")).map((input) => input.value);
-    await call("/api/v1/accounts/me/preferences", {
-      subjectId,
-      laneInterests,
-      followHorizons: document.getElementById("followHorizons").checked,
-      betaInterest: document.getElementById("betaInterest").checked,
-      onboardingCompleted: true
-    });
-    window.location.reload();
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    clearNotice(notice);
+    setBusy(button, true, "Saving...");
+    try {
+      await call("/api/v1/accounts/me/preferences", {
+        subjectId,
+        laneInterests,
+        followHorizons: document.getElementById("followHorizons").checked,
+        betaInterest: document.getElementById("betaInterest").checked,
+        onboardingCompleted: true
+      });
+      document.getElementById("participationOverviewState").textContent = "Configured";
+      setNotice(notice, "Participation settings saved.");
+    } catch (error) {
+      setNotice(notice, await normalizeError(error, "Participation settings could not be saved."), true);
+    } finally {
+      setBusy(button, false, "");
+    }
   });
 })();
 </script>

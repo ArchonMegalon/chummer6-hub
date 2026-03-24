@@ -379,6 +379,28 @@ button.button-like {
   align-content: start;
 }
 
+.site-footer__nav {
+  gap: 1rem;
+}
+
+.site-footer__link-group {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.site-footer__heading {
+  margin: 0;
+  color: rgba(237, 244, 255, 0.56);
+  font-family: var(--font-family-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.site-footer__link-group--utility .site-footer__heading {
+  color: rgba(237, 244, 255, 0.42);
+}
+
 .site-footer__wordmark {
   font-family: var(--font-family-display);
   letter-spacing: 0.18em;
@@ -406,6 +428,11 @@ button.button-like {
 .site-footer__links a {
   color: rgba(237, 244, 255, 0.7);
   font-size: 0.94rem;
+}
+
+.site-footer__links--utility a {
+  color: rgba(237, 244, 255, 0.52);
+  font-size: 0.88rem;
 }
 
 .site-footer__links a:hover,
@@ -1458,6 +1485,14 @@ td {
   transform: translateX(2px);
 }
 
+.status-copy--success {
+  color: #205f39;
+}
+
+.status-copy--error {
+  color: var(--accent-danger);
+}
+
 .proof-band {
   margin-top: 1.75rem;
   width: min(var(--site-max), calc(100% - 2rem));
@@ -1709,6 +1744,149 @@ td {
   box-shadow: var(--shadow-soft);
 }
 
+.release-guidance,
+.download-highlights,
+.trust-page-hero,
+.trust-page-sections,
+.faq-stack {
+  width: min(var(--site-max), calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+.release-guidance,
+.download-highlights,
+.trust-page-sections {
+  margin-top: 1.25rem;
+}
+
+.faq-stack {
+  margin-top: 1.5rem;
+}
+
+.release-guidance {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.release-guidance__item,
+.download-highlight,
+.trust-page-section,
+.faq-block {
+  padding: 1.3rem;
+  border-radius: 28px;
+  border: 1px solid rgba(15, 39, 74, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-soft);
+}
+
+.release-guidance__item,
+.download-highlight,
+.trust-page-section {
+  display: grid;
+  gap: 0.8rem;
+  align-content: start;
+}
+
+.release-guidance__item h2,
+.download-highlight h2,
+.trust-page-section h2 {
+  margin: 0;
+}
+
+.release-guidance__item p,
+.download-highlight p,
+.trust-page-section p,
+.trust-page-section li,
+.faq-item p {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.download-highlights {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.download-highlight__meta,
+.download-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.8rem;
+  align-items: center;
+  color: var(--ink-muted);
+  font-size: 0.92rem;
+}
+
+.evidence-row--download {
+  grid-template-columns: minmax(0, 1.2fr) minmax(200px, 0.9fr) auto;
+}
+
+.trust-page-hero {
+  margin-top: 2rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.15fr) auto;
+  align-items: end;
+  padding: 1.6rem;
+  border-radius: 34px;
+  background:
+    linear-gradient(135deg, rgba(7, 23, 45, 0.98), rgba(12, 37, 71, 0.94)),
+    radial-gradient(circle at top right, rgba(135, 200, 255, 0.18), transparent 34%);
+  color: #edf4ff;
+  box-shadow: var(--shadow-hero);
+}
+
+.trust-page-hero .page-copy {
+  color: rgba(237, 244, 255, 0.82);
+}
+
+.trust-page-sections {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.trust-page-section__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.faq-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.faq-block {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.faq-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.faq-item {
+  padding: 1rem 1.1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 39, 74, 0.08);
+  background: rgba(233, 242, 255, 0.52);
+}
+
+.faq-item summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.faq-item[open] {
+  background: rgba(255, 255, 255, 0.9);
+}
+
 .release-table th {
   font-family: var(--font-family-mono);
   font-size: 0.78rem;
@@ -1791,6 +1969,13 @@ td {
   border-radius: 18px;
   background: rgba(45, 114, 255, 0.08);
   color: var(--ink-muted);
+}
+
+.auth-panel__support {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  align-items: center;
 }
 
 .home-hero {
@@ -2577,14 +2762,18 @@ td {
   .audience-fit__grid,
   .works-matrix__columns,
   .artifact-gallery__grid,
+  .release-guidance,
   .access-band,
   .home-command,
   .home-dashboard,
   .home-command__status,
   .home-action-grid,
   .home-stream,
+  .trust-page-hero,
   .account-overview,
-  .auth-entry {
+  .auth-entry,
+  .trust-page-sections,
+  .download-highlights {
     grid-template-columns: 1fr;
   }
 
@@ -2689,7 +2878,11 @@ td {
   .home-stream__column,
   .account-overview__card,
   .auth-entry__story--visual,
-  .auth-panel--entry {
+  .auth-panel--entry,
+  .release-guidance__item,
+  .download-highlight,
+  .trust-page-section,
+  .faq-block {
     border-radius: 24px;
   }
 

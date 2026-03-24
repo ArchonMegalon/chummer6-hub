@@ -15,9 +15,22 @@ primary_nav:
 secondary_nav:
   - label: Downloads
     href: /downloads
-  - label: Progress
-    href: /progress
+  - label: Help
+    href: /help
+  - label: FAQ
+    href: /faq
+  - label: Privacy
+    href: /privacy
+  - label: Terms
+    href: /terms
+  - label: Contact
+    href: /contact
+utility_nav:
   - label: Status
     href: /status
+  - label: Progress
+    href: /progress
   - label: Leaderboards
     href: /leaderboards
+  - label: GitHub
+    href: https://github.com/ArchonMegalon/chummer6-hub

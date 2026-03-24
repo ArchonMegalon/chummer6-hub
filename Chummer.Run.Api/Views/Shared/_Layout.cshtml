@@ -8,6 +8,9 @@
     var surfaceClass = ViewData["SurfaceClass"] as string ?? string.Empty;
     var headerClass = routeKey is "landing" or "login" or "signup" ? "site-header site-header--immersive" : "site-header";
     var bodyClass = $"shell-body {(chrome.Authenticated ? "shell-authenticated" : "shell-public")} route-{routeKey} {surfaceClass}".Trim();
+    var supportLinks = chrome.SecondaryNavigation.Where(link =>
+        link.Href is "/help" or "/faq" or "/privacy" or "/terms" or "/contact").ToArray();
+    var productLinks = chrome.SecondaryNavigation.Except(supportLinks).ToArray();
 }
 <!doctype html>
 <html lang="en" data-theme="hub-front-door">
@@ -123,13 +126,37 @@
                 <a class="site-footer__wordmark" href="/">CHUMMER</a>
                 <p class="site-footer__copy">Explainable Shadowrun platform in early access.</p>
             </div>
-            <nav class="site-footer__nav" aria-label="Secondary navigation">
-                <div class="site-footer__links">
-                    @foreach (var link in chrome.SecondaryNavigation)
-                    {
-                        <a href="@link.Href">@link.Label</a>
-                    }
+            <nav class="site-footer__nav" aria-label="Footer navigation">
+                <div class="site-footer__link-group">
+                    <p class="site-footer__heading">Product</p>
+                    <div class="site-footer__links">
+                        @foreach (var link in productLinks)
+                        {
+                            <a href="@link.Href">@link.Label</a>
+                        }
+                    </div>
                 </div>
+                <div class="site-footer__link-group">
+                    <p class="site-footer__heading">Help and legal</p>
+                    <div class="site-footer__links">
+                        @foreach (var link in supportLinks)
+                        {
+                            <a href="@link.Href">@link.Label</a>
+                        }
+                    </div>
+                </div>
+                @if (chrome.UtilityNavigation.Count > 0)
+                {
+                    <div class="site-footer__link-group site-footer__link-group--utility">
+                        <p class="site-footer__heading">Utility</p>
+                        <div class="site-footer__links site-footer__links--utility">
+                            @foreach (var link in chrome.UtilityNavigation)
+                            {
+                                <a href="@link.Href">@link.Label</a>
+                            }
+                        </div>
+                    </div>
+                }
             </nav>
             <div class="site-footer__meta">
                 @if (chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel))
@@ -140,6 +167,8 @@
                 {
                     <p>Preview product. Honest status.</p>
                 }
+                <p><a class="quiet-link" href="/help">Need help?</a></p>
+                <p><a class="quiet-link" href="/contact">Contact Chummer</a></p>
             </div>
         </div>
     </footer>

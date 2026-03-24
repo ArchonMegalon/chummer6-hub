@@ -6,7 +6,8 @@ public sealed record PublicNavigationLink(
 
 public sealed record PublicNavigationModel(
     IReadOnlyList<PublicNavigationLink> Primary,
-    IReadOnlyList<PublicNavigationLink> Secondary);
+    IReadOnlyList<PublicNavigationLink> Secondary,
+    IReadOnlyList<PublicNavigationLink> Utility);
 
 public sealed class PublicNavigationService
 {
@@ -29,7 +30,8 @@ public sealed class PublicNavigationService
         var lines = File.ReadAllLines(path);
         return new PublicNavigationModel(
             Primary: ParseLinks(lines, "primary_nav"),
-            Secondary: ParseLinks(lines, "secondary_nav"));
+            Secondary: ParseLinks(lines, "secondary_nav"),
+            Utility: ParseLinks(lines, "utility_nav"));
     }
 
     private string ResolveRepoRoot()
