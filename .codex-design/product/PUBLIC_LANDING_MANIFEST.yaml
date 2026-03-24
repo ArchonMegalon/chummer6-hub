@@ -10,7 +10,7 @@ hero_ctas:
   - label: See what is real now
     href: /now
     emphasis: primary
-  - label: Download current build
+  - label: Download installer
     href: /downloads
     emphasis: primary
   - label: Create account
@@ -230,7 +230,7 @@ sections:
     audience: public
     route: /participate
   - id: release_shelf
-    title: Downloads and release notes
+    title: Downloads and updates
     audience: public
     route: /downloads
 registered_overlays:

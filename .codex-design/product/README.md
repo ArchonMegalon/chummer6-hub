@@ -11,41 +11,45 @@ Read in this order:
 3. `HORIZON_REGISTRY.yaml`
 4. `ARCHITECTURE.md`
 5. `PUBLIC_LANDING_POLICY.md`
-6. `PUBLIC_LANDING_MANIFEST.yaml`
-7. `PUBLIC_NAVIGATION.yaml`
-8. `PUBLIC_FEATURE_REGISTRY.yaml`
-9. `PUBLIC_LANDING_ASSET_REGISTRY.yaml`
-10. `PUBLIC_CAMPAIGN_IMAGE_MANIFEST.yaml`
-11. `PUBLIC_USER_MODEL.md`
-12. `PUBLIC_AUTH_FLOW.md`
-13. `IDENTITY_AND_CHANNEL_LINKING_MODEL.md`
-14. `PUBLIC_MEDIA_BRIEFS.yaml`
-15. `PARTICIPATION_AND_BOOSTER_WORKFLOW.md`
-16. `COMMUNITY_SPONSORSHIP_BACKLOG.md`
-17. `EXTERNAL_TOOLS_PLANE.md`
-18. `LTD_CAPABILITY_MAP.md`
-19. `PUBLIC_GUIDE_POLICY.md`
-20. `PUBLIC_GUIDE_PAGE_REGISTRY.yaml`
-21. `PUBLIC_PART_REGISTRY.yaml`
-22. `PUBLIC_FAQ_REGISTRY.yaml`
-23. `PUBLIC_HELP_COPY.md`
-24. `PUBLIC_GUIDE_EXPORT_MANIFEST.yaml`
-25. `HORIZON_SIGNAL_POLICY.md`
-26. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
-27. `OWNERSHIP_MATRIX.md`
-28. `PROGRAM_MILESTONES.yaml`
-29. `CONTRACT_SETS.yaml`
-30. `GROUP_BLOCKERS.md`
-31. `projects/*.md` for repo-specific scope
+6. `PUBLIC_DOWNLOADS_POLICY.md`
+7. `PUBLIC_AUTO_UPDATE_POLICY.md`
+8. `PUBLIC_LANDING_MANIFEST.yaml`
+9. `PUBLIC_NAVIGATION.yaml`
+10. `PUBLIC_FEATURE_REGISTRY.yaml`
+11. `PUBLIC_LANDING_ASSET_REGISTRY.yaml`
+12. `PUBLIC_CAMPAIGN_IMAGE_MANIFEST.yaml`
+13. `PUBLIC_USER_MODEL.md`
+14. `PUBLIC_AUTH_FLOW.md`
+15. `IDENTITY_AND_CHANNEL_LINKING_MODEL.md`
+16. `PUBLIC_MEDIA_BRIEFS.yaml`
+17. `PARTICIPATION_AND_BOOSTER_WORKFLOW.md`
+18. `COMMUNITY_SPONSORSHIP_BACKLOG.md`
+19. `EXTERNAL_TOOLS_PLANE.md`
+20. `LTD_CAPABILITY_MAP.md`
+21. `PUBLIC_GUIDE_POLICY.md`
+22. `PUBLIC_GUIDE_PAGE_REGISTRY.yaml`
+23. `PUBLIC_PART_REGISTRY.yaml`
+24. `PUBLIC_FAQ_REGISTRY.yaml`
+25. `PUBLIC_HELP_COPY.md`
+26. `PUBLIC_GUIDE_EXPORT_MANIFEST.yaml`
+27. `HORIZON_SIGNAL_POLICY.md`
+28. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
+29. `OWNERSHIP_MATRIX.md`
+30. `PROGRAM_MILESTONES.yaml`
+31. `CONTRACT_SETS.yaml`
+32. `GROUP_BLOCKERS.md`
+33. `projects/*.md` for repo-specific scope
 
 `HORIZON_REGISTRY.yaml` is the machine-readable source for horizon existence, order, public-guide eligibility, and eventual build path.
 The current horizon set covers knowledge fabric, spatial/runsite artifacts, creator press, replay/forensics, and bounded table coaching in addition to the earlier continuity and simulation lanes.
+`PUBLIC_DOWNLOADS_POLICY.md` is the canonical public posture for installer/setup packaging, archive demotion, integrity visibility, and the rule that Chummer should ship as an installable desktop product rather than a ZIP-first archive.
+`PUBLIC_AUTO_UPDATE_POLICY.md` is the canonical public posture for update channels, signed update metadata, in-app update UX, restart/apply behavior, and the rule that a finished Chummer desktop install should stay current without sending normal users back to a manual archive shelf.
 `PUBLIC_LANDING_MANIFEST.yaml`, `PUBLIC_NAVIGATION.yaml`, `PUBLIC_FEATURE_REGISTRY.yaml`, and `PUBLIC_LANDING_ASSET_REGISTRY.yaml` are the machine-readable source for the `chummer.run` landing structure, curated top-level IA, CTA routing, public proof shelf, asset slots, and signed-in overlay posture.
 `PUBLIC_CAMPAIGN_IMAGE_MANIFEST.yaml` is the first-class raster campaign-image brief for the Hub front door, including prompt anchors, negative prompts, filename bases, placement targets, and AVIF/WebP export requirements.
 `PUBLIC_PROGRESS_PARTS.yaml` is the canonical product-part mapping, public copy registry, and ETA/momentum policy input for the hosted `/progress` report, while `PROGRESS_REPORT.generated.json`, `PROGRESS_REPORT.generated.html`, and `PROGRESS_REPORT_POSTER.svg` are generated downstream projections that Hub may serve directly.
 `PUBLIC_AUTH_FLOW.md` defines the first-wave login/signup/logout posture, guest fallbacks, and which provider surfaces may appear publicly in the hosted shell.
 `IDENTITY_AND_CHANNEL_LINKING_MODEL.md` is the canonical source for email hygiene, social bootstrap, linked identities, official companion channels, and the rule that EA stays the orchestrator brain behind those channels.
-`PUBLIC_GUIDE_PAGE_REGISTRY.yaml`, `PUBLIC_PART_REGISTRY.yaml`, `PUBLIC_FAQ_REGISTRY.yaml`, and `PUBLIC_HELP_COPY.md` are the machine-readable and public-safe source of truth for downstream guide generation outside the landing surface, including the generated download/build shelf.
+`PUBLIC_GUIDE_PAGE_REGISTRY.yaml`, `PUBLIC_PART_REGISTRY.yaml`, `PUBLIC_FAQ_REGISTRY.yaml`, and `PUBLIC_HELP_COPY.md` are the machine-readable and public-safe source of truth for downstream guide generation outside the landing surface, including the generated install/update shelf.
 
 ## Active Chummer repos
 
