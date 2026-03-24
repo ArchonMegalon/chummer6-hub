@@ -1,6 +1,7 @@
 @model PublicLandingAssetDto
 @{
     var frameClass = ViewData["SceneFrameClass"] as string;
+    var showCaption = ViewData["ShowSceneCaption"] as bool? ?? false;
 }
 
 <figure class="scene-frame @(frameClass)">
@@ -11,7 +12,7 @@
         }
         <img src="@Model.PosterUrl" alt="@Model.Alt" loading="lazy" />
     </picture>
-    @if (!string.IsNullOrWhiteSpace(Model.Caption))
+    @if (showCaption && !string.IsNullOrWhiteSpace(Model.Caption))
     {
         <figcaption class="scene-frame__caption">@Model.Caption</figcaption>
     }

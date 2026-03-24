@@ -5,7 +5,7 @@ cards:
   - id: product_story
     bucket: start_here
     title: What is Chummer?
-    summary: Start with the product story instead of repo history.
+    summary: Read the product story in one clear pass.
     href: /what-is-chummer
     badge: Start here
     audience: public
@@ -37,7 +37,7 @@ cards:
   - id: receipts_and_provenance
     bucket: why_trust_it
     title: Receipts and provenance
-    summary: Show the work, keep the evidence, and stop asking people to trust vibes.
+    summary: Every answer stays tied to visible receipts and provenance.
     href: /now
     badge: Proof
     audience: public
@@ -85,7 +85,7 @@ cards:
   - id: real_public_guide
     bucket: whats_real_now
     title: Public guide and horizons
-    summary: The product story and horizon deck are already readable without guesswork.
+    summary: The product story and horizon map are already readable in one pass.
     href: /what-is-chummer#public-guide
     badge: Live now
     audience: public
@@ -98,15 +98,15 @@ cards:
   - id: real_mobile_prep
     bucket: whats_real_now
     title: Local-first prep and session posture
-    summary: Mobile and session continuity are treated as real product surfaces, not hand-wavy add-ons.
+    summary: Local-first prep and session continuity are already part of the product.
     href: /now
     badge: Inspectable
     audience: public
     image_family: streetfront
   - id: real_release_shelf
     bucket: whats_real_now
-    title: Release shelf
-    summary: Public drops, notes, and integrity clues live on one shelf.
+    title: Current builds and notes
+    summary: Public builds, notes, and integrity details stay together.
     href: /downloads
     badge: Live now
     audience: public
@@ -138,7 +138,7 @@ cards:
     fallback_label: Read the guide entry
     external_ok: true
     pain: We only discover weak builds after they explode in public.
-    payoff: Compare grounded tradeoffs with receipts instead of vibes.
+    payoff: Compare grounded tradeoffs with receipts instead of guesswork.
   - id: horizon_knowledge_fabric
     bucket: coming_next
     title: KNOWLEDGE FABRIC
@@ -296,7 +296,7 @@ cards:
   - id: participate_booster
     bucket: participate
     title: Start contributing
-    summary: Open a signed-in contribution lane if you want to lend bounded premium capacity.
+    summary: Start a signed-in contribution lane when you want to lend focused help.
     href: /login?next=/participate/codex
     badge: Registered
     audience: public
@@ -320,7 +320,7 @@ cards:
     title: Current build
     summary: Latest public build, release notes, and integrity details.
     href: /downloads
-    badge: POC
+    badge: Current
     audience: public
     image_family: facility_exterior
     render_mode: external_explainer

@@ -3,7 +3,7 @@ surface: chummer.run
 version: 1
 headline: Shadowrun that shows its work.
 subhead: Build, inspect, play, and follow what opens next without mystery math or empty promises.
-proof_line: Local-first continuity, deterministic explainability, and a real public proof shelf belong on the same front door.
+proof_line: Local-first continuity, deterministic explainability, and visible receipts belong on the same front door.
 no_provider_names: true
 no_ltd_names: true
 hero_ctas:
@@ -230,7 +230,7 @@ sections:
     audience: public
     route: /participate
   - id: release_shelf
-    title: Download and release shelf
+    title: Downloads and release notes
     audience: public
     route: /downloads
 registered_overlays:
@@ -251,4 +251,4 @@ registered_overlays:
     title: Future vote placeholder
     summary: Advisory signals may appear later, but they do not become design authority.
 footer_canonical_source: chummer6-design
-footer_generated_note: Generated from the canonical landing manifest, feature registry, and current public design surface.
+footer_generated_note: Maintained from the local Chummer design mirror.
