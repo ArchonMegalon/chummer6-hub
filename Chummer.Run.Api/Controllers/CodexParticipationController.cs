@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Chummer.Run.Api.Controllers;
 
 [ApiController]
+[AutoValidateAntiforgeryToken]
 [Route("api/v1/participation/codex")]
 public sealed class CodexParticipationController : Controller
 {
