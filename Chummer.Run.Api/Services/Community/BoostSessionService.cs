@@ -91,6 +91,11 @@ public sealed class BoostSessionService
 
             if (!string.IsNullOrWhiteSpace(reusable.FleetLaneId))
             {
+                if (ShouldIssueFreshDeviceAuth(reusable.Status))
+                {
+                    return await StartDeviceAuthAsync(reusable.SponsorSessionId, cancellationToken);
+                }
+
                 var refreshed = await RefreshAsync(reusable.SponsorSessionId, cancellationToken);
                 if (!IsTerminalContributionStatus(refreshed.Session.Status))
                 {
@@ -675,6 +680,13 @@ public sealed class BoostSessionService
     private static bool IsTerminalContributionStatus(string? status)
         => string.Equals(status, "stopped", StringComparison.OrdinalIgnoreCase)
             || string.Equals(status, "revoked", StringComparison.OrdinalIgnoreCase);
+
+    private static bool ShouldIssueFreshDeviceAuth(string? status)
+        => string.Equals(status, "pending_auth", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "fleet_lane_created", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "warming", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "consented", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "intent_created", StringComparison.OrdinalIgnoreCase);
 
     private sealed record HubUserSubject(string SubjectId, string DisplayName);
 }
