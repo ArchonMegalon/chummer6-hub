@@ -43,6 +43,7 @@
 
             <div id="emailAuthPanel" class="auth-panel__email" hidden>
                 <form class="auth-form" method="post" action="/auth/email/start">
+                    @Html.AntiForgeryToken()
                     <input type="hidden" name="next" value="@Model.NextPath" />
                     <div class="field">
                         <label for="email">Email</label>

@@ -5,6 +5,9 @@
 }
 
 <section class="auth-stage participation-stage">
+    <div class="sr-only" aria-hidden="true">
+        @Html.AntiForgeryToken()
+    </div>
     <div class="auth-shell participation-shell">
         <div class="auth-shell__story participation-shell__story">
             <p class="eyebrow">Participation</p>
@@ -154,9 +157,15 @@
 <script>
 let currentContributionId = "";
 let pollHandle = 0;
+const antiForgeryToken = document.querySelector("input[name='__RequestVerificationToken']")?.value || "";
 
 async function api(path, options = {}) {
-  const response = await fetch(path, { ...options });
+  const method = (options.method || "GET").toUpperCase();
+  const headers = new Headers(options.headers || {});
+  if (method !== "GET" && antiForgeryToken) {
+    headers.set("RequestVerificationToken", antiForgeryToken);
+  }
+  const response = await fetch(path, { ...options, headers });
   const body = await response.text();
   let data = {};
   if (body) {

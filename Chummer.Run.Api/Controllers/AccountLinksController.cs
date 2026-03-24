@@ -58,6 +58,7 @@ public sealed class AccountLinksController : ControllerBase
     }
 
     [HttpPost("links/email/start")]
+    [ValidateAntiForgeryToken]
     [ProducesResponseType<RecoveryEmailLinkStartResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<RecoveryEmailLinkStartResponse>> StartRecoveryEmailLink([FromBody] StartRecoveryEmailLinkRequest? request, CancellationToken cancellationToken)
     {
@@ -126,6 +127,7 @@ public sealed class AccountLinksController : ControllerBase
             detail: "Provider links are created through verified provider callbacks, not this API.");
 
     [HttpPost("channels")]
+    [ValidateAntiForgeryToken]
     [ProducesResponseType<ChannelLinkDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<ChannelLinkDto>> LinkChannel([FromBody] LinkChannelRequest? request, CancellationToken cancellationToken)
     {

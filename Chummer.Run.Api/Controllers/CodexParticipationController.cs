@@ -116,6 +116,7 @@ public sealed class CodexParticipationController : Controller
 
     [HttpPost("contributions/start")]
     [HttpPost("/api/v1/participation/contributions/start")]
+    [ValidateAntiForgeryToken]
     public async Task<ActionResult<object>> StartContribution(CancellationToken cancellationToken)
     {
         AuthenticatedHubSubject? subject = null;
@@ -201,6 +202,7 @@ public sealed class CodexParticipationController : Controller
 
     [HttpPost("contributions/{contributionId}/stop")]
     [HttpPost("/api/v1/participation/contributions/{contributionId}/stop")]
+    [ValidateAntiForgeryToken]
     public async Task<ActionResult<object>> StopContribution([FromRoute] string contributionId, CancellationToken cancellationToken)
     {
         SponsorSessionStatusDto? session = null;
@@ -240,6 +242,7 @@ public sealed class CodexParticipationController : Controller
 
     [HttpPost("contributions/{contributionId}/revoke")]
     [HttpPost("/api/v1/participation/contributions/{contributionId}/revoke")]
+    [ValidateAntiForgeryToken]
     public async Task<ActionResult<object>> RevokeContribution([FromRoute] string contributionId, CancellationToken cancellationToken)
     {
         SponsorSessionStatusDto? session = null;
