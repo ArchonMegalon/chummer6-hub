@@ -326,6 +326,7 @@ public sealed class BoostSessionService
             state.Status = "active";
             state.AuthorizedAtUtc ??= DateTimeOffset.UtcNow;
             state.ActivatedAtUtc ??= DateTimeOffset.UtcNow;
+            ClearDeviceAuthChallengeLocked(state);
             state.UpdatedAtUtc = DateTimeOffset.UtcNow;
             state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "lane_activated", "Participant lane activated on Fleet.", DateTimeOffset.UtcNow));
             SyncRecognitionStateLocked(state, "lane activated");
@@ -342,6 +343,7 @@ public sealed class BoostSessionService
             lock (_store.Gate)
             {
                 state.Status = revoke ? "revoked" : "stopped";
+                ClearDeviceAuthChallengeLocked(state);
                 state.StoppedAtUtc ??= DateTimeOffset.UtcNow;
                 state.UpdatedAtUtc = DateTimeOffset.UtcNow;
                 state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), revoke ? "revoked" : "stopped", revoke ? "Sponsor session revoked before Fleet lane creation." : "Sponsor session stopped before Fleet lane creation.", DateTimeOffset.UtcNow));
@@ -359,6 +361,7 @@ public sealed class BoostSessionService
         {
             ApplyFleetSnapshotLocked(state, fleet);
             state.Status = revoke ? "revoked" : "stopped";
+            ClearDeviceAuthChallengeLocked(state);
             state.StoppedAtUtc ??= DateTimeOffset.UtcNow;
             state.UpdatedAtUtc = DateTimeOffset.UtcNow;
             state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), revoke ? "revoked" : "stopped", revoke ? "Participant lane revoked." : "Participant lane stopped.", DateTimeOffset.UtcNow));
@@ -502,6 +505,13 @@ public sealed class BoostSessionService
             state.AuthorizedAtUtc ??= DateTimeOffset.UtcNow;
             state.ActivatedAtUtc ??= DateTimeOffset.UtcNow;
         }
+        if (authReady
+            || string.Equals(state.Status, "active", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(state.Status, "stopped", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(state.Status, "revoked", StringComparison.OrdinalIgnoreCase))
+        {
+            ClearDeviceAuthChallengeLocked(state);
+        }
         state.UpdatedAtUtc = DateTimeOffset.UtcNow;
     }
 
@@ -536,6 +546,12 @@ public sealed class BoostSessionService
             && state.ActivatedAtUtc is null
             && state.StoppedAtUtc is null
             && string.Equals(state.Status, "lane_pending", StringComparison.OrdinalIgnoreCase);
+
+    private static void ClearDeviceAuthChallengeLocked(SponsorSessionState state)
+    {
+        state.DeviceAuthVerificationUri = null;
+        state.DeviceAuthUserCode = null;
+    }
 
     private void MaybeAwardChickenedOutBadgeLocked(SponsorSessionState state)
     {

@@ -782,9 +782,11 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
                     status = "pending_auth",
                     authorization_tier = "pro",
                     tier_source = "fleet_detected",
+                    credential_handle = "cred-secret-123",
                     telemetry = new
                     {
                         auth_ready = false,
+                        credential_handle = "cred-secret-123",
                     },
                 },
             });
@@ -800,6 +802,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
                     status = "pending_auth",
                     authorization_tier = "pro",
                     tier_source = "fleet_detected",
+                    credential_handle = "cred-secret-123",
                     device_auth = new
                     {
                         verification_uri = "https://example.com/device",
@@ -811,6 +814,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
                         auth_ready = true,
                         authorization_tier = "pro",
                         tier_source = "fleet_detected",
+                        credential_handle = "cred-secret-123",
                     },
                 },
             });
@@ -826,11 +830,13 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
                     status = "active",
                     authorization_tier = "pro",
                     tier_source = "fleet_detected",
+                    credential_handle = "cred-secret-123",
                     telemetry = new
                     {
                         auth_ready = true,
                         authorization_tier = "pro",
                         tier_source = "fleet_detected",
+                        credential_handle = "cred-secret-123",
                     },
                 },
             });
@@ -852,10 +858,24 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     Assert(authStarted.Session.AuthorizedAtUtc is not null, "auth-ready device auth should mark the sponsor session as authorized.");
     Assert(string.Equals(authStarted.Session.Status, "active", StringComparison.OrdinalIgnoreCase), "auth-ready device auth should auto-activate the contribution lane.");
     Assert(string.Equals(authStarted.Session.RequestedLaneRole, "deep_review", StringComparison.OrdinalIgnoreCase), "sponsor sessions should preserve the requested participation role.");
+    Assert(string.IsNullOrWhiteSpace(authStarted.Session.DeviceAuthUserCode), "auth-ready sponsor sessions should clear the one-time device-auth code from the session snapshot.");
+    Assert(string.IsNullOrWhiteSpace(authStarted.Session.DeviceAuthVerificationUri), "auth-ready sponsor sessions should clear the device-auth verification URI from the session snapshot.");
+    var storeJson = File.ReadAllText(Path.Combine(tempRoot, "community-store.json"));
+    Assert(!storeJson.Contains("ABCD-EFGH", StringComparison.Ordinal), "the durable community snapshot should not persist device-auth user codes.");
+    Assert(!storeJson.Contains("https://example.com/device", StringComparison.Ordinal), "the durable community snapshot should not persist device-auth verification URIs.");
     var laterBadges = laterSessions.ListBadgesForSessionUser(laterSession.SponsorSessionId);
     Assert(!laterBadges.Any(static badge => string.Equals(badge.Key, "chickened-out", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)), "later successful authorization should revoke the Chickened Out badge.");
     Assert(laterBadges.Any(static badge => string.Equals(badge.Key, "contributor-ready", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)), "auth-ready contribution lanes should award the non-scoring contributor-ready badge.");
     Assert(laterBadges.Any(static badge => string.Equals(badge.Key, "pro-sponsor-active", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Status, "active", StringComparison.OrdinalIgnoreCase)), "current sponsor tier should award a transient active-tier badge.");
+    var boostSessionsController = new BoostSessionsController(accounts, identityClient, leaderboards, laterSessions)
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var boostedSessionPayload = await boostSessionsController.Get(laterSession.SponsorSessionId, CancellationToken.None);
+    var boostedSessionJson = JsonSerializer.Serialize((boostedSessionPayload.Result as OkObjectResult)?.Value);
+    Assert(!boostedSessionJson.Contains("cred-secret-123", StringComparison.Ordinal), "boost-session envelopes should not expose raw Fleet credential handles.");
+    Assert(!boostedSessionJson.Contains("\"telemetry\"", StringComparison.Ordinal), "boost-session envelopes should not expose raw Fleet telemetry blobs.");
+    Assert(boostedSessionJson.Contains("credentialHandlePresent", StringComparison.Ordinal), "boost-session envelopes should project only a boolean credential-handle presence flag.");
     var recognition = leaderboards.UserRecognitionSummary(createdUser.UserId);
     Assert(string.Equals(recognition.CurrentAuthorizationTier, "pro", StringComparison.OrdinalIgnoreCase), "recognition summary should report the current sponsor tier.");
     Assert(recognition.CurrentSponsorRankScore > recognition.LifetimePoints, "current sponsor rank should include a derived active-tier bonus without rewriting lifetime points.");
