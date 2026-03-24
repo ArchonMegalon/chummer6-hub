@@ -46,9 +46,24 @@ public sealed class AuthController : Controller
     public async Task<IActionResult> LoginPage([FromQuery] string? next, CancellationToken cancellationToken)
     {
         var nextPath = HubBrowserAuthService.SanitizeNextPath(next);
-        if (await TryIsAuthenticatedAsync(cancellationToken))
+        var sessionState = await ResolveAuthEntrySessionStateAsync(cancellationToken);
+        if (sessionState == AuthEntrySessionState.Authenticated)
         {
             return Redirect(nextPath);
+        }
+        if (sessionState == AuthEntrySessionState.Unavailable)
+        {
+            return BuildAuthMessage(
+                chromeTitle: "Sign-in unavailable",
+                chromeDescription: "Hub could not confirm the current browser session right now.",
+                currentPath: "/login",
+                heading: "Sign-in is unavailable right now",
+                supportLine: "Chummer could not confirm the current browser session. Try again in a moment.",
+                notice: null,
+                primaryLabel: "Return home",
+                primaryHref: "/",
+                secondaryLabel: "Try sign-in again",
+                secondaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}");
         }
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
@@ -63,9 +78,24 @@ public sealed class AuthController : Controller
     public async Task<IActionResult> SignupPage([FromQuery] string? next, CancellationToken cancellationToken)
     {
         var nextPath = HubBrowserAuthService.SanitizeNextPath(next);
-        if (await TryIsAuthenticatedAsync(cancellationToken))
+        var sessionState = await ResolveAuthEntrySessionStateAsync(cancellationToken);
+        if (sessionState == AuthEntrySessionState.Authenticated)
         {
             return Redirect(nextPath);
+        }
+        if (sessionState == AuthEntrySessionState.Unavailable)
+        {
+            return BuildAuthMessage(
+                chromeTitle: "Account creation unavailable",
+                chromeDescription: "Hub could not confirm the current browser session right now.",
+                currentPath: "/signup",
+                heading: "Account creation is unavailable right now",
+                supportLine: "Chummer could not confirm the current browser session. Try again in a moment.",
+                notice: null,
+                primaryLabel: "Return home",
+                primaryHref: "/",
+                secondaryLabel: "Try account creation again",
+                secondaryHref: $"/signup?next={Uri.EscapeDataString(nextPath)}");
         }
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
@@ -76,6 +106,7 @@ public sealed class AuthController : Controller
     }
 
     [HttpPost("/auth/email/start")]
+    [ValidateAntiForgeryToken]
     [Consumes("application/x-www-form-urlencoded")]
     [Produces("text/html")]
     public async Task<IActionResult> StartEmail([FromForm] string? email, [FromForm] string? displayName, [FromForm] string? next, CancellationToken cancellationToken)
@@ -484,21 +515,27 @@ public sealed class AuthController : Controller
         return Redirect("/");
     }
 
-    private async Task<bool> TryIsAuthenticatedAsync(CancellationToken cancellationToken)
+    private async Task<AuthEntrySessionState> ResolveAuthEntrySessionStateAsync(CancellationToken cancellationToken)
     {
+        var hasAccessCookie = Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName);
         try
         {
             await _identity.RequireSubjectAsync(Request, cancellationToken);
-            return true;
+            return AuthEntrySessionState.Authenticated;
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
-            return false;
+            if (hasAccessCookie)
+            {
+                _browserAuth.ClearCookie(Request, Response);
+            }
+
+            return AuthEntrySessionState.Guest;
         }
         catch (HubRequestAuthException ex)
         {
             _logger.LogWarning(ex, "Identity check failed while rendering the auth entry page.");
-            return false;
+            return hasAccessCookie ? AuthEntrySessionState.Unavailable : AuthEntrySessionState.Guest;
         }
     }
 
@@ -549,5 +586,12 @@ public sealed class AuthController : Controller
             GoogleAvailable: _google.IsConfigured(),
             GoogleUnavailableReason: _google.DisabledReason(),
             GoogleStartHref: $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}");
+    }
+
+    private enum AuthEntrySessionState
+    {
+        Guest,
+        Authenticated,
+        Unavailable
     }
 }

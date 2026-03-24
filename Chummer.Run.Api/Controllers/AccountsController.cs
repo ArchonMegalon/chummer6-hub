@@ -90,6 +90,7 @@ public sealed class AccountsController : Controller
     }
 
     [HttpPost("me/profile")]
+    [ValidateAntiForgeryToken]
     [ProducesResponseType<HubUserDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<HubUserDto>> UpsertProfile([FromBody] UpsertHubUserProfileRequest? request, CancellationToken cancellationToken)
     {
@@ -125,6 +126,7 @@ public sealed class AccountsController : Controller
     }
 
     [HttpPost("me/preferences")]
+    [ValidateAntiForgeryToken]
     [ProducesResponseType<HubUserExperienceDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<HubUserExperienceDto>> UpsertPreferences([FromBody] UpsertHubUserExperienceRequest? request, CancellationToken cancellationToken)
     {

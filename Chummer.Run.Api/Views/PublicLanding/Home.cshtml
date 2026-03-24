@@ -22,6 +22,10 @@
     </div>
 </section>
 
+<div class="sr-only" aria-hidden="true">
+    @Html.AntiForgeryToken()
+</div>
+
 <section class="home-shell-grid">
     <div class="home-shell-grid__main">
         <section class="home-actions">
@@ -167,6 +171,7 @@
 (() => {
   const dialog = document.getElementById("home-onboarding");
   if (!dialog) return;
+  const antiForgeryToken = document.querySelector("input[name='__RequestVerificationToken']")?.value || "";
   const panels = Array.from(dialog.querySelectorAll("[data-step-panel]"));
   const nextButton = dialog.querySelector("[data-onboarding-next]");
   const backButton = dialog.querySelector("[data-onboarding-back]");
@@ -196,7 +201,10 @@
   dialog.querySelector("#onboardingForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     errorNode.textContent = "";
-    const jsonHeaders = { "Content-Type": "application/json" };
+    const jsonHeaders = {
+      "Content-Type": "application/json",
+      ...(antiForgeryToken ? { "RequestVerificationToken": antiForgeryToken } : {})
+    };
     const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
     const laneInterests = Array.from(dialog.querySelectorAll("[data-step-panel='2'] input[type='checkbox']:checked")).map((input) => input.value);
 

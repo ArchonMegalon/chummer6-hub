@@ -1,4 +1,7 @@
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.ViewModels;
+using Chummer.Run.Api.Services.Community;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using System.Text;
@@ -10,20 +13,45 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class PublicProgressController : ControllerBase
 {
     private readonly PublicProgressService _progress;
-    private readonly PublicLandingService _landing;
     private readonly PublicNavigationService _navigation;
+    private readonly HubPageChromeService _chrome;
+    private readonly AccountService _accounts;
+    private readonly HubIdentityClient _identity;
+    private readonly IAntiforgery _antiforgery;
+    private readonly ILogger<PublicProgressController> _logger;
 
-    public PublicProgressController(PublicProgressService progress, PublicLandingService landing, PublicNavigationService navigation)
+    public PublicProgressController(
+        PublicProgressService progress,
+        PublicNavigationService navigation,
+        HubPageChromeService chrome,
+        AccountService accounts,
+        HubIdentityClient identity,
+        IAntiforgery antiforgery,
+        ILogger<PublicProgressController> logger)
     {
         _progress = progress;
-        _landing = landing;
         _navigation = navigation;
+        _chrome = chrome;
+        _accounts = accounts;
+        _identity = identity;
+        _antiforgery = antiforgery;
+        _logger = logger;
     }
 
     [HttpGet("/progress")]
     [Produces("text/html")]
-    public ContentResult ProgressPage()
-        => Content(RenderShell(_progress.LoadReportHtml()), "text/html");
+    public async Task<ContentResult> ProgressPage(CancellationToken cancellationToken)
+    {
+        var chrome = await BuildChromeAsync(
+            title: "Progress",
+            description: "Public progress and milestone status for Chummer.",
+            currentPath: "/progress",
+            cancellationToken);
+        var antiForgeryToken = chrome.Authenticated
+            ? _antiforgery.GetAndStoreTokens(HttpContext).RequestToken
+            : null;
+        return Content(RenderShell(_progress.LoadReportHtml(), chrome, antiForgeryToken), "text/html");
+    }
 
     [HttpGet("progress-report")]
     [HttpGet("/api/public/progress-report")]
@@ -37,9 +65,8 @@ public sealed class PublicProgressController : ControllerBase
     public ContentResult ProgressPoster()
         => Content(_progress.LoadPosterSvg(), "image/svg+xml");
 
-    private string RenderShell(string reportHtml)
+    private string RenderShell(string reportHtml, SiteChromeViewModel chrome, string? antiForgeryToken)
     {
-        var surface = _landing.LoadSurface();
         var navigation = _navigation.LoadNavigation();
         var nav = string.Join("", navigation.Primary.Append(new PublicNavigationLink("Progress", "/progress")).Select(route =>
         {
@@ -48,13 +75,34 @@ public sealed class PublicProgressController : ControllerBase
                 ? $"""<span class="progress-shell-nav-current">{Encode(route.Label)}</span>"""
                 : $"""<a href="{EncodeHref(route.Href)}">{Encode(route.Label)}</a>""";
         }));
-        var authActions = string.Join("", surface.GuestShellActions.Select(action =>
-            $"""<a class="progress-shell-action progress-shell-action-{Encode(action.Emphasis)}" href="{EncodeHref(action.Href)}">{Encode(action.Label)}</a>"""));
+        var authActions = string.Join("", chrome.HeaderActions.Select(action =>
+        {
+            if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(antiForgeryToken))
+            {
+                return $$"""
+<form method="post" action="/logout" class="progress-shell-action-form">
+  <input type="hidden" name="__RequestVerificationToken" value="{{Encode(antiForgeryToken)}}" />
+  <button class="progress-shell-action progress-shell-action-{{Encode(action.Tone)}} progress-shell-action-button" type="submit">{{Encode(action.Label)}}</button>
+</form>
+""";
+            }
+
+            return action.Current
+                ? $"""<span class="progress-shell-action progress-shell-action-current">{Encode(action.Label)}</span>"""
+                : $"""<a class="progress-shell-action progress-shell-action-{Encode(action.Tone)}" href="{EncodeHref(action.Href)}">{Encode(action.Label)}</a>""";
+        }));
+        var signedInLabel = chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel)
+            ? $"""<p class="progress-shell-signed-in">Signed in as {Encode(chrome.SignedInLabel!)}</p>"""
+            : string.Empty;
         var topbar = $$"""
 <header class="progress-topbar" aria-label="Chummer public navigation">
   <a class="progress-shell-brand" href="/">Chummer</a>
   <nav class="progress-shell-nav">{{nav}}</nav>
-  <div class="progress-shell-actions">{{authActions}}</div>
+  <div class="progress-shell-controls">
+    {{signedInLabel}}
+    <div class="progress-shell-actions">{{authActions}}</div>
+  </div>
 </header>
 """;
         var shellCss = """
@@ -92,11 +140,28 @@ public sealed class PublicProgressController : ControllerBase
       color: var(--text);
       font-weight: 700;
     }
+    .progress-shell-controls {
+      display: grid;
+      gap: 8px;
+      justify-items: flex-end;
+    }
+    .progress-shell-signed-in {
+      margin: 0;
+      color: rgba(246,251,255,.68);
+      font-size: .84rem;
+    }
     .progress-shell-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
       justify-content: flex-end;
+    }
+    .progress-shell-action-form {
+      margin: 0;
+    }
+    .progress-shell-action-button {
+      font: inherit;
+      cursor: pointer;
     }
     .progress-shell-action {
       appearance: none;
@@ -114,6 +179,10 @@ public sealed class PublicProgressController : ControllerBase
     .progress-shell-action-primary {
       background: linear-gradient(135deg, rgba(107,224,193,.18), rgba(137,182,255,.14));
       border-color: rgba(107,224,193,.38);
+    }
+    .progress-shell-action-current {
+      background: rgba(255,255,255,.06);
+      border-color: rgba(255,255,255,.16);
     }
     .progress-shell-action:hover {
       transform: translateY(-1px);
@@ -133,6 +202,9 @@ public sealed class PublicProgressController : ControllerBase
       .progress-shell-actions {
         justify-content: flex-start;
       }
+      .progress-shell-controls {
+        justify-items: flex-start;
+      }
     }
     @media (max-width: 760px) {
       .progress-topbar {
@@ -144,6 +216,47 @@ public sealed class PublicProgressController : ControllerBase
       }
 """, StringComparison.Ordinal);
         return reportHtml;
+    }
+
+    private async Task<SiteChromeViewModel> BuildChromeAsync(
+        string title,
+        string description,
+        string currentPath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return _chrome.BuildAuthenticatedChrome(title, description, currentPath, user.DisplayName);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return _chrome.BuildPublicChrome(title, description, currentPath);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Preserving signed-in progress chrome after identity failure.");
+            if (Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName))
+            {
+                return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
+            }
+
+            return _chrome.BuildPublicChrome(title, description, currentPath);
+        }
+        catch (Exception ex) when (
+            ex is HttpRequestException
+            or System.Text.Json.JsonException
+            || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            _logger.LogWarning(ex, "Falling back while building progress chrome.");
+            if (Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName))
+            {
+                return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
+            }
+
+            return _chrome.BuildPublicChrome(title, description, currentPath);
+        }
     }
 
     private static string Encode(string value) => WebUtility.HtmlEncode(value);

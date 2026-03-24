@@ -10,6 +10,9 @@
 }
 
 <section class="account-stage">
+    <div class="sr-only" aria-hidden="true">
+        @Html.AntiForgeryToken()
+    </div>
     <div class="account-stage__lead">
         <p class="eyebrow">Account</p>
         <h1 class="page-title">Account</h1>
@@ -181,7 +184,11 @@
 @section Scripts {
 <script>
 (() => {
-  const jsonHeaders = { "Content-Type": "application/json" };
+  const antiForgeryToken = document.querySelector("input[name='__RequestVerificationToken']")?.value || "";
+  const jsonHeaders = {
+    "Content-Type": "application/json",
+    ...(antiForgeryToken ? { "RequestVerificationToken": antiForgeryToken } : {})
+  };
   const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
 
   const call = async (url, body) => {
