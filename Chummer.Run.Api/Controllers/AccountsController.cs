@@ -101,7 +101,9 @@ public sealed class AccountsController : Controller
 
         try
         {
-            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
+            var subject = string.IsNullOrWhiteSpace(request.SubjectId)
+                ? await _identity.RequireSubjectAsync(Request, cancellationToken)
+                : await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
             return Ok(_accounts.UpsertProfile(request with { SubjectId = subject.SubjectId }));
         }
         catch (HubRequestAuthException ex)
@@ -137,7 +139,9 @@ public sealed class AccountsController : Controller
 
         try
         {
-            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
+            var subject = string.IsNullOrWhiteSpace(request.SubjectId)
+                ? await _identity.RequireSubjectAsync(Request, cancellationToken)
+                : await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
             return Ok(_experience.Upsert(request with { SubjectId = subject.SubjectId }));
         }
         catch (HubRequestAuthException ex)

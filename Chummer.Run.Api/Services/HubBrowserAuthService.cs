@@ -109,8 +109,7 @@ public sealed class HubBrowserAuthService
 
     public void WriteCookie(HttpRequest request, HttpResponse response, IdentitySessionIssueResponse session)
     {
-        var secure = request.IsHttps
-            || !string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase);
+        var secure = ShouldUseSecureCookies(request);
         response.Cookies.Append(
             HubBrowserAuthConstants.AccessTokenCookieName,
             session.AccessToken,
@@ -127,8 +126,7 @@ public sealed class HubBrowserAuthService
 
     public void ClearCookie(HttpRequest request, HttpResponse response)
     {
-        var secure = request.IsHttps
-            || !string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase);
+        var secure = ShouldUseSecureCookies(request);
         response.Cookies.Delete(
             HubBrowserAuthConstants.AccessTokenCookieName,
             new CookieOptions
@@ -152,6 +150,35 @@ public sealed class HubBrowserAuthService
         return trimmed.StartsWith("/", StringComparison.Ordinal) && !trimmed.StartsWith("//", StringComparison.Ordinal)
             ? trimmed
             : fallback;
+    }
+
+    private static bool ShouldUseSecureCookies(HttpRequest request)
+    {
+        if (request.IsHttps)
+        {
+            return true;
+        }
+
+        if (request.Headers.TryGetValue("X-Forwarded-Proto", out var forwardedProtoValues))
+        {
+            foreach (var forwardedProto in forwardedProtoValues)
+            {
+                if (string.Equals(forwardedProto, "https", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        var host = request.Host.Host;
+        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private async Task<T> SendAndReadAsync<T>(

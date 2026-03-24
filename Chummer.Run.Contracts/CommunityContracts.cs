@@ -16,7 +16,7 @@ public sealed record HubUserDto(
     DateTimeOffset UpdatedAtUtc);
 
 public sealed record UpsertHubUserProfileRequest(
-    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [StringLength(128)] string? SubjectId,
     string? DisplayName = null,
     string? Handle = null,
     string Visibility = "private",
@@ -33,7 +33,7 @@ public sealed record HubUserExperienceDto(
     DateTimeOffset UpdatedAtUtc);
 
 public sealed record UpsertHubUserExperienceRequest(
-    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [StringLength(128)] string? SubjectId,
     IReadOnlyList<string>? LaneInterests = null,
     bool? FollowHorizons = null,
     bool? BetaInterest = null,

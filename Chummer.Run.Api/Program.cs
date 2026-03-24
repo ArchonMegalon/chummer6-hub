@@ -1,7 +1,9 @@
 using System.IO;
+using System.Net;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -55,6 +57,12 @@ builder.Services.AddSingleton<EntitlementService>();
 builder.Services.AddSingleton<LeaderboardService>();
 builder.Services.AddSingleton<LedgerService>();
 builder.Services.AddScoped<BoostSessionService>();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 var app = builder.Build();
 app.Services.GetRequiredService<HubGoogleAuthService>().ValidateProductionReadiness();
@@ -62,6 +70,7 @@ app.Services.GetRequiredService<HubGoogleAuthService>().ValidateProductionReadin
 // Configure the HTTP request pipeline.
 
 app.UseExceptionHandler();
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 

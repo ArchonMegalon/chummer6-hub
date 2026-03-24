@@ -14,7 +14,7 @@ public sealed class AccountService
 
     public HubUserDto UpsertProfile(UpsertHubUserProfileRequest request)
     {
-        var subjectId = NormalizeRequired(request.SubjectId, nameof(request.SubjectId));
+        var subjectId = NormalizeRequired(request.SubjectId ?? string.Empty, nameof(request.SubjectId));
         var now = DateTimeOffset.UtcNow;
         var requestedDisplayName = NormalizeUserFacingDisplayName(request.DisplayName, subjectId);
         var requestedHandle = NormalizeUserFacingHandle(request.Handle, subjectId);
