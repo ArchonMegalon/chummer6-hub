@@ -223,44 +223,8 @@
 <script>
 let currentContributionId = "";
 let pollHandle = 0;
-const antiForgeryToken = document.querySelector("input[name='__RequestVerificationToken']")?.value || "";
 const dialog = document.getElementById("participationWizardDialog");
-
-async function api(path, options = {}) {
-  const method = (options.method || "GET").toUpperCase();
-  const headers = new Headers(options.headers || {});
-  if (method !== "GET" && antiForgeryToken) {
-    headers.set("RequestVerificationToken", antiForgeryToken);
-  }
-  const response = await fetch(path, { ...options, headers });
-  const body = await response.text();
-  let data = {};
-  if (body) {
-    try {
-      data = JSON.parse(body);
-    } catch {
-      data = { detail: body };
-    }
-  }
-  if (!response.ok) {
-    if (data && typeof data === "object" && data.phase) {
-      const error = new Error(data.support || data.detail || data.title || body || "Request failed.");
-      error.payload = data;
-      throw error;
-    }
-    throw new Error(data.detail || data.title || body || "Request failed.");
-  }
-  return data;
-}
-
-function setButtonBusy(button, busy, busyLabel) {
-  if (!button) return;
-  if (!button.dataset.defaultLabel) {
-    button.dataset.defaultLabel = button.textContent || "";
-  }
-  button.disabled = busy;
-  button.textContent = busy ? busyLabel : button.dataset.defaultLabel;
-}
+const ui = window.ChummerUi;
 
 function stopPolling() {
   if (pollHandle) {
@@ -463,8 +427,8 @@ function render(data) {
 
 async function refreshCurrent() {
   const data = currentContributionId
-    ? await api(`/api/v1/participation/contributions/${currentContributionId}`)
-    : await api("/api/v1/participation/contributions/current");
+    ? await ui.requestJson(`/api/v1/participation/contributions/${currentContributionId}`)
+    : await ui.requestJson("/api/v1/participation/contributions/current");
   render(data);
 }
 
@@ -473,14 +437,14 @@ async function startContribution() {
   const refreshButton = document.getElementById("refreshAuthorizationButton");
   setDialogOpen(true);
   showPreparingState();
-  setButtonBusy(button, true, "Preparing...");
-  setButtonBusy(refreshButton, true, "Preparing...");
+  ui.setButtonBusy(button, true, "Preparing...");
+  ui.setButtonBusy(refreshButton, true, "Preparing...");
   try {
-    const data = await api("/api/v1/participation/contributions/start", { method: "POST" });
+    const data = await ui.requestJson("/api/v1/participation/contributions/start", { method: "POST" });
     render(data);
   } finally {
-    setButtonBusy(button, false, "Preparing...");
-    setButtonBusy(refreshButton, false, "Preparing...");
+    ui.setButtonBusy(button, false, "Preparing...");
+    ui.setButtonBusy(refreshButton, false, "Preparing...");
   }
 }
 
@@ -489,15 +453,15 @@ async function stopContribution(revoke) {
   const button = revoke
     ? document.getElementById("revokeContributionButton")
     : document.getElementById("stopContributionButton");
-  setButtonBusy(button, true, revoke ? "Revoking..." : "Stopping...");
+  ui.setButtonBusy(button, true, revoke ? "Revoking..." : "Stopping...");
   try {
     const path = revoke
       ? `/api/v1/participation/contributions/${currentContributionId}/revoke`
       : `/api/v1/participation/contributions/${currentContributionId}/stop`;
-    const data = await api(path, { method: "POST" });
+    const data = await ui.requestJson(path, { method: "POST" });
     render(data);
   } finally {
-    setButtonBusy(button, false, revoke ? "Revoking..." : "Stopping...");
+    ui.setButtonBusy(button, false, revoke ? "Revoking..." : "Stopping...");
   }
 }
 
@@ -506,8 +470,8 @@ async function copyCode() {
   if (!code || code.startsWith("A fresh code will appear") || code.startsWith("No code yet")) return;
   await navigator.clipboard.writeText(code);
   const button = document.getElementById("copyCodeButton");
-  setButtonBusy(button, true, "Copied");
-  window.setTimeout(() => setButtonBusy(button, false, "Copied"), 1200);
+  ui.setButtonBusy(button, true, "Copied");
+  window.setTimeout(() => ui.setButtonBusy(button, false, "Copied"), 1200);
 }
 
 document.getElementById("openParticipationWizardButton").addEventListener("click", () => {

@@ -20,6 +20,8 @@ public sealed class FleetBridgeService
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly ILogger<FleetBridgeService> _logger;
+    private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan DeviceAuthStartTimeout = TimeSpan.FromSeconds(25);
 
     public FleetBridgeService(HttpClient httpClient, IConfiguration configuration, ILogger<FleetBridgeService>? logger = null)
     {
@@ -97,9 +99,11 @@ public sealed class FleetBridgeService
         }
 
         HttpResponseMessage response;
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(ResolveRequestTimeout(path));
         try
         {
-            response = await _httpClient.SendAsync(request, cancellationToken);
+            response = await _httpClient.SendAsync(request, timeoutCts.Token);
         }
         catch (HttpRequestException ex)
         {
@@ -165,4 +169,9 @@ public sealed class FleetBridgeService
             && (detail.Contains("participant lane internal auth is not configured", StringComparison.OrdinalIgnoreCase)
                 || detail.Contains("participant-lane bridge", StringComparison.OrdinalIgnoreCase)
                 || detail.Contains("FLEET_INTERNAL_API_TOKEN", StringComparison.OrdinalIgnoreCase));
+
+    private static TimeSpan ResolveRequestTimeout(string path)
+        => path.Contains("/device-auth/start", StringComparison.OrdinalIgnoreCase)
+            ? DeviceAuthStartTimeout
+            : DefaultRequestTimeout;
 }
