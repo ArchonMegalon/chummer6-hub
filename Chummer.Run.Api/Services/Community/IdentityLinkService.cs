@@ -42,10 +42,12 @@ public sealed class IdentityLinkService
                 .Where(link => string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(static link => link.IsPrimary)
                 .ThenBy(static link => link.Provider, StringComparer.OrdinalIgnoreCase)
+                .Select(RedactIdentityForSummary)
                 .ToArray();
             var channels = _store.ChannelLinks
                 .Where(link => string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(static link => link.ChannelKind, StringComparer.OrdinalIgnoreCase)
+                .Select(RedactChannelForSummary)
                 .ToArray();
 
             return new AccountLinkSummaryDto(
@@ -292,18 +294,17 @@ public sealed class IdentityLinkService
         {
             var existingIndex = _store.ChannelLinks.FindIndex(link =>
                 string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(link.ChannelKind, channelKind, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(link.DisplayLabel, channelHandle, StringComparison.OrdinalIgnoreCase));
+                && string.Equals(link.ChannelKind, channelKind, StringComparison.OrdinalIgnoreCase));
 
             var status = channelKind switch
             {
-                "telegram_official_bot" => "active",
+                "telegram_official_bot" => "pending_verification",
                 "telegram_user_bot" => "future_capability",
                 _ => "linked"
             };
             var note = channelKind switch
             {
-                "telegram_official_bot" => "Hub owns account, routing, permissions, and entitlements; EA stays the orchestrator brain behind the official bot.",
+                "telegram_official_bot" => "Telegram companion linking stays pending until the official bot confirms the account handshake.",
                 "telegram_user_bot" => "Bring-your-own Telegram bots are intentionally deferred until ownership, verification, and policy controls are stronger.",
                 _ => null
             };
@@ -313,6 +314,7 @@ public sealed class IdentityLinkService
             {
                 var updated = _store.ChannelLinks[existingIndex] with
                 {
+                    DisplayLabel = channelHandle,
                     Status = status,
                     NotificationsEnabled = request.NotificationsEnabled,
                     UpdatedAtUtc = now,
@@ -339,6 +341,21 @@ public sealed class IdentityLinkService
             return created;
         }
     }
+
+    private static LinkedIdentityDto RedactIdentityForSummary(LinkedIdentityDto link)
+        => link with
+        {
+            ProviderSubject = string.Equals(link.Provider, "email", StringComparison.OrdinalIgnoreCase)
+                ? link.DisplayLabel
+                : "hidden",
+            Note = null,
+        };
+
+    private static ChannelLinkDto RedactChannelForSummary(ChannelLinkDto link)
+        => link with
+        {
+            Note = null,
+        };
 
     private void DemotePrimaryAuthLocked(string userId)
     {

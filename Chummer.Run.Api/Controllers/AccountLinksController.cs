@@ -116,37 +116,10 @@ public sealed class AccountLinksController : ControllerBase
     }
 
     [HttpPost("links/provider")]
-    [ProducesResponseType<LinkedIdentityDto>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<LinkedIdentityDto>> LinkProvider([FromBody] LinkExternalIdentityRequest? request, CancellationToken cancellationToken)
-    {
-        if (request is null)
-        {
-            return BadRequest("external identity payload is required.");
-        }
-
-        try
-        {
-            var subject = await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
-            return Ok(_links.LinkExternalIdentity(request with { SubjectId = subject.SubjectId }));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new ProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "External identity already linked",
-                Detail = ex.Message
-            });
-        }
-        catch (ArgumentException ex)
-        {
-            return ValidationProblem(detail: ex.Message);
-        }
-        catch (HubRequestAuthException ex)
-        {
-            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
-        }
-    }
+    public ActionResult LinkProvider()
+        => Problem(
+            statusCode: StatusCodes.Status410Gone,
+            detail: "Provider links are created through verified provider callbacks, not this API.");
 
     [HttpPost("channels")]
     [ProducesResponseType<ChannelLinkDto>(StatusCodes.Status200OK)]
