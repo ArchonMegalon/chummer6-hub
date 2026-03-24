@@ -219,14 +219,6 @@ sections:
     title: Featured artifacts
     audience: public
     route: /artifacts
-  - id: participate
-    title: Participate and help
-    audience: public
-    route: /participate
-  - id: release_shelf
-    title: Downloads and updates
-    audience: public
-    route: /downloads
 registered_overlays:
   - id: follow_horizons
     path: /home
@@ -236,13 +228,5 @@ registered_overlays:
     path: /home
     title: Beta interest
     summary: Raise your hand for future player, GM, or creator previews.
-  - id: participate_booster
-    path: /participate
-    title: Contribution access
-    summary: Signed-in users can start a bounded contribution lane and follow what happens next.
-  - id: vote_placeholder
-    path: /home
-    title: Future vote placeholder
-    summary: Advisory signals may appear later, but they do not become design authority.
-footer_canonical_source: chummer6-design
-footer_generated_note: Maintained from the local Chummer design mirror.
+footer_canonical_source: Chummer product front canon
+footer_generated_note: Projection compiled from the approved design mirror.

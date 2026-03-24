@@ -1,51 +1,190 @@
 product: chummer
 surface: chummer.run
-version: 1
+version: 2
 style_epoch:
   mode: single_epoch_per_full_build
   comparison_between_builds: allowed
   note: A full landing build pass should share one major visual family, while later passes may intentionally compare different epochs.
+render_rules:
+  raster_only: true
+  no_svg: true
+  master_format: png
+  required_derivatives:
+    - avif
+    - webp
+  desktop_composition: 16:9
+  mobile_safety_rule: keep_critical_action_inside_middle_60_percent
+  no_readable_text: true
+  no_logos: true
+  no_provider_names: true
+  no_ui_labels: true
+  semantic_anchor_count_minimum: 3
+shared_prompt_scaffold:
+  style_anchor: |
+    premium software-campaign still, grounded Shadowrun-inspired cyberpunk fantasy, editorial realism, original composition, navy and graphite base palette, electric blue interface glow, warm amber proof lighting, subtle rain reflections, realistic skin and materials, layered physical props, high information density, product-specific semantics, no readable text, no logos
+  negative_prompt: |
+    readable text, letters, giant monogram, logo, watermark, central signboard, empty alley, empty boulevard, billboard centerpiece, sparse desk with one prop, lone brooding figure at vague wall, entertainment poster pose, action-movie gun pose, anime, comic art, cel shading, cosplay look, over-saturated magenta neon, low-detail hands, distorted anatomy, fisheye lens, huge lens flare, floating nonsense UI clutter, stock-photo smile
+semantic_anchors:
+  - dossier papers or briefing packet
+  - six-sided dice
+  - cyberware part or deck module
+  - magical focus or reagent
+  - route overlay or threat marker
+  - integrity seal or evidence clip
+  - commlink or data chip
+  - reviewer, witness, or operator relationship
 rules:
   - No provider names appear in public landing assets.
   - No LTD names appear in public landing assets.
+  - PNG masters with AVIF and WebP derivatives are required for every public still.
+  - No SVG files appear anywhere in the public front-door campaign set.
   - No empty placeholder frames are allowed.
   - Every placeholder card must still explain what is coming and why it matters.
   - Text in rendered images must be post-composited or otherwise verified instead of trusting raw model lettering.
   - A premium still hero is preferred over a mediocre teaser loop.
+  - First-contact assets must feel information-rich, layered, and unmistakably product-specific rather than like quiet generic cyberpunk mood art.
+  - Hero, index, and flagship horizon art must carry visible semantic anchors for what the product does; style alone is not enough.
+  - Central signboards, empty roadway ambience, and low-density “one person plus one vague prop wall” compositions are failures on public guide/landing surfaces.
+  - Calm isolated workstation energy is not enough for first contact; show relationships, pressure, and proof props.
+  - Every generated frame must keep decisive action inside the safe center so one master can survive desktop and mobile crops.
+contact_sheet_rejection:
+  - giant letterform or centered signboard
+  - empty neon boulevard
+  - lone person at vague wall
+  - sparse desk with one laptop and one mug
+  - generic cyberpunk mood art with no dossier, dice, or proof semantics
+  - text baked into the image
+  - poster-key-art posing instead of product-scene storytelling
+visual_contract:
+  first_contact_hero:
+    density_target: high
+    overlay_density: medium
+    negative_space_cap: low
+    flash_level: bold
+    person_count_target: duo_or_team
+    humor_allowed: false
+    pseudo_text_allowed: false
+    must_show_semantic_anchors:
+      - runner or table-prep trust pressure
+      - a visible operator relationship instead of a lone isolated figure
+      - layered physical proof props across foreground, midground, and background
+      - visible reasoning cues or diegetic overlay traces
+    must_not_show:
+      - generic brooding profile at a vague wall
+      - single-person dim bay still
+      - lone crate or tabletop glamour
+      - empty alley mood still
+      - central readable signboard
+  page_index:
+    density_target: high
+    overlay_density: medium
+    negative_space_cap: low
+    flash_level: bold
+    person_count_target: plurality_optional
+    humor_allowed: false
+    pseudo_text_allowed: false
+    must_show_semantic_anchors:
+      - branching plurality
+      - differentiated future or work lanes
+      - multiple grounded clues instead of one central marker
+    must_not_show:
+      - menu-board composition
+      - empty road ambience
+      - billboard centerpiece
+      - sparse corridor with one symbol
+  flagship_horizon:
+    density_target: high
+    overlay_density: high
+    negative_space_cap: low
+    flash_level: bold
+    person_count_target: duo_preferred
+    humor_allowed: false
+    pseudo_text_allowed: false
+    must_show_semantic_anchors:
+      - governed change under pressure
+      - at least one visible witness, reviewer, or approval presence
+      - approval or provenance logic
+      - rollback or consequence cues
+    must_not_show:
+      - generic card tinkering
+      - literal blacksmith cliché
+      - quiet desk still life
+      - single operator in a glow void
+      - semantically empty glow props
 sections:
   - id: hero
-    brief_family: boulevard_of_futures
-    scene_families: boulevard_of_futures, facility_exterior, solo_operator
+    brief_family: clinic_intake
+    scene_families: clinic_intake, service_rack, boulevard_of_futures
     motion_policy: premium_still_or_short_muted_loop
+    density_target: high
+    overlay_density: medium
+    negative_space_cap: low
+    flash_level: bold
+    person_count_target: duo_or_team
+    must_show_semantic_anchors: runner-prep truth, inspectable pressure, layered proof props, visible support figure or operator relationship
+    must_not_show: brooding profile, vague clue wall, crate desk, empty neon ambience, single-person dim bay
   - id: what_you_can_do_today
     brief_family: archive_stair
     scene_families: archive_stair, dossier_desk, facility_exterior
     motion_policy: stills_only
+    density_target: medium
+    overlay_density: low
+    negative_space_cap: medium
+    flash_level: moderate
   - id: why_this_feels_different
     brief_family: simulation_bench
     scene_families: simulation_bench, prop_cluster, dossier_desk
     motion_policy: stills_only
+    density_target: medium
+    overlay_density: medium
+    negative_space_cap: medium
+    flash_level: moderate
   - id: choose_your_lane
-    brief_family: solo_operator
-    scene_families: solo_operator, archive_stair, prop_cluster
+    brief_family: transit_checkpoint
+    scene_families: transit_checkpoint, archive_stair, prop_cluster
     motion_policy: stills_only
+    density_target: medium
+    overlay_density: medium
+    negative_space_cap: medium
+    flash_level: moderate
   - id: whats_real_now
     brief_family: dossier_desk
     scene_families: dossier_desk, simulation_bench, facility_exterior
     motion_policy: stills_only
+    density_target: medium
+    overlay_density: low
+    negative_space_cap: medium
+    flash_level: restrained
   - id: coming_next
     brief_family: boulevard_of_futures
     scene_families: boulevard_of_futures, streetfront, facility_exterior
     motion_policy: stills_only
+    density_target: high
+    overlay_density: medium
+    negative_space_cap: low
+    flash_level: bold
+    must_not_show: menu board, empty road, single signage slab
   - id: featured_artifacts
     brief_family: prop_cluster
     scene_families: prop_cluster, dossier_desk, archive_stair
     motion_policy: stills_only
+    density_target: medium
+    overlay_density: low
+    negative_space_cap: medium
+    flash_level: restrained
   - id: participate
-    brief_family: solo_operator
-    scene_families: solo_operator, boulevard_of_futures, dossier_desk
+    brief_family: street_front
+    scene_families: street_front, boulevard_of_futures, dossier_desk
     motion_policy: stills_only
+    density_target: medium
+    overlay_density: low
+    negative_space_cap: medium
+    flash_level: moderate
   - id: release_shelf
     brief_family: facility_exterior
     scene_families: facility_exterior, archive_stair
     motion_policy: stills_only
+    density_target: medium
+    overlay_density: low
+    negative_space_cap: medium
+    flash_level: restrained
