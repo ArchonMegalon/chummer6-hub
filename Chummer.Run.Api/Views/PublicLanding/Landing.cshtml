@@ -2,22 +2,22 @@
 @{
     ViewData["Title"] = "Chummer";
     ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-landing";
     var hero = Model.Assets.BySlot("section_hero");
 }
 
-<section class="hero-composition">
+<section class="landing-film">
     @if (hero is not null)
     {
-        <div class="hero-composition__media">
+        <div class="landing-film__media">
             @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", hero)
         </div>
     }
-    <div class="hero-composition__content">
-        <p class="eyebrow">Public front door</p>
-        <h1 class="hero-brand">CHUMMER</h1>
-        <h2 class="hero-headline">@Model.Surface.Headline</h2>
-        <p class="hero-support">@Model.Surface.Subhead</p>
-        <div class="hero-cta-row">
+    <div class="landing-film__content">
+        <h1 class="landing-film__brand">CHUMMER</h1>
+        <p class="landing-film__headline">@Model.Surface.Headline</p>
+        <p class="landing-film__support">@Model.Surface.Subhead</p>
+        <div class="landing-film__actions">
             @foreach (var action in Model.Surface.HeroCtas)
             {
                 var href = action.Href;
@@ -39,39 +39,43 @@
     </div>
 </section>
 
-<section class="section-band">
-    <div class="section-band__header">
+<section class="editorial-block editorial-block--strips">
+    <div class="editorial-block__lead">
         <p class="eyebrow">Start here</p>
-        <h2 class="section-title">Three ways into the product story</h2>
-        <p class="section-copy">No route dump. No dashboard. Just the three questions a new person needs answered first.</p>
+        <h2 class="editorial-title">Three clean ways into Chummer</h2>
+        <p class="editorial-copy">Start with the product story, the live evidence, or the current build. Nothing else needs to compete for the first read.</p>
     </div>
-    <div class="link-grid">
+    <div class="editorial-strip-list">
         @foreach (var card in Model.StartHere)
         {
             var asset = Model.Assets.ForCard(card);
-            <article class="link-block">
+            <article class="editorial-strip">
                 @if (asset is not null)
                 {
-                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                    <div class="editorial-strip__media">
+                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                    </div>
                 }
-                <span class="tag">@card.Badge</span>
-                <h3>@card.Title</h3>
-                <p>@card.Summary</p>
-                <a class="inline-link" href="@card.Href">Open</a>
+                <div class="editorial-strip__copy">
+                    <span class="tag">@card.Badge</span>
+                    <h3>@card.Title</h3>
+                    <p>@card.Summary</p>
+                </div>
+                <a class="editorial-strip__action" href="@card.Href">Open</a>
             </article>
         }
     </div>
 </section>
 
-<section class="section-band">
-    <div class="section-band__header">
+<section class="proof-band">
+    <div class="proof-band__lead">
         <p class="eyebrow">Why trust it</p>
-        <h2 class="section-title">Conviction, not repo archaeology</h2>
+        <h2 class="editorial-title">Dossier-grade trust, not vibes</h2>
     </div>
-    <div class="trust-grid">
+    <div class="proof-band__grid">
         @foreach (var card in Model.TrustPillars)
         {
-            <article class="link-block">
+            <article class="proof-statement">
                 <span class="tag">@card.Badge</span>
                 <h3>@card.Title</h3>
                 <p>@card.Summary</p>
@@ -80,35 +84,41 @@
     </div>
 </section>
 
-<section class="section-band">
-    <div class="section-band__header">
+<section class="editorial-block editorial-block--lanes">
+    <div class="editorial-block__lead">
         <p class="eyebrow">Choose your lane</p>
-        <h2 class="section-title">Player, GM, or creator</h2>
+        <h2 class="editorial-title">Player, GM, or creator</h2>
+        <p class="editorial-copy">Each role gets a clearer promise, a different visual note, and one route deeper instead of another feature matrix.</p>
     </div>
-    <div class="link-grid">
+    <div class="lane-strip-list">
         @foreach (var card in Model.Lanes)
         {
             var asset = Model.Assets.ForCard(card);
-            <article class="lane-block">
+            <article class="lane-strip">
+                <div class="lane-strip__copy">
+                    <span class="tag tag--amber">@card.Badge</span>
+                    <h3>@card.Title</h3>
+                    <p>@card.Summary</p>
+                    <a class="editorial-strip__action" href="@card.Href">See the lane</a>
+                </div>
                 @if (asset is not null)
                 {
-                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                    <div class="lane-strip__media">
+                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                    </div>
                 }
-                <h3>@card.Title</h3>
-                <p>@card.Summary</p>
-                <a class="inline-link" href="@card.Href">See the lane</a>
             </article>
         }
     </div>
 </section>
 
-<section class="section-band">
-    <div class="section-band__header">
+<section class="landing-closing-band">
+    <div>
         <p class="eyebrow">Follow what opens next</p>
-        <h2 class="section-title">Make the account before the future arrives</h2>
-        <p class="section-copy">The signed-in shell is where follows, beta interest, and contribution setup live.</p>
+        <h2 class="editorial-title">Make the account before the future arrives</h2>
+        <p class="editorial-copy">The signed-in side of Chummer is where follows, settings, and contribution access actually become useful.</p>
     </div>
-    <div class="stacked-actions">
+    <div class="landing-closing-band__actions">
         @if (Model.Chrome.Authenticated)
         {
             <a class="cta-link cta-link--primary" href="/home">Open home</a>

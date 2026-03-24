@@ -2,30 +2,33 @@
 @{
     ViewData["Title"] = "What Is Chummer?";
     ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-story";
     var leadAsset = Model.Assets.BySlot("scene_archive_stair");
 }
 
-<section class="story-band">
-    <div class="page-lead">
+<section class="story-cinematic">
+    <div class="story-cinematic__copy">
         <p class="eyebrow">What is Chummer</p>
-        <h1 class="page-title">A Shadowrun product front door with evidence attached.</h1>
-        <p class="page-copy">Chummer makes deterministic rules truth, explainable receipts, local-first continuity, and future artifact lanes feel like one coherent product instead of a pile of unrelated utilities.</p>
+        <h1 class="page-title">Shadowrun truth, shown in product form.</h1>
+        <p class="page-copy">Chummer turns deterministic rules truth, readable receipts, local-first continuity, and future artifact lanes into one coherent product front instead of a pile of unrelated utilities.</p>
     </div>
     @if (leadAsset is not null)
     {
-        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", leadAsset)
+        <div class="story-cinematic__media">
+            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", leadAsset)
+        </div>
     }
 </section>
 
-<section class="section-band">
-    <div class="section-band__header">
+<section class="trust-rail-section">
+    <div class="editorial-block__lead">
         <p class="eyebrow">Trust pillars</p>
-        <h2 class="section-title">What the product keeps promising on purpose</h2>
+        <h2 class="editorial-title">Three promises the product keeps on purpose</h2>
     </div>
-    <div class="trust-grid">
+    <div class="trust-rail-list">
         @foreach (var card in Model.TrustPillars)
         {
-            <article class="link-block">
+            <article class="trust-rail">
                 <span class="tag">@card.Badge</span>
                 <h3>@card.Title</h3>
                 <p>@card.Summary</p>
@@ -34,28 +37,26 @@
     </div>
 </section>
 
-<section class="section-band">
-    <div class="section-band__header">
-        <p class="eyebrow">Lane explainer</p>
-        <h2 class="section-title">Built for different table roles without splitting the product story</h2>
+<section class="role-matrix">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Roles</p>
+        <h2 class="editorial-title">One product story, different table needs</h2>
     </div>
-    <div class="link-grid">
+    <div class="role-matrix__grid">
         @foreach (var card in Model.Lanes)
         {
-            <article class="lane-block">
+            <article class="role-matrix__cell">
                 <h3>@card.Title</h3>
                 <p>@card.Summary</p>
-                <a class="inline-link" href="@card.Href">See more</a>
+                <a class="inline-link" href="@card.Href">Read more</a>
             </article>
         }
     </div>
 </section>
 
-<section id="public-guide" class="section-band">
-    <div class="section-band__header">
-        <p class="eyebrow">Deeper guide</p>
-        <h2 class="section-title">Longer reading stays secondary</h2>
-        <p class="section-copy">The deeper guide still exists, but it should feel like an extension of the product story rather than the real front door hiding off-site.</p>
-    </div>
-    <a class="cta-link cta-link--secondary" href="https://github.com/ArchonMegalon/Chummer6">Open the deeper guide fallback</a>
+<section id="public-guide" class="story-guide-tail">
+    <p class="eyebrow">Further reading</p>
+    <h2 class="editorial-title">The longer guide stays secondary</h2>
+    <p class="editorial-copy">Hub should read like the product front. The longer GitHub guide still exists when you want the full explainer.</p>
+    <a class="quiet-link" href="https://github.com/ArchonMegalon/Chummer6">Read the full guide</a>
 </section>

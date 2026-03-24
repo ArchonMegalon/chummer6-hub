@@ -53,7 +53,7 @@ public sealed class AuthController : Controller
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
             heading: "Sign in",
-            supportLine: "Create an account or come back with Google in one browser-cookie flow.",
+            supportLine: "Step back into your account, settings, follows, and contribution access in one clean browser flow.",
             nextPath,
             createAccount: false));
     }
@@ -70,7 +70,7 @@ public sealed class AuthController : Controller
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
             heading: "Create account",
-            supportLine: "Google is the primary path. Email magic link stays as the fallback for this browser shell.",
+            supportLine: "Create the account that unlocks home, settings, follows, and later contribution access.",
             nextPath,
             createAccount: true));
     }

@@ -1,6 +1,9 @@
 @model PublicLandingAssetDto
+@{
+    var frameClass = ViewData["SceneFrameClass"] as string;
+}
 
-<figure class="scene-frame">
+<figure class="scene-frame @(frameClass)">
     <picture class="scene-picture">
         @if (!string.IsNullOrWhiteSpace(Model.MobilePosterUrl))
         {
@@ -8,5 +11,8 @@
         }
         <img src="@Model.PosterUrl" alt="@Model.Alt" loading="lazy" />
     </picture>
-    <figcaption>@Model.Caption</figcaption>
+    @if (!string.IsNullOrWhiteSpace(Model.Caption))
+    {
+        <figcaption class="scene-frame__caption">@Model.Caption</figcaption>
+    }
 </figure>

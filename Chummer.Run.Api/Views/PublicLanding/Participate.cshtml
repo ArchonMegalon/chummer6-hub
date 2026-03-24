@@ -2,36 +2,55 @@
 @{
     ViewData["Title"] = "Participate";
     ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-participate";
 }
 
-<section class="section-band">
-    <div class="page-lead">
-        <p class="eyebrow">Participate</p>
-        <h1 class="page-title">Two lanes, cleanly split</h1>
-        <p class="page-copy">Public reporting stays public. The optional booster path appears only after sign-in, with plain-language guardrails instead of operator jargon.</p>
-    </div>
-    <div class="settings-grid">
-        <section class="settings-block">
-            <h2>Public lane</h2>
-            @foreach (var card in Model.PublicLane)
-            {
-                <article class="rail-item" id="@card.Id.Replace('_', '-')">
-                    <h3>@card.Title</h3>
-                    <p>@card.Summary</p>
-                    <a class="inline-link" href="@(card.FallbackRoute ?? card.Href)">Open</a>
-                </article>
-            }
-        </section>
-        <section class="settings-block">
-            <h2>Signed-in lane</h2>
-            @foreach (var card in Model.SignedInLane)
-            {
-                <article class="rail-item" id="@card.Id.Replace('_', '-')">
-                    <h3>@card.Title</h3>
-                    <p>@card.Summary</p>
-                    <a class="inline-link" href="@(Model.Chrome.Authenticated ? (card.RegisteredHref ?? card.Href) : (card.GuestHref ?? card.Href))">Continue</a>
-                </article>
-            }
-        </section>
+<section class="story-guide-tail">
+    <p class="eyebrow">Participate</p>
+    <h1 class="page-title">Two lanes, clearly split</h1>
+    <p class="page-copy">Public feedback stays public. Signed-in contribution access stays optional, bounded, and plain-language.</p>
+</section>
+
+<section class="editorial-block editorial-block--lanes">
+    <div class="lane-strip-list">
+        <article class="lane-strip">
+            <div class="lane-strip__copy">
+                <span class="tag">Public</span>
+                <h2>Public lane</h2>
+                <p>Report a problem or suggest a future without needing an account.</p>
+                <div class="compact-rail">
+                    @foreach (var card in Model.PublicLane)
+                    {
+                        <article class="compact-rail__item" id="@card.Id.Replace('_', '-')">
+                            <div class="compact-rail__copy">
+                                <h3>@card.Title</h3>
+                                <p>@card.Summary</p>
+                            </div>
+                            <a class="editorial-strip__action" href="@(card.FallbackRoute ?? card.Href)">Open</a>
+                        </article>
+                    }
+                </div>
+            </div>
+        </article>
+
+        <article class="lane-strip">
+            <div class="lane-strip__copy">
+                <span class="tag tag--amber">Signed in</span>
+                <h2>Contribution lane</h2>
+                <p>Use the signed-in path when you want to lend temporary premium capacity through the guided contribution flow.</p>
+                <div class="compact-rail">
+                    @foreach (var card in Model.SignedInLane)
+                    {
+                        <article class="compact-rail__item" id="@card.Id.Replace('_', '-')">
+                            <div class="compact-rail__copy">
+                                <h3>@card.Title</h3>
+                                <p>@card.Summary</p>
+                            </div>
+                            <a class="editorial-strip__action" href="@(Model.Chrome.Authenticated ? (card.RegisteredHref ?? card.Href) : (card.GuestHref ?? card.Href))">Continue</a>
+                        </article>
+                    }
+                </div>
+            </div>
+        </article>
     </div>
 </section>
