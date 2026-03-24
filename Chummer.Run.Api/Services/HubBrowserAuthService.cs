@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Chummer.Run.Contracts.Identity;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chummer.Run.Api.Services;
 
@@ -8,15 +9,25 @@ public static class HubBrowserAuthConstants
     public const string AccessTokenCookieName = "chummer_hub_access_token";
 }
 
+public sealed class HubBrowserAuthUnavailableException : InvalidOperationException
+{
+    public HubBrowserAuthUnavailableException(string message, Exception? innerException = null)
+        : base(message, innerException)
+    {
+    }
+}
+
 public sealed class HubBrowserAuthService
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<HubBrowserAuthService> _logger;
 
-    public HubBrowserAuthService(HttpClient httpClient, IConfiguration configuration)
+    public HubBrowserAuthService(HttpClient httpClient, IConfiguration configuration, ILogger<HubBrowserAuthService>? logger = null)
     {
         _httpClient = httpClient;
         _configuration = configuration;
+        _logger = logger ?? NullLogger<HubBrowserAuthService>.Instance;
     }
 
     private string BaseUrl =>
@@ -28,26 +39,24 @@ public sealed class HubBrowserAuthService
             : _configuration["IDENTITY_ADMIN_KEY"]!.Trim();
 
     public async Task<EmailAuthStartResponse> StartEmailEntryAsync(string email, string? displayName, string? nextPath, CancellationToken cancellationToken)
-    {
-        using var response = await _httpClient.PostAsJsonAsync(
-            $"{BaseUrl}/api/v1/identity/email/start",
-            new EmailAuthStartRequest(email, displayName, nextPath),
+        => await SendAndReadAsync<EmailAuthStartResponse>(
+            () => _httpClient.PostAsJsonAsync(
+                $"{BaseUrl}/api/v1/identity/email/start",
+                new EmailAuthStartRequest(email, displayName, nextPath),
+                cancellationToken),
+            operation: "email-start",
+            publicMessage: "Email sign-in is unavailable right now. Try again later.",
             cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<EmailAuthStartResponse>(cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("Identity email-start response was empty.");
-    }
 
     public async Task<IdentitySessionIssueResponse> CompleteEmailEntryAsync(string ticketId, CancellationToken cancellationToken)
-    {
-        using var response = await _httpClient.PostAsJsonAsync(
-            $"{BaseUrl}/api/v1/identity/email/complete",
-            new EmailAuthCompleteRequest(ticketId),
+        => await SendAndReadAsync<IdentitySessionIssueResponse>(
+            () => _httpClient.PostAsJsonAsync(
+                $"{BaseUrl}/api/v1/identity/email/complete",
+                new EmailAuthCompleteRequest(ticketId),
+                cancellationToken),
+            operation: "email-complete",
+            publicMessage: "Email sign-in could not be completed right now. Start from the latest Chummer email and try again.",
             cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<IdentitySessionIssueResponse>(cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("Identity email-complete response was empty.");
-    }
 
     public async Task<IdentitySessionIssueResponse> IssueSessionAsync(
         string subjectId,
@@ -58,23 +67,26 @@ public sealed class HubBrowserAuthService
     {
         if (string.IsNullOrWhiteSpace(AdminKey))
         {
-            throw new InvalidOperationException("IDENTITY_ADMIN_KEY must be configured before Hub can issue browser sessions for external auth.");
+            _logger.LogWarning("Hub cannot issue browser sessions because IDENTITY_ADMIN_KEY is missing.");
+            throw new HubBrowserAuthUnavailableException("Sign-in could not be completed right now. Try again later.");
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/api/v1/identity/sessions")
-        {
-            Content = JsonContent.Create(new IdentitySessionIssueRequest(
-                SubjectId: subjectId,
-                DisplayName: displayName,
-                Email: email,
-                RequestedRoles: requestedRoles))
-        };
-        request.Headers.Add("X-Identity-Admin-Key", AdminKey);
-
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<IdentitySessionIssueResponse>(cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("Identity session issuance response was empty.");
+        return await SendAndReadAsync<IdentitySessionIssueResponse>(async () =>
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/api/v1/identity/sessions")
+                {
+                    Content = JsonContent.Create(new IdentitySessionIssueRequest(
+                        SubjectId: subjectId,
+                        DisplayName: displayName,
+                        Email: email,
+                        RequestedRoles: requestedRoles))
+                };
+                request.Headers.Add("X-Identity-Admin-Key", AdminKey);
+                return await _httpClient.SendAsync(request, cancellationToken);
+            },
+            operation: "issue-session",
+            publicMessage: "Sign-in could not be completed right now. Try again later.",
+            cancellationToken);
     }
 
     public async Task RevokeCookieSessionAsync(HttpRequest request, CancellationToken cancellationToken)
@@ -85,11 +97,14 @@ public sealed class HubBrowserAuthService
             return;
         }
 
-        using var response = await _httpClient.PostAsJsonAsync(
-            $"{BaseUrl}/api/v1/identity/sessions/revoke",
-            new IdentitySessionRevokeRequest(accessToken),
+        await SendWithoutResultAsync(
+            () => _httpClient.PostAsJsonAsync(
+                $"{BaseUrl}/api/v1/identity/sessions/revoke",
+                new IdentitySessionRevokeRequest(accessToken),
+                cancellationToken),
+            operation: "revoke-session",
+            publicMessage: "Sign-out could not be completed right now. Try again later.",
             cancellationToken);
-        response.EnsureSuccessStatusCode();
     }
 
     public void WriteCookie(HttpRequest request, HttpResponse response, IdentitySessionIssueResponse session)
@@ -137,5 +152,87 @@ public sealed class HubBrowserAuthService
         return trimmed.StartsWith("/", StringComparison.Ordinal) && !trimmed.StartsWith("//", StringComparison.Ordinal)
             ? trimmed
             : fallback;
+    }
+
+    private async Task<T> SendAndReadAsync<T>(
+        Func<Task<HttpResponseMessage>> sendAsync,
+        string operation,
+        string publicMessage,
+        CancellationToken cancellationToken)
+    {
+        using var response = await SendAsync(sendAsync, operation, publicMessage, cancellationToken);
+        try
+        {
+            var payload = await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken);
+            if (payload is null)
+            {
+                _logger.LogWarning("Identity browser auth operation {Operation} returned an empty payload.", operation);
+                throw new HubBrowserAuthUnavailableException(publicMessage);
+            }
+
+            return payload;
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or NotSupportedException)
+        {
+            _logger.LogWarning(ex, "Identity browser auth operation {Operation} returned an unreadable payload.", operation);
+            throw new HubBrowserAuthUnavailableException(publicMessage, ex);
+        }
+    }
+
+    private async Task SendWithoutResultAsync(
+        Func<Task<HttpResponseMessage>> sendAsync,
+        string operation,
+        string publicMessage,
+        CancellationToken cancellationToken)
+    {
+        using var response = await SendAsync(sendAsync, operation, publicMessage, cancellationToken);
+        _ = response;
+    }
+
+    private async Task<HttpResponseMessage> SendAsync(
+        Func<Task<HttpResponseMessage>> sendAsync,
+        string operation,
+        string publicMessage,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await sendAsync();
+            if (response.IsSuccessStatusCode)
+            {
+                return response;
+            }
+
+            var detail = await SafeReadBodyAsync(response, cancellationToken);
+            _logger.LogWarning(
+                "Identity browser auth operation {Operation} failed with status {StatusCode}. Detail: {Detail}",
+                operation,
+                (int)response.StatusCode,
+                string.IsNullOrWhiteSpace(detail) ? "<empty>" : detail);
+            response.Dispose();
+            throw new HubBrowserAuthUnavailableException(publicMessage);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Identity browser auth operation {Operation} failed.", operation);
+            throw new HubBrowserAuthUnavailableException(publicMessage, ex);
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Identity browser auth operation {Operation} timed out.", operation);
+            throw new HubBrowserAuthUnavailableException(publicMessage, ex);
+        }
+    }
+
+    private static async Task<string> SafeReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await response.Content.ReadAsStringAsync(cancellationToken);
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 }

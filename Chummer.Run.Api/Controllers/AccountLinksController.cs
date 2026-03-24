@@ -100,6 +100,10 @@ public sealed class AccountLinksController : ControllerBase
                 PreviewHref: previewHref,
                 ExpiresAtUtc: started.ExpiresAtUtc));
         }
+        catch (HubBrowserAuthUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
         catch (InvalidOperationException ex)
         {
             return Conflict(new ProblemDetails

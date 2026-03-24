@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Chummer.Run.Contracts.Identity;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chummer.Run.Api.Services;
 
@@ -27,11 +28,14 @@ public sealed class HubIdentityClient
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<HubIdentityClient> _logger;
+    private const string IdentityUnavailableMessage = "Identity is unavailable right now. Try again later.";
 
-    public HubIdentityClient(HttpClient httpClient, IConfiguration configuration)
+    public HubIdentityClient(HttpClient httpClient, IConfiguration configuration, ILogger<HubIdentityClient>? logger = null)
     {
         _httpClient = httpClient;
         _configuration = configuration;
+        _logger = logger ?? NullLogger<HubIdentityClient>.Instance;
     }
 
     private string BaseUrl =>
@@ -72,30 +76,111 @@ public sealed class HubIdentityClient
 
     private async Task<IdentityIntrospectionResponse> IntrospectAsync(string accessToken, CancellationToken cancellationToken)
     {
-        using var response = await _httpClient.PostAsJsonAsync(
-            $"{BaseUrl}/api/v1/identity/introspect",
-            new IdentityIntrospectionRequest(accessToken),
-            cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        HttpResponseMessage response;
+        try
         {
-            throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "identity introspection failed.");
+            response = await _httpClient.PostAsJsonAsync(
+                $"{BaseUrl}/api/v1/identity/introspect",
+                new IdentityIntrospectionRequest(accessToken),
+                cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Identity introspection request failed.");
+            throw new HubRequestAuthException(StatusCodes.Status503ServiceUnavailable, IdentityUnavailableMessage);
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Identity introspection request timed out.");
+            throw new HubRequestAuthException(StatusCodes.Status503ServiceUnavailable, IdentityUnavailableMessage);
         }
 
-        var payload = await response.Content.ReadFromJsonAsync<IdentityIntrospectionResponse>(cancellationToken: cancellationToken);
-        return payload ?? new IdentityIntrospectionResponse(false, null, null, null, null);
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.BadRequest)
+                {
+                    throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "active identity session required.");
+                }
+
+                if (response.StatusCode is HttpStatusCode.TooManyRequests
+                    or HttpStatusCode.BadGateway
+                    or HttpStatusCode.ServiceUnavailable
+                    or HttpStatusCode.GatewayTimeout
+                    || (int)response.StatusCode >= 500)
+                {
+                    var detail = await SafeReadBodyAsync(response, cancellationToken);
+                    _logger.LogWarning(
+                        "Identity introspection returned status {StatusCode}. Detail: {Detail}",
+                        (int)response.StatusCode,
+                        string.IsNullOrWhiteSpace(detail) ? "<empty>" : detail);
+                    throw new HubRequestAuthException(StatusCodes.Status503ServiceUnavailable, IdentityUnavailableMessage);
+                }
+
+                throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "identity introspection failed.");
+            }
+
+            try
+            {
+                var payload = await response.Content.ReadFromJsonAsync<IdentityIntrospectionResponse>(cancellationToken: cancellationToken);
+                return payload ?? new IdentityIntrospectionResponse(false, null, null, null, null);
+            }
+            catch (Exception ex) when (ex is System.Text.Json.JsonException or NotSupportedException)
+            {
+                _logger.LogWarning(ex, "Identity introspection returned an unreadable payload.");
+                throw new HubRequestAuthException(StatusCodes.Status503ServiceUnavailable, IdentityUnavailableMessage);
+            }
+        }
     }
 
     private async Task<IdentitySubjectResponse?> TryGetSubjectAsync(string subjectId, CancellationToken cancellationToken)
     {
-        using var response = await _httpClient.GetAsync(
-            $"{BaseUrl}/api/v1/identity/subjects/{Uri.EscapeDataString(subjectId)}",
-            cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound || !response.IsSuccessStatusCode)
+        HttpResponseMessage response;
+        try
         {
+            response = await _httpClient.GetAsync(
+                $"{BaseUrl}/api/v1/identity/subjects/{Uri.EscapeDataString(subjectId)}",
+                cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Identity subject lookup failed for {SubjectId}.", subjectId);
+            return null;
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Identity subject lookup timed out for {SubjectId}.", subjectId);
             return null;
         }
 
-        return await response.Content.ReadFromJsonAsync<IdentitySubjectResponse>(cancellationToken: cancellationToken);
+        using (response)
+        {
+            if (response.StatusCode == HttpStatusCode.NotFound || !response.IsSuccessStatusCode)
+            {
+                if ((int)response.StatusCode >= 500)
+                {
+                    var detail = await SafeReadBodyAsync(response, cancellationToken);
+                    _logger.LogWarning(
+                        "Identity subject lookup for {SubjectId} returned status {StatusCode}. Detail: {Detail}",
+                        subjectId,
+                        (int)response.StatusCode,
+                        string.IsNullOrWhiteSpace(detail) ? "<empty>" : detail);
+                }
+
+                return null;
+            }
+
+            try
+            {
+                return await response.Content.ReadFromJsonAsync<IdentitySubjectResponse>(cancellationToken: cancellationToken);
+            }
+            catch (Exception ex) when (ex is System.Text.Json.JsonException or NotSupportedException)
+            {
+                _logger.LogWarning(ex, "Identity subject lookup for {SubjectId} returned an unreadable payload.", subjectId);
+                return null;
+            }
+        }
     }
 
     private static string ExtractBearerToken(HttpRequest request)
@@ -123,5 +208,17 @@ public sealed class HubIdentityClient
         }
 
         throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "bearer access token required.");
+    }
+
+    private static async Task<string> SafeReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await response.Content.ReadAsStringAsync(cancellationToken);
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 }

@@ -178,9 +178,22 @@ public sealed class PublicLandingController : Controller
                 HorizonRail: _landing.CardsForBucket(surface, "coming_next").Take(3).ToArray());
             return View("~/Views/PublicLanding/Home.cshtml", model);
         }
-        catch (HubRequestAuthException)
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             return Redirect("/login?next=/home");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Home page could not confirm the signed-in identity.");
+            return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
+                Chrome: _chrome.BuildPublicChrome("Home unavailable", "Hub could not confirm the signed-in home surface right now.", "/home"),
+                Heading: "Home is unavailable right now",
+                SupportLine: ex.Message,
+                Notice: null,
+                PrimaryLabel: "Try home again",
+                PrimaryHref: "/home",
+                SecondaryLabel: "Return to landing",
+                SecondaryHref: "/"));
         }
     }
 

@@ -16,6 +16,7 @@ public sealed class AccountsController : Controller
     private readonly UserExperienceService _experience;
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
+    private readonly ILogger<AccountsController> _logger;
 
     public AccountsController(
         AccountService accounts,
@@ -23,7 +24,8 @@ public sealed class AccountsController : Controller
         IdentityLinkService links,
         UserExperienceService experience,
         HubPageChromeService chrome,
-        HubGoogleAuthService google)
+        HubGoogleAuthService google,
+        ILogger<AccountsController> logger)
     {
         _accounts = accounts;
         _identity = identity;
@@ -31,6 +33,7 @@ public sealed class AccountsController : Controller
         _experience = experience;
         _chrome = chrome;
         _google = google;
+        _logger = logger;
     }
 
     [HttpGet("/account")]
@@ -49,9 +52,22 @@ public sealed class AccountsController : Controller
                 GoogleAvailable: _google.IsConfigured());
             return View("~/Views/Accounts/Account.cshtml", model);
         }
-        catch (HubRequestAuthException)
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             return Redirect("/login?next=/account");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Account page could not confirm the signed-in identity.");
+            return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
+                Chrome: _chrome.BuildPublicChrome("Account unavailable", "Hub could not confirm the signed-in account surface right now.", "/account"),
+                Heading: "Account is unavailable right now",
+                SupportLine: ex.Message,
+                Notice: null,
+                PrimaryLabel: "Try account again",
+                PrimaryHref: "/account",
+                SecondaryLabel: "Return home",
+                SecondaryHref: "/home"));
         }
     }
 
