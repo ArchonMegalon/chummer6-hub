@@ -64,10 +64,11 @@ public sealed class BoostSessionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<object>> Get([FromRoute] string sponsorSessionId, CancellationToken cancellationToken)
     {
+        SponsorSessionStatusDto? session = null;
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
-            var session = TryGetOwnedSession(sponsorSessionId, subject.SubjectId, out var denied);
+            session = TryGetOwnedSession(sponsorSessionId, subject.SubjectId, out var denied);
             if (denied is not null)
             {
                 return denied;
@@ -87,7 +88,9 @@ public sealed class BoostSessionsController : ControllerBase
         }
         catch (ParticipationUnavailableException ex)
         {
-            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+            return session is null
+                ? Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message)
+                : Ok(BuildSessionEnvelope(session, fleet: null));
         }
         catch (InvalidOperationException ex)
         {

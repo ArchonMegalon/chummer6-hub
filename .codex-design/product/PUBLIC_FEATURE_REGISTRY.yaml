@@ -305,21 +305,20 @@ cards:
   - id: participate_future
     bucket: participate
     title: Suggest a future
-    summary: Tell us what you want explained or opened next.
+    summary: Advisory signals are welcome even though canon still lives in design.
     href: /participate#suggest-a-future
     badge: Public
     audience: public
     image_family: boulevard_of_futures
   - id: participate_booster
     bucket: participate
-    title: Start contributing
-    summary: Start a signed-in contribution lane when you want to lend focused help.
-    href: /login?next=/participate/codex
+    title: I have a ChatGPT subscription
+    summary: Open the bounded booster lane if you want to lend temporary premium capacity.
+    href: /participate/codex
     badge: Registered
     audience: public
     image_family: solo_operator
-    asset_slot: participation_ops_lane
-    cta_kind: login
+    cta_kind: explainer
     guest_href: /login?next=/participate/codex
     registered_href: /participate/codex
   - id: participate_beta
@@ -335,10 +334,10 @@ cards:
     registered_href: /home#beta-interest
   - id: release_latest
     bucket: release_shelf
-    title: Current release
-    summary: Current installer options, channel posture, notes, and integrity details.
+    title: Latest POC build
+    summary: Current public drop, release notes, and integrity clues.
     href: /downloads
-    badge: Current
+    badge: POC
     audience: public
     image_family: facility_exterior
     render_mode: external_explainer

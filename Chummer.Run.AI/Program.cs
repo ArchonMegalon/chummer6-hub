@@ -69,6 +69,11 @@ builder.Services.AddSingleton<ISessionMemoryIngestionService, SessionMemoryInges
 builder.Services.AddSingleton<ISessionRuntimeBundleService, SessionRuntimeBundleService>();
 builder.Services.AddSingleton<IOfflineSyncService, OfflineSyncService>();
 builder.Services.AddSingleton<IGmOpsBoardService, GmOpsBoardService>();
+builder.Services.AddHttpClient<IHubCrashAutomationClient, HubCrashAutomationClient>(client =>
+{
+    client.BaseAddress = ResolveHubApiBaseAddress(builder.Configuration);
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
 builder.Services.AddSingleton<IInteropExportService, InteropExportService>();
 builder.Services.AddSingleton<IFastSignalDetector, FastSignalDetector>();
 builder.Services.AddSingleton<ISpiderDeepIngestionService, SpiderDeepIngestionService>();
@@ -138,4 +143,20 @@ static string ResolveProviderSetting(
 {
     var section = ResolveProviderSection(configuration);
     return section[$"{provider}:{key}"] ?? fallback;
+}
+
+static Uri ResolveHubApiBaseAddress(IConfiguration configuration)
+{
+    string? configured = configuration["CHUMMER_HUB_API_BASE_URL"]
+        ?? configuration["CHUMMER_API_BASE_URL"]
+        ?? configuration["HubApi:BaseUrl"];
+    string baseUrl = string.IsNullOrWhiteSpace(configured)
+        ? "http://chummer-api:8080"
+        : configured.Trim();
+    if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri? uri))
+    {
+        throw new InvalidOperationException($"Invalid Hub API base address '{baseUrl}'.");
+    }
+
+    return uri;
 }

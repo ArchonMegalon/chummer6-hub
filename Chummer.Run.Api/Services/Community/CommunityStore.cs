@@ -228,7 +228,8 @@ internal sealed class SponsorSessionState
             Events.ToArray(),
             AuthorizationTier,
             TierSource,
-            AuthorizedAtUtc);
+            AuthorizedAtUtc,
+            !string.IsNullOrWhiteSpace(FleetCredentialHandle));
 }
 
 internal sealed record CommunityStoreSnapshot(
