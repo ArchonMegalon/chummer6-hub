@@ -22,8 +22,8 @@ cards:
     asset_slot: capability_check_rules
   - id: get_the_poc
     bucket: start_here
-    title: Download current build
-    summary: Grab the current build, release notes, and integrity details.
+    title: Download installer
+    summary: Install the current desktop release, choose the right channel, and keep updates visible.
     href: /downloads
     badge: Download
     audience: public
@@ -111,8 +111,8 @@ cards:
     image_family: streetfront
   - id: real_release_shelf
     bucket: whats_real_now
-    title: Current builds and notes
-    summary: Public builds, notes, and integrity details stay together.
+    title: Installers, channels, and notes
+    summary: Desktop installers, update channels, notes, and integrity details stay together.
     href: /downloads
     badge: Live now
     audience: public
@@ -324,8 +324,8 @@ cards:
     registered_href: /home#beta-interest
   - id: release_latest
     bucket: release_shelf
-    title: Current build
-    summary: Latest public build, release notes, and integrity details.
+    title: Current release
+    summary: Current installer options, channel posture, notes, and integrity details.
     href: /downloads
     badge: Current
     audience: public

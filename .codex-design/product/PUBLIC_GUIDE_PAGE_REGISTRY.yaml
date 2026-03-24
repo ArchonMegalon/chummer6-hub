@@ -138,10 +138,11 @@ page_types:
     forbidden_sources:
     - products/chummer/projects/*.md
     required_topics:
-    - current build matrix
-    - honest artifact format
+    - current release matrix
+    - installer and setup packages
+    - auto-update channel behavior
     - checksums
-    - raw release fallback
+    - manual archive fallback
   deep_source_trail:
     audience: deeper_public
     max_technical_depth: high

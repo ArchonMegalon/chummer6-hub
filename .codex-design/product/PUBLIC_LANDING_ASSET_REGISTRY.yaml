@@ -55,7 +55,7 @@ assets:
     mobile_poster_webp_url: /media/campaign/release-current-build.webp
     loop_url:
     alt: Premium software release shelf with integrity markers, polished surfaces, and cool blue logistics light.
-    caption: Current build image
+    caption: Current release image
     motion_policy: stills_only
     fallback_style: facility_cyan_night
   - asset_slot: scene_archive_stair

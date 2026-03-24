@@ -31,6 +31,7 @@ The landing surface must let a normal person understand, in one visit:
 * Landing meaning must compile from design-owned manifest and registry data rather than hub-local improvisation.
 * Public status is advisory and explanatory; it does not overrule canonical design truth.
 * Provider names may appear only on dedicated auth and account-security surfaces, not on the landing hero or proof cards.
+* Download-facing copy and CTA labels must follow `PUBLIC_DOWNLOADS_POLICY.md` and `PUBLIC_AUTO_UPDATE_POLICY.md`.
 
 ## Surface split
 
@@ -83,7 +84,7 @@ The POC may keep registered overlays thin, but the split must be visible and can
 The landing page must always provide at least these public actions:
 
 * see what is real now
-* get the POC
+* download installer
 * participate / help
 * sign in to follow what is coming
 
@@ -98,6 +99,8 @@ Allowed proof surfaces include:
 * public featured artifacts
 * public status summaries
 * grounded horizon cards that clearly say `horizon`, `preview`, `POC`, or `available today`
+
+The release shelf should feel like an install-and-update shelf first and an archive list second.
 
 ## Participation wording
 

@@ -77,10 +77,11 @@ pages:
     include:
       page_type: download_page
     required_topics:
-    - current build matrix
-    - honest artifact format
+    - current release matrix
+    - installer and setup packages
+    - auto-update channel behavior
     - checksums
-    - raw release fallback
+    - manual archive fallback
   deep_source_trail:
     source: products/chummer/PUBLIC_GUIDE_PAGE_REGISTRY.yaml
     include:
