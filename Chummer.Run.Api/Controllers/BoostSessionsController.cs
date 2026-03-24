@@ -84,6 +84,14 @@ public sealed class BoostSessionsController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+        catch (ParticipationUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("{sponsorSessionId}/consent")]
@@ -144,6 +152,10 @@ public sealed class BoostSessionsController : ControllerBase
         {
             return NotFound();
         }
+        catch (ParticipationUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
             return BadRequest(ex.Message);
@@ -177,6 +189,10 @@ public sealed class BoostSessionsController : ControllerBase
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+        catch (ParticipationUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
@@ -212,6 +228,10 @@ public sealed class BoostSessionsController : ControllerBase
         {
             return NotFound();
         }
+        catch (ParticipationUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
             return BadRequest(ex.Message);
@@ -245,6 +265,10 @@ public sealed class BoostSessionsController : ControllerBase
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+        catch (ParticipationUnavailableException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
