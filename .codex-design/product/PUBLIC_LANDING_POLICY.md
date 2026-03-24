@@ -26,10 +26,12 @@ The landing surface must let a normal person understand, in one visit:
 * Empty placeholder boxes are forbidden.
 * If a feature is not live, the card must still explain what is coming and why it matters.
 * Public guest chrome must expose `Sign in` plus one primary acquisition action.
+* Public footer chrome must expose first-party help/legal routes before quiet utility or repo exits.
 * Public cards must not self-link back to the same route unless they are explicitly marked as non-clickable teasers.
 * External exits must be explicit and labeled as fallbacks or guide links, not disguised as first-party defaults.
 * Landing meaning must compile from design-owned manifest and registry data rather than hub-local improvisation.
 * Public status is advisory and explanatory; it does not overrule canonical design truth.
+* Progress, leaderboards, and repo exits are utility surfaces. They may exist publicly, but they must not dominate the emotional product path.
 * Provider names may appear only on dedicated auth and account-security surfaces, not on the landing hero or proof cards.
 * Download-facing copy and CTA labels must follow `PUBLIC_DOWNLOADS_POLICY.md` and `PUBLIC_AUTO_UPDATE_POLICY.md`.
 

@@ -72,7 +72,7 @@ public sealed class CodexParticipationController : Controller
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
                 Chrome: _chrome.BuildPublicChrome("Participation unavailable", "Hub could not confirm the signed-in participation surface right now.", "/participate/codex"),
                 Heading: "Participation is unavailable right now",
-                SupportLine: ex.Message,
+                SupportLine: "Chummer could not open the signed-in participation surface right now. Try again from Home or Account in a moment.",
                 Notice: null,
                 PrimaryLabel: "Return home",
                 PrimaryHref: "/home",

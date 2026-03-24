@@ -70,8 +70,8 @@
 
     <article class="evidence-group">
         <div class="evidence-group__header">
-            <span class="readiness-tag readiness-tag--horizon">Signed-in preview</span>
-            <h2>Signed-in preview</h2>
+            <span class="readiness-tag readiness-tag--horizon">Account preview</span>
+            <h2>Account preview</h2>
         </div>
         <div class="evidence-row-list">
             @foreach (var overlay in Model.SignedInPreview)
@@ -81,7 +81,7 @@
                         <h3>@overlay.Title</h3>
                         <p>@overlay.Summary</p>
                     </div>
-                    <span class="readiness-tag readiness-tag--horizon">Signed-in preview</span>
+                    <span class="readiness-tag readiness-tag--horizon">Account preview</span>
                     <a class="button-like button-like--ghost" href="@(Model.Chrome.Authenticated ? "/home" : "/signup?next=/home")">
                         @(Model.Chrome.Authenticated ? "Open home" : "Create account")
                     </a>

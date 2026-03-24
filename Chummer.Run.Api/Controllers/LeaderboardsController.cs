@@ -35,7 +35,7 @@ public sealed class LeaderboardsController : Controller
     public async Task<IActionResult> LeaderboardsPage(CancellationToken cancellationToken)
     {
         var model = new LeaderboardsPageViewModel(
-            Chrome: await BuildChromeAsync("Leaderboards", "Secondary community standings and quests, kept out of the front-door path.", "/leaderboards", cancellationToken),
+            Chrome: await BuildChromeAsync("Leaderboards", "Optional community standings and quests, kept out of the main product path.", "/leaderboards", cancellationToken),
             Individuals: _leaderboards.IndividualLeaderboard(publicOnly: true),
             SponsorRank: _leaderboards.SponsorRankLeaderboard(publicOnly: true),
             Groups: _leaderboards.GroupLeaderboard(publicOnly: true),

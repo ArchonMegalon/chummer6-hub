@@ -13,28 +13,28 @@
     <div class="home-command__intro">
         <p class="eyebrow">Home</p>
         <h1 class="page-title">Welcome back, @Model.User.DisplayName</h1>
-        <p class="page-copy">Keep setup moving, watch what is live, and jump into participation when you want to.</p>
+        <p class="page-copy">Pick up where you left off: finish the basics, install the current preview, and keep track of what is opening next.</p>
     </div>
     <div class="home-command__status">
         <article class="home-status-card">
-            <span class="tag">Setup</span>
-            <strong>@(showOnboarding ? "Needs attention" : "Ready")</strong>
-            <p>@(showOnboarding ? "Finish the three short setup steps." : "Your basic account setup is done.")</p>
+            <span class="tag">Account setup</span>
+            <strong id="homeSetupState">@(showOnboarding ? "In progress" : "Ready")</strong>
+            <p id="homeSetupCopy">@(showOnboarding ? "Finish the short setup flow so Chummer can address you, route updates, and recover the account cleanly." : "Your basic account setup is already in place.")</p>
         </article>
         <article class="home-status-card">
-            <span class="tag">Follows</span>
-            <strong>@followCount</strong>
-            <p>Roadmap and beta signals stay lightweight until you opt into more.</p>
+            <span class="tag">Interest profile</span>
+            <strong id="homeInterestState">@(followCount == 0 ? "Quiet" : $"{followCount} active")</strong>
+            <p id="homeInterestCopy">Roadmap and beta signals stay lightweight until you ask for more.</p>
         </article>
         <article class="home-status-card">
-            <span class="tag">Recovery</span>
-            <strong>@(recoveryLinked ? "Linked" : "Missing")</strong>
-            <p>@(recoveryLinked ? "A backup path is already attached." : "Add a verified recovery email from setup or account.")</p>
+            <span class="tag">Backup sign-in</span>
+            <strong id="homeRecoveryState">@(recoveryLinked ? "Ready" : "Add one")</strong>
+            <p id="homeRecoveryCopy">@(recoveryLinked ? "A backup recovery path is already attached." : "Add a verified recovery email from setup or Account.")</p>
         </article>
         <article class="home-status-card">
-            <span class="tag">Account</span>
+            <span class="tag">Primary sign-in</span>
             <strong>@Model.Links.RecommendedPrimaryAuth</strong>
-            <p><a class="inline-link" href="/account">Open account</a></p>
+            <p><a class="inline-link" href="/account">Review account settings</a></p>
         </article>
     </div>
 </section>
@@ -48,26 +48,26 @@
         <div class="home-action-grid">
             <article class="app-action-card">
                 <span class="tag">Setup</span>
-                <h2>@(showOnboarding ? "Continue setup" : "Review setup")</h2>
-                <p>@(showOnboarding ? "Finish the three short steps so Chummer knows how to address you, what to follow, and how to recover the account." : "Open the setup sheet whenever you want to adjust profile, interests, or recovery.")</p>
-                <button class="button-like button-like--primary" type="button" data-open-onboarding>@(showOnboarding ? "Continue setup" : "Open setup")</button>
+                <h2 id="setupCardTitle">@(showOnboarding ? "Continue setup" : "Review setup")</h2>
+                <p id="setupCardCopy">@(showOnboarding ? "Finish the short account setup so Chummer knows how to address you, what to follow, and how to recover the account." : "Open the setup sheet whenever you want to adjust profile, interests, or backup sign-in.")</p>
+                <button class="button-like button-like--primary" type="button" data-open-onboarding id="openSetupButton">@(showOnboarding ? "Continue setup" : "Open setup")</button>
             </article>
             <article class="app-action-card">
                 <span class="tag">What’s new</span>
-                <h2>See what changed</h2>
-                <p>See the current release, what works today, and what is opening next.</p>
+                <h2>Read the current preview</h2>
+                <p>See what works today, what is still preview, and what is opening next.</p>
                 <a class="button-like button-like--secondary" href="/now">See what works today</a>
             </article>
             <article class="app-action-card">
-                <span class="tag">What works now</span>
-                <h2>Use the preview lane</h2>
-                <p>Keep the current release, notes, and honest channel posture one click away.</p>
+                <span class="tag">Install</span>
+                <h2>Get the current build</h2>
+                <p>Open the installer shelf, pick the recommended package, and keep the release posture in view.</p>
                 <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
             </article>
             <article class="app-action-card">
                 <span class="tag">Participate</span>
                 <h2>Start contributing</h2>
-                <p>Open the bounded contribution flow only when you want to lend focused help with validated work.</p>
+                <p>Use the guided participation flow only when you want to lend focused help with validated work.</p>
                 <a class="button-like button-like--secondary" href="/participate/codex">Start contributing</a>
             </article>
         </div>
@@ -118,9 +118,18 @@
     <aside class="home-dashboard__side">
         <section class="app-side-card">
             <p class="eyebrow">Account</p>
-            <h2>Keep the account quiet and current</h2>
-            <p>Sign-in methods, recovery, linked channels, privacy, and participation stay together in one place.</p>
+            <h2>Keep the account steady</h2>
+            <p>Sign-in methods, recovery, channels, privacy, and participation settings stay together in one place.</p>
             <a class="button-like button-like--ghost" href="/account">Open account</a>
+        </section>
+        <section class="app-side-card">
+            <p class="eyebrow">Help</p>
+            <h2>Need support or policy?</h2>
+            <p>Use the first-party help, privacy, terms, and contact pages when you need the product posture in plain language.</p>
+            <div class="stacked-actions">
+                <a class="button-like button-like--secondary" href="/help">Open help</a>
+                <a class="button-like button-like--ghost" href="/privacy">Read privacy</a>
+            </div>
         </section>
     </aside>
 </section>
@@ -130,20 +139,20 @@
         <div class="onboarding-dialog__topline">
             <div>
                 <p class="eyebrow">Setup</p>
-                <h2 id="onboarding-title">Finish your account setup</h2>
+                <h2 id="onboarding-title">Finish the account basics</h2>
             </div>
             <button class="button-like button-like--ghost" type="button" data-close-onboarding>Close</button>
         </div>
         <div class="onboarding-steps">
-            <span class="onboarding-step">1. Identity</span>
-            <span class="onboarding-step">2. Lanes</span>
-            <span class="onboarding-step">3. Recovery</span>
+            <span class="onboarding-step">1. About you</span>
+            <span class="onboarding-step">2. What you're here for</span>
+            <span class="onboarding-step">3. Backup and updates</span>
         </div>
-        <div id="onboardingError" class="muted-copy"></div>
+        <div id="onboardingError" class="muted-copy" aria-live="polite"></div>
         <form id="onboardingForm" class="settings-form">
             <section data-step-panel="1">
                 <p class="eyebrow">Step 1</p>
-                <h2>Identity polish</h2>
+                <h2>Name and timezone</h2>
                 <div class="field">
                     <label for="onboardingDisplayName">Display name</label>
                     <input id="onboardingDisplayName" value="@Model.User.DisplayName" />
@@ -159,7 +168,7 @@
             </section>
             <section data-step-panel="2" hidden>
                 <p class="eyebrow">Step 2</p>
-                <h2>Lane interests</h2>
+                <h2>What you want from Chummer</h2>
                 <div class="check-grid">
                     @{
                         var currentLanes = Model.Experience.LaneInterests.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -171,7 +180,7 @@
             </section>
             <section data-step-panel="3" hidden>
                 <p class="eyebrow">Step 3</p>
-                <h2>Recovery and follows</h2>
+                <h2>Backup sign-in and updates</h2>
                 @if (googlePrimary)
                 {
                     <div class="field">
@@ -181,12 +190,12 @@
                 }
                 else
                 {
-                    <p class="muted-copy">Email is already your primary sign-in. Link Google later if you want a second mainstream sign-in method.</p>
+                    <p class="muted-copy">Email already covers your primary sign-in. Link Google later if you want a faster one-click return path as well.</p>
                     <a class="button-like button-like--secondary" href="/auth/google/link?next=/home">Link Google</a>
                 }
                 <div class="check-grid">
-                    <label class="check-row"><input id="onboardingFollow" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow horizons</span></label>
-                    <label class="check-row"><input id="onboardingBeta" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Raise beta interest</span></label>
+                    <label class="check-row"><input id="onboardingFollow" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow roadmap updates</span></label>
+                    <label class="check-row"><input id="onboardingBeta" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Invite me to the right beta when it opens</span></label>
                 </div>
             </section>
             <div class="stacked-actions">
@@ -211,10 +220,44 @@
   const openButtons = document.querySelectorAll("[data-open-onboarding]");
   const closeButtons = dialog.querySelectorAll("[data-close-onboarding]");
   const errorNode = document.getElementById("onboardingError");
+  const setupState = document.getElementById("homeSetupState");
+  const setupCopy = document.getElementById("homeSetupCopy");
+  const interestState = document.getElementById("homeInterestState");
+  const recoveryState = document.getElementById("homeRecoveryState");
+  const recoveryCopy = document.getElementById("homeRecoveryCopy");
+  const setupCardTitle = document.getElementById("setupCardTitle");
+  const setupCardCopy = document.getElementById("setupCardCopy");
+  const openSetupButton = document.getElementById("openSetupButton");
   let step = 0;
 
   const openDialog = () => { dialog.hidden = false; };
   const closeDialog = () => { dialog.hidden = true; };
+  const setStatus = (message, isError = false) => {
+    errorNode.textContent = message;
+    errorNode.classList.toggle("status-copy--error", isError);
+    errorNode.classList.toggle("status-copy--success", !isError);
+  };
+  const clearStatus = () => {
+    errorNode.textContent = "";
+    errorNode.classList.remove("status-copy--error", "status-copy--success");
+  };
+  const setBusy = (button, busy, busyLabel) => {
+    if (!button) return;
+    if (!button.dataset.defaultLabel) {
+      button.dataset.defaultLabel = button.textContent || "";
+    }
+    button.disabled = busy;
+    button.textContent = busy ? busyLabel : button.dataset.defaultLabel;
+  };
+  const parseJson = async (response) => {
+    const text = await response.text();
+    if (!text) return {};
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { detail: text };
+    }
+  };
 
   const showStep = (index) => {
     step = index;
@@ -232,16 +275,17 @@
 
   dialog.querySelector("#onboardingForm").addEventListener("submit", async (event) => {
     event.preventDefault();
-    errorNode.textContent = "";
+    clearStatus();
     const jsonHeaders = {
       "Content-Type": "application/json",
       ...(antiForgeryToken ? { "RequestVerificationToken": antiForgeryToken } : {})
     };
     const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
     const laneInterests = Array.from(dialog.querySelectorAll("[data-step-panel='2'] input[type='checkbox']:checked")).map((input) => input.value);
+    setBusy(submitButton, true, "Saving...");
 
     try {
-      await fetch("/api/v1/accounts/me/profile", {
+      const profileResponse = await fetch("/api/v1/accounts/me/profile", {
         method: "POST",
         headers: jsonHeaders,
         body: JSON.stringify({
@@ -251,9 +295,9 @@
           timezone: document.getElementById("onboardingTimezone").value,
           visibility: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.Visibility))
         })
-      }).then(async (response) => {
-        if (!response.ok) throw new Error((await response.json()).detail || "Profile save failed.");
       });
+      const profilePayload = await parseJson(profileResponse);
+      if (!profileResponse.ok) throw new Error(profilePayload.detail || "Profile save failed.");
 
       const recoveryField = document.getElementById("onboardingRecoveryEmail");
       if (recoveryField && recoveryField.value.trim().length > 0) {
@@ -266,7 +310,7 @@
             nextPath: "/home"
           })
         });
-        const recoveryPayload = await recoveryResponse.json();
+        const recoveryPayload = await parseJson(recoveryResponse);
         if (!recoveryResponse.ok) throw new Error(recoveryPayload.detail || "Recovery email save failed.");
         if (recoveryPayload.previewHref) {
           window.location.href = recoveryPayload.previewHref;
@@ -274,7 +318,7 @@
         }
       }
 
-      await fetch("/api/v1/accounts/me/preferences", {
+      const preferencesResponse = await fetch("/api/v1/accounts/me/preferences", {
         method: "POST",
         headers: jsonHeaders,
         body: JSON.stringify({
@@ -284,13 +328,32 @@
           betaInterest: document.getElementById("onboardingBeta").checked,
           onboardingCompleted: true
         })
-      }).then(async (response) => {
-        if (!response.ok) throw new Error((await response.json()).detail || "Preference save failed.");
       });
+      const preferencesPayload = await parseJson(preferencesResponse);
+      if (!preferencesResponse.ok) throw new Error(preferencesPayload.detail || "Preference save failed.");
 
-      window.location.reload();
+      const followCount = (preferencesPayload.followHorizons ? 1 : 0) + (preferencesPayload.betaInterest ? 1 : 0);
+      setupState.textContent = "Ready";
+      setupCopy.textContent = "Your basic account setup is already in place.";
+      interestState.textContent = followCount === 0 ? "Quiet" : `${followCount} active`;
+      recoveryState.textContent = recoveryField && recoveryField.value.trim().length > 0 ? "Verification sent" : recoveryState.textContent;
+      if (recoveryField && recoveryField.value.trim().length > 0) {
+        recoveryCopy.textContent = "Check your email to finish verifying the backup sign-in path.";
+      }
+      setupCardTitle.textContent = "Review setup";
+      setupCardCopy.textContent = "Open the setup sheet whenever you want to adjust profile, interests, or backup sign-in.";
+      openSetupButton.textContent = "Open setup";
+      openSetupButton.dataset.defaultLabel = "Open setup";
+
+      setStatus("Setup saved.");
+      window.setTimeout(() => {
+        closeDialog();
+        clearStatus();
+      }, 900);
     } catch (error) {
-      errorNode.textContent = error.message;
+      setStatus(error.message || "Setup could not be saved right now.", true);
+    } finally {
+      setBusy(submitButton, false, "");
     }
   });
 })();
