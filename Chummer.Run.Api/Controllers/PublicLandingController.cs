@@ -222,8 +222,18 @@ public sealed class PublicLandingController : Controller
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             return _chrome.BuildAuthenticatedChrome(title, description, currentPath, user.DisplayName);
         }
-        catch (HubRequestAuthException)
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
+            return _chrome.BuildPublicChrome(title, description, currentPath);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Preserving signed-in chrome after identity failure for {Path}.", currentPath);
+            if (Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName))
+            {
+                return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
+            }
+
             return _chrome.BuildPublicChrome(title, description, currentPath);
         }
         catch (Exception ex) when (
