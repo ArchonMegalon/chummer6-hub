@@ -236,7 +236,8 @@ async Task VerifySupportCrashWorkflowAsync()
 
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static builder => { });
         SupportStore store = new(configuration, loggerFactory.CreateLogger<SupportStore>());
-        CrashSupportService service = new(store, loggerFactory.CreateLogger<CrashSupportService>());
+        SupportCaseService supportCases = new(store, loggerFactory.CreateLogger<SupportCaseService>());
+        CrashSupportService service = new(store, supportCases, loggerFactory.CreateLogger<CrashSupportService>());
         SupportCrashesController controller = new(service)
         {
             ControllerContext = new ControllerContext
@@ -494,6 +495,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json"),
+            ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
             ["FLEET_RECEIPT_SIGNING_SECRET"] = "smoke-secret",
             ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
         })
@@ -501,7 +503,9 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
+    var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
     var installLinking = new InstallLinkingService(installLinkingStore);
+    var supportCases = new SupportCaseService(supportStore, loggerFactory.CreateLogger<SupportCaseService>());
     var accounts = new AccountService(store);
     var groups = new GroupService(store, accounts);
     var rewards = new RewardService(store);
@@ -542,7 +546,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         Timezone: "UTC",
         CountryCode: "AT"));
     var experience = new UserExperienceService(store, accounts);
-    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1412,7 +1416,9 @@ async Task VerifyPublicLandingProjectionAsync()
             ["CHUMMER_PUBLIC_CANON_ROOT"] = "/docker/chummercomplete/chummer.run-services",
             ["CHUMMER_COMMUNITY_STORE_PATH"] = storePath,
             ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
-            ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot
+            ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
+            ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot,
+            ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
         })
         .Build();
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
@@ -1426,7 +1432,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var progress = new PublicProgressService(configuration, loggerFactory.CreateLogger<PublicProgressService>());
     var trustContent = new PublicTrustContentService(canon);
     var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
+    var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
     var installLinking = new InstallLinkingService(installLinkingStore);
+    var supportCases = new SupportCaseService(supportStore, loggerFactory.CreateLogger<SupportCaseService>());
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
@@ -1495,6 +1503,35 @@ async Task VerifyPublicLandingProjectionAsync()
         linkedIdentityClient,
         accounts,
         installLinking)
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var supportCasesController = new SupportCasesController(
+        linkedIdentityClient,
+        accounts,
+        supportCases,
+        configuration)
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var supportAutomationController = new SupportCasesController(
+        linkedIdentityClient,
+        accounts,
+        supportCases,
+        configuration)
+    {
+        ControllerContext = AuthenticatedControllerContext("smoke-token")
+    };
+    var accountController = new AccountsController(
+        accounts,
+        linkedIdentityClient,
+        identityLinks,
+        experience,
+        installLinking,
+        supportCases,
+        chrome,
+        google,
+        loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1578,6 +1615,56 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(linkedSummaryPayload.ActiveGrants?.Any(static item => string.Equals(item.InstallationId, "install-smoke-001", StringComparison.Ordinal) && string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.Ordinal)) == true, "account summary should surface the active grant after rotation.");
     Assert(!linkedSummaryPayload.PendingClaimTickets.Any(item => string.Equals(item.TicketId, pendingTicket.TicketId, StringComparison.Ordinal)), "redeemed claim tickets should no longer appear as pending.");
 
+    var supportSubmitResult = await supportCasesController.Submit(
+        new SupportCaseSubmitRequest(
+            Kind: SupportCaseKinds.BugReport,
+            Title: "Restart guidance was unclear",
+            Summary: "The signed-in handoff did not explain whether the update was already staged.",
+            Detail: "Please make the restart/apply wording clearer on the account-aware update path.",
+            InstallationId: "install-smoke-001",
+            ApplicationVersion: "0.6.2-smoke",
+            ReleaseChannel: "preview",
+            HeadId: "avalonia",
+            Platform: "linux",
+            Arch: "x64",
+            Source: SupportCaseSourceKinds.HubAccount),
+        CancellationToken.None);
+    var supportAccepted = supportSubmitResult.Result as AcceptedAtActionResult;
+    var supportPayload = supportAccepted?.Value as SupportCaseProjection;
+    Assert(supportPayload is not null && string.Equals(supportPayload.Status, SupportCaseStatuses.New, StringComparison.Ordinal), "support case submission should create a new support case.");
+    SupportCaseProjection supportCase = supportPayload!;
+    Assert(string.Equals(supportCase.InstallationId, "install-smoke-001", StringComparison.Ordinal), "support case submission should retain installation linkage.");
+
+    var myCasesResult = await supportCasesController.GetMyCases(status: null, kind: null, CancellationToken.None);
+    var myCasesPayload = (myCasesResult.Result as OkObjectResult)?.Value as SupportCaseListResponse;
+    Assert(myCasesPayload is not null && myCasesPayload.TotalCount >= 1, "support case list should return reporter-scoped cases.");
+    Assert(myCasesPayload!.Items.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "support case list should include the newly submitted case.");
+    var triageResult = supportAutomationController.ListForTriage(status: null, kind: null, candidateOwnerRepo: null, designImpactOnly: null);
+    var triagePayload = (triageResult.Result as OkObjectResult)?.Value as SupportCaseListResponse;
+    Assert(triagePayload is not null && triagePayload.Items.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "internal triage view should surface submitted support cases.");
+    var releasedResult = supportAutomationController.Transition(
+        supportCase.CaseId,
+        new SupportCaseTransitionRequest(
+            TargetStatus: SupportCaseStatuses.ReleasedToReporterChannel,
+            Note: "Fix is live on preview 0.6.3-smoke.",
+            FixedVersion: "0.6.3-smoke",
+            FixedChannel: "preview",
+            Actor: "fleet"));
+    var releasedPayload = (releasedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
+    Assert(releasedPayload is not null && string.Equals(releasedPayload.Status, SupportCaseStatuses.ReleasedToReporterChannel, StringComparison.Ordinal), "internal transition should move the case into released_to_reporter_channel.");
+    var notifiedResult = supportAutomationController.NotifyReporter(
+        supportCase.CaseId,
+        new SupportCaseNotificationRequest(
+            Note: "Reporter notified that preview 0.6.3-smoke contains the fix.",
+            Actor: "hub",
+            Channel: "account_history"));
+    var notifiedPayload = (notifiedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
+    Assert(notifiedPayload is not null && string.Equals(notifiedPayload.Status, SupportCaseStatuses.UserNotified, StringComparison.Ordinal), "internal notify should close the user-facing loop.");
+
+    var accountPage = await accountController.AccountPage(CancellationToken.None) as ViewResult;
+    var accountModel = accountPage?.Model as AccountPageViewModel;
+    Assert(accountModel is not null && accountModel.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "account page should surface support-case history beside installs and access.");
+
     var progressHtml = (await progressController.ProgressPage(CancellationToken.None)).Content ?? string.Empty;
     Assert(progressHtml.Contains("Core Rules Engine", StringComparison.Ordinal), "progress page should render the generated product-part report");
     Assert(progressHtml.Contains("/api/public/progress-poster.svg", StringComparison.Ordinal), "progress page should render against the hosted poster route");
@@ -1653,7 +1740,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
     Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
-    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

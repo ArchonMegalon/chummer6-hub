@@ -56,6 +56,7 @@ Owns:
 * clustering
 * evidence synthesis
 * execution aids
+* published support-case packet artifacts that summarize open case clusters for operator and designer pulses
 
 ### `chummer6-design`
 

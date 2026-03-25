@@ -33,7 +33,8 @@ internal static class SupportCrashVerification
                 .Build();
 
             SupportStore store = new(configuration, NullLogger<SupportStore>.Instance);
-            CrashSupportService service = new(store, NullLogger<CrashSupportService>.Instance);
+            SupportCaseService supportCases = new(store, NullLogger<SupportCaseService>.Instance);
+            CrashSupportService service = new(store, supportCases, NullLogger<CrashSupportService>.Instance);
 
             CrashIntakeAcceptedResponse first = service.Submit(CreateEnvelope("crash-1", "1.0.0", "fingerprint-a"));
             CrashIntakeAcceptedResponse second = service.Submit(CreateEnvelope("crash-2", "1.1.0", "fingerprint-a"));
@@ -65,10 +66,53 @@ internal static class SupportCrashVerification
             CrashWorkItemListResponse filteredWorkItems = service.ListWorkItems(candidateOwnerRepo: "chummer6-ui");
             VerificationAssert.True(filteredWorkItems.TotalCount >= 2, "Owner filtering should keep desktop crash work items visible.");
 
+            SupportCaseProjection submittedCase = supportCases.Submit(
+                reporterUserId: "usr_runner",
+                reporterSubjectId: "subject.runner",
+                new SupportCaseSubmitRequest(
+                    Kind: SupportCaseKinds.BugReport,
+                    Title: "Updater note is confusing",
+                    Summary: "Release copy does not explain the staged restart clearly.",
+                    Detail: "The page should explain what was staged and whether the update already downloaded.",
+                    InstallationId: "install-1",
+                    ApplicationVersion: "1.1.0",
+                    ReleaseChannel: "preview",
+                    HeadId: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Source: SupportCaseSourceKinds.HubAccount));
+            VerificationAssert.Equal("chummer6-ui", submittedCase.CandidateOwnerRepo, "Bug reports should route to the UI owner by default.");
+            VerificationAssert.True(submittedCase.DesignImpactSuspected, "Confusing-copy reports should mark design-impact suspicion.");
+
+            SupportCaseListResponse reporterCases = supportCases.ListForReporter("usr_runner", "subject.runner");
+            VerificationAssert.Equal(1, reporterCases.TotalCount, "Reporter-scoped support lists should include submitted cases.");
+
+            SupportCaseProjection released = supportCases.Transition(
+                submittedCase.CaseId,
+                new SupportCaseTransitionRequest(
+                    TargetStatus: SupportCaseStatuses.ReleasedToReporterChannel,
+                    Note: "Fix landed in preview 1.1.1.",
+                    FixedVersion: "1.1.1",
+                    FixedChannel: "preview",
+                    Actor: "fleet"));
+            VerificationAssert.Equal(SupportCaseStatuses.ReleasedToReporterChannel, released.Status, "Release-to-reporter-channel should be a first-class support status.");
+
+            SupportCaseProjection notified = supportCases.RecordNotification(
+                submittedCase.CaseId,
+                new SupportCaseNotificationRequest(
+                    Note: "Reporter notified that preview 1.1.1 contains the fix.",
+                    Actor: "hub",
+                    Channel: "account_history"));
+            VerificationAssert.Equal(SupportCaseStatuses.UserNotified, notified.Status, "Notification hooks should move the case into user_notified.");
+            VerificationAssert.True(notified.UserNotifiedAtUtc.HasValue, "Notification hooks should stamp the notification time.");
+
             SupportStore reloadedStore = new(configuration, NullLogger<SupportStore>.Instance);
-            CrashSupportService reloadedService = new(reloadedStore, NullLogger<CrashSupportService>.Instance);
+            SupportCaseService reloadedSupportCases = new(reloadedStore, NullLogger<SupportCaseService>.Instance);
+            CrashSupportService reloadedService = new(reloadedStore, reloadedSupportCases, NullLogger<CrashSupportService>.Instance);
             CrashIncidentProjection? reloadedIncident = reloadedService.GetIncident(first.Incident.IncidentId);
             VerificationAssert.NotNull(reloadedIncident, "Persisted crash incidents should reload from durable storage.");
+            SupportCaseProjection? reloadedSupportCase = reloadedSupportCases.GetForReporter(submittedCase.CaseId, "usr_runner", "subject.runner");
+            VerificationAssert.NotNull(reloadedSupportCase, "Persisted support cases should reload from durable storage.");
 
             HubCrashAutomationClient client = new(new HttpClient(new FakeJsonHandler(new CrashWorkItemListResponse(
                 Items: [second.WorkItem],

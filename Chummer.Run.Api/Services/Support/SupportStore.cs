@@ -23,6 +23,9 @@ public sealed class SupportStore
 
     public object Gate { get; } = new();
     public string StoragePath => _storagePath;
+    public Dictionary<string, SupportCaseProjection> CasesById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> CaseIdByClusterKey { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> CrashCaseIdByWorkItemId { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CrashIncidentProjection> IncidentsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, string> IncidentIdByCrashId { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CrashClusterProjection> ClustersById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -33,6 +36,9 @@ public sealed class SupportStore
     public void PersistLocked()
     {
         SupportStoreSnapshot snapshot = new(
+            CasesById: CasesById,
+            CaseIdByClusterKey: CaseIdByClusterKey,
+            CrashCaseIdByWorkItemId: CrashCaseIdByWorkItemId,
             IncidentsById: IncidentsById,
             IncidentIdByCrashId: IncidentIdByCrashId,
             ClustersById: ClustersById,
@@ -61,7 +67,8 @@ public sealed class SupportStore
                 ?? throw new InvalidOperationException($"Unable to deserialize support store snapshot: {_storagePath}");
             ApplySnapshotLocked(snapshot);
             _logger.LogInformation(
-                "SupportStore loaded {IncidentCount} crash incidents, {ClusterCount} clusters, and {WorkItemCount} work items from {StoragePath}.",
+                "SupportStore loaded {CaseCount} support cases, {IncidentCount} crash incidents, {ClusterCount} clusters, and {WorkItemCount} work items from {StoragePath}.",
+                CasesById.Count,
                 IncidentsById.Count,
                 ClustersById.Count,
                 WorkItemsById.Count,
@@ -77,7 +84,13 @@ public sealed class SupportStore
         ClusterIdByFingerprint.Clear();
         WorkItemsById.Clear();
         WorkItemIdByClusterId.Clear();
+        CasesById.Clear();
+        CaseIdByClusterKey.Clear();
+        CrashCaseIdByWorkItemId.Clear();
 
+        CopyEntries(snapshot.CasesById, CasesById);
+        CopyEntries(snapshot.CaseIdByClusterKey, CaseIdByClusterKey);
+        CopyEntries(snapshot.CrashCaseIdByWorkItemId, CrashCaseIdByWorkItemId);
         CopyEntries(snapshot.IncidentsById, IncidentsById);
         CopyEntries(snapshot.IncidentIdByCrashId, IncidentIdByCrashId);
         CopyEntries(snapshot.ClustersById, ClustersById);
@@ -114,6 +127,9 @@ public sealed class SupportStore
 }
 
 internal sealed record SupportStoreSnapshot(
+    IReadOnlyDictionary<string, SupportCaseProjection>? CasesById,
+    IReadOnlyDictionary<string, string>? CaseIdByClusterKey,
+    IReadOnlyDictionary<string, string>? CrashCaseIdByWorkItemId,
     IReadOnlyDictionary<string, CrashIncidentProjection>? IncidentsById,
     IReadOnlyDictionary<string, string>? IncidentIdByCrashId,
     IReadOnlyDictionary<string, CrashClusterProjection>? ClustersById,

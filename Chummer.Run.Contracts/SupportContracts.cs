@@ -2,6 +2,102 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Chummer.Run.Contracts.Support;
 
+public static class SupportCaseKinds
+{
+    public const string CrashReport = "crash_report";
+    public const string BugReport = "bug_report";
+    public const string Feedback = "feedback";
+    public const string InstallHelp = "install_help";
+}
+
+public static class SupportCaseStatuses
+{
+    public const string New = "new";
+    public const string Clustered = "clustered";
+    public const string Routed = "routed";
+    public const string AwaitingEvidence = "awaiting_evidence";
+    public const string Accepted = "accepted";
+    public const string Fixed = "fixed";
+    public const string Deferred = "deferred";
+    public const string Rejected = "rejected";
+    public const string ReleasedToReporterChannel = "released_to_reporter_channel";
+    public const string UserNotified = "user_notified";
+}
+
+public static class SupportCaseSourceKinds
+{
+    public const string HubAccount = "hub_account";
+    public const string DesktopCrash = "desktop_crash";
+    public const string DesktopFeedback = "desktop_feedback";
+    public const string PublicWeb = "public_web";
+    public const string FleetAutomation = "fleet_automation";
+}
+
+public sealed record SupportCaseTimelineEvent(
+    string EventId,
+    string Status,
+    string Summary,
+    DateTimeOffset OccurredAtUtc,
+    string? Actor = null,
+    IReadOnlyDictionary<string, string>? Metadata = null);
+
+public sealed record SupportCaseProjection(
+    string CaseId,
+    string ClusterKey,
+    string Kind,
+    string Status,
+    string Title,
+    string Summary,
+    string Detail,
+    string CandidateOwnerRepo,
+    bool DesignImpactSuspected,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    string Source,
+    string? ReporterUserId = null,
+    string? ReporterSubjectId = null,
+    string? InstallationId = null,
+    string? ApplicationVersion = null,
+    string? ReleaseChannel = null,
+    string? HeadId = null,
+    string? Platform = null,
+    string? Arch = null,
+    string? FixedVersion = null,
+    string? FixedChannel = null,
+    DateTimeOffset? ReleasedToReporterChannelAtUtc = null,
+    DateTimeOffset? UserNotifiedAtUtc = null,
+    IReadOnlyList<string>? RelatedIds = null,
+    IReadOnlyList<SupportCaseTimelineEvent>? Timeline = null);
+
+public sealed record SupportCaseSubmitRequest(
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string Kind,
+    [property: Required(AllowEmptyStrings = false), StringLength(160)] string Title,
+    [property: Required(AllowEmptyStrings = false), StringLength(280)] string Summary,
+    [property: Required(AllowEmptyStrings = false)] string Detail,
+    [property: StringLength(64)] string? InstallationId = null,
+    [property: StringLength(64)] string? ApplicationVersion = null,
+    [property: StringLength(64)] string? ReleaseChannel = null,
+    [property: StringLength(64)] string? HeadId = null,
+    [property: StringLength(64)] string? Platform = null,
+    [property: StringLength(32)] string? Arch = null,
+    [property: StringLength(64)] string? Source = null);
+
+public sealed record SupportCaseTransitionRequest(
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string TargetStatus,
+    [property: StringLength(160)] string? Note = null,
+    [property: StringLength(64)] string? FixedVersion = null,
+    [property: StringLength(64)] string? FixedChannel = null,
+    [property: StringLength(64)] string? Actor = null);
+
+public sealed record SupportCaseNotificationRequest(
+    [property: Required(AllowEmptyStrings = false), StringLength(160)] string Note,
+    [property: StringLength(64)] string? Actor = null,
+    [property: StringLength(64)] string? Channel = null);
+
+public sealed record SupportCaseListResponse(
+    IReadOnlyList<SupportCaseProjection> Items,
+    int TotalCount);
+
 public sealed record CrashEnvelope(
     [Required(AllowEmptyStrings = false), StringLength(64)] string CrashId,
     [Required(AllowEmptyStrings = false), StringLength(64)] string HeadId,
@@ -19,6 +115,9 @@ public sealed record CrashEnvelope(
     [StringLength(64)] string? Platform = null,
     [StringLength(64)] string? DesktopHead = null,
     [StringLength(64)] string? RuntimeHead = null,
+    [StringLength(64)] string? InstallationId = null,
+    [StringLength(64)] string? UserId = null,
+    [StringLength(128)] string? SubjectId = null,
     [StringLength(128)] string? LastActionCategory = null,
     IReadOnlyList<string>? LogTail = null,
     bool FullDiagnosticsOptIn = false);
