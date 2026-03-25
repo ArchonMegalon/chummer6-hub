@@ -1483,6 +1483,13 @@ async Task VerifyPublicLandingProjectionAsync()
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
+    var installLinkingController = new InstallLinkingController(
+        linkedIdentityClient,
+        accounts,
+        installLinking)
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
     var progressController = new PublicProgressController(
         progress,
         navigation,
@@ -1522,6 +1529,42 @@ async Task VerifyPublicLandingProjectionAsync()
     var installSummary = installLinking.GetSummary(linkedUser.UserId, "subject.demo");
     Assert(installSummary.RecentReceipts.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal)), "signed-in downloads should mint a durable download receipt.");
     Assert(installSummary.PendingClaimTickets.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal) && string.Equals(item.Status, InstallClaimTicketStates.Pending, StringComparison.Ordinal)), "signed-in downloads should mint a pending install claim ticket.");
+    var pendingTicket = installSummary.PendingClaimTickets.Single(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal));
+    var redeemResult = installLinkingController.Redeem(new RedeemInstallClaimRequestDto(
+        ClaimCode: pendingTicket.ClaimCode,
+        InstallationId: "install-smoke-001",
+        HeadId: "avalonia",
+        ApplicationVersion: "0.6.1-smoke",
+        ChannelId: "preview",
+        Platform: "linux",
+        Arch: "x64",
+        PublicKey: "smoke-public-key",
+        HostLabel: "smoke-host"));
+    var redeemPayload = (redeemResult.Result as OkObjectResult)?.Value as RedeemInstallClaimResponseDto;
+    Assert(redeemPayload is not null && !redeemPayload.AlreadyClaimed, "claim redemption should create a claimed installation on the first pass.");
+    Assert(string.Equals(redeemPayload!.Installation.InstallationId, "install-smoke-001", StringComparison.Ordinal), "claim redemption should bind the requested installation id.");
+    Assert(string.Equals(redeemPayload.Installation.Status, ClaimedInstallationStates.Active, StringComparison.Ordinal), "claimed installation should become active immediately.");
+    Assert(string.Equals(redeemPayload.Grant.Status, InstallationGrantStates.Active, StringComparison.Ordinal), "claim redemption should issue an active installation grant.");
+    var refreshResult = installLinkingController.RefreshGrant(new RefreshInstallationGrantRequestDto(
+        InstallationId: redeemPayload.Installation.InstallationId,
+        AccessToken: redeemPayload.Grant.AccessToken,
+        HeadId: "avalonia",
+        ApplicationVersion: "0.6.2-smoke",
+        ChannelId: "preview",
+        Platform: "linux",
+        Arch: "x64",
+        PublicKey: "smoke-public-key-v2",
+        HostLabel: "smoke-host"));
+    var refreshPayload = (refreshResult.Result as OkObjectResult)?.Value as RefreshInstallationGrantResponseDto;
+    Assert(refreshPayload is not null && refreshPayload.Rotated, "grant refresh should rotate the installation grant.");
+    Assert(!string.Equals(refreshPayload!.Grant.AccessToken, redeemPayload.Grant.AccessToken, StringComparison.Ordinal), "grant refresh should issue a new installation token.");
+    Assert(string.Equals(refreshPayload.Installation.Version, "0.6.2-smoke", StringComparison.Ordinal), "grant refresh should update the current install version metadata.");
+    var linkedSummaryResult = await installLinkingController.GetSummary(CancellationToken.None);
+    var linkedSummaryPayload = (linkedSummaryResult.Result as OkObjectResult)?.Value as InstallLinkingSummaryDto;
+    Assert(linkedSummaryPayload is not null, "install linking summary endpoint should return the signed-in account state.");
+    Assert(linkedSummaryPayload!.ClaimedInstallations?.Any(static item => string.Equals(item.InstallationId, "install-smoke-001", StringComparison.Ordinal)) == true, "account summary should surface claimed installs after redemption.");
+    Assert(linkedSummaryPayload.ActiveGrants?.Any(static item => string.Equals(item.InstallationId, "install-smoke-001", StringComparison.Ordinal) && string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.Ordinal)) == true, "account summary should surface the active grant after rotation.");
+    Assert(!linkedSummaryPayload.PendingClaimTickets.Any(item => string.Equals(item.TicketId, pendingTicket.TicketId, StringComparison.Ordinal)), "redeemed claim tickets should no longer appear as pending.");
 
     var progressHtml = (await progressController.ProgressPage(CancellationToken.None)).Content ?? string.Empty;
     Assert(progressHtml.Contains("Core Rules Engine", StringComparison.Ordinal), "progress page should render the generated product-part report");

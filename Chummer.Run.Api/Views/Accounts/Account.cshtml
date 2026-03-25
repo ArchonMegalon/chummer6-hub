@@ -169,6 +169,14 @@
                         <span>Pending claim tickets</span>
                         <strong>@Model.InstallLinking.PendingClaimTickets.Count</strong>
                     </div>
+                    <div class="settings-summary-row">
+                        <span>Claimed installs</span>
+                        <strong>@(Model.InstallLinking.ClaimedInstallations?.Count ?? 0)</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Active grants</span>
+                        <strong>@(Model.InstallLinking.ActiveGrants?.Count ?? 0)</strong>
+                    </div>
                 </div>
                 @if (Model.InstallLinking.RecentReceipts.Count == 0)
                 {
@@ -188,12 +196,37 @@
                 }
                 @if (Model.InstallLinking.PendingClaimTickets.Count > 0)
                 {
+                    <p class="muted-copy">Paste one of these claim codes into the desktop link dialog on first launch if you want that install tied back to this account.</p>
                     <div class="settings-summary-list">
                         @foreach (var ticket in Model.InstallLinking.PendingClaimTickets)
                         {
                             <div class="settings-summary-row">
                                 <span>@ticket.ArtifactLabel</span>
                                 <strong><code class="mono-receipt">@ticket.ClaimCode</code> until @ticket.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                            </div>
+                        }
+                    </div>
+                }
+                @if ((Model.InstallLinking.ClaimedInstallations?.Count ?? 0) > 0)
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var installation in Model.InstallLinking.ClaimedInstallations!)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@(installation.HeadId ?? installation.ArtifactId) / @(installation.Platform ?? "unknown") / @(installation.Arch ?? "unknown")</span>
+                                <strong>@installation.Version on @installation.Channel (@HumanizeStatus(installation.Status, "Active"))</strong>
+                            </div>
+                        }
+                    </div>
+                }
+                @if ((Model.InstallLinking.ActiveGrants?.Count ?? 0) > 0)
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var grant in Model.InstallLinking.ActiveGrants!)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@grant.InstallationId</span>
+                                <strong>@HumanizeStatus(grant.Status, "Active") until @grant.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
                             </div>
                         }
                     </div>
