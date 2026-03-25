@@ -39,4 +39,42 @@ public sealed class InstallLinkingController : ControllerBase
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
     }
+
+    [HttpPost("redeem")]
+    [ProducesResponseType<RedeemInstallClaimResponseDto>(StatusCodes.Status200OK)]
+    public ActionResult<RedeemInstallClaimResponseDto> Redeem([FromBody] RedeemInstallClaimRequestDto? request)
+    {
+        if (request is null)
+        {
+            return BadRequest("claim payload is required.");
+        }
+
+        try
+        {
+            return Ok(_installLinking.RedeemClaim(request));
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpPost("grants/refresh")]
+    [ProducesResponseType<RefreshInstallationGrantResponseDto>(StatusCodes.Status200OK)]
+    public ActionResult<RefreshInstallationGrantResponseDto> RefreshGrant([FromBody] RefreshInstallationGrantRequestDto? request)
+    {
+        if (request is null)
+        {
+            return BadRequest("grant refresh payload is required.");
+        }
+
+        try
+        {
+            return Ok(_installLinking.RefreshGrant(request));
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
 }

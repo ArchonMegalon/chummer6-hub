@@ -22,6 +22,12 @@ public static class InstallationGrantStates
     public const string Expired = "expired";
 }
 
+public static class ClaimedInstallationStates
+{
+    public const string Active = "active";
+    public const string Revoked = "revoked";
+}
+
 public sealed record DownloadReceiptDto(
     string ReceiptId,
     string ArtifactId,
@@ -70,7 +76,12 @@ public sealed record ClaimedInstallationDto(
     string? UserId = null,
     string? SubjectId = null,
     string? PublicKey = null,
-    string? ClaimTicketId = null);
+    string? ClaimTicketId = null,
+    string? HeadId = null,
+    string? Platform = null,
+    string? Arch = null,
+    string? HostLabel = null,
+    string? GrantId = null);
 
 public sealed record InstallationGrantDto(
     string GrantId,
@@ -84,4 +95,39 @@ public sealed record InstallationGrantDto(
 
 public sealed record InstallLinkingSummaryDto(
     IReadOnlyList<DownloadReceiptDto> RecentReceipts,
-    IReadOnlyList<InstallClaimTicketDto> PendingClaimTickets);
+    IReadOnlyList<InstallClaimTicketDto> PendingClaimTickets,
+    IReadOnlyList<ClaimedInstallationDto>? ClaimedInstallations = null,
+    IReadOnlyList<InstallationGrantDto>? ActiveGrants = null);
+
+public sealed record RedeemInstallClaimRequestDto(
+    string ClaimCode,
+    string InstallationId,
+    string HeadId,
+    string ApplicationVersion,
+    string ChannelId,
+    string Platform,
+    string Arch,
+    string? PublicKey = null,
+    string? HostLabel = null);
+
+public sealed record RedeemInstallClaimResponseDto(
+    InstallClaimTicketDto Ticket,
+    ClaimedInstallationDto Installation,
+    InstallationGrantDto Grant,
+    bool AlreadyClaimed);
+
+public sealed record RefreshInstallationGrantRequestDto(
+    string InstallationId,
+    string AccessToken,
+    string? HeadId = null,
+    string? ApplicationVersion = null,
+    string? ChannelId = null,
+    string? Platform = null,
+    string? Arch = null,
+    string? PublicKey = null,
+    string? HostLabel = null);
+
+public sealed record RefreshInstallationGrantResponseDto(
+    ClaimedInstallationDto Installation,
+    InstallationGrantDto Grant,
+    bool Rotated);
