@@ -9,26 +9,30 @@
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
     var release = Model.ReleaseExperience;
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
+    var heroSection = Section("hero");
+    var productProofSection = Section("product_proof");
+    var startHereSection = Section("start_here");
+    var trustSection = Section("why_trust_it");
+    var laneSection = Section("choose_your_lane");
+    var worksNowSection = Section("whats_real_now");
+    var artifactSection = Section("featured_artifacts");
+    var closingSection = Section("closing_cta");
 
     static IReadOnlyList<string> MicroProof(PublicFeatureCardDto card)
         => string.IsNullOrWhiteSpace(card.MicroProof)
             ? Array.Empty<string>()
             : card.MicroProof.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    string SectionTitle(string id, string fallback)
-        => sectionsById.TryGetValue(id, out var section) ? section.Title : fallback;
-
-    string SectionEyebrow(string id, string fallback)
-        => sectionsById.TryGetValue(id, out var section) && !string.IsNullOrWhiteSpace(section.Eyebrow) ? section.Eyebrow! : fallback;
-
-    string SectionIntro(string id, string fallback)
-        => sectionsById.TryGetValue(id, out var section) && !string.IsNullOrWhiteSpace(section.Intro) ? section.Intro! : fallback;
+    PublicLandingSectionDto Section(string id)
+        => sectionsById.TryGetValue(id, out var section)
+            ? section
+            : throw new InvalidOperationException($"Landing section '{id}' is required.");
 }
 
 <section class="launch-hero">
     <div class="launch-hero__shell">
         <div class="launch-hero__copy">
-            <p class="eyebrow">Explainable Shadowrun</p>
+            <p class="eyebrow">@heroSection.Eyebrow</p>
             <h1 class="launch-hero__title">@Model.Surface.Headline</h1>
             <p class="launch-hero__support">@Model.Surface.Subhead</p>
             <div class="launch-hero__actions">
@@ -77,8 +81,8 @@
 <section class="product-proof">
     <div class="product-proof__copy">
         <p class="eyebrow">@Model.Surface.ProductProofEyebrow</p>
-        <h2 class="editorial-title">@SectionTitle("product_proof", "One concrete result, one visible trail, one current build")</h2>
-        <p class="editorial-copy">@Model.Surface.ProductProofIntro</p>
+        <h2 class="editorial-title">@productProofSection.Title</h2>
+        <p class="editorial-copy">@productProofSection.Intro</p>
         <div class="proof-surface">
             <div class="proof-surface__topline">
                 <span>@Model.Surface.ProductProofToplineLabel</span>
@@ -119,9 +123,9 @@
 
 <section class="workflow-band">
     <div class="workflow-band__lead">
-        <p class="eyebrow">@SectionEyebrow("start_here", "How Chummer helps at the table")</p>
-        <h2 class="editorial-title">@SectionTitle("start_here", "Build, explain, and keep the table moving")</h2>
-        <p class="editorial-copy">@SectionIntro("start_here", "See the product behavior first: build a runner, inspect the ruling, and keep a session moving without losing trust.")</p>
+        <p class="eyebrow">@startHereSection.Eyebrow</p>
+        <h2 class="editorial-title">@startHereSection.Title</h2>
+        <p class="editorial-copy">@startHereSection.Intro</p>
     </div>
     <div class="workflow-grid">
         @foreach (var card in Model.Workflows)
@@ -160,9 +164,9 @@
 
 <section class="trust-claims">
     <div class="trust-claims__lead">
-        <p class="eyebrow">@SectionEyebrow("why_trust_it", "Why trust Chummer")</p>
-        <h2 class="editorial-title">@SectionTitle("why_trust_it", "Product claims backed by evidence")</h2>
-        <p class="editorial-copy">@SectionIntro("why_trust_it", "The trust model is simple: deterministic rules truth, visible receipts, and local-first continuity.")</p>
+        <p class="eyebrow">@trustSection.Eyebrow</p>
+        <h2 class="editorial-title">@trustSection.Title</h2>
+        <p class="editorial-copy">@trustSection.Intro</p>
     </div>
     <div class="trust-claims__grid">
         @foreach (var card in Model.TrustPillars)
@@ -184,9 +188,9 @@
 
 <section class="audience-fit">
     <div class="audience-fit__lead">
-        <p class="eyebrow">@SectionEyebrow("choose_your_lane", "Who this is for")</p>
-        <h2 class="editorial-title">@SectionTitle("choose_your_lane", "Player, GM, and creator fit")</h2>
-        <p class="editorial-copy">@SectionIntro("choose_your_lane", "Choose the lane that matches how you come to the table.")</p>
+        <p class="eyebrow">@laneSection.Eyebrow</p>
+        <h2 class="editorial-title">@laneSection.Title</h2>
+        <p class="editorial-copy">@laneSection.Intro</p>
     </div>
     <div class="audience-fit__grid">
         @foreach (var card in Model.Lanes)
@@ -211,9 +215,9 @@
 
 <section class="works-matrix">
     <div class="works-matrix__lead">
-        <p class="eyebrow">@SectionEyebrow("whats_real_now", "What is real today, what is preview, what is next")</p>
-        <h2 class="editorial-title">@SectionTitle("whats_real_now", "What works today")</h2>
-        <p class="editorial-copy">@SectionIntro("whats_real_now", "See what is available now, what you can preview, and what is opening next.")</p>
+        <p class="eyebrow">@worksNowSection.Eyebrow</p>
+        <h2 class="editorial-title">@worksNowSection.Title</h2>
+        <p class="editorial-copy">@worksNowSection.Intro</p>
     </div>
     <div class="works-matrix__columns">
         <article class="works-column">
@@ -269,9 +273,9 @@
 
 <section class="artifact-gallery">
     <div class="artifact-gallery__lead">
-        <p class="eyebrow">@SectionEyebrow("featured_artifacts", "Proof, not promises")</p>
-        <h2 class="editorial-title">@SectionTitle("featured_artifacts", "Artifacts that make the product tangible")</h2>
-        <p class="editorial-copy">@SectionIntro("featured_artifacts", "The gallery now starts with live proof, then shows which artifacts are preview-only and which ones are still opening next.")</p>
+        <p class="eyebrow">@artifactSection.Eyebrow</p>
+        <h2 class="editorial-title">@artifactSection.Title</h2>
+        <p class="editorial-copy">@artifactSection.Intro</p>
     </div>
     <div class="artifact-gallery__grid">
         @foreach (var card in Model.Artifacts)
@@ -296,9 +300,9 @@
 
 <section class="access-band">
     <div class="access-band__copy">
-        <p class="eyebrow">@SectionEyebrow("closing_cta", "Get on the list that matches your interest")</p>
-        <h2 class="editorial-title">@SectionTitle("closing_cta", "Create the account that keeps your place")</h2>
-        <p class="editorial-copy">@SectionIntro("closing_cta", "Tell Chummer what you care about and get invited into the right lane as it opens.")</p>
+        <p class="eyebrow">@closingSection.Eyebrow</p>
+        <h2 class="editorial-title">@closingSection.Title</h2>
+        <p class="editorial-copy">@closingSection.Intro</p>
         <div class="interest-grid" aria-label="Interest options">
             <span class="interest-pill">I’m here for play</span>
             <span class="interest-pill">I want GM tools</span>

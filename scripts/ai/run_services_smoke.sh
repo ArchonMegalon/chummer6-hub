@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 
 TMP_DIR="${ROOT_DIR}/.tmp/run-services-smoke"
 mkdir -p "$TMP_DIR"
+find "$TMP_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
 scripts/ai/build_r1_cleanroom.sh >/dev/null
 
@@ -26,6 +27,8 @@ if [[ ! -f "$CSC_DLL" || -z "$NETCORE_REF_DIR" || -z "$ASPNET_REF_DIR" || -z "$N
 fi
 
 cp Chummer.Play.Contracts/bin/Debug/net10.0/Chummer.Play.Contracts.dll "$TMP_DIR/"
+cp Chummer.Campaign.Contracts/bin/Debug/net10.0/Chummer.Campaign.Contracts.dll "$TMP_DIR/"
+cp Chummer.Control.Contracts/bin/Debug/net10.0/Chummer.Control.Contracts.dll "$TMP_DIR/"
 cp ../chummer-core-engine/Chummer.Contracts/bin/Debug/net10.0/Chummer.Engine.Contracts.dll "$TMP_DIR/"
 cp ../chummer-hub-registry/Chummer.Hub.Registry.Contracts/bin/Debug/net10.0/Chummer.Hub.Registry.Contracts.dll "$TMP_DIR/"
 cp ../chummer-hub-registry/Chummer.Run.Registry/bin/Debug/net10.0/Chummer.Run.Registry.dll "$TMP_DIR/"

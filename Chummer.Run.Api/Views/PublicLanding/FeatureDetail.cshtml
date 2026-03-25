@@ -42,12 +42,59 @@
     </div>
 </section>
 
+<section class="role-matrix">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">What this proves</p>
+        <h2 class="editorial-title">Use the current proof, then decide how deep you need to go</h2>
+        <p class="editorial-copy">These detail pages should anchor the current product path, the user payoff, and the clearest way to verify the claim.</p>
+    </div>
+    <div class="role-matrix__grid">
+        @if (!string.IsNullOrWhiteSpace(Model.Pain))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">Why it matters</span>
+                <p>@Model.Pain</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Payoff))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">What it unlocks</span>
+                <p>@Model.Payoff</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">How to verify it</span>
+                <p>@Model.ProofNote</p>
+            </article>
+        }
+        @if (Model.MicroProof.Count > 0)
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">Verification markers</span>
+                <div class="trust-claim__microproof">
+                    @foreach (var item in Model.MicroProof)
+                    {
+                        <span>@item</span>
+                    }
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
 <section class="story-guide-tail">
     <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Use the real surface, then decide whether to go deeper</h2>
-    <p class="editorial-copy">Chummer should let you touch the real product path first, then open the deeper reference only when you actually need it.</p>
+    <h2 class="editorial-title">Take the truthful product path from here</h2>
+    <p class="editorial-copy">Start with the current product surface, then use support or the deeper brief only when the live proof is not enough.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
         <a class="button-like button-like--secondary" href="/contact#support-intake">Get help with this surface</a>
+        @if (Model.SecondaryAction is not null)
+        {
+            <a class="button-like button-like--ghost" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+        }
     </div>
 </section>

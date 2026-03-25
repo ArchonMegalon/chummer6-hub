@@ -9,8 +9,8 @@
 <section class="story-cinematic">
     <div class="story-cinematic__copy">
         <p class="eyebrow">Product</p>
-        <h1 class="page-title">A serious, explainable Shadowrun platform in early access.</h1>
-        <p class="page-copy">Chummer brings rules truth, receipts, and continuity together so the table can move faster without hand-waving the math.</p>
+        <h1 class="page-title">Build, Explain, Run, Publish, and Improve from one grounded product spine.</h1>
+        <p class="page-copy">Chummer is a serious, explainable Shadowrun platform that keeps rules truth, living dossiers, campaign continuity, publication, and support closure in one visible system.</p>
     </div>
     @if (leadAsset is not null)
     {
@@ -18,6 +18,25 @@
             @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", leadAsset)
         </div>
     }
+</section>
+
+<section class="role-matrix">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Product loop</p>
+        <h2 class="editorial-title">Five verbs define the product</h2>
+        <p class="editorial-copy">These are not marketing categories. They are the canon-backed product loop that ties workbench, explain receipts, campaign continuity, publication, and support closure together.</p>
+    </div>
+    <div class="role-matrix__grid">
+        @foreach (var card in Model.Workflows)
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">@card.Card.Badge</span>
+                <h3>@card.Card.Title</h3>
+                <p>@card.Card.Summary</p>
+                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+            </article>
+        }
+    </div>
 </section>
 
 <section class="trust-rail-section">
@@ -41,6 +60,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Roles</p>
         <h2 class="editorial-title">One product, different table needs</h2>
+        <p class="editorial-copy">Players, GMs, and creators hit different surfaces, but they still share the same install, rules, campaign, and support truth.</p>
     </div>
     <div class="role-matrix__grid">
         @foreach (var card in Model.Lanes)

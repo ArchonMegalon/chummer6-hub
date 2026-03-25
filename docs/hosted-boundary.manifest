@@ -1,4 +1,4 @@
-ACTIVE_HOSTED_PROJECTS=Chummer.Play.Contracts;Chummer.Run.Contracts;Chummer.Run.Api;Chummer.Run.Identity;Chummer.Run.AI
+ACTIVE_HOSTED_PROJECTS=Chummer.Play.Contracts;Chummer.Campaign.Contracts;Chummer.Control.Contracts;Chummer.Run.Contracts;Chummer.Run.Api;Chummer.Run.Identity;Chummer.Run.AI
 EXTERNAL_OWNER_PACKAGES=Chummer.Media.Contracts;Chummer.Hub.Registry.Contracts;Chummer.Media.Factory.Runtime;Chummer.Run.Registry
 ORACLE_ROOTS=
 RETIRED_ROOTS=Chummer;Chummer.Api;ChummerDataViewer;ChummerHub;Plugins;TextblockConverter;Translator

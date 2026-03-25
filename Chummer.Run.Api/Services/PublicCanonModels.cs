@@ -225,6 +225,10 @@ internal sealed class PublicReleaseExperienceDocument
     public string GuestGateSummary { get; init; } = string.Empty;
     public string GuestGatePrimaryLabel { get; init; } = string.Empty;
     public string GuestGateSecondaryLabel { get; init; } = string.Empty;
+    public string PublicPreviewPrimaryLabel { get; init; } = "Get preview build";
+    public string PublicPreviewPrimaryHref { get; init; } = "/downloads";
+    public string NoBuildPrimaryLabel { get; init; } = "Request early access";
+    public string NoBuildPrimaryHref { get; init; } = "/signup?next=/home";
     public string SignedInDispatchHeading { get; init; } = string.Empty;
     public string SignedInDispatchSummary { get; init; } = string.Empty;
     public List<string>? SignedInDispatchSteps { get; init; }

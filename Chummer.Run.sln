@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Run.Contracts", "Ch
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Play.Contracts", "Chummer.Play.Contracts\Chummer.Play.Contracts.csproj", "{F63601FB-5065-4F9F-A8D0-B8C445518708}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Campaign.Contracts", "Chummer.Campaign.Contracts\Chummer.Campaign.Contracts.csproj", "{C20D327E-5374-4408-B241-5A5018833E8D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Control.Contracts", "Chummer.Control.Contracts\Chummer.Control.Contracts.csproj", "{0035F2F1-42D8-4E2B-8FC0-A7538BBFBB0A}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Run.Api", "Chummer.Run.Api\Chummer.Run.Api.csproj", "{1989534D-2E82-4D52-AF20-92333C489F4D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Run.Identity", "Chummer.Run.Identity\Chummer.Run.Identity.csproj", "{36440FA7-93FE-4B12-B5BC-E31DF48F7580}"
@@ -30,6 +34,14 @@ Global
 		{F63601FB-5065-4F9F-A8D0-B8C445518708}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F63601FB-5065-4F9F-A8D0-B8C445518708}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F63601FB-5065-4F9F-A8D0-B8C445518708}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C20D327E-5374-4408-B241-5A5018833E8D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C20D327E-5374-4408-B241-5A5018833E8D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C20D327E-5374-4408-B241-5A5018833E8D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C20D327E-5374-4408-B241-5A5018833E8D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0035F2F1-42D8-4E2B-8FC0-A7538BBFBB0A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0035F2F1-42D8-4E2B-8FC0-A7538BBFBB0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0035F2F1-42D8-4E2B-8FC0-A7538BBFBB0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0035F2F1-42D8-4E2B-8FC0-A7538BBFBB0A}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1989534D-2E82-4D52-AF20-92333C489F4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1989534D-2E82-4D52-AF20-92333C489F4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1989534D-2E82-4D52-AF20-92333C489F4D}.Release|Any CPU.ActiveCfg = Release|Any CPU

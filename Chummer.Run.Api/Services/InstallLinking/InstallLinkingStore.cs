@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Chummer.Run.Contracts.InstallLinking;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
 
 namespace Chummer.Run.Api.Services.InstallLinking;
 

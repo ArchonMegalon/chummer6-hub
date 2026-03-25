@@ -69,6 +69,7 @@ builder.Services.AddSingleton<LedgerService>();
 builder.Services.AddSingleton<SupportCaseService>();
 builder.Services.AddSingleton<SupportAssistantService>();
 builder.Services.AddSingleton<CrashSupportService>();
+builder.Services.AddSingleton<CampaignSpineService>();
 builder.Services.AddScoped<BoostSessionService>();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {

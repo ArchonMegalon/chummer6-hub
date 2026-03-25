@@ -128,6 +128,7 @@ public sealed class PublicLandingService
     private void ValidateSurface(PublicLandingSurfaceDto surface, string repoRoot)
     {
         ValidateAssets(surface, repoRoot);
+        ValidateSections(surface);
 
         var allowedRoutes = surface.PublicRoutes
             .Concat(surface.AuthRoutes)
@@ -157,6 +158,32 @@ public sealed class PublicLandingService
         {
             _actions.ValidateActionableCard(card, allowedRoutes);
             ValidateCardProjection(card);
+        }
+    }
+
+    private static void ValidateSections(PublicLandingSurfaceDto surface)
+    {
+        var sections = surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
+        foreach (var sectionId in new[]
+                 {
+                     "hero",
+                     "product_proof",
+                     "start_here",
+                     "why_trust_it",
+                     "choose_your_lane",
+                     "whats_real_now",
+                     "featured_artifacts",
+                     "closing_cta"
+                 })
+        {
+            if (!sections.TryGetValue(sectionId, out var section))
+            {
+                throw new InvalidOperationException($"required landing section missing: {sectionId}");
+            }
+
+            RequireText(section.Title, $"{sectionId}.title");
+            RequireText(section.Eyebrow, $"{sectionId}.eyebrow");
+            RequireText(section.Intro, $"{sectionId}.intro");
         }
     }
 

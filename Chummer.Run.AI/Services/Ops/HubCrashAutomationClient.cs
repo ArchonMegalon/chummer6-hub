@@ -1,5 +1,5 @@
 using System.Net.Http.Json;
-using Chummer.Run.Contracts.Support;
+using Chummer.Control.Contracts.Support;
 
 namespace Chummer.Run.AI.Services.Ops;
 

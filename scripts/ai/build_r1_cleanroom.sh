@@ -11,6 +11,8 @@ dotnet build ../chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.c
 dotnet build ../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj --nologo
 dotnet build ../../fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime/Chummer.Media.Factory.Runtime.csproj --nologo
 dotnet build Chummer.Play.Contracts/Chummer.Play.Contracts.csproj --nologo
+dotnet build Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj --nologo
+dotnet build Chummer.Control.Contracts/Chummer.Control.Contracts.csproj --nologo
 dotnet build Chummer.Run.Contracts/Chummer.Run.Contracts.csproj --nologo
 dotnet build Chummer.Run.Api/Chummer.Run.Api.csproj --nologo
 dotnet build Chummer.Run.Identity/Chummer.Run.Identity.csproj --nologo

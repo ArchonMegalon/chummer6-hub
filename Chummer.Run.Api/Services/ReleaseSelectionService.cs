@@ -1,5 +1,5 @@
 using Chummer.Run.Api.ViewModels;
-using Chummer.Run.Contracts.InstallLinking;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 
 namespace Chummer.Run.Api.Services;
@@ -54,7 +54,7 @@ public sealed class ReleaseSelectionService
             .ThenBy(static download => PlatformLabel(download), StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var recommendedRequiresAccount = recommended is not null && RequiresAccount(recommended);
-        var installSteps = recommendedRequiresAccount && !authenticated
+        var installSteps = recommendedRequiresAccount
             ? (experience.AccountRequiredInstallSteps?.Count > 0 ? experience.AccountRequiredInstallSteps : experience.InstallSteps) ?? new List<string>()
             : experience.InstallSteps ?? new List<string>();
         var guestGateArtifactHref = recommended is null
@@ -84,11 +84,31 @@ public sealed class ReleaseSelectionService
             GuestGatePrimaryHref: guestGateArtifactHref,
             GuestGateSecondaryLabel: experience.GuestGateSecondaryLabel,
             GuestGateSecondaryHref: guestGateSignInHref,
+            PublicPreviewPrimaryLabel: experience.PublicPreviewPrimaryLabel,
+            PublicPreviewPrimaryHref: experience.PublicPreviewPrimaryHref,
+            NoBuildPrimaryLabel: experience.NoBuildPrimaryLabel,
+            NoBuildPrimaryHref: experience.NoBuildPrimaryHref,
             SignedInDispatchHeading: experience.SignedInDispatchHeading,
             SignedInDispatchSummary: experience.SignedInDispatchSummary,
             SignedInDispatchSteps: experience.SignedInDispatchSteps ?? new List<string>(),
             InstallSteps: installSteps,
             SystemRequirements: RequirementsFor(experience, recommended));
+    }
+
+    public PublicLandingActionDto BuildPublicPrimaryAction(PublicReleaseManifestDto manifest, bool authenticated)
+    {
+        var release = BuildExperience(manifest, string.Empty, authenticated);
+        if (manifest.Downloads.Count == 0)
+        {
+            return new PublicLandingActionDto(release.NoBuildPrimaryLabel, release.NoBuildPrimaryHref, "primary");
+        }
+
+        if (authenticated || HasGuestReadableDownloads(manifest))
+        {
+            return new PublicLandingActionDto(release.PublicPreviewPrimaryLabel, release.PublicPreviewPrimaryHref, "primary");
+        }
+
+        return new PublicLandingActionDto(release.GuestGatePrimaryLabel, release.GuestGatePrimaryHref, "primary");
     }
 
     public ReleaseOptionViewModel BuildOption(PublicReleaseManifestDto manifest, PublicReleaseArtifactDto download, bool authenticated, bool recommended)

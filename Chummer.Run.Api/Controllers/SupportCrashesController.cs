@@ -1,5 +1,5 @@
 using Chummer.Run.Api.Services.Support;
-using Chummer.Run.Contracts.Support;
+using Chummer.Control.Contracts.Support;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Cryptography;
 using System.Text;

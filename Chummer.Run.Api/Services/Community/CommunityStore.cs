@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Chummer.Campaign.Contracts;
 using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Entitlements;
@@ -42,6 +43,11 @@ public sealed class CommunityStore
     public List<EntitlementGrantDto> EntitlementEntries { get; } = new();
     public List<BadgeDto> Badges { get; } = new();
     public Dictionary<string, HubUserExperienceDto> UserExperienceByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, RunnerDossierProjection> DossiersById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, CrewProjection> CrewsById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, CampaignProjection> CampaignSpinesById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, RunProjection> RunsById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, WorkspaceRestoreProjection> RestoreByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void PersistLocked()
     {
@@ -64,7 +70,12 @@ public sealed class CommunityStore
             Badges: Badges.ToArray(),
             UserExperience: UserExperienceByUserId.Values
                 .OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase)
-                .ToArray());
+                .ToArray(),
+            Dossiers: DossiersById.Values.OrderBy(static item => item.DossierId, StringComparer.OrdinalIgnoreCase).ToArray(),
+            Crews: CrewsById.Values.OrderBy(static item => item.CrewId, StringComparer.OrdinalIgnoreCase).ToArray(),
+            CampaignSpines: CampaignSpinesById.Values.OrderBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase).ToArray(),
+            Runs: RunsById.Values.OrderBy(static item => item.RunId, StringComparer.OrdinalIgnoreCase).ToArray(),
+            RestoreSummaries: RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase).ToArray());
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var tempPath = $"{_storagePath}.tmp";
@@ -112,6 +123,11 @@ public sealed class CommunityStore
         EntitlementEntries.Clear();
         Badges.Clear();
         UserExperienceByUserId.Clear();
+        DossiersById.Clear();
+        CrewsById.Clear();
+        CampaignSpinesById.Clear();
+        RunsById.Clear();
+        RestoreByUserId.Clear();
 
         foreach (var user in snapshot.Users ?? Array.Empty<HubUserDto>())
         {
@@ -162,6 +178,31 @@ public sealed class CommunityStore
         foreach (var experience in snapshot.UserExperience ?? Array.Empty<HubUserExperienceDto>())
         {
             UserExperienceByUserId[experience.UserId] = experience;
+        }
+
+        foreach (var dossier in snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>())
+        {
+            DossiersById[dossier.DossierId] = dossier;
+        }
+
+        foreach (var crew in snapshot.Crews ?? Array.Empty<CrewProjection>())
+        {
+            CrewsById[crew.CrewId] = crew;
+        }
+
+        foreach (var campaign in snapshot.CampaignSpines ?? Array.Empty<CampaignProjection>())
+        {
+            CampaignSpinesById[campaign.CampaignId] = campaign;
+        }
+
+        foreach (var run in snapshot.Runs ?? Array.Empty<RunProjection>())
+        {
+            RunsById[run.RunId] = run;
+        }
+
+        foreach (var restore in snapshot.RestoreSummaries ?? Array.Empty<WorkspaceRestoreProjection>())
+        {
+            RestoreByUserId[restore.UserId] = restore;
         }
     }
 
@@ -246,7 +287,12 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<RewardJournalEntryDto> RewardEntries,
     IReadOnlyList<EntitlementGrantDto> EntitlementEntries,
     IReadOnlyList<BadgeDto> Badges,
-    IReadOnlyList<HubUserExperienceDto>? UserExperience = null);
+    IReadOnlyList<HubUserExperienceDto>? UserExperience = null,
+    IReadOnlyList<RunnerDossierProjection>? Dossiers = null,
+    IReadOnlyList<CrewProjection>? Crews = null,
+    IReadOnlyList<CampaignProjection>? CampaignSpines = null,
+    IReadOnlyList<RunProjection>? Runs = null,
+    IReadOnlyList<WorkspaceRestoreProjection>? RestoreSummaries = null);
 
 internal sealed record SponsorSessionStateSnapshot(
     string SponsorSessionId,

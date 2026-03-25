@@ -1,17 +1,19 @@
 # chummer6-hub
 
-Hosted orchestration and play API boundary for Chummer6.
+Hosted relationship, campaign, control, and play API boundary for Chummer6.
 
 ## What this repo is
 
 `chummer6-hub` is the hosted backbone for:
 
 - identity, relay, approvals, and memory
+- campaign spine truth for living dossiers, crews, campaigns, runs, scenes, objectives, and replay-safe continuity
+- product-control truth for support intake, case status, crash normalization, closure notices, and operator-facing case packets
 - hosted play APIs and orchestration
 - governed AI, docs/help, and automation bridges
 - orchestration-side registry and media adapters
 - user accounts, groups, access/support state, and the canonical community ledger
-- the `chummer.run` landing page, proof shelf, and thin signed-in home overlay
+- the `chummer.run` landing page, proof shelf, downloads/support/account surfaces, and thin signed-in home overlay
 
 ## What this repo is not
 
@@ -36,14 +38,16 @@ Current honesty clause:
 - the remaining shrinkage is orchestration polish, not hidden service ownership
 - closing the remaining hosted milestones is now about contract cleanup and adapter depth, not where registry/media code lives
 
-The public-facing community spine now lives here too:
+The public-facing customer and community spine now lives here too:
 
-- Chummer.Run.Api owns product-level user accounts, groups, sponsorship sessions, and the canonical community ledger.
-- `Chummer.Run.Api` owns product-level users, groups, join/boost codes, sponsor sessions, support/access flows, leaderboards, rewards, and entitlements as part of the canonical community ledger
+- `Chummer.Run.Api` owns the customer account backbone first: product-level users, groups, support/access flows, device/install linking, and the canonical community ledger.
+- Optional join/boost codes, sponsor sessions, leaderboards, rewards, and entitlements sit on top of that shared account and access plane rather than replacing it.
+- `Chummer.Campaign.Contracts` is the shared middle-plane package for runner dossier, crew, campaign, run, scene, objective, continuity, and roaming restore projections
+- `Chummer.Control.Contracts` is the shared middle-plane package for support cases, crash intake, clustered signals, routing decisions, and closure truth
 - `Chummer.Run.Api` also owns linked identity and channel-link state for email hygiene, Google/Facebook social bootstrap, and official Telegram companion routing
 - `Chummer.Run.Identity` remains the principal/session boundary below that account layer
 - `Chummer.Run.AI` ingests validated participation receipts and projects guided-lane activity
-- Fleet executes optional guided-contribution lanes, but Hub owns the canonical community ledger and accounting truth
+- Fleet executes optional guided-contribution lanes, but Hub owns the canonical customer/account ledger and accounting truth
 - EA remains the orchestrator brain behind companion and assistant channels; Telegram, Google, Facebook, and transactional email are adapters around that hub-owned account plane
 
 ## Go deeper
