@@ -1419,9 +1419,12 @@ async Task VerifyPublicLandingProjectionAsync()
     var landing = new PublicLandingService(configuration, loggerFactory.CreateLogger<PublicLandingService>());
     var navigation = new PublicNavigationService(configuration);
     var releases = new PublicReleaseManifestService(configuration);
-    var chrome = new HubPageChromeService(landing, navigation, releases);
+    var canon = new PublicCanonFileLoader(configuration);
+    var releaseSelection = new ReleaseSelectionService(canon);
+    var chrome = new HubPageChromeService(landing, navigation, releases, releaseSelection);
     var progress = new PublicProgressService(configuration, loggerFactory.CreateLogger<PublicProgressService>());
-    var trustContent = new PublicTrustContentService();
+    var trustContent = new PublicTrustContentService(canon);
+    var actions = new PublicActionResolver();
     var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
     var installLinking = new InstallLinkingService(installLinkingStore);
     var surface = landing.LoadSurface();
@@ -1468,7 +1471,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var emailLinks = new HubEmailLinkVerificationService(
         DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(tempRoot, "email-links"))));
     var google = CreateGoogleService(configuration, authService, identityLinks, accounts, loggerFactory, tempRoot);
-    var controller = new PublicLandingController(landing, releases, accounts, identityClient, identityLinks, experience, chrome, trustContent, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, chrome, trustContent, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
@@ -1477,8 +1480,8 @@ async Task VerifyPublicLandingProjectionAsync()
     };
     var downloadsController = new DownloadsCompatibilityController(
         releases,
+        releaseSelection,
         installLinking,
-        accounts,
         linkedIdentityClient,
         loggerFactory.CreateLogger<DownloadsCompatibilityController>())
     {
@@ -1524,8 +1527,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(downloadsModel is not null && downloadsModel.Manifest.Downloads.Any(static item => string.Equals(item.Id, "smoke-poc-linux-x64", StringComparison.Ordinal)), "downloads page should render artifacts from the live release manifest");
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
     var authenticatedDownloadResult = await downloadsController.DownloadArtifact("smoke-poc-linux-x64", CancellationToken.None);
-    var authenticatedFile = authenticatedDownloadResult as PhysicalFileResult;
-    Assert(authenticatedFile is not null && string.Equals(authenticatedFile.FileDownloadName, "smoke-poc-linux-x64.zip", StringComparison.Ordinal), "account-aware download dispatch should stream the canonical artifact file.");
+    var authenticatedRedirect = authenticatedDownloadResult as RedirectResult;
+    Assert(authenticatedRedirect is not null && string.Equals(authenticatedRedirect.Url, "/downloads/install/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in compatibility downloads should route through the install handoff.");
+    var dispatchView = await controller.DownloadDispatchPage("smoke-poc-linux-x64", CancellationToken.None) as ViewResult;
+    var dispatchModel = dispatchView?.Model as DownloadDispatchPageViewModel;
+    Assert(dispatchModel is not null && string.Equals(dispatchModel.DownloadHref, "/downloads/file/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in download handoff should expose the canonical file route.");
+    Assert(!string.IsNullOrWhiteSpace(dispatchModel?.ClaimCode), "signed-in download handoff should expose a claim code.");
     var linkedUser = accounts.EnsureUser("subject.demo", "Runner Demo", "runner@example.invalid");
     var installSummary = installLinking.GetSummary(linkedUser.UserId, "subject.demo");
     Assert(installSummary.RecentReceipts.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal)), "signed-in downloads should mint a durable download receipt.");
@@ -1620,7 +1627,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, accounts, unavailableIdentityClient, identityLinks, experience, chrome, trustContent, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, chrome, trustContent, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -3286,7 +3293,9 @@ HubPageChromeService CreateChromeService(IConfiguration configuration, ILoggerFa
     var landing = new PublicLandingService(configuration, loggerFactory.CreateLogger<PublicLandingService>());
     var navigation = new PublicNavigationService(configuration);
     var releases = new PublicReleaseManifestService(configuration);
-    return new HubPageChromeService(landing, navigation, releases);
+    var canon = new PublicCanonFileLoader(configuration);
+    var releaseSelection = new ReleaseSelectionService(canon);
+    return new HubPageChromeService(landing, navigation, releases, releaseSelection);
 }
 
 HubGoogleAuthService CreateGoogleService(

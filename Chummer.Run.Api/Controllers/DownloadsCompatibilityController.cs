@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
@@ -11,21 +10,21 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class DownloadsCompatibilityController : ControllerBase
 {
     private readonly PublicReleaseManifestService _releases;
+    private readonly ReleaseSelectionService _releaseSelection;
     private readonly InstallLinkingService _installLinking;
-    private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
     private readonly ILogger<DownloadsCompatibilityController> _logger;
 
     public DownloadsCompatibilityController(
         PublicReleaseManifestService releases,
+        ReleaseSelectionService releaseSelection,
         InstallLinkingService installLinking,
-        AccountService accounts,
         HubIdentityClient identity,
         ILogger<DownloadsCompatibilityController> logger)
     {
         _releases = releases;
+        _releaseSelection = releaseSelection;
         _installLinking = installLinking;
-        _accounts = accounts;
         _identity = identity;
         _logger = logger;
     }
@@ -33,14 +32,15 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     [HttpGet("/downloads/releases.json")]
     public IActionResult ReleaseManifest()
     {
-        var manifest = _releases.LoadManifest();
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         return Ok(manifest);
     }
 
     [HttpGet("/downloads/get/{artifactId}")]
     public async Task<IActionResult> DownloadArtifact([FromRoute] string artifactId, CancellationToken cancellationToken)
     {
-        var artifact = _releases.FindDownload(artifactId);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var artifact = manifest.Downloads.FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
         if (artifact is null)
         {
             return NotFound();
@@ -52,17 +52,48 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return NotFound();
         }
 
-        var manifest = _releases.LoadManifest();
-        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
-        var user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-        var dispatch = _installLinking.IssueDownload(manifest, artifact, user?.UserId, subject?.SubjectId);
-        Response.Headers["X-Chummer-Download-Receipt-Id"] = dispatch.Receipt.ReceiptId;
-        if (dispatch.ClaimTicket is not null)
+        var encodedArtifactId = Uri.EscapeDataString(artifact.Id);
+        var subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        if (subject is not null)
         {
-            Response.Headers["Cache-Control"] = "private, no-store";
-            Response.Headers["X-Chummer-Install-Claim-Ticket-Id"] = dispatch.ClaimTicket.TicketId;
-            Response.Headers["X-Chummer-Install-Claim-Code"] = dispatch.ClaimTicket.ClaimCode;
-            Response.Headers["X-Chummer-Install-Claim-Expires"] = dispatch.ClaimTicket.ExpiresAtUtc.ToUniversalTime().ToString("O");
+            return Redirect($"/downloads/install/{encodedArtifactId}");
+        }
+
+        if (_releaseSelection.RequiresAccount(artifact))
+        {
+            return Redirect(BuildInstallLoginHref(encodedArtifactId));
+        }
+
+        var dispatch = _installLinking.IssueDownload(manifest, artifact, null, null);
+        Response.Headers["X-Chummer-Download-Receipt-Id"] = dispatch.Receipt.ReceiptId;
+
+        return PhysicalFile(
+            filePath,
+            "application/octet-stream",
+            artifact.FileName ?? Path.GetFileName(filePath),
+            enableRangeProcessing: true);
+    }
+
+    [HttpGet("/downloads/file/{artifactId}")]
+    public async Task<IActionResult> DownloadResolvedArtifactFile([FromRoute] string artifactId, CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var artifact = manifest.Downloads.FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
+        if (artifact is null)
+        {
+            return NotFound();
+        }
+
+        var filePath = _releases.ResolveDownloadFilePath(artifact);
+        if (filePath is null)
+        {
+            return NotFound();
+        }
+
+        var subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        if (subject is null && _releaseSelection.RequiresAccount(artifact))
+        {
+            return Redirect(BuildInstallLoginHref(Uri.EscapeDataString(artifact.Id)));
         }
 
         return PhysicalFile(
@@ -73,16 +104,40 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     }
 
     [HttpGet("/downloads/files/{**path}")]
-    public IActionResult DownloadFile([FromRoute] string? path)
+    public async Task<IActionResult> DownloadFile([FromRoute] string? path, CancellationToken cancellationToken)
     {
+        var artifact = _releases.FindDownloadByPath(path);
+        if (artifact is null)
+        {
+            return NotFound();
+        }
+
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        artifact = manifest.Downloads.FirstOrDefault(item => string.Equals(item.Id, artifact.Id, StringComparison.OrdinalIgnoreCase)) ?? artifact;
+
         var filePath = _releases.ResolveDownloadFilePath(path);
         if (filePath is null)
         {
             return NotFound();
         }
 
+        var encodedArtifactId = Uri.EscapeDataString(artifact.Id);
+        var subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        if (subject is not null)
+        {
+            return Redirect($"/downloads/install/{encodedArtifactId}");
+        }
+
+        if (_releaseSelection.RequiresAccount(artifact))
+        {
+            return Redirect(BuildInstallLoginHref(encodedArtifactId));
+        }
+
         return PhysicalFile(filePath, "application/octet-stream", enableRangeProcessing: true);
     }
+
+    private static string BuildInstallLoginHref(string encodedArtifactId)
+        => $"/login?next={Uri.EscapeDataString($"/downloads/install/{encodedArtifactId}")}";
 
     private async Task<AuthenticatedHubSubject?> TryGetOptionalSubjectAsync(CancellationToken cancellationToken)
     {

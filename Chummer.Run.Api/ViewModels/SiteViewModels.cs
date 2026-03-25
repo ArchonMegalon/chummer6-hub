@@ -56,14 +56,19 @@ public sealed record ResolvedPublicCardViewModel(
 
 public sealed record ReleaseOptionViewModel(
     PublicReleaseArtifactDto Artifact,
+    string Title,
     string DispatchHref,
+    string DirectFileHref,
     string PlatformLabel,
     string HeadLabel,
     string SizeLabel,
     string SupportLine,
     string ActionLabel,
     string? ShaPreview,
-    bool Installer);
+    bool Installer,
+    string InstallAccessClass,
+    bool RequiresAccount,
+    bool GuestDownloadAllowed);
 
 public sealed record ReleaseExperienceViewModel(
     ReleaseOptionViewModel? Recommended,
@@ -76,6 +81,16 @@ public sealed record ReleaseExperienceViewModel(
     string InstallHelpLabel,
     string InstallHelpHref,
     string UpdatePostureSummary,
+    bool GuestDownloadAvailable,
+    string GuestGateHeading,
+    string GuestGateSummary,
+    string GuestGatePrimaryLabel,
+    string GuestGatePrimaryHref,
+    string GuestGateSecondaryLabel,
+    string GuestGateSecondaryHref,
+    string SignedInDispatchHeading,
+    string SignedInDispatchSummary,
+    IReadOnlyList<string> SignedInDispatchSteps,
     IReadOnlyList<string> InstallSteps,
     IReadOnlyList<string> SystemRequirements);
 
@@ -139,6 +154,26 @@ public sealed record DownloadsPageViewModel(
     AssetCatalogViewModel Assets,
     PublicReleaseManifestDto Manifest,
     ReleaseExperienceViewModel ReleaseExperience);
+
+public sealed record DownloadDispatchPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Summary,
+    string ArtifactTitle,
+    string ArtifactSupportLine,
+    string DownloadHref,
+    string DownloadLabel,
+    string AccountHref,
+    string AccountLabel,
+    string HelpHref,
+    string HelpLabel,
+    string Channel,
+    string Version,
+    string PlatformLabel,
+    string HeadLabel,
+    string? ClaimCode,
+    DateTimeOffset? ClaimCodeExpiresAtUtc,
+    IReadOnlyList<string> Steps);
 
 public sealed record TrustPageSectionViewModel(
     string Id,
