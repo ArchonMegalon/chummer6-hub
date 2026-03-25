@@ -69,7 +69,7 @@ public sealed class AuthController : Controller
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
             heading: "Sign in",
-            supportLine: "Return to your account, updates, and contribution status in one browser flow.",
+            supportLine: "Return to your account, linked downloads, and current release in one browser flow.",
             nextPath,
             createAccount: false));
     }
@@ -101,7 +101,7 @@ public sealed class AuthController : Controller
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
             heading: "Create account",
-            supportLine: "Create the account that keeps preview access, updates, and later contribution access together.",
+            supportLine: "Create the account that unlocks preview installs, linked devices, and support follow-up.",
             nextPath,
             createAccount: true));
     }

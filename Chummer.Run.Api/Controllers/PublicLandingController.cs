@@ -1,10 +1,12 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
+using Chummer.Run.Contracts.Support;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;
@@ -24,6 +26,7 @@ public sealed class PublicLandingController : Controller
     private readonly InstallLinkingService _installLinking;
     private readonly HubPageChromeService _chrome;
     private readonly PublicTrustContentService _trustContent;
+    private readonly SupportCaseService _supportCases;
     private readonly ILogger<PublicLandingController> _logger;
 
     public PublicLandingController(
@@ -38,6 +41,7 @@ public sealed class PublicLandingController : Controller
         InstallLinkingService installLinking,
         HubPageChromeService chrome,
         PublicTrustContentService trustContent,
+        SupportCaseService supportCases,
         ILogger<PublicLandingController> logger)
     {
         _landing = landing;
@@ -51,6 +55,7 @@ public sealed class PublicLandingController : Controller
         _installLinking = installLinking;
         _chrome = chrome;
         _trustContent = trustContent;
+        _supportCases = supportCases;
         _logger = logger;
     }
 
@@ -60,6 +65,8 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var hasPreviewBuild = manifest.Downloads.Count > 0;
         var guestDownloadAvailable = _releaseSelection.HasGuestReadableDownloads(manifest);
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
@@ -69,12 +76,13 @@ public sealed class PublicLandingController : Controller
             Surface: surface,
             Assets: assetCatalog,
             Manifest: manifest,
+            ReleaseExperience: releaseExperience,
             PrimaryHeroAction: new PublicLandingActionDto(
                 hasPreviewBuild
-                    ? guestDownloadAvailable ? "Get preview build" : "Sign in to download preview"
+                    ? authenticated || guestDownloadAvailable ? "Get preview build" : releaseExperience.GuestGatePrimaryLabel
                     : "Request early access",
                 hasPreviewBuild
-                    ? guestDownloadAvailable ? "/downloads" : "/login?next=/downloads"
+                    ? authenticated || guestDownloadAvailable ? "/downloads" : releaseExperience.GuestGatePrimaryHref
                     : "/signup?next=/home",
                 "primary"),
             SecondaryHeroAction: new PublicLandingActionDto("See what works today", "/now", "secondary"),
@@ -109,14 +117,18 @@ public sealed class PublicLandingController : Controller
         var surface = _landing.LoadSurface();
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var model = new NowPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("What Is Real Now", "Readiness labels and direct evidence for what you can use today.", "/now", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
+            ReleaseExperience: _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated),
+            ProofModules: ResolveCards(_landing.CardsForBucket(surface, "start_here").Take(3).ToArray(), assetCatalog, authenticated: false, "/now"),
             AvailableToday: ResolveCards(nowCards.Where(static card => string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/now"),
             Inspectable: ResolveCards(nowCards.Where(static card => !string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/now"),
             SignedInPreview: surface.RegisteredOverlays,
-            Manifest: _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest()));
+            Manifest: manifest);
         return View("~/Views/PublicLanding/Now.cshtml", model);
     }
 
@@ -180,6 +192,7 @@ public sealed class PublicLandingController : Controller
                 AccountLabel: "Open Devices and access",
                 HelpHref: release.InstallHelpHref,
                 HelpLabel: release.InstallHelpLabel,
+                Display: release.Display,
                 Channel: manifest.Channel,
                 Version: manifest.Version,
                 PlatformLabel: option.PlatformLabel,
@@ -270,10 +283,48 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/contact")]
     [Produces("text/html")]
-    public async Task<IActionResult> ContactPage(CancellationToken cancellationToken)
+    public async Task<IActionResult> ContactPage([FromQuery] string? submitted, CancellationToken cancellationToken)
     {
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Where to send bugs, account questions, and public product feedback right now.", "/contact", cancellationToken);
-        return View("~/Views/PublicLanding/TrustPage.cshtml", _trustContent.BuildContactPage(chrome));
+        return View("~/Views/PublicLanding/TrustPage.cshtml", BuildContactPageModel(chrome, submittedCaseId: submitted));
+    }
+
+    [HttpPost("/contact")]
+    [ValidateAntiForgeryToken]
+    [Consumes("application/x-www-form-urlencoded")]
+    [Produces("text/html")]
+    public async Task<IActionResult> SubmitContactCase(
+        [FromForm] string? kind,
+        [FromForm] string? title,
+        [FromForm] string? summary,
+        [FromForm] string? detail,
+        CancellationToken cancellationToken)
+    {
+        var request = new SupportCaseSubmitRequest(
+            Kind: kind ?? string.Empty,
+            Title: title ?? string.Empty,
+            Summary: summary ?? string.Empty,
+            Detail: detail ?? string.Empty,
+            Source: SupportCaseSourceKinds.PublicWeb);
+
+        try
+        {
+            var subject = await TryGetOptionalSubjectAsync(cancellationToken);
+            var user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var created = _supportCases.Submit(user?.UserId, subject?.SubjectId, request);
+            return Redirect($"/contact?submitted={Uri.EscapeDataString(created.CaseId)}#support-intake");
+        }
+        catch (ArgumentException ex)
+        {
+            var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Where to send bugs, account questions, and public product feedback right now.", "/contact", cancellationToken);
+            var model = BuildContactPageModel(chrome, submittedCaseId: null) with
+            {
+                SupportIntake = BuildSupportIntakeModel(
+                    authenticated: chrome.Authenticated,
+                    submissionNotice: ex.Message)
+            };
+            return View("~/Views/PublicLanding/TrustPage.cshtml", model);
+        }
     }
 
     [HttpGet("/home")]
@@ -332,6 +383,32 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         return Ok(_landing.CardsForBucket(surface, bucket));
+    }
+
+    [HttpGet("/artifacts/{slug}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> ArtifactDetailPage([FromRoute] string slug, CancellationToken cancellationToken)
+    {
+        var currentPath = $"/artifacts/{slug}";
+        return await BuildFeatureDetailPageAsync(
+            currentPath,
+            chromeTitle: "Artifact detail",
+            chromeDescription: "A grounded artifact detail page with current status, payoff, and the next truthful action.",
+            eyebrow: "Artifact detail",
+            cancellationToken);
+    }
+
+    [HttpGet("/roadmap/{slug}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> RoadmapDetailPage([FromRoute] string slug, CancellationToken cancellationToken)
+    {
+        var currentPath = $"/roadmap/{slug}";
+        return await BuildFeatureDetailPageAsync(
+            currentPath,
+            chromeTitle: "Roadmap detail",
+            chromeDescription: "A horizon detail page with the pain, payoff, and the next place to read deeper.",
+            eyebrow: "Roadmap detail",
+            cancellationToken);
     }
 
     private IReadOnlyList<ResolvedPublicCardViewModel> ResolveCards(
@@ -400,6 +477,118 @@ public sealed class PublicLandingController : Controller
         {
             return false;
         }
+    }
+
+    private async Task<AuthenticatedHubSubject?> TryGetOptionalSubjectAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return null;
+        }
+    }
+
+    private TrustPageViewModel BuildContactPageModel(SiteChromeViewModel chrome, string? submittedCaseId)
+        => _trustContent.BuildContactPage(chrome) with
+        {
+            SupportIntake = BuildSupportIntakeModel(
+                authenticated: chrome.Authenticated,
+                submissionNotice: string.IsNullOrWhiteSpace(submittedCaseId)
+                    ? null
+                    : $"Support case {submittedCaseId} was accepted. Create an account or use Account > Support if you want tracked follow-up in the product shell.")
+        };
+
+    private static SupportIntakeViewModel BuildSupportIntakeModel(bool authenticated, string? submissionNotice)
+        => new(
+            ActionHref: "/contact",
+            Heading: "Open a first-party support case",
+            Intro: authenticated
+                ? "Use the form for a quick report here, or open Account > Support when you want the full tracked case view."
+                : "Use the first-party intake here when you want help without a GitHub account. Create an account later if you want tracked follow-up inside Chummer.",
+            Authenticated: authenticated,
+            AccountSupportHref: authenticated ? "/account#support" : "/signup?next=%2Faccount%23support",
+            AccountSupportLabel: authenticated ? "Open tracked support" : "Create account for tracked support",
+            SubmissionNotice: submissionNotice,
+            Options:
+            [
+                new SupportIntakeOptionViewModel(SupportCaseKinds.InstallHelp, "Install or update", "Choose this when the installer, updater, or download handoff is the problem."),
+                new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Product bug", "Use this for broken behavior, bad routing, or product regressions."),
+                new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Use this when the product direction is right but the current surface is getting in your way.")
+            ]);
+
+    private async Task<IActionResult> BuildFeatureDetailPageAsync(
+        string currentPath,
+        string chromeTitle,
+        string chromeDescription,
+        string eyebrow,
+        CancellationToken cancellationToken)
+    {
+        var surface = _landing.LoadSurface();
+        var card = _landing.FindCardByDetailRoute(surface, currentPath);
+        if (card is null)
+        {
+            return NotFound();
+        }
+
+        var subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        var authenticated = subject is not null;
+        if (subject is not null)
+        {
+            _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        }
+
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync(chromeTitle, chromeDescription, currentPath, cancellationToken);
+        var assets = new AssetCatalogViewModel(surface.Assets);
+        var primaryAction = _actions.ResolvePrimaryExperienceAction(card, authenticated, currentPath);
+        TrustPageActionViewModel? secondaryAction = null;
+        if (!string.IsNullOrWhiteSpace(card.FallbackRoute))
+        {
+            secondaryAction = new TrustPageActionViewModel(
+                card.FallbackLabel ?? "Read the deeper brief",
+                card.FallbackRoute!,
+                "ghost");
+        }
+
+        var facts = BuildFeatureDetailFacts(card);
+        var model = new FeatureDetailPageViewModel(
+            Chrome: chrome,
+            Eyebrow: eyebrow,
+            Heading: card.Title,
+            Intro: card.Summary,
+            StatusLabel: card.Badge,
+            Asset: assets.ForCard(card),
+            PrimaryAction: primaryAction,
+            SecondaryAction: secondaryAction,
+            Facts: facts);
+        return View("~/Views/PublicLanding/FeatureDetail.cshtml", model);
+    }
+
+    private static IReadOnlyList<FeatureDetailFactViewModel> BuildFeatureDetailFacts(PublicFeatureCardDto card)
+    {
+        var facts = new List<FeatureDetailFactViewModel>
+        {
+            new("Current status", $"{card.Badge}. {card.Summary}")
+        };
+
+        if (!string.IsNullOrWhiteSpace(card.Pain))
+        {
+            facts.Add(new FeatureDetailFactViewModel("Why it matters", card.Pain));
+        }
+
+        if (!string.IsNullOrWhiteSpace(card.Payoff))
+        {
+            facts.Add(new FeatureDetailFactViewModel("What it unlocks", card.Payoff));
+        }
+
+        if (!string.IsNullOrWhiteSpace(card.ProofNote))
+        {
+            facts.Add(new FeatureDetailFactViewModel("How to verify it", card.ProofNote));
+        }
+
+        return facts;
     }
 
     private async Task<SiteChromeViewModel> BuildPublicOrAuthenticatedChromeAsync(

@@ -38,3 +38,60 @@
         </article>
     }
 </section>
+
+@if (Model.SupportIntake is not null)
+{
+    <section class="trust-page-sections" id="support-intake">
+        <article class="trust-page-section trust-page-section--form">
+            <p class="eyebrow">Support intake</p>
+            <h2>@Model.SupportIntake.Heading</h2>
+            <p>@Model.SupportIntake.Intro</p>
+
+            @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.SubmissionNotice))
+            {
+                <p class="status-copy status-copy--success">@Model.SupportIntake.SubmissionNotice</p>
+            }
+
+            <form class="settings-form" method="post" action="@Model.SupportIntake.ActionHref">
+                @Html.AntiForgeryToken()
+                <div class="field">
+                    <label for="supportKind">Case type</label>
+                    <select id="supportKind" name="kind" required>
+                        @foreach (var option in Model.SupportIntake.Options)
+                        {
+                            <option value="@option.Value">@option.Label</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="supportTitle">Short title</label>
+                    <input id="supportTitle" name="title" maxlength="160" placeholder="Installer linked, but first launch did not explain the next step" required />
+                </div>
+                <div class="field">
+                    <label for="supportSummary">One-line summary</label>
+                    <input id="supportSummary" name="summary" maxlength="280" placeholder="The Linux preview installed successfully, but the post-install guidance was unclear." required />
+                </div>
+                <div class="field">
+                    <label for="supportDetail">What happened</label>
+                    <textarea id="supportDetail" name="detail" rows="6" placeholder="Tell Chummer what you expected, what actually happened, and the fastest way to reproduce it." required></textarea>
+                </div>
+                <div class="stacked-actions">
+                    <button class="button-like button-like--primary" type="submit">Submit support case</button>
+                    <a class="button-like button-like--secondary" href="@Model.SupportIntake.AccountSupportHref">@Model.SupportIntake.AccountSupportLabel</a>
+                </div>
+            </form>
+
+            <div class="compact-rail">
+                @foreach (var option in Model.SupportIntake.Options)
+                {
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>@option.Label</h3>
+                            <p>@option.Description</p>
+                        </div>
+                    </article>
+                }
+            </div>
+        </article>
+    </section>
+}

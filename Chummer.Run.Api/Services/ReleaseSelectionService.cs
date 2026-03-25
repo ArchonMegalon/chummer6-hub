@@ -53,8 +53,19 @@ public sealed class ReleaseSelectionService
             .ThenBy(static download => HeadPriority(download))
             .ThenBy(static download => PlatformLabel(download), StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        var recommendedRequiresAccount = recommended is not null && RequiresAccount(recommended);
+        var installSteps = recommendedRequiresAccount && !authenticated
+            ? (experience.AccountRequiredInstallSteps?.Count > 0 ? experience.AccountRequiredInstallSteps : experience.InstallSteps) ?? new List<string>()
+            : experience.InstallSteps ?? new List<string>();
+        var guestGateArtifactHref = recommended is null
+            ? "/downloads"
+            : BuildSignupDispatchHref(recommended);
+        var guestGateSignInHref = recommended is null
+            ? "/login?next=/downloads"
+            : BuildLoginDispatchHref(recommended);
 
         return new ReleaseExperienceViewModel(
+            Display: BuildDisplay(manifest, experience),
             Recommended: recommended is null ? null : BuildOption(manifest, recommended, authenticated, recommended: true),
             Alternatives: alternatives.Select(download => BuildOption(manifest, download, authenticated, recommended: false)).ToArray(),
             OtherPlatforms: otherPlatforms.Select(download => BuildOption(manifest, download, authenticated, recommended: false)).ToArray(),
@@ -70,13 +81,13 @@ public sealed class ReleaseSelectionService
             GuestGateHeading: experience.GuestGateHeading,
             GuestGateSummary: experience.GuestGateSummary,
             GuestGatePrimaryLabel: experience.GuestGatePrimaryLabel,
-            GuestGatePrimaryHref: experience.GuestGatePrimaryHref,
+            GuestGatePrimaryHref: guestGateArtifactHref,
             GuestGateSecondaryLabel: experience.GuestGateSecondaryLabel,
-            GuestGateSecondaryHref: experience.GuestGateSecondaryHref,
+            GuestGateSecondaryHref: guestGateSignInHref,
             SignedInDispatchHeading: experience.SignedInDispatchHeading,
             SignedInDispatchSummary: experience.SignedInDispatchSummary,
             SignedInDispatchSteps: experience.SignedInDispatchSteps ?? new List<string>(),
-            InstallSteps: experience.InstallSteps ?? new List<string>(),
+            InstallSteps: installSteps,
             SystemRequirements: RequirementsFor(experience, recommended));
     }
 
@@ -88,7 +99,7 @@ public sealed class ReleaseSelectionService
             {
                 InstallAccessClass = ResolveInstallAccessClass(manifest.Channel, download.InstallAccessClass, LoadExperience())
             };
-        return BuildNormalizedOption(manifest.Channel, normalized, authenticated, recommended);
+        return BuildNormalizedOption(normalized, authenticated, recommended);
     }
 
     private PublicReleaseExperienceDocument LoadExperience()
@@ -105,7 +116,7 @@ public sealed class ReleaseSelectionService
                 .ToArray()
         };
 
-    private static ReleaseOptionViewModel BuildNormalizedOption(string channel, PublicReleaseArtifactDto download, bool authenticated, bool recommended)
+    private static ReleaseOptionViewModel BuildNormalizedOption(PublicReleaseArtifactDto download, bool authenticated, bool recommended)
     {
         var accessClass = NormalizeInstallAccessClass(download.InstallAccessClass) ?? InstallAccessClasses.AccountRequired;
         var requiresAccount = string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase);
@@ -114,7 +125,7 @@ public sealed class ReleaseSelectionService
         var dispatchHref = authenticated
             ? $"/downloads/install/{artifactId}"
             : requiresAccount
-                ? $"/login?next={Uri.EscapeDataString($"/downloads/install/{artifactId}")}"
+                ? BuildSignupDispatchHref(download)
                 : $"/downloads/get/{artifactId}";
 
         return new ReleaseOptionViewModel(
@@ -125,7 +136,7 @@ public sealed class ReleaseSelectionService
             PlatformLabel: PlatformLabel(download),
             HeadLabel: HeadLabel(download),
             SizeLabel: SizeLabel(download.SizeBytes),
-            SupportLine: SupportLine(download, channel, authenticated, accessClass, recommended),
+            SupportLine: SupportLine(download, authenticated, accessClass, recommended),
             ActionLabel: ActionLabel(download, authenticated, accessClass, recommended),
             ShaPreview: string.IsNullOrWhiteSpace(download.Sha256) ? null : $"SHA {download.Sha256[..Math.Min(download.Sha256.Length, 16)]}...",
             Installer: IsInstaller(download),
@@ -142,6 +153,41 @@ public sealed class ReleaseSelectionService
             "macos" => experience.MacosRequirements ?? new List<string>(),
             _ => experience.WindowsRequirements ?? new List<string>()
         };
+
+    private static ReleaseDisplayViewModel BuildDisplay(PublicReleaseManifestDto manifest, PublicReleaseExperienceDocument experience)
+    {
+        var channelLabel = ResolveChannelLabel(manifest.Channel, experience);
+        var buildLabel = ResolveBuildLabel(manifest.Version, experience);
+        var publishedLabel = $"Published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd}";
+        return new ReleaseDisplayViewModel(channelLabel, buildLabel, publishedLabel);
+    }
+
+    private static string ResolveChannelLabel(string? channel, PublicReleaseExperienceDocument experience)
+    {
+        var normalized = (channel ?? string.Empty).Trim();
+        var mapped = (experience.PublicChannelLabels ?? new List<PublicReleaseChannelLabelDocument>())
+            .FirstOrDefault(item => string.Equals(item.Id, normalized, StringComparison.OrdinalIgnoreCase));
+        return !string.IsNullOrWhiteSpace(mapped?.Label)
+            ? mapped.Label
+            : experience.DefaultPublicChannelLabel;
+    }
+
+    private static string ResolveBuildLabel(string? version, PublicReleaseExperienceDocument experience)
+    {
+        var normalized = (version ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "unpublished", StringComparison.OrdinalIgnoreCase))
+        {
+            return experience.UnpublishedBuildLabel;
+        }
+
+        return $"{experience.BuildLabelPrefix} {normalized}";
+    }
+
+    private static string BuildSignupDispatchHref(PublicReleaseArtifactDto artifact)
+        => $"/signup?next={Uri.EscapeDataString($"/downloads/install/{Uri.EscapeDataString(artifact.Id)}")}";
+
+    private static string BuildLoginDispatchHref(PublicReleaseArtifactDto artifact)
+        => $"/login?next={Uri.EscapeDataString($"/downloads/install/{Uri.EscapeDataString(artifact.Id)}")}";
 
     private static string ResolveInstallAccessClass(string channel, string? rawAccessClass, PublicReleaseExperienceDocument experience)
     {
@@ -239,7 +285,7 @@ public sealed class ReleaseSelectionService
             ? $"Alternative desktop head for {PlatformLabel(download)}. Use this only when you explicitly want this runtime path."
             : $"Manual package for {PlatformLabel(download)}. Use this only for advanced or support-directed install work.";
 
-    private static string SupportLine(PublicReleaseArtifactDto download, string channel, bool authenticated, string accessClass, bool recommended)
+    private static string SupportLine(PublicReleaseArtifactDto download, bool authenticated, string accessClass, bool recommended)
     {
         if (authenticated)
         {
@@ -248,7 +294,7 @@ public sealed class ReleaseSelectionService
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
         {
-            return $"The current {channel} channel starts with a signed-in download so Chummer can attach the install handoff to your account from the first launch.";
+            return "The current preview starts with account creation so Chummer can attach the install handoff to your account from the first launch.";
         }
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRecommended, StringComparison.OrdinalIgnoreCase))
@@ -268,7 +314,7 @@ public sealed class ReleaseSelectionService
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
         {
-            return recommended ? "Sign in to download preview" : "Sign in to download";
+            return recommended ? "Create account to get preview" : "Create account to download";
         }
 
         return recommended ? RecommendedActionLabel(download) : AlternativeActionLabel(download);

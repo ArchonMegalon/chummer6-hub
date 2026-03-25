@@ -59,7 +59,7 @@ public sealed class PublicLandingService
                 .Select(static route => new PublicLandingRouteDto(route.Path, route.Title, route.Audience, route.Purpose, route.RequiresAuth, route.GuestFallback, route.MustExist, route.PlaceholderAllowed, route.PlaceholderRequirements))
                 .ToArray(),
             Sections: (manifest.Sections ?? new List<PublicLandingSectionDocument>())
-                .Select(static section => new PublicLandingSectionDto(section.Id, section.Title, section.Audience, section.Route, section.AssetSlot))
+                .Select(static section => new PublicLandingSectionDto(section.Id, section.Eyebrow, section.Title, section.Intro, section.Audience, section.Route, section.AssetSlot))
                 .ToArray(),
             RegisteredOverlays: (manifest.RegisteredOverlays ?? new List<PublicLandingOverlayDocument>())
                 .Select(static overlay => new PublicLandingOverlayDto(overlay.Id, overlay.Path, overlay.Title, overlay.Summary))
@@ -117,6 +117,14 @@ public sealed class PublicLandingService
     public IReadOnlyList<PublicFeatureCardDto> CardsForBucket(PublicLandingSurfaceDto surface, string bucket)
         => surface.FeatureCards.Where(card => string.Equals(card.Bucket, bucket, StringComparison.Ordinal)).ToArray();
 
+    public PublicFeatureCardDto? FindCardByDetailRoute(PublicLandingSurfaceDto surface, string path)
+        => surface.FeatureCards.FirstOrDefault(card =>
+            !string.IsNullOrWhiteSpace(card.DetailRoute)
+            && string.Equals(
+                PublicRouteCatalog.NormalizeRoute(card.DetailRoute),
+                PublicRouteCatalog.NormalizeRoute(path),
+                StringComparison.OrdinalIgnoreCase));
+
     private void ValidateSurface(PublicLandingSurfaceDto surface, string repoRoot)
     {
         ValidateAssets(surface, repoRoot);
@@ -124,7 +132,7 @@ public sealed class PublicLandingService
         var allowedRoutes = surface.PublicRoutes
             .Concat(surface.AuthRoutes)
             .Concat(surface.RegisteredRoutes)
-            .Select(static route => NormalizeRoute(route.Path))
+            .Select(static route => PublicRouteCatalog.NormalizeRoute(route.Path))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var action in surface.HeroCtas.Concat(surface.GuestShellActions))
@@ -138,6 +146,11 @@ public sealed class PublicLandingService
         foreach (var overlay in surface.RegisteredOverlays)
         {
             ValidateRoute(overlay.Path, allowedRoutes, $"registered overlay '{overlay.Id}'");
+        }
+
+        foreach (var section in surface.Sections)
+        {
+            ValidateRoute(section.Route, allowedRoutes, $"landing section '{section.Id}'");
         }
 
         foreach (var card in surface.FeatureCards)
@@ -159,29 +172,11 @@ public sealed class PublicLandingService
             return;
         }
 
-        var normalized = NormalizeRoute(href);
+        var normalized = PublicRouteCatalog.NormalizeRoute(href);
         if (!allowedRoutes.Contains(normalized))
         {
             throw new InvalidOperationException($"{description} points at missing route '{href}'.");
         }
-    }
-
-    private static string NormalizeRoute(string route)
-    {
-        var trimmed = route.Trim();
-        var hash = trimmed.IndexOf('#');
-        if (hash >= 0)
-        {
-            trimmed = trimmed[..hash];
-        }
-
-        var query = trimmed.IndexOf('?');
-        if (query >= 0)
-        {
-            trimmed = trimmed[..query];
-        }
-
-        return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
     }
 
     private static void ValidateSelfLinkPolicy(PublicFeatureCardDto card)
@@ -221,7 +216,7 @@ public sealed class PublicLandingService
                 continue;
             }
 
-            if (string.Equals(NormalizeRoute(candidate), hostRoute, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(PublicRouteCatalog.NormalizeRoute(candidate), hostRoute, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException($"public feature card '{card.Id}' points back to its own surface without self_link_allowed.");
             }
