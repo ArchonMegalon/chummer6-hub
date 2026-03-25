@@ -26,11 +26,5 @@ secondary_nav:
   - label: Contact
     href: /contact
 utility_nav:
-  - label: Status
-    href: /status
-  - label: Progress
-    href: /progress
-  - label: Leaderboards
-    href: /leaderboards
   - label: GitHub
     href: https://github.com/ArchonMegalon/chummer6-hub

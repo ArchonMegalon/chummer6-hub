@@ -6,32 +6,38 @@ cards:
     bucket: start_here
     title: Build
     summary: Create and inspect a character without mystery math.
-    href: /what-is-chummer
+    href: /downloads
     badge: Workflow
     audience: public
     image_family: solo_operator
     asset_slot: capability_build_runner
+    action_label: Get the preview build
+    proof_note: "Proof: a real preview build exists now, not just a story about one."
     pain: Clean dossiers, visible tradeoffs, and no hidden modifier stack.
     payoff: Deterministic totals stay readable before you ever take the character to the table.
   - id: see_whats_real
     bucket: start_here
     title: Explain
     summary: See exactly why the number changed.
-    href: /what-is-chummer
+    href: /now#real-rules-truth
     badge: Workflow
     audience: public
     image_family: simulation_bench
     asset_slot: capability_check_rules
+    action_label: Inspect a real proof trail
+    proof_note: "Proof: modifier trail, source trace, and repeatable output stay visible together."
     pain: Follow receipts, source traces, and modifier trails instead of arguing from vibes.
     payoff: The answer stays inspectable when somebody asks where the number came from.
   - id: get_the_poc
     bucket: start_here
     title: Run
     summary: Keep the session moving when devices or networks drift.
-    href: /now
+    href: /now#real-mobile-prep
     badge: Workflow
     audience: public
     image_family: streetfront
+    action_label: See continuity in preview
+    proof_note: "Proof: continuity survives device drift without hiding the current product limits."
     pain: Carry the same dossier and session state across devices without losing trust.
     payoff: Local-first continuity keeps the table moving even when the network does not cooperate.
   - id: deterministic_truth
@@ -42,6 +48,7 @@ cards:
     badge: Trust
     audience: public
     image_family: simulation_bench
+    microproof: Deterministic engine|Repeatable totals|Clean audit trail
     pain: Engine-backed modifiers
     payoff: Repeatable totals and clean audits
   - id: receipts_and_provenance
@@ -52,6 +59,7 @@ cards:
     badge: Proof
     audience: public
     image_family: dossier_desk
+    microproof: Modifier trail|Source trace|Visible evidence
     pain: Modifier trail and source trace
     payoff: Visible evidence instead of table arguments
   - id: local_first_continuity
@@ -62,26 +70,29 @@ cards:
     badge: Continuity
     audience: public
     image_family: streetfront
+    microproof: Durable state|Offline posture|Clean recovery
     pain: Durable state across devices
     payoff: Recover the session without guessing
   - id: lane_player
     bucket: choose_your_lane
     title: Player
     summary: Build a clean dossier and understand every number.
-    href: /what-is-chummer
+    href: /downloads
     badge: Available now
     audience: public
     image_family: solo_operator
     asset_slot: lane_player
+    action_label: Start with the preview build
   - id: lane_gm
     bucket: choose_your_lane
     title: GM
     summary: Run faster, recover state, and brief the team.
-    href: /horizons
+    href: /now#real-mobile-prep
     badge: Mixed
     audience: public
     image_family: archive_stair
     asset_slot: lane_gm
+    action_label: See GM-ready continuity
   - id: lane_creator
     bucket: choose_your_lane
     title: Creator
@@ -91,20 +102,22 @@ cards:
     audience: public
     image_family: prop_cluster
     asset_slot: lane_creator
+    action_label: See creator outputs
   - id: real_rules_truth
     bucket: whats_real_now
     title: Deterministic rules truth
-    summary: Core-owned math and receipts are already the trust anchor.
-    href: /now
+    summary: The explanation trail is already visible enough to inspect a real result instead of trusting a black box.
+    href: /now#real-rules-truth
     badge: Live now
     audience: public
     image_family: simulation_bench
+    action_label: Inspect the proof trail
   - id: real_public_guide
-    bucket: whats_real_now
+    bucket: supporting_reads
     title: Product guide and roadmap
-    summary: The product story and roadmap are already readable in one pass.
+    summary: The deeper guide explains the current shape of the product and where the broader platform is still maturing.
     href: /what-is-chummer#public-guide
-    badge: Live now
+    badge: Guide
     audience: public
     image_family: archive_stair
     cta_kind: route
@@ -116,18 +129,20 @@ cards:
     bucket: whats_real_now
     title: Local-first prep and session continuity
     summary: Session posture already assumes devices drift and continuity has to survive it.
-    href: /now
+    href: /now#real-mobile-prep
     badge: Inspectable
     audience: public
     image_family: streetfront
+    action_label: See continuity in preview
   - id: real_release_shelf
     bucket: whats_real_now
     title: Preview releases, channels, and notes
     summary: Preview releases, update channels, notes, and integrity details stay together.
-    href: /downloads
+    href: /downloads#recommended-download
     badge: Live now
     audience: public
     image_family: facility_exterior
+    action_label: Open the installer shelf
   - id: horizon_nexus_pan
     bucket: coming_next
     title: NEXUS-PAN
@@ -254,12 +269,34 @@ cards:
     external_ok: true
     pain: Some heavy local workflows still need more muscle.
     payoff: Local acceleration stays optional and bounded instead of becoming a mystery dependency.
+  - id: artifact_preview_build
+    bucket: featured_artifacts
+    title: Current preview build
+    summary: The installer shelf, release channel, and integrity trail are live right now.
+    href: /downloads
+    badge: Available today
+    audience: public
+    image_family: facility_exterior
+    asset_slot: release_current_build
+    detail_route: /downloads
+    action_label: Open the installer shelf
+  - id: artifact_rules_receipt
+    bucket: featured_artifacts
+    title: Explanation receipt trail
+    summary: The proof shelf already shows how Chummer explains a result instead of hiding the path.
+    href: /now#real-rules-truth
+    badge: Available today
+    audience: public
+    image_family: simulation_bench
+    asset_slot: capability_check_rules
+    detail_route: /now#real-rules-truth
+    action_label: Inspect the proof trail
   - id: artifact_runsite_pack
     bucket: featured_artifacts
     title: Runsite pack
     summary: Walk the job before the team walks into it.
     href: /horizons#horizon-runsite
-    badge: Coming soon
+    badge: Preview
     audience: public
     image_family: facility_exterior
     detail_route: /horizons#horizon-runsite
@@ -268,7 +305,7 @@ cards:
     title: Dossier brief
     summary: Turn notes into a credible mission packet.
     href: /horizons#horizon-jackpoint
-    badge: Coming soon
+    badge: Preview
     audience: public
     image_family: dossier_desk
     detail_route: /horizons#horizon-jackpoint
@@ -277,7 +314,7 @@ cards:
     title: Campaign primer
     summary: Bring new players in without the two-hour lecture.
     href: /horizons#horizon-runbook-press
-    badge: Coming soon
+    badge: Preview
     audience: public
     image_family: prop_cluster
     detail_route: /horizons#horizon-runbook-press
@@ -286,14 +323,14 @@ cards:
     title: Replay and after-action
     summary: See what happened, not just what people remember.
     href: /horizons#horizon-ghostwire
-    badge: Coming soon
+    badge: Preview
     audience: public
     image_family: boulevard_of_futures
     detail_route: /horizons#horizon-ghostwire
   - id: participate_feedback
     bucket: participate
     title: Report a problem
-    summary: Use the public issue tracker when you want to file a bug or a concrete improvement.
+    summary: Use the public support path when you want to flag a bug, confusing copy, or a concrete improvement.
     href: /participate#report-a-problem
     badge: Public
     audience: public
@@ -305,15 +342,18 @@ cards:
   - id: participate_future
     bucket: participate
     title: Suggest a future
-    summary: Advisory signals are welcome even though canon still lives in design.
-    href: /participate#suggest-a-future
+    summary: Tell Chummer what would help your table next, then keep the product team pointed at the right lane.
+    href: /signup?next=/home
     badge: Public
     audience: public
     image_family: boulevard_of_futures
+    guest_href: /signup?next=/home
+    registered_href: /home
+    action_label: Create account to signal interest
   - id: participate_booster
     bucket: participate
-    title: I have a ChatGPT subscription
-    summary: Open the bounded booster lane if you want to lend temporary premium capacity.
+    title: Guided contribution
+    summary: Open the signed-in contribution flow when you want to lend focused, review-safe help.
     href: /participate/codex
     badge: Registered
     audience: public
@@ -334,10 +374,10 @@ cards:
     registered_href: /home#beta-interest
   - id: release_latest
     bucket: release_shelf
-    title: Latest POC build
-    summary: Current public drop, release notes, and integrity clues.
+    title: Current preview build
+    summary: Current preview installer, release notes, and integrity details in one shelf.
     href: /downloads
-    badge: POC
+    badge: Preview
     audience: public
     image_family: facility_exterior
     render_mode: external_explainer

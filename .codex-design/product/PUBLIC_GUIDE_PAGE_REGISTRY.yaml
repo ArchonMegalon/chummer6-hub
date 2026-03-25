@@ -135,7 +135,7 @@ page_types:
     - products/chummer/OWNERSHIP_MATRIX.md
     required_topics:
     - free baseline help
-    - bounded booster lane
+    - guided contribution lane
     - privacy and review safety
     - free-later explanation
     forbidden_terms:

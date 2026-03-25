@@ -9,9 +9,20 @@ public sealed class PublicTrustContentService
             Chrome: chrome,
             Eyebrow: "Help",
             Heading: "How to get help without guessing",
-            Intro: "Chummer is still early access, but the support path should still feel boring: where to ask, what is public, what stays private, and when the bounded participation lane makes sense.",
+            Intro: "Chummer is still early access, but the support path should still feel boring: where to ask, what is public, what stays private, and when guided contribution actually makes sense.",
             Sections: new[]
             {
+                new TrustPageSectionViewModel(
+                    "First-party support",
+                    "Start with the product surfaces first",
+                    "Use the help, FAQ, account, privacy, terms, and contact pages before you fall through to deeper repo or community routes. The product front should answer normal customer questions without making you spelunk for them.",
+                    new[]
+                    {
+                        "Help explains the support path.",
+                        "FAQ answers the normal first questions.",
+                        "Account handles sign-in, recovery, and linked-download follow-up.",
+                        "Contact is where you go when the next step is still unclear."
+                    }),
                 new TrustPageSectionViewModel(
                     "Public feedback lane",
                     "Start with public feedback",
@@ -21,12 +32,12 @@ public sealed class PublicTrustContentService
                         "Report a bug or rough edge.",
                         "Flag confusing public copy or onboarding friction.",
                         "Suggest a future lane that would help your table.",
-                        "Read status first when you are checking whether something is already known."
+                        "Check what works today first when you want the current customer-facing state."
                     }),
                 new TrustPageSectionViewModel(
-                    "Booster lane",
+                    "Guided contribution lane",
                     "Use participation only when you want the deeper lane",
-                    "Participation is the opt-in path for bounded contribution help. It is temporary, review-safe, and additive on top of the normal public feedback path.",
+                    "Participation is the opt-in path for guided contribution help. It is temporary, review-safe, and additive on top of the normal public feedback path.",
                     new[]
                     {
                         "Participation is optional.",
@@ -73,8 +84,8 @@ public sealed class PublicTrustContentService
                     "Participation and preview",
                     new[]
                     {
-                        new FaqEntryViewModel("How can I help?", "Start with public feedback, bug reports, and feature suggestions. If you want to go further, the bounded participation lane exists as an opt-in path."),
-                        new FaqEntryViewModel("Do I need to participate to help?", "No. The public feedback path remains the default path. Participation is optional and additive, not the price of admission."),
+                        new FaqEntryViewModel("How can I help?", "Start with public feedback, bug reports, and feature suggestions. If you want to go further, the guided contribution lane exists as an opt-in path."),
+                        new FaqEntryViewModel("Do I need to participate to help?", "No. The public feedback path remains the default path. Guided contribution is optional and additive, not the price of admission."),
                         new FaqEntryViewModel("Can I participate privately?", "Yes. Recognition should remain opt-in, and private participation should still be possible even when badges or leaderboards exist."),
                         new FaqEntryViewModel("Will some previews become free later?", "That is the long-run intent. Some lanes may start tighter while approvals, provenance, compatibility, or support costs are still unusually heavy.")
                     }),
@@ -185,14 +196,14 @@ public sealed class PublicTrustContentService
             Sections: new[]
             {
                 new TrustPageSectionViewModel(
-                    "Product bugs and rough edges",
-                    "Use the public issue tracker for product feedback",
-                    "If something is broken, confusing, or misleading on the public surface, use the public tracker. That keeps the problem visible and stops support from disappearing into side channels.",
+                    "Account and sign-in trouble",
+                    "Start from the account and help surfaces",
+                    "Use the account page for sign-in, recovery, and linked-download questions first. Use the help surface when you need the current support path explained in product language.",
                     null),
                 new TrustPageSectionViewModel(
-                    "Account and sign-in trouble",
-                    "Start from the first-party account and help surfaces",
-                    "Use the account page for sign-in, recovery, and channel issues, and use the help surface when you need the current support path explained in product language.",
+                    "Product bugs and rough edges",
+                    "Use the public issue tracker for reproducible public bugs",
+                    "If something on the public surface is broken, confusing, or misleading and you can describe it cleanly, the public tracker keeps the problem visible instead of letting it disappear into side channels.",
                     null),
                 new TrustPageSectionViewModel(
                     "Participation questions",
@@ -200,16 +211,16 @@ public sealed class PublicTrustContentService
                     "The participation route should answer what the lane is for, what gets stored, and when recognition appears before you touch the wizard.",
                     null),
                 new TrustPageSectionViewModel(
-                    "Status first",
-                    "Check status when a failure looks systemic",
-                    "If sign-in, downloads, or participation start failing across the board, check status first so you can tell the difference between an account issue and a host issue.",
+                    "What works today first",
+                    "Check the customer state page when a failure looks systemic",
+                    "If sign-in, downloads, or participation start failing across the board, check what works today first so you can tell the difference between an account issue and a host issue.",
                     null)
             },
             Actions: new[]
             {
-                new TrustPageActionViewModel("Open public issue tracker", "https://github.com/ArchonMegalon/Chummer6/issues", "primary"),
-                new TrustPageActionViewModel("Open help", "/help", "secondary"),
-                new TrustPageActionViewModel("Check status", "/status", "ghost")
+                new TrustPageActionViewModel("Open help", "/help", "primary"),
+                new TrustPageActionViewModel("Open account", "/account", "secondary"),
+                new TrustPageActionViewModel("Open public issue tracker", "https://github.com/ArchonMegalon/Chummer6/issues", "ghost")
             });
 
     private static IReadOnlyList<TrustPageActionViewModel> BuildTrustActions(bool authenticated)

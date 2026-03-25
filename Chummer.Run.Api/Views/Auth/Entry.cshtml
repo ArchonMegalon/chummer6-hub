@@ -11,7 +11,7 @@
         <h1 class="hero-brand">CHUMMER</h1>
         <h2 class="hero-headline">@Model.Heading</h2>
         <p class="auth-entry__copy">@Model.SupportLine</p>
-        <p class="auth-entry__trust">One account keeps preview access, updates, and contribution status together.</p>
+        <p class="auth-entry__trust">One account keeps downloads, release follow-up, and contribution status together.</p>
     </div>
 
     <div class="auth-entry__panel auth-panel auth-panel--entry">
@@ -32,7 +32,15 @@
         {
             <div class="auth-panel__intro">
                 <h3>Email first</h3>
-                <p>Use email to request access and keep the first step simple. Google stays available if you prefer the faster return path.</p>
+                <p>Create the account first, then decide how much more you want from it. Email keeps the first step simple; Google stays available if you prefer the faster return path.</p>
+            </div>
+            <div class="auth-benefits">
+                <span class="tag">What you get right away</span>
+                <ul>
+                    <li>A Chummer account that can link downloads and install receipts.</li>
+                    <li>A place to follow roadmap updates and raise beta interest.</li>
+                    <li>A calmer return path when you come back for the next preview.</li>
+                </ul>
             </div>
             <form class="auth-form" method="post" action="/auth/email/start">
                 @Html.AntiForgeryToken()
@@ -63,7 +71,15 @@
         {
             <div class="auth-panel__intro">
                 <h3>Fastest way back in</h3>
-                <p>Use Google for the fastest browser sign-in, or switch to a magic link if you prefer email delivery and a quieter return path.</p>
+                <p>Sign in to reopen your downloads, account settings, roadmap follows, and any participation state already attached to your account.</p>
+            </div>
+            <div class="auth-benefits">
+                <span class="tag">What opens after sign-in</span>
+                <ul>
+                    <li>Your signed-in home and account surfaces.</li>
+                    <li>Account-linked download receipts and claim tickets.</li>
+                    <li>Any beta interest, update follows, or guided contribution history already on the account.</li>
+                </ul>
             </div>
 
             @if (Model.GoogleAvailable)
@@ -85,10 +101,6 @@
                     <div class="field">
                         <label for="email">Email</label>
                         <input id="email" name="email" type="email" placeholder="runner@example.com" required />
-                    </div>
-                    <div class="field">
-                        <label for="displayName">Display name</label>
-                        <input id="displayName" name="displayName" placeholder="Runner" />
                     </div>
                     <button class="button-like button-like--secondary" type="submit">Send magic link</button>
                 </form>
