@@ -65,6 +65,7 @@ builder.Services.AddSingleton<RewardService>();
 builder.Services.AddSingleton<EntitlementService>();
 builder.Services.AddSingleton<LeaderboardService>();
 builder.Services.AddSingleton<LedgerService>();
+builder.Services.AddSingleton<SupportCaseService>();
 builder.Services.AddSingleton<CrashSupportService>();
 builder.Services.AddScoped<BoostSessionService>();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>

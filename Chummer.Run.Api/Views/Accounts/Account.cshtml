@@ -10,6 +10,7 @@
     var claimedInstallations = Model.InstallLinking.ClaimedInstallations?.Count ?? 0;
     var activeAccessRights = Model.InstallLinking.ActiveGrants?.Count ?? 0;
     var pendingClaims = Model.InstallLinking.PendingClaimTickets.Count;
+    var openSupportCases = Model.SupportCases.Count(item => !string.Equals(item.Status, "user_notified", StringComparison.OrdinalIgnoreCase));
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -65,6 +66,7 @@
             <a href="#profile">Profile</a>
             <a href="#sign-in">Primary sign-in</a>
             <a href="#recovery">Recovery email</a>
+            <a href="#support">Support</a>
             <a href="#devices-access">Devices &amp; access</a>
             <a href="#channels">Linked channels</a>
             <a href="#privacy">Privacy</a>
@@ -156,6 +158,79 @@
                     <button class="button-like button-like--secondary" type="submit">Connect Telegram</button>
                     <p id="telegramStatusNotice" class="muted-copy" hidden></p>
                 </form>
+            </section>
+
+            <section id="support" class="settings-section">
+                <div class="settings-section__header">
+                    <h2>Support and feedback</h2>
+                    <p>Report a bug, confusing copy, install trouble, or product feedback without leaving the account surface. Visible status stays attached to the case instead of disappearing into email.</p>
+                </div>
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Open or active cases</span>
+                        <strong>@openSupportCases</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Total recent cases</span>
+                        <strong>@Model.SupportCases.Count</strong>
+                    </div>
+                </div>
+                <form id="supportCaseForm" class="settings-form">
+                    <div class="field">
+                        <label for="supportCaseKind">Case type</label>
+                        <select id="supportCaseKind">
+                            <option value="bug_report">Bug report</option>
+                            <option value="feedback">Feedback</option>
+                            <option value="install_help">Install or update help</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="supportCaseInstallation">Related install</label>
+                        <select id="supportCaseInstallation">
+                            <option value="">No specific install</option>
+                            @foreach (var installation in Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Run.Contracts.InstallLinking.ClaimedInstallationDto>())
+                            {
+                                <option
+                                    value="@installation.InstallationId"
+                                    data-version="@installation.Version"
+                                    data-channel="@installation.Channel"
+                                    data-head="@installation.HeadId"
+                                    data-platform="@installation.Platform"
+                                    data-arch="@installation.Arch">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="supportCaseTitle">Short title</label>
+                        <input id="supportCaseTitle" maxlength="160" placeholder="Update prompt was unclear on Linux" />
+                    </div>
+                    <div class="field">
+                        <label for="supportCaseSummary">One-line summary</label>
+                        <input id="supportCaseSummary" maxlength="280" placeholder="The updater offered a restart but did not explain what was staged." />
+                    </div>
+                    <div class="field">
+                        <label for="supportCaseDetail">What happened</label>
+                        <textarea id="supportCaseDetail" rows="6" placeholder="Tell Chummer what you expected, what actually happened, and anything that would help route the fix."></textarea>
+                    </div>
+                    <button class="button-like button-like--primary" type="submit">Submit support case</button>
+                    <p id="supportCaseStatusNotice" class="muted-copy" hidden></p>
+                </form>
+                @if (Model.SupportCases.Count == 0)
+                {
+                    <p class="muted-copy">No support cases yet. New reports will show up here with routing, release, and notification state.</p>
+                }
+                else
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var supportCase in Model.SupportCases)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@supportCase.Title</span>
+                                <strong>@HumanizeStatus(supportCase.Status, "New") · @supportCase.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                            </div>
+                        }
+                    </div>
+                }
             </section>
 
             <section id="devices-access" class="settings-section">
@@ -433,6 +508,43 @@
       ui.setNotice(notice, ui.describeError(error, "Participation settings could not be saved."), true);
     } finally {
       ui.setButtonBusy(button, false, "Saving...");
+    }
+  });
+
+  document.getElementById("supportCaseForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("supportCaseStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    const installationSelect = document.getElementById("supportCaseInstallation");
+    const installationOption = installationSelect.options[installationSelect.selectedIndex];
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Submitting...");
+    try {
+      await ui.requestJson("/api/v1/support/cases", {
+        method: "POST",
+        json: {
+          kind: document.getElementById("supportCaseKind").value,
+          title: document.getElementById("supportCaseTitle").value,
+          summary: document.getElementById("supportCaseSummary").value,
+          detail: document.getElementById("supportCaseDetail").value,
+          installationId: installationSelect.value || null,
+          applicationVersion: installationOption?.dataset?.version || null,
+          releaseChannel: installationOption?.dataset?.channel || null,
+          headId: installationOption?.dataset?.head || null,
+          platform: installationOption?.dataset?.platform || null,
+          arch: installationOption?.dataset?.arch || null,
+          source: "hub_account"
+        }
+      });
+      document.getElementById("supportCaseTitle").value = "";
+      document.getElementById("supportCaseSummary").value = "";
+      document.getElementById("supportCaseDetail").value = "";
+      installationSelect.selectedIndex = 0;
+      ui.setNotice(notice, "Support case submitted. Refresh the page in a moment to see the new status entry.");
+    } catch (error) {
+      ui.setNotice(notice, ui.describeError(error, "Support case could not be submitted right now."), true);
+    } finally {
+      ui.setButtonBusy(button, false, "Submitting...");
     }
   });
 })();

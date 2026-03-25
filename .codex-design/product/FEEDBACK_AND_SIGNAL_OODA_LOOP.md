@@ -50,6 +50,7 @@ Fleet owns:
 * dedupe
 * clustering
 * evidence packets
+* support-case packet artifacts for operator and designer review
 * repro or routing aids
 * grouped candidate actions
 

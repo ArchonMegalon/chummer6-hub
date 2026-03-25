@@ -8,11 +8,16 @@ namespace Chummer.Run.Api.Services.Support;
 public sealed class CrashSupportService
 {
     private readonly SupportStore _store;
+    private readonly SupportCaseService _supportCases;
     private readonly ILogger<CrashSupportService> _logger;
 
-    public CrashSupportService(SupportStore store, ILogger<CrashSupportService> logger)
+    public CrashSupportService(
+        SupportStore store,
+        SupportCaseService supportCases,
+        ILogger<CrashSupportService> logger)
     {
         _store = store;
+        _supportCases = supportCases;
         _logger = logger;
     }
 
@@ -65,6 +70,7 @@ public sealed class CrashSupportService
             _store.IncidentIdByCrashId[normalizedCrashId] = incidentId;
             _store.ClustersById[clusterId] = cluster;
             _store.WorkItemsById[workItemId] = workItem;
+            _supportCases.UpsertFromCrash(incident, cluster, workItem);
             _store.PersistLocked();
 
             _logger.LogInformation(
@@ -178,6 +184,9 @@ public sealed class CrashSupportService
             Platform = NormalizeOptional(envelope.Platform),
             DesktopHead = NormalizeOptional(envelope.DesktopHead),
             RuntimeHead = NormalizeOptional(envelope.RuntimeHead),
+            InstallationId = NormalizeOptional(envelope.InstallationId),
+            UserId = NormalizeOptional(envelope.UserId),
+            SubjectId = NormalizeOptional(envelope.SubjectId),
             LastActionCategory = NormalizeOptional(envelope.LastActionCategory),
             LogTail = NormalizeLogTail(envelope.LogTail)
         };

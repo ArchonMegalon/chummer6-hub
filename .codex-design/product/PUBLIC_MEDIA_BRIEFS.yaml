@@ -21,15 +21,15 @@ render_rules:
   semantic_anchor_count_minimum: 3
 shared_prompt_scaffold:
   style_anchor: |
-    premium software-campaign still, grounded Shadowrun-inspired cyberpunk fantasy, editorial realism, original composition, navy and graphite base palette, electric blue interface glow, warm amber proof lighting, subtle rain reflections, realistic skin and materials, layered physical props, high information density, product-specific semantics, no readable text, no logos
+    premium cyberpunk campaign scene art, grounded Shadowrun-inspired cyberpunk fantasy, tactile realism with illustrated or poster energy allowed when the scene stays lived-in, original composition, navy and graphite base palette, electric blue interface glow, warm amber proof lighting, subtle rain reflections, textured materials, layered physical props, high information density, product-specific semantics, no readable text, no logos
   negative_prompt: |
-    readable text, letters, giant monogram, logo, watermark, central signboard, empty alley, empty boulevard, billboard centerpiece, sparse desk with one prop, lone brooding figure at vague wall, entertainment poster pose, action-movie gun pose, anime, comic art, cel shading, cosplay look, over-saturated magenta neon, low-detail hands, distorted anatomy, fisheye lens, huge lens flare, floating nonsense UI clutter, stock-photo smile
+    readable text, letters, giant monogram, logo, watermark, central signboard, empty alley, empty boulevard, billboard centerpiece, sparse desk with one prop, lone brooding figure at vague wall, empty title-card pose with no scene logic, action-movie gun pose, anime, cel shading, cosplay look, over-saturated magenta neon, low-detail hands, distorted anatomy, fisheye lens, huge lens flare, floating nonsense UI clutter, stock-photo smile
 critical_asset_style_epoch:
-  mode: premium_dark_product_surface
+  mode: flagship_poster
   style_anchor: |
-    premium software-campaign still for a cyberpunk-fantasy tabletop assistant, grounded cinematic realism, dark blue and steel palette, rain on glass, polished workstation surfaces, subtle holographic overlays, restrained neon, believable human or metahuman presence, high-end commercial photography plus light VFX, trustworthy and professional, one clear focal subject, strong negative space for web copy, premium SaaS launch quality, no text, no logos, no visible UI labels, no vector art, no illustration, no anime, no comic-book style
+    illustrated cover-grade promo poster for a cyberpunk-fantasy tabletop world, high-contrast painted realism, dramatic grouping, strong silhouette hierarchy, saturated but grounded color, visible grime, patched gear, neon and sodium-vapor contrast, metahuman street-life specificity, dense practical props, diegetic overlays added in post, unmistakably Shadowrun-adjacent runner life, scene-driven poster energy, not a clean cinematic screenshot, not a generic software landing still
   negative_prompt: |
-    vector art, svg style, flat illustration, cartoon, anime, comic, painterly, generic skyline, empty hallway, empty stairs, stock photo smile, cosplay armor, excessive magenta or purple, cluttered collage, readable text, watermarks, logos, labels, fake UI text, deformed hands, extra fingers, duplicate limbs, bad anatomy, warped face, blurry, low resolution, oversharpened, heavy grain, posterized lighting, fisheye distortion
+    stock-photo realism, quiet editorial still, clean clinic, sterile exam room, generic sci-fi workshop, moody empty corridor, tasteful sparse composition, corporate lifestyle ad, one person in a dim room, paperwork meeting, tidy suburban medical office, bland near-future thriller vibe, clean software-campaign still
 semantic_anchors:
   - dossier papers or briefing packet
   - six-sided dice
@@ -50,7 +50,7 @@ rules:
   - A premium flagship poster or still hero is preferred over a mediocre teaser loop.
   - First-contact assets must feel information-rich, layered, and unmistakably product-specific rather than like quiet generic cyberpunk mood art.
   - Hero, index, and flagship horizon art must carry visible semantic anchors for what the product does; style alone is not enough.
-  - Premium launch-campaign polish is welcome when it still reads as a lived product scene instead of a title card or fashion pose.
+  - Poster energy is welcome on flagship assets when it still reads as a lived product scene instead of a title card or fashion pose.
   - Critical public assets must choose one overlay posture before compositing: none, ambient diegetic, smartlink tactical, medscan diagnostic, or forge review AR.
   - Overlay geometry on flagship art should prefer rails, brackets, spline traces, radial halos, and capsule chips over large face-covering rectangles.
   - Central signboards, empty roadway ambience, and low-density “one person plus one vague prop wall” compositions are failures on public guide/landing surfaces.
@@ -74,13 +74,14 @@ visual_contract:
     humor_allowed: false
     pseudo_text_allowed: false
     required_setting_markers:
-      - rain-heavy intake bay or prep-service rack required
-      - dossiers, proof props, and service hardware required
-      - visible city depth or wet-glass exterior required
-      - layered props across foreground, midground, and background required
+      - improvised garage clinic required
+      - hacked med gear required
+      - tool chest or lift bay residue required
+      - cheap fluorescent strips or work lamps required
+      - wet concrete, tarp, or extension-cord grime required
     required_cast_markers:
-      - operator relationship required
-      - runner or table-prep pressure required
+      - metahuman clinician required
+      - wounded runner required
       - assistant or teammate encouraged
     required_overlay_schema:
       - BOD
@@ -93,14 +94,16 @@ visual_contract:
       - WIL
       - ESS
       - EDGE
+    required_status_labels:
+      - UPGRADING
     forbidden_environment_markers:
-      - clean clinic with no lived pressure
-      - empty desk stage
-      - vague blue room
-      - empty roadway ambience
+      - clean hospital exam room
+      - clean van interior with no garage cues
+      - pristine dental-clinic lighting
+      - white-box medical showroom
     forbidden_cast_defaults:
-      - lone isolated figure
-      - vague hooded silhouette with no role readability
+      - lone clean human doctor in white coat
+      - ambiguous hooded figure with no clinical role readability
     cyberpunk_intensity: high
     shadowrun_lore_weight: high
     must_show_semantic_anchors:
@@ -110,7 +113,7 @@ visual_contract:
       - visible reasoning cues or diegetic overlay traces
     must_not_show:
       - generic brooding profile at a vague wall
-      - clean isolated workstation
+      - single-person dim bay still
       - lone crate or tabletop glamour
       - empty alley mood still
       - central readable signboard
@@ -184,8 +187,8 @@ visual_contract:
       - semantically empty glow props
 sections:
   - id: hero
-    brief_family: intake_bay
-    scene_families: intake_bay, prep_service_rack, boulevard_of_futures
+    brief_family: clinic_intake
+    scene_families: streetdoc_garage_clinic, getaway_van_triage, safehouse_patchup, runner_upgrade_bay, clinic_intake
     motion_policy: premium_still_or_short_muted_loop
     density_target: high
     overlay_density: medium

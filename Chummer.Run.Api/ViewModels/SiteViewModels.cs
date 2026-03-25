@@ -3,6 +3,7 @@ using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.InstallLinking;
 using Chummer.Run.Contracts.Leaderboards;
 using Chummer.Run.Contracts.PublicSurface;
+using Chummer.Run.Contracts.Support;
 
 namespace Chummer.Run.Api.ViewModels;
 
@@ -243,7 +244,8 @@ public sealed record AccountPageViewModel(
     AccountLinkSummaryDto Links,
     HubUserExperienceDto Experience,
     bool GoogleAvailable,
-    InstallLinkingSummaryDto InstallLinking);
+    InstallLinkingSummaryDto InstallLinking,
+    IReadOnlyList<SupportCaseProjection> SupportCases);
 
 public sealed record AuthPageViewModel(
     SiteChromeViewModel Chrome,
