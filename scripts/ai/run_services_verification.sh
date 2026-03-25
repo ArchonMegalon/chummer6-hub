@@ -54,8 +54,11 @@ rg -n 'public sealed class AuthController|/login|/signup|/logout|/auth/email/sta
   Chummer.Run.Api/Controllers/AuthController.cs >/dev/null
 rg -n 'public sealed class AccountService|public sealed class GroupService|public sealed class BoostSessionService|public sealed class LedgerService|public sealed class RewardService|public sealed class EntitlementService|public sealed class LeaderboardService|public sealed class CommunityStore' \
   Chummer.Run.Api/Services/Community/*.cs >/dev/null
-rg -n 'public sealed class CampaignSpineService|RunnerDossierProjection|CampaignProjection|RunProjection|WorkspaceRestoreProjection|AccountCampaignSummary' \
+rg -n 'public sealed class CampaignSpineService|RunnerDossierProjection|CampaignProjection|RunProjection|CampaignWorkspaceProjection|CampaignReadinessCue|WorkspaceRestoreProjection|AccountCampaignSummary' \
   Chummer.Run.Api/Services/Community/CampaignSpineService.cs >/dev/null
+rg -n 'OperatorRole|CampaignVisibilitySummary|ApprovalState|Workspaces|Campaign workspace|GM readiness|Permissions' \
+  Chummer.Campaign.Contracts/CampaignContracts.cs \
+  Chummer.Run.Api/Views/Accounts/Account.cshtml >/dev/null
 rg -n 'public sealed class IdentityLinkService|Google|Facebook|Telegram|EA' \
   Chummer.Run.Api/Services/Community/IdentityLinkService.cs >/dev/null
 rg -n 'public sealed class PublicLandingService|PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|PUBLIC_LANDING_ASSET_REGISTRY\.yaml|guest_shell_actions|asset_slot|auth_routes|registered_overlays|feature registry' \

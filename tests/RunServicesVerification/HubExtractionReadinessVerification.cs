@@ -415,10 +415,15 @@ internal static class HubExtractionReadinessVerification
                      "RunnerDossierProjection",
                      "CampaignProjection",
                      "RunProjection",
+                     "CampaignWorkspaceProjection",
+                     "CampaignReadinessCue",
                      "WorkspaceRestoreProjection",
                      "AccountCampaignSummary",
                      "EnsurePersonalDossierLocked",
-                     "BuildRestoreProjection"
+                     "BuildRestoreProjection",
+                     "BuildWorkspaceProjection",
+                     "ResolveOperatorRole",
+                     "CampaignVisibilitySummary"
                  })
         {
             VerificationAssert.True(

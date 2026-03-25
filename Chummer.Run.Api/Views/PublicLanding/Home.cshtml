@@ -15,7 +15,10 @@
     var dossiers = Model.CampaignSpine.Dossiers.Take(3).ToArray();
     var campaigns = Model.CampaignSpine.Campaigns.Take(3).ToArray();
     var runs = Model.CampaignSpine.Runs.Take(3).ToArray();
+    var workspaces = Model.CampaignSpine.Workspaces.Take(2).ToArray();
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
+    var workspaceReadinessCount = workspaces.SelectMany(item => item.ReadinessCues).Count();
+    var ruleEnvironmentCount = workspaces.Select(item => item.RuleEnvironment.CompatibilityFingerprint).Distinct(StringComparer.OrdinalIgnoreCase).Count();
     var releasedOrNotifiedCases = Model.SupportCases
         .Where(item =>
             string.Equals(item.Status, "released_to_reporter_channel", StringComparison.OrdinalIgnoreCase)
@@ -341,10 +344,30 @@
                         <strong>@Model.CampaignSpine.Campaigns.Count</strong>
                     </div>
                     <div class="settings-summary-row">
+                        <span>Rule environments</span>
+                        <strong>@(ruleEnvironmentCount == 0 ? "Pending" : ruleEnvironmentCount.ToString())</strong>
+                    </div>
+                    <div class="settings-summary-row">
                         <span>Open support cases</span>
                         <strong>@openSupportCases</strong>
                     </div>
+                    <div class="settings-summary-row">
+                        <span>GM readiness cues</span>
+                        <strong>@(workspaceReadinessCount == 0 ? "Clear" : workspaceReadinessCount.ToString())</strong>
+                    </div>
                 </div>
+                @if (workspaces.Length > 0)
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var workspace in workspaces)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@workspace.CampaignName</span>
+                                <strong>@workspace.RuleEnvironment.CompatibilityFingerprint · @workspace.RuleEnvironment.ApprovalState</strong>
+                            </div>
+                        }
+                    </div>
+                }
                 <a class="button-like button-like--secondary" href="/account#campaigns">Open campaign return</a>
             </section>
         }

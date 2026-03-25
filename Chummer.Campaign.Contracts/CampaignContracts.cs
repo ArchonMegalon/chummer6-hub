@@ -26,6 +26,7 @@ public sealed record RuleEnvironmentRef(
     string EnvironmentId,
     string OwnerScope,
     string CompatibilityFingerprint,
+    string ApprovalState,
     IReadOnlyList<string> SourcePacks,
     IReadOnlyList<string> HouseRulePacks,
     IReadOnlyList<string> OptionToggles);
@@ -141,14 +142,40 @@ public sealed record CommunityOperatorProjection(
     string GroupName,
     string GroupType,
     string Visibility,
+    string OperatorRole,
+    string CampaignVisibilitySummary,
+    IReadOnlyList<string> CampaignNames,
+    RuleEnvironmentRef RuleEnvironment,
     IReadOnlyList<string> Capabilities,
     int MemberCount,
     int ActiveCampaignCount,
     int ActiveSponsorSessionCount);
 
+public sealed record CampaignReadinessCue(
+    string CueId,
+    string Severity,
+    string Title,
+    string Summary);
+
+public sealed record CampaignWorkspaceProjection(
+    string WorkspaceId,
+    string CampaignId,
+    string CampaignName,
+    string Visibility,
+    RuleEnvironmentRef RuleEnvironment,
+    IReadOnlyList<CrewProjection> Crews,
+    IReadOnlyList<RunnerDossierProjection> Dossiers,
+    IReadOnlyList<RunProjection> Runs,
+    IReadOnlyList<PublicationSafeProjection> RecapShelf,
+    IReadOnlyList<CampaignReadinessCue> ReadinessCues,
+    ContinuitySnapshotRef? LatestContinuity,
+    string ReturnSummary);
+
 public sealed record AccountCampaignSummary(
     IReadOnlyList<RunnerDossierProjection> Dossiers,
     IReadOnlyList<CampaignProjection> Campaigns,
     IReadOnlyList<RunProjection> Runs,
+    IReadOnlyList<CrewProjection> Crews,
+    IReadOnlyList<CampaignWorkspaceProjection> Workspaces,
     IReadOnlyList<CommunityOperatorProjection> CommunityOperations,
     WorkspaceRestoreProjection Restore);
