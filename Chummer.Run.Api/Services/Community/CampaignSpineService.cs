@@ -39,24 +39,43 @@ public sealed class CampaignSpineService
                 .Where(item => campaigns.Any(campaign => string.Equals(campaign.CampaignId, item.CampaignId, StringComparison.OrdinalIgnoreCase)))
                 .OrderByDescending(static item => item.UpdatedAtUtc)
                 .ToArray();
-            var operations = _store.GroupsById.Values
-                .Where(group => group.Memberships.Any(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase) && IsOperatorRole(member.Role)))
-                .OrderBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(group => new CommunityOperatorProjection(
-                    GroupId: group.GroupId,
-                    GroupName: group.Name,
-                    GroupType: group.GroupType,
-                    Visibility: group.Visibility,
-                    Capabilities: group.Capabilities,
-                    MemberCount: group.Memberships.Count,
-                    ActiveCampaignCount: _store.CampaignSpinesById.Values.Count(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Status, CampaignStatuses.Active, StringComparison.OrdinalIgnoreCase)),
-                    ActiveSponsorSessionCount: _store.SponsorSessionsById.Values.Count(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "stopped", StringComparison.OrdinalIgnoreCase))))
+            var crews = _store.CrewsById.Values
+                .Where(item => campaigns.Any(campaign => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)))
+                .OrderByDescending(static item => item.UpdatedAtUtc)
                 .ToArray();
             var restore = _store.RestoreByUserId.TryGetValue(user.UserId, out var existingRestore)
                 ? existingRestore
                 : BuildRestoreProjection(user, dossiers, campaigns, installLinking);
+            var workspaces = campaigns
+                .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore))
+                .OrderByDescending(static workspace => workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.MinValue)
+                .ToArray();
+            var operations = _store.GroupsById.Values
+                .Where(group => group.Memberships.Any(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase) && IsOperatorRole(member.Role)))
+                .OrderBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(group =>
+                {
+                    var groupCampaigns = _store.CampaignSpinesById.Values
+                        .Where(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                    return new CommunityOperatorProjection(
+                        GroupId: group.GroupId,
+                        GroupName: group.Name,
+                        GroupType: group.GroupType,
+                        Visibility: group.Visibility,
+                        OperatorRole: ResolveOperatorRole(group, user.UserId),
+                        CampaignVisibilitySummary: ResolveCampaignVisibilitySummary(groupCampaigns),
+                        CampaignNames: groupCampaigns.Select(static item => item.Name).ToArray(),
+                        RuleEnvironment: DefaultRuleEnvironment($"group:{group.GroupId}", "group"),
+                        Capabilities: group.Capabilities,
+                        MemberCount: group.Memberships.Count,
+                        ActiveCampaignCount: groupCampaigns.Count(item => string.Equals(item.Status, CampaignStatuses.Active, StringComparison.OrdinalIgnoreCase)),
+                        ActiveSponsorSessionCount: _store.SponsorSessionsById.Values.Count(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "stopped", StringComparison.OrdinalIgnoreCase)));
+                })
+                .ToArray();
 
-            return new AccountCampaignSummary(dossiers, campaigns, runs, operations, restore);
+            return new AccountCampaignSummary(dossiers, campaigns, runs, crews, workspaces, operations, restore);
         }
     }
 
@@ -149,7 +168,8 @@ public sealed class CampaignSpineService
                 Summary: $"Campaign continuity is tracked for {sponsorCampaign.Title}.",
                 RestoreState: "synced",
                 SessionId: runId,
-                SceneId: sceneId);
+                SceneId: sceneId,
+                RecapArtifactId: StableId("recap", sponsorCampaign.CampaignId));
             var memberAssignments = group.Memberships
                 .Select(member =>
                 {
@@ -268,7 +288,8 @@ public sealed class CampaignSpineService
             Summary: $"Attached to {campaignTitle} with replay-safe continuity.",
             RestoreState: "campaign_bound",
             SessionId: runId,
-            SceneId: sceneId);
+            SceneId: sceneId,
+            RecapArtifactId: StableId("recap", campaignId));
 
         if (existing is null)
         {
@@ -292,7 +313,14 @@ public sealed class CampaignSpineService
                         ProjectionId: StableId("projection", $"{user.UserId}:{campaignId}"),
                         Kind: "campaign_recap",
                         Label: "Campaign-ready dossier",
-                        Summary: "This runner can move through build, play, recap, and return without losing identity.")
+                        Summary: "This runner can move through build, play, recap, and return without losing identity.",
+                        ArtifactId: continuity.RecapArtifactId),
+                    new PublicationSafeProjection(
+                        ProjectionId: StableId("projection", $"{user.UserId}:{campaignId}:ops"),
+                        Kind: "runboard_packet",
+                        Label: "Runboard continuity packet",
+                        Summary: "GM-facing continuity and recap-safe state for the active campaign return.",
+                        ArtifactId: StableId("ops", campaignId))
                 ],
                 CreatedAtUtc: DateTimeOffset.UtcNow,
                 UpdatedAtUtc: DateTimeOffset.UtcNow);
@@ -307,6 +335,21 @@ public sealed class CampaignSpineService
                 CurrentSceneId = sceneId,
                 RuleEnvironment = DefaultRuleEnvironment($"campaign:{campaignId}", "campaign"),
                 LatestContinuity = continuity,
+                Projections =
+                [
+                    new PublicationSafeProjection(
+                        ProjectionId: StableId("projection", $"{user.UserId}:{campaignId}"),
+                        Kind: "campaign_recap",
+                        Label: "Campaign-ready dossier",
+                        Summary: "This runner can move through build, play, recap, and return without losing identity.",
+                        ArtifactId: continuity.RecapArtifactId),
+                    new PublicationSafeProjection(
+                        ProjectionId: StableId("projection", $"{user.UserId}:{campaignId}:ops"),
+                        Kind: "runboard_packet",
+                        Label: "Runboard continuity packet",
+                        Summary: "GM-facing continuity and recap-safe state for the active campaign return.",
+                        ArtifactId: StableId("ops", campaignId))
+                ],
                 SnapshotIds = existing.SnapshotIds.Concat(new[] { continuity.SnapshotId }).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
                 UpdatedAtUtc = DateTimeOffset.UtcNow
             };
@@ -349,15 +392,143 @@ public sealed class CampaignSpineService
             EnvironmentId: StableId("ruleenv", environmentId),
             OwnerScope: ownerScope,
             CompatibilityFingerprint: "sr6.preview.v1",
+            ApprovalState: string.Equals(ownerScope, "person", StringComparison.OrdinalIgnoreCase) ? "self_service" : "approved",
             SourcePacks: new[] { "shadowrun-6e-core@current" },
             HouseRulePacks: Array.Empty<string>(),
             OptionToggles: new[] { "explain_everywhere", "campaign_continuity" });
+
+    private static CampaignWorkspaceProjection BuildWorkspaceProjection(
+        CampaignProjection campaign,
+        IReadOnlyList<RunnerDossierProjection> dossiers,
+        IReadOnlyList<RunProjection> runs,
+        IReadOnlyList<CrewProjection> crews,
+        WorkspaceRestoreProjection restore)
+    {
+        var workspaceCrews = crews
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var workspaceRuns = runs
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+        var workspaceDossiers = dossiers
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+
+        var readinessCues = new List<CampaignReadinessCue>();
+        if (restore.ConflictSummaries.Count > 0)
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:restore"),
+                Severity: "warning",
+                Title: "Restore confirmation needed",
+                Summary: restore.ConflictSummaries[0]));
+        }
+
+        if (!string.Equals(campaign.RuleEnvironment.ApprovalState, "approved", StringComparison.OrdinalIgnoreCase))
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:ruleenv"),
+                Severity: "review",
+                Title: "Rule environment needs explicit review",
+                Summary: $"{campaign.RuleEnvironment.OwnerScope} scope is {campaign.RuleEnvironment.ApprovalState} on {campaign.RuleEnvironment.CompatibilityFingerprint}."));
+        }
+        else
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:ruleenv"),
+                Severity: "ready",
+                Title: "Rule environment is approved",
+                Summary: $"{campaign.RuleEnvironment.OwnerScope} scope is pinned to {campaign.RuleEnvironment.CompatibilityFingerprint}."));
+        }
+
+        var openObjectives = workspaceRuns.SelectMany(static item => item.Objectives)
+            .Where(item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (openObjectives.Length > 0)
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:objectives"),
+                Severity: "attention",
+                Title: "Open runboard objectives",
+                Summary: $"{openObjectives.Length} objective(s) still need attention before the next safe continue point."));
+        }
+
+        if (workspaceDossiers.Any(item => item.LatestContinuity is null))
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:continuity"),
+                Severity: "warning",
+                Title: "Continuity gap detected",
+                Summary: "At least one dossier is missing the latest continuity snapshot for safe campaign return."));
+        }
+
+        var recapShelf = workspaceDossiers
+            .SelectMany(static item => item.Projections)
+            .Where(item => item.Kind.Contains("recap", StringComparison.OrdinalIgnoreCase)
+                || item.Kind.Contains("runboard", StringComparison.OrdinalIgnoreCase)
+                || item.Kind.Contains("dossier", StringComparison.OrdinalIgnoreCase))
+            .Distinct()
+            .ToArray();
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: StableId("workspace", campaign.CampaignId),
+            CampaignId: campaign.CampaignId,
+            CampaignName: campaign.Name,
+            Visibility: campaign.Visibility,
+            RuleEnvironment: campaign.RuleEnvironment,
+            Crews: workspaceCrews,
+            Dossiers: workspaceDossiers,
+            Runs: workspaceRuns,
+            RecapShelf: recapShelf,
+            ReadinessCues: readinessCues,
+            LatestContinuity: campaign.LatestContinuity,
+            ReturnSummary: campaign.LatestContinuity?.Summary ?? campaign.Summary);
+    }
 
     private static bool IsOperatorRole(string role)
         => string.Equals(role, "owner", StringComparison.OrdinalIgnoreCase)
             || string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase)
             || string.Equals(role, "manager", StringComparison.OrdinalIgnoreCase)
             || string.Equals(role, "gm", StringComparison.OrdinalIgnoreCase);
+
+    private static string ResolveOperatorRole(GroupDto group, string userId)
+        => group.Memberships
+               .Where(member => string.Equals(member.UserId, userId, StringComparison.OrdinalIgnoreCase))
+               .OrderByDescending(member => OperatorRolePriority(member.Role))
+               .Select(static member => member.Role)
+               .FirstOrDefault()
+           ?? "member";
+
+    private static string ResolveCampaignVisibilitySummary(IReadOnlyList<CampaignProjection> campaigns)
+    {
+        if (campaigns.Count == 0)
+        {
+            return "No governed campaign visibility yet";
+        }
+
+        var visibilities = campaigns
+            .Select(static item => item.Visibility)
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(static item => item, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return visibilities.Length == 1
+            ? visibilities[0]
+            : string.Join(" + ", visibilities);
+    }
+
+    private static int OperatorRolePriority(string? role)
+        => role?.Trim().ToLowerInvariant() switch
+        {
+            "owner" => 4,
+            "admin" => 3,
+            "manager" => 2,
+            "gm" => 1,
+            _ => 0
+        };
 
     private static string StableId(string prefix, string seed)
     {

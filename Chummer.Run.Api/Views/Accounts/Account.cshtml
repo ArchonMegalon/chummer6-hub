@@ -13,9 +13,12 @@
     var openSupportCases = Model.SupportCases.Count(item => !string.Equals(item.Status, "user_notified", StringComparison.OrdinalIgnoreCase));
     var dossierCount = Model.CampaignSpine.Dossiers.Count;
     var campaignCount = Model.CampaignSpine.Campaigns.Count;
+    var runCount = Model.CampaignSpine.Runs.Count;
+    var workspaceCount = Model.CampaignSpine.Workspaces.Count;
+    var recapProjectionCount = Model.CampaignSpine.Workspaces.SelectMany(item => item.RecapShelf).Count();
     var communityOpsCount = Model.CampaignSpine.CommunityOperations.Count;
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
-    var showCampaignSection = dossierCount > 0 || campaignCount > 0 || restoreConflicts > 0;
+    var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
     var showChannelsSection = telegramChannel is not null;
     var showParticipationSection = Model.Experience.OnboardingCompleted || laneInterests.Count > 0 || Model.Experience.FollowHorizons || Model.Experience.BetaInterest;
@@ -34,10 +37,19 @@
             "pending" => "Pending",
             "pending_verification" => "Verification sent",
             "verified" => "Verified",
+            "approved" => "Approved",
+            "self_service" => "Self-service",
+            "review" => "Needs review",
+            "warning" => "Needs attention",
+            "attention" => "Needs attention",
+            "ready" => "Ready",
             "revoked" => "Revoked",
             _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '))
         };
     }
+
+    static string RuleEnvironmentSummary(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
+        => $"{environment.OwnerScope} scope · {environment.CompatibilityFingerprint} · {HumanizeStatus(environment.ApprovalState, "Review")}";
 }
 
 <section class="account-stage">
@@ -74,6 +86,14 @@
         <article class="account-overview__card">
             <span class="tag">Campaigns</span>
             <strong>@(campaignCount == 0 ? "Ready to start" : campaignCount.ToString())</strong>
+        </article>
+        <article class="account-overview__card">
+            <span class="tag">Runboards</span>
+            <strong>@(runCount == 0 ? "Quiet" : runCount.ToString())</strong>
+        </article>
+        <article class="account-overview__card">
+            <span class="tag">Workspace</span>
+            <strong>@(workspaceCount == 0 ? "Ready to seed" : $"{workspaceCount} live")</strong>
         </article>
     </div>
 
@@ -380,8 +400,8 @@
             {
             <section id="campaigns" class="settings-section">
                 <div class="settings-section__header">
-                    <h2>Campaigns &amp; dossiers</h2>
-                    <p>Living dossiers, crew context, campaign continuity, and restore posture stay tied together here instead of falling back to one-off build files.</p>
+                    <h2>Campaign workspace</h2>
+                    <p>Living dossiers, crew context, rule-environment posture, GM runboard state, recap shelf, and restore signals stay tied together here instead of falling back to one-off build files.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -389,41 +409,134 @@
                         <strong>@dossierCount</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Active campaigns</span>
-                        <strong>@campaignCount</strong>
+                        <span>Campaign workspaces</span>
+                        <strong>@(workspaceCount == 0 ? "Ready to seed" : workspaceCount.ToString())</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Active runboards</span>
+                        <strong>@(runCount == 0 ? "Quiet" : runCount.ToString())</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Recap shelf items</span>
+                        <strong>@(recapProjectionCount == 0 ? "None yet" : recapProjectionCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
                         <span>Restore conflicts</span>
                         <strong>@(restoreConflicts == 0 ? "None" : restoreConflicts.ToString())</strong>
                     </div>
+                    <div class="settings-summary-row">
+                        <span>Support blockers</span>
+                        <strong>@(openSupportCases == 0 ? "None" : openSupportCases.ToString())</strong>
+                    </div>
                 </div>
-                @if (Model.CampaignSpine.Dossiers.Count == 0)
+                @if (Model.CampaignSpine.Workspaces.Count == 0)
                 {
-                    <p class="muted-copy">No living dossiers yet. The first claimed install or campaign handoff will seed the long-lived runner identity.</p>
+                    <p class="muted-copy">No campaign workspace yet. The first claimed install or campaign handoff will seed the long-lived runner identity and the first shared runboard.</p>
                 }
                 else
                 {
-                    <div class="settings-summary-list">
-                        @foreach (var dossier in Model.CampaignSpine.Dossiers)
-                        {
-                            <div class="settings-summary-row">
-                                <span>@dossier.DisplayName</span>
-                                <strong>@HumanizeStatus(dossier.Status, "Active") · @(string.IsNullOrWhiteSpace(dossier.CampaignId) ? "Solo" : dossier.CampaignId)</strong>
+                    @foreach (var workspace in Model.CampaignSpine.Workspaces)
+                    {
+                        <details class="details-drawer" open>
+                            <summary>@workspace.CampaignName · GM runboard</summary>
+                            <div class="settings-summary-list">
+                                <div class="settings-summary-row">
+                                    <span>Visibility</span>
+                                    <strong>@HumanizeStatus(workspace.Visibility, "Private")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Rule environment</span>
+                                    <strong>@RuleEnvironmentSummary(workspace.RuleEnvironment)</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Continuity</span>
+                                    <strong>@(workspace.LatestContinuity?.Summary ?? workspace.ReturnSummary)</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Runboard</span>
+                                    <strong>@(workspace.Runs.Count == 0 ? "No active run" : $"{workspace.Runs.Count} tracked")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Recap shelf</span>
+                                    <strong>@(workspace.RecapShelf.Count == 0 ? "Pending" : $"{workspace.RecapShelf.Count} ready")</strong>
+                                </div>
                             </div>
-                        }
-                    </div>
-                }
-                @if (Model.CampaignSpine.Campaigns.Count > 0)
-                {
-                    <div class="settings-summary-list">
-                        @foreach (var campaign in Model.CampaignSpine.Campaigns)
-                        {
-                            <div class="settings-summary-row">
-                                <span>@campaign.Name</span>
-                                <strong>@campaign.DossierIds.Count dossiers · @(campaign.ActiveRunId is null ? "No active run" : "Run ready")</strong>
+
+                            <div class="settings-summary-list">
+                                @foreach (var crew in workspace.Crews)
+                                {
+                                    <div class="settings-summary-row">
+                                        <span>@crew.Name roster</span>
+                                        <strong>@crew.Members.Count members · @HumanizeStatus(crew.Visibility, "Private")</strong>
+                                    </div>
+                                    @foreach (var member in crew.Members)
+                                    {
+                                        var memberDossier = workspace.Dossiers.FirstOrDefault(dossier => string.Equals(dossier.DossierId, member.DossierId, StringComparison.OrdinalIgnoreCase));
+                                        <div class="settings-summary-row">
+                                            <span>@(memberDossier?.DisplayName ?? member.DossierId)</span>
+                                            <strong>@HumanizeStatus(member.Role, "Member") · @HumanizeStatus(member.Availability, "Ready")</strong>
+                                        </div>
+                                    }
+                                }
                             </div>
-                        }
-                    </div>
+
+                            <div class="settings-summary-list">
+                                @foreach (var run in workspace.Runs)
+                                {
+                                    <div class="settings-summary-row">
+                                        <span>@run.Title</span>
+                                        <strong>@HumanizeStatus(run.Status, "Active") · @(run.ActiveSceneId is null ? "No active scene" : "Scene live") · @run.Objectives.Count objectives</strong>
+                                    </div>
+                                    @foreach (var objective in run.Objectives)
+                                    {
+                                        <div class="settings-summary-row">
+                                            <span>@objective.Title</span>
+                                            <strong>@HumanizeStatus(objective.Status, "Open") · @objective.Pressure pressure</strong>
+                                        </div>
+                                    }
+                                    @foreach (var scene in run.Scenes)
+                                    {
+                                        <div class="settings-summary-row">
+                                            <span>@scene.Title</span>
+                                            <strong>@HumanizeStatus(scene.Status, "Ready") · @scene.Revision</strong>
+                                        </div>
+                                    }
+                                }
+                            </div>
+
+                            @if (workspace.ReadinessCues.Count > 0)
+                            {
+                                <details class="details-drawer">
+                                    <summary>GM readiness</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var cue in workspace.ReadinessCues)
+                                        {
+                                            <li><strong>@HumanizeStatus(cue.Severity, "Ready"):</strong> @cue.Title. @cue.Summary</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+
+                            @if (workspace.RecapShelf.Count > 0)
+                            {
+                                <details class="details-drawer">
+                                    <summary>Recap and artifact shelf</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var item in workspace.RecapShelf)
+                                        {
+                                            <li>
+                                                <strong>@item.Label</strong>: @item.Summary
+                                                @if (!string.IsNullOrWhiteSpace(item.ArtifactId))
+                                                {
+                                                    <span> (@item.ArtifactId)</span>
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+                        </details>
+                    }
                 }
                 @if (Model.CampaignSpine.Restore.ConflictSummaries.Count > 0)
                 {
@@ -445,7 +558,7 @@
             <section id="community-ops" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Teams &amp; permissions</h2>
-                    <p>Organizer work stays subordinate to the customer path: group memberships, visibility, and permissions stay visible only when this account actually uses them.</p>
+                    <p>Organizer work stays on the same account/control model as the player path: group ownership, permissions, roster state, campaign visibility, and governed rule posture stay explicit without inventing a second operator system.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -463,15 +576,63 @@
                 }
                 else
                 {
-                    <div class="settings-summary-list">
-                        @foreach (var op in Model.CampaignSpine.CommunityOperations)
-                        {
-                            <div class="settings-summary-row">
-                                <span>@op.GroupName</span>
-                                <strong>@op.MemberCount members · @op.ActiveCampaignCount campaigns · @op.ActiveSponsorSessionCount sponsor sessions</strong>
+                    @foreach (var op in Model.CampaignSpine.CommunityOperations)
+                    {
+                        <details class="details-drawer" open>
+                            <summary>@op.GroupName · @HumanizeStatus(op.OperatorRole, "Member")</summary>
+                            <div class="settings-summary-list">
+                                <div class="settings-summary-row">
+                                    <span>Group type</span>
+                                    <strong>@HumanizeStatus(op.GroupType, "Group")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Visibility</span>
+                                    <strong>@HumanizeStatus(op.Visibility, "Private")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Campaign visibility</span>
+                                    <strong>@op.CampaignVisibilitySummary</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Rule environment</span>
+                                    <strong>@RuleEnvironmentSummary(op.RuleEnvironment)</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Roster state</span>
+                                    <strong>@op.MemberCount members · @op.ActiveCampaignCount campaigns</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Sponsor sessions</span>
+                                    <strong>@(op.ActiveSponsorSessionCount == 0 ? "Quiet" : op.ActiveSponsorSessionCount.ToString())</strong>
+                                </div>
                             </div>
-                        }
-                    </div>
+                            @if (op.Capabilities.Count > 0)
+                            {
+                                <details class="details-drawer">
+                                    <summary>Permissions</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var capability in op.Capabilities)
+                                        {
+                                            <li>@capability</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+                            @if (op.CampaignNames.Count > 0)
+                            {
+                                <details class="details-drawer">
+                                    <summary>Visible campaigns</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var name in op.CampaignNames)
+                                        {
+                                            <li>@name</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+                        </details>
+                    }
+                    <p class="muted-copy">Recognition, badges, and sponsor motion stay secondary to campaign ownership, permissions, and real support closure.</p>
                 }
             </section>
             }
