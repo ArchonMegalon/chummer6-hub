@@ -26,12 +26,16 @@ public sealed class HubPageChromeService
     {
         var surface = _landing.LoadSurface();
         var nav = _navigation.LoadNavigation();
+        var publicPrimaryCta = BuildPublicPrimaryCta();
         var signInAction = surface.GuestShellActions
             .FirstOrDefault(action => string.Equals(NormalizeRoute(action.Href), "/login", StringComparison.OrdinalIgnoreCase))
             ?? new PublicLandingActionDto("Sign in", "/login?next=/home", "secondary");
         var createAccountAction = surface.GuestShellActions
             .FirstOrDefault(action => string.Equals(NormalizeRoute(action.Href), "/signup", StringComparison.OrdinalIgnoreCase))
             ?? new PublicLandingActionDto("Create account", "/signup?next=/home", "primary");
+        var primaryHeaderAction = publicPrimaryCta is null
+            ? createAccountAction
+            : new PublicLandingActionDto(publicPrimaryCta.Label, publicPrimaryCta.Href, publicPrimaryCta.Tone);
         var actions = new[]
         {
             new SiteChromeActionViewModel(
@@ -40,10 +44,10 @@ public sealed class HubPageChromeService
                 "link",
                 Current: string.Equals(NormalizeRoute(currentPath), NormalizeRoute(signInAction.Href), StringComparison.OrdinalIgnoreCase)),
             new SiteChromeActionViewModel(
-                createAccountAction.Label,
-                createAccountAction.Href,
-                createAccountAction.Emphasis,
-                Current: string.Equals(NormalizeRoute(currentPath), NormalizeRoute(createAccountAction.Href), StringComparison.OrdinalIgnoreCase))
+                primaryHeaderAction.Label,
+                primaryHeaderAction.Href,
+                primaryHeaderAction.Emphasis,
+                Current: string.Equals(NormalizeRoute(currentPath), NormalizeRoute(primaryHeaderAction.Href), StringComparison.OrdinalIgnoreCase))
         };
 
         return new SiteChromeViewModel(
@@ -54,7 +58,7 @@ public sealed class HubPageChromeService
             SecondaryNavigation: nav.Secondary,
             UtilityNavigation: nav.Utility,
             HeaderActions: actions,
-            PublicPrimaryCta: BuildPublicPrimaryCta(),
+            PublicPrimaryCta: publicPrimaryCta,
             Authenticated: false,
             SignedInLabel: null,
             FooterCanonicalSource: surface.FooterCanonicalSource,
