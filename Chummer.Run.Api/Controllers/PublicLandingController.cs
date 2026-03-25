@@ -24,6 +24,7 @@ public sealed class PublicLandingController : Controller
     private readonly IdentityLinkService _links;
     private readonly UserExperienceService _experience;
     private readonly InstallLinkingService _installLinking;
+    private readonly CampaignSpineService _campaignSpine;
     private readonly HubPageChromeService _chrome;
     private readonly PublicTrustContentService _trustContent;
     private readonly SupportCaseService _supportCases;
@@ -39,6 +40,7 @@ public sealed class PublicLandingController : Controller
         IdentityLinkService links,
         UserExperienceService experience,
         InstallLinkingService installLinking,
+        CampaignSpineService campaignSpine,
         HubPageChromeService chrome,
         PublicTrustContentService trustContent,
         SupportCaseService supportCases,
@@ -53,6 +55,7 @@ public sealed class PublicLandingController : Controller
         _links = links;
         _experience = experience;
         _installLinking = installLinking;
+        _campaignSpine = campaignSpine;
         _chrome = chrome;
         _trustContent = trustContent;
         _supportCases = supportCases;
@@ -350,6 +353,8 @@ public sealed class PublicLandingController : Controller
             var links = _links.GetSummary(subject.SubjectId);
             var experience = _experience.GetOrCreate(subject.SubjectId);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
+            var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
             var model = new HomePageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome("Home", "Pick the next action and keep track of what is opening next.", "/home", user.DisplayName),
                 Surface: surface,
@@ -358,6 +363,8 @@ public sealed class PublicLandingController : Controller
                 Links: links,
                 Experience: experience,
                 InstallLinking: installLinking,
+                SupportCases: supportCases,
+                CampaignSpine: campaignSpine,
                 PrimaryAction: BuildHomePrimaryAction(experience, installLinking),
                 NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, "/home"),
                 HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, "/home"));

@@ -1464,6 +1464,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var identityLinks = new IdentityLinkService(store, accounts);
     var experience = new UserExperienceService(store, accounts);
     var leaderboards = new LeaderboardService(store);
+    var groups = new GroupService(store, accounts);
     var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
         JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized))), configuration);
     var linkedIdentityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(request =>
@@ -1487,14 +1488,14 @@ async Task VerifyPublicLandingProjectionAsync()
     var emailLinks = new HubEmailLinkVerificationService(
         DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(tempRoot, "email-links"))));
     var google = CreateGoogleService(configuration, authService, identityLinks, accounts, loggerFactory, tempRoot);
-    var controller = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1613,6 +1614,14 @@ async Task VerifyPublicLandingProjectionAsync()
             && method.GetCustomAttributes(typeof(HttpGetAttribute), inherit: true).Length > 0);
     Assert(publicContactPageMethod.GetParameters().Length == 1 && publicContactPageMethod.GetParameters()[0].ParameterType == typeof(CancellationToken), "public contact page should not accept a spoofable submitted query parameter.");
     var linkedUser = accounts.EnsureUser("subject.demo", "Runner Demo", "runner@example.invalid");
+    var operatorGroup = groups.CreateGroup(new CreateGroupRequest(
+        SubjectId: "subject.demo",
+        Name: "Smoke Crew Ops",
+        GroupType: "campaign",
+        Visibility: "group",
+        Capabilities: new[] { "can_manage_members", "can_issue_join_codes", "can_issue_boost_codes", "can_hold_shared_entitlements" }));
+    var seededCampaign = groups.GetOrCreateCampaign(operatorGroup.GroupId, "hub", "Smoke Campaign");
+    Assert(string.Equals(seededCampaign.GroupId, operatorGroup.GroupId, StringComparison.Ordinal), "smoke campaign should attach to the seeded operator group.");
     var installSummary = installLinking.GetSummary(linkedUser.UserId, "subject.demo");
     Assert(installSummary.RecentReceipts.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal)), "signed-in downloads should mint a durable download receipt.");
     Assert(installSummary.PendingClaimTickets.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal) && string.Equals(item.Status, InstallClaimTicketStates.Pending, StringComparison.Ordinal)), "signed-in downloads should mint a pending install claim ticket.");
@@ -1725,6 +1734,16 @@ async Task VerifyPublicLandingProjectionAsync()
     var accountPage = await accountController.AccountPage(CancellationToken.None) as ViewResult;
     var accountModel = accountPage?.Model as AccountPageViewModel;
     Assert(accountModel is not null && accountModel.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "account page should surface support-case history beside installs and access.");
+    Assert(accountModel!.CampaignSpine.Dossiers.Count >= 1, "account page should surface the living dossier summary.");
+    Assert(accountModel.CampaignSpine.Runs.Count >= 1, "account page should surface the current runboard summary.");
+
+    var authenticatedHomePage = await authenticatedLandingController.HomePage(CancellationToken.None) as ViewResult;
+    var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
+    Assert(authenticatedHomeModel is not null, "signed-in home page should render through the MVC view layer.");
+    Assert(authenticatedHomeModel!.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "signed-in home should surface tracked support context.");
+    Assert(authenticatedHomeModel.CampaignSpine.Dossiers.Count >= 1, "signed-in home should surface living dossier continuity.");
+    Assert(authenticatedHomeModel.CampaignSpine.Runs.Count >= 1, "signed-in home should surface runboard continuity.");
+    Assert(authenticatedHomeModel.InstallLinking.ClaimedInstallations?.Any(static item => string.Equals(item.Platform, "linux", StringComparison.OrdinalIgnoreCase)) == true, "signed-in home should surface claimed install posture.");
 
     var progressHtml = (await progressController.ProgressPage(CancellationToken.None)).Content ?? string.Empty;
     Assert(progressHtml.Contains("Core Rules Engine", StringComparison.Ordinal), "progress page should render the generated product-part report");
@@ -1784,7 +1803,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

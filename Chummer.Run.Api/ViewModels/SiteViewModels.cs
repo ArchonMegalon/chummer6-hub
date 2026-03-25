@@ -290,6 +290,8 @@ public sealed record HomePageViewModel(
     AccountLinkSummaryDto Links,
     HubUserExperienceDto Experience,
     InstallLinkingSummaryDto InstallLinking,
+    IReadOnlyList<SupportCaseProjection> SupportCases,
+    AccountCampaignSummary CampaignSpine,
     HomePrimaryActionViewModel PrimaryAction,
     IReadOnlyList<ResolvedPublicCardViewModel> NowRail,
     IReadOnlyList<ResolvedPublicCardViewModel> HorizonRail);

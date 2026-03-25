@@ -11,6 +11,56 @@
     var activeAccessRights = Model.InstallLinking.ActiveGrants?.Count ?? 0;
     var pendingClaims = Model.InstallLinking.PendingClaimTickets.Count;
     var primaryActionOpensSetup = string.Equals(Model.PrimaryAction.Href, "#setup-sheet", StringComparison.OrdinalIgnoreCase);
+    var openSupportCases = Model.SupportCases.Count(item => !string.Equals(item.Status, "user_notified", StringComparison.OrdinalIgnoreCase));
+    var dossiers = Model.CampaignSpine.Dossiers.Take(3).ToArray();
+    var campaigns = Model.CampaignSpine.Campaigns.Take(3).ToArray();
+    var runs = Model.CampaignSpine.Runs.Take(3).ToArray();
+    var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
+    var releasedOrNotifiedCases = Model.SupportCases
+        .Where(item =>
+            string.Equals(item.Status, "released_to_reporter_channel", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.Status, "user_notified", StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(item => item.UpdatedAtUtc)
+        .Take(2)
+        .ToArray();
+    var recentReceipts = Model.InstallLinking.RecentReceipts.Take(2).ToArray();
+    var claimedInstallList = (Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>())
+        .Take(3)
+        .ToArray();
+
+    static string DeviceRoleLabel(Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto installation)
+    {
+        if (string.Equals(installation.Platform, "android", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(installation.Platform, "ios", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Play tablet";
+        }
+
+        if ((installation.HeadId?.Contains("observer", StringComparison.OrdinalIgnoreCase) ?? false)
+            || (installation.HostLabel?.Contains("observer", StringComparison.OrdinalIgnoreCase) ?? false))
+        {
+            return "Observer screen";
+        }
+
+        if (string.Equals(installation.Channel, "preview", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Preview scout";
+        }
+
+        if (string.Equals(installation.HeadId, "offline", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Travel cache";
+        }
+
+        return "Workstation";
+    }
+
+    static string DeviceRoleSummary(Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto installation)
+    {
+        var platform = string.IsNullOrWhiteSpace(installation.Platform) ? "unknown platform" : installation.Platform;
+        var head = string.IsNullOrWhiteSpace(installation.HeadId) ? "desktop" : installation.HeadId;
+        return $"{platform} · {head} · {installation.Version}";
+    }
 }
 
 <section class="home-command">
@@ -39,6 +89,11 @@
             <span class="tag">Devices & access</span>
             <strong>@(activeAccessRights > 0 ? $"{activeAccessRights} active" : claimedInstallations > 0 ? $"{claimedInstallations} linked" : pendingClaims > 0 ? $"{pendingClaims} pending" : "Not linked")</strong>
             <p><a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a></p>
+        </article>
+        <article class="home-status-card">
+            <span class="tag">Campaign return</span>
+            <strong>@(campaigns.Length > 0 ? $"{campaigns.Length} active" : dossiers.Length > 0 ? $"{dossiers.Length} dossier-ready" : "Ready to seed")</strong>
+            <p>@(restoreConflicts > 0 ? $"{restoreConflicts} restore note(s) need a quick check." : "Dossiers, campaigns, and return context stay visible from the signed-in shell.")</p>
         </article>
     </div>
 </section>
@@ -79,6 +134,120 @@
 
         @if (!showOnboarding)
         {
+            <section class="home-stream">
+                <div class="home-stream__column">
+                    <div class="home-stream__lead">
+                        <p class="eyebrow">What changed for you</p>
+                        <h2 class="home-stream__title">Recent fixes, installs, and follow-up</h2>
+                    </div>
+                    <div class="app-rail">
+                        @if (releasedOrNotifiedCases.Length == 0 && recentReceipts.Length == 0 && restoreConflicts == 0)
+                        {
+                            <article class="app-rail__item">
+                                <span class="tag">Calm</span>
+                                <div class="app-rail__copy">
+                                    <h3>No urgent follow-up</h3>
+                                    <p>The signed-in shell does not see a fresh fix notice, install handoff, or restore conflict right now.</p>
+                                </div>
+                                <a class="inline-link" href="/now">See what works today</a>
+                            </article>
+                        }
+                        else
+                        {
+                            @foreach (var supportCase in releasedOrNotifiedCases)
+                            {
+                                <article class="app-rail__item">
+                                    <span class="tag">Support closure</span>
+                                    <div class="app-rail__copy">
+                                        <h3>@supportCase.Title</h3>
+                                        <p>@(supportCase.FixedVersion is null ? supportCase.Summary : $"Fixed in {supportCase.FixedVersion} on {supportCase.FixedChannel ?? supportCase.ReleaseChannel ?? "current channel"}: {supportCase.Summary}")</p>
+                                    </div>
+                                    <a class="inline-link" href="/account#support">Open support history</a>
+                                </article>
+                            }
+                            @foreach (var receipt in recentReceipts)
+                            {
+                                <article class="app-rail__item">
+                                    <span class="tag">Install handoff</span>
+                                    <div class="app-rail__copy">
+                                        <h3>@receipt.ArtifactLabel</h3>
+                                        <p>@receipt.Version on @receipt.Channel is still visible in your download history so you can reconnect the install later without guessing.</p>
+                                    </div>
+                                    <a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a>
+                                </article>
+                            }
+                            @if (restoreConflicts > 0)
+                            {
+                                <article class="app-rail__item">
+                                    <span class="tag">Restore</span>
+                                    <div class="app-rail__copy">
+                                        <h3>Return path needs confirmation</h3>
+                                        <p>@Model.CampaignSpine.Restore.ConflictSummaries[0]</p>
+                                    </div>
+                                    <a class="inline-link" href="/account#campaigns">Review campaign return</a>
+                                </article>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <div class="home-stream__column">
+                    <div class="home-stream__lead">
+                        <p class="eyebrow">Campaign return</p>
+                        <h2 class="home-stream__title">Dossiers, runs, and current continuity</h2>
+                    </div>
+                    <div class="app-rail">
+                        @if (dossiers.Length == 0 && campaigns.Length == 0)
+                        {
+                            <article class="app-rail__item">
+                                <span class="tag">Ready</span>
+                                <div class="app-rail__copy">
+                                    <h3>No long-lived runner yet</h3>
+                                    <p>Your first claimed install or campaign handoff will seed the living dossier and return context here.</p>
+                                </div>
+                                <a class="inline-link" href="/downloads">Start from downloads</a>
+                            </article>
+                        }
+                        else
+                        {
+                            @foreach (var dossier in dossiers)
+                            {
+                                <article class="app-rail__item">
+                                    <span class="tag">Dossier</span>
+                                    <div class="app-rail__copy">
+                                        <h3>@dossier.DisplayName</h3>
+                                        <p>@(dossier.LatestContinuity?.Summary ?? "Living dossier is ready for the next handoff.")</p>
+                                    </div>
+                                    <a class="inline-link" href="/account#campaigns">Open dossiers</a>
+                                </article>
+                            }
+                            @foreach (var campaign in campaigns)
+                            {
+                                <article class="app-rail__item">
+                                    <span class="tag">Campaign</span>
+                                    <div class="app-rail__copy">
+                                        <h3>@campaign.Name</h3>
+                                        <p>@(campaign.LatestContinuity?.Summary ?? "Campaign continuity is live.")</p>
+                                    </div>
+                                    <a class="inline-link" href="/account#campaigns">Open campaign return</a>
+                                </article>
+                            }
+                            @foreach (var run in runs)
+                            {
+                                <article class="app-rail__item">
+                                    <span class="tag">Runboard</span>
+                                    <div class="app-rail__copy">
+                                        <h3>@run.Title</h3>
+                                        <p>@run.Objectives.Count objectives · @(run.ActiveSceneId is null ? "No active scene" : "Scene live") · @(run.LatestContinuity?.Summary ?? run.Summary)</p>
+                                    </div>
+                                    <a class="inline-link" href="/account#campaigns">Open run context</a>
+                                </article>
+                            }
+                        }
+                    </div>
+                </div>
+            </section>
+
             <section class="home-stream">
                 <div class="home-stream__column">
                     <div class="home-stream__lead">
@@ -124,12 +293,61 @@
     </div>
 
     <aside class="home-dashboard__side">
+        @if (!showOnboarding)
+        {
+            <section class="app-side-card">
+                <p class="eyebrow">Device roles</p>
+                <h2>Know what each claimed install is for</h2>
+                <p>One signed-in shell should still make it obvious which copy is your workstation, preview scout, or travel-safe lane.</p>
+                @if (claimedInstallList.Length == 0)
+                {
+                    <p class="muted-copy">No claimed installs yet. The first claimed download will start the device-role view here.</p>
+                }
+                else
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var installation in claimedInstallList)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@(installation.HostLabel ?? installation.InstallationId)</span>
+                                <strong>@DeviceRoleLabel(installation) · @DeviceRoleSummary(installation)</strong>
+                            </div>
+                        }
+                    </div>
+                }
+                <a class="button-like button-like--ghost" href="/account#devices-access">Manage device roles</a>
+            </section>
+        }
+
         <section class="app-side-card">
             <p class="eyebrow">Account</p>
             <h2>Keep access and recovery steady</h2>
             <p>Sign-in, recovery, devices, and access rights stay together so the account behaves like a product setting, not a worksheet.</p>
             <a class="button-like button-like--ghost" href="/account">Open account</a>
         </section>
+        @if (!showOnboarding)
+        {
+            <section class="app-side-card">
+                <p class="eyebrow">Campaign workspace</p>
+                <h2>Bring the right table context back</h2>
+                <p>Open the account workspace when you need the live dossier, campaign, support, and operator context in one place.</p>
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Living dossiers</span>
+                        <strong>@Model.CampaignSpine.Dossiers.Count</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Active campaigns</span>
+                        <strong>@Model.CampaignSpine.Campaigns.Count</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Open support cases</span>
+                        <strong>@openSupportCases</strong>
+                    </div>
+                </div>
+                <a class="button-like button-like--secondary" href="/account#campaigns">Open campaign return</a>
+            </section>
+        }
         @if (!showOnboarding && (claimedInstallations > 0 || activeAccessRights > 0))
         {
             <section class="app-side-card">
