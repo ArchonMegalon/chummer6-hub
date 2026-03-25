@@ -176,7 +176,7 @@ program_phases:
     exit:
     - "`PARTICIPATION_AND_BOOSTER_WORKFLOW.md` exists and defines actor, state, receipt, and revoke semantics."
     - Guide/help policy and ownership matrix reference the same workflow.
-    - Horizon access/booster posture fields are canonical where needed.
+    - Horizon access and guided-preview posture fields are canonical where needed.
   - id: I1
     title: Participation surfaces converge on central canon
     owners:

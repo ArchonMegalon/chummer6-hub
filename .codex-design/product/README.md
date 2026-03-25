@@ -88,7 +88,7 @@ Player and GM play-mode shell. Owns mobile/PWA/session UX, offline ledger, sync 
 
 ### `chummer6-hub`
 
-Hosted orchestration and community plane. Owns identity mapping, user/community accounts, generic groups and memberships, sponsorship/booster UX, fact/reward/entitlement ledgers, public landing/home projection for `chummer.run`, play API aggregation, relay, approvals, memory, Coach/Spider/Director orchestration, and hosted service policy. The next major product sequencing rule is Hub-first: account/group/ledger backbone before more booster-specific Fleet product behavior.
+Hosted orchestration and community plane. Owns identity mapping, user/community accounts, generic groups and memberships, sponsorship/guided-contribution UX, fact/reward/entitlement ledgers, public landing/home projection for `chummer.run`, play API aggregation, relay, approvals, memory, Coach/Spider/Director orchestration, support-case and help surfaces, and hosted service policy. The next major product sequencing rule is Hub-first: account/group/ledger backbone before more guided-contribution-specific Fleet product behavior.
 
 ### `chummer6-ui-kit`
 

@@ -27,9 +27,9 @@ The next wave is therefore not a fresh architecture rewrite. It is a convergence
 
 ## Product rules
 
-* Do not build one-off Fleet-side booster product logic ahead of the Hub community/accounting spine.
+* Do not build one-off Fleet-side guided-contribution product logic ahead of the Hub community/accounting spine.
 * Do not collapse raw identity subjects into product users.
-* Do not special-case booster groups when the system really needs generic `group_type` plus capability flags.
+* Do not special-case guided-contribution groups when the system really needs generic `group_type` plus capability flags.
 * Do not collapse facts, rewards, and entitlements into one table or one DTO family.
 * Do not mint rewards from mere auth completion or idle time; mint from validated Fleet receipts.
 * Do not store raw participant `auth.json` or device-auth secrets in Hub.
@@ -79,13 +79,13 @@ Landed now:
 Remaining delta:
 
 * durable storage for groups, memberships, roles, and join codes
-* richer role templates for `booster`, `campaign`, `gm_circle`, `creator_team`, and future org-like groups
+* richer role templates for `guided_contribution`, `campaign`, `gm_circle`, `creator_team`, and future org-like groups
 * stronger capability-matrix enforcement beyond the current default capability set
 
 Acceptance:
 
 * groups survive restarts
-* group behavior stays data-driven instead of booster-only
+* group behavior stays data-driven instead of contribution-only
 
 ### HUB-P0-03
 
@@ -140,7 +140,7 @@ Acceptance:
 
 ### HUB-P0-05
 
-Task: keep sponsorship/booster workflow as the first use case of the community platform.
+Task: keep the sponsorship/guided-contribution workflow as the first use case of the community platform.
 
 Status:
 `v1 landed`, `remaining delta = durability and richer campaign semantics`

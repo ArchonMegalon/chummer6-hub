@@ -20,9 +20,9 @@ It is not a second design authority.
 * `PUBLIC_PART_REGISTRY.yaml` is the source of truth for public part pages.
 * `PUBLIC_FAQ_REGISTRY.yaml` and `PUBLIC_HELP_COPY.md` are the source of truth for FAQ/help participation copy.
 * If the guide and design canon disagree, the guide is wrong and must be corrected.
-* Generated public guide output must include a human-facing help/support lane that explains the bounded booster concept and points readers at the Hub participation endpoint.
-* The booster/support lane must describe opt-in premium help on top of the cheap baseline, not a return to premium-by-default execution.
-* Public help/support copy should prefer `participate` and `booster` rather than leading with operator jargon such as `participant burst lane`.
+* Generated public guide output must include a human-facing help/support lane that explains the guided contribution concept and points readers at the Hub participation endpoint.
+* The guided-contribution support lane must describe opt-in premium help on top of the cheap baseline, not a return to premium-by-default execution.
+* Public help/support copy should prefer `participate` and `guided contribution` rather than leading with operator jargon such as `participant burst lane`.
 * Feature and horizon suggestions from the public go to `Chummer6`, Discord, or other public intake lanes, not to `chummer6-design`.
 * Public prioritization, polls, and votes are advisory only.
 

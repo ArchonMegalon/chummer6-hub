@@ -38,7 +38,7 @@ The future lane for grounded, cited rules understanding built from Chummer-owned
 
 ## Participant lane
 
-Fleet's operator term for the temporary execution lane behind a booster or participation session.
+Fleet's operator term for the temporary execution lane behind a guided-contribution or participation session.
 
 ## Proof shelf
 
@@ -62,7 +62,7 @@ A bounded explorable location pack for mission-space artifacts. It is an artifac
 
 ## Sponsor session
 
-The Hub-owned participation record for a bounded premium or booster help session.
+The Hub-owned participation record for a bounded premium or guided-contribution help session.
 
 ## Spider
 
