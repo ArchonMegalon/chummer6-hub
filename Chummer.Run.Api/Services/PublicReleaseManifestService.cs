@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Chummer.Run.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 
 namespace Chummer.Run.Api.Services;
@@ -60,6 +61,30 @@ public sealed class PublicReleaseManifestService
         }
 
         return candidate;
+    }
+
+    public PublicReleaseArtifactDto? FindDownload(string? artifactId)
+    {
+        var normalized = string.IsNullOrWhiteSpace(artifactId) ? null : artifactId.Trim();
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        return LoadManifest().Downloads.FirstOrDefault(item => string.Equals(item.Id, normalized, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public string? ResolveDownloadFilePath(PublicReleaseArtifactDto artifact)
+    {
+        var fileName = artifact.FileName;
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            var rawUrl = artifact.Url ?? string.Empty;
+            var withoutQuery = rawUrl.Split('?', '#')[0];
+            fileName = Path.GetFileName(withoutQuery);
+        }
+
+        return ResolveDownloadFilePath(fileName);
     }
 
     private string ResolveDownloadsRoot()
@@ -142,7 +167,13 @@ public sealed class PublicReleaseManifestService
                 Platform: item.PlatformLabel ?? item.Platform ?? "Preview build",
                 Url: item.DownloadUrl ?? "",
                 Sha256: item.Sha256 ?? "",
-                SizeBytes: item.SizeBytes))
+                SizeBytes: item.SizeBytes,
+                Head: item.Head,
+                PlatformId: item.Platform,
+                Arch: item.Arch,
+                Kind: item.Kind,
+                FileName: item.FileName,
+                InstallAccessClass: item.InstallAccessClass ?? InstallAccessClasses.OpenPublic))
             .ToList();
 
         var status = downloads.Count > 0
@@ -178,10 +209,14 @@ public sealed class PublicReleaseManifestService
 
     private sealed record RegistryReleaseArtifact(
         string? ArtifactId,
+        string? Head,
         string? Platform,
+        string? Arch,
+        string? Kind,
         string? PlatformLabel,
         string? FileName,
         string? DownloadUrl,
         string? Sha256,
-        long? SizeBytes);
+        long? SizeBytes,
+        string? InstallAccessClass);
 }

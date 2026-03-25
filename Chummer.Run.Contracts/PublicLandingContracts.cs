@@ -50,7 +50,13 @@ public sealed record PublicReleaseArtifactDto(
     string Platform,
     string Url,
     string Sha256,
-    long? SizeBytes = null);
+    long? SizeBytes = null,
+    string? Head = null,
+    string? PlatformId = null,
+    string? Arch = null,
+    string? Kind = null,
+    string? FileName = null,
+    string? InstallAccessClass = null);
 
 public sealed record PublicReleaseManifestDto(
     string Version,

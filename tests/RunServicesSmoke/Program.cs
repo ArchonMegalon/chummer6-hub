@@ -1,6 +1,7 @@
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.AI.Services.Assets;
@@ -27,6 +28,7 @@ using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Entitlements;
 using Chummer.Run.Contracts.Identity;
+using Chummer.Run.Contracts.InstallLinking;
 using Chummer.Run.Contracts.Ledger;
 using Chummer.Run.Contracts.Leaderboards;
 using Chummer.Run.Contracts.Ops;
@@ -498,6 +500,8 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         .Build();
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
+    var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
+    var installLinking = new InstallLinkingService(installLinkingStore);
     var accounts = new AccountService(store);
     var groups = new GroupService(store, accounts);
     var rewards = new RewardService(store);
@@ -538,7 +542,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         Timezone: "UTC",
         CountryCode: "AT"));
     var experience = new UserExperienceService(store, accounts);
-    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1416,6 +1420,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var releases = new PublicReleaseManifestService(configuration);
     var chrome = new HubPageChromeService(landing, navigation, releases);
     var progress = new PublicProgressService(configuration, loggerFactory.CreateLogger<PublicProgressService>());
+    var trustContent = new PublicTrustContentService();
+    var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
+    var installLinking = new InstallLinkingService(installLinkingStore);
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
@@ -1439,6 +1446,13 @@ async Task VerifyPublicLandingProjectionAsync()
     var leaderboards = new LeaderboardService(store);
     var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
         JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized))), configuration);
+    var linkedIdentityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        var body = request.Content is null ? string.Empty : request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        return body.Contains("subject-token", StringComparison.Ordinal)
+            ? JsonResponse(new IdentityIntrospectionResponse(true, "session-subject", "subject.demo", new[] { "player" }, DateTimeOffset.UtcNow.AddHours(1)))
+            : JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized);
+    })), configuration);
     var authService = new HubBrowserAuthService(new HttpClient(new StubHttpMessageHandler(_ =>
         JsonResponse(new EmailAuthStartResponse(
             TicketId: "eml_demo",
@@ -1453,12 +1467,21 @@ async Task VerifyPublicLandingProjectionAsync()
     var emailLinks = new HubEmailLinkVerificationService(
         DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(tempRoot, "email-links"))));
     var google = CreateGoogleService(configuration, authService, identityLinks, accounts, loggerFactory, tempRoot);
-    var controller = new PublicLandingController(landing, releases, accounts, identityClient, identityLinks, experience, chrome, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, releases, accounts, identityClient, identityLinks, experience, chrome, trustContent, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
+    };
+    var downloadsController = new DownloadsCompatibilityController(
+        releases,
+        installLinking,
+        accounts,
+        linkedIdentityClient,
+        loggerFactory.CreateLogger<DownloadsCompatibilityController>())
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
     };
     var progressController = new PublicProgressController(
         progress,
@@ -1492,6 +1515,13 @@ async Task VerifyPublicLandingProjectionAsync()
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
     Assert(downloadsModel is not null && downloadsModel.Manifest.Downloads.Any(static item => string.Equals(item.Id, "smoke-poc-linux-x64", StringComparison.Ordinal)), "downloads page should render artifacts from the live release manifest");
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
+    var authenticatedDownloadResult = await downloadsController.DownloadArtifact("smoke-poc-linux-x64", CancellationToken.None);
+    var authenticatedFile = authenticatedDownloadResult as PhysicalFileResult;
+    Assert(authenticatedFile is not null && string.Equals(authenticatedFile.FileDownloadName, "smoke-poc-linux-x64.zip", StringComparison.Ordinal), "account-aware download dispatch should stream the canonical artifact file.");
+    var linkedUser = accounts.EnsureUser("subject.demo", "Runner Demo", "runner@example.invalid");
+    var installSummary = installLinking.GetSummary(linkedUser.UserId, "subject.demo");
+    Assert(installSummary.RecentReceipts.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal)), "signed-in downloads should mint a durable download receipt.");
+    Assert(installSummary.PendingClaimTickets.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal) && string.Equals(item.Status, InstallClaimTicketStates.Pending, StringComparison.Ordinal)), "signed-in downloads should mint a pending install claim ticket.");
 
     var progressHtml = (await progressController.ProgressPage(CancellationToken.None)).Content ?? string.Empty;
     Assert(progressHtml.Contains("Core Rules Engine", StringComparison.Ordinal), "progress page should render the generated product-part report");
@@ -1546,7 +1576,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, accounts, unavailableIdentityClient, identityLinks, experience, chrome, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, accounts, unavailableIdentityClient, identityLinks, experience, chrome, trustContent, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1568,7 +1598,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
     Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
-    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
