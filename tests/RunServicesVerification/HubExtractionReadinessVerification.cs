@@ -414,6 +414,7 @@ internal static class HubExtractionReadinessVerification
                  {
                      "RunnerDossierProjection",
                      "CampaignProjection",
+                     "RunProjection",
                      "WorkspaceRestoreProjection",
                      "AccountCampaignSummary",
                      "EnsurePersonalDossierLocked",

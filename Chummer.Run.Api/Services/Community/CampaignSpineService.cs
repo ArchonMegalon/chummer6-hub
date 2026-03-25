@@ -35,6 +35,10 @@ public sealed class CampaignSpineService
                 .Where(item => item.DossierIds.Any(dossierId => dossiers.Any(dossier => string.Equals(dossier.DossierId, dossierId, StringComparison.OrdinalIgnoreCase))))
                 .OrderByDescending(static item => item.UpdatedAtUtc)
                 .ToArray();
+            var runs = _store.RunsById.Values
+                .Where(item => campaigns.Any(campaign => string.Equals(campaign.CampaignId, item.CampaignId, StringComparison.OrdinalIgnoreCase)))
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
             var operations = _store.GroupsById.Values
                 .Where(group => group.Memberships.Any(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase) && IsOperatorRole(member.Role)))
                 .OrderBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
@@ -52,7 +56,7 @@ public sealed class CampaignSpineService
                 ? existingRestore
                 : BuildRestoreProjection(user, dossiers, campaigns, installLinking);
 
-            return new AccountCampaignSummary(dossiers, campaigns, operations, restore);
+            return new AccountCampaignSummary(dossiers, campaigns, runs, operations, restore);
         }
     }
 

@@ -149,5 +149,6 @@ public sealed record CommunityOperatorProjection(
 public sealed record AccountCampaignSummary(
     IReadOnlyList<RunnerDossierProjection> Dossiers,
     IReadOnlyList<CampaignProjection> Campaigns,
+    IReadOnlyList<RunProjection> Runs,
     IReadOnlyList<CommunityOperatorProjection> CommunityOperations,
     WorkspaceRestoreProjection Restore);
