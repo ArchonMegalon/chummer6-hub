@@ -60,7 +60,7 @@ assets:
     prompt_variants:
       - name: hero_a_intake_trust_under_pressure
         prompt: |
-          A premium first-contact still inside a midnight shadowrunner intake bay overlooking a rain-heavy city. Foreground: open dossier folios, cyberware calibration trays, sealed evidence sleeves, six-sided dice, med patches, a commlink, and abstract audit overlays with no readable text. Midground: two runners under prep pressure while a calm operator validates their loadout beside them, visible collaboration and trust. Background: service racks, wet glass, deep city lights, subtle awakened-magic cues, one drone silhouette. Dense, layered, information-rich, software-product realism, not poster art.
+          A premium first-contact still inside a midnight shadowrunner intake bay overlooking a rain-heavy city. Foreground: open dossier folios, cyberware calibration trays, sealed evidence sleeves, six-sided dice, med patches, a commlink, and abstract audit overlays with no readable text. Midground: two runners under prep pressure while a steady operator validates their loadout beside them, visible collaboration and trust. Background: service racks, wet glass, deep city lights, subtle awakened-magic cues, one drone silhouette. Dense, layered, information-rich, software-product realism, not poster art.
       - name: hero_b_boulevard_of_futures
         prompt: |
           A premium hero still on a rain-polished near-future boulevard with multiple branching paths hinting at product lanes like runsites, dossiers, creator tools, and replay through grounded props and architecture instead of signs. Two runners and one handler pause in the foreground, comparing a packet and device state before moving. Layered reflections, city depth, subtle magic-tech fusion, clear sense of choice and momentum, dense and cinematic, not an empty road scene.
@@ -87,7 +87,7 @@ assets:
     long_side_px: 2400
     negative_space: side_35
     prompt: |
-      A precision rules-verification lab that mixes physical source evidence and digital audit traces. Modifier-chain overlays, clipped evidence markers, source fragments, cyberdeck component, spell reagent, ammo tags, and six-sided dice arranged with clean logic. Two people are present: one builder and one reviewer or witness. The scene makes the math feel inspectable and trustworthy, with calm blue light and warm proof accents, no text.
+      A precision rules-verification lab that mixes physical source evidence and digital audit traces. Modifier-chain overlays, clipped evidence markers, source fragments, cyberdeck component, spell reagent, ammo tags, and six-sided dice arranged with clean logic. Two people are present: one builder and one reviewer or witness. The scene makes the math feel inspectable and trustworthy, with focused blue light and warm proof accents, no text.
   - id: scene_archive_stair
     filename_base: scene-archive-stair
     runtime_targets:
@@ -150,7 +150,7 @@ assets:
     long_side_px: 2400
     negative_space: side_30
     prompt: |
-      A premium night exterior of a controlled release facility in a rain-wet city district. Lit windows, secure loading bay, one courier case transfer, subtle integrity markers, calm industrial polish, and a sense of disciplined rollout. No giant signage, no empty parking lot, no generic sci-fi warehouse.
+      A premium night exterior of a controlled release facility in a rain-wet city district. Lit windows, secure loading bay, one courier case transfer, subtle integrity markers, disciplined industrial polish, and a sense of controlled rollout. No giant signage, no empty parking lot, no generic sci-fi warehouse.
   - id: auth_entry_blueglass
     filename_base: auth-entry-blueglass
     runtime_targets:
@@ -181,7 +181,7 @@ assets:
     long_side_px: 2400
     negative_space: side_30
     prompt: |
-      A creator-proof cluster arranged as a premium publishing workstation: scanner, camera, packet mockups, artifact cards, reference fragments, sealed proofs, and receipt-linked objects on a disciplined desk. One person assembles, another reviews. Editorial-grade realism, calm blue light with warm desk accents, dense but controlled.
+      A creator-proof cluster arranged as a premium publishing workstation: scanner, camera, packet mockups, artifact cards, reference fragments, sealed proofs, and receipt-linked objects on a disciplined desk. One person assembles, another reviews. Editorial-grade realism, layered blue proof light with warm desk accents, dense but controlled.
   - id: lane_player
     filename_base: lane-player
     runtime_targets:

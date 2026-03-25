@@ -166,7 +166,7 @@ assets:
     mobile_poster_avif_url: /media/campaign/participation-ops-lane.avif
     mobile_poster_webp_url: /media/campaign/participation-ops-lane.webp
     loop_url:
-    alt: Contribution workstation with intake trays, verification cues, and a solo operator connected to a wider trusted system.
+    alt: Contribution lane with intake trays, verification cues, and a solo operator visibly connected to a wider trusted system.
     caption: Participation image
     motion_policy: stills_only
     fallback_style: solo_cockpit
@@ -222,7 +222,7 @@ assets:
     mobile_poster_avif_url: /media/campaign/lane-creator.avif
     mobile_poster_webp_url: /media/campaign/lane-creator.webp
     loop_url:
-    alt: Creator workstation with package fragments, polished media pieces, and careful rules stewardship.
+    alt: Creator publishing lane with package fragments, polished media pieces, and careful rules stewardship under visible review pressure.
     caption: Creator lane image
     motion_policy: stills_only
     fallback_style: prop_table

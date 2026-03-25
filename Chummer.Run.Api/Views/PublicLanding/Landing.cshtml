@@ -6,6 +6,7 @@
     var hero = Model.Assets.BySlot("section_hero");
     var proofAsset = Model.Assets.BySlot("product_proof_ui") ?? Model.Assets.BySlot("capability_check_rules");
     var proofNotes = Model.Workflows.Take(3).ToArray();
+    var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
 
     static IReadOnlyList<string> MicroProof(PublicFeatureCardDto card)
@@ -39,6 +40,28 @@
         {
             <div class="launch-hero__media">
                 @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", hero)
+                <div class="launch-hero__prooffloat" aria-label="Current preview proof">
+                    <div class="launch-hero__proof-topline">
+                        <span>Current preview</span>
+                        <span>@Model.Manifest.Channel · @Model.Manifest.Version</span>
+                    </div>
+                    <div class="launch-hero__proof-summary">
+                        <strong>@Model.Surface.ProductProofResultTitle</strong>
+                        <p>@Model.Surface.ProductProofResultSummary</p>
+                    </div>
+                    <div class="launch-hero__proof-trail">
+                        @foreach (var step in heroProofTrail)
+                        {
+                            <span>@step</span>
+                        }
+                    </div>
+                    @if (proofAsset is not null)
+                    {
+                        <div class="launch-hero__proof-shot">
+                            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", proofAsset)
+                        </div>
+                    }
+                </div>
             </div>
         }
     </div>

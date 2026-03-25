@@ -8,6 +8,7 @@ COPY chummercomplete/chummer.run-services/Chummer.Run.Contracts/ chummercomplete
 COPY chummercomplete/chummer.run-services/.codex-design/ chummercomplete/chummer.run-services/.codex-design/
 COPY chummercomplete/chummer.run-services/Chummer.Play.Contracts/bin/Release/net10.0/ chummercomplete/chummer.run-services/Chummer.Play.Contracts/bin/Release/net10.0/
 COPY chummercomplete/chummer-core-engine/Chummer.Contracts/bin/Release/net10.0/ chummercomplete/chummer-core-engine/Chummer.Contracts/bin/Release/net10.0/
+COPY chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/bin/Release/net10.0/ chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/bin/Release/net10.0/
 COPY fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/bin/Release/net10.0/ fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/bin/Release/net10.0/
 WORKDIR /src/chummercomplete/chummer.run-services/Chummer.Run.Api
 RUN dotnet publish -c Release -o /app/publish
