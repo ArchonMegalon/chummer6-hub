@@ -63,6 +63,7 @@
             <a href="#sign-in">Primary sign-in</a>
             <a href="#recovery">Recovery email</a>
             <a href="#channels">Linked channels</a>
+            <a href="#desktop">Desktop installs</a>
             <a href="#privacy">Privacy</a>
             <a href="#participation">Participation</a>
         </aside>
@@ -152,6 +153,55 @@
                     <button class="button-like button-like--secondary" type="submit">Connect Telegram</button>
                     <p id="telegramStatusNotice" class="muted-copy" hidden></p>
                 </form>
+            </section>
+
+            <section id="desktop" class="settings-section">
+                <div class="settings-section__header">
+                    <h2>Desktop installs</h2>
+                    <p>Downloads stay canonical, but signed-in handoffs keep receipts and claim tickets so this copy can be linked later without mutating the file.</p>
+                </div>
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Recent download receipts</span>
+                        <strong>@Model.InstallLinking.RecentReceipts.Count</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Pending claim tickets</span>
+                        <strong>@Model.InstallLinking.PendingClaimTickets.Count</strong>
+                    </div>
+                </div>
+                @if (Model.InstallLinking.RecentReceipts.Count == 0)
+                {
+                    <p class="muted-copy">No account-linked downloads yet. Use the Hub downloads page while signed in to create a claimable handoff.</p>
+                }
+                else
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var receipt in Model.InstallLinking.RecentReceipts)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@receipt.ArtifactLabel</span>
+                                <strong>@receipt.Version on @receipt.IssuedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                            </div>
+                        }
+                    </div>
+                }
+                @if (Model.InstallLinking.PendingClaimTickets.Count > 0)
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var ticket in Model.InstallLinking.PendingClaimTickets)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@ticket.ArtifactLabel</span>
+                                <strong><code class="mono-receipt">@ticket.ClaimCode</code> until @ticket.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                            </div>
+                        }
+                    </div>
+                }
+                <div class="stacked-actions">
+                    <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
+                    <a class="button-like button-like--ghost" href="/help">How install linking works</a>
+                </div>
             </section>
 
             <section id="privacy" class="settings-section">

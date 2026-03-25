@@ -1,5 +1,6 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.Mvc;
@@ -15,6 +16,7 @@ public sealed class AccountsController : Controller
     private readonly HubIdentityClient _identity;
     private readonly IdentityLinkService _links;
     private readonly UserExperienceService _experience;
+    private readonly InstallLinkingService _installLinking;
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
     private readonly ILogger<AccountsController> _logger;
@@ -24,6 +26,7 @@ public sealed class AccountsController : Controller
         HubIdentityClient identity,
         IdentityLinkService links,
         UserExperienceService experience,
+        InstallLinkingService installLinking,
         HubPageChromeService chrome,
         HubGoogleAuthService google,
         ILogger<AccountsController> logger)
@@ -32,6 +35,7 @@ public sealed class AccountsController : Controller
         _identity = identity;
         _links = links;
         _experience = experience;
+        _installLinking = installLinking;
         _chrome = chrome;
         _google = google;
         _logger = logger;
@@ -50,7 +54,8 @@ public sealed class AccountsController : Controller
                 User: user,
                 Links: _links.GetSummary(subject.SubjectId),
                 Experience: _experience.GetOrCreate(subject.SubjectId),
-                GoogleAvailable: _google.IsConfigured());
+                GoogleAvailable: _google.IsConfigured(),
+                InstallLinking: _installLinking.GetSummary(user.UserId, subject.SubjectId));
             return View("~/Views/Accounts/Account.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)

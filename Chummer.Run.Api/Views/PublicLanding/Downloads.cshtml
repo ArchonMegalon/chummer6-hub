@@ -26,6 +26,9 @@
     static string ActionLabel(PublicReleaseArtifactDto download)
         => IsInstaller(download) ? "Download installer" : "Download file";
 
+    static string DispatchHref(PublicReleaseArtifactDto download)
+        => $"/downloads/get/{Uri.EscapeDataString(download.Id)}";
+
     static string SupportNote(PublicReleaseArtifactDto download)
         => IsInstaller(download)
             ? "Recommended for most people. Use this when you want the cleanest setup path."
@@ -47,6 +50,10 @@
         <h1 class="page-title">Install the current preview</h1>
         <p class="page-copy">@Model.Manifest.Channel channel, version @Model.Manifest.Version, published @Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd").</p>
         <p class="release-stage__note">Use an installer when you see one. Manual archives stay available as the fallback path for people who explicitly want the raw package.</p>
+        @if (Model.Chrome.Authenticated)
+        {
+            <p class="release-stage__note">Signed-in downloads keep a Hub receipt and a claim ticket for this copy without changing the installer bytes. You can review that handoff from your account page later.</p>
+        }
     </div>
     <div class="release-stage__integrity">
         <span class="tag">Install and update</span>
@@ -100,7 +107,7 @@ else
                     <span>Checksum <code class="mono-receipt">@download.Sha256[..Math.Min(download.Sha256.Length, 16)]...</code></span>
                 </div>
                 <div class="stacked-actions">
-                    <a class="button-like button-like--primary" href="@download.Url">@ActionLabel(download)</a>
+                    <a class="button-like button-like--primary" href="@DispatchHref(download)">@(Model.Chrome.Authenticated ? "Download and link this copy" : ActionLabel(download))</a>
                 </div>
             </article>
         }
@@ -128,7 +135,7 @@ else
                             <span class="muted-copy">@SizeLabel(download.SizeBytes)</span>
                             <code class="mono-receipt">SHA @download.Sha256[..Math.Min(download.Sha256.Length, 16)]...</code>
                         </div>
-                        <a class="button-like button-like--primary" href="@download.Url">@ActionLabel(download)</a>
+                        <a class="button-like button-like--primary" href="@DispatchHref(download)">@(Model.Chrome.Authenticated ? "Download and link this copy" : ActionLabel(download))</a>
                     </article>
                 }
             </div>
@@ -157,7 +164,7 @@ else
                             <span class="muted-copy">@SizeLabel(download.SizeBytes)</span>
                             <code class="mono-receipt">SHA @download.Sha256[..Math.Min(download.Sha256.Length, 16)]...</code>
                         </div>
-                        <a class="button-like button-like--ghost" href="@download.Url">@ActionLabel(download)</a>
+                        <a class="button-like button-like--ghost" href="@DispatchHref(download)">@(Model.Chrome.Authenticated ? "Download and link this copy" : ActionLabel(download))</a>
                     </article>
                 }
             </div>
