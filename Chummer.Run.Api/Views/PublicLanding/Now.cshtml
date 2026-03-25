@@ -36,13 +36,13 @@
         <div class="evidence-row-list">
             @foreach (var card in Model.AvailableToday)
             {
-                <article class="evidence-row" id="@card.Id.Replace('_', '-')">
+                <article class="evidence-row" id="@card.Card.Id.Replace('_', '-')">
                     <div class="evidence-row__copy">
-                        <h3>@card.Title</h3>
-                        <p>@card.Summary</p>
+                        <h3>@card.Card.Title</h3>
+                        <p>@card.Card.Summary</p>
                     </div>
-                    <span class="readiness-tag">@card.Badge</span>
-                    <a class="button-like button-like--ghost" href="@card.Href">@(card.ActionLabel ?? "Open")</a>
+                    <span class="readiness-tag">@card.Card.Badge</span>
+                    <a class="button-like button-like--ghost" href="@card.Action.Href">@card.Action.Label</a>
                 </article>
             }
         </div>
@@ -56,13 +56,13 @@
         <div class="evidence-row-list">
             @foreach (var card in Model.Inspectable)
             {
-                <article class="evidence-row" id="@card.Id.Replace('_', '-')">
+                <article class="evidence-row" id="@card.Card.Id.Replace('_', '-')">
                     <div class="evidence-row__copy">
-                        <h3>@card.Title</h3>
-                        <p>@card.Summary</p>
+                        <h3>@card.Card.Title</h3>
+                        <p>@card.Card.Summary</p>
                     </div>
-                    <span class="readiness-tag tag--amber">@card.Badge</span>
-                    <a class="button-like button-like--ghost" href="@card.Href">@(card.ActionLabel ?? "Inspect")</a>
+                    <span class="readiness-tag tag--amber">@card.Card.Badge</span>
+                    <a class="button-like button-like--ghost" href="@card.Action.Href">@card.Action.Label</a>
                 </article>
             }
         </div>

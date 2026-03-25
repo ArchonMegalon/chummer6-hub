@@ -3,149 +3,7 @@
     ViewData["Title"] = "Downloads";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads";
-
-    static bool IsInstaller(PublicReleaseArtifactDto download)
-        => download.Url.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-           || download.Url.EndsWith(".deb", StringComparison.OrdinalIgnoreCase)
-           || download.Url.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)
-           || download.Url.EndsWith(".dmg", StringComparison.OrdinalIgnoreCase)
-           || download.Url.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase)
-           || download.Id.Contains("installer", StringComparison.OrdinalIgnoreCase);
-
-    static string DispatchHref(PublicReleaseArtifactDto download)
-        => $"/downloads/get/{Uri.EscapeDataString(download.Id)}";
-
-    static string SizeLabel(long? sizeBytes)
-        => sizeBytes is long size
-            ? $"{Math.Round(size / 1024d / 1024d, 1)} MB"
-            : "Unknown size";
-
-    static string PlatformFamily(PublicReleaseArtifactDto download)
-    {
-        if (!string.IsNullOrWhiteSpace(download.PlatformId))
-        {
-            if (download.PlatformId.Contains("win", StringComparison.OrdinalIgnoreCase))
-            {
-                return "windows";
-            }
-
-            if (download.PlatformId.Contains("linux", StringComparison.OrdinalIgnoreCase))
-            {
-                return "linux";
-            }
-
-            if (download.PlatformId.Contains("osx", StringComparison.OrdinalIgnoreCase) || download.PlatformId.Contains("mac", StringComparison.OrdinalIgnoreCase))
-            {
-                return "macos";
-            }
-        }
-
-        if (download.Platform.Contains("Windows", StringComparison.OrdinalIgnoreCase))
-        {
-            return "windows";
-        }
-
-        if (download.Platform.Contains("Linux", StringComparison.OrdinalIgnoreCase))
-        {
-            return "linux";
-        }
-
-        if (download.Platform.Contains("mac", StringComparison.OrdinalIgnoreCase))
-        {
-            return "macos";
-        }
-
-        return "generic";
-    }
-
-    static string PlatformLabel(PublicReleaseArtifactDto download)
-        => PlatformFamily(download) switch
-        {
-            "windows" => "Windows",
-            "linux" => "Linux",
-            "macos" => "macOS",
-            _ => download.Platform
-        };
-
-    static int PlatformPriority(PublicReleaseArtifactDto download)
-        => PlatformFamily(download) switch
-        {
-            "windows" => 0,
-            "macos" => 1,
-            "linux" => 2,
-            _ => 3
-        };
-
-    static string HeadLabel(PublicReleaseArtifactDto download)
-        => download.Head?.ToLowerInvariant() switch
-        {
-            "avalonia" => "Avalonia desktop head",
-            "blazor-desktop" => "Blazor desktop head",
-            _ => IsInstaller(download) ? "Recommended desktop install" : "Manual package"
-        };
-
-    static int HeadPriority(PublicReleaseArtifactDto download)
-        => download.Head?.ToLowerInvariant() switch
-        {
-            "avalonia" => 0,
-            "blazor-desktop" => 1,
-            _ => 2
-        };
-
-    static string RecommendedSupport(PublicReleaseArtifactDto download)
-        => IsInstaller(download)
-            ? $"This is the default recommended installer for {PlatformLabel(download)}."
-            : $"A packaged installer is not published for {PlatformLabel(download)} yet. This is the cleanest current preview package for that platform.";
-
-    static string RecommendedActionLabel(PublicReleaseArtifactDto download, bool authenticated)
-        => authenticated
-            ? "Download and link this copy"
-            : IsInstaller(download)
-                ? "Download Chummer"
-                : "Download preview package";
-
-    static string AlternativeSupport(PublicReleaseArtifactDto download)
-        => IsInstaller(download)
-            ? "Alternative desktop head for the same platform. Use this only when you explicitly want this runtime path."
-            : "Manual package for advanced or support-directed use.";
-
-    static PublicReleaseArtifactDto? SelectRecommendedDownload(IEnumerable<PublicReleaseArtifactDto> downloads, string userAgent)
-    {
-        var candidates = downloads.ToArray();
-        if (candidates.Length == 0)
-        {
-            return null;
-        }
-
-        string? preferredPlatform = null;
-        if (userAgent.Contains("Windows", StringComparison.OrdinalIgnoreCase))
-        {
-            preferredPlatform = "windows";
-        }
-        else if (userAgent.Contains("Linux", StringComparison.OrdinalIgnoreCase))
-        {
-            preferredPlatform = "linux";
-        }
-        else if (userAgent.Contains("Mac OS", StringComparison.OrdinalIgnoreCase) || userAgent.Contains("Macintosh", StringComparison.OrdinalIgnoreCase))
-        {
-            preferredPlatform = "macos";
-        }
-
-        var platformMatched = preferredPlatform is null
-            ? candidates
-            : candidates.Where(download => string.Equals(PlatformFamily(download), preferredPlatform, StringComparison.OrdinalIgnoreCase)).ToArray();
-        var pool = platformMatched.Length > 0 ? platformMatched : candidates;
-        return pool
-            .OrderBy(download => HeadPriority(download))
-            .ThenBy(download => PlatformPriority(download))
-            .ThenBy(download => PlatformLabel(download), StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
-    }
-
-    var installers = Model.Manifest.Downloads.Where(IsInstaller).ToArray();
-    var manualDownloads = Model.Manifest.Downloads.Where(download => !IsInstaller(download)).ToArray();
-    var recommendedDownload = SelectRecommendedDownload(installers.Length > 0 ? installers : Model.Manifest.Downloads, Context.Request.Headers.UserAgent.ToString());
-    var alternativeInstallers = installers.Where(download => !string.Equals(download.Id, recommendedDownload?.Id, StringComparison.OrdinalIgnoreCase)).ToArray();
+    var release = Model.ReleaseExperience;
 }
 
 <section class="release-stage">
@@ -153,37 +11,38 @@
         <p class="eyebrow">Downloads</p>
         <h1 class="page-title">Install the current preview</h1>
         <p class="page-copy">@Model.Manifest.Channel channel, version @Model.Manifest.Version, published @Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd").</p>
-        <p class="release-stage__note">Start with the single recommended installer for your platform. Advanced desktop heads and manual packages live underneath when you actually need them.</p>
+        <p class="release-stage__note">Start with the recommended installer for your platform. Alternative desktop heads and manual packages stay underneath when you explicitly need them.</p>
         @if (Model.Chrome.Authenticated)
         {
-            <p class="release-stage__note">Signed-in downloads keep a Hub receipt and a claim ticket for this copy without changing the installer bytes. Review that handoff from your account page later if you need it.</p>
+            <p class="release-stage__note">Signed-in downloads keep a receipt and an install-link handoff without changing the published bytes.</p>
         }
     </div>
     <div class="release-stage__integrity">
-        <span class="tag">Install and update</span>
-        <p>Checksums stay visible, the release channel stays explicit, and the primary action stays obvious.</p>
+        <span class="tag">Current release</span>
+        <p>@release.ReleaseNotesSummary</p>
     </div>
 </section>
 
 <section class="release-guidance">
     <article class="release-guidance__item">
-        <span class="tag">Recommended</span>
-        <h2>One obvious default</h2>
-        <p>Normal users should not have to pick between multiple implementation heads before the first install.</p>
+        <span class="tag">Release notes</span>
+        <h2>What changed in this preview</h2>
+        <p>@release.ReleaseNotesSummary</p>
     </article>
     <article class="release-guidance__item">
-        <span class="tag tag--quiet">Advanced</span>
-        <h2>Alternatives stay available</h2>
-        <p>Desktop-head and manual-package choices still exist, but they are advanced options, not the first decision on the page.</p>
+        <span class="tag tag--quiet">Updates</span>
+        <h2>How updates behave</h2>
+        <p>@release.UpdatePostureSummary</p>
     </article>
     <article class="release-guidance__item">
-        <span class="tag">Updates</span>
-        <h2>Keep the channel visible</h2>
-        <p>Use this page as the release truth whenever you need to confirm the current preview version, channel, or package integrity.</p>
+        <span class="tag">Help</span>
+        <h2>Get install help fast</h2>
+        <p>Known issues, install help, and the recommended path stay on first-party pages instead of making you reverse-engineer packaging choices.</p>
+        <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
     </article>
 </section>
 
-@if (Model.Manifest.Downloads.Count == 0)
+@if (Model.Manifest.Downloads.Count == 0 || release.Recommended is null)
 {
     <section class="release-shelf">
         <article class="release-empty">
@@ -196,65 +55,142 @@
         </article>
     </section>
 }
-else if (recommendedDownload is not null)
+else
 {
     <section class="recommended-download" id="recommended-download">
         <article class="recommended-download__card">
             <div class="recommended-download__copy">
                 <span class="tag">Recommended</span>
-                <h2>Download Chummer for @PlatformLabel(recommendedDownload)</h2>
-                <p>@RecommendedSupport(recommendedDownload)</p>
+                <h2>@release.Recommended.ActionLabel</h2>
+                <p>@release.Recommended.SupportLine</p>
                 <div class="recommended-download__meta">
-                    <span>@PlatformLabel(recommendedDownload)</span>
-                    <span>@SizeLabel(recommendedDownload.SizeBytes)</span>
-                    <span>@(IsInstaller(recommendedDownload) ? "Recommended install" : "Current preview package")</span>
-                    <code class="mono-receipt">SHA @recommendedDownload.Sha256[..Math.Min(recommendedDownload.Sha256.Length, 16)]...</code>
+                    <span>@release.Recommended.PlatformLabel</span>
+                    <span>@release.Recommended.SizeLabel</span>
+                    <span>@release.Recommended.HeadLabel</span>
+                    @if (!string.IsNullOrWhiteSpace(release.Recommended.ShaPreview))
+                    {
+                        <code class="mono-receipt">@release.Recommended.ShaPreview</code>
+                    }
                 </div>
                 <div class="stacked-actions">
-                    <a class="button-like button-like--primary" href="@DispatchHref(recommendedDownload)">@RecommendedActionLabel(recommendedDownload, Model.Chrome.Authenticated)</a>
-                    <a class="button-like button-like--secondary" href="/help">Need install help?</a>
+                    <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
+                    <a class="button-like button-like--secondary" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                    <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
                 </div>
             </div>
         </article>
     </section>
 
-    @if (alternativeInstallers.Length > 0 || manualDownloads.Length > 0)
+    <section class="release-guidance release-guidance--detail">
+        <article class="release-guidance__item">
+            <span class="tag">Install steps</span>
+            <h2>First run should be straightforward</h2>
+            <ul class="trust-page-section__list">
+                @foreach (var step in release.InstallSteps)
+                {
+                    <li>@step</li>
+                }
+            </ul>
+        </article>
+        <article class="release-guidance__item">
+            <span class="tag tag--quiet">System requirements</span>
+            <h2>@release.Recommended.PlatformLabel requirements</h2>
+            <ul class="trust-page-section__list">
+                @foreach (var requirement in release.SystemRequirements)
+                {
+                    <li>@requirement</li>
+                }
+            </ul>
+        </article>
+    </section>
+
+    @if (release.Alternatives.Count > 0)
     {
         <section class="release-shelf release-shelf--manual">
             <div class="release-shelf__lead">
                 <p class="eyebrow">More download options</p>
-                <h2 class="editorial-title">Advanced desktop heads and manual packages</h2>
-                <p class="editorial-copy">Choose these only when you explicitly want a different desktop head or a manual package.</p>
+                <h2 class="editorial-title">Alternative desktop heads for @release.Recommended.PlatformLabel</h2>
+                <p class="editorial-copy">Use these only when you explicitly want a different desktop implementation on the same platform.</p>
             </div>
             <div class="evidence-row-list">
-                @foreach (var download in alternativeInstallers)
+                @foreach (var download in release.Alternatives)
                 {
                     <article class="evidence-row evidence-row--download">
                         <div class="evidence-row__copy">
-                            <h3>@PlatformLabel(download)</h3>
-                            <p>@AlternativeSupport(download)</p>
+                            <h3>@download.HeadLabel</h3>
+                            <p>@download.SupportLine</p>
                         </div>
                         <div class="download-row__meta">
-                            <span class="platform-pill">@HeadLabel(download)</span>
-                            <span class="muted-copy">@SizeLabel(download.SizeBytes)</span>
-                            <code class="mono-receipt">SHA @download.Sha256[..Math.Min(download.Sha256.Length, 16)]...</code>
+                            <span class="platform-pill">@download.PlatformLabel</span>
+                            <span class="muted-copy">@download.SizeLabel</span>
+                            @if (!string.IsNullOrWhiteSpace(download.ShaPreview))
+                            {
+                                <code class="mono-receipt">@download.ShaPreview</code>
+                            }
                         </div>
-                        <a class="button-like button-like--ghost" href="@DispatchHref(download)">@(Model.Chrome.Authenticated ? "Download and link this copy" : "Download alternative installer")</a>
+                        <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
                     </article>
                 }
-                @foreach (var download in manualDownloads)
+            </div>
+        </section>
+    }
+
+    @if (release.OtherPlatforms.Count > 0)
+    {
+        <section class="release-shelf release-shelf--manual">
+            <div class="release-shelf__lead">
+                <p class="eyebrow">Other platforms</p>
+                <h2 class="editorial-title">Preview packages for other platforms</h2>
+                <p class="editorial-copy">Use these when you are intentionally installing on another platform, not as the default choice for this machine.</p>
+            </div>
+            <div class="evidence-row-list">
+                @foreach (var download in release.OtherPlatforms)
                 {
                     <article class="evidence-row evidence-row--download">
                         <div class="evidence-row__copy">
-                            <h3>@download.Platform</h3>
-                            <p>@AlternativeSupport(download)</p>
+                            <h3>@download.PlatformLabel</h3>
+                            <p>@download.SupportLine</p>
                         </div>
                         <div class="download-row__meta">
-                            <span class="platform-pill">Manual package</span>
-                            <span class="muted-copy">@SizeLabel(download.SizeBytes)</span>
-                            <code class="mono-receipt">SHA @download.Sha256[..Math.Min(download.Sha256.Length, 16)]...</code>
+                            <span class="platform-pill">@download.HeadLabel</span>
+                            <span class="muted-copy">@download.SizeLabel</span>
+                            @if (!string.IsNullOrWhiteSpace(download.ShaPreview))
+                            {
+                                <code class="mono-receipt">@download.ShaPreview</code>
+                            }
                         </div>
-                        <a class="button-like button-like--ghost" href="@DispatchHref(download)">@(Model.Chrome.Authenticated ? "Download and link this copy" : "Download manual package")</a>
+                        <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    @if (release.ManualPackages.Count > 0)
+    {
+        <section class="release-shelf release-shelf--manual">
+            <div class="release-shelf__lead">
+                <p class="eyebrow">Manual packages</p>
+                <h2 class="editorial-title">Fallback packages for advanced or support-directed installs</h2>
+                <p class="editorial-copy">These packages stay available for edge cases, but they are not the default first-run path.</p>
+            </div>
+            <div class="evidence-row-list">
+                @foreach (var download in release.ManualPackages)
+                {
+                    <article class="evidence-row evidence-row--download">
+                        <div class="evidence-row__copy">
+                            <h3>@download.PlatformLabel</h3>
+                            <p>@download.SupportLine</p>
+                        </div>
+                        <div class="download-row__meta">
+                            <span class="platform-pill">@download.HeadLabel</span>
+                            <span class="muted-copy">@download.SizeLabel</span>
+                            @if (!string.IsNullOrWhiteSpace(download.ShaPreview))
+                            {
+                                <code class="mono-receipt">@download.ShaPreview</code>
+                            }
+                        </div>
+                        <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
                     </article>
                 }
             </div>
@@ -263,9 +199,9 @@ else if (recommendedDownload is not null)
 }
 
 <section class="release-footnote">
-    <p class="muted-copy">Need help choosing? Start with the recommended installer on this page, then use the help and contact pages when the package choice or update posture is still not obvious.</p>
+    <p class="muted-copy">If the package choice is still unclear, stop here and use the install help or known-issues path instead of guessing.</p>
     <div class="stacked-actions">
-        <a class="button-like button-like--secondary" href="/help">Open help</a>
+        <a class="button-like button-like--secondary" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
         <a class="button-like button-like--ghost" href="/contact">Contact Chummer</a>
     </div>
 </section>

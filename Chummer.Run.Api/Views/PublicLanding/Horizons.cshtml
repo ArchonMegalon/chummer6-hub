@@ -15,37 +15,36 @@
     @for (var index = 0; index < Model.Horizons.Count; index++)
     {
         var card = Model.Horizons[index];
-        var asset = Model.Assets.ForCard(card);
         var reverseClass = index % 2 == 1 ? " horizon-band--reverse" : string.Empty;
 
-        <article class="horizon-band@reverseClass" id="@card.Id.ToLowerInvariant().Replace('_', '-')">
-            @if (asset is not null)
+        <article class="horizon-band@reverseClass" id="@card.Card.Id.ToLowerInvariant().Replace('_', '-')">
+            @if (card.Asset is not null)
             {
                 <div class="horizon-band__media">
-                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
                 </div>
             }
             <div class="horizon-band__copy">
-                <span class="readiness-tag readiness-tag--horizon">@card.Badge</span>
-                <h2>@card.Title</h2>
-                <p>@card.Summary</p>
+                <span class="readiness-tag readiness-tag--horizon">@card.Card.Badge</span>
+                <h2>@card.Card.Title</h2>
+                <p>@card.Card.Summary</p>
                 <div class="horizon-band__claims">
-                    @if (!string.IsNullOrWhiteSpace(card.Pain))
+                    @if (!string.IsNullOrWhiteSpace(card.Card.Pain))
                     {
                         <div>
                             <span class="horizon-band__label">Pain</span>
-                            <p>@card.Pain</p>
+                            <p>@card.Card.Pain</p>
                         </div>
                     }
-                    @if (!string.IsNullOrWhiteSpace(card.Payoff))
+                    @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
                     {
                         <div>
                             <span class="horizon-band__label">Payoff</span>
-                            <p>@card.Payoff</p>
+                            <p>@card.Card.Payoff</p>
                         </div>
                     }
                 </div>
-                <a class="editorial-strip__action" href="@card.Href">Read more</a>
+                <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
             </div>
         </article>
     }

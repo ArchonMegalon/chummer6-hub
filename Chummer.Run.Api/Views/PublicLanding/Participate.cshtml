@@ -3,14 +3,6 @@
     ViewData["Title"] = "Participate";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-participate";
-
-    string ResolveCardHref(PublicFeatureCardDto card)
-        => Model.Chrome.Authenticated
-            ? card.RegisteredHref ?? card.FallbackRoute ?? card.Href
-            : card.GuestHref ?? card.FallbackRoute ?? card.Href;
-
-    string ResolveCardLabel(PublicFeatureCardDto card, string fallback)
-        => card.ActionLabel ?? fallback;
 }
 
 <section class="story-guide-tail">
@@ -29,15 +21,15 @@
                 <div class="compact-rail">
                     @foreach (var card in Model.PublicLane)
                     {
-                        var sectionId = card.Href.Contains('#', StringComparison.Ordinal)
-                            ? card.Href[(card.Href.LastIndexOf('#') + 1)..]
-                            : card.Id.Replace('_', '-');
+                        var sectionId = card.Action.Href.Contains('#', StringComparison.Ordinal)
+                            ? card.Action.Href[(card.Action.Href.LastIndexOf('#') + 1)..]
+                            : card.Card.Id.Replace('_', '-');
                         <article class="compact-rail__item" id="@sectionId">
                             <div class="compact-rail__copy">
-                                <h3>@card.Title</h3>
-                                <p>@card.Summary</p>
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
                             </div>
-                            <a class="editorial-strip__action" href="@ResolveCardHref(card)">@ResolveCardLabel(card, "Open")</a>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                         </article>
                     }
                 </div>
@@ -52,15 +44,15 @@
                 <div class="compact-rail">
                     @foreach (var card in Model.SignedInLane)
                     {
-                        var sectionId = card.Href.Contains('#', StringComparison.Ordinal)
-                            ? card.Href[(card.Href.LastIndexOf('#') + 1)..]
-                            : card.Id.Replace('_', '-');
+                        var sectionId = card.Action.Href.Contains('#', StringComparison.Ordinal)
+                            ? card.Action.Href[(card.Action.Href.LastIndexOf('#') + 1)..]
+                            : card.Card.Id.Replace('_', '-');
                         <article class="compact-rail__item" id="@sectionId">
                             <div class="compact-rail__copy">
-                                <h3>@card.Title</h3>
-                                <p>@card.Summary</p>
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
                             </div>
-                            <a class="editorial-strip__action" href="@ResolveCardHref(card)">@ResolveCardLabel(card, "Continue")</a>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                         </article>
                     }
                 </div>

@@ -22,7 +22,7 @@
 <section class="trust-page-sections">
     @foreach (var pageSection in Model.Sections)
     {
-        <article class="trust-page-section">
+        <article class="trust-page-section" id="@pageSection.Id">
             <p class="eyebrow">@pageSection.Eyebrow</p>
             <h2>@pageSection.Heading</h2>
             <p>@pageSection.Body</p>

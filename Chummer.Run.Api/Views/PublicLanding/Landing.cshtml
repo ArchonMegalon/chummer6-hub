@@ -68,8 +68,8 @@
                 @foreach (var workflow in proofNotes)
                 {
                     <div>
-                        <span class="tag">@workflow.Title</span>
-                        <p>@(workflow.ProofNote ?? workflow.Payoff ?? workflow.Summary)</p>
+                        <span class="tag">@workflow.Card.Title</span>
+                        <p>@(workflow.Card.ProofNote ?? workflow.Card.Payoff ?? workflow.Card.Summary)</p>
                     </div>
                 }
             </div>
@@ -96,33 +96,32 @@
     <div class="workflow-grid">
         @foreach (var card in Model.Workflows)
         {
-            var asset = Model.Assets.ForCard(card);
             <article class="workflow-card">
-                @if (asset is not null)
+                @if (card.Asset is not null)
                 {
                     <div class="workflow-card__media">
-                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
                     </div>
                 }
                 <div class="workflow-card__copy">
-                    <span class="tag">@card.Badge</span>
-                    <h3>@card.Title</h3>
-                    <p>@card.Summary</p>
+                    <span class="tag">@card.Card.Badge</span>
+                    <h3>@card.Card.Title</h3>
+                    <p>@card.Card.Summary</p>
                     <ul class="workflow-card__points">
-                        @if (!string.IsNullOrWhiteSpace(card.Pain))
+                        @if (!string.IsNullOrWhiteSpace(card.Card.Pain))
                         {
-                            <li>@card.Pain</li>
+                            <li>@card.Card.Pain</li>
                         }
-                        @if (!string.IsNullOrWhiteSpace(card.Payoff))
+                        @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
                         {
-                            <li>@card.Payoff</li>
+                            <li>@card.Card.Payoff</li>
                         }
                     </ul>
-                    @if (!string.IsNullOrWhiteSpace(card.ProofNote))
+                    @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                     {
-                        <p class="workflow-card__proof">@card.ProofNote</p>
+                        <p class="workflow-card__proof">@card.Card.ProofNote</p>
                     }
-                    <a class="inline-link" href="@card.Href">@(card.ActionLabel ?? "Open the walkthrough")</a>
+                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                 </div>
             </article>
         }
@@ -162,19 +161,18 @@
     <div class="audience-fit__grid">
         @foreach (var card in Model.Lanes)
         {
-            var asset = Model.Assets.ForCard(card);
             <article class="audience-card">
-                @if (asset is not null)
+                @if (card.Asset is not null)
                 {
                     <div class="audience-card__media">
-                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
                     </div>
                 }
                 <div class="audience-card__copy">
-                    <span class="tag tag--amber">@card.Badge</span>
-                    <h3>@card.Title</h3>
-                    <p>@card.Summary</p>
-                    <a class="inline-link" href="@card.Href">@(card.ActionLabel ?? "See the fit")</a>
+                    <span class="tag tag--amber">@card.Card.Badge</span>
+                    <h3>@card.Card.Title</h3>
+                    <p>@card.Card.Summary</p>
+                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                 </div>
             </article>
         }
@@ -196,10 +194,10 @@
             <div class="works-column__list">
                 @foreach (var card in Model.AvailableToday)
                 {
-                    <article class="works-item" id="@card.Id.Replace('_', '-')">
-                        <h4>@card.Title</h4>
-                        <p>@card.Summary</p>
-                        <a class="inline-link" href="@card.Href">@(card.ActionLabel ?? "Use it now")</a>
+                    <article class="works-item" id="@card.Card.Id.Replace('_', '-')">
+                        <h4>@card.Card.Title</h4>
+                        <p>@card.Card.Summary</p>
+                        <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                     </article>
                 }
             </div>
@@ -212,10 +210,10 @@
             <div class="works-column__list">
                 @foreach (var card in Model.PreviewItems)
                 {
-                    <article class="works-item" id="@card.Id.Replace('_', '-')">
-                        <h4>@card.Title</h4>
-                        <p>@card.Summary</p>
-                        <a class="inline-link" href="@card.Href">@(card.ActionLabel ?? "See the preview")</a>
+                    <article class="works-item" id="@card.Card.Id.Replace('_', '-')">
+                        <h4>@card.Card.Title</h4>
+                        <p>@card.Card.Summary</p>
+                        <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                     </article>
                 }
             </div>
@@ -228,10 +226,10 @@
             <div class="works-column__list">
                 @foreach (var card in Model.ComingNext)
                 {
-                    <article class="works-item" id="@card.Id.Replace('_', '-')">
-                        <h4>@card.Title</h4>
-                        <p>@card.Summary</p>
-                        <a class="inline-link" href="@card.Href">@(card.ActionLabel ?? "See what is next")</a>
+                    <article class="works-item" id="@card.Card.Id.Replace('_', '-')">
+                        <h4>@card.Card.Title</h4>
+                        <p>@card.Card.Summary</p>
+                        <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                     </article>
                 }
             </div>
@@ -248,19 +246,18 @@
     <div class="artifact-gallery__grid">
         @foreach (var card in Model.Artifacts)
         {
-            var asset = Model.Assets.ForCard(card);
             <article class="artifact-card">
-                @if (asset is not null)
+                @if (card.Asset is not null)
                 {
                     <div class="artifact-card__media">
-                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
                     </div>
                 }
                 <div class="artifact-card__copy">
-                    <span class="tag @(string.Equals(card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--quiet")">@card.Badge</span>
-                    <h3>@card.Title</h3>
-                    <p>@card.Summary</p>
-                    <a class="inline-link" href="@(card.DetailRoute ?? card.Href)">@(card.ActionLabel ?? "Open the proof trail")</a>
+                    <span class="tag @(string.Equals(card.Card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--quiet")">@card.Card.Badge</span>
+                    <h3>@card.Card.Title</h3>
+                    <p>@card.Card.Summary</p>
+                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                 </div>
             </article>
         }

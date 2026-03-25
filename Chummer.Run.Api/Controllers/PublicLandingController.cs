@@ -1,6 +1,9 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.ViewModels;
+using Chummer.Run.Contracts.Community;
+using Chummer.Run.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,10 +15,13 @@ public sealed class PublicLandingController : Controller
 {
     private readonly PublicLandingService _landing;
     private readonly PublicReleaseManifestService _releases;
+    private readonly ReleaseSelectionService _releaseSelection;
+    private readonly PublicActionResolver _actions;
     private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
     private readonly IdentityLinkService _links;
     private readonly UserExperienceService _experience;
+    private readonly InstallLinkingService _installLinking;
     private readonly HubPageChromeService _chrome;
     private readonly PublicTrustContentService _trustContent;
     private readonly ILogger<PublicLandingController> _logger;
@@ -23,20 +29,26 @@ public sealed class PublicLandingController : Controller
     public PublicLandingController(
         PublicLandingService landing,
         PublicReleaseManifestService releases,
+        ReleaseSelectionService releaseSelection,
+        PublicActionResolver actions,
         AccountService accounts,
         HubIdentityClient identity,
         IdentityLinkService links,
         UserExperienceService experience,
+        InstallLinkingService installLinking,
         HubPageChromeService chrome,
         PublicTrustContentService trustContent,
         ILogger<PublicLandingController> logger)
     {
         _landing = landing;
         _releases = releases;
+        _releaseSelection = releaseSelection;
+        _actions = actions;
         _accounts = accounts;
         _identity = identity;
         _links = links;
         _experience = experience;
+        _installLinking = installLinking;
         _chrome = chrome;
         _trustContent = trustContent;
         _logger = logger;
@@ -49,24 +61,25 @@ public sealed class PublicLandingController : Controller
         var surface = _landing.LoadSurface();
         var manifest = _releases.LoadManifest();
         var hasPreviewBuild = manifest.Downloads.Count > 0;
+        var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
         var model = new LandingPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", surface.Subhead, "/", cancellationToken),
             Surface: surface,
-            Assets: new AssetCatalogViewModel(surface.Assets),
+            Assets: assetCatalog,
             Manifest: manifest,
             PrimaryHeroAction: new PublicLandingActionDto(
                 hasPreviewBuild ? "Get preview build" : "Request early access",
                 hasPreviewBuild ? "/downloads" : "/signup?next=/home",
                 "primary"),
             SecondaryHeroAction: new PublicLandingActionDto("See what works today", "/now", "secondary"),
-            Workflows: _landing.CardsForBucket(surface, "start_here"),
+            Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/"),
             TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),
-            Lanes: _landing.CardsForBucket(surface, "choose_your_lane"),
-            AvailableToday: nowCards.Where(static card => string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(),
-            PreviewItems: nowCards.Where(static card => !string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(),
-            ComingNext: _landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(),
-            Artifacts: _landing.CardsForBucket(surface, "featured_artifacts"));
+            Lanes: ResolveCards(_landing.CardsForBucket(surface, "choose_your_lane"), assetCatalog, authenticated: false, "/"),
+            AvailableToday: ResolveCards(nowCards.Where(static card => string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/"),
+            PreviewItems: ResolveCards(nowCards.Where(static card => !string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/"),
+            ComingNext: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: false, "/"),
+            Artifacts: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/"));
         return View("~/Views/PublicLanding/Landing.cshtml", model);
     }
 
@@ -80,7 +93,7 @@ public sealed class PublicLandingController : Controller
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),
-            Lanes: _landing.CardsForBucket(surface, "choose_your_lane"));
+            Lanes: ResolveCards(_landing.CardsForBucket(surface, "choose_your_lane"), new AssetCatalogViewModel(surface.Assets), authenticated: false, "/what-is-chummer"));
         return View("~/Views/PublicLanding/ProductStory.cshtml", model);
     }
 
@@ -89,13 +102,14 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> NowPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
+        var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
         var model = new NowPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("What Is Real Now", "Readiness labels and direct evidence for what you can use today.", "/now", cancellationToken),
             Surface: surface,
-            Assets: new AssetCatalogViewModel(surface.Assets),
-            AvailableToday: nowCards.Where(static card => string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(),
-            Inspectable: nowCards.Where(static card => !string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(),
+            Assets: assetCatalog,
+            AvailableToday: ResolveCards(nowCards.Where(static card => string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/now"),
+            Inspectable: ResolveCards(nowCards.Where(static card => !string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/now"),
             SignedInPreview: surface.RegisteredOverlays,
             Manifest: _releases.LoadManifest());
         return View("~/Views/PublicLanding/Now.cshtml", model);
@@ -106,11 +120,12 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> HorizonsPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
+        var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var model = new HorizonsPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Coming Next", "The named horizons, their pain, and the payoff they are aiming for.", "/horizons", cancellationToken),
             Surface: surface,
-            Assets: new AssetCatalogViewModel(surface.Assets),
-            Horizons: _landing.CardsForBucket(surface, "coming_next"));
+            Assets: assetCatalog,
+            Horizons: ResolveCards(_landing.CardsForBucket(surface, "coming_next"), assetCatalog, authenticated: false, "/horizons"));
         return View("~/Views/PublicLanding/Horizons.cshtml", model);
     }
 
@@ -119,11 +134,14 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> DownloadsPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
+        var manifest = _releases.LoadManifest();
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var model = new DownloadsPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current preview, compare package types, and keep release integrity in view.", "/downloads", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
-            Manifest: _releases.LoadManifest());
+            Manifest: manifest,
+            ReleaseExperience: _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated));
         return View("~/Views/PublicLanding/Downloads.cshtml", model);
     }
 
@@ -137,8 +155,8 @@ public sealed class PublicLandingController : Controller
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Participate", "Two clean lanes: public feedback and an optional signed-in guided contribution path.", "/participate", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
-            PublicLane: cards.Where(card => !string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && !string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(),
-            SignedInLane: cards.Where(card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) || string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray());
+            PublicLane: ResolveCards(cards.Where(card => !string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && !string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(), new AssetCatalogViewModel(surface.Assets), authenticated: false, "/participate"),
+            SignedInLane: ResolveCards(cards.Where(card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) || string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(), new AssetCatalogViewModel(surface.Assets), authenticated: true, "/participate"));
         return View("~/Views/PublicLanding/Participate.cshtml", model);
     }
 
@@ -151,14 +169,15 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> ArtifactsPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
+        var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var model = new ShelfPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Artifacts", "Proof surfaces, briefs, and grounded outputs connected to the current preview.", "/artifacts", cancellationToken),
             Surface: surface,
-            Assets: new AssetCatalogViewModel(surface.Assets),
+            Assets: assetCatalog,
             Eyebrow: "Artifacts",
             Heading: "Proof gallery",
             Intro: "Browse the packs, briefs, and proof surfaces that make the preview feel tangible.",
-            Items: _landing.CardsForBucket(surface, "featured_artifacts"));
+            Items: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/artifacts"));
         return View("~/Views/PublicLanding/Shelf.cshtml", model);
     }
 
@@ -211,15 +230,21 @@ public sealed class PublicLandingController : Controller
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var surface = _landing.LoadSurface();
+            var assetCatalog = new AssetCatalogViewModel(surface.Assets);
+            var links = _links.GetSummary(subject.SubjectId);
+            var experience = _experience.GetOrCreate(subject.SubjectId);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var model = new HomePageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome("Home", "Pick the next action and keep track of what is opening next.", "/home", user.DisplayName),
                 Surface: surface,
-                Assets: new AssetCatalogViewModel(surface.Assets),
+                Assets: assetCatalog,
                 User: user,
-                Links: _links.GetSummary(subject.SubjectId),
-                Experience: _experience.GetOrCreate(subject.SubjectId),
-                NowRail: _landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(),
-                HorizonRail: _landing.CardsForBucket(surface, "coming_next").Take(3).ToArray());
+                Links: links,
+                Experience: experience,
+                InstallLinking: installLinking,
+                PrimaryAction: BuildHomePrimaryAction(experience, installLinking),
+                NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, "/home"),
+                HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, "/home"));
             return View("~/Views/PublicLanding/Home.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -252,6 +277,74 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         return Ok(_landing.CardsForBucket(surface, bucket));
+    }
+
+    private IReadOnlyList<ResolvedPublicCardViewModel> ResolveCards(
+        IReadOnlyList<PublicFeatureCardDto> cards,
+        AssetCatalogViewModel assets,
+        bool authenticated,
+        string currentPath)
+        => cards.Select(card => new ResolvedPublicCardViewModel(
+                Card: card,
+                Asset: assets.ForCard(card),
+                Action: _actions.ResolveFeatureAction(card, authenticated, currentPath)))
+            .ToArray();
+
+    private static HomePrimaryActionViewModel BuildHomePrimaryAction(HubUserExperienceDto experience, InstallLinkingSummaryDto installLinking)
+    {
+        if (!experience.OnboardingCompleted)
+        {
+            return new HomePrimaryActionViewModel(
+                "Setup",
+                "Finish setup",
+                "Complete the short setup flow so Chummer can recover your account, route updates, and keep the signed-in shell calm.",
+                "Complete setup",
+                "#setup-sheet",
+                "primary");
+        }
+
+        if ((installLinking.ClaimedInstallations?.Count ?? 0) == 0 && installLinking.RecentReceipts.Count == 0 && installLinking.PendingClaimTickets.Count == 0)
+        {
+            return new HomePrimaryActionViewModel(
+                "Install",
+                "Get the preview build",
+                "Start with the recommended installer, then come back here when you want to link the installed copy to this account.",
+                "Open downloads",
+                "/downloads",
+                "primary");
+        }
+
+        if ((installLinking.ClaimedInstallations?.Count ?? 0) == 0 && installLinking.PendingClaimTickets.Count > 0)
+        {
+            return new HomePrimaryActionViewModel(
+                "Devices & access",
+                "Link this copy",
+                "You already have a signed-in download handoff. Open Devices and access to claim the install instead of starting over.",
+                "Open account",
+                "/account#devices-access",
+                "primary");
+        }
+
+        return new HomePrimaryActionViewModel(
+            "Current release",
+            "Stay on the current preview",
+            "Check the current release posture, your linked devices, and what changed before you spend attention on optional contribution work.",
+            "See what works today",
+            "/now",
+            "primary");
+    }
+
+    private async Task<bool> TryIsAuthenticatedAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private async Task<SiteChromeViewModel> BuildPublicOrAuthenticatedChromeAsync(

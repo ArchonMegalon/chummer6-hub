@@ -13,16 +13,15 @@
     <div class="shelf-stack">
         @foreach (var card in Model.Items)
         {
-            var asset = Model.Assets.ForCard(card);
             <article class="shelf-item">
-                @if (asset is not null)
+                @if (card.Asset is not null)
                 {
-                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", asset)
+                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
                 }
-                <span class="tag">@card.Badge</span>
-                <h2>@card.Title</h2>
-                <p>@card.Summary</p>
-                <a class="inline-link" href="@card.Href">Open</a>
+                <span class="tag">@card.Card.Badge</span>
+                <h2>@card.Card.Title</h2>
+                <p>@card.Card.Summary</p>
+                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
             </article>
         }
     </div>
