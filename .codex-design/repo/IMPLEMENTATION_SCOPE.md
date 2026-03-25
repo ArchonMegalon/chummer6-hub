@@ -10,11 +10,11 @@
 * identity, approvals, memory, and delivery on the hosted side
 * principal-to-user mapping and user-profile truth
 * linked identities, verified-email hygiene, and social/channel adapter policy
-* generic groups, memberships, join codes, and access-oriented code flows
-* optional participation UX for guided contribution lanes after account basics are real
-* fact ledger, reward journal, and entitlement journal for support, access, and community participation
+* generic groups, memberships, join codes, and boost codes
+* sponsorship / participation UX for Fleet premium burst lanes
+* fact ledger, reward journal, and entitlement journal for community participation
 * campaign spine truth for runner dossier, crew, campaign, run, scene, objective, and replay-safe continuity
-* leaderboards, quests, badges, and community-side entitlement views after the customer shell is solid
+* leaderboards, quests, badges, and community-side entitlement views
 * the `chummer.run` public landing, proof shelf, public status, and signed-in home overlays
 * registry-backed downloads, channel selection, and install guidance UX
 * optional entitlement brokering for gated desktop channels
@@ -68,10 +68,10 @@ The mission statement and the repo body are much closer now.
 Registry and media execution ownership are physically out of this repo.
 
 The remaining work is future product depth and physical cleanup, not pretending hub still owns every hosted surface or still lacks authority proof.
-Participation UX for optional guided lanes belongs here, but the resulting Codex auth cache stays lane-local on Fleet rather than being stored in hub identity or hub databases.
+Participation UX for premium burst lanes belongs here, but the resulting Codex auth cache stays lane-local on Fleet rather than being stored in hub identity or hub databases.
 Campaign continuity and product control may start here as bounded contexts, but they must stay explicit enough that later extraction remains possible if the domains outgrow Hub.
 
-The first-class consent/device-auth/lane/receipt lifecycle is defined centrally in `products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md`.
+The first-class sponsor/consent/device-auth/lane/receipt lifecycle is defined centrally in `products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md`.
 The first-class linked-identity and channel-linking posture is defined centrally in `products/chummer/IDENTITY_AND_CHANNEL_LINKING_MODEL.md`.
 Desktop download and install guidance may live here, but the public update feed and promoted desktop head truth stay in `chummer6-hub-registry`.
 
@@ -97,7 +97,7 @@ If a support assistant is approved later, it lands on Hub/help surfaces after th
 
 ## Sequencing rule
 
-Do not treat boost codes or guided contribution lanes as the first-class product.
+Do not treat boost codes or sponsored premium lanes as the first-class product.
 
 Build order for the next serious Hub wave:
 
@@ -105,7 +105,7 @@ Build order for the next serious Hub wave:
 2. generic groups, memberships, and join codes
 3. fact ledger, reward journal, and entitlement journal
 4. participation intent/session UX
-5. Fleet receipt ingest and participation-session projections
+5. Fleet receipt ingest and sponsor-session projections
 6. leaderboards, badges, quests, and entitlement-backed perks
 
 New guided-contribution UX must not outrun that shared backbone.
