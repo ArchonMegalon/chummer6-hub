@@ -1446,14 +1446,13 @@ async Task VerifyPublicLandingProjectionAsync()
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
-    Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/progress", StringComparison.Ordinal)), "landing surface should expose the progress report route");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/participate", StringComparison.Ordinal)), "landing surface should expose the participate entry route");
     Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/login", StringComparison.Ordinal)), "landing surface should expose the login route");
     Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/signup", StringComparison.Ordinal)), "landing surface should expose the signup route");
     Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/login?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Sign in", StringComparison.Ordinal)), "landing guest shell should expose the sign-in action");
     Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/signup?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Create account", StringComparison.Ordinal)), "landing guest shell should expose the create-account action");
     Assert(surface.Assets.Any(static asset => string.Equals(asset.AssetSlot, "section_hero", StringComparison.Ordinal)), "landing surface should load the hero asset slot");
-    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Title, "KARMA FORGE", StringComparison.Ordinal) && string.Equals(card.Badge, "Booster first", StringComparison.Ordinal)), "landing feature registry should carry the booster-first posture for KARMA FORGE");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Title, "KARMA FORGE", StringComparison.Ordinal) && string.Equals(card.Badge, "Research", StringComparison.Ordinal)), "landing feature registry should carry the updated readiness posture for KARMA FORGE");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "real_public_guide", StringComparison.Ordinal) && string.Equals(card.Href, "/what-is-chummer#public-guide", StringComparison.Ordinal) && card.ExternalOk), "landing guide card should keep a first-party route with an explicit external fallback");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "artifact_runsite_pack", StringComparison.Ordinal) && string.Equals(card.Href, "/roadmap/runsite", StringComparison.Ordinal)), "artifact cards should point at related horizon details instead of self-linking to the shelf");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/participate/codex", StringComparison.Ordinal)), "booster participation should split guest and registered destinations");
@@ -1581,15 +1580,23 @@ async Task VerifyPublicLandingProjectionAsync()
     var roadmapDetailModel = roadmapDetailView?.Model as FeatureDetailPageViewModel;
     Assert(roadmapDetailModel is not null && !string.IsNullOrWhiteSpace(roadmapDetailModel.ProofNote), "roadmap detail pages should expose a verification note instead of a bare placeholder shell.");
     Assert(roadmapDetailModel!.MicroProof.Count > 0, "roadmap detail pages should surface micro-proof markers.");
+    Assert(roadmapDetailModel.SecondaryAction is not null, "roadmap detail pages should keep a single deeper brief action.");
+    var roadmapSecondaryAction = roadmapDetailModel.SecondaryAction!;
+    Assert(!string.Equals(
+        PublicRouteCatalog.NormalizeRoute(roadmapDetailModel.PrimaryAction.Href),
+        PublicRouteCatalog.NormalizeRoute(roadmapSecondaryAction.Href),
+        StringComparison.OrdinalIgnoreCase), "roadmap detail pages should not repeat the same primary and secondary action.");
     var artifactDetailView = await controller.ArtifactDetailPage("current-preview-build", CancellationToken.None) as ViewResult;
     var artifactDetailModel = artifactDetailView?.Model as FeatureDetailPageViewModel;
     Assert(artifactDetailModel is not null && !string.IsNullOrWhiteSpace(artifactDetailModel.Payoff), "artifact detail pages should carry explicit product payoff.");
+    Assert(!string.Equals(artifactDetailModel?.PrimaryAction.Label, "Read the linked detail", StringComparison.OrdinalIgnoreCase), "artifact detail pages should not fall back to a generic linked-detail label.");
 
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
     Assert(downloadsModel is not null && downloadsModel.Manifest.Downloads.Any(static item => string.Equals(item.Id, "smoke-poc-linux-x64", StringComparison.Ordinal)), "downloads page should render artifacts from the live release manifest");
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
     Assert(downloadsModel!.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Create your Chummer account first.", StringComparison.OrdinalIgnoreCase)), "account-gated releases should keep account-required install steps for the current preview recommendation.");
+    Assert(string.Equals(downloadsModel.ReleaseExperience.GuestGatePrimaryLabel, "Create account to get preview", StringComparison.Ordinal), "downloads page should keep the signup-first guest gate label.");
     var authenticatedDownloadResult = await downloadsController.DownloadArtifact("smoke-poc-linux-x64", CancellationToken.None);
     var authenticatedRedirect = authenticatedDownloadResult as RedirectResult;
     Assert(authenticatedRedirect is not null && string.Equals(authenticatedRedirect.Url, "/downloads/install/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in compatibility downloads should route through the install handoff.");

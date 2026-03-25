@@ -294,6 +294,10 @@ public sealed class PublicLandingController : Controller
         [FromForm] string? title,
         [FromForm] string? summary,
         [FromForm] string? detail,
+        [FromForm] string? replyEmail,
+        [FromForm] string? installationId,
+        [FromForm] string? applicationVersion,
+        [FromForm] string? platform,
         CancellationToken cancellationToken)
     {
         var request = new SupportCaseSubmitRequest(
@@ -301,11 +305,20 @@ public sealed class PublicLandingController : Controller
             Title: title ?? string.Empty,
             Summary: summary ?? string.Empty,
             Detail: detail ?? string.Empty,
+            ReporterEmail: replyEmail,
+            InstallationId: installationId,
+            ApplicationVersion: applicationVersion,
+            Platform: platform,
             Source: SupportCaseSourceKinds.PublicWeb);
 
         try
         {
             var subject = await TryGetOptionalSubjectAsync(cancellationToken);
+            if (subject is null && string.IsNullOrWhiteSpace(replyEmail))
+            {
+                throw new ArgumentException("A reply email is required when you submit support without an account.");
+            }
+
             var user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var created = _supportCases.Submit(user?.UserId, subject?.SubjectId, request);
             TempData["ContactSubmittedCaseId"] = created.CaseId;
@@ -511,6 +524,9 @@ public sealed class PublicLandingController : Controller
             Authenticated: authenticated,
             AccountSupportHref: authenticated ? "/account#support" : "/signup?next=%2Faccount%23support",
             AccountSupportLabel: authenticated ? "Open tracked support" : "Create account for tracked support",
+            ResponseExpectation: authenticated
+                ? "Tracked cases stay visible in Account. When the report is actionable, the next routed update should show up there without sending you into side channels."
+                : "Guest cases should include a reply email. We usually answer preview support within two working days when the report includes a clear reproduction path.",
             SubmissionNotice: submissionNotice,
             Options:
             [
@@ -542,9 +558,13 @@ public sealed class PublicLandingController : Controller
 
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(chromeTitle, chromeDescription, currentPath, cancellationToken);
         var assets = new AssetCatalogViewModel(surface.Assets);
-        var primaryAction = _actions.ResolvePrimaryExperienceAction(card, authenticated, currentPath);
+        var primaryAction = _actions.ResolveDetailPrimaryAction(card, authenticated, currentPath);
         TrustPageActionViewModel? secondaryAction = null;
-        if (!string.IsNullOrWhiteSpace(card.FallbackRoute))
+        if (!string.IsNullOrWhiteSpace(card.FallbackRoute)
+            && !string.Equals(
+                PublicRouteCatalog.NormalizeRoute(card.FallbackRoute),
+                PublicRouteCatalog.NormalizeRoute(primaryAction.Href),
+                StringComparison.OrdinalIgnoreCase))
         {
             secondaryAction = new TrustPageActionViewModel(
                 card.FallbackLabel ?? "Read the deeper brief",
@@ -557,7 +577,12 @@ public sealed class PublicLandingController : Controller
         var facts = BuildFeatureDetailFacts(card, proofNote, payoff);
         var model = new FeatureDetailPageViewModel(
             Chrome: chrome,
-            Eyebrow: eyebrow,
+            Eyebrow: card.Bucket switch
+            {
+                "featured_artifacts" => "Artifact",
+                "coming_next" => "Roadmap",
+                _ => eyebrow
+            },
             Heading: card.Title,
             Intro: card.Summary,
             StatusLabel: card.Badge,
@@ -573,29 +598,7 @@ public sealed class PublicLandingController : Controller
     }
 
     private static IReadOnlyList<FeatureDetailFactViewModel> BuildFeatureDetailFacts(PublicFeatureCardDto card, string? proofNote, string? payoff)
-    {
-        var facts = new List<FeatureDetailFactViewModel>
-        {
-            new("Current status", $"{card.Badge}. {card.Summary}")
-        };
-
-        if (!string.IsNullOrWhiteSpace(card.Pain))
-        {
-            facts.Add(new FeatureDetailFactViewModel("Why it matters", card.Pain));
-        }
-
-        if (!string.IsNullOrWhiteSpace(payoff))
-        {
-            facts.Add(new FeatureDetailFactViewModel("What it unlocks", payoff));
-        }
-
-        if (!string.IsNullOrWhiteSpace(proofNote))
-        {
-            facts.Add(new FeatureDetailFactViewModel("How to verify it", proofNote));
-        }
-
-        return facts;
-    }
+        => [new("Current status", $"{card.Badge}. {card.Summary}")];
 
     private static string? BuildFeatureDetailProofNote(PublicFeatureCardDto card)
     {

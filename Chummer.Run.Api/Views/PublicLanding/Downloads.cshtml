@@ -18,7 +18,7 @@
         }
         else
         {
-            <p class="release-stage__note">Start with the recommended installer for your platform. Alternative desktop heads and manual packages stay underneath when you explicitly need them.</p>
+            <p class="release-stage__note">Start with the recommended installer for your platform. Alternative builds and manual packages stay underneath when you explicitly need them.</p>
         }
         @if (Model.Chrome.Authenticated || guestGateRequired)
         {
@@ -46,7 +46,8 @@
         <span class="tag">Help</span>
         <h2>Get install help fast</h2>
         <p>Known issues, install help, and the recommended path stay on first-party pages instead of making you reverse-engineer packaging choices.</p>
-        <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+        <p><a class="inline-link" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a></p>
+        <p><a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a></p>
     </article>
 </section>
 
@@ -74,7 +75,6 @@ else
                 <div class="recommended-download__meta">
                     <span>@release.Recommended.PlatformLabel</span>
                     <span>@release.Recommended.SizeLabel</span>
-                    <span>@release.Recommended.HeadLabel</span>
                     @if (!string.IsNullOrWhiteSpace(release.Recommended.ShaPreview))
                     {
                         <code class="mono-receipt">@release.Recommended.ShaPreview</code>
@@ -85,14 +85,12 @@ else
                     {
                         <a class="button-like button-like--primary" href="@release.GuestGatePrimaryHref">@release.GuestGatePrimaryLabel</a>
                         <a class="button-like button-like--secondary" href="@release.GuestGateSecondaryHref">@release.GuestGateSecondaryLabel</a>
-                        <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
-                        <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                        <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                     }
                     else
                     {
                         <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
-                        <a class="button-like button-like--secondary" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
-                        <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
+                        <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                     }
                 </div>
             </div>
@@ -220,9 +218,8 @@ else
 }
 
 <section class="release-footnote">
-    <p class="muted-copy">If the package choice is still unclear, stop here and use the install help or known-issues path instead of guessing.</p>
+    <p class="muted-copy">If the package choice is still unclear, stop here and use install help before you guess between package types or alternate builds.</p>
     <div class="stacked-actions">
-        <a class="button-like button-like--secondary" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
         <a class="button-like button-like--ghost" href="/contact">Contact Chummer</a>
     </div>
 </section>

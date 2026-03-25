@@ -10,6 +10,28 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
+        @if (!string.IsNullOrWhiteSpace(Model.EffectiveDate) || !string.IsNullOrWhiteSpace(Model.UpdatedDate))
+        {
+            <div class="trust-claim__microproof">
+                @if (!string.IsNullOrWhiteSpace(Model.EffectiveDate))
+                {
+                    <span>Effective @Model.EffectiveDate</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.UpdatedDate))
+                {
+                    <span>Updated @Model.UpdatedDate</span>
+                }
+            </div>
+        }
+        @if (Model.SummaryPoints is { Count: > 0 })
+        {
+            <div class="trust-claim__microproof">
+                @foreach (var point in Model.SummaryPoints)
+                {
+                    <span>@point</span>
+                }
+            </div>
+        }
     </div>
     <div class="stacked-actions">
         @foreach (var action in Model.Actions)
@@ -75,11 +97,34 @@
                     <label for="supportDetail">What happened</label>
                     <textarea id="supportDetail" name="detail" rows="6" placeholder="Tell Chummer what you expected, what actually happened, and the fastest way to reproduce it." required></textarea>
                 </div>
+                @if (!Model.SupportIntake.Authenticated)
+                {
+                    <div class="field">
+                        <label for="supportReplyEmail">Reply email</label>
+                        <input id="supportReplyEmail" name="replyEmail" type="email" placeholder="runner@example.com" required />
+                    </div>
+                }
+                <details class="details-drawer">
+                    <summary>Optional environment details</summary>
+                    <div class="field">
+                        <label for="supportPlatform">Platform</label>
+                        <input id="supportPlatform" name="platform" maxlength="64" placeholder="Windows, Linux, or macOS" />
+                    </div>
+                    <div class="field">
+                        <label for="supportVersion">Version</label>
+                        <input id="supportVersion" name="applicationVersion" maxlength="64" placeholder="Current preview build or version number" />
+                    </div>
+                    <div class="field">
+                        <label for="supportInstallationId">Install or claim code</label>
+                        <input id="supportInstallationId" name="installationId" maxlength="64" placeholder="Optional install id or claim code" />
+                    </div>
+                </details>
                 <div class="stacked-actions">
                     <button class="button-like button-like--primary" type="submit">Submit support case</button>
                     <a class="button-like button-like--secondary" href="@Model.SupportIntake.AccountSupportHref">@Model.SupportIntake.AccountSupportLabel</a>
                 </div>
             </form>
+            <p class="muted-copy">@Model.SupportIntake.ResponseExpectation</p>
 
             <div class="compact-rail">
                 @foreach (var option in Model.SupportIntake.Options)

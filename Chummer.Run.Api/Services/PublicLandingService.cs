@@ -104,6 +104,8 @@ public sealed class PublicLandingService
                     card.ExternalOk,
                     card.SelfLinkAllowed,
                     card.ActionLabel,
+                    card.DetailPrimaryHref,
+                    card.DetailPrimaryLabel,
                     card.ProofNote,
                     card.Microproof,
                     card.Pain,
@@ -190,6 +192,7 @@ public sealed class PublicLandingService
     private static void ValidateCardProjection(PublicFeatureCardDto card)
     {
         ValidateSelfLinkPolicy(card);
+        ValidateDetailActionPolicy(card);
     }
 
     private static void ValidateRoute(string? href, IReadOnlySet<string> allowedRoutes, string description)
@@ -236,7 +239,7 @@ public sealed class PublicLandingService
             return;
         }
 
-        foreach (var candidate in new[] { card.Href, card.DetailRoute, card.GuestHref, card.RegisteredHref })
+        foreach (var candidate in new[] { card.Href, card.DetailRoute, card.GuestHref, card.RegisteredHref, card.DetailPrimaryHref })
         {
             if (string.IsNullOrWhiteSpace(candidate) || Uri.TryCreate(candidate, UriKind.Absolute, out _))
             {
@@ -252,6 +255,24 @@ public sealed class PublicLandingService
             {
                 throw new InvalidOperationException($"public feature card '{card.Id}' points back to its own surface without self_link_allowed.");
             }
+        }
+    }
+
+    private static void ValidateDetailActionPolicy(PublicFeatureCardDto card)
+    {
+        if (string.IsNullOrWhiteSpace(card.DetailRoute))
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(card.DetailPrimaryHref)
+            && !string.IsNullOrWhiteSpace(card.FallbackRoute)
+            && string.Equals(
+                PublicRouteCatalog.NormalizeRoute(card.DetailPrimaryHref),
+                PublicRouteCatalog.NormalizeRoute(card.FallbackRoute),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"public feature card '{card.Id}' resolves the same detail primary and fallback route.");
         }
     }
 

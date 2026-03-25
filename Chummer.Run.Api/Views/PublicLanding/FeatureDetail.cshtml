@@ -44,9 +44,9 @@
 
 <section class="role-matrix">
     <div class="editorial-block__lead">
-        <p class="eyebrow">What this proves</p>
-        <h2 class="editorial-title">Use the current proof, then decide how deep you need to go</h2>
-        <p class="editorial-copy">These detail pages should anchor the current product path, the user payoff, and the clearest way to verify the claim.</p>
+        <p class="eyebrow">Use it intelligently</p>
+        <h2 class="editorial-title">Why it matters, what it unlocks, and how to verify it</h2>
+        <p class="editorial-copy">Start with the current product path, then use the deeper brief only when the first-party proof is not enough.</p>
     </div>
     <div class="role-matrix__grid">
         @if (!string.IsNullOrWhiteSpace(Model.Pain))
@@ -87,14 +87,9 @@
 
 <section class="story-guide-tail">
     <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Take the truthful product path from here</h2>
-    <p class="editorial-copy">Start with the current product surface, then use support or the deeper brief only when the live proof is not enough.</p>
+    <h2 class="editorial-title">Use support or the deeper brief only when you need them</h2>
+    <p class="editorial-copy">The product path should stay first. Support comes next, and the external brief is the deeper read when you want the longer rationale.</p>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
         <a class="button-like button-like--secondary" href="/contact#support-intake">Get help with this surface</a>
-        @if (Model.SecondaryAction is not null)
-        {
-            <a class="button-like button-like--ghost" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
-        }
     </div>
 </section>

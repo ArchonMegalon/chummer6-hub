@@ -2,6 +2,8 @@
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
+    var liveItems = Model.Items.Where(card => string.Equals(card.Card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) || string.Equals(card.Card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray();
+    var previewItems = Model.Items.Except(liveItems).ToArray();
 }
 
 <section class="section-band">
@@ -10,19 +12,56 @@
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
     </div>
-    <div class="shelf-stack">
-        @foreach (var card in Model.Items)
-        {
-            <article class="shelf-item">
-                @if (card.Asset is not null)
-                {
-                    @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
-                }
-                <span class="tag">@card.Card.Badge</span>
-                <h2>@card.Card.Title</h2>
-                <p>@card.Card.Summary</p>
-                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
-            </article>
-        }
-    </div>
+    @if (liveItems.Length > 0)
+    {
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Live now</p>
+            <h2 class="editorial-title">Current proof surfaces</h2>
+        </div>
+        <div class="shelf-stack">
+            @foreach (var card in liveItems)
+            {
+                <article class="shelf-item">
+                    @if (card.Asset is not null)
+                    {
+                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
+                    }
+                    <span class="tag">@card.Card.Badge</span>
+                    <h2>@card.Card.Title</h2>
+                    <p>@card.Card.Summary</p>
+                    @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote) || !string.IsNullOrWhiteSpace(card.Card.Payoff))
+                    {
+                        <p class="muted-copy">@(card.Card.ProofNote ?? card.Card.Payoff)</p>
+                    }
+                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                </article>
+            }
+        </div>
+    }
+    @if (previewItems.Length > 0)
+    {
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Preview concepts</p>
+            <h2 class="editorial-title">What these cards are trying to verify next</h2>
+        </div>
+        <div class="shelf-stack">
+            @foreach (var card in previewItems)
+            {
+                <article class="shelf-item">
+                    @if (card.Asset is not null)
+                    {
+                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
+                    }
+                    <span class="tag">@card.Card.Badge</span>
+                    <h2>@card.Card.Title</h2>
+                    <p>@card.Card.Summary</p>
+                    @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote) || !string.IsNullOrWhiteSpace(card.Card.Payoff))
+                    {
+                        <p class="muted-copy">@(card.Card.ProofNote ?? card.Card.Payoff)</p>
+                    }
+                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                </article>
+            }
+        </div>
+    }
 </section>

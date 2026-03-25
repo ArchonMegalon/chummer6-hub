@@ -17,6 +17,7 @@
     var worksNowSection = Section("whats_real_now");
     var artifactSection = Section("featured_artifacts");
     var closingSection = Section("closing_cta");
+    var workflowFollowOns = Model.Workflows.Skip(3).ToArray();
 
     static IReadOnlyList<string> MicroProof(PublicFeatureCardDto card)
         => string.IsNullOrWhiteSpace(card.MicroProof)
@@ -124,11 +125,11 @@
 <section class="workflow-band">
     <div class="workflow-band__lead">
         <p class="eyebrow">@startHereSection.Eyebrow</p>
-        <h2 class="editorial-title">@startHereSection.Title</h2>
-        <p class="editorial-copy">@startHereSection.Intro</p>
+        <h2 class="editorial-title">What comes after the core proof</h2>
+        <p class="editorial-copy">Once the build, explanation trail, and continuity path feel trustworthy, the next product jobs are publication and improvement.</p>
     </div>
     <div class="workflow-grid">
-        @foreach (var card in Model.Workflows)
+        @foreach (var card in workflowFollowOns)
         {
             <article class="workflow-card">
                 @if (card.Asset is not null)

@@ -38,10 +38,10 @@ Current honesty clause:
 - the remaining shrinkage is orchestration polish, not hidden service ownership
 - closing the remaining hosted milestones is now about contract cleanup and adapter depth, not where registry/media code lives
 
-The public-facing customer and community spine now lives here too:
+The public-facing customer and access spine now lives here too:
 
 - `Chummer.Run.Api` owns the customer account backbone first: product-level users, groups, support/access flows, device/install linking, and the canonical community ledger.
-- Optional join/boost codes, sponsor sessions, leaderboards, rewards, and entitlements sit on top of that shared account and access plane rather than replacing it.
+- Optional join/boost codes, sponsor sessions, leaderboards, rewards, and entitlements sit on top of that shared account and access plane.
 - `Chummer.Campaign.Contracts` is the shared middle-plane package for runner dossier, crew, campaign, run, scene, objective, continuity, and roaming restore projections
 - `Chummer.Control.Contracts` is the shared middle-plane package for support cases, crash intake, clustered signals, routing decisions, and closure truth
 - `Chummer.Run.Api` also owns linked identity and channel-link state for email hygiene, Google/Facebook social bootstrap, and official Telegram companion routing
