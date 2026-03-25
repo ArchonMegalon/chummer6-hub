@@ -90,16 +90,8 @@ public sealed class HubPageChromeService
     private SiteChromeActionViewModel BuildPublicPrimaryCta()
     {
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var release = _releaseSelection.BuildExperience(manifest, string.Empty, authenticated: false);
-        var hasPreviewBuild = manifest.Downloads.Count > 0;
-        if (!hasPreviewBuild)
-        {
-            return new SiteChromeActionViewModel("Request early access", "/signup?next=/home", "primary");
-        }
-
-        return _releaseSelection.HasGuestReadableDownloads(manifest)
-            ? new SiteChromeActionViewModel("Get preview build", "/downloads", "primary")
-            : new SiteChromeActionViewModel(release.GuestGatePrimaryLabel, release.GuestGatePrimaryHref, "primary");
+        var action = _releaseSelection.BuildPublicPrimaryAction(manifest, authenticated: false);
+        return new SiteChromeActionViewModel(action.Label, action.Href, action.Emphasis);
     }
 
     private static string NormalizeRoute(string value)

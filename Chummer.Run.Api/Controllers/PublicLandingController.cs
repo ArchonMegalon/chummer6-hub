@@ -4,9 +4,9 @@ using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
-using Chummer.Run.Contracts.InstallLinking;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
-using Chummer.Run.Contracts.Support;
+using Chummer.Control.Contracts.Support;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;
@@ -67,25 +67,19 @@ public sealed class PublicLandingController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
-        var hasPreviewBuild = manifest.Downloads.Count > 0;
-        var guestDownloadAvailable = _releaseSelection.HasGuestReadableDownloads(manifest);
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
+        var secondaryHeroAction = surface.HeroCtas.FirstOrDefault(static action => string.Equals(action.Emphasis, "secondary", StringComparison.OrdinalIgnoreCase))
+            ?? surface.HeroCtas.Skip(1).FirstOrDefault()
+            ?? new PublicLandingActionDto("See what works today", "/now", "secondary");
         var model = new LandingPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", surface.Subhead, "/", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
             Manifest: manifest,
             ReleaseExperience: releaseExperience,
-            PrimaryHeroAction: new PublicLandingActionDto(
-                hasPreviewBuild
-                    ? authenticated || guestDownloadAvailable ? "Get preview build" : releaseExperience.GuestGatePrimaryLabel
-                    : "Request early access",
-                hasPreviewBuild
-                    ? authenticated || guestDownloadAvailable ? "/downloads" : releaseExperience.GuestGatePrimaryHref
-                    : "/signup?next=/home",
-                "primary"),
-            SecondaryHeroAction: new PublicLandingActionDto("See what works today", "/now", "secondary"),
+            PrimaryHeroAction: _releaseSelection.BuildPublicPrimaryAction(manifest, authenticated),
+            SecondaryHeroAction: secondaryHeroAction,
             Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/"),
             TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),
             Lanes: ResolveCards(_landing.CardsForBucket(surface, "choose_your_lane"), assetCatalog, authenticated: false, "/"),
@@ -101,12 +95,14 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> ProductStoryPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
+        var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var model = new StoryPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("What Is Chummer?", surface.ProofLine, "/what-is-chummer", cancellationToken),
             Surface: surface,
-            Assets: new AssetCatalogViewModel(surface.Assets),
+            Assets: assetCatalog,
+            Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/what-is-chummer"),
             TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),
-            Lanes: ResolveCards(_landing.CardsForBucket(surface, "choose_your_lane"), new AssetCatalogViewModel(surface.Assets), authenticated: false, "/what-is-chummer"));
+            Lanes: ResolveCards(_landing.CardsForBucket(surface, "choose_your_lane"), assetCatalog, authenticated: false, "/what-is-chummer"));
         return View("~/Views/PublicLanding/ProductStory.cshtml", model);
     }
 
@@ -556,7 +552,9 @@ public sealed class PublicLandingController : Controller
                 "ghost");
         }
 
-        var facts = BuildFeatureDetailFacts(card);
+        var proofNote = BuildFeatureDetailProofNote(card);
+        var payoff = BuildFeatureDetailPayoff(card);
+        var facts = BuildFeatureDetailFacts(card, proofNote, payoff);
         var model = new FeatureDetailPageViewModel(
             Chrome: chrome,
             Eyebrow: eyebrow,
@@ -566,11 +564,15 @@ public sealed class PublicLandingController : Controller
             Asset: assets.ForCard(card),
             PrimaryAction: primaryAction,
             SecondaryAction: secondaryAction,
-            Facts: facts);
+            Facts: facts,
+            Pain: card.Pain,
+            Payoff: payoff,
+            ProofNote: proofNote,
+            MicroProof: BuildFeatureDetailMicroProof(card));
         return View("~/Views/PublicLanding/FeatureDetail.cshtml", model);
     }
 
-    private static IReadOnlyList<FeatureDetailFactViewModel> BuildFeatureDetailFacts(PublicFeatureCardDto card)
+    private static IReadOnlyList<FeatureDetailFactViewModel> BuildFeatureDetailFacts(PublicFeatureCardDto card, string? proofNote, string? payoff)
     {
         var facts = new List<FeatureDetailFactViewModel>
         {
@@ -582,18 +584,69 @@ public sealed class PublicLandingController : Controller
             facts.Add(new FeatureDetailFactViewModel("Why it matters", card.Pain));
         }
 
-        if (!string.IsNullOrWhiteSpace(card.Payoff))
+        if (!string.IsNullOrWhiteSpace(payoff))
         {
-            facts.Add(new FeatureDetailFactViewModel("What it unlocks", card.Payoff));
+            facts.Add(new FeatureDetailFactViewModel("What it unlocks", payoff));
         }
 
-        if (!string.IsNullOrWhiteSpace(card.ProofNote))
+        if (!string.IsNullOrWhiteSpace(proofNote))
         {
-            facts.Add(new FeatureDetailFactViewModel("How to verify it", card.ProofNote));
+            facts.Add(new FeatureDetailFactViewModel("How to verify it", proofNote));
         }
 
         return facts;
     }
+
+    private static string? BuildFeatureDetailProofNote(PublicFeatureCardDto card)
+    {
+        if (!string.IsNullOrWhiteSpace(card.ProofNote))
+        {
+            return card.ProofNote;
+        }
+
+        return card.Bucket switch
+        {
+            "coming_next" => "Read the horizon brief, compare it to the current preview surface, and treat this as planned product work until it appears on the live proof shelf.",
+            "featured_artifacts" => "Use the proof gallery and current release shelf together to verify whether this artifact is live today or still preview-only.",
+            _ => null
+        };
+    }
+
+    private static string? BuildFeatureDetailPayoff(PublicFeatureCardDto card)
+    {
+        if (!string.IsNullOrWhiteSpace(card.Payoff))
+        {
+            return card.Payoff;
+        }
+
+        return card.Bucket switch
+        {
+            "featured_artifacts" => "This artifact keeps the preview tangible through manifests, provenance, and one truthful next action instead of a vague gallery card.",
+            "coming_next" => "The payoff only becomes real when the horizon moves onto the live proof shelf, but the user value is already explicit here.",
+            _ => null
+        };
+    }
+
+    private static IReadOnlyList<string> BuildFeatureDetailMicroProof(PublicFeatureCardDto card)
+    {
+        var explicitProof = SplitMicroProof(card.MicroProof);
+        if (explicitProof.Count > 0)
+        {
+            return explicitProof;
+        }
+
+        return card.Bucket switch
+        {
+            "coming_next" => new[] { "Planned product work", "Current proof shelf contrast", "Deeper horizon brief" },
+            "featured_artifacts" => new[] { "Manifest-backed", "Preview or live status", "Next truthful action" },
+            _ => Array.Empty<string>()
+        };
+    }
+
+    private static IReadOnlyList<string> SplitMicroProof(string? raw)
+        => string.IsNullOrWhiteSpace(raw)
+            ? Array.Empty<string>()
+            : raw.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private async Task<SiteChromeViewModel> BuildPublicOrAuthenticatedChromeAsync(
         string title,

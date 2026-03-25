@@ -34,6 +34,11 @@ public sealed class PublicNavigationService
         => (links ?? new List<PublicNavigationLinkDocument>())
             .Select(link =>
             {
+                if (string.IsNullOrWhiteSpace(link.Label))
+                {
+                    throw new InvalidOperationException($"{group} contains a link with a blank label.");
+                }
+
                 _routes.ValidateRouteTarget(link.Href, $"{group} link '{link.Label}'");
                 return new PublicNavigationLink(link.Label, link.Href);
             })

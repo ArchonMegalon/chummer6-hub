@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using Chummer.Run.Contracts.InstallLinking;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Http;
 

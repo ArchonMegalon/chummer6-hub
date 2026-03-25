@@ -1,6 +1,6 @@
 # Hub Extraction Acceptance
 
-`docs/hosted-boundary.manifest`, `docs/HOSTED_BOUNDARY.md`, and `tests/RunServicesVerification/CompatibilityVerification.cs` keep the active hosted boundary limited to the canonical `Chummer.Run.*` plus `Chummer.Play.Contracts` surface, require media-factory and hub-registry contracts to flow through external owner-package seams, target the hosted runtime on `net10.0`, and block retired legacy roots (`Chummer`, `Chummer.Api`, `ChummerDataViewer`, `ChummerHub`, `Plugins`, `TextblockConverter`, and `Translator`) from re-entering the repo.
+`docs/hosted-boundary.manifest`, `docs/HOSTED_BOUNDARY.md`, and `tests/RunServicesVerification/CompatibilityVerification.cs` keep the active hosted boundary limited to the canonical `Chummer.Play.Contracts`, `Chummer.Campaign.Contracts`, `Chummer.Control.Contracts`, and `Chummer.Run.*` surface, require media-factory and hub-registry contracts to flow through external owner-package seams, target the hosted runtime on `net10.0`, and block retired legacy roots (`Chummer`, `Chummer.Api`, `ChummerDataViewer`, `ChummerHub`, `Plugins`, `TextblockConverter`, and `Translator`) from re-entering the repo.
 
 ## Worklist and issue anchors
 
@@ -129,6 +129,19 @@ Issue and migration anchors preserved in this acceptance narrative:
   - `.codex-design/review/REVIEW_CONTEXT.md`
   - `tests/RunServicesVerification/HubExtractionReadinessVerification.cs`
 
+## WL-240 campaign and control middle-plane materialization (`N1`)
+
+- Scope: make the campaign-spine and product-control contract families executable inside Hub without regrowing a hidden monorepo blob.
+- Acceptance rule: `Chummer.Campaign.Contracts` owns runner dossier, crew, campaign, run, scene, objective, continuity, and roaming restore DTOs; `Chummer.Control.Contracts` owns support, crash, and closure DTOs; `Chummer.Run.Contracts` must not re-absorb those families.
+- Executable proof path:
+  - `Chummer.Campaign.Contracts/*`
+  - `Chummer.Control.Contracts/*`
+  - `Chummer.Run.Api/Services/Community/CampaignSpineService.cs`
+  - `Chummer.Run.Api/Controllers/CampaignSpineController.cs`
+  - `tests/RunServicesVerification/CompatibilityVerification.cs`
+  - `tests/RunServicesSmoke/Program.cs`
+  - `scripts/ai/verify.sh`
+
 ## WL-220 observability / DR / replay-safety materialization (`F1`)
 
 - `F1` scope is observability, disaster-recovery, restore, and replay-safety hardening.
@@ -165,6 +178,8 @@ Issue and migration anchors preserved in this acceptance narrative:
 
 - Chummer.Run.Registry
 - Chummer.Play.Contracts
+- Chummer.Campaign.Contracts
+- Chummer.Control.Contracts
 - Chummer.Media.Contracts
 - Chummer.Hub.Registry.Contracts
 - LEGACY_ROOT_SURFACE_INVENTORY.md

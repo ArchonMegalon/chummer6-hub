@@ -1,5 +1,5 @@
 using Chummer.Run.AI.Services.Ops;
-using Chummer.Run.Contracts.Support;
+using Chummer.Control.Contracts.Support;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.AI.Controllers;

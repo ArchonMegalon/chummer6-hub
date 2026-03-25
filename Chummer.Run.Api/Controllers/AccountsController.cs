@@ -19,6 +19,7 @@ public sealed class AccountsController : Controller
     private readonly UserExperienceService _experience;
     private readonly InstallLinkingService _installLinking;
     private readonly SupportCaseService _supportCases;
+    private readonly CampaignSpineService _campaignSpine;
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
     private readonly ILogger<AccountsController> _logger;
@@ -30,6 +31,7 @@ public sealed class AccountsController : Controller
         UserExperienceService experience,
         InstallLinkingService installLinking,
         SupportCaseService supportCases,
+        CampaignSpineService campaignSpine,
         HubPageChromeService chrome,
         HubGoogleAuthService google,
         ILogger<AccountsController> logger)
@@ -40,6 +42,7 @@ public sealed class AccountsController : Controller
         _experience = experience;
         _installLinking = installLinking;
         _supportCases = supportCases;
+        _campaignSpine = campaignSpine;
         _chrome = chrome;
         _google = google;
         _logger = logger;
@@ -53,14 +56,16 @@ public sealed class AccountsController : Controller
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var model = new AccountPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome("Account", "Profile, sign-in methods, recovery posture, and channel settings.", "/account", user.DisplayName),
                 User: user,
                 Links: _links.GetSummary(subject.SubjectId),
                 Experience: _experience.GetOrCreate(subject.SubjectId),
                 GoogleAvailable: _google.IsConfigured(),
-                InstallLinking: _installLinking.GetSummary(user.UserId, subject.SubjectId),
-                SupportCases: _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items);
+                InstallLinking: installLinking,
+                SupportCases: _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items,
+                CampaignSpine: _campaignSpine.GetAccountSummary(user, installLinking));
             return View("~/Views/Accounts/Account.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)

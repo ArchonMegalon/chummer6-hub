@@ -3,12 +3,14 @@
 `chummer6-hub` keeps its active hosted surface limited to:
 
 - `Chummer.Play.Contracts`
+- `Chummer.Campaign.Contracts`
+- `Chummer.Control.Contracts`
 - `Chummer.Run.Contracts`
 - `Chummer.Run.Api`
 - `Chummer.Run.Identity`
 - `Chummer.Run.AI`
 
-These projects are the active hosted runtime boundary for relay, Spider, identity, and policy surfaces.
+These projects are the active hosted runtime boundary for relationship, campaign, control, relay, Spider, identity, and policy surfaces.
 
 External owner seams consumed by this repo, but no longer treated as active
 hosted projects here:
@@ -37,4 +39,4 @@ Boundary rules:
 1. Active hosted projects must be the only in-repo projects built through `Chummer.Run.sln`; external owner packages and owner-runtime assemblies are restored through sibling-repo assembly seams during clean-room verification.
 2. No legacy oracle/application root may be reintroduced into this repo as a compatibility anchor.
 3. Retired hosted clutter must stay absent from the repository and must not be reintroduced through source roots, project references, or docker paths.
-4. Registry/publication ownership now lives in `chummer6-hub-registry`, media render/job execution and contracts live in `chummer6-media-factory`, and this repo stays the orchestrator shell around identity, relay, Spider, and policy.
+4. Registry/publication ownership now lives in `chummer6-hub-registry`, media render/job execution and contracts live in `chummer6-media-factory`, and this repo stays the orchestrator shell around identity, campaign spine, product control, relay, Spider, and policy.

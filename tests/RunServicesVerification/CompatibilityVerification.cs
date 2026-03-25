@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.IO;
 using System.Text.Json;
+using Chummer.Campaign.Contracts;
+using Chummer.Control.Contracts.Support;
 using Chummer.Play.Core.Application;
 using Chummer.Play.Core.Offline;
 using Chummer.Play.Core.PlayApi;
@@ -109,6 +111,18 @@ internal static class CompatibilityVerification
         VerificationAssert.True(
             typeof(OfflineLedgerEnvelope).Assembly == playContractsAssembly,
             "Offline ledger envelopes must live in Chummer.Play.Contracts.");
+        VerificationAssert.True(
+            typeof(RunnerDossierProjection).Assembly.GetName().Name == "Chummer.Campaign.Contracts",
+            "Runner dossier projections must live in Chummer.Campaign.Contracts.");
+        VerificationAssert.True(
+            typeof(CampaignProjection).Assembly.GetName().Name == "Chummer.Campaign.Contracts",
+            "Campaign projections must live in Chummer.Campaign.Contracts.");
+        VerificationAssert.True(
+            typeof(SupportCaseProjection).Assembly.GetName().Name == "Chummer.Control.Contracts",
+            "Support case projections must live in Chummer.Control.Contracts.");
+        VerificationAssert.True(
+            typeof(CrashEnvelope).Assembly.GetName().Name == "Chummer.Control.Contracts",
+            "Crash envelopes must live in Chummer.Control.Contracts.");
 
         VerificationAssert.True(
             runContractsAssembly.GetType("Chummer.Run.Contracts.Relay.SessionEventEnvelope") is null,
@@ -131,6 +145,12 @@ internal static class CompatibilityVerification
         VerificationAssert.True(
             runContractsAssembly.GetType("Chummer.Run.Contracts.Publication.PublicationRecordResponse") is null,
             "Chummer.Run.Contracts must not shadow extracted publication DTOs.");
+        VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Campaign.RunnerDossierProjection") is null,
+            "Chummer.Run.Contracts must not shadow campaign-spine DTOs.");
+        VerificationAssert.True(
+            runContractsAssembly.GetType("Chummer.Run.Contracts.Support.SupportCaseProjection") is null,
+            "Chummer.Run.Contracts must not shadow product-control DTOs.");
         VerificationAssert.True(
             typeof(RunMemoryContracts.SessionMemoryIngestionResult).GetProperty(nameof(RunMemoryContracts.SessionMemoryIngestionResult.Draft))?.PropertyType == typeof(SessionMemoryDraftResult),
             "Run-specific memory ingestion should point back to canonical play-memory draft results.");
@@ -361,6 +381,8 @@ internal static class CompatibilityVerification
 
         var canonicalHostedProjects = new[]
             {
+                "Chummer.Campaign.Contracts",
+                "Chummer.Control.Contracts",
                 "Chummer.Play.Contracts",
                 "Chummer.Run.AI",
                 "Chummer.Run.Api",

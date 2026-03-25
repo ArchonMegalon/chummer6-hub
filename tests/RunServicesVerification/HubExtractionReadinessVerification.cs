@@ -349,7 +349,7 @@ internal static class HubExtractionReadinessVerification
         {
             Path.Combine(RepoRoot, "..", "chummer-core-engine"),
             Path.Combine(RepoRoot, "..", "chummer-play"),
-            Path.Combine(RepoRoot, "..", "chummer-presentation"),
+            Path.Combine(RepoRoot, "..", "chummer6-ui"),
             Path.Combine(RepoRoot, "..", "chummer-ui-kit"),
             Path.Combine(RepoRoot, "..", "chummer-hub-registry"),
             Path.Combine(RepoRoot, "..", "..", "fleet", "repos", "chummer-media-factory")
@@ -389,8 +389,14 @@ internal static class HubExtractionReadinessVerification
     private static void VerifyCommunityPlaneDurabilityAndConvergence()
     {
         var communityStorePath = Path.Combine(RepoRoot, "Chummer.Run.Api", "Services", "Community", "CommunityStore.cs");
+        var campaignSpineServicePath = Path.Combine(RepoRoot, "Chummer.Run.Api", "Services", "Community", "CampaignSpineService.cs");
+        var campaignSpineControllerPath = Path.Combine(RepoRoot, "Chummer.Run.Api", "Controllers", "CampaignSpineController.cs");
         VerificationAssert.True(File.Exists(communityStorePath), "CommunityStore source must exist.");
+        VerificationAssert.True(File.Exists(campaignSpineServicePath), "Campaign spine service source must exist.");
+        VerificationAssert.True(File.Exists(campaignSpineControllerPath), "Campaign spine controller source must exist.");
         var communityStoreText = File.ReadAllText(communityStorePath);
+        var campaignSpineServiceText = File.ReadAllText(campaignSpineServicePath);
+        var campaignSpineControllerText = File.ReadAllText(campaignSpineControllerPath);
         foreach (var requiredToken in new[]
                  {
                      "CHUMMER_COMMUNITY_STORE_PATH",
@@ -403,6 +409,32 @@ internal static class HubExtractionReadinessVerification
             VerificationAssert.True(
                 communityStoreText.Contains(requiredToken, StringComparison.Ordinal),
                 $"CommunityStore must keep durability token '{requiredToken}'.");
+        }
+        foreach (var requiredToken in new[]
+                 {
+                     "RunnerDossierProjection",
+                     "CampaignProjection",
+                     "WorkspaceRestoreProjection",
+                     "AccountCampaignSummary",
+                     "EnsurePersonalDossierLocked",
+                     "BuildRestoreProjection"
+                 })
+        {
+            VerificationAssert.True(
+                campaignSpineServiceText.Contains(requiredToken, StringComparison.Ordinal),
+                $"CampaignSpineService must keep '{requiredToken}'.");
+        }
+        foreach (var requiredToken in new[]
+                 {
+                     "Route(\"api/v1/campaign-spine\")",
+                     "GetMyCampaignSummary",
+                     "AccountCampaignSummary",
+                     "_campaignSpine.GetAccountSummary"
+                 })
+        {
+            VerificationAssert.True(
+                campaignSpineControllerText.Contains(requiredToken, StringComparison.Ordinal),
+                $"CampaignSpineController must keep '{requiredToken}'.");
         }
 
         var legacyParticipationServicePath = Path.Combine(RepoRoot, "Chummer.Run.Api", "Services", "CodexParticipationService.cs");
@@ -826,6 +858,10 @@ internal static class HubExtractionReadinessVerification
                      "LEGACY_ROOT_SURFACE_INVENTORY.md",
                      "PublicationVerification.cs",
                      "CompatibilityVerification.cs",
+                     "Chummer.Campaign.Contracts",
+                     "Chummer.Control.Contracts",
+                     "CampaignSpineController.cs",
+                     "CampaignSpineService.cs",
                      "PipelineProjectionVerification.cs",
                      "StateStoreBackupVerification.cs",
                      "RuntimeBundleVerification.cs",

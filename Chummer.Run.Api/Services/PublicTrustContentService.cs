@@ -23,14 +23,16 @@ public sealed class PublicTrustContentService
 
         return new FaqPageViewModel(
             Chrome: chrome,
-            Eyebrow: page.Eyebrow,
-            Heading: page.Heading,
-            Intro: page.Intro,
+            Eyebrow: RequireText(page.Eyebrow, "faq page eyebrow"),
+            Heading: RequireText(page.Heading, "faq page heading"),
+            Intro: RequireText(page.Intro, "faq page intro"),
             Sections: (page.Sections ?? new List<PublicFaqSectionDocument>())
-                .Select(static section => new FaqSectionViewModel(
-                    section.Title,
+                .Select(section => new FaqSectionViewModel(
+                    RequireText(section.Title, "faq section title"),
                     (section.Entries ?? new List<PublicFaqEntryDocument>())
-                    .Select(static entry => new FaqEntryViewModel(entry.Question, entry.Answer))
+                    .Select(entry => new FaqEntryViewModel(
+                        RequireText(entry.Question, "faq entry question"),
+                        RequireText(entry.Answer, "faq entry answer")))
                     .ToArray()))
                 .ToArray(),
             Actions: BuildActions(page.Actions));
@@ -49,15 +51,15 @@ public sealed class PublicTrustContentService
 
         return new TrustPageViewModel(
             Chrome: chrome,
-            Eyebrow: page.Eyebrow,
-            Heading: page.Heading,
-            Intro: page.Intro,
+            Eyebrow: RequireText(page.Eyebrow, $"trust page '{id}' eyebrow"),
+            Heading: RequireText(page.Heading, $"trust page '{id}' heading"),
+            Intro: RequireText(page.Intro, $"trust page '{id}' intro"),
             Sections: (page.Sections ?? new List<PublicTrustSectionDocument>())
-                .Select(static section => new TrustPageSectionViewModel(
-                    section.Id,
-                    section.Eyebrow,
-                    section.Heading,
-                    section.Body,
+                .Select(section => new TrustPageSectionViewModel(
+                    RequireText(section.Id, $"trust page '{id}' section id"),
+                    RequireText(section.Eyebrow, $"trust page '{id}' section eyebrow"),
+                    RequireText(section.Heading, $"trust page '{id}' section heading"),
+                    RequireText(section.Body, $"trust page '{id}' section body"),
                     section.Bullets))
                 .ToArray(),
             Actions: BuildActions(page.Actions));
@@ -67,8 +69,9 @@ public sealed class PublicTrustContentService
         => (actions ?? new List<PublicTrustActionDocument>())
             .Select(action =>
             {
-                _routes.ValidateRouteTarget(action.Href, $"trust action '{action.Label}'");
-                return new TrustPageActionViewModel(action.Label, action.Href, action.Tone);
+                var label = RequireText(action.Label, "trust action label");
+                _routes.ValidateRouteTarget(action.Href, $"trust action '{label}'");
+                return new TrustPageActionViewModel(label, action.Href, action.Tone);
             })
             .ToArray();
 
@@ -87,4 +90,9 @@ public sealed class PublicTrustContentService
 
         return document;
     }
+
+    private static string RequireText(string? value, string description)
+        => string.IsNullOrWhiteSpace(value)
+            ? throw new InvalidOperationException($"{description} is missing required text.")
+            : value;
 }

@@ -11,6 +11,10 @@
     var activeAccessRights = Model.InstallLinking.ActiveGrants?.Count ?? 0;
     var pendingClaims = Model.InstallLinking.PendingClaimTickets.Count;
     var openSupportCases = Model.SupportCases.Count(item => !string.Equals(item.Status, "user_notified", StringComparison.OrdinalIgnoreCase));
+    var dossierCount = Model.CampaignSpine.Dossiers.Count;
+    var campaignCount = Model.CampaignSpine.Campaigns.Count;
+    var communityOpsCount = Model.CampaignSpine.CommunityOperations.Count;
+    var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -59,6 +63,14 @@
             <span class="tag">Preferences</span>
             <strong id="participationOverviewState">@(Model.Experience.OnboardingCompleted ? "Configured" : "Needs setup")</strong>
         </article>
+        <article class="account-overview__card">
+            <span class="tag">Living dossiers</span>
+            <strong>@dossierCount</strong>
+        </article>
+        <article class="account-overview__card">
+            <span class="tag">Campaigns</span>
+            <strong>@(campaignCount == 0 ? "Ready to start" : campaignCount.ToString())</strong>
+        </article>
     </div>
 
     <div class="account-shell">
@@ -67,6 +79,8 @@
             <a href="#sign-in">Primary sign-in</a>
             <a href="#recovery">Recovery email</a>
             <a href="#support">Support</a>
+            <a href="#campaigns">Campaign spine</a>
+            <a href="#community-ops">Community operator</a>
             <a href="#devices-access">Devices &amp; access</a>
             <a href="#channels">Linked channels</a>
             <a href="#privacy">Privacy</a>
@@ -184,7 +198,7 @@
                         <label for="supportAssistantInstallation">Related install</label>
                         <select id="supportAssistantInstallation">
                             <option value="">Any install or no install yet</option>
-                            @foreach (var installation in Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Run.Contracts.InstallLinking.ClaimedInstallationDto>())
+                            @foreach (var installation in Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>())
                             {
                                 <option value="@installation.InstallationId">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
                             }
@@ -209,7 +223,7 @@
                         <label for="supportCaseInstallation">Related install</label>
                         <select id="supportCaseInstallation">
                             <option value="">No specific install</option>
-                            @foreach (var installation in Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Run.Contracts.InstallLinking.ClaimedInstallationDto>())
+                            @foreach (var installation in Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>())
                             {
                                 <option
                                     value="@installation.InstallationId"
@@ -337,6 +351,100 @@
                     <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
                     <a class="button-like button-like--ghost" href="/help#install-update">How install linking works</a>
                 </div>
+            </section>
+
+            <section id="campaigns" class="settings-section">
+                <div class="settings-section__header">
+                    <h2>Campaign spine</h2>
+                    <p>Living dossiers, crew context, campaign continuity, and restore posture stay tied together here instead of falling back to one-off build files.</p>
+                </div>
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Living dossiers</span>
+                        <strong>@dossierCount</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Active campaigns</span>
+                        <strong>@campaignCount</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Restore conflicts</span>
+                        <strong>@(restoreConflicts == 0 ? "None" : restoreConflicts.ToString())</strong>
+                    </div>
+                </div>
+                @if (Model.CampaignSpine.Dossiers.Count == 0)
+                {
+                    <p class="muted-copy">No living dossiers yet. The first claimed install or campaign handoff will seed the long-lived runner identity.</p>
+                }
+                else
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var dossier in Model.CampaignSpine.Dossiers)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@dossier.DisplayName</span>
+                                <strong>@HumanizeStatus(dossier.Status, "Active") · @(string.IsNullOrWhiteSpace(dossier.CampaignId) ? "Solo" : dossier.CampaignId)</strong>
+                            </div>
+                        }
+                    </div>
+                }
+                @if (Model.CampaignSpine.Campaigns.Count > 0)
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var campaign in Model.CampaignSpine.Campaigns)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@campaign.Name</span>
+                                <strong>@campaign.DossierIds.Count dossiers · @(campaign.ActiveRunId is null ? "No active run" : "Run ready")</strong>
+                            </div>
+                        }
+                    </div>
+                }
+                @if (Model.CampaignSpine.Restore.ConflictSummaries.Count > 0)
+                {
+                    <details class="details-drawer">
+                        <summary>Restore and continuity notes</summary>
+                        <ul class="muted-copy">
+                            @foreach (var note in Model.CampaignSpine.Restore.ConflictSummaries)
+                            {
+                                <li>@note</li>
+                            }
+                        </ul>
+                    </details>
+                }
+            </section>
+
+            <section id="community-ops" class="settings-section">
+                <div class="settings-section__header">
+                    <h2>Community operator</h2>
+                    <p>Organizer and operator work stays subordinate to campaign truth: memberships, visibility, capabilities, and active sponsor pressure remain visible without becoming the product core.</p>
+                </div>
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Operator groups</span>
+                        <strong>@communityOpsCount</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Recent restore generation</span>
+                        <strong>@Model.CampaignSpine.Restore.GeneratedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                    </div>
+                </div>
+                @if (communityOpsCount == 0)
+                {
+                    <p class="muted-copy">You are not currently the operator for a campaign, creator team, or community group on this account.</p>
+                }
+                else
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var op in Model.CampaignSpine.CommunityOperations)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@op.GroupName</span>
+                                <strong>@op.MemberCount members · @op.ActiveCampaignCount campaigns · @op.ActiveSponsorSessionCount sponsor sessions</strong>
+                            </div>
+                        }
+                    </div>
+                }
             </section>
 
             <section id="privacy" class="settings-section">
@@ -563,10 +671,15 @@
       if (actionItems.length > 0) {
         actions.hidden = false;
         for (const item of actionItems) {
+          const label = (item.label || item.actionId || "").trim();
+          if (!label) {
+            continue;
+          }
+
           const link = document.createElement("a");
           link.className = "button-like button-like--ghost";
           link.href = item.href || "#";
-          link.textContent = item.label || item.actionId || "Open";
+          link.textContent = label.replaceAll("_", " ");
           link.title = item.reason || "";
           actions.appendChild(link);
         }

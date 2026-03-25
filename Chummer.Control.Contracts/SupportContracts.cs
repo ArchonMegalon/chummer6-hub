@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Chummer.Run.Contracts.Support;
+namespace Chummer.Control.Contracts.Support;
 
 public static class SupportCaseKinds
 {

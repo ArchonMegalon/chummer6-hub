@@ -1,7 +1,7 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
-using Chummer.Run.Contracts.InstallLinking;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;

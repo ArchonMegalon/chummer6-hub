@@ -18,6 +18,7 @@ using Chummer.Run.AI.Services.Transcription;
 using Chummer.Run.AI.Controllers;
 using Chummer.Run.Registry.Controllers;
 using Chummer.Run.Registry.Services;
+using Chummer.Campaign.Contracts;
 using Chummer.Play.Contracts.Gateway;
 using Chummer.Play.Contracts.Interop;
 using Chummer.Play.Contracts.Memory;
@@ -28,14 +29,14 @@ using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Entitlements;
 using Chummer.Run.Contracts.Identity;
-using Chummer.Run.Contracts.InstallLinking;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.Ledger;
 using Chummer.Run.Contracts.Leaderboards;
 using Chummer.Run.Contracts.Ops;
 using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Run.Contracts.Publication;
 using Chummer.Run.Contracts.Registry;
-using Chummer.Run.Contracts.Support;
+using Chummer.Control.Contracts.Support;
 using Chummer.Run.Identity.Services;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.DataProtection;
@@ -511,6 +512,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
     var installLinking = new InstallLinkingService(installLinkingStore);
     var supportCases = new SupportCaseService(supportStore, loggerFactory.CreateLogger<SupportCaseService>());
+    var campaignSpine = new CampaignSpineService(store);
     var accounts = new AccountService(store);
     var groups = new GroupService(store, accounts);
     var rewards = new RewardService(store);
@@ -551,7 +553,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         Timezone: "UTC",
         CountryCode: "AT"));
     var experience = new UserExperienceService(store, accounts);
-    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, campaignSpine, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1458,6 +1460,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/signup?next=/home", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/home#beta-interest", StringComparison.Ordinal)), "beta waitlist should split guest signup from registered-home follow-up");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
+    var campaignSpine = new CampaignSpineService(store);
     var accounts = new AccountService(store);
     var identityLinks = new IdentityLinkService(store, accounts);
     var experience = new UserExperienceService(store, accounts);
@@ -1537,6 +1540,7 @@ async Task VerifyPublicLandingProjectionAsync()
         experience,
         installLinking,
         supportCases,
+        campaignSpine,
         chrome,
         google,
         loggerFactory.CreateLogger<AccountsController>())
@@ -1562,6 +1566,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var landingModel = landingView?.Model as LandingPageViewModel;
     Assert(landingModel is not null, "landing page should render through the MVC view layer.");
     Assert(string.Equals(landingModel!.Surface.Headline, "Shadowrun rules truth, with receipts.", StringComparison.Ordinal), "landing page should render the canonical headline");
+    Assert(string.Equals(landingModel.PrimaryHeroAction.Label, "Create account to get preview", StringComparison.Ordinal), "landing page should source the guest-gated primary CTA from release canon.");
+    Assert(landingModel.PrimaryHeroAction.Href.StartsWith("/signup?next=", StringComparison.Ordinal), "guest-gated primary CTA should route to signup through the install handoff.");
+    Assert(string.Equals(landingModel.SecondaryHeroAction.Label, "See what works today", StringComparison.Ordinal), "landing page should keep the manifest-backed secondary CTA.");
     Assert(landingModel.Workflows.Any(static card => string.Equals(card.Action.Href, "/downloads", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
     Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Href, "/signup?next=/home", StringComparison.Ordinal)), "landing page chrome should expose create account beside sign in");
     Assert(landingModel.Lanes.Any(static card => string.Equals(card.Card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
@@ -1570,11 +1577,19 @@ async Task VerifyPublicLandingProjectionAsync()
     var storyView = await controller.ProductStoryPage(CancellationToken.None) as ViewResult;
     var storyModel = storyView?.Model as StoryPageViewModel;
     Assert(storyModel is not null && storyModel.TrustPillars.Count == 3, "product story page should expose the three trust pillars.");
+    var roadmapDetailView = await controller.RoadmapDetailPage("runsite", CancellationToken.None) as ViewResult;
+    var roadmapDetailModel = roadmapDetailView?.Model as FeatureDetailPageViewModel;
+    Assert(roadmapDetailModel is not null && !string.IsNullOrWhiteSpace(roadmapDetailModel.ProofNote), "roadmap detail pages should expose a verification note instead of a bare placeholder shell.");
+    Assert(roadmapDetailModel!.MicroProof.Count > 0, "roadmap detail pages should surface micro-proof markers.");
+    var artifactDetailView = await controller.ArtifactDetailPage("current-preview-build", CancellationToken.None) as ViewResult;
+    var artifactDetailModel = artifactDetailView?.Model as FeatureDetailPageViewModel;
+    Assert(artifactDetailModel is not null && !string.IsNullOrWhiteSpace(artifactDetailModel.Payoff), "artifact detail pages should carry explicit product payoff.");
 
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
     Assert(downloadsModel is not null && downloadsModel.Manifest.Downloads.Any(static item => string.Equals(item.Id, "smoke-poc-linux-x64", StringComparison.Ordinal)), "downloads page should render artifacts from the live release manifest");
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
+    Assert(downloadsModel!.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Create your Chummer account first.", StringComparison.OrdinalIgnoreCase)), "account-gated releases should keep account-required install steps for the current preview recommendation.");
     var authenticatedDownloadResult = await downloadsController.DownloadArtifact("smoke-poc-linux-x64", CancellationToken.None);
     var authenticatedRedirect = authenticatedDownloadResult as RedirectResult;
     Assert(authenticatedRedirect is not null && string.Equals(authenticatedRedirect.Url, "/downloads/install/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in compatibility downloads should route through the install handoff.");
@@ -1784,7 +1799,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
     Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
-    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, campaignSpine, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

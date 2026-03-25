@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 
 TMP_DIR="${ROOT_DIR}/.tmp/run-services-verification"
 mkdir -p "$TMP_DIR"
+find "$TMP_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
 if [ ! -f Chummer.Play.Contracts/Chummer.Play.Contracts.csproj ]; then
   echo "Chummer.Play.Contracts project is missing." >&2
@@ -36,19 +37,25 @@ rg -n 'PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|PUBLIC_LANDIN
   docs/PUBLIC_LANDING_SURFACE.md >/dev/null
 rg -n 'durable local snapshot|CHUMMER_COMMUNITY_STORE_PATH|parallel intent-only state model' \
   docs/HUB_COMMUNITY_LEDGER_PLANE.md >/dev/null
-rg -n 'user accounts, groups, sponsorship sessions, and the canonical community ledger|Chummer\.Run\.Api owns product-level users, groups, join/boost codes, sponsor sessions, leaderboards, rewards, and entitlements' \
+rg -n 'Chummer\.Campaign\.Contracts|Chummer\.Control\.Contracts|campaign spine truth|product-control truth' \
+  README.md docs/HOSTED_BOUNDARY.md docs/HUB_EXTRACTION_ACCEPTANCE.md >/dev/null
+rg -n 'user accounts, groups, access/support state, and the canonical community ledger|Chummer\.Run\.Api owns the customer account backbone first: product-level users, groups, support/access flows, device/install linking, and the canonical community ledger|Optional join/boost codes, sponsor sessions, leaderboards, rewards, and entitlements sit on top of that shared account and access plane' \
   README.md >/dev/null
-rg -n 'linked identity and channel-link state|EA remains the orchestrator brain behind companion and assistant channels' \
+rg -n 'linked identity and channel-link state|EA remains the orchestrator brain behind companion and assistant channels|Telegram, Google, Facebook, and transactional email are adapters around that hub-owned account plane' \
   README.md >/dev/null
 rg -n 'public sealed class AccountsController|public sealed class GroupsController|public sealed class BoostCodesController|public sealed class BoostSessionsController|public sealed class LedgerController|public sealed class LeaderboardsController|public sealed class EntitlementsController' \
   Chummer.Run.Api/Controllers/*.cs >/dev/null
 rg -n 'public sealed class AccountLinksController' Chummer.Run.Api/Controllers/AccountLinksController.cs >/dev/null
 rg -n 'public sealed class PublicLandingController|PublicReleaseManifestService|/what-is-chummer|/downloads|/participate|/status|/artifacts|GetLanding|GuestShellActions|ResolveCardHref' \
   Chummer.Run.Api/Controllers/PublicLandingController.cs >/dev/null
+rg -n 'public sealed class CampaignSpineController|api/v1/campaign-spine|GetMyCampaignSummary' \
+  Chummer.Run.Api/Controllers/CampaignSpineController.cs >/dev/null
 rg -n 'public sealed class AuthController|/login|/signup|/logout|/auth/email/start|/auth/email/callback|/auth/google/start|/auth/google/callback|Create Account|Sign in instead|shell-action' \
   Chummer.Run.Api/Controllers/AuthController.cs >/dev/null
 rg -n 'public sealed class AccountService|public sealed class GroupService|public sealed class BoostSessionService|public sealed class LedgerService|public sealed class RewardService|public sealed class EntitlementService|public sealed class LeaderboardService|public sealed class CommunityStore' \
   Chummer.Run.Api/Services/Community/*.cs >/dev/null
+rg -n 'public sealed class CampaignSpineService|RunnerDossierProjection|CampaignProjection|WorkspaceRestoreProjection|AccountCampaignSummary' \
+  Chummer.Run.Api/Services/Community/CampaignSpineService.cs >/dev/null
 rg -n 'public sealed class IdentityLinkService|Google|Facebook|Telegram|EA' \
   Chummer.Run.Api/Services/Community/IdentityLinkService.cs >/dev/null
 rg -n 'public sealed class PublicLandingService|PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|PUBLIC_LANDING_ASSET_REGISTRY\.yaml|guest_shell_actions|asset_slot|auth_routes|registered_overlays|feature registry' \
@@ -179,7 +186,7 @@ for retired_media_service in \
   fi
 done
 
-scripts/ai/build_r1_cleanroom.sh >/dev/null
+bash scripts/ai/build_r1_cleanroom.sh >/dev/null
 
 SDK_VERSION="$(dotnet --version)"
 DOTNET_ROOT="$(dirname "$(readlink -f "$(command -v dotnet)")")"
@@ -197,6 +204,8 @@ if [[ ! -f "$CSC_DLL" || -z "$NETCORE_REF_DIR" || -z "$ASPNET_REF_DIR" || -z "$N
 fi
 
 cp Chummer.Play.Contracts/bin/Debug/net10.0/Chummer.Play.Contracts.dll "$TMP_DIR/"
+cp Chummer.Campaign.Contracts/bin/Debug/net10.0/Chummer.Campaign.Contracts.dll "$TMP_DIR/"
+cp Chummer.Control.Contracts/bin/Debug/net10.0/Chummer.Control.Contracts.dll "$TMP_DIR/"
 cp ../chummer-core-engine/Chummer.Contracts/bin/Debug/net10.0/Chummer.Engine.Contracts.dll "$TMP_DIR/"
 cp ../chummer-hub-registry/Chummer.Hub.Registry.Contracts/bin/Debug/net10.0/Chummer.Hub.Registry.Contracts.dll "$TMP_DIR/"
 cp ../chummer-hub-registry/Chummer.Run.Registry/bin/Debug/net10.0/Chummer.Run.Registry.dll "$TMP_DIR/"

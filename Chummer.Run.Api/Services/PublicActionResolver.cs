@@ -8,6 +8,8 @@ public sealed class PublicActionResolver
     private static readonly string[] GenericLabels =
     {
         "open",
+        "open the artifact detail",
+        "open the roadmap detail",
         "read more",
         "learn more",
         "continue"

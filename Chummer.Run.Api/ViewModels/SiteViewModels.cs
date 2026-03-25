@@ -1,9 +1,10 @@
 using Chummer.Run.Api.Services;
+using Chummer.Campaign.Contracts;
+using Chummer.Control.Contracts.Support;
 using Chummer.Run.Contracts.Community;
-using Chummer.Run.Contracts.InstallLinking;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.Leaderboards;
 using Chummer.Run.Contracts.PublicSurface;
-using Chummer.Run.Contracts.Support;
 
 namespace Chummer.Run.Api.ViewModels;
 
@@ -95,6 +96,10 @@ public sealed record ReleaseExperienceViewModel(
     string GuestGatePrimaryHref,
     string GuestGateSecondaryLabel,
     string GuestGateSecondaryHref,
+    string PublicPreviewPrimaryLabel,
+    string PublicPreviewPrimaryHref,
+    string NoBuildPrimaryLabel,
+    string NoBuildPrimaryHref,
     string SignedInDispatchHeading,
     string SignedInDispatchSummary,
     IReadOnlyList<string> SignedInDispatchSteps,
@@ -129,6 +134,7 @@ public sealed record StoryPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
+    IReadOnlyList<ResolvedPublicCardViewModel> Workflows,
     IReadOnlyList<PublicFeatureCardDto> TrustPillars,
     IReadOnlyList<ResolvedPublicCardViewModel> Lanes);
 
@@ -258,7 +264,11 @@ public sealed record FeatureDetailPageViewModel(
     PublicLandingAssetDto? Asset,
     ResolvedPublicActionViewModel PrimaryAction,
     TrustPageActionViewModel? SecondaryAction,
-    IReadOnlyList<FeatureDetailFactViewModel> Facts);
+    IReadOnlyList<FeatureDetailFactViewModel> Facts,
+    string? Pain,
+    string? Payoff,
+    string? ProofNote,
+    IReadOnlyList<string> MicroProof);
 
 public sealed record LeaderboardsPageViewModel(
     SiteChromeViewModel Chrome,
@@ -286,7 +296,8 @@ public sealed record AccountPageViewModel(
     HubUserExperienceDto Experience,
     bool GoogleAvailable,
     InstallLinkingSummaryDto InstallLinking,
-    IReadOnlyList<SupportCaseProjection> SupportCases);
+    IReadOnlyList<SupportCaseProjection> SupportCases,
+    AccountCampaignSummary CampaignSpine);
 
 public sealed record AuthPageViewModel(
     SiteChromeViewModel Chrome,
