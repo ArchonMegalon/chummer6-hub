@@ -43,9 +43,22 @@ else
 
   portal_files_dir="$PORTAL_DOWNLOADS_DIR/files"
   mkdir -p "$portal_files_dir"
-  mapfile -t portal_artifacts < <(find "$DOWNLOADS_DIR" -maxdepth 1 -type f \( -name "chummer-*.zip" -o -name "chummer-*.tar.gz" \) | sort)
+  mapfile -t portal_artifacts < <(find "$DOWNLOADS_DIR" -maxdepth 1 -type f \( \
+    -name "chummer-*-installer.exe" -o \
+    -name "chummer-*-installer.deb" -o \
+    -name "chummer-*-installer.pkg" -o \
+    -name "chummer-*-installer.dmg" -o \
+    -name "chummer-*-installer.msix" \
+  \) | sort)
   if [[ "${#portal_artifacts[@]}" -gt 0 ]]; then
-    rm -f "$portal_files_dir"/chummer-*.zip "$portal_files_dir"/chummer-*.tar.gz
+    rm -f \
+      "$portal_files_dir"/chummer-*.zip \
+      "$portal_files_dir"/chummer-*.tar.gz \
+      "$portal_files_dir"/chummer-*-installer.exe \
+      "$portal_files_dir"/chummer-*-installer.deb \
+      "$portal_files_dir"/chummer-*-installer.pkg \
+      "$portal_files_dir"/chummer-*-installer.dmg \
+      "$portal_files_dir"/chummer-*-installer.msix
     cp "${portal_artifacts[@]}" "$portal_files_dir"/
     echo "synced ${#portal_artifacts[@]} local portal artifact(s) -> $portal_files_dir"
   else

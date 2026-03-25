@@ -1,6 +1,46 @@
 {
-  "version": "unpublished",
-  "channel": "docker",
-  "publishedAt": "2026-03-04T15:31:02Z",
-  "downloads": []
+  "version": "run-20260325-081445",
+  "channel": "preview",
+  "publishedAt": "2026-03-25T08:16:56Z",
+  "downloads": [
+    {
+      "id": "avalonia-linux-x64-installer",
+      "platform": "Avalonia Desktop Linux X64 Installer",
+      "url": "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+      "sha256": "75081156011dc38457694bb33f1b1c1eacc38b3691fa14dafd3b77cb8c0bd0a7",
+      "sizeBytes": 33987294,
+      "format": "deb",
+      "flavor": "installer"
+    },
+    {
+      "id": "blazor-desktop-linux-x64-installer",
+      "platform": "Blazor Desktop Linux X64 Installer",
+      "url": "/downloads/files/chummer-blazor-desktop-linux-x64-installer.deb",
+      "sha256": "b36624a7b8a5a1b4e06cac6ead3040d86db542dd8dfe5694252d3b5cc54e6f56",
+      "sizeBytes": 36411366,
+      "format": "deb",
+      "flavor": "installer"
+    },
+    {
+      "id": "avalonia-win-x64-installer",
+      "platform": "Avalonia Desktop Windows X64 Installer",
+      "url": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+      "sha256": "dcb609cbfc32e795bbd9880a8b15538ae965ce347a99a8cb44170f6731b0f4c2",
+      "sizeBytes": 51645826,
+      "format": "exe",
+      "flavor": "installer"
+    },
+    {
+      "id": "blazor-desktop-win-x64-installer",
+      "platform": "Blazor Desktop Windows X64 Installer",
+      "url": "/downloads/files/chummer-blazor-desktop-win-x64-installer.exe",
+      "sha256": "bc960d8d8081bd3e661b6f7ac281ee08879a5eeb007d45ec0bdfb9a98f188499",
+      "sizeBytes": 51645872,
+      "format": "exe",
+      "flavor": "installer"
+    }
+  ],
+  "source": "registry",
+  "status": "published",
+  "message": null
 }
