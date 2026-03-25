@@ -329,14 +329,15 @@ if [[ "$RUNBOOK_MODE" == "desktop-gate" ]]; then
   require_match "scripts/publish-download-bundle-s3.sh" ".github/workflows/desktop-downloads-matrix.yml"
   require_match "scripts/validate-amend-manifests.sh" ".github/workflows/desktop-downloads-matrix.yml"
   require_match "SELF_HOSTED_DOWNLOADS_RUNBOOK.md" "README.md"
-  require_match "rid: osx-x64" ".github/workflows/desktop-downloads-matrix.yml"
+  require_match "rid: linux-arm64" ".github/workflows/desktop-downloads-matrix.yml"
+  require_match "installer_ext: deb" ".github/workflows/desktop-downloads-matrix.yml"
   require_match "deploy-downloads-object-storage" ".github/workflows/desktop-downloads-matrix.yml"
   require_match "CHUMMER_PORTAL_DOWNLOADS_S3_URI" ".github/workflows/desktop-downloads-matrix.yml"
   require_match "CHUMMER_PORTAL_DOWNLOADS_AWS_ACCESS_KEY_ID" ".github/workflows/desktop-downloads-matrix.yml"
   require_match "CHUMMER_PORTAL_DOWNLOADS_VERIFY_LINKS" ".github/workflows/desktop-downloads-matrix.yml"
   require_match "chummer-\\(\\?P<app>avalonia\\|blazor-desktop\\)-" "scripts/generate-releases-manifest.sh"
-  require_match "\"osx-x64\": \"macOS x64\"" "scripts/generate-releases-manifest.sh"
-  require_match "\"id\": f\"\\{app\\}-\\{rid\\}\"" "scripts/generate-releases-manifest.sh"
+  require_match "chummer-\\*-installer\\.deb" "scripts/generate-releases-manifest.sh"
+  require_match "chummer-\\*-installer\\.exe" "scripts/generate-releases-manifest.sh"
   require_match "Task<ShellBootstrapSnapshot> GetShellBootstrapAsync\\(string\\? rulesetId, CancellationToken ct\\);" "Chummer.Presentation/IChummerClient.cs"
   require_no_match "GetShellBootstrapAsync\\(string\\? rulesetId, CancellationToken ct\\)\\s*\\{" "Chummer.Presentation/IChummerClient.cs"
   require_no_match "GetShellBootstrapAsync\\(string\\? rulesetId, CancellationToken ct\\)\\s*=>" "Chummer.Presentation/IChummerClient.cs"
@@ -529,8 +530,10 @@ if [[ "$RUNBOOK_MODE" == "downloads-smoke" ]]; then
   DOWNLOADS_SMOKE_VERSION="${DOWNLOADS_SMOKE_VERSION:-smoke-0001}"
   mkdir -p "$DOWNLOADS_SMOKE_BUNDLE_DIR/files" "$DOWNLOADS_SMOKE_DEPLOY_DIR"
 
-  artifact_path="$DOWNLOADS_SMOKE_BUNDLE_DIR/files/chummer-avalonia-linux-x64.zip"
-  printf 'downloads smoke artifact\n' > "$artifact_path"
+  artifact_path="$DOWNLOADS_SMOKE_BUNDLE_DIR/files/chummer-avalonia-linux-x64-installer.deb"
+  installer_path="$DOWNLOADS_SMOKE_BUNDLE_DIR/files/chummer-avalonia-win-x64-installer.exe"
+  printf 'downloads smoke installer (linux deb)\n' > "$artifact_path"
+  printf 'downloads smoke installer\n' > "$installer_path"
   cat > "$DOWNLOADS_SMOKE_BUNDLE_DIR/releases.json" <<JSON
 {
   "version": "$DOWNLOADS_SMOKE_VERSION",

@@ -6,6 +6,7 @@
 
     static bool IsInstaller(PublicReleaseArtifactDto download)
         => download.Url.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+           || download.Url.EndsWith(".deb", StringComparison.OrdinalIgnoreCase)
            || download.Url.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)
            || download.Url.EndsWith(".dmg", StringComparison.OrdinalIgnoreCase)
            || download.Url.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase)
@@ -20,7 +21,7 @@
         => IsInstaller(download)
             ? "Installer"
             : IsArchive(download)
-                ? "Manual archive"
+                ? "Archive"
                 : "Download";
 
     static string ActionLabel(PublicReleaseArtifactDto download)
@@ -32,7 +33,7 @@
     static string SupportNote(PublicReleaseArtifactDto download)
         => IsInstaller(download)
             ? "Recommended for most people. Use this when you want the cleanest setup path."
-            : "Manual path. Use this when you specifically want the raw archive.";
+            : "Additional package. Use this only when support explicitly points you to a manual path.";
 
     static string SizeLabel(long? sizeBytes)
         => sizeBytes is long size
@@ -49,7 +50,7 @@
         <p class="eyebrow">Downloads</p>
         <h1 class="page-title">Install the current preview</h1>
         <p class="page-copy">@Model.Manifest.Channel channel, version @Model.Manifest.Version, published @Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd").</p>
-        <p class="release-stage__note">Use an installer when you see one. Manual archives stay available as the fallback path for people who explicitly want the raw package.</p>
+        <p class="release-stage__note">This shelf publishes installer-ready builds. Start with the installer that matches your platform and channel.</p>
         @if (Model.Chrome.Authenticated)
         {
             <p class="release-stage__note">Signed-in downloads keep a Hub receipt and a claim ticket for this copy without changing the installer bytes. On first launch, paste that claim code into the desktop link dialog or review it from your account page later.</p>
@@ -57,7 +58,7 @@
     </div>
     <div class="release-stage__integrity">
         <span class="tag">Install and update</span>
-        <p>Checksums stay visible beside every package, installers stay clearly marked, and manual archives never pretend to be the default path.</p>
+        <p>Checksums stay visible beside every package, installers stay clearly marked, and account-linked downloads keep the artifact canonical.</p>
     </div>
 </section>
 
@@ -69,8 +70,8 @@
     </article>
     <article class="release-guidance__item">
         <span class="tag tag--quiet">Manual</span>
-        <h2>Archives stay honest</h2>
-        <p>ZIP and tarball packages remain available for manual use, but they are the self-service path and may require you to replace the build yourself later.</p>
+        <h2>Channel truth stays visible</h2>
+        <p>Use the installer listed here instead of guessing from an old file name. Hub and Registry keep the current channel/version record in one place.</p>
     </article>
     <article class="release-guidance__item">
         <span class="tag">Updates</span>
@@ -147,8 +148,8 @@ else
         <section class="release-shelf release-shelf--manual">
             <div class="release-shelf__lead">
                 <p class="eyebrow">Manual fallback</p>
-                <h2 class="editorial-title">Archives and raw packages</h2>
-                <p class="editorial-copy">Use these only when you specifically want the unpack-it-yourself path.</p>
+                <h2 class="editorial-title">Additional packages</h2>
+                <p class="editorial-copy">Use these only when support or a specific workflow explicitly calls for them.</p>
             </div>
             <div class="evidence-row-list">
                 @foreach (var download in manualDownloads)
