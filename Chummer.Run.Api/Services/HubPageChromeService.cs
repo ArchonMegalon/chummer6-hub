@@ -8,12 +8,18 @@ public sealed class HubPageChromeService
     private readonly PublicLandingService _landing;
     private readonly PublicNavigationService _navigation;
     private readonly PublicReleaseManifestService _releases;
+    private readonly ReleaseSelectionService _releaseSelection;
 
-    public HubPageChromeService(PublicLandingService landing, PublicNavigationService navigation, PublicReleaseManifestService releases)
+    public HubPageChromeService(
+        PublicLandingService landing,
+        PublicNavigationService navigation,
+        PublicReleaseManifestService releases,
+        ReleaseSelectionService releaseSelection)
     {
         _landing = landing;
         _navigation = navigation;
         _releases = releases;
+        _releaseSelection = releaseSelection;
     }
 
     public SiteChromeViewModel BuildPublicChrome(string title, string description, string currentPath)
@@ -83,11 +89,16 @@ public sealed class HubPageChromeService
 
     private SiteChromeActionViewModel BuildPublicPrimaryCta()
     {
-        var manifest = _releases.LoadManifest();
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var hasPreviewBuild = manifest.Downloads.Count > 0;
-        return hasPreviewBuild
+        if (!hasPreviewBuild)
+        {
+            return new SiteChromeActionViewModel("Request early access", "/signup?next=/home", "primary");
+        }
+
+        return _releaseSelection.HasGuestReadableDownloads(manifest)
             ? new SiteChromeActionViewModel("Get preview build", "/downloads", "primary")
-            : new SiteChromeActionViewModel("Request early access", "/signup?next=/home", "primary");
+            : new SiteChromeActionViewModel("Sign in to download preview", "/login?next=/downloads", "primary");
     }
 
     private static string NormalizeRoute(string value)

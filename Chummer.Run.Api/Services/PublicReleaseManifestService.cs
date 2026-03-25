@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Chummer.Run.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 
 namespace Chummer.Run.Api.Services;
@@ -72,6 +71,34 @@ public sealed class PublicReleaseManifestService
         }
 
         return LoadManifest().Downloads.FirstOrDefault(item => string.Equals(item.Id, normalized, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public PublicReleaseArtifactDto? FindDownloadByPath(string? path)
+    {
+        var normalized = string.IsNullOrWhiteSpace(path) ? null : path.Trim().TrimStart('/');
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        var targetFile = Path.GetFileName(normalized.Split('?', '#')[0]);
+        if (string.IsNullOrWhiteSpace(targetFile))
+        {
+            return null;
+        }
+
+        return LoadManifest().Downloads.FirstOrDefault(item =>
+        {
+            var fileName = item.FileName;
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                var rawUrl = item.Url ?? string.Empty;
+                var withoutQuery = rawUrl.Split('?', '#')[0];
+                fileName = Path.GetFileName(withoutQuery);
+            }
+
+            return string.Equals(fileName, targetFile, StringComparison.OrdinalIgnoreCase);
+        });
     }
 
     public string? ResolveDownloadFilePath(PublicReleaseArtifactDto artifact)
@@ -173,7 +200,7 @@ public sealed class PublicReleaseManifestService
                 Arch: item.Arch,
                 Kind: item.Kind,
                 FileName: item.FileName,
-                InstallAccessClass: item.InstallAccessClass ?? InstallAccessClasses.OpenPublic))
+                InstallAccessClass: item.InstallAccessClass))
             .ToList();
 
         var status = downloads.Count > 0

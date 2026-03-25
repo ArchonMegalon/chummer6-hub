@@ -59,8 +59,9 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> LandingPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
-        var manifest = _releases.LoadManifest();
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var hasPreviewBuild = manifest.Downloads.Count > 0;
+        var guestDownloadAvailable = _releaseSelection.HasGuestReadableDownloads(manifest);
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
         var model = new LandingPageViewModel(
@@ -69,8 +70,12 @@ public sealed class PublicLandingController : Controller
             Assets: assetCatalog,
             Manifest: manifest,
             PrimaryHeroAction: new PublicLandingActionDto(
-                hasPreviewBuild ? "Get preview build" : "Request early access",
-                hasPreviewBuild ? "/downloads" : "/signup?next=/home",
+                hasPreviewBuild
+                    ? guestDownloadAvailable ? "Get preview build" : "Sign in to download preview"
+                    : "Request early access",
+                hasPreviewBuild
+                    ? guestDownloadAvailable ? "/downloads" : "/login?next=/downloads"
+                    : "/signup?next=/home",
                 "primary"),
             SecondaryHeroAction: new PublicLandingActionDto("See what works today", "/now", "secondary"),
             Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/"),
@@ -111,7 +116,7 @@ public sealed class PublicLandingController : Controller
             AvailableToday: ResolveCards(nowCards.Where(static card => string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/now"),
             Inspectable: ResolveCards(nowCards.Where(static card => !string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/now"),
             SignedInPreview: surface.RegisteredOverlays,
-            Manifest: _releases.LoadManifest());
+            Manifest: _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest()));
         return View("~/Views/PublicLanding/Now.cshtml", model);
     }
 
@@ -134,7 +139,7 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> DownloadsPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
-        var manifest = _releases.LoadManifest();
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var model = new DownloadsPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current preview, compare package types, and keep release integrity in view.", "/downloads", cancellationToken),
@@ -143,6 +148,56 @@ public sealed class PublicLandingController : Controller
             Manifest: manifest,
             ReleaseExperience: _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated));
         return View("~/Views/PublicLanding/Downloads.cshtml", model);
+    }
+
+    [HttpGet("/downloads/install/{artifactId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> DownloadDispatchPage([FromRoute] string artifactId, CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var artifact = manifest.Downloads.FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
+        if (artifact is null)
+        {
+            return NotFound();
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var dispatch = _installLinking.IssueDownload(manifest, artifact, user.UserId, subject.SubjectId);
+            var release = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
+            var option = _releaseSelection.BuildOption(manifest, artifact, authenticated: true, recommended: false);
+            var model = new DownloadDispatchPageViewModel(
+                Chrome: _chrome.BuildAuthenticatedChrome("Download handoff", "Start the installer download and keep the install linked to this account from the first launch.", "/downloads", user.DisplayName),
+                Heading: release.SignedInDispatchHeading,
+                Summary: release.SignedInDispatchSummary,
+                ArtifactTitle: option.Title,
+                ArtifactSupportLine: option.SupportLine,
+                DownloadHref: option.DirectFileHref,
+                DownloadLabel: "Start download again",
+                AccountHref: "/account#devices-access",
+                AccountLabel: "Open Devices and access",
+                HelpHref: release.InstallHelpHref,
+                HelpLabel: release.InstallHelpLabel,
+                Channel: manifest.Channel,
+                Version: manifest.Version,
+                PlatformLabel: option.PlatformLabel,
+                HeadLabel: option.HeadLabel,
+                ClaimCode: dispatch.ClaimTicket?.ClaimCode,
+                ClaimCodeExpiresAtUtc: dispatch.ClaimTicket?.ExpiresAtUtc,
+                Steps: release.SignedInDispatchSteps);
+            return View("~/Views/PublicLanding/DownloadDispatch.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString($"/downloads/install/{artifactId}")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Downloads handoff could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpGet("/participate")]

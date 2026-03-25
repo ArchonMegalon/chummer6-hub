@@ -208,12 +208,22 @@ internal sealed class PublicReleaseExperienceDocument
     public string Product { get; init; } = string.Empty;
     public string Surface { get; init; } = string.Empty;
     public int Version { get; init; }
+    public List<string>? GuestReadableChannels { get; init; }
     public string ReleaseNotesSummary { get; init; } = string.Empty;
     public string KnownIssuesLabel { get; init; } = string.Empty;
     public string KnownIssuesHref { get; init; } = string.Empty;
     public string InstallHelpLabel { get; init; } = string.Empty;
     public string InstallHelpHref { get; init; } = string.Empty;
     public string UpdatePostureSummary { get; init; } = string.Empty;
+    public string GuestGateHeading { get; init; } = string.Empty;
+    public string GuestGateSummary { get; init; } = string.Empty;
+    public string GuestGatePrimaryLabel { get; init; } = string.Empty;
+    public string GuestGatePrimaryHref { get; init; } = string.Empty;
+    public string GuestGateSecondaryLabel { get; init; } = string.Empty;
+    public string GuestGateSecondaryHref { get; init; } = string.Empty;
+    public string SignedInDispatchHeading { get; init; } = string.Empty;
+    public string SignedInDispatchSummary { get; init; } = string.Empty;
+    public List<string>? SignedInDispatchSteps { get; init; }
     public List<string>? InstallSteps { get; init; }
     public List<string>? WindowsRequirements { get; init; }
     public List<string>? LinuxRequirements { get; init; }

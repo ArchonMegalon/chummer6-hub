@@ -1,0 +1,128 @@
+@model DownloadDispatchPageViewModel
+@{
+    ViewData["Title"] = "Download handoff";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-downloads";
+    var claimExpires = Model.ClaimCodeExpiresAtUtc?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'");
+}
+
+<section class="release-stage">
+    <div class="release-stage__lead">
+        <p class="eyebrow">Signed-in download</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Summary</p>
+        <p class="release-stage__note">This handoff keeps the published installer canonical while attaching the install relationship to your account through a short-lived claim code.</p>
+    </div>
+    <div class="release-stage__integrity">
+        <span class="tag">Current release</span>
+        <p>@Model.Channel channel, version @Model.Version, @Model.PlatformLabel via @Model.HeadLabel.</p>
+    </div>
+</section>
+
+<section class="recommended-download" id="signed-in-download">
+    <article class="recommended-download__card">
+        <div class="recommended-download__copy">
+            <span class="tag">Account-aware install</span>
+            <h2>@Model.ArtifactTitle</h2>
+            <p>@Model.ArtifactSupportLine</p>
+            <div class="recommended-download__meta">
+                <span>@Model.PlatformLabel</span>
+                <span>@Model.HeadLabel</span>
+                <span>@Model.Channel channel</span>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Model.ClaimCode))
+            {
+                <div class="code-panel">
+                    <div class="code-panel__label">Install claim code</div>
+                    <div class="code-panel__value mono-receipt" id="claimCodeValue">@Model.ClaimCode</div>
+                    <p class="muted-copy">Copy this now. Chummer can use it on first launch to link this copy to your account.</p>
+                    @if (!string.IsNullOrWhiteSpace(claimExpires))
+                    {
+                        <p class="muted-copy">Expires @claimExpires.</p>
+                    }
+                    <div class="stacked-actions">
+                        <button class="button-like button-like--secondary" type="button" id="copyClaimCodeButton">Copy claim code</button>
+                    </div>
+                    <p class="status-copy" id="claimCodeNotice" hidden></p>
+                </div>
+            }
+
+            <div class="stacked-actions">
+                <a class="button-like button-like--primary" href="@Model.DownloadHref" id="startSignedInDownloadButton">@Model.DownloadLabel</a>
+                <a class="button-like button-like--secondary" href="@Model.AccountHref">@Model.AccountLabel</a>
+                <a class="button-like button-like--ghost" href="@Model.HelpHref">@Model.HelpLabel</a>
+            </div>
+        </div>
+    </article>
+</section>
+
+@if (Model.Steps.Count > 0)
+{
+    <section class="release-guidance release-guidance--detail">
+        <article class="release-guidance__item">
+            <span class="tag">First launch</span>
+            <h2>Keep this copy linked from the start</h2>
+            <ul class="trust-page-section__list">
+                @foreach (var step in Model.Steps)
+                {
+                    <li>@step</li>
+                }
+            </ul>
+        </article>
+        <article class="release-guidance__item">
+            <span class="tag tag--quiet">Need it later?</span>
+            <h2>Devices &amp; access keeps the same handoff visible</h2>
+            <p>If you close this page or miss the first launch, you can reopen your account and copy the pending install claim code from the Devices &amp; access section.</p>
+        </article>
+    </section>
+}
+
+<section class="release-footnote">
+    <p class="muted-copy">The installer bytes stay canonical for every user. The account-aware part is the short-lived claim ticket, not a personalized binary.</p>
+    <div class="stacked-actions">
+        <a class="button-like button-like--secondary" href="@Model.AccountHref">@Model.AccountLabel</a>
+        <a class="button-like button-like--ghost" href="/downloads">Back to downloads</a>
+    </div>
+</section>
+
+<iframe id="signedInDownloadFrame" title="Signed-in download" hidden></iframe>
+
+@section Scripts {
+<script>
+(() => {
+  const ui = window.ChummerUi;
+  const downloadHref = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DownloadHref));
+  const downloadButton = document.getElementById("startSignedInDownloadButton");
+  const downloadFrame = document.getElementById("signedInDownloadFrame");
+  const copyButton = document.getElementById("copyClaimCodeButton");
+  const claimCodeValue = document.getElementById("claimCodeValue");
+  const claimCodeNotice = document.getElementById("claimCodeNotice");
+
+  const startDownload = () => {
+    if (!downloadFrame || !downloadHref) return;
+    downloadFrame.setAttribute("src", downloadHref);
+  };
+
+  if (downloadButton) {
+    downloadButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      startDownload();
+    });
+  }
+
+  window.setTimeout(startDownload, 250);
+
+  if (copyButton && claimCodeValue && ui?.copyToClipboard) {
+    copyButton.addEventListener("click", async () => {
+      try {
+        await ui.copyToClipboard(claimCodeValue.textContent || "", copyButton, "Copied");
+        ui.setNotice(claimCodeNotice, "Claim code copied.");
+      } catch (error) {
+        ui.setNotice(claimCodeNotice, ui.describeError(error, "Claim code copy failed. Copy it manually from the code panel."), true);
+      }
+    });
+  }
+})();
+</script>
+}

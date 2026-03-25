@@ -4,6 +4,7 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads";
     var release = Model.ReleaseExperience;
+    var guestGateRequired = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
 }
 
 <section class="release-stage">
@@ -11,8 +12,15 @@
         <p class="eyebrow">Downloads</p>
         <h1 class="page-title">Install the current preview</h1>
         <p class="page-copy">@Model.Manifest.Channel channel, version @Model.Manifest.Version, published @Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd").</p>
-        <p class="release-stage__note">Start with the recommended installer for your platform. Alternative desktop heads and manual packages stay underneath when you explicitly need them.</p>
-        @if (Model.Chrome.Authenticated)
+        @if (guestGateRequired)
+        {
+            <p class="release-stage__note">@release.GuestGateSummary</p>
+        }
+        else
+        {
+            <p class="release-stage__note">Start with the recommended installer for your platform. Alternative desktop heads and manual packages stay underneath when you explicitly need them.</p>
+        }
+        @if (Model.Chrome.Authenticated || guestGateRequired)
         {
             <p class="release-stage__note">Signed-in downloads keep a receipt and an install-link handoff without changing the published bytes.</p>
         }
@@ -60,8 +68,8 @@ else
     <section class="recommended-download" id="recommended-download">
         <article class="recommended-download__card">
             <div class="recommended-download__copy">
-                <span class="tag">Recommended</span>
-                <h2>@release.Recommended.ActionLabel</h2>
+                <span class="tag">@(guestGateRequired ? release.GuestGateHeading : "Recommended")</span>
+                <h2>@release.Recommended.Title</h2>
                 <p>@release.Recommended.SupportLine</p>
                 <div class="recommended-download__meta">
                     <span>@release.Recommended.PlatformLabel</span>
@@ -73,9 +81,18 @@ else
                     }
                 </div>
                 <div class="stacked-actions">
-                    <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
-                    <a class="button-like button-like--secondary" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
-                    <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
+                    @if (guestGateRequired)
+                    {
+                        <a class="button-like button-like--primary" href="@release.GuestGatePrimaryHref">@release.GuestGatePrimaryLabel</a>
+                        <a class="button-like button-like--secondary" href="@release.GuestGateSecondaryHref">@release.GuestGateSecondaryLabel</a>
+                        <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                    }
+                    else
+                    {
+                        <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
+                        <a class="button-like button-like--secondary" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                        <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
+                    }
                 </div>
             </div>
         </article>
