@@ -1,14 +1,14 @@
 {
-  "version": "run-20260325-081445",
-  "channel": "preview",
-  "publishedAt": "2026-03-25T08:16:56Z",
+  "version": "unpublished",
+  "channel": "docker",
+  "publishedAt": "2026-03-25T14:40:15Z",
   "downloads": [
     {
       "id": "avalonia-linux-x64-installer",
       "platform": "Avalonia Desktop Linux X64 Installer",
       "url": "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
-      "sha256": "75081156011dc38457694bb33f1b1c1eacc38b3691fa14dafd3b77cb8c0bd0a7",
-      "sizeBytes": 33987294,
+      "sha256": "c61d176def02a0ea5ef9d06df691e39dc1dd8bb07313b7490fbce01ea384b817",
+      "sizeBytes": 7960268,
       "format": "deb",
       "flavor": "installer"
     },
@@ -16,8 +16,8 @@
       "id": "blazor-desktop-linux-x64-installer",
       "platform": "Blazor Desktop Linux X64 Installer",
       "url": "/downloads/files/chummer-blazor-desktop-linux-x64-installer.deb",
-      "sha256": "b36624a7b8a5a1b4e06cac6ead3040d86db542dd8dfe5694252d3b5cc54e6f56",
-      "sizeBytes": 36411366,
+      "sha256": "2893da622ededca373cb2171ea85d2da8f523e38b266a2cd0e1612234abb6999",
+      "sizeBytes": 1272354,
       "format": "deb",
       "flavor": "installer"
     },

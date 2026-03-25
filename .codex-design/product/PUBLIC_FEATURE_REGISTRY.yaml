@@ -40,6 +40,31 @@ cards:
     proof_note: "Proof: continuity survives device drift without hiding the current product limits."
     pain: Carry the same dossier and session state across devices without losing trust.
     payoff: Local-first continuity keeps the table moving even when the network does not cooperate.
+  - id: publish_grounded_artifacts
+    bucket: start_here
+    title: Publish
+    summary: Turn grounded dossiers, packets, and primers into finished artifacts with provenance.
+    href: /artifacts
+    badge: Workflow
+    audience: public
+    image_family: prop_cluster
+    asset_slot: lane_creator
+    action_label: See creator outputs
+    proof_note: "Proof: publication and artifact lanes are defined around manifests, previews, and provenance rather than copy-paste folklore."
+    pain: Mission packets and creator outputs are usually manual, fragile, and hard to trust.
+    payoff: Finished artifacts stay tied to manifests, previews, and receipts.
+  - id: improve_the_product
+    bucket: start_here
+    title: Improve
+    summary: Report pain, follow closure, and see whether the product is actually getting better.
+    href: /help
+    badge: Workflow
+    audience: public
+    image_family: archive_stair
+    action_label: Open support and feedback
+    proof_note: "Proof: support, feedback, and release truth are meant to close the loop back to users rather than disappear into a private inbox."
+    pain: Reporting a problem is useless if the product cannot route, close, and explain the outcome honestly.
+    payoff: Improvement becomes a visible loop instead of a one-way complaint box.
   - id: deterministic_truth
     bucket: why_trust_it
     title: Deterministic rules truth

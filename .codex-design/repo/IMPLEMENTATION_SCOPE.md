@@ -2,7 +2,7 @@
 
 ## Mission
 
-`chummer6-hub` owns hosted orchestration plus the community/accounting control plane for Chummer6.
+`chummer6-hub` owns the relationship/orchestration plane for Chummer6 plus the initial bounded home of campaign and product-control domains.
 
 ## Owns
 
@@ -13,11 +13,13 @@
 * generic groups, memberships, join codes, and boost codes
 * sponsorship / participation UX for Fleet premium burst lanes
 * fact ledger, reward journal, and entitlement journal for community participation
+* campaign spine truth for runner dossier, crew, campaign, run, scene, objective, and replay-safe continuity
 * leaderboards, quests, badges, and community-side entitlement views
 * the `chummer.run` public landing, proof shelf, public status, and signed-in home overlays
 * registry-backed downloads, channel selection, and install guidance UX
 * optional entitlement brokering for gated desktop channels
 * support intake, ticket threads, and private case truth
+* product-control packet truth, closure notices, and health/decision projections
 * knowledge/help surfaces, known-issue pages, and human escalation flows
 * survey bridges and later grounded support-assistant handoff layers
 * play API aggregation and hosted session coordination
@@ -44,6 +46,8 @@ Canonical hosted package plane:
 
 * `Chummer.Play.Contracts`
 * `Chummer.Run.Contracts`
+* `Chummer.Campaign.Contracts`
+* `Chummer.Control.Contracts`
 
 Mixed contract planes are temporary debt, not acceptable end state.
 
@@ -65,10 +69,22 @@ Registry and media execution ownership are physically out of this repo.
 
 The remaining work is future product depth and physical cleanup, not pretending hub still owns every hosted surface or still lacks authority proof.
 Participation UX for premium burst lanes belongs here, but the resulting Codex auth cache stays lane-local on Fleet rather than being stored in hub identity or hub databases.
+Campaign continuity and product control may start here as bounded contexts, but they must stay explicit enough that later extraction remains possible if the domains outgrow Hub.
 
 The first-class sponsor/consent/device-auth/lane/receipt lifecycle is defined centrally in `products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md`.
 The first-class linked-identity and channel-linking posture is defined centrally in `products/chummer/IDENTITY_AND_CHANNEL_LINKING_MODEL.md`.
 Desktop download and install guidance may live here, but the public update feed and promoted desktop head truth stay in `chummer6-hub-registry`.
+
+## Bounded-context rule
+
+Hub currently carries three adjacent but distinct bounded contexts:
+
+1. relationship plane: identity, users, groups, entitlements, participation, and delivery
+2. campaign spine: runner dossier, crew, campaign, run, scene, objective, and continuity truth
+3. product control: support cases, signal packets, closure notices, and control-plane projections
+
+Those contexts may share a repo for now.
+They must not collapse back into one unnamed hosted blob.
 
 ## Support plane rule
 
@@ -92,7 +108,7 @@ Build order for the next serious Hub wave:
 5. Fleet receipt ingest and sponsor-session projections
 6. leaderboards, badges, quests, and entitlement-backed perks
 
-New booster-facing UX must not outrun that shared backbone.
+New guided-contribution UX must not outrun that shared backbone.
 The point is to make boosting the first public use case of a reusable community platform, not a one-off side feature.
 
 ## Community modeling rule
@@ -106,7 +122,7 @@ Canonical Hub concepts:
 * entitlement: durable user or group product right
 * sponsor session: bounded premium-burst sponsorship lifecycle
 
-User accounts must not collapse into raw identity subjects, and group types must stay generic enough for `booster`, `campaign`, `gm_circle`, `creator_team`, `guild`, and future org-like surfaces.
+User accounts must not collapse into raw identity subjects, and group types must stay generic enough for `guided_contribution`, `campaign`, `gm_circle`, `creator_team`, `guild`, and future org-like surfaces.
 
 Linked identities and linked channels are separate records:
 
@@ -142,7 +158,7 @@ Rewards must be derived from validated Fleet contribution receipts, not from mer
 * leaderboards, rewards, and entitlements
 * gated desktop-channel guidance when entitlement-backed download and install policy matters
 
-That initial product shell can be server-rendered and thin, but it must exist here before Fleet grows more booster-specific product behavior.
+That initial product shell can be server-rendered and thin, but it must exist here before Fleet grows more guided-contribution-specific product behavior.
 
 ## Fleet boundary handoff
 

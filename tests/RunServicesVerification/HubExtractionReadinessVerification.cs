@@ -49,7 +49,10 @@ internal static class HubExtractionReadinessVerification
             .Select(static value => value!)
             .ToArray();
 
-        VerificationAssert.Equal(0, projectReferences.Length, "Chummer.Run.Registry should stop source-owning registry/publication DTOs through project references.");
+        VerificationAssert.True(
+            projectReferences.Length == 1
+            && string.Equals(projectReferences[0], @"..\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj", StringComparison.Ordinal),
+            "Chummer.Run.Registry should consume registry/publication DTOs through the owner-repo contracts project.");
         var assemblyReferences = registryProject
             .Descendants("Reference")
             .Select(static element => new
@@ -61,10 +64,8 @@ internal static class HubExtractionReadinessVerification
             .ToArray();
 
         VerificationAssert.True(
-            assemblyReferences.Any(static entry =>
-                string.Equals(entry.Include, "Chummer.Hub.Registry.Contracts", StringComparison.Ordinal)
-                && string.Equals(entry.HintPath, @"..\Chummer.Hub.Registry.Contracts\bin\$(Configuration)\net10.0\Chummer.Hub.Registry.Contracts.dll", StringComparison.Ordinal)),
-            "Chummer.Run.Registry should consume registry/publication DTOs through the sibling hub-registry owner package.");
+            assemblyReferences.All(static entry => !string.Equals(entry.Include, "Chummer.Hub.Registry.Contracts", StringComparison.Ordinal)),
+            "Chummer.Run.Registry must not fall back to a binary HintPath seam for owner-repo registry/publication contracts.");
         VerificationAssert.True(
             assemblyReferences.All(static entry => !string.Equals(entry.Include, "Chummer.Run.Contracts", StringComparison.Ordinal)),
             "Chummer.Run.Registry must not keep a local Chummer.Run.Contracts assembly seam for registry/publication ownership.");

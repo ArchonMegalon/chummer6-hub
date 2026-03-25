@@ -31,7 +31,7 @@ Cleared 2026-03-19.
 ### BLK-002 — package canon is not fully settled
 
 Cleared 2026-03-19.
-`Chummer.Engine.Contracts`, `Chummer.Play.Contracts`, and `Chummer.Run.Contracts` now have executable owner-repo boundaries, while `Chummer.Ui.Kit`, `Chummer.Hub.Registry.Contracts`, `Chummer.Run.Registry`, `Chummer.Media.Contracts`, and `Chummer.Media.Factory.Runtime` are already package-clean.
+`Chummer.Engine.Contracts`, `Chummer.Play.Contracts`, and `Chummer.Run.Contracts` now have executable owner-repo boundaries, while `Chummer.Ui.Kit`, `Chummer.Hub.Registry.Contracts`, `Chummer.Run.Registry`, `Chummer.Media.Contracts`, and `Chummer.Media.Factory.Runtime` are already package-clean. The new `Chummer.Campaign.Contracts` and `Chummer.Control.Contracts` families are an additive middle-layer wave, not a re-opened foundational package blocker.
 
 ### BLK-003 — session semantic duplication risk
 

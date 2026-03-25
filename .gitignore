@@ -218,6 +218,12 @@ FakesAssemblies/
 # Mac Specific Generated Files
 .DS_Store
 
+# Local release/smoke workdirs
+/.tmp-e2e-linux/
+/.tmp-e2e-linux-proof/
+/.tmp-e2e-linux-blazor/
+/.tmp-e2e-linux-blazor-proof/
+
 # Local agent runtime state
 AGENT_MEMORY.md
 WORK_QUEUE.md

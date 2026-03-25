@@ -1416,15 +1416,15 @@ async Task VerifyPublicLandingProjectionAsync()
         })
         .Build();
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
-    var landing = new PublicLandingService(configuration, loggerFactory.CreateLogger<PublicLandingService>());
-    var navigation = new PublicNavigationService(configuration);
-    var releases = new PublicReleaseManifestService(configuration);
     var canon = new PublicCanonFileLoader(configuration);
+    var actions = new PublicActionResolver();
+    var landing = new PublicLandingService(canon, actions);
+    var navigation = new PublicNavigationService(canon);
+    var releases = new PublicReleaseManifestService(configuration);
     var releaseSelection = new ReleaseSelectionService(canon);
     var chrome = new HubPageChromeService(landing, navigation, releases, releaseSelection);
     var progress = new PublicProgressService(configuration, loggerFactory.CreateLogger<PublicProgressService>());
     var trustContent = new PublicTrustContentService(canon);
-    var actions = new PublicActionResolver();
     var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
     var installLinking = new InstallLinkingService(installLinkingStore);
     var surface = landing.LoadSurface();
@@ -1478,6 +1478,10 @@ async Task VerifyPublicLandingProjectionAsync()
             HttpContext = new DefaultHttpContext()
         }
     };
+    var authenticatedLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, chrome, trustContent, loggerFactory.CreateLogger<PublicLandingController>())
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
     var downloadsController = new DownloadsCompatibilityController(
         releases,
         releaseSelection,
@@ -1512,10 +1516,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var landingView = await controller.LandingPage(CancellationToken.None) as ViewResult;
     var landingModel = landingView?.Model as LandingPageViewModel;
     Assert(landingModel is not null, "landing page should render through the MVC view layer.");
-    Assert(string.Equals(landingModel!.Surface.Headline, "Shadowrun that shows its work.", StringComparison.Ordinal), "landing page should render the canonical headline");
-    Assert(landingModel.Workflows.Any(static card => string.Equals(card.Href, "/what-is-chummer", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
+    Assert(string.Equals(landingModel!.Surface.Headline, "Shadowrun rules truth, with receipts.", StringComparison.Ordinal), "landing page should render the canonical headline");
+    Assert(landingModel.Workflows.Any(static card => string.Equals(card.Action.Href, "/downloads", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
     Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Href, "/signup?next=/home", StringComparison.Ordinal)), "landing page chrome should expose create account beside sign in");
-    Assert(landingModel.Lanes.Any(static card => string.Equals(card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
+    Assert(landingModel.Lanes.Any(static card => string.Equals(card.Card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
     Assert(!string.IsNullOrWhiteSpace(landingModel.Assets.BySlot("section_hero")?.PosterUrl), "landing hero should use a non-empty media asset.");
 
     var storyView = await controller.ProductStoryPage(CancellationToken.None) as ViewResult;
@@ -1529,7 +1533,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var authenticatedDownloadResult = await downloadsController.DownloadArtifact("smoke-poc-linux-x64", CancellationToken.None);
     var authenticatedRedirect = authenticatedDownloadResult as RedirectResult;
     Assert(authenticatedRedirect is not null && string.Equals(authenticatedRedirect.Url, "/downloads/install/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in compatibility downloads should route through the install handoff.");
-    var dispatchView = await controller.DownloadDispatchPage("smoke-poc-linux-x64", CancellationToken.None) as ViewResult;
+    var dispatchView = await authenticatedLandingController.DownloadDispatchPage("smoke-poc-linux-x64", CancellationToken.None) as ViewResult;
     var dispatchModel = dispatchView?.Model as DownloadDispatchPageViewModel;
     Assert(dispatchModel is not null && string.Equals(dispatchModel.DownloadHref, "/downloads/file/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in download handoff should expose the canonical file route.");
     Assert(!string.IsNullOrWhiteSpace(dispatchModel?.ClaimCode), "signed-in download handoff should expose a claim code.");
@@ -1594,13 +1598,13 @@ async Task VerifyPublicLandingProjectionAsync()
 
     var artifactsView = await controller.ArtifactsPage(CancellationToken.None) as ViewResult;
     var artifactsModel = artifactsView?.Model as ShelfPageViewModel;
-    Assert(artifactsModel is not null && artifactsModel.Items.Any(static card => string.Equals(card.Href, "/horizons#horizon-runsite", StringComparison.Ordinal)), "artifacts shelf should point teaser cards at deliberate related detail pages");
+    Assert(artifactsModel is not null && artifactsModel.Items.Any(static card => string.Equals(card.Action.Href, "/horizons#horizon-runsite", StringComparison.Ordinal)), "artifacts shelf should point teaser cards at deliberate related detail pages");
 
     var participateView = await controller.ParticipatePage(CancellationToken.None) as ViewResult;
     var participateModel = participateView?.Model as ParticipatePageViewModel;
     Assert(participateModel is not null, "participate page should render through the MVC view layer.");
-    Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal)), "participate page should route the booster lane through login");
-    Assert(!participateModel.PublicLane.Any(static card => card.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
+    Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal)), "participate page should preserve the booster guest-login handoff.");
+    Assert(!participateModel.PublicLane.Any(static card => card.Card.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
 
     var homeResult = await controller.HomePage(CancellationToken.None);
     var homeRedirect = homeResult as RedirectResult;
@@ -3290,10 +3294,11 @@ HttpResponseMessage JsonResponse<T>(T payload, HttpStatusCode statusCode = HttpS
 
 HubPageChromeService CreateChromeService(IConfiguration configuration, ILoggerFactory loggerFactory)
 {
-    var landing = new PublicLandingService(configuration, loggerFactory.CreateLogger<PublicLandingService>());
-    var navigation = new PublicNavigationService(configuration);
-    var releases = new PublicReleaseManifestService(configuration);
     var canon = new PublicCanonFileLoader(configuration);
+    var actions = new PublicActionResolver();
+    var landing = new PublicLandingService(canon, actions);
+    var navigation = new PublicNavigationService(canon);
+    var releases = new PublicReleaseManifestService(configuration);
     var releaseSelection = new ReleaseSelectionService(canon);
     return new HubPageChromeService(landing, navigation, releases, releaseSelection);
 }

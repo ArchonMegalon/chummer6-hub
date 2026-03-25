@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <Reference Include="Chummer.Hub.Registry.Contracts">
+      <HintPath>..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\bin\$(Configuration)\net10.0\Chummer.Hub.Registry.Contracts.dll</HintPath>
+    </Reference>
     <Reference Include="Chummer.Play.Contracts">
       <HintPath>..\Chummer.Play.Contracts\bin\$(Configuration)\net10.0\Chummer.Play.Contracts.dll</HintPath>
     </Reference>

@@ -32,6 +32,9 @@ sections:
       - question: Do I need to join guided contribution to help?
         required: true
         answer: No. Public bug reports, guide feedback, and future-feature suggestions still matter. Guided contribution is optional and additive, not the price of admission.
+      - question: Should I use the public issue tracker for a crash?
+        required: true
+        answer: Use the in-product private crash lane when diagnostics or logs are involved. Public issues stay best for public-safe reproducible bugs, guide feedback, and future-feature suggestions.
       - question: Why are some things preview-only?
         required: true
         answer: Because some surfaces are real enough to try while their support, release, or compatibility story is still catching up. Preview means shape can move, not that the product is pretending.
