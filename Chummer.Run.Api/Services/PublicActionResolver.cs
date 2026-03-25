@@ -10,6 +10,7 @@ public sealed class PublicActionResolver
         "open",
         "open the artifact detail",
         "open the roadmap detail",
+        "read the linked detail",
         "read more",
         "learn more",
         "continue"
@@ -40,6 +41,21 @@ public sealed class PublicActionResolver
         return new ResolvedPublicActionViewModel(label, href, ResolveTone(primaryCard), external, IsSameRoute(href, currentPath));
     }
 
+    public ResolvedPublicActionViewModel ResolveDetailPrimaryAction(PublicFeatureCardDto card, bool authenticated, string currentPath)
+    {
+        var detailCard = card with
+        {
+            Href = card.DetailPrimaryHref ?? card.Href,
+            DetailRoute = null,
+            ActionLabel = card.DetailPrimaryLabel ?? card.ActionLabel
+        };
+
+        var href = ResolveHref(detailCard, authenticated);
+        var label = ResolveLabel(detailCard, href);
+        var external = Uri.TryCreate(href, UriKind.Absolute, out _);
+        return new ResolvedPublicActionViewModel(label, href, ResolveTone(detailCard), external, IsSameRoute(href, currentPath));
+    }
+
     public void ValidateActionableCard(PublicFeatureCardDto card, IReadOnlySet<string> allowedRoutes)
     {
         var routeCandidates = new[]
@@ -48,7 +64,8 @@ public sealed class PublicActionResolver
             card.DetailRoute,
             card.FallbackRoute,
             card.GuestHref,
-            card.RegisteredHref
+            card.RegisteredHref,
+            card.DetailPrimaryHref
         };
 
         if (routeCandidates.All(string.IsNullOrWhiteSpace))
@@ -71,6 +88,7 @@ public sealed class PublicActionResolver
         }
 
         ValidateLabel(card.Id, "action_label", card.ActionLabel);
+        ValidateLabel(card.Id, "detail_primary_label", card.DetailPrimaryLabel);
         ValidateLabel(card.Id, "fallback_label", card.FallbackLabel);
     }
 
@@ -93,9 +111,18 @@ public sealed class PublicActionResolver
 
         if (Uri.TryCreate(href, UriKind.Absolute, out _))
         {
-            return !string.IsNullOrWhiteSpace(card.FallbackLabel)
-                ? card.FallbackLabel!
-                : "Read the linked detail";
+            if (!string.IsNullOrWhiteSpace(card.FallbackLabel))
+            {
+                return card.FallbackLabel!;
+            }
+
+            return card.Bucket switch
+            {
+                "coming_next" => "Read the horizon brief",
+                "featured_artifacts" => "Open the external release brief",
+                "supporting_reads" => "Read the external guide",
+                _ => "Open the linked brief"
+            };
         }
 
         return card.Bucket switch

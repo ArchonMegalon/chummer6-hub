@@ -15,6 +15,10 @@
     var campaignCount = Model.CampaignSpine.Campaigns.Count;
     var communityOpsCount = Model.CampaignSpine.CommunityOperations.Count;
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
+    var showCampaignSection = dossierCount > 0 || campaignCount > 0 || restoreConflicts > 0;
+    var showTeamsSection = communityOpsCount > 0;
+    var showChannelsSection = telegramChannel is not null;
+    var showParticipationSection = Model.Experience.OnboardingCompleted || laneInterests.Count > 0 || Model.Experience.FollowHorizons || Model.Experience.BetaInterest;
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -79,12 +83,24 @@
             <a href="#sign-in">Primary sign-in</a>
             <a href="#recovery">Recovery email</a>
             <a href="#support">Support</a>
-            <a href="#campaigns">Campaign spine</a>
-            <a href="#community-ops">Community operator</a>
             <a href="#devices-access">Devices &amp; access</a>
-            <a href="#channels">Linked channels</a>
             <a href="#privacy">Privacy</a>
-            <a href="#participation">Participation</a>
+            @if (showCampaignSection)
+            {
+                <a href="#campaigns">Campaigns &amp; dossiers</a>
+            }
+            @if (showTeamsSection)
+            {
+                <a href="#community-ops">Teams &amp; permissions</a>
+            }
+            @if (showChannelsSection)
+            {
+                <a href="#channels">Linked channels</a>
+            }
+            @if (showParticipationSection)
+            {
+                <a href="#participation">Participation</a>
+            }
         </aside>
 
         <div class="account-pane">
@@ -155,6 +171,8 @@
                 </form>
             </section>
 
+            @if (showChannelsSection)
+            {
             <section id="channels" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Linked channels</h2>
@@ -173,6 +191,7 @@
                     <p id="telegramStatusNotice" class="muted-copy" hidden></p>
                 </form>
             </section>
+            }
 
             <section id="support" class="settings-section">
                 <div class="settings-section__header">
@@ -341,7 +360,11 @@
                             {
                                 <div class="settings-summary-row">
                                     <span>@ticket.ArtifactLabel</span>
-                                    <strong><code class="mono-receipt">@ticket.ClaimCode</code> until @ticket.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                                    <strong>
+                                        <code class="mono-receipt" id="claim-code-@ticket.ClaimCode">@ticket.ClaimCode</code>
+                                        until @ticket.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC
+                                        <button class="button-like button-like--ghost" type="button" data-copy-source="claim-code-@ticket.ClaimCode">Copy</button>
+                                    </strong>
                                 </div>
                             }
                         </div>
@@ -353,9 +376,11 @@
                 </div>
             </section>
 
+            @if (showCampaignSection)
+            {
             <section id="campaigns" class="settings-section">
                 <div class="settings-section__header">
-                    <h2>Campaign spine</h2>
+                    <h2>Campaigns &amp; dossiers</h2>
                     <p>Living dossiers, crew context, campaign continuity, and restore posture stay tied together here instead of falling back to one-off build files.</p>
                 </div>
                 <div class="settings-summary-list">
@@ -413,11 +438,14 @@
                     </details>
                 }
             </section>
+            }
 
+            @if (showTeamsSection)
+            {
             <section id="community-ops" class="settings-section">
                 <div class="settings-section__header">
-                    <h2>Community operator</h2>
-                    <p>Organizer and operator work stays subordinate to campaign truth: memberships, visibility, capabilities, and active sponsor pressure remain visible without becoming the product core.</p>
+                    <h2>Teams &amp; permissions</h2>
+                    <p>Organizer work stays subordinate to the customer path: group memberships, visibility, and permissions stay visible only when this account actually uses them.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -446,6 +474,7 @@
                     </div>
                 }
             </section>
+            }
 
             <section id="privacy" class="settings-section">
                 <div class="settings-section__header">
@@ -464,6 +493,8 @@
                 </div>
             </section>
 
+            @if (showParticipationSection)
+            {
             <section id="participation" class="settings-section">
                 <div class="settings-section__header">
                     <h2>Participation</h2>
@@ -481,6 +512,7 @@
                     <p id="experienceStatusNotice" class="muted-copy" hidden></p>
                 </form>
             </section>
+            }
 
             <section class="settings-section">
                 <div class="settings-section__header">

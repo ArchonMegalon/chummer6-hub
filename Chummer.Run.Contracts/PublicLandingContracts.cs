@@ -90,6 +90,8 @@ public sealed record PublicFeatureCardDto(
     bool ExternalOk = false,
     bool SelfLinkAllowed = false,
     string? ActionLabel = null,
+    string? DetailPrimaryHref = null,
+    string? DetailPrimaryLabel = null,
     string? ProofNote = null,
     string? MicroProof = null,
     string? Pain = null,

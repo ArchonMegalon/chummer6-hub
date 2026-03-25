@@ -3,6 +3,31 @@
     ViewData["Title"] = "What Is Real Now";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-now";
+    static string NormalizeRoute(string href)
+    {
+        var trimmed = (href ?? string.Empty).Trim();
+        var hash = trimmed.IndexOf('#');
+        if (hash >= 0)
+        {
+            trimmed = trimmed[..hash];
+        }
+
+        var query = trimmed.IndexOf('?');
+        if (query >= 0)
+        {
+            trimmed = trimmed[..query];
+        }
+
+        return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
+    }
+
+    var proofTargets = Model.ProofModules
+        .Select(card => NormalizeRoute(card.Action.Href))
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var supportingProof = Model.AvailableToday
+        .Concat(Model.Inspectable)
+        .Where(card => !proofTargets.Contains(NormalizeRoute(card.Action.Href)))
+        .ToArray();
 }
 
 <section class="evidence-header">
@@ -61,38 +86,18 @@
 <section class="evidence-wall">
     <article class="evidence-group">
         <div class="evidence-group__header">
-            <span class="readiness-tag">Live now</span>
-            <h2>Available today</h2>
+            <span class="readiness-tag">Supporting proof</span>
+            <h2>Release and proof surfaces around the core loop</h2>
         </div>
         <div class="evidence-row-list">
-            @foreach (var card in Model.AvailableToday)
+            @foreach (var card in supportingProof)
             {
                 <article class="evidence-row" id="@card.Card.Id.Replace('_', '-')">
                     <div class="evidence-row__copy">
                         <h3>@card.Card.Title</h3>
                         <p>@card.Card.Summary</p>
                     </div>
-                    <span class="readiness-tag">@card.Card.Badge</span>
-                    <a class="button-like button-like--ghost" href="@card.Action.Href">@card.Action.Label</a>
-                </article>
-            }
-        </div>
-    </article>
-
-    <article class="evidence-group">
-        <div class="evidence-group__header">
-            <span class="readiness-tag tag--amber">Inspectable</span>
-            <h2>Inspectable</h2>
-        </div>
-        <div class="evidence-row-list">
-            @foreach (var card in Model.Inspectable)
-            {
-                <article class="evidence-row" id="@card.Card.Id.Replace('_', '-')">
-                    <div class="evidence-row__copy">
-                        <h3>@card.Card.Title</h3>
-                        <p>@card.Card.Summary</p>
-                    </div>
-                    <span class="readiness-tag tag--amber">@card.Card.Badge</span>
+                    <span class="readiness-tag @(string.Equals(card.Card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--amber")">@card.Card.Badge</span>
                     <a class="button-like button-like--ghost" href="@card.Action.Href">@card.Action.Label</a>
                 </article>
             }

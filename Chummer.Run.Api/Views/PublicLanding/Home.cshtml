@@ -77,47 +77,50 @@
             </article>
         </div>
 
-        <section class="home-stream">
-            <div class="home-stream__column">
-                <div class="home-stream__lead">
-                    <p class="eyebrow">What works now</p>
-                    <h2 class="home-stream__title">What you can use right now</h2>
+        @if (!showOnboarding)
+        {
+            <section class="home-stream">
+                <div class="home-stream__column">
+                    <div class="home-stream__lead">
+                        <p class="eyebrow">What works now</p>
+                        <h2 class="home-stream__title">What you can use right now</h2>
+                    </div>
+                    <div class="app-rail">
+                        @foreach (var card in Model.NowRail)
+                        {
+                            <article class="app-rail__item">
+                                <span class="tag">@card.Card.Badge</span>
+                                <div class="app-rail__copy">
+                                    <h3>@card.Card.Title</h3>
+                                    <p>@card.Card.Summary</p>
+                                </div>
+                                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                            </article>
+                        }
+                    </div>
                 </div>
-                <div class="app-rail">
-                    @foreach (var card in Model.NowRail)
-                    {
-                        <article class="app-rail__item">
-                            <span class="tag">@card.Card.Badge</span>
-                            <div class="app-rail__copy">
-                                <h3>@card.Card.Title</h3>
-                                <p>@card.Card.Summary</p>
-                            </div>
-                            <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
-                        </article>
-                    }
-                </div>
-            </div>
 
-            <div class="home-stream__column">
-                <div class="home-stream__lead">
-                    <p class="eyebrow">Roadmap</p>
-                    <h2 class="home-stream__title">What to keep an eye on</h2>
+                <div class="home-stream__column">
+                    <div class="home-stream__lead">
+                        <p class="eyebrow">Roadmap</p>
+                        <h2 class="home-stream__title">What to keep an eye on</h2>
+                    </div>
+                    <div class="app-rail">
+                        @foreach (var card in Model.HorizonRail)
+                        {
+                            <article class="app-rail__item">
+                                <span class="tag tag--amber">@card.Card.Badge</span>
+                                <div class="app-rail__copy">
+                                    <h3>@card.Card.Title</h3>
+                                    <p>@card.Card.Summary</p>
+                                </div>
+                                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                            </article>
+                        }
+                    </div>
                 </div>
-                <div class="app-rail">
-                    @foreach (var card in Model.HorizonRail)
-                    {
-                        <article class="app-rail__item">
-                            <span class="tag tag--amber">@card.Card.Badge</span>
-                            <div class="app-rail__copy">
-                                <h3>@card.Card.Title</h3>
-                                <p>@card.Card.Summary</p>
-                            </div>
-                            <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
-                        </article>
-                    }
-                </div>
-            </div>
-        </section>
+            </section>
+        }
     </div>
 
     <aside class="home-dashboard__side">
@@ -127,12 +130,15 @@
             <p>Sign-in, recovery, devices, and access rights stay together so the account behaves like a product setting, not a worksheet.</p>
             <a class="button-like button-like--ghost" href="/account">Open account</a>
         </section>
-        <section class="app-side-card">
-            <p class="eyebrow">Optional</p>
-            <h2>Contribute later if you want to</h2>
-            <p>Guided contribution stays available, but it sits behind the customer path instead of competing with setup, install, and recovery.</p>
-            <a class="button-like button-like--secondary" href="/participate/codex">Open guided contribution</a>
-        </section>
+        @if (!showOnboarding && (claimedInstallations > 0 || activeAccessRights > 0))
+        {
+            <section class="app-side-card">
+                <p class="eyebrow">Optional</p>
+                <h2>Contribute later if you want to</h2>
+                <p>Guided contribution stays available, but it sits behind setup, install, and recovery instead of competing with them.</p>
+                <a class="button-like button-like--secondary" href="/participate/codex">Open guided contribution</a>
+            </section>
+        }
         <section class="app-side-card">
             <p class="eyebrow">Help</p>
             <h2>Need support or policy?</h2>

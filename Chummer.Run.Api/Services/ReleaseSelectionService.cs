@@ -302,7 +302,7 @@ public sealed class ReleaseSelectionService
 
     private static string AlternativeSupport(PublicReleaseArtifactDto download)
         => IsInstaller(download)
-            ? $"Alternative desktop head for {PlatformLabel(download)}. Use this only when you explicitly want this runtime path."
+            ? $"Alternative desktop build for {PlatformLabel(download)}. Use this only when support sends you to a different build on the same platform."
             : $"Manual package for {PlatformLabel(download)}. Use this only for advanced or support-directed install work.";
 
     private static string SupportLine(PublicReleaseArtifactDto download, bool authenticated, string accessClass, bool recommended)
@@ -368,8 +368,8 @@ public sealed class ReleaseSelectionService
     private static string HeadLabel(PublicReleaseArtifactDto download)
         => download.Head?.ToLowerInvariant() switch
         {
-            "avalonia" => "Avalonia desktop head",
-            "blazor-desktop" => "Blazor desktop head",
+            "avalonia" => IsInstaller(download) ? "Recommended desktop build" : "Recommended desktop package",
+            "blazor-desktop" => IsInstaller(download) ? "Alternative desktop build" : "Alternative desktop package",
             _ => IsInstaller(download) ? "Recommended desktop install" : "Manual package"
         };
 

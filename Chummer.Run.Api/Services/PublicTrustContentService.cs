@@ -50,6 +50,7 @@ public sealed class PublicTrustContentService
                    ?? throw new InvalidOperationException($"public trust content is missing trust page '{id}'.");
 
         return new TrustPageViewModel(
+            PageId: id,
             Chrome: chrome,
             Eyebrow: RequireText(page.Eyebrow, $"trust page '{id}' eyebrow"),
             Heading: RequireText(page.Heading, $"trust page '{id}' heading"),
@@ -62,7 +63,10 @@ public sealed class PublicTrustContentService
                     RequireText(section.Body, $"trust page '{id}' section body"),
                     section.Bullets))
                 .ToArray(),
-            Actions: BuildActions(page.Actions));
+            Actions: BuildActions(page.Actions),
+            EffectiveDate: page.EffectiveDate,
+            UpdatedDate: page.UpdatedDate,
+            SummaryPoints: page.SummaryPoints);
     }
 
     private IReadOnlyList<TrustPageActionViewModel> BuildActions(IReadOnlyList<PublicTrustActionDocument>? actions)

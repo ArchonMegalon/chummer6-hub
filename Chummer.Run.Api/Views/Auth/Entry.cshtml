@@ -32,7 +32,7 @@
         {
             <div class="auth-panel__intro">
                 <h3>Email first</h3>
-                <p>Create the account first, then decide how much more you want from it. Email keeps the first step simple; Google stays available if you prefer the faster return path.</p>
+                <p>Create the account first, then shape the profile in setup. Email keeps the first step simple; Google stays available if you prefer the faster return path later.</p>
             </div>
             <div class="auth-benefits">
                 <span class="tag">What you get right away</span>
@@ -48,10 +48,6 @@
                 <div class="field">
                     <label for="email">Email</label>
                     <input id="email" name="email" type="email" placeholder="runner@example.com" required />
-                </div>
-                <div class="field">
-                    <label for="displayName">Display name</label>
-                    <input id="displayName" name="displayName" placeholder="Runner" />
                 </div>
                 <button class="button-like button-like--primary" type="submit">Continue with email</button>
             </form>
@@ -82,29 +78,26 @@
                 </ul>
             </div>
 
+            <form class="auth-form" method="post" action="/auth/email/start">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="next" value="@Model.NextPath" />
+                <div class="field">
+                    <label for="email">Email</label>
+                    <input id="email" name="email" type="email" placeholder="runner@example.com" required />
+                </div>
+                <button class="button-like button-like--primary auth-panel__primary" type="submit">Send magic link</button>
+            </form>
+
+            <div class="auth-divider"><span>Or use Google</span></div>
             @if (Model.GoogleAvailable)
             {
-                <a class="button-like button-like--primary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
+                <a class="button-like button-like--secondary auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
             }
             else
             {
                 <button class="button-like button-like--ghost auth-panel__primary" type="button" disabled>Google unavailable</button>
                 <p class="muted-copy">@Model.GoogleUnavailableReason</p>
             }
-
-            <button class="button-like button-like--secondary" type="button" data-email-toggle="emailAuthPanel">Continue with email</button>
-
-            <div id="emailAuthPanel" class="auth-panel__email" hidden>
-                <form class="auth-form" method="post" action="/auth/email/start">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="next" value="@Model.NextPath" />
-                    <div class="field">
-                        <label for="email">Email</label>
-                        <input id="email" name="email" type="email" placeholder="runner@example.com" required />
-                    </div>
-                    <button class="button-like button-like--secondary" type="submit">Send magic link</button>
-                </form>
-            </div>
         }
 
         <p class="privacy-note">The account keeps preview access, updates, devices, and support history together.</p>

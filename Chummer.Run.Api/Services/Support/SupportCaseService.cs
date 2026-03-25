@@ -47,6 +47,7 @@ public sealed class SupportCaseService
         string detail = NormalizeRequired(request.Detail, nameof(request.Detail), 8000);
         string? userId = NormalizeOptional(reporterUserId, 64);
         string? subjectId = NormalizeOptional(reporterSubjectId, 128);
+        string? reporterEmail = NormalizeOptional(request.ReporterEmail, 256);
         string? installationId = NormalizeOptional(request.InstallationId, 64);
         string? applicationVersion = NormalizeOptional(request.ApplicationVersion, 64);
         string? releaseChannel = NormalizeOptional(request.ReleaseChannel, 64);
@@ -60,6 +61,7 @@ public sealed class SupportCaseService
             kind,
             title,
             summary,
+            reporterEmail,
             userId,
             subjectId,
             installationId,
@@ -78,6 +80,7 @@ public sealed class SupportCaseService
                 {
                     Status = existing.Status == SupportCaseStatuses.New ? SupportCaseStatuses.Clustered : existing.Status,
                     UpdatedAtUtc = now,
+                    ReporterEmail = reporterEmail ?? existing.ReporterEmail,
                     ApplicationVersion = applicationVersion ?? existing.ApplicationVersion,
                     ReleaseChannel = releaseChannel ?? existing.ReleaseChannel,
                     HeadId = headId ?? existing.HeadId,
@@ -114,6 +117,7 @@ public sealed class SupportCaseService
                 CreatedAtUtc: now,
                 UpdatedAtUtc: now,
                 Source: source,
+                ReporterEmail: reporterEmail,
                 ReporterUserId: userId,
                 ReporterSubjectId: subjectId,
                 InstallationId: installationId,
@@ -178,6 +182,7 @@ public sealed class SupportCaseService
                     Detail = BuildCrashDetail(incident, cluster, workItem),
                     CandidateOwnerRepo = workItem.CandidateOwnerRepo,
                     DesignImpactSuspected = existing.DesignImpactSuspected || designImpact,
+                    ReporterEmail = existing.ReporterEmail,
                     ReporterUserId = NormalizeOptional(incident.Envelope.UserId, 64) ?? existing.ReporterUserId,
                     ReporterSubjectId = NormalizeOptional(incident.Envelope.SubjectId, 128) ?? existing.ReporterSubjectId,
                     InstallationId = NormalizeOptional(incident.Envelope.InstallationId, 64) ?? existing.InstallationId,
@@ -219,6 +224,7 @@ public sealed class SupportCaseService
                 CreatedAtUtc: now,
                 UpdatedAtUtc: now,
                 Source: SupportCaseSourceKinds.DesktopCrash,
+                ReporterEmail: null,
                 ReporterUserId: NormalizeOptional(incident.Envelope.UserId, 64),
                 ReporterSubjectId: NormalizeOptional(incident.Envelope.SubjectId, 128),
                 InstallationId: NormalizeOptional(incident.Envelope.InstallationId, 64),
@@ -563,6 +569,7 @@ public sealed class SupportCaseService
         string kind,
         string title,
         string summary,
+        string? reporterEmail,
         string? userId,
         string? subjectId,
         string? installationId,
@@ -578,6 +585,7 @@ public sealed class SupportCaseService
                 kind,
                 title.Trim().ToLowerInvariant(),
                 summary.Trim().ToLowerInvariant(),
+                NormalizeOptional(reporterEmail, 256) ?? "-",
                 NormalizeOptional(userId, 64) ?? "-",
                 NormalizeOptional(subjectId, 128) ?? "-",
                 NormalizeOptional(installationId, 64) ?? "-",

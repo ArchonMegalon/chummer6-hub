@@ -139,8 +139,22 @@
       const expanded = navToggle.getAttribute("aria-expanded") === "true";
       navToggle.setAttribute("aria-expanded", expanded ? "false" : "true");
       navSheet.hidden = expanded;
+      navSheet.toggleAttribute("inert", expanded);
+      navSheet.setAttribute("aria-hidden", expanded ? "true" : "false");
     });
   }
+
+  document.querySelectorAll("[data-copy-source]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const target = document.getElementById(button.getAttribute("data-copy-source"));
+      if (!target) return;
+      try {
+        await ChummerUi.copyToClipboard(target.textContent || "", button, "Copied");
+      } catch {
+        // Keep the visible code available for manual copy.
+      }
+    });
+  });
 
   document.querySelectorAll("[data-email-toggle]").forEach((button) => {
     button.addEventListener("click", () => {

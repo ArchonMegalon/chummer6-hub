@@ -116,6 +116,8 @@ internal sealed class PublicFeatureCardDocument
     public bool ExternalOk { get; init; }
     public bool SelfLinkAllowed { get; init; }
     public string? ActionLabel { get; init; }
+    public string? DetailPrimaryHref { get; init; }
+    public string? DetailPrimaryLabel { get; init; }
     public string? ProofNote { get; init; }
     public string? Microproof { get; init; }
     public string? Pain { get; init; }
@@ -163,6 +165,9 @@ internal sealed class PublicTrustPageDocument
     public string Eyebrow { get; init; } = string.Empty;
     public string Heading { get; init; } = string.Empty;
     public string Intro { get; init; } = string.Empty;
+    public string? EffectiveDate { get; init; }
+    public string? UpdatedDate { get; init; }
+    public List<string>? SummaryPoints { get; init; }
     public List<PublicTrustActionDocument>? Actions { get; init; }
     public List<PublicTrustSectionDocument>? Sections { get; init; }
 }

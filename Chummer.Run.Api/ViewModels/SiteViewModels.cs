@@ -216,16 +216,21 @@ public sealed record SupportIntakeViewModel(
     bool Authenticated,
     string AccountSupportHref,
     string AccountSupportLabel,
+    string ResponseExpectation,
     string? SubmissionNotice,
     IReadOnlyList<SupportIntakeOptionViewModel> Options);
 
 public sealed record TrustPageViewModel(
+    string PageId,
     SiteChromeViewModel Chrome,
     string Eyebrow,
     string Heading,
     string Intro,
     IReadOnlyList<TrustPageSectionViewModel> Sections,
     IReadOnlyList<TrustPageActionViewModel> Actions,
+    string? EffectiveDate = null,
+    string? UpdatedDate = null,
+    IReadOnlyList<string>? SummaryPoints = null,
     SupportIntakeViewModel? SupportIntake = null);
 
 public sealed record FaqEntryViewModel(
