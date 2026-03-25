@@ -1,0 +1,206 @@
+product: chummer
+surface: chummer.run
+version: 1
+trust_pages:
+  - id: help
+    eyebrow: Help
+    heading: How to get help without guessing
+    intro: "Chummer is still early access, but the support path should still feel boring: where to ask, what is public, what stays private, and when guided contribution actually makes sense."
+    actions:
+      - label: Create account
+        href: /signup?next=/home
+        tone: primary
+      - label: See what works today
+        href: /now
+        tone: secondary
+      - label: Open participate
+        href: /participate
+        tone: ghost
+    sections:
+      - id: first-party-support
+        eyebrow: First-party support
+        heading: Start with the product surfaces first
+        body: Use the help, FAQ, account, privacy, terms, and contact pages before you fall through to deeper repo or community routes. The product front should answer normal customer questions without making you spelunk for them.
+        bullets:
+          - Help explains the support path.
+          - FAQ answers the normal first questions.
+          - Account handles sign-in, recovery, and linked-download follow-up.
+          - Contact is where you go when the next step is still unclear.
+      - id: install-update
+        eyebrow: Install and update
+        heading: Start with install help before advanced routes
+        body: The first install should feel obvious. Start from the recommended installer, the current release notes summary, and the known-issues/help path before you reach for a manual package or a repo trail.
+        bullets:
+          - Use the recommended installer first.
+          - Manual packages are the fallback path.
+          - Known issues and install help live in product-facing support pages.
+          - Account-linked downloads and claim tickets belong under Devices and access.
+      - id: public-feedback
+        eyebrow: Public feedback lane
+        heading: Start with public feedback
+        body: Use the public path when you want to report a bug, flag confusing copy, or point at a feature that would make the product more useful.
+        bullets:
+          - Report a bug or rough edge.
+          - Flag confusing public copy or onboarding friction.
+          - Suggest a future lane that would help your table.
+          - Check what works today first when you want the current customer-facing state.
+      - id: guided-contribution
+        eyebrow: Guided contribution lane
+        heading: Use participation only when you want the deeper lane
+        body: Participation is the opt-in path for guided contribution help. It is temporary, review-safe, and additive on top of the normal public feedback path.
+        bullets:
+          - Participation is optional.
+          - It does not bypass review.
+          - You can stop or revoke later.
+          - Recognition only appears after validated work lands.
+      - id: privacy-review
+        eyebrow: Privacy and review
+        heading: Normal help should stay low-drama
+        body: Public help should not require a public identity, and contributing should not force you into leaderboards or badges if you prefer to stay quiet.
+        bullets:
+          - Public recognition stays opt-in.
+          - Private participation remains valid even when recognition exists.
+          - The free baseline remains the default path.
+          - Status and help pages should explain what happened without forcing repo spelunking.
+  - id: privacy
+    eyebrow: Privacy
+    heading: What Chummer stores, and what it does not
+    intro: The product should be honest about data handling. This page explains the practical early-access posture in plain language.
+    actions:
+      - label: Open account
+        href: /account
+        tone: primary
+      - label: Read terms
+        href: /terms
+        tone: secondary
+      - label: Contact Chummer
+        href: /contact
+        tone: ghost
+    sections:
+      - id: hosted-account
+        eyebrow: Hosted account data
+        heading: Hub keeps the account record and your product preferences
+        body: The account keeps your basic profile, linked sign-in methods, recovery posture, update preferences, and participation record so the public and signed-in surfaces can stay coherent.
+        bullets:
+          - Display name and handle.
+          - Linked sign-in and recovery posture.
+          - Update and beta-interest preferences.
+          - Participation status, badge state, and contribution receipts.
+      - id: not-in-hub
+        eyebrow: What stays out of Hub
+        heading: Temporary contribution auth material does not belong here
+        body: Contribution authorization material stays on the execution host. The account keeps consent, state, and receipts; it does not keep raw provider auth caches.
+        bullets:
+          - No raw ChatGPT auth cache in Hub.
+          - No temporary one-time-code secret storage in Hub.
+          - No provider-credit or provider-secret storage in Hub.
+      - id: recognition-privacy
+        eyebrow: Recognition and privacy
+        heading: Recognition should not force publicity
+        body: Badges and leaderboards are recognition layers, not an excuse to make participation public by default. Private participation and private recognition settings remain valid.
+      - id: early-access-reality
+        eyebrow: Early-access reality
+        heading: This is the current product posture
+        body: This is a practical privacy statement for the current hosted product surface. It is meant to explain the live behavior honestly while the fuller legal and release posture continues to mature.
+  - id: terms
+    eyebrow: Terms
+    heading: Preview terms in plain language
+    intro: "This is not legal theater. It is the practical contract the hosted preview is trying to keep right now: what the product is promising, what may still move, and where support stops."
+    actions:
+      - label: Open downloads
+        href: /downloads
+        tone: primary
+      - label: Read privacy
+        href: /privacy
+        tone: secondary
+      - label: Open help
+        href: /help
+        tone: ghost
+    sections:
+      - id: preview-posture
+        eyebrow: Preview posture
+        heading: The product is real, but still early access
+        body: Chummer is trying to be usable and honest at the same time. Expect working surfaces, clear labels for preview lanes, and visible evidence when something is not fully settled yet.
+      - id: account-participation
+        eyebrow: Account and participation
+        heading: Accounts should be boring, participation should stay bounded
+        body: Normal sign-in should keep your access and preferences together. Participation remains opt-in, temporary, and review-safe. Authorization alone does not count as contribution credit.
+      - id: downloads-updates
+        eyebrow: Downloads and updates
+        heading: Installers are the preferred path when available
+        body: Installer builds are the product-default path. Manual archives remain available when needed, but they are the fallback path and should not be mistaken for the polished default experience.
+      - id: support-limits
+        eyebrow: Support limits
+        heading: Early access does not mean silent failure is acceptable
+        body: Support and legal posture are still maturing, but that is not a license for mystery behavior. The status, help, privacy, and contact pages should explain the current state in product language.
+  - id: contact
+    eyebrow: Contact
+    heading: Where to send the right kind of problem
+    intro: A polished product should not make you guess where to go. Chummer is still early access, so the contact path is structured before it is fully staffed.
+    actions:
+      - label: Open help
+        href: /help
+        tone: primary
+      - label: Open account
+        href: /account
+        tone: secondary
+      - label: Open public issue tracker
+        href: https://github.com/ArchonMegalon/Chummer6/issues
+        tone: ghost
+    sections:
+      - id: account-support
+        eyebrow: Account and sign-in trouble
+        heading: Start from the account and help surfaces
+        body: Use the account page for sign-in, recovery, and linked-download questions first. Use the help surface when you need the current support path explained in product language.
+      - id: install-support
+        eyebrow: Install and update
+        heading: Use install help before deep troubleshooting
+        body: Start with the recommended installer, the current release notes summary, and the install-help section. That keeps the first-run path product-shaped instead of making you reverse-engineer packaging choices.
+      - id: product-bugs
+        eyebrow: Product bugs and rough edges
+        heading: Use the public issue tracker for reproducible public bugs
+        body: If something on the public surface is broken, confusing, or misleading and you can describe it cleanly, the public tracker keeps the problem visible instead of letting it disappear into side channels.
+      - id: participation-questions
+        eyebrow: Participation questions
+        heading: Read the participation explainer before you open the deeper lane
+        body: The participation route should answer what the lane is for, what gets stored, and when recognition appears before you touch the wizard.
+faq_pages:
+  - id: faq
+    eyebrow: FAQ
+    heading: Plain answers before you commit time
+    intro: "The early-access pitch should still answer the normal questions directly: what is real, what is preview, how help works, and what deeper sources are for."
+    actions:
+      - label: See what works today
+        href: /now
+        tone: primary
+      - label: Open help
+        href: /help
+        tone: secondary
+      - label: Create account
+        href: /signup?next=/home
+        tone: ghost
+    sections:
+      - title: Using Chummer
+        entries:
+          - question: Can I actually use this now?
+            answer: Yes, with honest caveats. There are usable public surfaces and a real preview shelf, but several surfaces are still explicitly marked preview.
+          - question: Why would I trust it more than an opaque tool?
+            answer: "Because the product is trying to make the number and the trail visible together: deterministic outcomes, readable receipts, and provenance instead of mystery math."
+          - question: What is preview versus available today?
+            answer: Available today means there is a real surface or build you can touch right now. Preview means the shape is usable but the support, release, or compatibility story is still moving.
+      - title: Participation and preview
+        entries:
+          - question: How can I help?
+            answer: Start with public feedback, bug reports, and feature suggestions. If you want to go further, the guided contribution lane exists as an opt-in path.
+          - question: Do I need to participate to help?
+            answer: No. The public feedback path remains the default path. Guided contribution is optional and additive, not the price of admission.
+          - question: Can I participate privately?
+            answer: Yes. Recognition should remain opt-in, and private participation should still be possible even when badges or leaderboards exist.
+          - question: Will some previews become free later?
+            answer: That is the long-run intent. Some lanes may start tighter while approvals, provenance, compatibility, or support costs are still unusually heavy.
+      - title: Deeper sources
+        entries:
+          - question: Where does the deeper plan live?
+            answer: In the published product materials and linked source trail. The public front should help you decide whether Chummer is for you before you ever need the deeper implementation view.
+          - question: Where does the code live?
+            answer: In the owning source repos. This front door exists so normal users do not have to reverse-engineer the product story from commit archaeology.

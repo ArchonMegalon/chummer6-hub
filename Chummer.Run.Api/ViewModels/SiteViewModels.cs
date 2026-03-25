@@ -42,6 +42,51 @@ public sealed class AssetCatalogViewModel
         => BySlot(card.AssetSlot);
 }
 
+public sealed record ResolvedPublicActionViewModel(
+    string Label,
+    string Href,
+    string Tone,
+    bool External = false,
+    bool Current = false);
+
+public sealed record ResolvedPublicCardViewModel(
+    PublicFeatureCardDto Card,
+    PublicLandingAssetDto? Asset,
+    ResolvedPublicActionViewModel Action);
+
+public sealed record ReleaseOptionViewModel(
+    PublicReleaseArtifactDto Artifact,
+    string DispatchHref,
+    string PlatformLabel,
+    string HeadLabel,
+    string SizeLabel,
+    string SupportLine,
+    string ActionLabel,
+    string? ShaPreview,
+    bool Installer);
+
+public sealed record ReleaseExperienceViewModel(
+    ReleaseOptionViewModel? Recommended,
+    IReadOnlyList<ReleaseOptionViewModel> Alternatives,
+    IReadOnlyList<ReleaseOptionViewModel> OtherPlatforms,
+    IReadOnlyList<ReleaseOptionViewModel> ManualPackages,
+    string ReleaseNotesSummary,
+    string KnownIssuesLabel,
+    string KnownIssuesHref,
+    string InstallHelpLabel,
+    string InstallHelpHref,
+    string UpdatePostureSummary,
+    IReadOnlyList<string> InstallSteps,
+    IReadOnlyList<string> SystemRequirements);
+
+public sealed record HomePrimaryActionViewModel(
+    string Eyebrow,
+    string Title,
+    string Summary,
+    string Label,
+    string Href,
+    string Tone);
+
 public sealed record LandingPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
@@ -49,27 +94,27 @@ public sealed record LandingPageViewModel(
     PublicReleaseManifestDto Manifest,
     PublicLandingActionDto PrimaryHeroAction,
     PublicLandingActionDto SecondaryHeroAction,
-    IReadOnlyList<PublicFeatureCardDto> Workflows,
+    IReadOnlyList<ResolvedPublicCardViewModel> Workflows,
     IReadOnlyList<PublicFeatureCardDto> TrustPillars,
-    IReadOnlyList<PublicFeatureCardDto> Lanes,
-    IReadOnlyList<PublicFeatureCardDto> AvailableToday,
-    IReadOnlyList<PublicFeatureCardDto> PreviewItems,
-    IReadOnlyList<PublicFeatureCardDto> ComingNext,
-    IReadOnlyList<PublicFeatureCardDto> Artifacts);
+    IReadOnlyList<ResolvedPublicCardViewModel> Lanes,
+    IReadOnlyList<ResolvedPublicCardViewModel> AvailableToday,
+    IReadOnlyList<ResolvedPublicCardViewModel> PreviewItems,
+    IReadOnlyList<ResolvedPublicCardViewModel> ComingNext,
+    IReadOnlyList<ResolvedPublicCardViewModel> Artifacts);
 
 public sealed record StoryPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
     IReadOnlyList<PublicFeatureCardDto> TrustPillars,
-    IReadOnlyList<PublicFeatureCardDto> Lanes);
+    IReadOnlyList<ResolvedPublicCardViewModel> Lanes);
 
 public sealed record NowPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
-    IReadOnlyList<PublicFeatureCardDto> AvailableToday,
-    IReadOnlyList<PublicFeatureCardDto> Inspectable,
+    IReadOnlyList<ResolvedPublicCardViewModel> AvailableToday,
+    IReadOnlyList<ResolvedPublicCardViewModel> Inspectable,
     IReadOnlyList<PublicLandingOverlayDto> SignedInPreview,
     PublicReleaseManifestDto Manifest);
 
@@ -77,7 +122,7 @@ public sealed record HorizonsPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
-    IReadOnlyList<PublicFeatureCardDto> Horizons);
+    IReadOnlyList<ResolvedPublicCardViewModel> Horizons);
 
 public sealed record ShelfPageViewModel(
     SiteChromeViewModel Chrome,
@@ -86,15 +131,17 @@ public sealed record ShelfPageViewModel(
     string Eyebrow,
     string Heading,
     string Intro,
-    IReadOnlyList<PublicFeatureCardDto> Items);
+    IReadOnlyList<ResolvedPublicCardViewModel> Items);
 
 public sealed record DownloadsPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
-    PublicReleaseManifestDto Manifest);
+    PublicReleaseManifestDto Manifest,
+    ReleaseExperienceViewModel ReleaseExperience);
 
 public sealed record TrustPageSectionViewModel(
+    string Id,
     string Eyebrow,
     string Heading,
     string Body,
@@ -133,8 +180,8 @@ public sealed record ParticipatePageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
-    IReadOnlyList<PublicFeatureCardDto> PublicLane,
-    IReadOnlyList<PublicFeatureCardDto> SignedInLane);
+    IReadOnlyList<ResolvedPublicCardViewModel> PublicLane,
+    IReadOnlyList<ResolvedPublicCardViewModel> SignedInLane);
 
 public sealed record LeaderboardsPageViewModel(
     SiteChromeViewModel Chrome,
@@ -150,8 +197,10 @@ public sealed record HomePageViewModel(
     HubUserDto User,
     AccountLinkSummaryDto Links,
     HubUserExperienceDto Experience,
-    IReadOnlyList<PublicFeatureCardDto> NowRail,
-    IReadOnlyList<PublicFeatureCardDto> HorizonRail);
+    InstallLinkingSummaryDto InstallLinking,
+    HomePrimaryActionViewModel PrimaryAction,
+    IReadOnlyList<ResolvedPublicCardViewModel> NowRail,
+    IReadOnlyList<ResolvedPublicCardViewModel> HorizonRail);
 
 public sealed record AccountPageViewModel(
     SiteChromeViewModel Chrome,

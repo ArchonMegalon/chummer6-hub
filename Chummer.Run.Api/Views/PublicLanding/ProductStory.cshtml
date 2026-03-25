@@ -4,11 +4,6 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-story";
     var leadAsset = Model.Assets.BySlot("scene_archive_stair");
-
-    static string ResolveLaneHref(PublicFeatureCardDto card)
-        => string.Equals(card.Href, "/what-is-chummer", StringComparison.OrdinalIgnoreCase) && !card.SelfLinkAllowed
-            ? card.DetailRoute ?? card.FallbackRoute ?? "/downloads"
-            : card.Href;
 }
 
 <section class="story-cinematic">
@@ -51,9 +46,9 @@
         @foreach (var card in Model.Lanes)
         {
             <article class="role-matrix__cell">
-                <h3>@card.Title</h3>
-                <p>@card.Summary</p>
-                <a class="inline-link" href="@ResolveLaneHref(card)">@(card.ActionLabel ?? "Read more")</a>
+                <h3>@card.Card.Title</h3>
+                <p>@card.Card.Summary</p>
+                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
             </article>
         }
     </div>

@@ -7,6 +7,10 @@
     var googlePrimary = string.Equals(Model.Links.RecommendedPrimaryAuth, "google", StringComparison.OrdinalIgnoreCase);
     var followCount = (Model.Experience.FollowHorizons ? 1 : 0) + (Model.Experience.BetaInterest ? 1 : 0);
     var recoveryLinked = Model.Links.LinkedIdentities.Any(link => string.Equals(link.Provider, "email", StringComparison.OrdinalIgnoreCase));
+    var claimedInstallations = Model.InstallLinking.ClaimedInstallations?.Count ?? 0;
+    var activeAccessRights = Model.InstallLinking.ActiveGrants?.Count ?? 0;
+    var pendingClaims = Model.InstallLinking.PendingClaimTickets.Count;
+    var primaryActionOpensSetup = string.Equals(Model.PrimaryAction.Href, "#setup-sheet", StringComparison.OrdinalIgnoreCase);
 }
 
 <section class="home-command">
@@ -32,9 +36,9 @@
             <p id="homeRecoveryCopy">@(recoveryLinked ? "A backup recovery path is already attached." : "Add a verified recovery email from setup or Account.")</p>
         </article>
         <article class="home-status-card">
-            <span class="tag">Primary sign-in</span>
-            <strong>@Model.Links.RecommendedPrimaryAuth</strong>
-            <p><a class="inline-link" href="/account">Review account settings</a></p>
+            <span class="tag">Devices & access</span>
+            <strong>@(activeAccessRights > 0 ? $"{activeAccessRights} active" : claimedInstallations > 0 ? $"{claimedInstallations} linked" : pendingClaims > 0 ? $"{pendingClaims} pending" : "Not linked")</strong>
+            <p><a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a></p>
         </article>
     </div>
 </section>
@@ -46,29 +50,30 @@
 <section class="home-dashboard">
     <div class="home-dashboard__main">
         <div class="home-action-grid">
-            <article class="app-action-card">
-                <span class="tag">Setup</span>
-                <h2 id="setupCardTitle">@(showOnboarding ? "Continue setup" : "Review setup")</h2>
-                <p id="setupCardCopy">@(showOnboarding ? "Finish the short account setup so Chummer knows how to address you, what to follow, and how to recover the account." : "Open the setup sheet whenever you want to adjust profile, interests, or backup sign-in.")</p>
-                <button class="button-like button-like--primary" type="button" data-open-onboarding id="openSetupButton">@(showOnboarding ? "Continue setup" : "Open setup")</button>
+            <article class="app-action-card app-action-card--primary">
+                <span class="tag">@Model.PrimaryAction.Eyebrow</span>
+                <h2 id="setupCardTitle">@Model.PrimaryAction.Title</h2>
+                <p id="setupCardCopy">@Model.PrimaryAction.Summary</p>
+                @if (primaryActionOpensSetup)
+                {
+                    <button class="button-like button-like--primary" type="button" data-open-onboarding id="openSetupButton">@Model.PrimaryAction.Label</button>
+                }
+                else
+                {
+                    <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href" id="openSetupButton">@Model.PrimaryAction.Label</a>
+                }
             </article>
             <article class="app-action-card">
-                <span class="tag">What’s new</span>
+                <span class="tag">Current release</span>
                 <h2>Read the current preview</h2>
-                <p>See what works today, what is still preview, and what is opening next.</p>
+                <p>See what works today, what changed in the current release, and what is still preview.</p>
                 <a class="button-like button-like--secondary" href="/now">See what works today</a>
             </article>
             <article class="app-action-card">
-                <span class="tag">Install</span>
-                <h2>Get the current build</h2>
-                <p>Open the installer shelf, pick the recommended package, and keep the release posture in view.</p>
-                <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
-            </article>
-            <article class="app-action-card">
-                <span class="tag">Participate</span>
-                <h2>Start contributing</h2>
-                <p>Use the guided participation flow only when you want to lend focused help with validated work.</p>
-                <a class="button-like button-like--secondary" href="/participate/codex">Start contributing</a>
+                <span class="tag">Devices &amp; access</span>
+                <h2>Manage this install</h2>
+                <p>Link this copy, review access rights, and keep download handoff details in one place.</p>
+                <a class="button-like button-like--ghost" href="/account#devices-access">Open Devices &amp; access</a>
             </article>
         </div>
 
@@ -82,12 +87,12 @@
                     @foreach (var card in Model.NowRail)
                     {
                         <article class="app-rail__item">
-                            <span class="tag">@card.Badge</span>
+                            <span class="tag">@card.Card.Badge</span>
                             <div class="app-rail__copy">
-                                <h3>@card.Title</h3>
-                                <p>@card.Summary</p>
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
                             </div>
-                            <a class="inline-link" href="@card.Href">Open</a>
+                            <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                         </article>
                     }
                 </div>
@@ -102,12 +107,12 @@
                     @foreach (var card in Model.HorizonRail)
                     {
                         <article class="app-rail__item">
-                            <span class="tag tag--amber">@card.Badge</span>
+                            <span class="tag tag--amber">@card.Card.Badge</span>
                             <div class="app-rail__copy">
-                                <h3>@card.Title</h3>
-                                <p>@card.Summary</p>
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
                             </div>
-                            <a class="inline-link" href="@card.Href">Read more</a>
+                            <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                         </article>
                     }
                 </div>
@@ -118,9 +123,15 @@
     <aside class="home-dashboard__side">
         <section class="app-side-card">
             <p class="eyebrow">Account</p>
-            <h2>Keep the account steady</h2>
-            <p>Sign-in methods, recovery, channels, privacy, and participation settings stay together in one place.</p>
+            <h2>Keep access and recovery steady</h2>
+            <p>Sign-in, recovery, devices, and access rights stay together so the account behaves like a product setting, not a worksheet.</p>
             <a class="button-like button-like--ghost" href="/account">Open account</a>
+        </section>
+        <section class="app-side-card">
+            <p class="eyebrow">Optional</p>
+            <h2>Contribute later if you want to</h2>
+            <p>Guided contribution stays available, but it sits behind the customer path instead of competing with setup, install, and recovery.</p>
+            <a class="button-like button-like--secondary" href="/participate/codex">Open guided contribution</a>
         </section>
         <section class="app-side-card">
             <p class="eyebrow">Help</p>
