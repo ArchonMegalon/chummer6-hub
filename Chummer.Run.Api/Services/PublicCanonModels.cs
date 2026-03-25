@@ -71,7 +71,9 @@ internal sealed class PublicLandingRouteDocument
 internal sealed class PublicLandingSectionDocument
 {
     public string Id { get; init; } = string.Empty;
+    public string? Eyebrow { get; init; }
     public string Title { get; init; } = string.Empty;
+    public string? Intro { get; init; }
     public string Audience { get; init; } = string.Empty;
     public string Route { get; init; } = string.Empty;
     public string? AssetSlot { get; init; }
@@ -215,17 +217,26 @@ internal sealed class PublicReleaseExperienceDocument
     public string InstallHelpLabel { get; init; } = string.Empty;
     public string InstallHelpHref { get; init; } = string.Empty;
     public string UpdatePostureSummary { get; init; } = string.Empty;
+    public string DefaultPublicChannelLabel { get; init; } = "Preview channel";
+    public string UnpublishedBuildLabel { get; init; } = "Current preview build";
+    public string BuildLabelPrefix { get; init; } = "Build";
+    public List<PublicReleaseChannelLabelDocument>? PublicChannelLabels { get; init; }
     public string GuestGateHeading { get; init; } = string.Empty;
     public string GuestGateSummary { get; init; } = string.Empty;
     public string GuestGatePrimaryLabel { get; init; } = string.Empty;
-    public string GuestGatePrimaryHref { get; init; } = string.Empty;
     public string GuestGateSecondaryLabel { get; init; } = string.Empty;
-    public string GuestGateSecondaryHref { get; init; } = string.Empty;
     public string SignedInDispatchHeading { get; init; } = string.Empty;
     public string SignedInDispatchSummary { get; init; } = string.Empty;
     public List<string>? SignedInDispatchSteps { get; init; }
     public List<string>? InstallSteps { get; init; }
+    public List<string>? AccountRequiredInstallSteps { get; init; }
     public List<string>? WindowsRequirements { get; init; }
     public List<string>? LinuxRequirements { get; init; }
     public List<string>? MacosRequirements { get; init; }
+}
+
+internal sealed class PublicReleaseChannelLabelDocument
+{
+    public string Id { get; init; } = string.Empty;
+    public string Label { get; init; } = string.Empty;
 }

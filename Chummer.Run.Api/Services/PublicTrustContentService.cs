@@ -6,10 +6,12 @@ public sealed class PublicTrustContentService
 {
     private const string TrustContentRelativePath = ".codex-design/product/PUBLIC_TRUST_CONTENT.yaml";
     private readonly PublicCanonFileLoader _canon;
+    private readonly PublicRouteCatalogService _routes;
 
-    public PublicTrustContentService(PublicCanonFileLoader canon)
+    public PublicTrustContentService(PublicCanonFileLoader canon, PublicRouteCatalogService routes)
     {
         _canon = canon;
+        _routes = routes;
     }
 
     public TrustPageViewModel BuildHelpPage(SiteChromeViewModel chrome) => BuildTrustPage("help", chrome);
@@ -61,10 +63,28 @@ public sealed class PublicTrustContentService
             Actions: BuildActions(page.Actions));
     }
 
-    private static IReadOnlyList<TrustPageActionViewModel> BuildActions(IReadOnlyList<PublicTrustActionDocument>? actions)
+    private IReadOnlyList<TrustPageActionViewModel> BuildActions(IReadOnlyList<PublicTrustActionDocument>? actions)
         => (actions ?? new List<PublicTrustActionDocument>())
-            .Select(static action => new TrustPageActionViewModel(action.Label, action.Href, action.Tone))
+            .Select(action =>
+            {
+                _routes.ValidateRouteTarget(action.Href, $"trust action '{action.Label}'");
+                return new TrustPageActionViewModel(action.Label, action.Href, action.Tone);
+            })
             .ToArray();
 
-    private PublicTrustContentDocument LoadDocument() => _canon.LoadRequiredYaml<PublicTrustContentDocument>(TrustContentRelativePath);
+    private PublicTrustContentDocument LoadDocument()
+    {
+        var document = _canon.LoadRequiredYaml<PublicTrustContentDocument>(TrustContentRelativePath);
+        foreach (var page in document.TrustPages ?? new List<PublicTrustPageDocument>())
+        {
+            BuildActions(page.Actions);
+        }
+
+        foreach (var page in document.FaqPages ?? new List<PublicFaqPageDocument>())
+        {
+            BuildActions(page.Actions);
+        }
+
+        return document;
+    }
 }

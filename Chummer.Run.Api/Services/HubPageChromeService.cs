@@ -90,6 +90,7 @@ public sealed class HubPageChromeService
     private SiteChromeActionViewModel BuildPublicPrimaryCta()
     {
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var release = _releaseSelection.BuildExperience(manifest, string.Empty, authenticated: false);
         var hasPreviewBuild = manifest.Downloads.Count > 0;
         if (!hasPreviewBuild)
         {
@@ -98,7 +99,7 @@ public sealed class HubPageChromeService
 
         return _releaseSelection.HasGuestReadableDownloads(manifest)
             ? new SiteChromeActionViewModel("Get preview build", "/downloads", "primary")
-            : new SiteChromeActionViewModel("Sign in to download preview", "/login?next=/downloads", "primary");
+            : new SiteChromeActionViewModel(release.GuestGatePrimaryLabel, release.GuestGatePrimaryHref, "primary");
     }
 
     private static string NormalizeRoute(string value)

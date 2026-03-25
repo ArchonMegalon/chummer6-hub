@@ -46,6 +46,7 @@ builder.Services.AddSingleton<CommunityStore>();
 builder.Services.AddSingleton<InstallLinkingStore>();
 builder.Services.AddSingleton<SupportStore>();
 builder.Services.AddSingleton<PublicCanonFileLoader>();
+builder.Services.AddSingleton<PublicRouteCatalogService>();
 builder.Services.AddSingleton<PublicActionResolver>();
 builder.Services.AddSingleton<PublicLandingService>();
 builder.Services.AddSingleton<PublicTrustContentService>();

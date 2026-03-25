@@ -71,7 +71,13 @@ public sealed record ReleaseOptionViewModel(
     bool RequiresAccount,
     bool GuestDownloadAllowed);
 
+public sealed record ReleaseDisplayViewModel(
+    string ChannelLabel,
+    string BuildLabel,
+    string PublishedLabel);
+
 public sealed record ReleaseExperienceViewModel(
+    ReleaseDisplayViewModel Display,
     ReleaseOptionViewModel? Recommended,
     IReadOnlyList<ReleaseOptionViewModel> Alternatives,
     IReadOnlyList<ReleaseOptionViewModel> OtherPlatforms,
@@ -108,6 +114,7 @@ public sealed record LandingPageViewModel(
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
     PublicReleaseManifestDto Manifest,
+    ReleaseExperienceViewModel ReleaseExperience,
     PublicLandingActionDto PrimaryHeroAction,
     PublicLandingActionDto SecondaryHeroAction,
     IReadOnlyList<ResolvedPublicCardViewModel> Workflows,
@@ -129,6 +136,8 @@ public sealed record NowPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
+    ReleaseExperienceViewModel ReleaseExperience,
+    IReadOnlyList<ResolvedPublicCardViewModel> ProofModules,
     IReadOnlyList<ResolvedPublicCardViewModel> AvailableToday,
     IReadOnlyList<ResolvedPublicCardViewModel> Inspectable,
     IReadOnlyList<PublicLandingOverlayDto> SignedInPreview,
@@ -168,6 +177,7 @@ public sealed record DownloadDispatchPageViewModel(
     string AccountLabel,
     string HelpHref,
     string HelpLabel,
+    ReleaseDisplayViewModel Display,
     string Channel,
     string Version,
     string PlatformLabel,
@@ -188,13 +198,29 @@ public sealed record TrustPageActionViewModel(
     string Href,
     string Tone);
 
+public sealed record SupportIntakeOptionViewModel(
+    string Value,
+    string Label,
+    string Description);
+
+public sealed record SupportIntakeViewModel(
+    string ActionHref,
+    string Heading,
+    string Intro,
+    bool Authenticated,
+    string AccountSupportHref,
+    string AccountSupportLabel,
+    string? SubmissionNotice,
+    IReadOnlyList<SupportIntakeOptionViewModel> Options);
+
 public sealed record TrustPageViewModel(
     SiteChromeViewModel Chrome,
     string Eyebrow,
     string Heading,
     string Intro,
     IReadOnlyList<TrustPageSectionViewModel> Sections,
-    IReadOnlyList<TrustPageActionViewModel> Actions);
+    IReadOnlyList<TrustPageActionViewModel> Actions,
+    SupportIntakeViewModel? SupportIntake = null);
 
 public sealed record FaqEntryViewModel(
     string Question,
@@ -218,6 +244,21 @@ public sealed record ParticipatePageViewModel(
     AssetCatalogViewModel Assets,
     IReadOnlyList<ResolvedPublicCardViewModel> PublicLane,
     IReadOnlyList<ResolvedPublicCardViewModel> SignedInLane);
+
+public sealed record FeatureDetailFactViewModel(
+    string Label,
+    string Body);
+
+public sealed record FeatureDetailPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string StatusLabel,
+    PublicLandingAssetDto? Asset,
+    ResolvedPublicActionViewModel PrimaryAction,
+    TrustPageActionViewModel? SecondaryAction,
+    IReadOnlyList<FeatureDetailFactViewModel> Facts);
 
 public sealed record LeaderboardsPageViewModel(
     SiteChromeViewModel Chrome,

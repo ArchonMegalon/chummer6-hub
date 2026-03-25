@@ -8,7 +8,7 @@ public sealed class PublicCanonFileLoader
     private readonly IConfiguration _configuration;
     private static readonly IDeserializer Deserializer = new DeserializerBuilder()
         .WithNamingConvention(UnderscoredNamingConvention.Instance)
-        .IgnoreUnmatchedProperties()
+        .WithDuplicateKeyChecking()
         .Build();
 
     public PublicCanonFileLoader(IConfiguration configuration)
@@ -51,8 +51,15 @@ public sealed class PublicCanonFileLoader
             throw new FileNotFoundException($"required canon file not found: {path}");
         }
 
-        using var reader = File.OpenText(path);
-        return Deserializer.Deserialize<T>(reader)
-               ?? throw new InvalidOperationException($"canon file '{relativePath}' could not be deserialized.");
+        try
+        {
+            using var reader = File.OpenText(path);
+            return Deserializer.Deserialize<T>(reader)
+                   ?? throw new InvalidOperationException($"canon file '{relativePath}' could not be deserialized.");
+        }
+        catch (YamlDotNet.Core.YamlException ex)
+        {
+            throw new InvalidOperationException($"canon file '{relativePath}' is invalid: {ex.Message}", ex);
+        }
     }
 }

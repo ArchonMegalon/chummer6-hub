@@ -18,7 +18,9 @@ public sealed record PublicLandingRouteDto(
 
 public sealed record PublicLandingSectionDto(
     string Id,
+    string? Eyebrow,
     string Title,
+    string? Intro,
     string Audience,
     string Route,
     string? AssetSlot = null);

@@ -24,6 +24,20 @@ public sealed class PublicActionResolver
         return new ResolvedPublicActionViewModel(label, href, tone, external, current);
     }
 
+    public ResolvedPublicActionViewModel ResolvePrimaryExperienceAction(PublicFeatureCardDto card, bool authenticated, string currentPath)
+    {
+        var primaryCard = card with
+        {
+            DetailRoute = null,
+            ActionLabel = null
+        };
+
+        var href = ResolveHref(primaryCard, authenticated);
+        var label = ResolveLabel(primaryCard, href);
+        var external = Uri.TryCreate(href, UriKind.Absolute, out _);
+        return new ResolvedPublicActionViewModel(label, href, ResolveTone(primaryCard), external, IsSameRoute(href, currentPath));
+    }
+
     public void ValidateActionableCard(PublicFeatureCardDto card, IReadOnlySet<string> allowedRoutes)
     {
         var routeCandidates = new[]
@@ -42,7 +56,7 @@ public sealed class PublicActionResolver
                 continue;
             }
 
-            var normalized = NormalizeRoute(candidate!);
+            var normalized = PublicRouteCatalog.NormalizeRoute(candidate!);
             if (!allowedRoutes.Contains(normalized))
             {
                 throw new InvalidOperationException($"public feature card '{card.Id}' points at missing route '{candidate}'.");
@@ -102,26 +116,8 @@ public sealed class PublicActionResolver
             _ => "ghost"
         };
 
-    private static string NormalizeRoute(string href)
-    {
-        var trimmed = href.Trim();
-        var hash = trimmed.IndexOf('#');
-        if (hash >= 0)
-        {
-            trimmed = trimmed[..hash];
-        }
-
-        var query = trimmed.IndexOf('?');
-        if (query >= 0)
-        {
-            trimmed = trimmed[..query];
-        }
-
-        return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
-    }
-
     private static bool IsSameRoute(string href, string currentPath)
-        => string.Equals(NormalizeRoute(href), NormalizeRoute(currentPath), StringComparison.OrdinalIgnoreCase);
+        => string.Equals(PublicRouteCatalog.NormalizeRoute(href), PublicRouteCatalog.NormalizeRoute(currentPath), StringComparison.OrdinalIgnoreCase);
 
     private static void ValidateLabel(string cardId, string fieldName, string? label)
     {

@@ -7,6 +7,7 @@
     var proofAsset = Model.Assets.BySlot("product_proof_ui") ?? Model.Assets.BySlot("capability_check_rules");
     var proofNotes = Model.Workflows.Take(3).ToArray();
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
+    var release = Model.ReleaseExperience;
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
 
     static IReadOnlyList<string> MicroProof(PublicFeatureCardDto card)
@@ -16,6 +17,12 @@
 
     string SectionTitle(string id, string fallback)
         => sectionsById.TryGetValue(id, out var section) ? section.Title : fallback;
+
+    string SectionEyebrow(string id, string fallback)
+        => sectionsById.TryGetValue(id, out var section) && !string.IsNullOrWhiteSpace(section.Eyebrow) ? section.Eyebrow! : fallback;
+
+    string SectionIntro(string id, string fallback)
+        => sectionsById.TryGetValue(id, out var section) && !string.IsNullOrWhiteSpace(section.Intro) ? section.Intro! : fallback;
 }
 
 <section class="launch-hero">
@@ -43,7 +50,7 @@
                 <div class="launch-hero__prooffloat" aria-label="Current preview proof">
                     <div class="launch-hero__proof-topline">
                         <span>Current preview</span>
-                        <span>@Model.Manifest.Channel · @Model.Manifest.Version</span>
+                        <span>@release.Display.ChannelLabel · @release.Display.BuildLabel</span>
                     </div>
                     <div class="launch-hero__proof-summary">
                         <strong>@Model.Surface.ProductProofResultTitle</strong>
@@ -75,7 +82,7 @@
         <div class="proof-surface">
             <div class="proof-surface__topline">
                 <span>@Model.Surface.ProductProofToplineLabel</span>
-                <span>@Model.Manifest.Channel · @Model.Manifest.Version</span>
+                <span>@release.Display.ChannelLabel · @release.Display.BuildLabel</span>
             </div>
             <div class="proof-surface__result">
                 <strong>@Model.Surface.ProductProofResultTitle</strong>
@@ -112,9 +119,9 @@
 
 <section class="workflow-band">
     <div class="workflow-band__lead">
-        <p class="eyebrow">How Chummer helps at the table</p>
-        <h2 class="editorial-title">Build, explain, and keep the table moving</h2>
-        <p class="editorial-copy">See the product behavior first: build a runner, inspect the ruling, and keep a session moving without losing trust.</p>
+        <p class="eyebrow">@SectionEyebrow("start_here", "How Chummer helps at the table")</p>
+        <h2 class="editorial-title">@SectionTitle("start_here", "Build, explain, and keep the table moving")</h2>
+        <p class="editorial-copy">@SectionIntro("start_here", "See the product behavior first: build a runner, inspect the ruling, and keep a session moving without losing trust.")</p>
     </div>
     <div class="workflow-grid">
         @foreach (var card in Model.Workflows)
@@ -153,9 +160,9 @@
 
 <section class="trust-claims">
     <div class="trust-claims__lead">
-        <p class="eyebrow">Why trust Chummer</p>
-        <h2 class="editorial-title">Product claims backed by evidence</h2>
-        <p class="editorial-copy">The trust model is simple: deterministic rules truth, visible receipts, and local-first continuity.</p>
+        <p class="eyebrow">@SectionEyebrow("why_trust_it", "Why trust Chummer")</p>
+        <h2 class="editorial-title">@SectionTitle("why_trust_it", "Product claims backed by evidence")</h2>
+        <p class="editorial-copy">@SectionIntro("why_trust_it", "The trust model is simple: deterministic rules truth, visible receipts, and local-first continuity.")</p>
     </div>
     <div class="trust-claims__grid">
         @foreach (var card in Model.TrustPillars)
@@ -177,9 +184,9 @@
 
 <section class="audience-fit">
     <div class="audience-fit__lead">
-        <p class="eyebrow">Who this is for</p>
-        <h2 class="editorial-title">Player, GM, and creator fit</h2>
-        <p class="editorial-copy">Choose the lane that matches how you come to the table.</p>
+        <p class="eyebrow">@SectionEyebrow("choose_your_lane", "Who this is for")</p>
+        <h2 class="editorial-title">@SectionTitle("choose_your_lane", "Player, GM, and creator fit")</h2>
+        <p class="editorial-copy">@SectionIntro("choose_your_lane", "Choose the lane that matches how you come to the table.")</p>
     </div>
     <div class="audience-fit__grid">
         @foreach (var card in Model.Lanes)
@@ -204,9 +211,9 @@
 
 <section class="works-matrix">
     <div class="works-matrix__lead">
-        <p class="eyebrow">What is real today, what is preview, what is next</p>
-        <h2 class="editorial-title">What works today</h2>
-        <p class="editorial-copy">See what is available now, what you can preview, and what is opening next.</p>
+        <p class="eyebrow">@SectionEyebrow("whats_real_now", "What is real today, what is preview, what is next")</p>
+        <h2 class="editorial-title">@SectionTitle("whats_real_now", "What works today")</h2>
+        <p class="editorial-copy">@SectionIntro("whats_real_now", "See what is available now, what you can preview, and what is opening next.")</p>
     </div>
     <div class="works-matrix__columns">
         <article class="works-column">
@@ -262,9 +269,9 @@
 
 <section class="artifact-gallery">
     <div class="artifact-gallery__lead">
-        <p class="eyebrow">Proof, not promises</p>
-        <h2 class="editorial-title">Artifacts that make the product tangible</h2>
-        <p class="editorial-copy">The gallery now starts with live proof, then shows which artifacts are preview-only and which ones are still opening next.</p>
+        <p class="eyebrow">@SectionEyebrow("featured_artifacts", "Proof, not promises")</p>
+        <h2 class="editorial-title">@SectionTitle("featured_artifacts", "Artifacts that make the product tangible")</h2>
+        <p class="editorial-copy">@SectionIntro("featured_artifacts", "The gallery now starts with live proof, then shows which artifacts are preview-only and which ones are still opening next.")</p>
     </div>
     <div class="artifact-gallery__grid">
         @foreach (var card in Model.Artifacts)
@@ -289,9 +296,9 @@
 
 <section class="access-band">
     <div class="access-band__copy">
-        <p class="eyebrow">Get on the list that matches your interest</p>
-        <h2 class="editorial-title">Create the account that keeps your place</h2>
-        <p class="editorial-copy">Tell Chummer what you care about and get invited into the right lane as it opens.</p>
+        <p class="eyebrow">@SectionEyebrow("closing_cta", "Get on the list that matches your interest")</p>
+        <h2 class="editorial-title">@SectionTitle("closing_cta", "Create the account that keeps your place")</h2>
+        <p class="editorial-copy">@SectionIntro("closing_cta", "Tell Chummer what you care about and get invited into the right lane as it opens.")</p>
         <div class="interest-grid" aria-label="Interest options">
             <span class="interest-pill">I’m here for play</span>
             <span class="interest-pill">I want GM tools</span>

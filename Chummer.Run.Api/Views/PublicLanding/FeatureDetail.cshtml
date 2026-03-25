@@ -1,0 +1,53 @@
+@model FeatureDetailPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-feature-detail";
+}
+
+<section class="story-cinematic">
+    <div class="story-cinematic__copy">
+        <p class="eyebrow">@Model.Eyebrow</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+            @if (Model.SecondaryAction is not null)
+            {
+                <a class="button-like button-like--ghost" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+            }
+        </div>
+    </div>
+    @if (Model.Asset is not null)
+    {
+        <div class="story-cinematic__media">
+            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", Model.Asset)
+        </div>
+    }
+</section>
+
+<section class="trust-rail-section">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Current status</p>
+        <h2 class="editorial-title">@Model.StatusLabel</h2>
+    </div>
+    <div class="trust-rail-list">
+        @foreach (var fact in Model.Facts)
+        {
+            <article class="trust-rail">
+                <span class="tag">@fact.Label</span>
+                <p>@fact.Body</p>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="story-guide-tail">
+    <p class="eyebrow">Next step</p>
+    <h2 class="editorial-title">Use the real surface, then decide whether to go deeper</h2>
+    <p class="editorial-copy">Chummer should let you touch the real product path first, then open the deeper reference only when you actually need it.</p>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="button-like button-like--secondary" href="/contact#support-intake">Get help with this surface</a>
+    </div>
+</section>

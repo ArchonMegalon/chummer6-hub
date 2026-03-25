@@ -13,17 +13,48 @@
     </div>
     <div class="evidence-header__stats">
         <div>
-            <span class="evidence-header__label">Current version</span>
-            <strong>@Model.Manifest.Version</strong>
+            <span class="evidence-header__label">Current build</span>
+            <strong>@Model.ReleaseExperience.Display.BuildLabel</strong>
         </div>
         <div>
             <span class="evidence-header__label">Channel</span>
-            <strong>@Model.Manifest.Channel</strong>
+            <strong>@Model.ReleaseExperience.Display.ChannelLabel</strong>
         </div>
         <div>
             <span class="evidence-header__label">Published</span>
             <strong>@Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd")</strong>
         </div>
+    </div>
+</section>
+
+<section class="workflow-band">
+    <div class="workflow-band__lead">
+        <p class="eyebrow">Concrete proof modules</p>
+        <h2 class="editorial-title">Build, explain, and run with visible evidence</h2>
+        <p class="editorial-copy">These are the three product behaviors the current preview is already trying to prove in public: builder truth, explanation trail, and continuity under drift.</p>
+    </div>
+    <div class="workflow-grid">
+        @foreach (var card in Model.ProofModules)
+        {
+            <article class="workflow-card">
+                @if (card.Asset is not null)
+                {
+                    <div class="workflow-card__media">
+                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
+                    </div>
+                }
+                <div class="workflow-card__copy">
+                    <span class="tag">@card.Card.Badge</span>
+                    <h3>@card.Card.Title</h3>
+                    <p>@card.Card.Summary</p>
+                    @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
+                    {
+                        <p class="workflow-card__proof">@card.Card.ProofNote</p>
+                    }
+                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                </div>
+            </article>
+        }
     </div>
 </section>
 
