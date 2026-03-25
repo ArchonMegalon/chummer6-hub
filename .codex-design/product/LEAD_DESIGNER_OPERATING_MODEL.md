@@ -61,7 +61,11 @@ Changes program sequencing, status, release gates, or group blockers.
 
 Changes canonical future-capability posture, public-guide relationship, or advisory participation rules.
 
-Types C, D, E, and F must update multiple canonical files in the same change.
+### Type G — governor/autopilot change
+
+Changes whole-product stop/reroute authority, feedback-routing logic, or the operating scorecard that turns product reality into program decisions.
+
+Types C, D, E, F, and G must update multiple canonical files in the same change.
 
 ## Mandatory file updates by change type
 
@@ -106,6 +110,16 @@ Types C, D, E, and F must update multiple canonical files in the same change.
 * `products/chummer/README.md`
 * `sync/sync-manifest.yaml` if new canonical files must mirror downstream
 
+### Governor/autopilot change must update
+
+* `products/chummer/PRODUCT_GOVERNOR_AND_AUTOPILOT_LOOP.md`
+* `products/chummer/FEEDBACK_AND_SIGNAL_OODA_LOOP.md`
+* `products/chummer/PRODUCT_HEALTH_SCORECARD.yaml`
+* `products/chummer/OWNERSHIP_MATRIX.md`
+* `products/chummer/PROGRAM_MILESTONES.yaml`
+* `products/chummer/README.md`
+* `sync/sync-manifest.yaml` if new canonical files must mirror downstream
+
 ## Mirror discipline
 
 Every active worker-driven code repo must receive:
@@ -131,6 +145,23 @@ Design petitions live under `products/chummer/proposals/` and must identify:
 * urgency
 
 Petitions are design inputs. They are not implementation patches, and they do not overrule canon until merged here.
+
+## Product-governor relationship
+
+The lead designer and product governor are adjacent but different roles.
+
+The lead designer:
+
+* owns vision, canon, boundary truth, and milestone truth
+* decides whether a packet implies a canon change
+
+The product governor:
+
+* owns whole-product pulse
+* decides whether reality requires code, docs, queue, policy, freeze, or reroute action
+* escalates canon contradictions back to the lead designer
+
+The lead designer is not the raw support inbox and not the default stop/replan operator.
 
 ## Synthesis rule
 

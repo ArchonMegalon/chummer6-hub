@@ -31,6 +31,31 @@ A registered user may, in addition to guest behavior:
 * enter the guided participation flow
 * unlock future advisory-vote placeholders when enabled
 
+## Install relationship states
+
+Downloads and installs are related to user classes, but they are not the same thing.
+
+### Guest install
+
+A guest install may:
+
+* download public stable/open builds
+* run the app without a Hub account
+* send pseudonymous crash, bug, or feedback intake tied to an installation id
+* later be linked to an account
+
+### Claimed install
+
+A claimed install is a desktop installation linked to a registered user.
+
+It may additionally:
+
+* receive account-aware channel guidance
+* receive case-status and fix-available notices
+* keep support history attached to the account
+
+The install relationship may be personalized without making the binary itself user-specific.
+
 ## Profile flags
 
 The first public profile pass should prefer flags over hard roles:

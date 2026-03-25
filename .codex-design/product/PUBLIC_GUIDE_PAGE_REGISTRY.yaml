@@ -2,6 +2,57 @@ product: chummer
 version: 1
 purpose: Machine-readable page-class contract for downstream public-guide generation.
 page_types:
+  root_story_github_readme:
+    audience: public
+    max_technical_depth: low
+    section_order:
+    - pitch
+    - quick_nav
+    - current_posture
+    - hero
+    - table_pain_example
+    - why_watch
+    - participation_entry
+    - try_it_now
+    - deeper_map
+    max_front_page_updates: 0
+    nav_before_updates: true
+    hero_layout: compact_after_scan_band
+    updates_teaser_enabled: false
+    primary_cta_order:
+    - start_here
+    - current_status
+    - what_chummer6_is
+    - participate
+    - download
+    public_participation_entry_route: /participate
+    visual_density_profile: first_contact_hero
+    allowed_sources:
+    - products/chummer/PUBLIC_LANDING_POLICY.md
+    - products/chummer/PUBLIC_LANDING_MANIFEST.yaml
+    - products/chummer/PUBLIC_FEATURE_REGISTRY.yaml
+    - products/chummer/PUBLIC_USER_MODEL.md
+    - products/chummer/PUBLIC_GUIDE_POLICY.md
+    - approved public-status summaries
+    forbidden_sources:
+    - products/chummer/projects/*.md
+    - products/chummer/OWNERSHIP_MATRIX.md
+    - products/chummer/GROUP_BLOCKERS.md
+    - products/chummer/PROGRAM_MILESTONES.yaml
+    required_topics:
+    - product promise
+    - what is real now
+    - first useful routes
+    forbidden_terms:
+    - repo topology
+    - control plane
+    - blocker truth
+    - petition intake
+    - principal-to-user mapping
+    required_cta_families:
+    - start_here
+    - current_status
+    - participate
   root_story:
     audience: public
     max_technical_depth: low

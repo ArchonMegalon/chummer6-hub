@@ -17,7 +17,7 @@ It does not imply that every owned tool must be integrated.
 * `Prompting Systems` - prompt, style, and persona support for guide, horizon, and media workflows
 * `BrowserAct` - no-API automation fallback, account verification, capture, and ops bridge
 * `ApproveThis` - approval inbox bridge
-* `MetaSurvey` - structured feedback and future-signal collection
+* `MetaSurvey` - structured feedback and future-signal collection, not crash telemetry or ticket truth
 * `Soundmadeseen` - narrated media, recap, and briefing clips
 * `Crezlo Tours` - explorable GM run-site artifacts
 * `First Book ai` - long-form player, GM, and creator authoring lane
@@ -25,7 +25,7 @@ It does not imply that every owned tool must be integrated.
 * `AvoMap` - route and location visualization lane
 * `PeekShot` - preview/share-card adapter lane
 * `Mootion` - bounded video generation lane
-* `Documentation.AI` - docs/help projection surface downstream of canon
+* `Documentation.AI` - docs/help projection surface downstream of canon, not first-line crash capture
 * `Internxt Cloud Storage` - archive and retention support
 
 ## Bounded
@@ -57,6 +57,15 @@ Default owner posture:
 * `chummer6-media-factory` - document, image, preview, audio, video, route, and archive adapters
 * `chummer6-hub-registry` - publication references and compatibility metadata
 * `chummer6-design` - policy, classification, and rollout authority
+
+## Support plane posture
+
+Current rule:
+
+* Chummer does not need another AppSumo LTD to ship the core crash path.
+* No AppSumo chat/support product is promoted as the first support feature.
+* `MetaSurvey` and `Documentation.AI` are enough to start structured feedback and help projection behind Hub-owned adapters.
+* Any later support assistant is phase 2, Hub-owned, grounded on curated help/known-issue sources, and optional rather than gating crash or bug submission.
 
 ## Bounded owner assignments
 

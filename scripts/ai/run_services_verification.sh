@@ -152,9 +152,15 @@ if [ ! -f ../chummer-hub-registry/Chummer.Run.Registry/Controllers/PublicationsC
   exit 1
 fi
 
-if ! grep -En '<HintPath>\.\.\\Chummer\.Hub\.Registry\.Contracts\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Hub\.Registry\.Contracts\.dll</HintPath>' \
+if ! grep -En '<ProjectReference Include="\.\.\\Chummer\.Hub\.Registry\.Contracts\\Chummer\.Hub\.Registry\.Contracts\.csproj" />' \
   ../chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj >/dev/null; then
-  echo "Hub-registry runtime must consume the owner-repo contract assembly." >&2
+  echo "Hub-registry runtime must consume the owner-repo contract project." >&2
+  exit 1
+fi
+
+if grep -En '<HintPath>\.\.\\Chummer\.Hub\.Registry\.Contracts\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Hub\.Registry\.Contracts\.dll</HintPath>' \
+  ../chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj >/dev/null; then
+  echo "Hub-registry runtime must not consume owner contracts through a binary HintPath seam." >&2
   exit 1
 fi
 
@@ -197,6 +203,7 @@ cp ../chummer-hub-registry/Chummer.Run.Registry/bin/Debug/net10.0/Chummer.Run.Re
 cp ../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/bin/Debug/net10.0/Chummer.Media.Contracts.dll "$TMP_DIR/"
 cp ../../fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime/bin/Debug/net10.0/Chummer.Media.Factory.Runtime.dll "$TMP_DIR/"
 cp Chummer.Run.Api/bin/Debug/net10.0/Chummer.Run.Api.dll "$TMP_DIR/"
+cp Chummer.Run.Api/bin/Debug/net10.0/YamlDotNet.dll "$TMP_DIR/"
 cp Chummer.Run.Identity/bin/Debug/net10.0/Chummer.Run.Identity.dll "$TMP_DIR/"
 cp Chummer.Run.AI/bin/Debug/net10.0/Chummer.Run.AI.dll "$TMP_DIR/"
 cp Chummer.Run.Contracts/bin/Debug/net10.0/Chummer.Run.Contracts.dll "$TMP_DIR/"
@@ -217,6 +224,7 @@ cp Chummer.Run.Contracts/bin/Debug/net10.0/Chummer.Run.Contracts.dll "$TMP_DIR/"
   for dll in "$TMP_DIR"/Chummer*.dll; do
     echo "-r:${dll}"
   done
+  echo "-r:${TMP_DIR}/YamlDotNet.dll"
   echo "${ROOT_DIR}/../chummer-hub-registry/Chummer.Run.Registry/GlobalUsings.RegistryContracts.cs"
   find "${ROOT_DIR}/tests/RunServicesVerification" -maxdepth 1 -name '*.cs' | sort
 } > "$RSP_FILE"

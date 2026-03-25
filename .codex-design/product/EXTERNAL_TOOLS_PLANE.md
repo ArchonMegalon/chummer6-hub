@@ -160,6 +160,8 @@ The following remain Chummer-owned:
 * moderation state
 * publication state
 * install state
+* support case state
+* crash/bug/feedback intake state
 * artifact manifests
 * media lifecycle state
 * delivery state
@@ -212,6 +214,13 @@ It is not automatically approved for canonical runtime use.
 
 Any tool that analyzes human session behavior must stay opt-in, post-session, and clearly separate from canonical session truth, moderation truth, or player discipline.
 
+### Rule 9 - support assistant is not phase 0
+
+The first support plane must work without a chat assistant or support widget.
+
+Crash reporting, structured bug reporting, and lightweight feedback must be first-class Chummer-owned flows before any support assistant becomes user-facing.
+No new AppSumo LTD is required or assumed for the core crash path.
+
 ## Repo ownership
 
 ### `chummer6-design`
@@ -240,9 +249,11 @@ Owns:
 * reasoning provider routing
 * approval bridges
 * docs/help bridges
+* support/help-desk bridges
 * survey bridges
 * automation bridges
 * research/eval toolchain integrations
+* later grounded support-assistant or human-handoff layers
 * user-facing projection shaping for external-tool outputs
 
 Must not own:
@@ -474,6 +485,7 @@ Docs/help plane.
 * cited help assistant
 * operator and publisher documentation
 * onboarding docs
+* knowledge-base projection after Chummer-owned curation
 
 ### Owner
 
@@ -485,6 +497,7 @@ Docs/help plane.
 * not the canonical architecture repo
 * not the only docs store
 * not an unreviewed source of policy
+* not the required crash-report path
 
 ## MetaSurvey
 
@@ -499,6 +512,7 @@ Feedback loop.
 * Coach usefulness ratings
 * recap/video quality ratings
 * moderation/registry quality surveys
+* lightweight product-feedback intake
 
 ### Owner
 
@@ -508,6 +522,7 @@ Feedback loop.
 
 * not canonical analytics warehouse
 * not canonical moderation state
+* not canonical bug, crash, or support-ticket truth
 
 ## Nonverbia
 

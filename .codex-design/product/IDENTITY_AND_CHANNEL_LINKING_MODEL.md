@@ -13,6 +13,16 @@ This file defines the canonical public-account posture for:
 
 It exists so Hub, `chummer.run`, and later channel adapters do not invent contradictory account behavior.
 
+## Person, install, and channel are distinct
+
+Chummer keeps three related but separate identities:
+
+* the Hub account person
+* the claimed or guest desktop installation
+* the linked notification or companion channel
+
+Do not collapse these into one giant auth object.
+
 ## Canonical split
 
 * `chummer6-hub` owns identity linking, account hygiene, permissions, groups, sponsorship sessions, rewards, and entitlements.
@@ -74,8 +84,20 @@ Canonical distinction:
 
 * linked identities prove or recover account access
 * linked channels route messages, notifications, and companion behavior
+* installations authenticate desktop clients and bind support/update history to one local copy
 
 These are separate records and separate policy decisions.
+
+## Install claim rule
+
+Desktop installs are claimable after download.
+
+That means:
+
+* the downloaded installer stays canonical and signed for its release target
+* Hub may mint a claim ticket when a signed-in user downloads it
+* first launch may link the installed copy to the account
+* the desktop client later authenticates as that claimed installation instead of pretending a browser session is its long-lived identity
 
 ## Telegram posture
 

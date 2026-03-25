@@ -40,6 +40,10 @@ The future lane for grounded, cited rules understanding built from Chummer-owned
 
 Fleet's operator term for the temporary execution lane behind a guided-contribution or participation session.
 
+## Product governor
+
+The whole-product operator role that turns release health, support truth, and scope pressure into stop, reroute, defer, or canon-change decisions.
+
 ## Proof shelf
 
 The public place where Chummer shows what is real now, with honest labels for available, preview, and horizon surfaces.
@@ -67,3 +71,7 @@ The Hub-owned participation record for a bounded premium or guided-contribution 
 ## Spider
 
 A governed hosted operator/support role around session relay, coordination, or intervention. It does not own mechanics or registry truth.
+
+## Signal packet
+
+A clustered support, feedback, release, or public-promise finding prepared for designer or product-governor review instead of being treated as raw inbox truth.
