@@ -1516,6 +1516,7 @@ async Task VerifyPublicLandingProjectionAsync()
         linkedIdentityClient,
         accounts,
         supportCases,
+        new SupportAssistantService(supportCases, configuration, loggerFactory.CreateLogger<SupportAssistantService>()),
         configuration)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -1524,6 +1525,7 @@ async Task VerifyPublicLandingProjectionAsync()
         linkedIdentityClient,
         accounts,
         supportCases,
+        new SupportAssistantService(supportCases, configuration, loggerFactory.CreateLogger<SupportAssistantService>()),
         configuration)
     {
         ControllerContext = AuthenticatedControllerContext("smoke-token")
@@ -1580,6 +1582,14 @@ async Task VerifyPublicLandingProjectionAsync()
     var dispatchModel = dispatchView?.Model as DownloadDispatchPageViewModel;
     Assert(dispatchModel is not null && string.Equals(dispatchModel.DownloadHref, "/downloads/file/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in download handoff should expose the canonical file route.");
     Assert(!string.IsNullOrWhiteSpace(dispatchModel?.ClaimCode), "signed-in download handoff should expose a claim code.");
+    Assert(!string.IsNullOrWhiteSpace(dispatchModel?.Heading), "signed-in download handoff should expose a non-empty heading.");
+    Assert(!string.IsNullOrWhiteSpace(dispatchModel?.Summary), "signed-in download handoff should expose a non-empty summary.");
+    Assert(dispatchModel?.Steps.Count > 0, "signed-in download handoff should expose the signed-in install steps.");
+    var publicContactPageMethod = typeof(PublicLandingController).GetMethods()
+        .Single(static method =>
+            string.Equals(method.Name, nameof(PublicLandingController.ContactPage), StringComparison.Ordinal)
+            && method.GetCustomAttributes(typeof(HttpGetAttribute), inherit: true).Length > 0);
+    Assert(publicContactPageMethod.GetParameters().Length == 1 && publicContactPageMethod.GetParameters()[0].ParameterType == typeof(CancellationToken), "public contact page should not accept a spoofable submitted query parameter.");
     var linkedUser = accounts.EnsureUser("subject.demo", "Runner Demo", "runner@example.invalid");
     var installSummary = installLinking.GetSummary(linkedUser.UserId, "subject.demo");
     Assert(installSummary.RecentReceipts.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal)), "signed-in downloads should mint a durable download receipt.");
@@ -1648,6 +1658,15 @@ async Task VerifyPublicLandingProjectionAsync()
     var triageResult = supportAutomationController.ListForTriage(status: null, kind: null, candidateOwnerRepo: null, designImpactOnly: null);
     var triagePayload = (triageResult.Result as OkObjectResult)?.Value as SupportCaseListResponse;
     Assert(triagePayload is not null && triagePayload.Items.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "internal triage view should surface submitted support cases.");
+    var assistantResult = await supportCasesController.AskAssistant(
+        new SupportAssistantRequest(
+            Query: "The signed-in download restart wording is still confusing after the preview install update.",
+            InstallationId: "install-smoke-001"),
+        CancellationToken.None);
+    var assistantPayload = (assistantResult.Result as OkObjectResult)?.Value as SupportAssistantResponse;
+    Assert(assistantPayload is not null && string.Equals(assistantPayload.Confidence, SupportAssistantConfidenceLevels.CaseTruth, StringComparison.Ordinal), "support assistant should ground answers on the signed-in reporter case when available.");
+    Assert(assistantPayload!.Citations.Any(static item => string.Equals(item.SourceKind, "support_case", StringComparison.Ordinal)), "support assistant should cite the matching support case.");
+    Assert(assistantPayload.Actions.Any(static item => string.Equals(item.ActionId, "open_account_support", StringComparison.Ordinal)), "support assistant should suggest the tracked case timeline when a matching case exists.");
     var releasedResult = supportAutomationController.Transition(
         supportCase.CaseId,
         new SupportCaseTransitionRequest(
@@ -1658,6 +1677,13 @@ async Task VerifyPublicLandingProjectionAsync()
             Actor: "fleet"));
     var releasedPayload = (releasedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
     Assert(releasedPayload is not null && string.Equals(releasedPayload.Status, SupportCaseStatuses.ReleasedToReporterChannel, StringComparison.Ordinal), "internal transition should move the case into released_to_reporter_channel.");
+    var postReleaseAssistant = await supportCasesController.AskAssistant(
+        new SupportAssistantRequest(
+            Query: "Has the preview fix for my download handoff shipped yet?",
+            InstallationId: "install-smoke-001"),
+        CancellationToken.None);
+    var postReleaseAssistantPayload = (postReleaseAssistant.Result as OkObjectResult)?.Value as SupportAssistantResponse;
+    Assert(postReleaseAssistantPayload is not null && postReleaseAssistantPayload.Actions.Any(static item => string.Equals(item.ActionId, "open_downloads", StringComparison.Ordinal)), "support assistant should route released fixes back to the downloads surface.");
     var notifiedResult = supportAutomationController.NotifyReporter(
         supportCase.CaseId,
         new SupportCaseNotificationRequest(

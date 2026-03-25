@@ -62,7 +62,12 @@ public sealed class PublicRouteCatalogService
 
     public void ValidateRouteTarget(string? href, string description)
     {
-        if (string.IsNullOrWhiteSpace(href) || Uri.TryCreate(href, UriKind.Absolute, out _))
+        if (string.IsNullOrWhiteSpace(href))
+        {
+            throw new InvalidOperationException($"{description} is missing an href.");
+        }
+
+        if (Uri.TryCreate(href, UriKind.Absolute, out _))
         {
             return;
         }

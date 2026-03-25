@@ -167,7 +167,12 @@ public sealed class PublicLandingService
 
     private static void ValidateRoute(string? href, IReadOnlySet<string> allowedRoutes, string description)
     {
-        if (string.IsNullOrWhiteSpace(href) || Uri.TryCreate(href, UriKind.Absolute, out _))
+        if (string.IsNullOrWhiteSpace(href))
+        {
+            throw new InvalidOperationException($"{description} is missing an href.");
+        }
+
+        if (Uri.TryCreate(href, UriKind.Absolute, out _))
         {
             return;
         }

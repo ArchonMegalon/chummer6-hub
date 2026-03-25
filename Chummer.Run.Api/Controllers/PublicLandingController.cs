@@ -283,10 +283,10 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/contact")]
     [Produces("text/html")]
-    public async Task<IActionResult> ContactPage([FromQuery] string? submitted, CancellationToken cancellationToken)
+    public async Task<IActionResult> ContactPage(CancellationToken cancellationToken)
     {
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Where to send bugs, account questions, and public product feedback right now.", "/contact", cancellationToken);
-        return View("~/Views/PublicLanding/TrustPage.cshtml", BuildContactPageModel(chrome, submittedCaseId: submitted));
+        return View("~/Views/PublicLanding/TrustPage.cshtml", BuildContactPageModel(chrome));
     }
 
     [HttpPost("/contact")]
@@ -312,12 +312,13 @@ public sealed class PublicLandingController : Controller
             var subject = await TryGetOptionalSubjectAsync(cancellationToken);
             var user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var created = _supportCases.Submit(user?.UserId, subject?.SubjectId, request);
-            return Redirect($"/contact?submitted={Uri.EscapeDataString(created.CaseId)}#support-intake");
+            TempData["ContactSubmittedCaseId"] = created.CaseId;
+            return Redirect("/contact#support-intake");
         }
         catch (ArgumentException ex)
         {
             var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Where to send bugs, account questions, and public product feedback right now.", "/contact", cancellationToken);
-            var model = BuildContactPageModel(chrome, submittedCaseId: null) with
+            var model = BuildContactPageModel(chrome) with
             {
                 SupportIntake = BuildSupportIntakeModel(
                     authenticated: chrome.Authenticated,
@@ -491,8 +492,10 @@ public sealed class PublicLandingController : Controller
         }
     }
 
-    private TrustPageViewModel BuildContactPageModel(SiteChromeViewModel chrome, string? submittedCaseId)
-        => _trustContent.BuildContactPage(chrome) with
+    private TrustPageViewModel BuildContactPageModel(SiteChromeViewModel chrome)
+    {
+        var submittedCaseId = TempData["ContactSubmittedCaseId"] as string;
+        return _trustContent.BuildContactPage(chrome) with
         {
             SupportIntake = BuildSupportIntakeModel(
                 authenticated: chrome.Authenticated,
@@ -500,6 +503,7 @@ public sealed class PublicLandingController : Controller
                     ? null
                     : $"Support case {submittedCaseId} was accepted. Create an account or use Account > Support if you want tracked follow-up in the product shell.")
         };
+    }
 
     private static SupportIntakeViewModel BuildSupportIntakeModel(bool authenticated, string? submissionNotice)
         => new(
