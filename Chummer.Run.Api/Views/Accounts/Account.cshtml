@@ -175,6 +175,27 @@
                         <strong>@Model.SupportCases.Count</strong>
                     </div>
                 </div>
+                <form id="supportAssistantForm" class="settings-form">
+                    <div class="field">
+                        <label for="supportAssistantQuery">Ask the grounded support assistant</label>
+                        <textarea id="supportAssistantQuery" rows="4" placeholder="What changed, what still hurts, or what do you need help understanding?"></textarea>
+                    </div>
+                    <div class="field">
+                        <label for="supportAssistantInstallation">Related install</label>
+                        <select id="supportAssistantInstallation">
+                            <option value="">Any install or no install yet</option>
+                            @foreach (var installation in Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Run.Contracts.InstallLinking.ClaimedInstallationDto>())
+                            {
+                                <option value="@installation.InstallationId">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
+                            }
+                        </select>
+                    </div>
+                    <button class="button-like button-like--secondary" type="submit">Check guidance</button>
+                    <p id="supportAssistantStatusNotice" class="muted-copy" hidden></p>
+                    <div id="supportAssistantAnswer" class="stacked-copy" hidden></div>
+                    <div id="supportAssistantActions" class="stacked-actions" hidden></div>
+                    <div id="supportAssistantCitations" class="settings-summary-list" hidden></div>
+                </form>
                 <form id="supportCaseForm" class="settings-form">
                     <div class="field">
                         <label for="supportCaseKind">Case type</label>
@@ -508,6 +529,71 @@
       ui.setNotice(notice, ui.describeError(error, "Participation settings could not be saved."), true);
     } finally {
       ui.setButtonBusy(button, false, "Saving...");
+    }
+  });
+
+  document.getElementById("supportAssistantForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("supportAssistantStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    const answer = document.getElementById("supportAssistantAnswer");
+    const actions = document.getElementById("supportAssistantActions");
+    const citations = document.getElementById("supportAssistantCitations");
+    ui.clearNotice(notice);
+    answer.hidden = true;
+    actions.hidden = true;
+    citations.hidden = true;
+    answer.textContent = "";
+    actions.innerHTML = "";
+    citations.innerHTML = "";
+    ui.setButtonBusy(button, true, "Checking...");
+    try {
+      const payload = await ui.requestJson("/api/v1/support/cases/assistant", {
+        method: "POST",
+        json: {
+          query: document.getElementById("supportAssistantQuery").value,
+          installationId: document.getElementById("supportAssistantInstallation").value || null
+        }
+      });
+
+      answer.textContent = payload.answer || "";
+      answer.hidden = !answer.textContent;
+
+      const actionItems = Array.isArray(payload.actions) ? payload.actions : [];
+      if (actionItems.length > 0) {
+        actions.hidden = false;
+        for (const item of actionItems) {
+          const link = document.createElement("a");
+          link.className = "button-like button-like--ghost";
+          link.href = item.href || "#";
+          link.textContent = item.label || item.actionId || "Open";
+          link.title = item.reason || "";
+          actions.appendChild(link);
+        }
+      }
+
+      const citationItems = Array.isArray(payload.citations) ? payload.citations : [];
+      if (citationItems.length > 0) {
+        citations.hidden = false;
+        for (const item of citationItems) {
+          const row = document.createElement("div");
+          row.className = "settings-summary-row";
+          const label = document.createElement("span");
+          label.textContent = item.label || item.sourceKind || "source";
+          const summary = document.createElement("strong");
+          summary.textContent = item.summary || "";
+          row.appendChild(label);
+          row.appendChild(summary);
+          citations.appendChild(row);
+        }
+      }
+
+      const confidence = payload.confidence ? ` (${payload.confidence.replaceAll("_", " ")})` : "";
+      ui.setNotice(notice, `Grounded guidance loaded${confidence}.`);
+    } catch (error) {
+      ui.setNotice(notice, ui.describeError(error, "Grounded guidance could not be loaded right now."), true);
+    } finally {
+      ui.setButtonBusy(button, false, "Checking...");
     }
   });
 

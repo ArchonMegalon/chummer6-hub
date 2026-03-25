@@ -98,6 +98,39 @@ public sealed record SupportCaseListResponse(
     IReadOnlyList<SupportCaseProjection> Items,
     int TotalCount);
 
+public static class SupportAssistantConfidenceLevels
+{
+    public const string CaseTruth = "case_truth";
+    public const string CanonHelp = "canon_help";
+    public const string NeedsCase = "needs_case";
+}
+
+public sealed record SupportAssistantRequest(
+    [Required(AllowEmptyStrings = false), StringLength(2000)] string Query,
+    [StringLength(64)] string? CaseId = null,
+    [StringLength(64)] string? InstallationId = null,
+    [Range(1, 5)] int MaxCitations = 3);
+
+public sealed record SupportAssistantCitation(
+    string SourceKind,
+    string Label,
+    string Summary,
+    string? Status = null,
+    string? Href = null);
+
+public sealed record SupportAssistantAction(
+    string ActionId,
+    string Label,
+    string Href,
+    string Reason);
+
+public sealed record SupportAssistantResponse(
+    string Answer,
+    string Confidence,
+    bool EscalationRecommended,
+    IReadOnlyList<SupportAssistantCitation> Citations,
+    IReadOnlyList<SupportAssistantAction> Actions);
+
 public sealed record CrashEnvelope(
     [Required(AllowEmptyStrings = false), StringLength(64)] string CrashId,
     [Required(AllowEmptyStrings = false), StringLength(64)] string HeadId,

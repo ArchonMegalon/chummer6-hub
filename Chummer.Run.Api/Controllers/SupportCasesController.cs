@@ -16,17 +16,20 @@ public sealed class SupportCasesController : ControllerBase
     private readonly HubIdentityClient _identity;
     private readonly AccountService _accounts;
     private readonly SupportCaseService _supportCases;
+    private readonly SupportAssistantService _assistant;
     private readonly IConfiguration _configuration;
 
     public SupportCasesController(
         HubIdentityClient identity,
         AccountService accounts,
         SupportCaseService supportCases,
+        SupportAssistantService assistant,
         IConfiguration configuration)
     {
         _identity = identity;
         _accounts = accounts;
         _supportCases = supportCases;
+        _assistant = assistant;
         _configuration = configuration;
     }
 
@@ -89,6 +92,33 @@ public sealed class SupportCasesController : ControllerBase
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             SupportCaseProjection created = _supportCases.Submit(user.UserId, subject.SubjectId, request);
             return AcceptedAtAction(nameof(GetCase), new { caseId = created.CaseId }, created);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("assistant")]
+    [ProducesResponseType<SupportAssistantResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<SupportAssistantResponse>> AskAssistant(
+        [FromBody] SupportAssistantRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("assistant payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_assistant.Answer(user.UserId, subject.SubjectId, request));
         }
         catch (HubRequestAuthException ex)
         {

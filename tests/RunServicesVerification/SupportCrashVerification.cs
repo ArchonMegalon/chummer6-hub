@@ -124,7 +124,7 @@ internal static class SupportCrashVerification
                     Platform: "linux",
                     Arch: "x64",
                     Source: SupportCaseSourceKinds.HubAccount));
-            VerificationAssert.Equal("chummer6-ui", submittedCase.CandidateOwnerRepo, "Bug reports should route to the UI owner by default.");
+            VerificationAssert.Equal("chummer6-hub", submittedCase.CandidateOwnerRepo, "Install/update/account bug reports should route to the Hub-owned front door by default.");
             VerificationAssert.True(submittedCase.DesignImpactSuspected, "Confusing-copy reports should mark design-impact suspicion.");
 
             SupportCaseProjection distinctCase = supportCases.Submit(
@@ -144,8 +144,41 @@ internal static class SupportCrashVerification
                     Source: SupportCaseSourceKinds.HubAccount));
             VerificationAssert.True(!string.Equals(distinctCase.CaseId, submittedCase.CaseId, StringComparison.Ordinal), "Support-case clustering should not collapse distinct summaries under the same title.");
 
+            SupportCaseProjection desktopBugCase = supportCases.Submit(
+                reporterUserId: "usr_runner",
+                reporterSubjectId: "subject.runner",
+                new SupportCaseSubmitRequest(
+                    Kind: SupportCaseKinds.BugReport,
+                    Title: "Desktop save fails",
+                    Summary: "Saving a character throws immediately.",
+                    Detail: "The desktop editor crashes during save.",
+                    InstallationId: "install-2",
+                    ApplicationVersion: "1.1.2",
+                    ReleaseChannel: "preview",
+                    HeadId: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Source: SupportCaseSourceKinds.HubAccount));
+            VerificationAssert.Equal("chummer6-ui", desktopBugCase.CandidateOwnerRepo, "Desktop runtime bug reports should still route to the UI owner.");
+
             SupportCaseListResponse reporterCases = supportCases.ListForReporter("usr_runner", "subject.runner");
-            VerificationAssert.Equal(2, reporterCases.TotalCount, "Reporter-scoped support lists should include all distinct submitted cases.");
+            VerificationAssert.Equal(3, reporterCases.TotalCount, "Reporter-scoped support lists should include all distinct submitted cases.");
+
+            bool blockedDirectNotify = false;
+            try
+            {
+                supportCases.Transition(
+                    submittedCase.CaseId,
+                    new SupportCaseTransitionRequest(
+                        TargetStatus: SupportCaseStatuses.UserNotified,
+                        Note: "This should fail.",
+                        Actor: "fleet"));
+            }
+            catch (InvalidOperationException)
+            {
+                blockedDirectNotify = true;
+            }
+            VerificationAssert.True(blockedDirectNotify, "Direct transition to user_notified should be blocked; callers must use the notification hook.");
 
             SupportCaseProjection released = supportCases.Transition(
                 submittedCase.CaseId,
