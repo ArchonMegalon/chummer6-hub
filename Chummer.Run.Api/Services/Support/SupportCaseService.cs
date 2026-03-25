@@ -299,6 +299,10 @@ public sealed class SupportCaseService
         ArgumentNullException.ThrowIfNull(request);
 
         string targetStatus = NormalizeStatus(request.TargetStatus);
+        if (string.Equals(targetStatus, SupportCaseStatuses.UserNotified, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Use the notification hook to move a support case into user_notified.");
+        }
         string? note = NormalizeOptional(request.Note, 160);
         string? fixedVersion = NormalizeOptional(request.FixedVersion, 64);
         string? fixedChannel = NormalizeOptional(request.FixedChannel, 64);
@@ -517,8 +521,8 @@ public sealed class SupportCaseService
         string? installationId,
         bool designImpact)
     {
-        string probe = string.Join("\n", new[] { title, summary, detail, headId, platform, installationId });
-        if (kind == SupportCaseKinds.CrashReport || kind == SupportCaseKinds.BugReport)
+        string probe = string.Join("\n", new[] { title, summary, detail, headId, platform });
+        if (kind == SupportCaseKinds.CrashReport)
         {
             return "chummer6-ui";
         }
@@ -531,6 +535,11 @@ public sealed class SupportCaseService
             || probe.Contains("channel", StringComparison.OrdinalIgnoreCase))
         {
             return "chummer6-hub";
+        }
+
+        if (kind == SupportCaseKinds.BugReport)
+        {
+            return "chummer6-ui";
         }
 
         return designImpact ? "chummer6-design" : "chummer6-hub";

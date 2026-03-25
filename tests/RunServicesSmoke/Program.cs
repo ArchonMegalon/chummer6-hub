@@ -1516,7 +1516,7 @@ async Task VerifyPublicLandingProjectionAsync()
         linkedIdentityClient,
         accounts,
         supportCases,
-        new SupportAssistantService(supportCases, configuration, loggerFactory.CreateLogger<SupportAssistantService>()),
+        new SupportAssistantService(supportCases, canon, loggerFactory.CreateLogger<SupportAssistantService>()),
         configuration)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -1525,7 +1525,7 @@ async Task VerifyPublicLandingProjectionAsync()
         linkedIdentityClient,
         accounts,
         supportCases,
-        new SupportAssistantService(supportCases, configuration, loggerFactory.CreateLogger<SupportAssistantService>()),
+        new SupportAssistantService(supportCases, canon, loggerFactory.CreateLogger<SupportAssistantService>()),
         configuration)
     {
         ControllerContext = AuthenticatedControllerContext("smoke-token")
@@ -1667,6 +1667,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(assistantPayload is not null && string.Equals(assistantPayload.Confidence, SupportAssistantConfidenceLevels.CaseTruth, StringComparison.Ordinal), "support assistant should ground answers on the signed-in reporter case when available.");
     Assert(assistantPayload!.Citations.Any(static item => string.Equals(item.SourceKind, "support_case", StringComparison.Ordinal)), "support assistant should cite the matching support case.");
     Assert(assistantPayload.Actions.Any(static item => string.Equals(item.ActionId, "open_account_support", StringComparison.Ordinal)), "support assistant should suggest the tracked case timeline when a matching case exists.");
+    SupportAssistantService supportAssistant = new(supportCases, canon, loggerFactory.CreateLogger<SupportAssistantService>());
+    var canonOnlyAssistant = supportAssistant.Answer(
+        reporterUserId: "usr_runner",
+        reporterSubjectId: "subject.runner",
+        new SupportAssistantRequest(Query: "How do I install or update the preview build?", InstallationId: null));
+    Assert(canonOnlyAssistant.Citations.Any(static item => string.Equals(item.SourceKind, "canon_doc", StringComparison.Ordinal)), "support assistant should ground install/update guidance in canon documents when no matching support case exists.");
+    Assert(canonOnlyAssistant.Actions.Any(static item => string.Equals(item.ActionId, "open_downloads", StringComparison.Ordinal)), "support assistant should offer the downloads surface for install/update questions.");
     var releasedResult = supportAutomationController.Transition(
         supportCase.CaseId,
         new SupportCaseTransitionRequest(
