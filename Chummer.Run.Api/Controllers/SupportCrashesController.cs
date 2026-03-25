@@ -1,6 +1,8 @@
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Contracts.Support;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Chummer.Run.Api.Controllers;
 
@@ -9,10 +11,12 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class SupportCrashesController : ControllerBase
 {
     private readonly CrashSupportService _crashSupport;
+    private readonly IConfiguration _configuration;
 
-    public SupportCrashesController(CrashSupportService crashSupport)
+    public SupportCrashesController(CrashSupportService crashSupport, IConfiguration configuration)
     {
         _crashSupport = crashSupport;
+        _configuration = configuration;
     }
 
     [HttpPost]
@@ -37,6 +41,12 @@ public sealed class SupportCrashesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult<CrashIncidentProjection> GetIncident([FromRoute] string incidentId)
     {
+        ActionResult? denied = RequireInternalAutomationAuth();
+        if (denied is not null)
+        {
+            return denied;
+        }
+
         if (string.IsNullOrWhiteSpace(incidentId))
         {
             return BadRequest("incidentId is required.");
@@ -51,12 +61,59 @@ public sealed class SupportCrashesController : ControllerBase
     public ActionResult<CrashClusterListResponse> ListClusters(
         [FromQuery] string? status = null,
         [FromQuery] string? fingerprint = null)
-        => Ok(_crashSupport.ListClusters(status, fingerprint));
+    {
+        ActionResult? denied = RequireInternalAutomationAuth();
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        return Ok(_crashSupport.ListClusters(status, fingerprint));
+    }
 
     [HttpGet("work-items")]
     [ProducesResponseType<CrashWorkItemListResponse>(StatusCodes.Status200OK)]
     public ActionResult<CrashWorkItemListResponse> ListWorkItems(
         [FromQuery] string? status = null,
         [FromQuery] string? candidateOwnerRepo = null)
-        => Ok(_crashSupport.ListWorkItems(status, candidateOwnerRepo));
+    {
+        ActionResult? denied = RequireInternalAutomationAuth();
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        return Ok(_crashSupport.ListWorkItems(status, candidateOwnerRepo));
+    }
+
+    private ActionResult? RequireInternalAutomationAuth()
+    {
+        string expectedToken = (_configuration["FLEET_INTERNAL_API_TOKEN"] ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(expectedToken))
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "internal crash automation auth is not configured.");
+        }
+
+        string header = Request.Headers.Authorization.ToString();
+        const string bearerPrefix = "Bearer ";
+        if (!header.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "internal crash automation authorization is required.");
+        }
+
+        string providedToken = header[bearerPrefix.Length..].Trim();
+        if (!FixedTimeEquals(providedToken, expectedToken))
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "internal crash automation authorization is required.");
+        }
+
+        return null;
+    }
+
+    private static bool FixedTimeEquals(string left, string right)
+    {
+        byte[] leftBytes = Encoding.UTF8.GetBytes(left);
+        byte[] rightBytes = Encoding.UTF8.GetBytes(right);
+        return CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
+    }
 }

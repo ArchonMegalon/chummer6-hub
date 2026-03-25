@@ -254,6 +254,41 @@ public sealed class InstallLinkingService
         }
     }
 
+    public ClaimedInstallationDto? ResolveInstallationForGrant(string? installationId, string? accessToken)
+    {
+        string? normalizedInstallationId = NormalizeOptional(installationId);
+        string? normalizedAccessToken = NormalizeOptional(accessToken);
+        if (normalizedInstallationId is null || normalizedAccessToken is null)
+        {
+            return null;
+        }
+
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            ExpireGrantsLocked(now);
+
+            if (!_store.InstallationsById.TryGetValue(normalizedInstallationId, out ClaimedInstallationDto? installation))
+            {
+                return null;
+            }
+
+            if (!string.Equals(installation.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            InstallationGrantDto? grant = _store.GrantsById.Values
+                .Where(item => string.Equals(item.InstallationId, normalizedInstallationId, StringComparison.OrdinalIgnoreCase))
+                .Where(item => string.Equals(item.AccessToken, normalizedAccessToken, StringComparison.Ordinal))
+                .Where(item => string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase))
+                .Where(item => item.ExpiresAtUtc > now)
+                .OrderByDescending(static item => item.IssuedAtUtc)
+                .FirstOrDefault();
+            return grant is null ? null : installation;
+        }
+    }
+
     private InstallClaimTicketDto? FindReusableTicketLocked(string artifactId, string? userId, string? subjectId, DateTimeOffset now)
         => _store.ClaimTicketsById.Values
             .Where(item => string.Equals(item.ArtifactId, artifactId, StringComparison.OrdinalIgnoreCase))

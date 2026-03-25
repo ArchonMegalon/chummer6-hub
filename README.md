@@ -10,7 +10,7 @@ Hosted orchestration and play API boundary for Chummer6.
 - hosted play APIs and orchestration
 - governed AI, docs/help, and automation bridges
 - orchestration-side registry and media adapters
-- user accounts, groups, sponsorship sessions, and the canonical community ledger
+- user accounts, groups, access/support state, and the canonical community ledger
 - the `chummer.run` landing page, proof shelf, and thin signed-in home overlay
 
 ## What this repo is not
@@ -38,11 +38,12 @@ Current honesty clause:
 
 The public-facing community spine now lives here too:
 
-- `Chummer.Run.Api` owns product-level users, groups, join/boost codes, sponsor sessions, leaderboards, rewards, and entitlements
+- Chummer.Run.Api owns product-level user accounts, groups, sponsorship sessions, and the canonical community ledger.
+- `Chummer.Run.Api` owns product-level users, groups, join/boost codes, sponsor sessions, support/access flows, leaderboards, rewards, and entitlements as part of the canonical community ledger
 - `Chummer.Run.Api` also owns linked identity and channel-link state for email hygiene, Google/Facebook social bootstrap, and official Telegram companion routing
 - `Chummer.Run.Identity` remains the principal/session boundary below that account layer
-- `Chummer.Run.AI` ingests sponsor receipts and projects sponsored-lane activity
-- Fleet executes sponsored participant lanes, but Hub owns the canonical community/accounting truth
+- `Chummer.Run.AI` ingests validated participation receipts and projects guided-lane activity
+- Fleet executes optional guided-contribution lanes, but Hub owns the canonical community ledger and accounting truth
 - EA remains the orchestrator brain behind companion and assistant channels; Telegram, Google, Facebook, and transactional email are adapters around that hub-owned account plane
 
 ## Go deeper

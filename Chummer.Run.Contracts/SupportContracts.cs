@@ -116,6 +116,7 @@ public sealed record CrashEnvelope(
     [StringLength(64)] string? DesktopHead = null,
     [StringLength(64)] string? RuntimeHead = null,
     [StringLength(64)] string? InstallationId = null,
+    [StringLength(256)] string? InstallationGrantToken = null,
     [StringLength(64)] string? UserId = null,
     [StringLength(128)] string? SubjectId = null,
     [StringLength(128)] string? LastActionCategory = null,

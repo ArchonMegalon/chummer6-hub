@@ -73,6 +73,11 @@ builder.Services.AddHttpClient<IHubCrashAutomationClient, HubCrashAutomationClie
 {
     client.BaseAddress = ResolveHubApiBaseAddress(builder.Configuration);
     client.Timeout = TimeSpan.FromSeconds(20);
+    string? token = builder.Configuration["FLEET_INTERNAL_API_TOKEN"];
+    if (!string.IsNullOrWhiteSpace(token))
+    {
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Trim());
+    }
 });
 builder.Services.AddSingleton<IInteropExportService, InteropExportService>();
 builder.Services.AddSingleton<IFastSignalDetector, FastSignalDetector>();
