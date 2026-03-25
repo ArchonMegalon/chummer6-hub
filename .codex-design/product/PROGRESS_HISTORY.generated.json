@@ -1,7 +1,7 @@
 {
   "contract_name": "fleet.public_progress_history",
   "contract_version": "2026-03-23",
-  "generated_at": "2026-03-23T20:29:30Z",
+  "generated_at": "2026-03-24T16:42:39Z",
   "snapshot_count": 1,
   "snapshots": [
     {
@@ -15,7 +15,7 @@
           "progress_percent": 80,
           "remaining_open_weight": 8,
           "remaining_open_milestones": 1,
-          "recent_commit_count_7d": 56,
+          "recent_commit_count_7d": 55,
           "uncovered_scope_count": 3,
           "eta_weeks_low": 3,
           "eta_weeks_high": 5,
@@ -51,7 +51,7 @@
           "progress_percent": 63,
           "remaining_open_weight": 58,
           "remaining_open_milestones": 8,
-          "recent_commit_count_7d": 77,
+          "recent_commit_count_7d": 97,
           "uncovered_scope_count": 8,
           "eta_weeks_low": 10,
           "eta_weeks_high": 14,
@@ -63,7 +63,7 @@
           "progress_percent": 82,
           "remaining_open_weight": 8,
           "remaining_open_milestones": 1,
-          "recent_commit_count_7d": 45,
+          "recent_commit_count_7d": 47,
           "uncovered_scope_count": 2,
           "eta_weeks_low": 2,
           "eta_weeks_high": 4,

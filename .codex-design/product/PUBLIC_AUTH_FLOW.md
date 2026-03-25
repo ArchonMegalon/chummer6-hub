@@ -30,6 +30,7 @@ Registered routes:
 * guest access to `/account` must redirect or fall back to `/login?next=/account`
 * guest access to `/participate/codex` must redirect or fall back to `/login?next=/participate/codex`
 * `/participate` remains the public explainer and must not require sign-in
+* guest-visible participation CTAs should prefer `/participate` first; the deep `/participate/codex` lane is a later step, not the first public landing target
 
 ## Discoverability rule
 

@@ -1411,6 +1411,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             ["CHUMMER_PUBLIC_CANON_ROOT"] = "/docker/chummercomplete/chummer.run-services",
             ["CHUMMER_COMMUNITY_STORE_PATH"] = storePath,
+            ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
             ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot
         })
         .Build();

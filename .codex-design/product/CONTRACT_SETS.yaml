@@ -1,11 +1,13 @@
 group_id: chummer-vnext
-last_reviewed: 2026-03-19
+last_reviewed: 2026-03-24
 
 packages:
   - id: Chummer.Engine.Contracts
     owner_repo: chummer6-core
     purpose: Deterministic engine/runtime/explain/reducer DTOs.
     status: complete
+    versioning_policy: SemVer. Breaking runtime or explain payload meaning is major; additive DTO fields or projections are minor; compatible clarifications are patch.
+    deprecation_policy: Deprecations land in design and core first, remain supported for at least one promoted release cycle, and require milestone/blocker updates before removal.
     consumers:
       - chummer6-ui
       - chummer6-mobile
@@ -19,6 +21,8 @@ packages:
     owner_repo: chummer6-hub
     purpose: Play/mobile/service seam for hosted play APIs, role-shell transport DTOs, replay checkpoints, and play-safe projections.
     status: complete
+    versioning_policy: SemVer. Breaking play-shell API or transport semantics is major; additive projections or request fields are minor; compatible clarifications are patch.
+    deprecation_policy: Deprecations must be announced in design and hub first, keep replay-safe compatibility for at least one promoted release cycle, and update blockers before semantic removal.
     consumers:
       - chummer6-mobile
       - chummer6-ui
@@ -30,6 +34,8 @@ packages:
     owner_repo: chummer6-hub
     purpose: Hosted orchestration contracts for identity, approvals, run-specific ingestion/backup seams, delivery, and service policy.
     status: complete
+    versioning_policy: SemVer. Breaking hosted orchestration or participation semantics is major; additive workflow fields are minor; compatible clarifications are patch.
+    deprecation_policy: Deprecations must be published in design and hub, dual-served for at least one promoted release cycle, and paired with milestone/blocker updates before removal.
     consumers:
       - chummer6-ui
       - internal service clients
@@ -42,6 +48,8 @@ packages:
     owner_repo: chummer6-ui-kit
     purpose: Shared design tokens, themes, primitives, shell chrome, and reusable Chummer UI patterns.
     status: complete
+    versioning_policy: SemVer. Breaking token, primitive, or component contracts is major; additive reusable surfaces are minor; compatible visual fixes are patch.
+    deprecation_policy: Deprecations must name a replacement primitive or token, be reflected in design and package release notes, and stay available for at least one promoted UI/mobile release cycle before removal.
     consumers:
       - chummer6-ui
       - chummer6-mobile
@@ -53,6 +61,8 @@ packages:
     owner_repo: chummer6-hub-registry
     purpose: Immutable registry/publication/install/compatibility contracts.
     status: complete
+    versioning_policy: SemVer. Breaking artifact, install, or release-feed schema meaning is major; additive publication and compatibility metadata is minor; compatible clarifications are patch.
+    deprecation_policy: Deprecations must be staged in design and registry, dual-served for at least one promoted release cycle, and reflected in compatibility guidance before removal.
     consumers:
       - chummer6-hub
       - chummer6-ui
@@ -64,6 +74,8 @@ packages:
     owner_repo: chummer6-media-factory
     purpose: Media execution contracts for render jobs, manifests, previews, asset lifecycle, and media receipts.
     status: complete
+    versioning_policy: SemVer. Breaking render-job, manifest, or receipt semantics is major; additive media metadata is minor; compatible clarifications are patch.
+    deprecation_policy: Deprecations must be announced in design and media-factory, preserve preview/manifests for at least one promoted release cycle, and update affected blockers before removal.
     consumers:
       - chummer6-hub
       - chummer6-ui

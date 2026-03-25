@@ -238,6 +238,13 @@ WORK_QUEUE.md
 .aider.tags.cache.v4
 .codex-studio/
 .codex.boot.prompt.txt
+
+# Local download bundle snapshots
+/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json
+/Chummer.Portal/downloads/releases.json
+/Chummer.Portal/downloads/files/
+/legacy/tooling/docker/Docker/Downloads/RELEASE_CHANNEL.generated.json
+/legacy/tooling/docker/Docker/Downloads/files/
 .codex.resume.boot.txt
 .tmp/
 .local/

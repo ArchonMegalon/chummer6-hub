@@ -5,6 +5,27 @@ page_types:
   root_story:
     audience: public
     max_technical_depth: low
+    section_order:
+    - hero
+    - pitch
+    - quick_nav
+    - current_posture
+    - table_pain_example
+    - why_watch
+    - updates_teaser
+    - participation_entry
+    - try_it_now
+    - deeper_map
+    max_front_page_updates: 1
+    nav_before_updates: true
+    primary_cta_order:
+    - start_here
+    - current_status
+    - what_chummer6_is
+    - participate
+    - download
+    public_participation_entry_route: /participate
+    visual_density_profile: first_contact_hero
     allowed_sources:
     - products/chummer/PUBLIC_LANDING_POLICY.md
     - products/chummer/PUBLIC_LANDING_MANIFEST.yaml
@@ -72,6 +93,11 @@ page_types:
   horizon_index:
     audience: deeper_public
     max_technical_depth: medium
+    visual_density_profile: page_index
+    must_show_semantic_anchors:
+    - branching futures
+    - differentiated lane identities
+    - multiple grounded clues instead of one sign
     allowed_sources:
     - products/chummer/HORIZON_REGISTRY.yaml
     - products/chummer/PUBLIC_GUIDE_EXPORT_MANIFEST.yaml
@@ -99,6 +125,7 @@ page_types:
   help_page:
     audience: public
     max_technical_depth: low
+    primary_participation_entry_route: /participate
     allowed_sources:
     - products/chummer/PUBLIC_HELP_COPY.md
     - products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md
@@ -131,6 +158,14 @@ page_types:
   download_page:
     audience: public
     max_technical_depth: low
+    preferred_artifact_kinds:
+    - installer
+    - dmg
+    - pkg
+    - portable
+    archive_only_behavior: secondary_manual_preview_shelf
+    archive_only_primary_cta_allowed: false
+    visual_density_profile: restrained_support_surface
     allowed_sources:
     - products/chummer/PUBLIC_FEATURE_REGISTRY.yaml
     - approved public-status summaries
@@ -138,11 +173,10 @@ page_types:
     forbidden_sources:
     - products/chummer/projects/*.md
     required_topics:
-    - current release matrix
-    - installer and setup packages
-    - auto-update channel behavior
+    - current build matrix
+    - honest artifact format
     - checksums
-    - manual archive fallback
+    - raw release fallback
   deep_source_trail:
     audience: deeper_public
     max_technical_depth: high

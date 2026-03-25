@@ -225,6 +225,51 @@ let currentContributionId = "";
 let pollHandle = 0;
 const dialog = document.getElementById("participationWizardDialog");
 const ui = window.ChummerUi;
+const nodes = {
+  openWizardButton: document.getElementById("openParticipationWizardButton"),
+  closeWizardButton: document.getElementById("closeParticipationWizardButton"),
+  closeStartButton: document.getElementById("closeStartStateButton"),
+  backdrop: document.querySelector("[data-close-participation-dialog]"),
+  startContributionButton: document.getElementById("startContributionButton"),
+  refreshAuthorizationButton: document.getElementById("refreshAuthorizationButton"),
+  stopContributionButton: document.getElementById("stopContributionButton"),
+  revokeContributionButton: document.getElementById("revokeContributionButton"),
+  cancelContributionButton: document.getElementById("cancelContributionButton"),
+  copyCodeButton: document.getElementById("copyCodeButton"),
+  authorizationLink: document.getElementById("openAuthorizationLink"),
+  authorizationCode: document.getElementById("authorizationCode"),
+  technicalDetails: document.getElementById("technicalDetails"),
+  badgeReveal: document.getElementById("badgeReveal"),
+  stateTag: document.getElementById("stateTag"),
+  heading: document.getElementById("participationHeading"),
+  support: document.getElementById("stateSupport"),
+  statusLine: document.getElementById("stateLine"),
+  wizardStepLabel: document.getElementById("wizardStepLabel"),
+  unavailableHomeLink: document.getElementById("unavailableHomeLink"),
+  unavailableAccountLink: document.getElementById("unavailableAccountLink"),
+  unavailableExplainLink: document.getElementById("unavailableExplainLink"),
+  badgeLabel: document.getElementById("badgeLabel"),
+  badgeNote: document.getElementById("badgeNote"),
+  details: {
+    contributionId: document.getElementById("detailContributionId"),
+    fleetLaneId: document.getElementById("detailFleetLaneId"),
+    authStatus: document.getElementById("detailAuthStatus"),
+    authReadyAt: document.getElementById("detailAuthReadyAt"),
+    authorizationTier: document.getElementById("detailAuthorizationTier"),
+    laneRole: document.getElementById("detailLaneRole")
+  },
+  steps: {
+    start: document.getElementById("wizardStepStart"),
+    authorize: document.getElementById("wizardStepAuthorize"),
+    complete: document.getElementById("wizardStepComplete")
+  },
+  states: {
+    start: document.getElementById("startState"),
+    authorize: document.getElementById("authorizeState"),
+    complete: document.getElementById("completeState"),
+    unavailable: document.getElementById("unavailableState")
+  }
+};
 
 function stopPolling() {
   if (pollHandle) {
@@ -255,23 +300,20 @@ function setDialogOpen(open) {
 }
 
 function toggleState(phase) {
-  document.getElementById("startState").hidden = phase !== "start";
-  document.getElementById("authorizeState").hidden = phase !== "authorize";
-  document.getElementById("completeState").hidden = phase !== "complete";
-  document.getElementById("unavailableState").hidden = phase !== "unavailable";
+  ui.toggleExclusive(nodes.states, phase);
 }
 
 function setWizardStep(phase, status) {
-  const steps = {
-    start: ["wizardStepStart"],
-    authorize: ["wizardStepStart", "wizardStepAuthorize"],
-    complete: ["wizardStepStart", "wizardStepAuthorize", "wizardStepComplete"],
+  const completedSteps = {
+    start: ["start"],
+    authorize: ["start", "authorize"],
+    complete: ["start", "authorize", "complete"],
     unavailable: []
   };
-  const current = {
-    start: "wizardStepStart",
-    authorize: "wizardStepAuthorize",
-    complete: "wizardStepComplete",
+  const currentStep = {
+    start: "start",
+    authorize: "authorize",
+    complete: "complete",
     unavailable: ""
   };
   let label = {
@@ -287,12 +329,12 @@ function setWizardStep(phase, status) {
     label = "Fresh code ready";
   }
 
-  document.getElementById("wizardStepLabel").textContent = label;
-  for (const id of ["wizardStepStart", "wizardStepAuthorize", "wizardStepComplete"]) {
-    const element = document.getElementById(id);
-    element.classList.toggle("wizard-step--complete", (steps[phase] || []).includes(id) && id !== current[phase]);
-    element.classList.toggle("wizard-step--current", id === current[phase]);
-    element.classList.toggle("wizard-step--pending", !(steps[phase] || []).includes(id));
+  ui.setText(nodes.wizardStepLabel, label);
+  for (const [key, element] of Object.entries(nodes.steps)) {
+    const done = (completedSteps[phase] || []).includes(key);
+    element.classList.toggle("wizard-step--complete", done && key !== currentStep[phase]);
+    element.classList.toggle("wizard-step--current", key === currentStep[phase]);
+    element.classList.toggle("wizard-step--pending", !done);
   }
 }
 
@@ -328,12 +370,12 @@ function showPreparingState() {
   currentContributionId = "";
   setWizardStep("start", "starting");
   toggleState("start");
-  document.getElementById("stateTag").textContent = "Preparing";
-  document.getElementById("participationHeading").textContent = "Preparing a fresh authorization code";
-  document.getElementById("stateSupport").textContent = "Chummer is opening a fresh participation challenge for this session.";
-  document.getElementById("stateLine").textContent = "Codes are only generated after you explicitly start.";
-  document.getElementById("technicalDetails").hidden = true;
-  document.getElementById("badgeReveal").hidden = true;
+  ui.setText(nodes.stateTag, "Preparing");
+  ui.setText(nodes.heading, "Preparing a fresh authorization code");
+  ui.setText(nodes.support, "Chummer is opening a fresh participation challenge for this session.");
+  ui.setText(nodes.statusLine, "Codes are only generated after you explicitly start.");
+  nodes.technicalDetails.hidden = true;
+  nodes.badgeReveal.hidden = true;
 }
 
 function renderError(error) {
@@ -346,13 +388,57 @@ function renderError(error) {
   stopPolling();
   currentContributionId = "";
   setDialogOpen(true);
-  document.getElementById("stateTag").textContent = "Attention";
-  document.getElementById("participationHeading").textContent = "The contribution flow could not continue";
-  document.getElementById("stateSupport").textContent = error?.message || "Something interrupted the current request.";
-  document.getElementById("stateLine").textContent = "Try again in a moment.";
-  document.getElementById("technicalDetails").hidden = true;
+  ui.setText(nodes.stateTag, "Attention");
+  ui.setText(nodes.heading, "The contribution flow could not continue");
+  ui.setText(nodes.support, error?.message || "Something interrupted the current request.");
+  ui.setText(nodes.statusLine, "Try again in a moment.");
+  nodes.technicalDetails.hidden = true;
   setWizardStep("start", "error");
   toggleState("start");
+}
+
+function syncAuthorization(auth, status) {
+  nodes.authorizationLink.dataset.href = auth.verificationUri || "";
+  nodes.authorizationLink.disabled = !auth.verificationUri;
+  nodes.authorizationLink.setAttribute("aria-disabled", auth.verificationUri ? "false" : "true");
+  nodes.authorizationLink.classList.toggle("button-like--disabled", !auth.verificationUri);
+  nodes.copyCodeButton.disabled = !auth.userCode;
+  ui.setText(
+    nodes.authorizationCode,
+    auth.userCode
+      || (status === "waiting_for_slot"
+        ? "No code yet. Chummer is waiting for a contribution slot to open."
+        : "A fresh code will appear here as soon as Chummer receives it.")
+  );
+}
+
+function syncUnavailableActions(actions) {
+  nodes.unavailableHomeLink.href = actions.homeHref || "/home";
+  nodes.unavailableAccountLink.href = actions.accountHref || "/account";
+  nodes.unavailableExplainLink.href = actions.explainHref || "/participate";
+}
+
+function syncBadge(phase, badge) {
+  nodes.badgeReveal.hidden = !(phase === "complete" && badge);
+  ui.setText(nodes.badgeLabel, badge?.label || "Contributor Ready");
+  ui.setText(nodes.badgeNote, badge?.note || "This is a thank-you marker only. Contribution credit appears later after validated work.");
+}
+
+function syncTechnicalDetails(contribution, details) {
+  nodes.technicalDetails.hidden = !contribution;
+  ui.setText(nodes.details.contributionId, details?.contributionId || "None");
+  ui.setText(nodes.details.fleetLaneId, details?.fleetLaneId || "Not created yet");
+  ui.setText(nodes.details.authStatus, details?.authStatus || "Not started");
+  ui.setText(nodes.details.authReadyAt, formatDate(details?.authReadyAtUtc));
+  ui.setText(nodes.details.authorizationTier, details?.authorizationTier || "Unknown");
+  ui.setText(nodes.details.laneRole, details?.requestedLaneRole || "coding");
+}
+
+function syncContributionActions(phase, status) {
+  const canCloseContribution = !!currentContributionId && phase !== "unavailable" && status !== "stopped" && status !== "revoked";
+  nodes.stopContributionButton.disabled = !canCloseContribution;
+  nodes.revokeContributionButton.disabled = !canCloseContribution;
+  nodes.cancelContributionButton.hidden = !currentContributionId || phase === "unavailable";
 }
 
 function render(data) {
@@ -366,7 +452,7 @@ function render(data) {
   currentContributionId = contribution?.contributionId || "";
 
   setDialogOpen(true);
-  document.getElementById("stateTag").textContent = status === "waiting_for_slot"
+  ui.setText(nodes.stateTag, status === "waiting_for_slot"
     ? "Queued"
     : phase === "complete"
       ? "Ready"
@@ -374,48 +460,17 @@ function render(data) {
         ? "Authorize"
         : phase === "unavailable"
           ? "Unavailable"
-          : "Start";
-  document.getElementById("participationHeading").textContent = data.heading || "Open a fresh contribution lane";
-  document.getElementById("stateSupport").textContent = data.support || "";
-  document.getElementById("stateLine").textContent = data.statusLine || "";
+          : "Start");
+  ui.setText(nodes.heading, data.heading || "Open a fresh contribution lane");
+  ui.setText(nodes.support, data.support || "");
+  ui.setText(nodes.statusLine, data.statusLine || "");
   setWizardStep(phase, status);
   toggleState(phase);
-
-  const authorizationLink = document.getElementById("openAuthorizationLink");
-  const copyCodeButton = document.getElementById("copyCodeButton");
-  const authorizationCode = document.getElementById("authorizationCode");
-  authorizationLink.dataset.href = auth.verificationUri || "";
-  authorizationLink.disabled = !auth.verificationUri;
-  authorizationLink.setAttribute("aria-disabled", auth.verificationUri ? "false" : "true");
-  authorizationLink.classList.toggle("button-like--disabled", !auth.verificationUri);
-  copyCodeButton.disabled = !auth.userCode;
-  authorizationCode.textContent = auth.userCode
-    || (status === "waiting_for_slot"
-      ? "No code yet. Chummer is waiting for a contribution slot to open."
-      : "A fresh code will appear here as soon as Chummer receives it.");
-
-  document.getElementById("unavailableHomeLink").href = actions.homeHref || "/home";
-  document.getElementById("unavailableAccountLink").href = actions.accountHref || "/account";
-  document.getElementById("unavailableExplainLink").href = actions.explainHref || "/participate";
-
-  const badgeReveal = document.getElementById("badgeReveal");
-  badgeReveal.hidden = !(phase === "complete" && badge);
-  document.getElementById("badgeLabel").textContent = badge?.label || "Contributor Ready";
-  document.getElementById("badgeNote").textContent = badge?.note || "This is a thank-you marker only. Contribution credit appears later after validated work.";
-
-  const technicalDetails = document.getElementById("technicalDetails");
-  technicalDetails.hidden = !contribution;
-  document.getElementById("detailContributionId").textContent = details?.contributionId || "None";
-  document.getElementById("detailFleetLaneId").textContent = details?.fleetLaneId || "Not created yet";
-  document.getElementById("detailAuthStatus").textContent = details?.authStatus || "Not started";
-  document.getElementById("detailAuthReadyAt").textContent = formatDate(details?.authReadyAtUtc);
-  document.getElementById("detailAuthorizationTier").textContent = details?.authorizationTier || "Unknown";
-  document.getElementById("detailLaneRole").textContent = details?.requestedLaneRole || "coding";
-
-  const canCloseContribution = !!currentContributionId && phase !== "unavailable" && status !== "stopped" && status !== "revoked";
-  document.getElementById("stopContributionButton").disabled = !canCloseContribution;
-  document.getElementById("revokeContributionButton").disabled = !canCloseContribution;
-  document.getElementById("cancelContributionButton").hidden = !currentContributionId || phase === "unavailable";
+  syncAuthorization(auth, status);
+  syncUnavailableActions(actions);
+  syncBadge(phase, badge);
+  syncTechnicalDetails(contribution, details);
+  syncContributionActions(phase, status);
 
   if (phase === "authorize" && currentContributionId) {
     schedulePoll(auth.pollAfterMs || 3000);
@@ -433,78 +488,65 @@ async function refreshCurrent() {
 }
 
 async function startContribution() {
-  const button = document.getElementById("startContributionButton");
-  const refreshButton = document.getElementById("refreshAuthorizationButton");
   setDialogOpen(true);
   showPreparingState();
-  ui.setButtonBusy(button, true, "Preparing...");
-  ui.setButtonBusy(refreshButton, true, "Preparing...");
-  try {
+  await ui.withBusyState([nodes.startContributionButton, nodes.refreshAuthorizationButton], "Preparing...", async () => {
     const data = await ui.requestJson("/api/v1/participation/contributions/start", { method: "POST" });
     render(data);
-  } finally {
-    ui.setButtonBusy(button, false, "Preparing...");
-    ui.setButtonBusy(refreshButton, false, "Preparing...");
-  }
+  });
 }
 
 async function stopContribution(revoke) {
   if (!currentContributionId) return;
   const button = revoke
-    ? document.getElementById("revokeContributionButton")
-    : document.getElementById("stopContributionButton");
-  ui.setButtonBusy(button, true, revoke ? "Revoking..." : "Stopping...");
-  try {
+    ? nodes.revokeContributionButton
+    : nodes.stopContributionButton;
+  await ui.withBusyState(button, revoke ? "Revoking..." : "Stopping...", async () => {
     const path = revoke
       ? `/api/v1/participation/contributions/${currentContributionId}/revoke`
       : `/api/v1/participation/contributions/${currentContributionId}/stop`;
     const data = await ui.requestJson(path, { method: "POST" });
     render(data);
-  } finally {
-    ui.setButtonBusy(button, false, revoke ? "Revoking..." : "Stopping...");
-  }
+  });
 }
 
 async function copyCode() {
-  const code = document.getElementById("authorizationCode").textContent || "";
+  const code = nodes.authorizationCode.textContent || "";
   if (!code || code.startsWith("A fresh code will appear") || code.startsWith("No code yet")) return;
-  await navigator.clipboard.writeText(code);
-  const button = document.getElementById("copyCodeButton");
-  ui.setButtonBusy(button, true, "Copied");
-  window.setTimeout(() => ui.setButtonBusy(button, false, "Copied"), 1200);
+  await ui.copyToClipboard(code, nodes.copyCodeButton);
 }
 
-document.getElementById("openParticipationWizardButton").addEventListener("click", () => {
+nodes.openWizardButton.addEventListener("click", () => {
   startContribution().catch(renderError);
 });
-document.getElementById("startContributionButton").addEventListener("click", () => {
+nodes.startContributionButton.addEventListener("click", () => {
   startContribution().catch(renderError);
 });
-document.getElementById("refreshAuthorizationButton").addEventListener("click", () => {
+nodes.refreshAuthorizationButton.addEventListener("click", () => {
   startContribution().catch(renderError);
 });
-document.getElementById("copyCodeButton").addEventListener("click", () => {
+nodes.copyCodeButton.addEventListener("click", () => {
   copyCode().catch(renderError);
 });
-document.getElementById("cancelContributionButton").addEventListener("click", () => {
+nodes.cancelContributionButton.addEventListener("click", () => {
   stopContribution(false).catch(renderError);
 });
-document.getElementById("stopContributionButton").addEventListener("click", () => {
+nodes.stopContributionButton.addEventListener("click", () => {
   stopContribution(false).catch(renderError);
 });
-document.getElementById("revokeContributionButton").addEventListener("click", () => {
+nodes.revokeContributionButton.addEventListener("click", () => {
   stopContribution(true).catch(renderError);
 });
-document.getElementById("closeParticipationWizardButton").addEventListener("click", () => {
+nodes.closeWizardButton.addEventListener("click", () => {
   setDialogOpen(false);
 });
-document.getElementById("closeStartStateButton").addEventListener("click", () => {
+nodes.closeStartButton.addEventListener("click", () => {
   setDialogOpen(false);
 });
-document.querySelector("[data-close-participation-dialog]").addEventListener("click", () => {
+nodes.backdrop.addEventListener("click", () => {
   setDialogOpen(false);
 });
-document.getElementById("openAuthorizationLink").addEventListener("click", (event) => {
+nodes.authorizationLink.addEventListener("click", (event) => {
   const href = event.currentTarget.dataset.href;
   if (!href) {
     return;
