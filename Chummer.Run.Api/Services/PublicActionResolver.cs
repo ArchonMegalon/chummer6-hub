@@ -49,6 +49,11 @@ public sealed class PublicActionResolver
             card.RegisteredHref
         };
 
+        if (routeCandidates.All(string.IsNullOrWhiteSpace))
+        {
+            throw new InvalidOperationException($"public feature card '{card.Id}' has no actionable route.");
+        }
+
         foreach (var candidate in routeCandidates.Where(static value => !string.IsNullOrWhiteSpace(value)))
         {
             if (Uri.TryCreate(candidate, UriKind.Absolute, out _))
