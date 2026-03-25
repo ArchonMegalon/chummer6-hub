@@ -75,10 +75,6 @@
                         <a class="@actionClass" href="@action.Href">@action.Label</a>
                     }
                 }
-                @if (!chrome.Authenticated && chrome.PublicPrimaryCta is not null)
-                {
-                    <a class="action-pill action-pill--@chrome.PublicPrimaryCta.Tone" href="@chrome.PublicPrimaryCta.Href">@chrome.PublicPrimaryCta.Label</a>
-                }
             </div>
         </div>
         <div class="site-nav-sheet" id="site-nav-sheet" data-nav-sheet hidden>
@@ -106,10 +102,6 @@
                                 : $"action-pill action-pill--{action.Tone}";
                             <a class="@actionClass" href="@action.Href">@action.Label</a>
                         }
-                    }
-                    @if (!chrome.Authenticated && chrome.PublicPrimaryCta is not null)
-                    {
-                        <a class="action-pill action-pill--@chrome.PublicPrimaryCta.Tone" href="@chrome.PublicPrimaryCta.Href">@chrome.PublicPrimaryCta.Label</a>
                     }
                 </div>
             </div>
