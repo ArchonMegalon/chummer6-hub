@@ -123,7 +123,7 @@ Boosting is the first use case of that platform, not a license to let Fleet abso
 
 ### Rule 14 — Participation canon starts in design, not in guide copy or helper scripts
 
-The bounded participate/booster lane is a first-class product workflow.
+The guided participation lane is a first-class product workflow.
 
 Canonical workflow truth lives in `products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md`, not in:
 
@@ -380,7 +380,7 @@ This plane exists to integrate owned third-party capabilities without allowing a
 
 ## Community sponsorship plane
 
-Chummer uses one community/sponsorship spine rather than a one-off booster feature.
+Chummer uses one community/sponsorship spine rather than a one-off contribution-only feature.
 
 Canonical split:
 
@@ -397,7 +397,7 @@ Canonical split:
 * sponsor session: a bounded premium-burst sponsorship intent/execution record
 * entitlement: a durable product right granted to a user or group
 
-User accounts must not collapse into raw identity-subject rows. Groups must stay generic enough to serve booster groups now and campaign / GM-circle / creator-team surfaces later.
+User accounts must not collapse into raw identity-subject rows. Groups must stay generic enough to serve guided-contribution groups now and campaign / GM-circle / creator-team surfaces later.
 
 ### Accounting rule
 

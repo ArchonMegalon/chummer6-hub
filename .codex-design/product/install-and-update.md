@@ -1,6 +1,6 @@
 # Install and update
 
-Status: poc_and_preview
+Status: early_access_preview
 
 ## User goal
 
@@ -24,7 +24,7 @@ Choose the right build, install it, and later update it without guessing which c
 
 * If a promoted head lacks compatibility or runtime-bundle metadata, the download route must block or clearly label the gap.
 * If updater behavior and registry channel truth disagree, registry wins and the mismatch is release-blocking.
-* If a build is still preview or POC quality, the shelf must say so plainly instead of implying stable general availability.
+* If a build is still preview quality or otherwise rough-edged, the shelf must say so plainly instead of implying stable general availability.
 
 ## Success evidence
 

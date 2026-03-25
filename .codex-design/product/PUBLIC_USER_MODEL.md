@@ -28,7 +28,7 @@ A registered user may, in addition to guest behavior:
 * manage a lightweight account/profile
 * follow or watch future horizons when that overlay is enabled
 * raise beta-interest or waitlist intent
-* enter the bounded participation / booster flow
+* enter the guided participation flow
 * unlock future advisory-vote placeholders when enabled
 
 ## Profile flags
@@ -40,9 +40,9 @@ The first public profile pass should prefer flags over hard roles:
 * `interested_in_creator_tools`
 * `wants_horizon_updates`
 * `wants_beta_invites`
-* `booster_opt_in`
+* `guided_participation_opt_in`
 
-These flags may later inform richer roles or product lanes, but they are not a license to hardcode complex role UX into the POC.
+These flags may later inform richer roles or product lanes, but they are not a license to hardcode complex role UX into the early-access surface.
 
 ## Linked identities
 
@@ -85,14 +85,14 @@ Public recognition remains opt-in.
 Group-public and user-private combinations are allowed.
 Landing and home surfaces must not force public identity merely to show interest, status, or future follow behavior.
 
-## POC rule
+## Early-access rule
 
-The POC needs only:
+The early-access surface needs only:
 
 * sign in
 * basic profile
 * follow/watchlist placeholders
-* participate / booster entry
+* guided participation entry
 * future vote placeholder
 
 Do not force a giant onboarding wizard or hard role selection up front.

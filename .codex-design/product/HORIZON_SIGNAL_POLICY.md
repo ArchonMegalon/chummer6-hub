@@ -18,7 +18,7 @@ Project Chummer accepts future-capability ideas and public signal, but public si
 Signals, votes, survey responses, and community enthusiasm are advisory only.
 Canonical horizon posture is published in `chummer6-design`.
 
-Participation in a booster lane is a governed execution path, not a public idea-intake lane.
+Participation in a guided contribution lane is a governed execution path, not a public idea-intake lane.
 Sponsoring temporary premium work does not create canonical product truth by itself.
 
 ## Tool posture
