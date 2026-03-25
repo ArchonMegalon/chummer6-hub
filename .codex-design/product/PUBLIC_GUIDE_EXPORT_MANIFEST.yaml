@@ -73,15 +73,14 @@ pages:
     - privacy and review safety
     - free-later explanation when booster-first horizons exist
   download_page:
-    source: generated release matrix artifact
+    source: registry-backed generated release matrix artifact
     include:
       page_type: download_page
     required_topics:
-    - current release matrix
-    - installer and setup packages
-    - auto-update channel behavior
+    - current build matrix
+    - honest artifact format
     - checksums
-    - manual archive fallback
+    - raw release fallback
   deep_source_trail:
     source: products/chummer/PUBLIC_GUIDE_PAGE_REGISTRY.yaml
     include:

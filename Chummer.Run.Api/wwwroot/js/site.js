@@ -30,6 +30,18 @@
     node.classList.remove("status-copy--error", "status-copy--success");
   };
 
+  ChummerUi.setText = function setText(node, value, fallback = "") {
+    if (!node) return;
+    node.textContent = value ?? fallback;
+  };
+
+  ChummerUi.toggleExclusive = function toggleExclusive(nodes, activeKey) {
+    for (const [key, node] of Object.entries(nodes || {})) {
+      if (!node) continue;
+      node.hidden = key !== activeKey;
+    }
+  };
+
   ChummerUi.humanizeStatus = function humanizeStatus(value, fallback = "Not connected") {
     if (!value) return fallback;
     const normalized = String(value).trim().toLowerCase();
@@ -91,6 +103,23 @@
     }
 
     return data;
+  };
+
+  ChummerUi.withBusyState = async function withBusyState(targets, busyLabel, action) {
+    const list = Array.isArray(targets) ? targets.filter(Boolean) : [targets].filter(Boolean);
+    list.forEach((target) => ChummerUi.setButtonBusy(target, true, busyLabel));
+    try {
+      return await action();
+    } finally {
+      list.forEach((target) => ChummerUi.setButtonBusy(target, false, busyLabel));
+    }
+  };
+
+  ChummerUi.copyToClipboard = async function copyToClipboard(text, button, copiedLabel = "Copied", resetDelayMs = 1200) {
+    await navigator.clipboard.writeText(text);
+    await ChummerUi.withBusyState(button, copiedLabel, async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, resetDelayMs));
+    });
   };
 
   const header = document.querySelector("[data-site-header]");

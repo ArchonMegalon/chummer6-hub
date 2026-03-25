@@ -213,34 +213,29 @@
   const ui = window.ChummerUi;
   const dialog = document.getElementById("home-onboarding");
   if (!dialog) return;
+  const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
   const panels = Array.from(dialog.querySelectorAll("[data-step-panel]"));
+  const onboardingForm = dialog.querySelector("#onboardingForm");
   const nextButton = dialog.querySelector("[data-onboarding-next]");
   const backButton = dialog.querySelector("[data-onboarding-back]");
   const submitButton = dialog.querySelector("[data-onboarding-submit]");
   const openButtons = document.querySelectorAll("[data-open-onboarding]");
   const closeButtons = dialog.querySelectorAll("[data-close-onboarding]");
-  const errorNode = document.getElementById("onboardingError");
-  const setupState = document.getElementById("homeSetupState");
-  const setupCopy = document.getElementById("homeSetupCopy");
-  const interestState = document.getElementById("homeInterestState");
-  const recoveryState = document.getElementById("homeRecoveryState");
-  const recoveryCopy = document.getElementById("homeRecoveryCopy");
-  const setupCardTitle = document.getElementById("setupCardTitle");
-  const setupCardCopy = document.getElementById("setupCardCopy");
-  const openSetupButton = document.getElementById("openSetupButton");
+  const nodes = {
+    error: document.getElementById("onboardingError"),
+    setupState: document.getElementById("homeSetupState"),
+    setupCopy: document.getElementById("homeSetupCopy"),
+    interestState: document.getElementById("homeInterestState"),
+    recoveryState: document.getElementById("homeRecoveryState"),
+    recoveryCopy: document.getElementById("homeRecoveryCopy"),
+    setupCardTitle: document.getElementById("setupCardTitle"),
+    setupCardCopy: document.getElementById("setupCardCopy"),
+    openSetupButton: document.getElementById("openSetupButton")
+  };
   let step = 0;
 
   const openDialog = () => { dialog.hidden = false; };
   const closeDialog = () => { dialog.hidden = true; };
-  const setStatus = (message, isError = false) => {
-    errorNode.textContent = message;
-    errorNode.classList.toggle("status-copy--error", isError);
-    errorNode.classList.toggle("status-copy--success", !isError);
-  };
-  const clearStatus = () => {
-    errorNode.textContent = "";
-    errorNode.classList.remove("status-copy--error", "status-copy--success");
-  };
 
   const showStep = (index) => {
     step = index;
@@ -250,80 +245,85 @@
     submitButton.hidden = index !== panels.length - 1;
   };
 
+  const updateAccountSummary = (preferencesPayload, recoveryRequested) => {
+    const followCount = (preferencesPayload.followHorizons ? 1 : 0) + (preferencesPayload.betaInterest ? 1 : 0);
+    ui.setText(nodes.setupState, "Ready");
+    ui.setText(nodes.setupCopy, "Your basic account setup is already in place.");
+    ui.setText(nodes.interestState, followCount === 0 ? "Quiet" : `${followCount} active`);
+
+    if (recoveryRequested) {
+      ui.setText(nodes.recoveryState, "Verification sent");
+      ui.setText(nodes.recoveryCopy, "Check your email to finish verifying the backup sign-in path.");
+    }
+
+    ui.setText(nodes.setupCardTitle, "Review setup");
+    ui.setText(nodes.setupCardCopy, "Open the setup sheet whenever you want to adjust profile, interests, or backup sign-in.");
+    ui.setText(nodes.openSetupButton, "Open setup");
+    nodes.openSetupButton.dataset.defaultLabel = "Open setup";
+  };
+
   openButtons.forEach((button) => button.addEventListener("click", openDialog));
   closeButtons.forEach((button) => button.addEventListener("click", closeDialog));
   nextButton.addEventListener("click", () => showStep(Math.min(step + 1, panels.length - 1)));
   backButton.addEventListener("click", () => showStep(Math.max(step - 1, 0)));
   showStep(step);
 
-  dialog.querySelector("#onboardingForm").addEventListener("submit", async (event) => {
+  onboardingForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    clearStatus();
-    const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
-    const laneInterests = Array.from(dialog.querySelectorAll("[data-step-panel='2'] input[type='checkbox']:checked")).map((input) => input.value);
-    ui.setButtonBusy(submitButton, true, "Saving...");
-
+    ui.clearNotice(nodes.error);
     try {
-      await ui.requestJson("/api/v1/accounts/me/profile", {
-        method: "POST",
-        json: {
-          subjectId,
-          displayName: document.getElementById("onboardingDisplayName").value,
-          handle: document.getElementById("onboardingHandle").value,
-          timezone: document.getElementById("onboardingTimezone").value,
-          visibility: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.Visibility))
-        }
-      });
+      await ui.withBusyState(submitButton, "Saving...", async () => {
+        const laneInterests = Array.from(dialog.querySelectorAll("[data-step-panel='2'] input[type='checkbox']:checked")).map((input) => input.value);
+        const recoveryField = document.getElementById("onboardingRecoveryEmail");
+        const recoveryEmail = recoveryField?.value.trim() || "";
 
-      const recoveryField = document.getElementById("onboardingRecoveryEmail");
-      if (recoveryField && recoveryField.value.trim().length > 0) {
-        const recoveryPayload = await ui.requestJson("/api/v1/accounts/me/links/email/start", {
+        await ui.requestJson("/api/v1/accounts/me/profile", {
           method: "POST",
           json: {
             subjectId,
-            email: recoveryField.value.trim(),
-            nextPath: "/home"
+            displayName: document.getElementById("onboardingDisplayName").value,
+            handle: document.getElementById("onboardingHandle").value,
+            timezone: document.getElementById("onboardingTimezone").value,
+            visibility: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.Visibility))
           }
         });
-        if (recoveryPayload.previewHref) {
-          window.location.href = recoveryPayload.previewHref;
-          return;
-        }
-      }
 
-      const preferencesPayload = await ui.requestJson("/api/v1/accounts/me/preferences", {
-        method: "POST",
-        json: {
-          subjectId,
-          laneInterests,
-          followHorizons: document.getElementById("onboardingFollow").checked,
-          betaInterest: document.getElementById("onboardingBeta").checked,
-          onboardingCompleted: true
+        if (recoveryEmail.length > 0) {
+          const recoveryPayload = await ui.requestJson("/api/v1/accounts/me/links/email/start", {
+            method: "POST",
+            json: {
+              subjectId,
+              email: recoveryEmail,
+              nextPath: "/home"
+            }
+          });
+
+          if (recoveryPayload.previewHref) {
+            window.location.href = recoveryPayload.previewHref;
+            return;
+          }
         }
+
+        const preferencesPayload = await ui.requestJson("/api/v1/accounts/me/preferences", {
+          method: "POST",
+          json: {
+            subjectId,
+            laneInterests,
+            followHorizons: document.getElementById("onboardingFollow").checked,
+            betaInterest: document.getElementById("onboardingBeta").checked,
+            onboardingCompleted: true
+          }
+        });
+
+        updateAccountSummary(preferencesPayload, recoveryEmail.length > 0);
+        ui.setNotice(nodes.error, "Setup saved.");
+        window.setTimeout(() => {
+          closeDialog();
+          ui.clearNotice(nodes.error);
+        }, 900);
       });
-
-      const followCount = (preferencesPayload.followHorizons ? 1 : 0) + (preferencesPayload.betaInterest ? 1 : 0);
-      setupState.textContent = "Ready";
-      setupCopy.textContent = "Your basic account setup is already in place.";
-      interestState.textContent = followCount === 0 ? "Quiet" : `${followCount} active`;
-      recoveryState.textContent = recoveryField && recoveryField.value.trim().length > 0 ? "Verification sent" : recoveryState.textContent;
-      if (recoveryField && recoveryField.value.trim().length > 0) {
-        recoveryCopy.textContent = "Check your email to finish verifying the backup sign-in path.";
-      }
-      setupCardTitle.textContent = "Review setup";
-      setupCardCopy.textContent = "Open the setup sheet whenever you want to adjust profile, interests, or backup sign-in.";
-      openSetupButton.textContent = "Open setup";
-      openSetupButton.dataset.defaultLabel = "Open setup";
-
-      setStatus("Setup saved.");
-      window.setTimeout(() => {
-        closeDialog();
-        clearStatus();
-      }, 900);
     } catch (error) {
-      setStatus(ui.describeError(error, "Setup could not be saved right now."), true);
-    } finally {
-      ui.setButtonBusy(submitButton, false, "Saving...");
+      ui.setNotice(nodes.error, ui.describeError(error, "Setup could not be saved right now."), true);
     }
   });
 })();

@@ -1,5 +1,13 @@
 mode: prepend
 items:
+- Publish or append runnable backlog for Legacy desktop/tooling clutter still shares the run-services repo root with hosted-service code..
+- Add milestone mapping or executable queue work for The missing `Chummer.Media.Contracts` package still prevents a dedicated media-factory repo from becoming a real package-only seam..
+- Add milestone mapping or executable queue work for `Chummer.Run.Contracts.Media` still needs a clean split between render-only media DTOs and upstream narrative-generation, delivery, and session-aware orchestration DTOs..
+- Publish or append runnable backlog for `Chummer.Run.Contracts.Media` still needs a clean split between render-only media DTOs and upstream narrative-generation, delivery, and session-aware orchestration DTOs..
+- Make the remaining publication, moderation, and projection seams for `hub` explicit and owner-backed rather than implied by runtime behavior.
+- Delete or quarantine the remaining legacy roots in `hub` so compatibility clutter stops sharing space with the current owner surface.
+- Turn the remaining `hub` adapter/provider/media seams into explicit owned slices instead of leaving them as open-ended uncovered scope.
+- Add milestone mapping or executable queue work for Legacy desktop/tooling clutter still shares the run-services repo root with hosted-service code..
 - Publish or append runnable backlog for The missing `Chummer.Media.Contracts` package still prevents a dedicated media-factory repo from becoming a real package-only seam..
 - Publish or append runnable backlog for The `chummer-media-factory` split exists as a scaffold, but not yet as a render-only asset/job boundary separated from orchestration and narrative-authoring DTOs..
 - Add milestone mapping or executable queue work for The `chummer-media-factory` split exists as a scaffold, but not yet as a render-only asset/job boundary separated from orchestration and narrative-authoring DTOs..

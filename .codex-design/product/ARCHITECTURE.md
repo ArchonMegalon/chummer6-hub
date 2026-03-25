@@ -41,7 +41,7 @@ No other repo may compute or redefine canonical mechanics.
 * memory
 * Coach / Spider / Director orchestration
 * play API aggregation
-* delivery policy
+* account-aware download/install UX
 * service-to-service coordination
 
 It must not own duplicate mechanics, registry persistence after split, or media rendering after split.
@@ -61,7 +61,7 @@ They do not fork it.
 
 ### Rule 7 — Registry is a service boundary
 
-Artifact catalog, publication workflow, moderation state, installs, reviews, and compatibility metadata belong in `chummer6-hub-registry`.
+Artifact catalog, publication workflow, release channels, installs, update-feed metadata, reviews, and compatibility metadata belong in `chummer6-hub-registry`.
 
 ### Rule 8 — Media execution is a service boundary
 
@@ -82,6 +82,8 @@ Fleet may own:
 * premium burst scheduling
 * jury-gated landing control
 * execution telemetry for repo work
+* release matrix expansion and release-job orchestration
+* publish/signoff history and compile-manifest evidence for release waves
 
 Fleet must not own:
 
@@ -89,6 +91,8 @@ Fleet must not own:
 * product contract truth
 * Hub user identity truth
 * raw participant OpenAI auth state outside lane-local worker storage
+* installer recipe truth
+* canonical release-channel or update-feed truth
 
 ### Rule 11 — Petition upward, do not invent local truth
 
@@ -162,6 +166,19 @@ Hub may project that truth.
 Guide generators may explain it.
 Neither may invent a second public feature map.
 
+### Rule 17 — Release control and update truth stay split
+
+Release/build/install/update authority is intentionally split:
+
+* `chummer6-core` owns runtime-bundle production and fingerprints
+* `chummer6-ui` owns desktop packaging, installer recipes, and updater integration
+* `fleet` owns release orchestration, matrix expansion, verify gates, and promotion evidence
+* `chummer6-hub-registry` owns promoted channels, installer/update-feed metadata, compatibility, and runtime-bundle heads
+* `chummer6-hub` renders public download/install UX by consuming registry truth
+* `chummer6-media-factory` may render release visuals, but it does not own installers or publication/update policy
+
+Neither EA helper scripts nor Hub-local release manifests may become the canonical build authority.
+
 ## Repo graph
 
 ```text
@@ -172,7 +189,7 @@ chummer6-design
 chummer6-core
   ├─ publishes Chummer.Engine.Contracts
   ├─ computes mechanics truth
-  └─ emits runtime/explain/reducer semantics
+  └─ emits runtime bundle / explain / reducer semantics
 
 chummer6-ui-kit
   └─ publishes Chummer.Ui.Kit
@@ -180,6 +197,7 @@ chummer6-ui-kit
 chummer6-ui
   ├─ consumes Chummer.Engine.Contracts
   ├─ consumes Chummer.Ui.Kit
+  ├─ owns desktop packaging and updater integration
   └─ consumes hosted projections from hub / registry
 
 chummer6-mobile
@@ -194,10 +212,11 @@ chummer6-hub
   ├─ consumes Chummer.Engine.Contracts
   ├─ consumes Chummer.Hub.Registry.Contracts
   ├─ consumes Chummer.Media.Contracts
-  └─ orchestrates hosted workflows
+  └─ renders hosted workflows and registry-backed public download UX
 
 chummer6-hub-registry
-  └─ publishes Chummer.Hub.Registry.Contracts
+  ├─ publishes Chummer.Hub.Registry.Contracts
+  └─ owns release/install/update/read-model truth
 
 chummer6-media-factory
   └─ publishes Chummer.Media.Contracts
@@ -206,6 +225,7 @@ fleet
   ├─ consumes mirrored Chummer canon from chummer6-design
   ├─ owns parity automation and clustered queue synthesis for mirrored canon
   ├─ orchestrates repo work across Chummer codebases
+  ├─ orchestrates release waves across core/ui/registry
   ├─ keeps cheap groundwork as the default execution plane
   └─ may open explicit premium burst lanes that still land through review authority
 ```

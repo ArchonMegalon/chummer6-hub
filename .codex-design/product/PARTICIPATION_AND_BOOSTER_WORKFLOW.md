@@ -30,17 +30,6 @@ Use these terms consistently:
 Public copy should prefer `participate` and `booster`.
 Operator terms such as `participant burst lane`, `jury`, `core backend`, or `device-auth helper` may appear in operator and verifier surfaces, but they are not first-contact user language.
 
-### `signed_in_flow_collapse`
-
-The first-run signed-in participation surface should collapse the visible UX into three states:
-
-1. `Start contributing`
-2. `Authorize in ChatGPT`
-3. `Thanks, you're set`
-
-The signed-in page may still use the Hub-owned sponsor session and consent model internally, but it should not surface raw lifecycle verbs such as `create intent`, `record consent`, `start device auth`, or `activate lane` as first-run controls.
-Those remain backend truth and operator detail, not the default product flow.
-
 ## Public extract
 
 ### `public_pitch`
@@ -244,8 +233,6 @@ Bad scoring inputs:
 * raw spend
 * raw prompt/turn volume
 * auth completion without validated work
-
-Auth completion may unlock a cosmetic ready-state badge, but it must not mint leaderboard points or persistent contribution-credit badges by itself.
 
 Recognition should stay:
 

@@ -44,6 +44,6 @@ When those lanes become cheaper and safer to operate broadly, the long-run inten
 
 ## Primary CTAs
 
-* Open the Hub participation page
+* Open the public participation page
 * File a public issue
 * Read current status before promising yourself too much

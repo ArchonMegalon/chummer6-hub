@@ -15,6 +15,7 @@
 * fact ledger, reward journal, and entitlement journal for community participation
 * leaderboards, quests, badges, and community-side entitlement views
 * the `chummer.run` public landing, proof shelf, public status, and signed-in home overlays
+* registry-backed downloads, channel selection, and install UX
 * play API aggregation and hosted session coordination
 * orchestration-side Coach/Spider/Director surfaces
 * hosted external-integration routing that is not render-only media execution
@@ -29,6 +30,7 @@
 * raw participant Codex/OpenAI auth caches or device-auth secrets
 * provider-credit accounting or provider-secret storage
 * Fleet worker execution or landing authority
+* release manifest generation or update-feed authority
 
 ## Package boundary
 
