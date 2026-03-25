@@ -44,7 +44,7 @@ public sealed class PublicProgressController : ControllerBase
     {
         var chrome = await BuildChromeAsync(
             title: "Progress",
-            description: "Public progress and milestone status for Chummer.",
+            description: "Program telemetry and milestone status for Chummer. Customer-facing current state lives on What works today.",
             currentPath: "/progress",
             cancellationToken);
         var antiForgeryToken = chrome.Authenticated
@@ -104,6 +104,16 @@ public sealed class PublicProgressController : ControllerBase
     <div class="progress-shell-actions">{{authActions}}</div>
   </div>
 </header>
+""";
+        var telemetryBanner = """
+<section class="progress-telemetry-banner" aria-label="Progress page context">
+  <div>
+    <p class="progress-telemetry-banner__eyebrow">Program telemetry</p>
+    <h1>Current customer state lives on <a href="/now">What works today</a>.</h1>
+    <p>This page is the weighted program report for people who want the deeper delivery read, not the main customer-facing status surface.</p>
+  </div>
+  <a class="progress-telemetry-banner__action" href="/now">Open What works today</a>
+</section>
 """;
         var shellCss = """
     .progress-topbar {
@@ -201,15 +211,71 @@ public sealed class PublicProgressController : ControllerBase
       border-color: rgba(255,255,255,.42);
       background: rgba(255,255,255,.07);
     }
+    .progress-telemetry-banner {
+      width: min(var(--max), calc(100vw - 56px));
+      margin: 18px auto 0;
+      padding: 20px 22px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.03));
+      position: relative;
+      z-index: 3;
+    }
+    .progress-telemetry-banner__eyebrow {
+      margin: 0 0 8px;
+      color: rgba(246,251,255,.68);
+      font-size: .76rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .progress-telemetry-banner h1 {
+      margin: 0;
+      font-size: clamp(1.2rem, 2vw, 1.55rem);
+      line-height: 1.1;
+    }
+    .progress-telemetry-banner h1 a {
+      color: inherit;
+      text-decoration-color: rgba(246,251,255,.42);
+    }
+    .progress-telemetry-banner p {
+      margin: 10px 0 0;
+      color: rgba(246,251,255,.76);
+      max-width: 60ch;
+    }
+    .progress-telemetry-banner__action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.18);
+      color: var(--text);
+      text-decoration: none;
+      background: rgba(255,255,255,.06);
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+    .progress-telemetry-banner__action:hover,
+    .progress-telemetry-banner__action:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(255,255,255,.4);
+      background: rgba(255,255,255,.09);
+    }
 """;
         reportHtml = reportHtml.Replace("</style>", shellCss + Environment.NewLine + "  </style>", StringComparison.Ordinal);
-        reportHtml = reportHtml.Replace("<div class=\"shell\">", "<div class=\"shell\">" + Environment.NewLine + topbar, StringComparison.Ordinal);
+        reportHtml = reportHtml.Replace("<div class=\"shell\">", "<div class=\"shell\">" + Environment.NewLine + topbar + Environment.NewLine + telemetryBanner, StringComparison.Ordinal);
         reportHtml = reportHtml.Replace("min-height: 96vh;", "min-height: calc(96vh - 88px);", StringComparison.Ordinal);
         reportHtml = reportHtml.Replace("@media (max-width: 760px) {", """
     @media (max-width: 980px) {
       .progress-topbar {
         grid-template-columns: 1fr;
         justify-items: flex-start;
+      }
+      .progress-telemetry-banner {
+        grid-template-columns: 1fr;
       }
       .progress-shell-actions {
         justify-content: flex-start;
@@ -222,6 +288,11 @@ public sealed class PublicProgressController : ControllerBase
       .progress-topbar {
         width: min(var(--max), calc(100vw - 36px));
         padding-top: 14px;
+      }
+      .progress-telemetry-banner {
+        width: min(var(--max), calc(100vw - 36px));
+        margin-top: 14px;
+        padding: 18px;
       }
       .progress-shell-actions {
         width: 100%;

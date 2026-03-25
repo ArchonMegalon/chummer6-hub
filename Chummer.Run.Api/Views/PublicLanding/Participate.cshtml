@@ -3,6 +3,14 @@
     ViewData["Title"] = "Participate";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-participate";
+
+    string ResolveCardHref(PublicFeatureCardDto card)
+        => Model.Chrome.Authenticated
+            ? card.RegisteredHref ?? card.FallbackRoute ?? card.Href
+            : card.GuestHref ?? card.FallbackRoute ?? card.Href;
+
+    string ResolveCardLabel(PublicFeatureCardDto card, string fallback)
+        => card.ActionLabel ?? fallback;
 }
 
 <section class="story-guide-tail">
@@ -29,7 +37,7 @@
                                 <h3>@card.Title</h3>
                                 <p>@card.Summary</p>
                             </div>
-                            <a class="editorial-strip__action" href="@(card.FallbackRoute ?? card.Href)">Open</a>
+                            <a class="editorial-strip__action" href="@ResolveCardHref(card)">@ResolveCardLabel(card, "Open")</a>
                         </article>
                     }
                 </div>
@@ -52,7 +60,7 @@
                                 <h3>@card.Title</h3>
                                 <p>@card.Summary</p>
                             </div>
-                            <a class="editorial-strip__action" href="@(Model.Chrome.Authenticated ? (card.RegisteredHref ?? card.Href) : (card.GuestHref ?? card.Href))">Continue</a>
+                            <a class="editorial-strip__action" href="@ResolveCardHref(card)">@ResolveCardLabel(card, "Continue")</a>
                         </article>
                     }
                 </div>

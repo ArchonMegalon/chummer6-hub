@@ -12,7 +12,7 @@ assets:
     mobile_poster_avif_url: /media/campaign/hero-shadowrun-assistant-nightdesk.avif
     mobile_poster_webp_url: /media/campaign/hero-shadowrun-assistant-nightdesk.webp
     loop_url:
-    alt: Calm night workstation with rain on glass, dossiers, and blue-lit city depth behind the Chummer front door.
+    alt: Rain-heavy intake bay with dossiers, prep hardware, and a visible operator relationship behind the Chummer front door.
     caption: Landing hero image
     motion_policy: premium_still_or_short_muted_loop
     fallback_style: boulevard_glass
@@ -26,10 +26,24 @@ assets:
     mobile_poster_avif_url: /media/campaign/capability-build-runner.avif
     mobile_poster_webp_url: /media/campaign/capability-build-runner.webp
     loop_url:
-    alt: Professional build workspace with runner dossier fragments, calm desk analysis, and blue-lit assistant cues.
+    alt: Runner build workspace with dossier fragments, cyberware parts, and visible tradeoff review under blue proof light.
     caption: Build runner image
     motion_policy: stills_only
     fallback_style: dossier_lamplight
+  - asset_slot: product_proof_ui
+    section_id: product_proof
+    media_kind: screenshot
+    poster_url: /media/product/proof-builder-trail.png
+    poster_avif_url: /media/product/proof-builder-trail.avif
+    poster_webp_url: /media/product/proof-builder-trail.webp
+    mobile_poster_url: /media/product/proof-builder-trail.png
+    mobile_poster_avif_url: /media/product/proof-builder-trail.avif
+    mobile_poster_webp_url: /media/product/proof-builder-trail.webp
+    loop_url:
+    alt: Product proof panel showing a build summary, modifier trail, receipt notes, and preview release posture in one concrete screen.
+    caption: Product proof panel
+    motion_policy: stills_only
+    fallback_style: proof_console
   - asset_slot: capability_check_rules
     section_id: shared_card_media
     media_kind: still
@@ -152,7 +166,7 @@ assets:
     mobile_poster_avif_url: /media/campaign/participation-ops-lane.avif
     mobile_poster_webp_url: /media/campaign/participation-ops-lane.webp
     loop_url:
-    alt: Focused contribution workstation with a calm operator, clean desk, and blue secure-session cues.
+    alt: Contribution workstation with intake trays, verification cues, and a solo operator connected to a wider trusted system.
     caption: Participation image
     motion_policy: stills_only
     fallback_style: solo_cockpit
@@ -180,7 +194,7 @@ assets:
     mobile_poster_avif_url: /media/campaign/lane-player.avif
     mobile_poster_webp_url: /media/campaign/lane-player.webp
     loop_url:
-    alt: Player prep scene with dossier review, gear planning, and calm blue-lit focus.
+    alt: Player prep scene with dossier review, gear planning, and grounded pressure before the run.
     caption: Player lane image
     motion_policy: stills_only
     fallback_style: solo_cockpit
@@ -222,7 +236,7 @@ assets:
     mobile_poster_avif_url: /media/campaign/participation-ops-lane.avif
     mobile_poster_webp_url: /media/campaign/participation-ops-lane.webp
     loop_url:
-    alt: Secure contribution lane setup with one operator, clean devices, and calm blue verification cues.
+    alt: Secure contribution lane setup with one operator, clean devices, and visible verification pressure cues.
     caption: Participation lane image
     motion_policy: stills_only
     fallback_style: solo_cockpit

@@ -4,6 +4,11 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-story";
     var leadAsset = Model.Assets.BySlot("scene_archive_stair");
+
+    static string ResolveLaneHref(PublicFeatureCardDto card)
+        => string.Equals(card.Href, "/what-is-chummer", StringComparison.OrdinalIgnoreCase) && !card.SelfLinkAllowed
+            ? card.DetailRoute ?? card.FallbackRoute ?? "/downloads"
+            : card.Href;
 }
 
 <section class="story-cinematic">
@@ -48,7 +53,7 @@
             <article class="role-matrix__cell">
                 <h3>@card.Title</h3>
                 <p>@card.Summary</p>
-                <a class="inline-link" href="@card.Href">Read more</a>
+                <a class="inline-link" href="@ResolveLaneHref(card)">@(card.ActionLabel ?? "Read more")</a>
             </article>
         }
     </div>

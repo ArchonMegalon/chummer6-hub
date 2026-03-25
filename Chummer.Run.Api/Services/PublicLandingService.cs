@@ -64,6 +64,16 @@ public sealed class PublicLandingService
                     Emphasis: Required(item, "emphasis")))
                 .ToArray(),
             SecondaryHighlights: ParseStringList(manifest, "secondary_highlights").ToArray(),
+            ProductProofEyebrow: OptionalScalar(manifest, "product_proof_eyebrow"),
+            ProductProofIntro: OptionalScalar(manifest, "product_proof_intro"),
+            ProductProofPrimaryLabel: OptionalScalar(manifest, "product_proof_primary_label"),
+            ProductProofPrimaryHref: OptionalScalar(manifest, "product_proof_primary_href"),
+            ProductProofSecondaryLabel: OptionalScalar(manifest, "product_proof_secondary_label"),
+            ProductProofSecondaryHref: OptionalScalar(manifest, "product_proof_secondary_href"),
+            ProductProofToplineLabel: OptionalScalar(manifest, "product_proof_topline_label"),
+            ProductProofResultTitle: OptionalScalar(manifest, "product_proof_result_title"),
+            ProductProofResultSummary: OptionalScalar(manifest, "product_proof_result_summary"),
+            ProductProofTrail: ParseStringList(manifest, "product_proof_trail").ToArray(),
             PublicRoutes: ParseMapList(manifest, "public_routes")
                 .Select(ParseRoute)
                 .ToArray(),
@@ -113,6 +123,9 @@ public sealed class PublicLandingService
                     RegisteredHref: Optional(item, "registered_href"),
                     ExternalOk: ParseOptionalBool(item, "external_ok") ?? false,
                     SelfLinkAllowed: ParseOptionalBool(item, "self_link_allowed") ?? false,
+                    ActionLabel: Optional(item, "action_label"),
+                    ProofNote: Optional(item, "proof_note"),
+                    MicroProof: Optional(item, "microproof"),
                     Pain: Optional(item, "pain"),
                     Payoff: Optional(item, "payoff")))
                 .ToArray());
@@ -185,6 +198,10 @@ public sealed class PublicLandingService
     {
         var webRoot = Path.Combine(repoRoot, "Chummer.Run.Api", "wwwroot");
         ValidateAsset(surface.Assets.FirstOrDefault(static asset => string.Equals(asset.AssetSlot, "section_hero", StringComparison.Ordinal)), "section_hero", webRoot, requireMobilePoster: true);
+        if (surface.Assets.FirstOrDefault(static asset => string.Equals(asset.AssetSlot, "product_proof_ui", StringComparison.Ordinal)) is { } productProofAsset)
+        {
+            ValidateAsset(productProofAsset, "product_proof_ui", webRoot, requireMobilePoster: true);
+        }
 
         foreach (var slot in surface.FeatureCards
                      .Select(static card => card.AssetSlot)

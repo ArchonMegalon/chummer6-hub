@@ -4,52 +4,24 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing";
     var hero = Model.Assets.BySlot("section_hero");
+    var proofAsset = Model.Assets.BySlot("product_proof_ui") ?? Model.Assets.BySlot("capability_check_rules");
+    var proofNotes = Model.Workflows.Take(3).ToArray();
+    var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
 
-    string[] TrustProofs(string cardId) => cardId switch
-    {
-        "deterministic_truth" => new[] { "Deterministic engine", "Repeatable totals", "Clean audit trail" },
-        "receipts_and_provenance" => new[] { "Modifier trail", "Source trace", "Visible evidence" },
-        "local_first_continuity" => new[] { "Durable state", "Offline posture", "Clean recovery" },
-        _ => new[] { "Visible output", "Traceable state", "Clear status" }
-    };
+    static IReadOnlyList<string> MicroProof(PublicFeatureCardDto card)
+        => string.IsNullOrWhiteSpace(card.MicroProof)
+            ? Array.Empty<string>()
+            : card.MicroProof.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    string WorkflowProof(string cardId) => cardId switch
-    {
-        "product_story" => "Proof: clean dossiers and visible tradeoffs.",
-        "see_whats_real" => "Proof: source traces and repeatable output.",
-        "get_the_poc" => "Proof: durable state across devices.",
-        _ => "Proof: visible output and clear status."
-    };
-
-    string WorkflowAction(string cardId) => cardId switch
-    {
-        "product_story" => "See the build flow",
-        "see_whats_real" => "See the explanation trail",
-        "get_the_poc" => "See the continuity path",
-        _ => "Open the walkthrough"
-    };
-
-    string LaneStatus(string badge) => badge switch
-    {
-        "Available now" => "Available now",
-        "Mixed" => "Mixed",
-        _ => "Coming next"
-    };
-
-    string LaneAction(string title) => title switch
-    {
-        "Player" => "See player fit",
-        "GM" => "See GM fit",
-        "Creator" => "See creator fit",
-        _ => "See the fit"
-    };
+    string SectionTitle(string id, string fallback)
+        => sectionsById.TryGetValue(id, out var section) ? section.Title : fallback;
 }
 
 <section class="launch-hero">
     <div class="launch-hero__shell">
         <div class="launch-hero__copy">
             <p class="eyebrow">Explainable Shadowrun</p>
-            <h1 class="launch-hero__title">Shadowrun rules truth, with receipts.</h1>
+            <h1 class="launch-hero__title">@Model.Surface.Headline</h1>
             <p class="launch-hero__support">@Model.Surface.Subhead</p>
             <div class="launch-hero__actions">
                 <a class="button-like button-like--primary" href="@Model.PrimaryHeroAction.Href">@Model.PrimaryHeroAction.Label</a>
@@ -72,11 +44,54 @@
     </div>
 </section>
 
+<section class="product-proof">
+    <div class="product-proof__copy">
+        <p class="eyebrow">@Model.Surface.ProductProofEyebrow</p>
+        <h2 class="editorial-title">@SectionTitle("product_proof", "One concrete result, one visible trail, one current build")</h2>
+        <p class="editorial-copy">@Model.Surface.ProductProofIntro</p>
+        <div class="proof-surface">
+            <div class="proof-surface__topline">
+                <span>@Model.Surface.ProductProofToplineLabel</span>
+                <span>@Model.Manifest.Channel · @Model.Manifest.Version</span>
+            </div>
+            <div class="proof-surface__result">
+                <strong>@Model.Surface.ProductProofResultTitle</strong>
+                <p>@Model.Surface.ProductProofResultSummary</p>
+            </div>
+            <div class="proof-surface__trail">
+                @foreach (var step in Model.Surface.ProductProofTrail)
+                {
+                    <span>@step</span>
+                }
+            </div>
+            <div class="proof-surface__notes">
+                @foreach (var workflow in proofNotes)
+                {
+                    <div>
+                        <span class="tag">@workflow.Title</span>
+                        <p>@(workflow.ProofNote ?? workflow.Payoff ?? workflow.Summary)</p>
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="@Model.Surface.ProductProofPrimaryHref">@Model.Surface.ProductProofPrimaryLabel</a>
+            <a class="button-like button-like--secondary" href="@Model.Surface.ProductProofSecondaryHref">@Model.Surface.ProductProofSecondaryLabel</a>
+        </div>
+    </div>
+    @if (proofAsset is not null)
+    {
+        <div class="product-proof__media">
+            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", proofAsset)
+        </div>
+    }
+</section>
+
 <section class="workflow-band">
     <div class="workflow-band__lead">
         <p class="eyebrow">How Chummer helps at the table</p>
         <h2 class="editorial-title">Build, explain, and keep the table moving</h2>
-        <p class="editorial-copy">See the product in motion first: build a runner, inspect the ruling, and keep a session moving without losing trust.</p>
+        <p class="editorial-copy">See the product behavior first: build a runner, inspect the ruling, and keep a session moving without losing trust.</p>
     </div>
     <div class="workflow-grid">
         @foreach (var card in Model.Workflows)
@@ -103,8 +118,11 @@
                             <li>@card.Payoff</li>
                         }
                     </ul>
-                    <p class="workflow-card__proof">@WorkflowProof(card.Id)</p>
-                    <a class="inline-link" href="@card.Href">@WorkflowAction(card.Id)</a>
+                    @if (!string.IsNullOrWhiteSpace(card.ProofNote))
+                    {
+                        <p class="workflow-card__proof">@card.ProofNote</p>
+                    }
+                    <a class="inline-link" href="@card.Href">@(card.ActionLabel ?? "Open the walkthrough")</a>
                 </div>
             </article>
         }
@@ -125,7 +143,7 @@
                 <h3>@card.Title</h3>
                 <p>@card.Summary</p>
                 <div class="trust-claim__microproof">
-                    @foreach (var item in TrustProofs(card.Id))
+                    @foreach (var item in MicroProof(card))
                     {
                         <span>@item</span>
                     }
@@ -153,10 +171,10 @@
                     </div>
                 }
                 <div class="audience-card__copy">
-                    <span class="tag tag--amber">@LaneStatus(card.Badge)</span>
+                    <span class="tag tag--amber">@card.Badge</span>
                     <h3>@card.Title</h3>
                     <p>@card.Summary</p>
-                    <a class="inline-link" href="@card.Href">@LaneAction(card.Title)</a>
+                    <a class="inline-link" href="@card.Href">@(card.ActionLabel ?? "See the fit")</a>
                 </div>
             </article>
         }
@@ -178,10 +196,10 @@
             <div class="works-column__list">
                 @foreach (var card in Model.AvailableToday)
                 {
-                    <article class="works-item">
+                    <article class="works-item" id="@card.Id.Replace('_', '-')">
                         <h4>@card.Title</h4>
                         <p>@card.Summary</p>
-                        <a class="inline-link" href="@card.Href">Use it now</a>
+                        <a class="inline-link" href="@card.Href">@(card.ActionLabel ?? "Use it now")</a>
                     </article>
                 }
             </div>
@@ -194,10 +212,10 @@
             <div class="works-column__list">
                 @foreach (var card in Model.PreviewItems)
                 {
-                    <article class="works-item">
+                    <article class="works-item" id="@card.Id.Replace('_', '-')">
                         <h4>@card.Title</h4>
                         <p>@card.Summary</p>
-                        <a class="inline-link" href="@card.Href">See the preview</a>
+                        <a class="inline-link" href="@card.Href">@(card.ActionLabel ?? "See the preview")</a>
                     </article>
                 }
             </div>
@@ -210,10 +228,10 @@
             <div class="works-column__list">
                 @foreach (var card in Model.ComingNext)
                 {
-                    <article class="works-item">
+                    <article class="works-item" id="@card.Id.Replace('_', '-')">
                         <h4>@card.Title</h4>
                         <p>@card.Summary</p>
-                        <a class="inline-link" href="@card.Href">See what is next</a>
+                        <a class="inline-link" href="@card.Href">@(card.ActionLabel ?? "See what is next")</a>
                     </article>
                 }
             </div>
@@ -225,7 +243,7 @@
     <div class="artifact-gallery__lead">
         <p class="eyebrow">Proof, not promises</p>
         <h2 class="editorial-title">Artifacts that make the product tangible</h2>
-        <p class="editorial-copy">Runsite packs, dossiers, primers, and after-action surfaces keep the preview grounded in real output.</p>
+        <p class="editorial-copy">The gallery now starts with live proof, then shows which artifacts are preview-only and which ones are still opening next.</p>
     </div>
     <div class="artifact-gallery__grid">
         @foreach (var card in Model.Artifacts)
@@ -239,10 +257,10 @@
                     </div>
                 }
                 <div class="artifact-card__copy">
-                    <span class="tag tag--quiet">@card.Badge</span>
+                    <span class="tag @(string.Equals(card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--quiet")">@card.Badge</span>
                     <h3>@card.Title</h3>
                     <p>@card.Summary</p>
-                    <a class="inline-link" href="@(card.DetailRoute ?? card.Href)">See the proof trail</a>
+                    <a class="inline-link" href="@(card.DetailRoute ?? card.Href)">@(card.ActionLabel ?? "Open the proof trail")</a>
                 </div>
             </article>
         }

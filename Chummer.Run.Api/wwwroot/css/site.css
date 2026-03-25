@@ -1746,6 +1746,7 @@ td {
 
 .release-guidance,
 .download-highlights,
+.recommended-download,
 .trust-page-hero,
 .trust-page-sections,
 .faq-stack {
@@ -1755,6 +1756,7 @@ td {
 
 .release-guidance,
 .download-highlights,
+.recommended-download,
 .trust-page-sections {
   margin-top: 1.25rem;
 }
@@ -1807,6 +1809,38 @@ td {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.recommended-download__card {
+  padding: 1.45rem;
+  border-radius: 32px;
+  border: 1px solid rgba(15, 39, 74, 0.12);
+  background:
+    linear-gradient(135deg, rgba(7, 23, 45, 0.98), rgba(10, 30, 58, 0.94)),
+    radial-gradient(circle at top right, rgba(45, 114, 255, 0.16), transparent 34%);
+  color: #edf4ff;
+  box-shadow: var(--shadow-hero);
+}
+
+.recommended-download__copy {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.recommended-download__copy h2,
+.recommended-download__copy p {
+  margin: 0;
+}
+
+.recommended-download__copy p {
+  color: rgba(237, 244, 255, 0.82);
+}
+
+.recommended-download__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  color: rgba(237, 244, 255, 0.78);
 }
 
 .download-highlight__meta,
@@ -2256,6 +2290,109 @@ td {
   text-transform: uppercase;
 }
 
+.product-proof {
+  width: min(var(--site-max), calc(100% - 2rem));
+  margin: 1.75rem auto 0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 0.96fr) minmax(320px, 1.04fr);
+  align-items: stretch;
+}
+
+.product-proof__copy,
+.product-proof__media {
+  min-height: 100%;
+}
+
+.product-proof__copy {
+  display: grid;
+  gap: 1rem;
+  padding: 1.55rem;
+  border-radius: 32px;
+  border: 1px solid rgba(15, 39, 74, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-soft);
+}
+
+.product-proof__media .scene-frame,
+.product-proof__media .scene-picture,
+.product-proof__media img {
+  height: 100%;
+}
+
+.product-proof__media .scene-picture {
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+
+.product-proof__media img {
+  width: 100%;
+  object-fit: contain;
+  background: radial-gradient(circle at top right, rgba(135, 200, 255, 0.14), transparent 34%), #08182e;
+}
+
+.proof-surface {
+  display: grid;
+  gap: 0.95rem;
+  padding: 1rem;
+  border-radius: 28px;
+  border: 1px solid rgba(15, 39, 74, 0.12);
+  background:
+    linear-gradient(180deg, rgba(9, 28, 54, 0.98), rgba(8, 24, 46, 0.96)),
+    radial-gradient(circle at top right, rgba(135, 200, 255, 0.14), transparent 34%);
+  color: #edf4ff;
+}
+
+.proof-surface__topline,
+.proof-surface__trail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  justify-content: space-between;
+}
+
+.proof-surface__topline {
+  font-family: var(--font-family-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(237, 244, 255, 0.74);
+}
+
+.proof-surface__result strong {
+  display: block;
+  font-family: var(--font-family-display);
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: 0.94;
+}
+
+.proof-surface__result p {
+  margin: 0.45rem 0 0;
+  color: rgba(237, 244, 255, 0.82);
+}
+
+.proof-surface__trail span {
+  display: inline-flex;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--font-family-mono);
+  font-size: 0.8rem;
+}
+
+.proof-surface__notes {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.proof-surface__notes p {
+  margin: 0.45rem 0 0;
+  color: rgba(237, 244, 255, 0.78);
+}
+
 .workflow-band,
 .audience-fit,
 .works-matrix,
@@ -2667,6 +2804,23 @@ td {
   margin: 0;
 }
 
+.auth-benefits {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.95rem 1rem;
+  border-radius: 24px;
+  border: 1px solid rgba(15, 39, 74, 0.08);
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.auth-benefits ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.45rem;
+  color: var(--ink-strong);
+}
+
 .auth-divider {
   position: relative;
   text-align: center;
@@ -2757,6 +2911,7 @@ td {
   }
 
   .launch-hero__shell,
+  .product-proof,
   .workflow-grid,
   .trust-claims__grid,
   .audience-fit__grid,
@@ -2856,6 +3011,10 @@ td {
   .launch-hero__copy,
   .launch-hero__media {
     min-height: auto;
+  }
+
+  .proof-surface__notes {
+    grid-template-columns: 1fr;
   }
 
   .launch-hero__title {

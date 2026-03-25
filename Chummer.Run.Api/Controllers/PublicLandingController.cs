@@ -144,19 +144,7 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/status")]
     [Produces("text/html")]
-    public async Task<IActionResult> StatusPage(CancellationToken cancellationToken)
-    {
-        var surface = _landing.LoadSurface();
-        var model = new ShelfPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "A compact public read on what is live and what still sits in horizon territory.", "/status", cancellationToken),
-            Surface: surface,
-            Assets: new AssetCatalogViewModel(surface.Assets),
-            Eyebrow: "Status",
-            Heading: "Public status",
-            Intro: "This summary comes from the live public surface and stays focused on what people can actually use or inspect.",
-            Items: _landing.CardsForBucket(surface, "whats_real_now"));
-        return View("~/Views/PublicLanding/Shelf.cshtml", model);
-    }
+    public IActionResult StatusPage() => Redirect("/now");
 
     [HttpGet("/artifacts")]
     [Produces("text/html")]

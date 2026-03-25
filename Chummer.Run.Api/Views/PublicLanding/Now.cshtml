@@ -36,13 +36,13 @@
         <div class="evidence-row-list">
             @foreach (var card in Model.AvailableToday)
             {
-                <article class="evidence-row">
+                <article class="evidence-row" id="@card.Id.Replace('_', '-')">
                     <div class="evidence-row__copy">
                         <h3>@card.Title</h3>
                         <p>@card.Summary</p>
                     </div>
                     <span class="readiness-tag">@card.Badge</span>
-                    <a class="button-like button-like--ghost" href="@card.Href">Open</a>
+                    <a class="button-like button-like--ghost" href="@card.Href">@(card.ActionLabel ?? "Open")</a>
                 </article>
             }
         </div>
@@ -56,13 +56,13 @@
         <div class="evidence-row-list">
             @foreach (var card in Model.Inspectable)
             {
-                <article class="evidence-row">
+                <article class="evidence-row" id="@card.Id.Replace('_', '-')">
                     <div class="evidence-row__copy">
                         <h3>@card.Title</h3>
                         <p>@card.Summary</p>
                     </div>
                     <span class="readiness-tag tag--amber">@card.Badge</span>
-                    <a class="button-like button-like--ghost" href="@card.Href">Inspect</a>
+                    <a class="button-like button-like--ghost" href="@card.Href">@(card.ActionLabel ?? "Inspect")</a>
                 </article>
             }
         </div>
@@ -70,8 +70,8 @@
 
     <article class="evidence-group">
         <div class="evidence-group__header">
-            <span class="readiness-tag readiness-tag--horizon">Account preview</span>
-            <h2>Account preview</h2>
+            <span class="readiness-tag readiness-tag--horizon">Signed-in next step</span>
+            <h2>What your account adds</h2>
         </div>
         <div class="evidence-row-list">
             @foreach (var overlay in Model.SignedInPreview)
@@ -81,7 +81,7 @@
                         <h3>@overlay.Title</h3>
                         <p>@overlay.Summary</p>
                     </div>
-                    <span class="readiness-tag readiness-tag--horizon">Account preview</span>
+                    <span class="readiness-tag readiness-tag--horizon">Signed-in next step</span>
                     <a class="button-like button-like--ghost" href="@(Model.Chrome.Authenticated ? "/home" : "/signup?next=/home")">
                         @(Model.Chrome.Authenticated ? "Open home" : "Create account")
                     </a>

@@ -1,7 +1,7 @@
 product: chummer
 surface: chummer.run
 version: 1
-headline: Shadowrun that shows its work.
+headline: Shadowrun rules truth, with receipts.
 subhead: Build characters, inspect rulings, and keep sessions moving with explainable math, durable state, and clear proof of what works today.
 proof_line: Preview product. Honest status. No mystery roadmap.
 no_provider_names: true
@@ -24,6 +24,20 @@ secondary_highlights:
   - Deterministic engine
   - Rules receipts
   - Local-first continuity
+product_proof_eyebrow: Real product proof
+product_proof_intro: Install the current preview, inspect one visible trail, and see the same result stay legible when the next device or network wobble shows up.
+product_proof_primary_label: Install the current preview
+product_proof_primary_href: /downloads
+product_proof_secondary_label: Inspect the proof trail
+product_proof_secondary_href: /now#real-rules-truth
+product_proof_topline_label: Current preview
+product_proof_result_title: Final pool 9
+product_proof_result_summary: Same inputs, same answer, with the trail and release posture still attached.
+product_proof_trail:
+  - Base 11
+  - Weather -1
+  - Wounds -1
+  - Recoil -1
 public_routes:
   - path: /
     title: Landing
@@ -237,6 +251,10 @@ registered_routes:
 sections:
   - id: hero
     title: Shadowrun rules truth, with receipts.
+    audience: public
+    route: /
+  - id: product_proof
+    title: One concrete result, one visible trail, one current build
     audience: public
     route: /
   - id: start_here

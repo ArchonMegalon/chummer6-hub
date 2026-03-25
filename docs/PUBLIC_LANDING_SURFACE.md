@@ -16,6 +16,11 @@
 - `/now`
 - `/horizons`
 - `/downloads`
+- `/help`
+- `/faq`
+- `/privacy`
+- `/terms`
+- `/contact`
 - `/progress`
 - `/participate`
 - `/status`
@@ -39,11 +44,12 @@ The hosted landing surface reads mirrored design canon from:
 - `.codex-design/product/PUBLIC_PROGRESS_PARTS.yaml`
 - `.codex-design/product/PROGRESS_REPORT.generated.json`
 - `.codex-design/product/PROGRESS_REPORT.generated.html`
-- `.codex-design/product/PROGRESS_REPORT_POSTER.svg`
+- `.codex-design/product/PROGRESS_REPORT_POSTER.svg` for the generated progress report export only
 - related mirrored public-surface canon files
 
 The hosted surface must not invent a second feature map or public route story.
 The guest shell must expose both `Sign in` and `Create account`, and the media layer must come from canonical asset slots rather than raw scene-family labels.
+The raster-only campaign rule applies to public front-door imagery, not to generated progress-report exports.
 
 ## Public versus registered
 
@@ -67,7 +73,7 @@ Registered overlays may add:
 
 The first-wave hosted shell uses a boring browser session cookie over the identity boundary so account and participation pages stop doubling as ad hoc auth entrypoints.
 
-Thin overlays are acceptable in the POC, but the split must remain obvious.
+Thin overlays are acceptable in the early-access shell, but the split must remain obvious.
 Public cards should land on deliberate first-party routes by default; self-linking cards are only acceptable when they are explicitly teaser-only, and any external fallback should be labeled honestly.
 
 ## Public copy rules
@@ -76,5 +82,5 @@ Public cards should land on deliberate first-party routes by default; self-linki
 - do not name providers or LTDs
 - do not show empty placeholder boxes
 - explain what is real today and what is coming next
-- keep participation language user-facing (`participate`, `booster`) before operator-facing
+- keep participation language user-facing (`participate`, `guided contribution`) before operator-facing
 - do not leak operator terms like `Fleet`, `device-code auth`, or `worker host` on landing-adjacent public pages
