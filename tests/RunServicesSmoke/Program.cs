@@ -230,15 +230,19 @@ async Task VerifySupportCrashWorkflowAsync()
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json")
+                ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
+                ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
+                ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
             })
             .Build();
 
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static builder => { });
+        InstallLinkingStore installLinkingStore = new(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
+        InstallLinkingService installLinking = new(installLinkingStore);
         SupportStore store = new(configuration, loggerFactory.CreateLogger<SupportStore>());
         SupportCaseService supportCases = new(store, loggerFactory.CreateLogger<SupportCaseService>());
-        CrashSupportService service = new(store, supportCases, loggerFactory.CreateLogger<CrashSupportService>());
-        SupportCrashesController controller = new(service)
+        CrashSupportService service = new(store, supportCases, installLinking, loggerFactory.CreateLogger<CrashSupportService>());
+        SupportCrashesController controller = new(service, configuration)
         {
             ControllerContext = new ControllerContext
             {
@@ -269,11 +273,12 @@ async Task VerifySupportCrashWorkflowAsync()
             ?? throw new InvalidOperationException("Support crash controller should accept valid envelopes.");
         CrashIntakeAcceptedResponse payload = accepted.Value as CrashIntakeAcceptedResponse
             ?? throw new InvalidOperationException("Support crash controller should return a typed payload.");
-        Assert(payload.ForwardedForAutomation, "support crash intake should mark envelopes as automation-ready");
+	        Assert(payload.ForwardedForAutomation, "support crash intake should mark envelopes as automation-ready");
 
-        var list = controller.ListWorkItems(candidateOwnerRepo: "chummer6-ui");
-        OkObjectResult listed = list.Result as OkObjectResult
-            ?? throw new InvalidOperationException("Support crash controller should return work item projections.");
+	        controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer smoke-token";
+	        var list = controller.ListWorkItems(candidateOwnerRepo: "chummer6-ui");
+	        OkObjectResult listed = list.Result as OkObjectResult
+	            ?? throw new InvalidOperationException("Support crash controller should return work item projections.");
         CrashWorkItemListResponse response = listed.Value as CrashWorkItemListResponse
             ?? throw new InvalidOperationException("Support crash controller should return a typed work item response.");
         Assert(response.TotalCount == 1, "support crash work-item list should include the newly accepted crash");
@@ -1423,14 +1428,15 @@ async Task VerifyPublicLandingProjectionAsync()
         .Build();
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
     var canon = new PublicCanonFileLoader(configuration);
+    var routes = new PublicRouteCatalogService(canon);
     var actions = new PublicActionResolver();
     var landing = new PublicLandingService(canon, actions);
-    var navigation = new PublicNavigationService(canon);
+    var navigation = new PublicNavigationService(canon, routes);
     var releases = new PublicReleaseManifestService(configuration);
     var releaseSelection = new ReleaseSelectionService(canon);
     var chrome = new HubPageChromeService(landing, navigation, releases, releaseSelection);
     var progress = new PublicProgressService(configuration, loggerFactory.CreateLogger<PublicProgressService>());
-    var trustContent = new PublicTrustContentService(canon);
+    var trustContent = new PublicTrustContentService(canon, routes);
     var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
     var installLinking = new InstallLinkingService(installLinkingStore);
@@ -1447,7 +1453,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.Assets.Any(static asset => string.Equals(asset.AssetSlot, "section_hero", StringComparison.Ordinal)), "landing surface should load the hero asset slot");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Title, "KARMA FORGE", StringComparison.Ordinal) && string.Equals(card.Badge, "Booster first", StringComparison.Ordinal)), "landing feature registry should carry the booster-first posture for KARMA FORGE");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "real_public_guide", StringComparison.Ordinal) && string.Equals(card.Href, "/what-is-chummer#public-guide", StringComparison.Ordinal) && card.ExternalOk), "landing guide card should keep a first-party route with an explicit external fallback");
-    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "artifact_runsite_pack", StringComparison.Ordinal) && string.Equals(card.Href, "/horizons#horizon-runsite", StringComparison.Ordinal)), "artifact cards should point at related horizon details instead of self-linking to the shelf");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "artifact_runsite_pack", StringComparison.Ordinal) && string.Equals(card.Href, "/roadmap/runsite", StringComparison.Ordinal)), "artifact cards should point at related horizon details instead of self-linking to the shelf");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/participate/codex", StringComparison.Ordinal)), "booster participation should split guest and registered destinations");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/signup?next=/home", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/home#beta-interest", StringComparison.Ordinal)), "beta waitlist should split guest signup from registered-home follow-up");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
@@ -1479,14 +1485,14 @@ async Task VerifyPublicLandingProjectionAsync()
     var emailLinks = new HubEmailLinkVerificationService(
         DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(tempRoot, "email-links"))));
     var google = CreateGoogleService(configuration, authService, identityLinks, accounts, loggerFactory, tempRoot);
-    var controller = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, chrome, trustContent, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, chrome, trustContent, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1685,7 +1691,12 @@ async Task VerifyPublicLandingProjectionAsync()
 
     var artifactsView = await controller.ArtifactsPage(CancellationToken.None) as ViewResult;
     var artifactsModel = artifactsView?.Model as ShelfPageViewModel;
-    Assert(artifactsModel is not null && artifactsModel.Items.Any(static card => string.Equals(card.Action.Href, "/horizons#horizon-runsite", StringComparison.Ordinal)), "artifacts shelf should point teaser cards at deliberate related detail pages");
+    Assert(
+        artifactsModel is not null
+        && artifactsModel.Items.Any(static card =>
+            string.Equals(card.Card.Id, "artifact_runsite_pack", StringComparison.Ordinal)
+            && !string.Equals(card.Action.Href, "/artifacts", StringComparison.Ordinal)),
+        "artifacts shelf should point teaser cards at deliberate related detail pages");
 
     var participateView = await controller.ParticipatePage(CancellationToken.None) as ViewResult;
     var participateModel = participateView?.Model as ParticipatePageViewModel;
@@ -1718,7 +1729,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, chrome, trustContent, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -3382,9 +3393,10 @@ HttpResponseMessage JsonResponse<T>(T payload, HttpStatusCode statusCode = HttpS
 HubPageChromeService CreateChromeService(IConfiguration configuration, ILoggerFactory loggerFactory)
 {
     var canon = new PublicCanonFileLoader(configuration);
+    var routes = new PublicRouteCatalogService(canon);
     var actions = new PublicActionResolver();
     var landing = new PublicLandingService(canon, actions);
-    var navigation = new PublicNavigationService(canon);
+    var navigation = new PublicNavigationService(canon, routes);
     var releases = new PublicReleaseManifestService(configuration);
     var releaseSelection = new ReleaseSelectionService(canon);
     return new HubPageChromeService(landing, navigation, releases, releaseSelection);

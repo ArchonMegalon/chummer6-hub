@@ -56,7 +56,17 @@ public sealed class SupportCaseService
         string source = NormalizeSource(request.Source);
         bool designImpact = LooksLikeDesignImpact(title, summary, detail);
         string candidateOwnerRepo = ResolveCandidateOwnerRepo(kind, title, summary, detail, headId, platform, installationId, designImpact);
-        string clusterKey = ComputeClusterKey(kind, title, userId, subjectId, installationId, candidateOwnerRepo);
+        string clusterKey = ComputeClusterKey(
+            kind,
+            title,
+            summary,
+            userId,
+            subjectId,
+            installationId,
+            applicationVersion,
+            releaseChannel,
+            headId,
+            candidateOwnerRepo);
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
         lock (_store.Gate)
@@ -543,9 +553,13 @@ public sealed class SupportCaseService
     private static string ComputeClusterKey(
         string kind,
         string title,
+        string summary,
         string? userId,
         string? subjectId,
         string? installationId,
+        string? applicationVersion,
+        string? releaseChannel,
+        string? headId,
         string candidateOwnerRepo)
     {
         string seed = string.Join(
@@ -554,9 +568,13 @@ public sealed class SupportCaseService
             {
                 kind,
                 title.Trim().ToLowerInvariant(),
+                summary.Trim().ToLowerInvariant(),
                 NormalizeOptional(userId, 64) ?? "-",
                 NormalizeOptional(subjectId, 128) ?? "-",
                 NormalizeOptional(installationId, 64) ?? "-",
+                NormalizeOptional(applicationVersion, 64) ?? "-",
+                NormalizeOptional(releaseChannel, 64) ?? "-",
+                NormalizeOptional(headId, 64) ?? "-",
                 candidateOwnerRepo
             });
         return $"support:{ComputeHash(seed)}";
@@ -598,8 +616,16 @@ public sealed class SupportCaseService
         {
             return SupportCaseSourceKinds.HubAccount;
         }
-
-        return normalized.ToLowerInvariant();
+        normalized = normalized.ToLowerInvariant();
+        return normalized switch
+        {
+            SupportCaseSourceKinds.HubAccount => normalized,
+            SupportCaseSourceKinds.DesktopCrash => normalized,
+            SupportCaseSourceKinds.DesktopFeedback => normalized,
+            SupportCaseSourceKinds.PublicWeb => normalized,
+            SupportCaseSourceKinds.FleetAutomation => normalized,
+            _ => SupportCaseSourceKinds.HubAccount
+        };
     }
 
     private static string NormalizeRequired(string value, string parameterName, int maxLength)

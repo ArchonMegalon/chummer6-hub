@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Contracts.Support;
 using Microsoft.Extensions.Logging;
 
@@ -9,15 +10,18 @@ public sealed class CrashSupportService
 {
     private readonly SupportStore _store;
     private readonly SupportCaseService _supportCases;
+    private readonly InstallLinkingService _installLinking;
     private readonly ILogger<CrashSupportService> _logger;
 
     public CrashSupportService(
         SupportStore store,
         SupportCaseService supportCases,
+        InstallLinkingService installLinking,
         ILogger<CrashSupportService> logger)
     {
         _store = store;
         _supportCases = supportCases;
+        _installLinking = installLinking;
         _logger = logger;
     }
 
@@ -42,6 +46,7 @@ public sealed class CrashSupportService
 
             DateTimeOffset receivedAtUtc = DateTimeOffset.UtcNow;
             CrashEnvelope normalizedEnvelope = NormalizeEnvelope(envelope);
+            normalizedEnvelope = ResolveTrustedReporter(normalizedEnvelope);
             CrashRegistryContextProjection registryContext = BuildRegistryContext(normalizedEnvelope);
             string clusterId = GetOrCreateClusterIdLocked(normalizedEnvelope.CrashFingerprint);
             string workItemId = GetOrCreateWorkItemIdLocked(clusterId);
@@ -185,10 +190,41 @@ public sealed class CrashSupportService
             DesktopHead = NormalizeOptional(envelope.DesktopHead),
             RuntimeHead = NormalizeOptional(envelope.RuntimeHead),
             InstallationId = NormalizeOptional(envelope.InstallationId),
+            InstallationGrantToken = NormalizeOptional(envelope.InstallationGrantToken),
             UserId = NormalizeOptional(envelope.UserId),
             SubjectId = NormalizeOptional(envelope.SubjectId),
             LastActionCategory = NormalizeOptional(envelope.LastActionCategory),
             LogTail = NormalizeLogTail(envelope.LogTail)
+        };
+
+    private CrashEnvelope ResolveTrustedReporter(CrashEnvelope envelope)
+    {
+        if (string.IsNullOrWhiteSpace(envelope.InstallationId) || string.IsNullOrWhiteSpace(envelope.InstallationGrantToken))
+        {
+            return ClearReporterIdentity(envelope);
+        }
+
+        var installation = _installLinking.ResolveInstallationForGrant(envelope.InstallationId, envelope.InstallationGrantToken);
+        if (installation is null)
+        {
+            return ClearReporterIdentity(envelope);
+        }
+
+        return envelope with
+        {
+            InstallationId = NormalizeOptional(installation.InstallationId),
+            UserId = NormalizeOptional(installation.UserId),
+            SubjectId = NormalizeOptional(installation.SubjectId)
+        };
+    }
+
+    private static CrashEnvelope ClearReporterIdentity(CrashEnvelope envelope)
+        => envelope with
+        {
+            InstallationId = null,
+            InstallationGrantToken = null,
+            UserId = null,
+            SubjectId = null
         };
 
     private static CrashRegistryContextProjection BuildRegistryContext(CrashEnvelope envelope)
