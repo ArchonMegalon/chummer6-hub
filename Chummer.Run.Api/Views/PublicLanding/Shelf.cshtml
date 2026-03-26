@@ -2,6 +2,10 @@
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
+    static string DisplayStatus(string badge)
+        => string.Equals(badge, "Live now", StringComparison.OrdinalIgnoreCase)
+            ? "Available today"
+            : badge;
     var liveItems = Model.Items.Where(card => string.Equals(card.Card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) || string.Equals(card.Card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray();
     var previewItems = Model.Items.Except(liveItems).ToArray();
 }
@@ -12,11 +16,22 @@
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
     </div>
+    <div class="stacked-actions">
+        @if (liveItems.Length > 0)
+        {
+            <a class="button-like button-like--ghost" href="#live-artifacts">Live now</a>
+        }
+        @if (previewItems.Length > 0)
+        {
+            <a class="button-like button-like--ghost" href="#preview-artifacts">Preview concepts</a>
+        }
+    </div>
     @if (liveItems.Length > 0)
     {
-        <div class="editorial-block__lead">
+        <div class="editorial-block__lead" id="live-artifacts">
             <p class="eyebrow">Live now</p>
             <h2 class="editorial-title">Current proof surfaces</h2>
+            <p class="editorial-copy">These are the artifacts you can use or inspect against the current preview today.</p>
         </div>
         <div class="shelf-stack">
             @foreach (var card in liveItems)
@@ -26,9 +41,13 @@
                     {
                         @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
                     }
-                    <span class="tag">@card.Card.Badge</span>
+                    <span class="tag">@DisplayStatus(card.Card.Badge)</span>
                     <h2>@card.Card.Title</h2>
                     <p>@card.Card.Summary</p>
+                    @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
+                    {
+                        <p class="muted-copy"><strong>What this verifies:</strong> @card.Card.Payoff</p>
+                    }
                     @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote) || !string.IsNullOrWhiteSpace(card.Card.Payoff))
                     {
                         <p class="muted-copy">@(card.Card.ProofNote ?? card.Card.Payoff)</p>
@@ -40,9 +59,10 @@
     }
     @if (previewItems.Length > 0)
     {
-        <div class="editorial-block__lead">
+        <div class="editorial-block__lead" id="preview-artifacts">
             <p class="eyebrow">Preview concepts</p>
             <h2 class="editorial-title">What these cards are trying to verify next</h2>
+            <p class="editorial-copy">These stay visible so you can compare future-facing artifact ideas against what is already live.</p>
         </div>
         <div class="shelf-stack">
             @foreach (var card in previewItems)
@@ -52,9 +72,13 @@
                     {
                         @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
                     }
-                    <span class="tag">@card.Card.Badge</span>
+                    <span class="tag">@DisplayStatus(card.Card.Badge)</span>
                     <h2>@card.Card.Title</h2>
                     <p>@card.Card.Summary</p>
+                    @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
+                    {
+                        <p class="muted-copy"><strong>Expected unlock:</strong> @card.Card.Payoff</p>
+                    }
                     @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote) || !string.IsNullOrWhiteSpace(card.Card.Payoff))
                     {
                         <p class="muted-copy">@(card.Card.ProofNote ?? card.Card.Payoff)</p>

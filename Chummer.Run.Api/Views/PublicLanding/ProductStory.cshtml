@@ -4,13 +4,16 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-story";
     var leadAsset = Model.Assets.BySlot("scene_archive_stair");
+    var installLane = Model.Lanes.FirstOrDefault(card => string.Equals(card.Card.Title, "Player", StringComparison.OrdinalIgnoreCase));
+    var continuityLane = Model.Lanes.FirstOrDefault(card => string.Equals(card.Card.Title, "GM", StringComparison.OrdinalIgnoreCase));
+    var creatorLane = Model.Lanes.FirstOrDefault(card => string.Equals(card.Card.Title, "Creator", StringComparison.OrdinalIgnoreCase));
 }
 
 <section class="story-cinematic">
     <div class="story-cinematic__copy">
         <p class="eyebrow">Product</p>
-        <h1 class="page-title">A product for Shadowrun rules truth, living dossiers, and session continuity.</h1>
-        <p class="page-copy">Chummer keeps character math, explanation trails, installs, campaign return, and support follow-up inside one product surface you can actually inspect.</p>
+        <h1 class="page-title">One product for rules truth, living dossiers, and session return.</h1>
+        <p class="page-copy">Chummer keeps the preview build, the explanation trail, the signed-in return path, and first-party support inside one product surface you can inspect without guessing.</p>
     </div>
     @if (leadAsset is not null)
     {
@@ -20,57 +23,62 @@
     }
 </section>
 
-<section class="trust-rail-section">
+<section class="role-matrix">
     <div class="editorial-block__lead">
-        <p class="eyebrow">What it is</p>
-        <h2 class="editorial-title">One product, not a pile of disconnected tools</h2>
-        <p class="editorial-copy">Use Chummer when you want the builder, the explanation trail, and the return path after the session to agree with each other instead of drifting into separate apps and separate truths.</p>
+        <p class="eyebrow">The short answer</p>
+        <h2 class="editorial-title">What it is, where it fits, why it is different, and who it helps</h2>
+        <p class="editorial-copy">This page is the shortest useful explanation of the product. Install and proof still live elsewhere; this is the differentiation layer.</p>
     </div>
-    <div class="trust-rail-list">
-        <article class="trust-rail">
-            <span class="tag">Use it when</span>
-            <h3>You need rules answers you can inspect</h3>
-            <p>Start with the preview when you want the current build, a real explanation trail, and a clear account path for follow-up.</p>
+    <div class="role-matrix__grid">
+        <article class="role-matrix__cell">
+            <span class="tag">What it is</span>
+            <h3>A hosted Shadowrun product shell</h3>
+            <p>Chummer combines the preview installer, rules explanation, account return path, and support follow-up instead of treating them as separate projects.</p>
         </article>
-        <article class="trust-rail">
+        <article class="role-matrix__cell">
             <span class="tag">Where it fits</span>
-            <h3>Desk, session, and return path</h3>
-            <p>Chummer is strongest when the same runner, run, and support context need to survive more than one screen and more than one moment.</p>
+            <h3>From first install to next session</h3>
+            <p>Use it when the same runner, run, and support context need to survive more than one device and more than one moment.</p>
         </article>
-        <article class="trust-rail">
-            <span class="tag">Why it matters</span>
-            <h3>The answer should stay trustworthy after first contact</h3>
-            <p>Installer, receipt, dossier, and support all stay connected instead of turning into separate detective work later.</p>
+        <article class="role-matrix__cell">
+            <span class="tag">Why it is different</span>
+            <h3>Trust stays visible after first contact</h3>
+            <p>The answer, the release, and the help path stay attached to the same product story instead of becoming separate detective work later.</p>
+        </article>
+        <article class="role-matrix__cell">
+            <span class="tag">Who it helps</span>
+            <h3>Players, GMs, and creators</h3>
+            <p>Each lane uses a different slice of the product, but they still share one rules truth, one release shelf, and one support path.</p>
         </article>
     </div>
 </section>
 
-<section class="role-matrix">
+<section class="trust-rail-section">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Where it fits</p>
+        <p class="eyebrow">How the pieces fit together</p>
         <h2 class="editorial-title">One path from install to session return</h2>
-        <p class="editorial-copy">The product is strongest when the current preview, the account shell, the live proof shelf, and support all point at the same truth instead of fragmenting into separate tools.</p>
+        <p class="editorial-copy">The product should feel like one coherent path: install the preview, verify proof, keep the account connected, and use support only when the product path stops being enough.</p>
     </div>
-    <div class="role-matrix__grid">
-        <article class="role-matrix__cell">
+    <div class="trust-rail-list">
+        <article class="trust-rail">
             <span class="tag">Current preview</span>
             <h3>Install the product that exists now</h3>
             <p>Start from the current preview build so the install path, known issues, and account handoff all describe the same release.</p>
             <a class="inline-link" href="/downloads">Open downloads</a>
         </article>
-        <article class="role-matrix__cell">
+        <article class="trust-rail">
             <span class="tag">Proof shelf</span>
             <h3>Verify the builder, trail, and continuity claims</h3>
             <p>Use the live proof modules when you want to confirm what the preview can already demonstrate in public.</p>
             <a class="inline-link" href="/now">See what works today</a>
         </article>
-        <article class="role-matrix__cell">
+        <article class="trust-rail">
             <span class="tag">Account shell</span>
             <h3>Keep access, devices, and recovery in one place</h3>
             <p>The signed-in shell exists so downloads, claim codes, support history, and return context do not drift apart later.</p>
             <a class="inline-link" href="/signup?next=%2Fhome">Create account</a>
         </article>
-        <article class="role-matrix__cell">
+        <article class="trust-rail">
             <span class="tag">Support</span>
             <h3>Escalate from the product surface first</h3>
             <p>Use first-party support when install, account, or preview behavior breaks down instead of starting from a repo or issue search.</p>
@@ -83,7 +91,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Why it is different</p>
         <h2 class="editorial-title">Trust stays visible instead of implied</h2>
-        <p class="editorial-copy">These are the checks that make Chummer feel like a product instead of a pretty wrapper around hidden logic.</p>
+        <p class="editorial-copy">These are the checks that make Chummer feel like a product instead of a wrapper around hidden logic.</p>
     </div>
     <div class="role-matrix__grid">
         @foreach (var card in Model.TrustPillars)
@@ -101,16 +109,34 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Who it is for</p>
         <h2 class="editorial-title">Different table roles, one shared product truth</h2>
-        <p class="editorial-copy">Players, GMs, and creators hit different surfaces, but they still share the same install, rules, campaign, and support truth.</p>
+        <p class="editorial-copy">Start from the lane that best matches your job, then use the shared release and proof surfaces to keep everyone on the same page.</p>
     </div>
     <div class="role-matrix__grid">
-        @foreach (var card in Model.Lanes)
+        @if (installLane is not null)
         {
             <article class="role-matrix__cell">
-                <span class="tag">@card.Card.Badge</span>
-                <h3>@card.Card.Title</h3>
-                <p>@card.Card.Summary</p>
-                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                <span class="tag">@installLane.Card.Badge</span>
+                <h3>@installLane.Card.Title</h3>
+                <p>@installLane.Card.Summary</p>
+                <a class="inline-link" href="@installLane.Action.Href">@installLane.Action.Label</a>
+            </article>
+        }
+        @if (continuityLane is not null)
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">@continuityLane.Card.Badge</span>
+                <h3>@continuityLane.Card.Title</h3>
+                <p>@continuityLane.Card.Summary</p>
+                <a class="inline-link" href="@continuityLane.Action.Href">@continuityLane.Action.Label</a>
+            </article>
+        }
+        @if (creatorLane is not null)
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">@creatorLane.Card.Badge</span>
+                <h3>@creatorLane.Card.Title</h3>
+                <p>@creatorLane.Card.Summary</p>
+                <a class="inline-link" href="@creatorLane.Action.Href">@creatorLane.Action.Label</a>
             </article>
         }
     </div>

@@ -3,6 +3,12 @@
     ViewData["Title"] = "What Is Real Now";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-now";
+    static string DisplayStatus(string badge)
+        => string.Equals(badge, "Live now", StringComparison.OrdinalIgnoreCase)
+            ? "Available today"
+            : string.Equals(badge, "Inspectable", StringComparison.OrdinalIgnoreCase)
+                ? "Preview"
+                : badge;
     static string NormalizeRoute(string href)
     {
         var trimmed = (href ?? string.Empty).Trim();
@@ -34,8 +40,8 @@
 <section class="evidence-header">
     <div class="page-lead">
         <p class="eyebrow">What works today</p>
-        <h1 class="page-title">Evidence before promises</h1>
-        <p class="page-copy">Read the current release, the active channel, and the readiness labels in one place.</p>
+        <h1 class="page-title">Current preview, visible proof, and known posture</h1>
+        <p class="page-copy">Use this page to answer three practical questions fast: what changed in the current preview, what you can verify today, and when you should install or wait.</p>
     </div>
     <div class="evidence-header__stats">
         <div>
@@ -53,11 +59,43 @@
     </div>
 </section>
 
+<section class="evidence-wall">
+    <article class="evidence-group">
+        <div class="evidence-group__header">
+            <span class="readiness-tag">Current release</span>
+            <h2>What changed, what hurts, and what to expect</h2>
+        </div>
+        <div class="evidence-row-list">
+            <article class="evidence-row">
+                <div class="evidence-row__copy">
+                    <h3>Release summary</h3>
+                    <p>@Model.ReleaseExperience.ReleaseNotesSummary</p>
+                </div>
+                <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
+            </article>
+            <article class="evidence-row">
+                <div class="evidence-row__copy">
+                    <h3>Known issues and install help</h3>
+                    <p>Check the install help and current known-issues lane before you commit a fresh device to the preview.</p>
+                </div>
+                <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
+            </article>
+            <article class="evidence-row">
+                <div class="evidence-row__copy">
+                    <h3>Update posture</h3>
+                    <p>@Model.ReleaseExperience.UpdatePostureSummary</p>
+                </div>
+                <span class="readiness-tag">Preview channel</span>
+            </article>
+        </div>
+    </article>
+</section>
+
 <section class="workflow-band">
     <div class="workflow-band__lead">
         <p class="eyebrow">Concrete proof modules</p>
         <h2 class="editorial-title">Build, explain, and run with visible evidence</h2>
-        <p class="editorial-copy">These are the three product behaviors the current preview is already trying to prove in public: builder truth, explanation trail, and continuity under drift.</p>
+        <p class="editorial-copy">These are the three product behaviors the current preview is already proving in public: builder truth, explanation trail, and continuity under drift.</p>
     </div>
     <div class="workflow-grid">
         @foreach (var card in Model.ProofModules)
@@ -91,14 +129,6 @@
             <h2>Current preview facts around the core loop</h2>
         </div>
         <div class="evidence-row-list">
-            <article class="evidence-row">
-                <div class="evidence-row__copy">
-                    <h3>Current release</h3>
-                    <p>@Model.ReleaseExperience.ReleaseNotesSummary</p>
-                </div>
-                <span class="readiness-tag">Live now</span>
-                <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
-            </article>
             @foreach (var card in supportingProof)
             {
                 <article class="evidence-row" id="@card.Card.Id.Replace('_', '-')">
@@ -106,7 +136,7 @@
                         <h3>@card.Card.Title</h3>
                         <p>@card.Card.Summary</p>
                     </div>
-                    <span class="readiness-tag @(string.Equals(card.Card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--amber")">@card.Card.Badge</span>
+                    <span class="readiness-tag @(string.Equals(card.Card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--amber")">@DisplayStatus(card.Card.Badge)</span>
                     <a class="button-like button-like--ghost" href="@card.Action.Href">@card.Action.Label</a>
                 </article>
             }
@@ -122,7 +152,7 @@
             <article class="evidence-row">
                 <div class="evidence-row__copy">
                     <h3>@(Model.Chrome.Authenticated ? "Use the signed-in shell" : "Create an account for the signed-in shell")</h3>
-                    <p>The account path keeps install receipts, roadmap follows, beta interest, and support follow-up attached to the same return surface.</p>
+                    <p>The account path keeps install receipts, roadmap follows, beta interest, devices, and support follow-up attached to the same return surface.</p>
                     @if (signedInBenefits.Length > 0)
                     {
                         <ul class="trust-page-section__list">
@@ -149,7 +179,7 @@
 </section>
 
 <section class="evidence-tail">
-    <p class="editorial-copy">Integrity stays visible. Preview releases and the product story stay one click away.</p>
+    <p class="editorial-copy">Integrity stays visible. Use downloads when you are ready to install, and use the product story only when you need the broader fit and differentiation view.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="/downloads">Open downloads</a>
         <a class="cta-link cta-link--secondary" href="/what-is-chummer">Read the product story</a>

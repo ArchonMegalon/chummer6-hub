@@ -16,6 +16,11 @@
     <p class="eyebrow">Coming next</p>
     <h1 class="page-title">What Chummer is building toward</h1>
     <p class="page-copy">Each horizon carries a clearer readiness label, the user pain it addresses, and one truthful next step inside the product before the deeper brief.</p>
+    <div class="stacked-actions">
+        <a class="button-like button-like--ghost" href="#preparing">Preparing next</a>
+        <a class="button-like button-like--ghost" href="#designing">Designing in public</a>
+        <a class="button-like button-like--ghost" href="#research">Research tracks</a>
+    </div>
 </section>
 
 @foreach (var group in groups)
@@ -31,7 +36,7 @@
         rendered.Add(item.Card.Id);
     }
 
-    <section class="section-band">
+    <section class="section-band" id="@group.Badge.ToLowerInvariant()">
         <div class="editorial-block__lead">
             <p class="eyebrow">@group.Badge</p>
             <h2 class="editorial-title">@group.Heading</h2>

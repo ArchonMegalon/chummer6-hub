@@ -3,6 +3,12 @@
     ViewData["Title"] = "Chummer";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing";
+    static string DisplayStatus(string badge)
+        => string.Equals(badge, "Live now", StringComparison.OrdinalIgnoreCase)
+            ? "Available today"
+            : string.Equals(badge, "Inspectable", StringComparison.OrdinalIgnoreCase)
+                ? "Preview"
+                : badge;
     var hero = Model.Assets.BySlot("section_hero");
     var proofAsset = Model.Assets.BySlot("product_proof_ui") ?? Model.Assets.BySlot("capability_check_rules");
     var proofNotes = Model.Workflows.Take(3).ToArray();
@@ -188,7 +194,7 @@
                     </div>
                 }
                 <div class="artifact-card__copy">
-                    <span class="tag @(string.Equals(card.Card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--quiet")">@card.Card.Badge</span>
+                    <span class="tag @(string.Equals(card.Card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) || string.Equals(card.Card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--quiet")">@DisplayStatus(card.Card.Badge)</span>
                     <h3>@card.Card.Title</h3>
                     <p>@card.Card.Summary</p>
                     <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>

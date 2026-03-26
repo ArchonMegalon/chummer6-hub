@@ -90,27 +90,36 @@
 
     <div class="account-shell">
         <aside class="account-nav" aria-label="Account sections">
+            <p class="eyebrow">Core settings</p>
             <a href="#profile" data-account-tab>Profile</a>
             <a href="#sign-in" data-account-tab>Primary sign-in</a>
             <a href="#recovery" data-account-tab>Recovery email</a>
             <a href="#support" data-account-tab>Support</a>
             <a href="#devices-access" data-account-tab>Devices &amp; access</a>
             <a href="#privacy" data-account-tab>Privacy</a>
-            @if (showCampaignSection)
+            @if (showCampaignSection || showTeamsSection || showChannelsSection || showParticipationSection)
             {
-                <a href="#campaigns" data-account-tab>Campaigns &amp; dossiers</a>
-            }
-            @if (showTeamsSection)
-            {
-                <a href="#community-ops" data-account-tab>Teams &amp; permissions</a>
-            }
-            @if (showChannelsSection)
-            {
-                <a href="#channels" data-account-tab>Linked channels</a>
-            }
-            @if (showParticipationSection)
-            {
-                <a href="#participation" data-account-tab>Participation</a>
+                <details class="details-drawer">
+                    <summary>More settings</summary>
+                    <div class="stacked-actions">
+                        @if (showCampaignSection)
+                        {
+                            <a href="#campaigns" data-account-tab>Campaigns &amp; dossiers</a>
+                        }
+                        @if (showTeamsSection)
+                        {
+                            <a href="#community-ops" data-account-tab>Teams &amp; permissions</a>
+                        }
+                        @if (showChannelsSection)
+                        {
+                            <a href="#channels" data-account-tab>Linked channels</a>
+                        }
+                        @if (showParticipationSection)
+                        {
+                            <a href="#participation" data-account-tab>Participation</a>
+                        }
+                    </div>
+                </details>
             }
         </aside>
 
@@ -343,27 +352,33 @@
                 }
                 @if (claimedInstallations > 0)
                 {
-                    <div class="settings-summary-list">
-                        @foreach (var installation in Model.InstallLinking.ClaimedInstallations!)
-                        {
-                            <div class="settings-summary-row">
-                                <span>@(installation.HostLabel ?? installation.HeadId ?? installation.ArtifactId)</span>
-                                <strong>@installation.Version on @installation.Channel (@HumanizeStatus(installation.Status, "Active"))</strong>
-                            </div>
-                        }
-                    </div>
+                    <details class="details-drawer">
+                        <summary>Linked installs</summary>
+                        <div class="settings-summary-list">
+                            @foreach (var installation in Model.InstallLinking.ClaimedInstallations!)
+                            {
+                                <div class="settings-summary-row">
+                                    <span>@(installation.HostLabel ?? installation.HeadId ?? installation.ArtifactId)</span>
+                                    <strong>@installation.Version on @installation.Channel (@HumanizeStatus(installation.Status, "Active"))</strong>
+                                </div>
+                            }
+                        </div>
+                    </details>
                 }
                 @if (activeAccessRights > 0)
                 {
-                    <div class="settings-summary-list">
-                        @foreach (var grant in Model.InstallLinking.ActiveGrants!)
-                        {
-                            <div class="settings-summary-row">
-                                <span>@grant.InstallationId</span>
-                                <strong>@HumanizeStatus(grant.Status, "Active") until @grant.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
-                            </div>
-                        }
-                    </div>
+                    <details class="details-drawer">
+                        <summary>Access rights</summary>
+                        <div class="settings-summary-list">
+                            @foreach (var grant in Model.InstallLinking.ActiveGrants!)
+                            {
+                                <div class="settings-summary-row">
+                                    <span>@grant.InstallationId</span>
+                                    <strong>@HumanizeStatus(grant.Status, "Active") until @grant.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                                </div>
+                            }
+                        </div>
+                    </details>
                 }
                 @if (pendingClaims > 0)
                 {
@@ -390,7 +405,7 @@
                     <a class="button-like button-like--ghost" href="/help#install-update">How install linking works</a>
                 </div>
                 <details class="details-drawer">
-                    <summary>Roaming workspace restore</summary>
+                    <summary>Restore between devices</summary>
                     <div class="settings-summary-list">
                         <div class="settings-summary-row">
                             <span>Claimed restore devices</span>
@@ -502,11 +517,11 @@
                         <strong>@(openSupportCases == 0 ? "None" : openSupportCases.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Build Lab handoffs</span>
+                        <span>Build comparisons</span>
                         <strong>@(buildLabHandoffCount == 0 ? "Pending" : buildLabHandoffCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Rules Navigator answers</span>
+                        <span>Rules answers</span>
                         <strong>@(rulesNavigatorCount == 0 ? "Pending" : rulesNavigatorCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -642,7 +657,7 @@
                 @if (Model.CampaignSpine.BuildLabHandoffs.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Build Lab hand-off</summary>
+                        <summary>Build comparisons</summary>
                         <ul class="muted-copy">
                             @foreach (var handoff in Model.CampaignSpine.BuildLabHandoffs)
                             {
@@ -661,7 +676,7 @@
                 @if (Model.CampaignSpine.RulesNavigator.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Rules Navigator</summary>
+                        <summary>Rules answers</summary>
                         <ul class="muted-copy">
                             @foreach (var answer in Model.CampaignSpine.RulesNavigator)
                             {
