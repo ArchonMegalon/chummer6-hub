@@ -1458,10 +1458,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("proofSectionAsset", StringComparison.Ordinal), "landing should use a separate lower proof asset instead of rendering the same proof screenshot twice.");
     var storySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml"));
     Assert(!storySource.Contains("One path from install to session return", StringComparison.Ordinal), "product story should not drift back into a second install/support explainer.");
+    Assert(!storySource.Contains("From first install to next session", StringComparison.Ordinal), "product story should stay focused on differentiation instead of retelling the install path.");
     var nowSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml"));
-    Assert(nowSource.Contains("More proof markers around the core loop", StringComparison.Ordinal), "now should keep supporting proof behind a calmer secondary disclosure.");
+    Assert(nowSource.Contains("Supporting proof around the core loop", StringComparison.Ordinal), "now should keep supporting proof behind a calmer secondary disclosure.");
+    Assert(!nowSource.Contains("Integrity stays visible. Use downloads when you are ready to install", StringComparison.Ordinal), "now should not end with a second generic CTA band after the signed-in return callout.");
     var homeSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"));
     Assert(!homeSource.Contains("More in your signed-in shell", StringComparison.Ordinal), "home should not fall back to the old catch-all signed-in shell accordion.");
+    Assert(homeSource.Contains("Account state at a glance", StringComparison.Ordinal), "home should keep top-level account state behind a calmer at-a-glance disclosure.");
     Assert(homeSource.Contains("Overview details and current release", StringComparison.Ordinal), "home should keep overview depth behind a calmer secondary disclosure.");
     Assert(homeSource.Contains("Work, return, and follow-up", StringComparison.Ordinal), "home should collapse deeper work surfaces behind a calmer secondary disclosure.");
     var accountSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"));

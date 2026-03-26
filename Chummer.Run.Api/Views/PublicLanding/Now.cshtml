@@ -41,7 +41,7 @@
     <div class="page-lead">
         <p class="eyebrow">What works today</p>
         <h1 class="page-title">Current preview, visible proof, and known posture</h1>
-        <p class="page-copy">Use this page to answer three practical questions fast: what changed in the current preview, what you can verify today, and when you should install or wait.</p>
+        <p class="page-copy">Start with release health, then move to the proof shelf. This page should tell you whether to install now, wait, or inspect one more proof surface first.</p>
     </div>
     <div class="evidence-header__stats">
         <div>
@@ -126,7 +126,7 @@
 {
     <section class="release-shelf release-shelf--manual">
         <details class="release-accordion">
-            <summary>More proof markers around the core loop</summary>
+            <summary>Supporting proof around the core loop</summary>
             <div class="release-accordion__body">
                 <div class="evidence-row-list">
                     @foreach (var card in supportingProof)
@@ -148,8 +148,8 @@
 
 <section class="story-guide-tail">
     <p class="eyebrow">Signed-in return</p>
-    <h2 class="editorial-title">Use the account path when you want continuity, not just one download</h2>
-    <p class="editorial-copy">The account path keeps install receipts, roadmap follows, beta interest, devices, and support follow-up attached to the same return surface.</p>
+    <h2 class="editorial-title">Keep the return path attached when one download is not enough</h2>
+    <p class="editorial-copy">Use the account path when you want install receipts, devices, roadmap follows, and support updates to stay attached to the same return surface.</p>
     @if (signedInBenefits.Length > 0)
     {
         <div class="trust-claim__microproof">
@@ -160,6 +160,7 @@
         </div>
     }
     <div class="stacked-actions">
+        <a class="cta-link cta-link--secondary" href="/downloads">Open downloads</a>
         <a class="cta-link cta-link--primary" href="@(Model.Chrome.Authenticated ? "/home" : "/signup?next=/home")">
             @(Model.Chrome.Authenticated ? "Open home" : "Create account")
         </a>
@@ -168,12 +169,5 @@
             <a class="cta-link cta-link--secondary" href="/login?next=/home">Already have an account? Sign in</a>
         }
     </div>
-</section>
-
-<section class="evidence-tail">
-    <p class="editorial-copy">Integrity stays visible. Use downloads when you are ready to install, and use the product story only when you need the broader fit and differentiation view.</p>
-    <div class="stacked-actions">
-        <a class="cta-link cta-link--primary" href="/downloads">Open downloads</a>
-        <a class="cta-link cta-link--secondary" href="/what-is-chummer">Read the product story</a>
-    </div>
+    <p class="muted-copy">Need the broader fit instead? <a class="inline-link" href="/what-is-chummer">Read the product story</a>.</p>
 </section>

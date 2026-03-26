@@ -622,14 +622,50 @@ public sealed class PublicLandingController : Controller
     }
 
     private static IReadOnlyList<FeatureDetailFactViewModel> BuildFeatureDetailFacts(PublicFeatureCardDto card)
-        => [new(
+    {
+        var facts = new List<FeatureDetailFactViewModel>();
+        var liveArtifact = string.Equals(card.Badge, "Available today", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase);
+
+        facts.Add(new(
             card.Bucket switch
             {
-                "featured_artifacts" => "Availability",
-                "coming_next" => "Roadmap",
+                "featured_artifacts" => liveArtifact ? "Availability" : "Preview status",
+                "coming_next" => "Roadmap status",
                 _ => "Current status"
             },
-            $"{card.Badge}. {card.Summary}")];
+            $"{card.Badge}. {card.Summary}"));
+
+        if (!string.IsNullOrWhiteSpace(card.Audience))
+        {
+            facts.Add(new(
+                card.Bucket switch
+                {
+                    "coming_next" => "Who this horizon helps",
+                    "featured_artifacts" => "Who this proof is for",
+                    _ => "Audience"
+                },
+                card.Audience));
+        }
+
+        var nextStep = card.DetailPrimaryLabel
+            ?? card.ActionLabel
+            ?? card.FallbackLabel;
+        if (!string.IsNullOrWhiteSpace(nextStep))
+        {
+            facts.Add(new(
+                card.Bucket switch
+                {
+                    "coming_next" => "Best next step in Chummer",
+                    "featured_artifacts" when liveArtifact => "Use this live proof from",
+                    "featured_artifacts" => "Follow this preview from",
+                    _ => "Next step"
+                },
+                nextStep));
+        }
+
+        return facts;
+    }
 
     private static string? BuildFeatureDetailProofNote(PublicFeatureCardDto card)
     {
@@ -640,7 +676,7 @@ public sealed class PublicLandingController : Controller
 
         return card.Bucket switch
         {
-            "coming_next" => "Read the horizon brief, compare it to the current preview surface, and treat this as planned product work until it appears on the live proof shelf.",
+            "coming_next" => "Compare this horizon with the current preview proof first, then open the deeper roadmap brief only when you need the longer rationale.",
             "featured_artifacts" => "Use the proof gallery and current release shelf together to verify whether this artifact is live today or still preview-only.",
             _ => null
         };
