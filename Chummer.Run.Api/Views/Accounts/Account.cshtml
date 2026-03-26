@@ -66,7 +66,7 @@
     <div class="account-stage__lead">
         <p class="eyebrow">Account</p>
         <h1 class="page-title">Account</h1>
-        <p class="page-copy">Keep your sign-in, backup recovery, channels, privacy, and participation settings in one calm place.</p>
+        <p class="page-copy">Keep sign-in, recovery, devices, support, and account preferences in one calmer product settings surface.</p>
     </div>
 
     <div class="account-overview">
@@ -79,59 +79,43 @@
             <strong>@(emailLink is null ? "Add one" : HumanizeStatus(emailLink.Status, "Add one"))</strong>
         </article>
         <article class="account-overview__card">
-            <span class="tag">Channels</span>
-            <strong>@(telegramChannel is null ? "Optional" : "Telegram connected")</strong>
+            <span class="tag">Devices &amp; access</span>
+            <strong>@(activeAccessRights > 0 ? $"{activeAccessRights} active" : claimedInstallations > 0 ? $"{claimedInstallations} linked" : "Ready to link")</strong>
         </article>
         <article class="account-overview__card">
-            <span class="tag">Preferences</span>
-            <strong id="participationOverviewState">@(Model.Experience.OnboardingCompleted ? "Configured" : "Needs setup")</strong>
-        </article>
-        <article class="account-overview__card">
-            <span class="tag">Living dossiers</span>
-            <strong>@dossierCount</strong>
-        </article>
-        <article class="account-overview__card">
-            <span class="tag">Campaigns</span>
-            <strong>@(campaignCount == 0 ? "Ready to start" : campaignCount.ToString())</strong>
-        </article>
-        <article class="account-overview__card">
-            <span class="tag">Live runs</span>
-            <strong>@(runCount == 0 ? "Quiet" : runCount.ToString())</strong>
-        </article>
-        <article class="account-overview__card">
-            <span class="tag">Workspace</span>
-            <strong>@(workspaceCount == 0 ? "Ready to seed" : $"{workspaceCount} live")</strong>
+            <span class="tag">Support</span>
+            <strong>@(openSupportCases == 0 ? "Quiet" : $"{openSupportCases} active")</strong>
         </article>
     </div>
 
     <div class="account-shell">
         <aside class="account-nav" aria-label="Account sections">
-            <a href="#profile">Profile</a>
-            <a href="#sign-in">Primary sign-in</a>
-            <a href="#recovery">Recovery email</a>
-            <a href="#support">Support</a>
-            <a href="#devices-access">Devices &amp; access</a>
-            <a href="#privacy">Privacy</a>
+            <a href="#profile" data-account-tab>Profile</a>
+            <a href="#sign-in" data-account-tab>Primary sign-in</a>
+            <a href="#recovery" data-account-tab>Recovery email</a>
+            <a href="#support" data-account-tab>Support</a>
+            <a href="#devices-access" data-account-tab>Devices &amp; access</a>
+            <a href="#privacy" data-account-tab>Privacy</a>
             @if (showCampaignSection)
             {
-                <a href="#campaigns">Campaigns &amp; dossiers</a>
+                <a href="#campaigns" data-account-tab>Campaigns &amp; dossiers</a>
             }
             @if (showTeamsSection)
             {
-                <a href="#community-ops">Teams &amp; permissions</a>
+                <a href="#community-ops" data-account-tab>Teams &amp; permissions</a>
             }
             @if (showChannelsSection)
             {
-                <a href="#channels">Linked channels</a>
+                <a href="#channels" data-account-tab>Linked channels</a>
             }
             @if (showParticipationSection)
             {
-                <a href="#participation">Participation</a>
+                <a href="#participation" data-account-tab>Participation</a>
             }
         </aside>
 
         <div class="account-pane">
-            <section id="profile" class="settings-section">
+            <section id="profile" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Profile</h2>
                     <p>Keep the visible identity clear, stable, and easy to recognize.</p>
@@ -154,7 +138,7 @@
                 </form>
             </section>
 
-            <section id="sign-in" class="settings-section">
+            <section id="sign-in" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Primary sign-in</h2>
                     <p>Choose the sign-in path that feels stable for daily use, then keep recovery separate.</p>
@@ -179,7 +163,7 @@
                 }
             </section>
 
-            <section id="recovery" class="settings-section">
+            <section id="recovery" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Recovery email</h2>
                     <p>Add a verified backup path so one sign-in method is never the whole story.</p>
@@ -200,7 +184,7 @@
 
             @if (showChannelsSection)
             {
-            <section id="channels" class="settings-section">
+            <section id="channels" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Linked channels</h2>
                     <p>Companion channels stay separate from account access and recovery.</p>
@@ -220,9 +204,9 @@
             </section>
             }
 
-            <section id="support" class="settings-section">
+            <section id="support" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
-                    <h2>Support and feedback</h2>
+                    <h2>Support</h2>
                     <p>Report a bug, confusing copy, install trouble, or product feedback without leaving the account surface. Visible status stays attached to the case instead of disappearing into email.</p>
                 </div>
                 <div class="settings-summary-list">
@@ -314,7 +298,7 @@
                 }
             </section>
 
-            <section id="devices-access" class="settings-section">
+            <section id="devices-access" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Devices &amp; access</h2>
                     <p>Keep linked installs, preview access, and download handoff in one place. Technical claim details stay available, but they do not need to be the first thing you read.</p>
@@ -487,7 +471,7 @@
 
             @if (showCampaignSection)
             {
-            <section id="campaigns" class="settings-section">
+            <section id="campaigns" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Campaigns &amp; dossiers</h2>
                     <p>Living dossiers, crew context, rules checks, live run state, recap material, and restore signals stay tied together here instead of falling back to one-off build files.</p>
@@ -724,7 +708,7 @@
 
             @if (showTeamsSection)
             {
-            <section id="community-ops" class="settings-section">
+            <section id="community-ops" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Teams &amp; permissions</h2>
                     <p>Organizer work stays on the same account/control model as the player path: group ownership, permissions, roster state, campaign visibility, and governed rule posture stay explicit without inventing a second operator system.</p>
@@ -806,7 +790,7 @@
             </section>
             }
 
-            <section id="privacy" class="settings-section">
+            <section id="privacy" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Privacy</h2>
                     <p>Choose what stays visible while deeper identifiers remain tucked away.</p>
@@ -825,7 +809,7 @@
 
             @if (showParticipationSection)
             {
-            <section id="participation" class="settings-section">
+            <section id="participation" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Participation</h2>
                     <p>Tell Chummer which lanes matter to you and which updates you actually want to hear about.</p>
@@ -844,7 +828,7 @@
             </section>
             }
 
-            <section class="settings-section">
+            <section class="settings-section" data-account-panel id="help-policy">
                 <div class="settings-section__header">
                     <h2>Help and policy</h2>
                     <p>When you need support, privacy, or preview-use guidance, use the first-party pages instead of guessing.</p>
@@ -993,7 +977,10 @@
         onboardingCompleted: true
         }
       });
-      document.getElementById("participationOverviewState").textContent = "Configured";
+      const participationOverview = document.getElementById("participationOverviewState");
+      if (participationOverview) {
+        participationOverview.textContent = "Configured";
+      }
       ui.setNotice(notice, "Participation settings saved.");
     } catch (error) {
       ui.setNotice(notice, ui.describeError(error, "Participation settings could not be saved."), true);

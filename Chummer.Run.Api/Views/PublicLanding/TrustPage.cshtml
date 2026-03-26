@@ -3,6 +3,15 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-trust-page";
+
+    static TrustPageActionViewModel? HelpActionFor(string sectionId, bool authenticated) => sectionId switch
+    {
+        "install-update" => new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
+        "sign-in-recovery" => new TrustPageActionViewModel(authenticated ? "Open account" : "Create account", authenticated ? "/account" : "/signup?next=/home", "secondary"),
+        "product-bug" => new TrustPageActionViewModel("Open support intake", "/contact#support-intake", "secondary"),
+        "product-question" => new TrustPageActionViewModel("Read the FAQ", "/faq", "secondary"),
+        _ => null
+    };
 }
 
 <section class="trust-page-hero">
@@ -41,25 +50,67 @@
     </div>
 </section>
 
-<section class="trust-page-sections">
-    @foreach (var pageSection in Model.Sections)
-    {
-        <article class="trust-page-section" id="@pageSection.Id">
-            <p class="eyebrow">@pageSection.Eyebrow</p>
-            <h2>@pageSection.Heading</h2>
-            <p>@pageSection.Body</p>
-            @if (pageSection.Bullets is { Count: > 0 })
+@if (string.Equals(Model.PageId, "help", StringComparison.OrdinalIgnoreCase))
+{
+    <section class="trust-page-sections">
+        <div class="workflow-grid">
+            @foreach (var pageSection in Model.Sections)
             {
-                <ul class="trust-page-section__list">
-                    @foreach (var bullet in pageSection.Bullets)
-                    {
-                        <li>@bullet</li>
-                    }
-                </ul>
+                var quickAction = HelpActionFor(pageSection.Id, Model.Chrome.Authenticated);
+                <article class="workflow-card">
+                    <div class="workflow-card__copy">
+                        <span class="tag">@pageSection.Eyebrow</span>
+                        <h3>@pageSection.Heading</h3>
+                        <p>@pageSection.Body</p>
+                        @if (pageSection.Bullets is { Count: > 0 })
+                        {
+                            <ul class="workflow-card__points">
+                                @foreach (var bullet in pageSection.Bullets)
+                                {
+                                    <li>@bullet</li>
+                                }
+                            </ul>
+                        }
+                        @if (quickAction is not null)
+                        {
+                            <a class="inline-link" href="@quickAction.Href">@quickAction.Label</a>
+                        }
+                    </div>
+                </article>
             }
-        </article>
-    }
-</section>
+        </div>
+    </section>
+}
+else
+{
+    <section class="trust-page-layout">
+        <aside class="account-nav account-nav--trust" aria-label="Page sections">
+            @foreach (var pageSection in Model.Sections)
+            {
+                <a href="#@pageSection.Id">@pageSection.Heading</a>
+            }
+        </aside>
+        <div class="trust-page-sections">
+            @foreach (var pageSection in Model.Sections)
+            {
+                <article class="trust-page-section" id="@pageSection.Id">
+                    <p class="eyebrow">@pageSection.Eyebrow</p>
+                    <h2>@pageSection.Heading</h2>
+                    <p>@pageSection.Body</p>
+                    @if (pageSection.Bullets is { Count: > 0 })
+                    {
+                        <ul class="trust-page-section__list">
+                            @foreach (var bullet in pageSection.Bullets)
+                            {
+                                <li>@bullet</li>
+                            }
+                        </ul>
+                    }
+                </article>
+            }
+        </div>
+    </section>
+}
 
 @if (Model.SupportIntake is not null)
 {

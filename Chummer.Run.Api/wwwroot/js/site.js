@@ -164,4 +164,44 @@
       target.toggleAttribute("hidden", !hidden);
     });
   });
+
+  const faqFilter = document.querySelector("[data-faq-filter]");
+  if (faqFilter) {
+    const faqItems = Array.from(document.querySelectorAll("[data-faq-item]"));
+    const faqSections = Array.from(document.querySelectorAll("[data-faq-section]"));
+    faqFilter.addEventListener("input", () => {
+      const term = faqFilter.value.trim().toLowerCase();
+      faqSections.forEach((section) => {
+        let visibleCount = 0;
+        section.querySelectorAll("[data-faq-item]").forEach((item) => {
+          const haystack = (item.getAttribute("data-faq-text") || "").toLowerCase();
+          const visible = !term || haystack.includes(term);
+          item.hidden = !visible;
+          if (visible) visibleCount += 1;
+        });
+        section.hidden = visibleCount === 0;
+      });
+    });
+  }
+
+  const accountTabs = Array.from(document.querySelectorAll("[data-account-tab]"));
+  const accountPanels = Array.from(document.querySelectorAll("[data-account-panel]"));
+  if (accountTabs.length > 0 && accountPanels.length > 0) {
+    const panelIds = new Set(accountPanels.map((panel) => panel.id).filter(Boolean));
+    const syncAccountPanels = () => {
+      const requested = (window.location.hash || "#profile").slice(1);
+      const activeId = panelIds.has(requested) ? requested : accountPanels[0].id;
+      accountPanels.forEach((panel) => {
+        panel.hidden = panel.id !== activeId;
+      });
+      accountTabs.forEach((tab) => {
+        const href = tab.getAttribute("href") || "";
+        const current = href === `#${activeId}`;
+        tab.setAttribute("aria-current", current ? "page" : "false");
+      });
+    };
+
+    window.addEventListener("hashchange", syncAccountPanels);
+    syncAccountPanels();
+  }
 })();

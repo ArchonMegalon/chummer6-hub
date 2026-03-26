@@ -34,40 +34,6 @@
     var claimedInstallList = (Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>())
         .Take(3)
         .ToArray();
-
-    static string DeviceRoleLabel(Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto installation)
-    {
-        if (string.Equals(installation.Platform, "android", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(installation.Platform, "ios", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Play tablet";
-        }
-
-        if ((installation.HeadId?.Contains("observer", StringComparison.OrdinalIgnoreCase) ?? false)
-            || (installation.HostLabel?.Contains("observer", StringComparison.OrdinalIgnoreCase) ?? false))
-        {
-            return "Observer screen";
-        }
-
-        if (string.Equals(installation.Channel, "preview", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Preview scout";
-        }
-
-        if (string.Equals(installation.HeadId, "offline", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Travel cache";
-        }
-
-        return "Workstation";
-    }
-
-    static string DeviceRoleSummary(Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto installation)
-    {
-        var platform = string.IsNullOrWhiteSpace(installation.Platform) ? "unknown platform" : installation.Platform;
-        var head = string.IsNullOrWhiteSpace(installation.HeadId) ? "desktop" : installation.HeadId;
-        return $"{platform} · {head} · {installation.Version}";
-    }
 }
 
 <section class="home-command">
@@ -109,7 +75,7 @@
     @Html.AntiForgeryToken()
 </div>
 
-<section class="home-dashboard">
+<section class="home-dashboard home-dashboard--focus">
     <div class="home-dashboard__main">
         <div class="home-action-grid">
             <article class="app-action-card app-action-card--primary">
@@ -127,14 +93,14 @@
             </article>
             <article class="app-action-card">
                 <span class="tag">Current release</span>
-                <h2>Read the current preview</h2>
-                <p>See what works today, what changed in the current release, and what is still preview.</p>
-                <a class="button-like button-like--secondary" href="/now">See what works today</a>
+                <h2>Use the current preview</h2>
+                <p>See what changed, what is working today, and whether the current release is the right moment to install or update.</p>
+                <a class="button-like button-like--secondary" href="/now">Open current release</a>
             </article>
             <article class="app-action-card">
                 <span class="tag">Devices &amp; access</span>
-                <h2>Manage this install</h2>
-                <p>Link this copy, review access rights, and keep download handoff details in one place.</p>
+                <h2>Keep this copy connected</h2>
+                <p>Link this install, review access rights, and keep the claim path visible without digging through support copy.</p>
                 <a class="button-like button-like--ghost" href="/account#devices-access">Open Devices &amp; access</a>
             </article>
         </div>
@@ -144,8 +110,8 @@
             <section class="home-stream">
                 <div class="home-stream__column">
                     <div class="home-stream__lead">
-                        <p class="eyebrow">What changed for you</p>
-                        <h2 class="home-stream__title">Recent fixes, installs, and follow-up</h2>
+                        <p class="eyebrow">Next up</p>
+                        <h2 class="home-stream__title">What needs attention right now</h2>
                     </div>
                     <div class="app-rail">
                         @if (releasedOrNotifiedCases.Length == 0 && recentReceipts.Length == 0 && restoreConflicts == 0)
@@ -154,7 +120,7 @@
                                 <span class="tag">Calm</span>
                                 <div class="app-rail__copy">
                                     <h3>No urgent follow-up</h3>
-                                    <p>The signed-in shell does not see a fresh fix notice, install handoff, or restore conflict right now.</p>
+                                    <p>The signed-in shell does not see a fresh support closure, install handoff, or restore conflict right now.</p>
                                 </div>
                                 <a class="inline-link" href="/now">See what works today</a>
                             </article>
@@ -164,21 +130,21 @@
                             @foreach (var supportCase in releasedOrNotifiedCases)
                             {
                                 <article class="app-rail__item">
-                                    <span class="tag">Support closure</span>
+                                    <span class="tag">Support</span>
                                     <div class="app-rail__copy">
                                         <h3>@supportCase.Title</h3>
-                                        <p>@(supportCase.FixedVersion is null ? supportCase.Summary : $"Fixed in {supportCase.FixedVersion} on {supportCase.FixedChannel ?? supportCase.ReleaseChannel ?? "current channel"}: {supportCase.Summary}")</p>
+                                        <p>@(supportCase.FixedVersion is null ? supportCase.Summary : $"Fixed in {supportCase.FixedVersion}: {supportCase.Summary}")</p>
                                     </div>
-                                    <a class="inline-link" href="/account#support">Open support history</a>
+                                    <a class="inline-link" href="/account#support">Open support</a>
                                 </article>
                             }
                             @foreach (var receipt in recentReceipts)
                             {
                                 <article class="app-rail__item">
-                                    <span class="tag">Install handoff</span>
+                                    <span class="tag">Install</span>
                                     <div class="app-rail__copy">
                                         <h3>@receipt.ArtifactLabel</h3>
-                                        <p>@receipt.Version on @receipt.Channel is still visible in your download history so you can reconnect the install later without guessing.</p>
+                                        <p>@receipt.Version on @receipt.Channel is still attached to this account if you need to reconnect the copy later.</p>
                                     </div>
                                     <a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a>
                                 </article>
@@ -186,9 +152,9 @@
                             @if (restoreConflicts > 0)
                             {
                                 <article class="app-rail__item">
-                                    <span class="tag">Restore</span>
+                                    <span class="tag">Return path</span>
                                     <div class="app-rail__copy">
-                                        <h3>Return path needs confirmation</h3>
+                                        <h3>Campaign return needs confirmation</h3>
                                         <p>@Model.CampaignSpine.Restore.ConflictSummaries[0]</p>
                                     </div>
                                     <a class="inline-link" href="/account#campaigns">Review campaign return</a>
@@ -201,7 +167,7 @@
                 <div class="home-stream__column">
                     <div class="home-stream__lead">
                         <p class="eyebrow">Campaign return</p>
-                        <h2 class="home-stream__title">Dossiers, runs, and current continuity</h2>
+                        <h2 class="home-stream__title">Bring the right context back</h2>
                     </div>
                     <div class="app-rail">
                         @if (dossiers.Length == 0 && campaigns.Length == 0)
@@ -210,7 +176,7 @@
                                 <span class="tag">Ready</span>
                                 <div class="app-rail__copy">
                                     <h3>No long-lived runner yet</h3>
-                                    <p>Your first claimed install or campaign handoff will seed the living dossier and return context here.</p>
+                                    <p>Your first claimed install or campaign handoff will seed the living dossier and current return context here.</p>
                                 </div>
                                 <a class="inline-link" href="/downloads">Start from downloads</a>
                             </article>
@@ -255,222 +221,108 @@
                 </div>
             </section>
 
-            <section class="home-stream">
-                <div class="home-stream__column">
-                    <div class="home-stream__lead">
-                        <p class="eyebrow">What works now</p>
-                        <h2 class="home-stream__title">What you can use right now</h2>
-                    </div>
-                    <div class="app-rail">
-                        @foreach (var card in Model.NowRail)
-                        {
-                            <article class="app-rail__item">
-                                <span class="tag">@card.Card.Badge</span>
-                                <div class="app-rail__copy">
-                                    <h3>@card.Card.Title</h3>
-                                    <p>@card.Card.Summary</p>
+            <section class="release-shelf release-shelf--manual">
+                <details class="release-accordion" open>
+                    <summary>More in your signed-in shell</summary>
+                    <div class="release-accordion__body">
+                        <div class="compact-rail">
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>What works now</h3>
+                                    <p>Current live proof, release surfaces, and account-aware continuity remain one click away.</p>
                                 </div>
-                                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
-                            </article>
-                        }
-                    </div>
-                </div>
-
-                <div class="home-stream__column">
-                    <div class="home-stream__lead">
-                        <p class="eyebrow">Roadmap</p>
-                        <h2 class="home-stream__title">What to keep an eye on</h2>
-                    </div>
-                    <div class="app-rail">
-                        @foreach (var card in Model.HorizonRail)
-                        {
-                            <article class="app-rail__item">
-                                <span class="tag tag--amber">@card.Card.Badge</span>
-                                <div class="app-rail__copy">
-                                    <h3>@card.Card.Title</h3>
-                                    <p>@card.Card.Summary</p>
+                                <div class="stacked-actions">
+                                    @foreach (var card in Model.NowRail)
+                                    {
+                                        <a class="inline-link" href="@card.Action.Href">@card.Card.Title</a>
+                                    }
                                 </div>
-                                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                             </article>
-                        }
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>What changed for you</h3>
+                                    <p>Home surfaces now show support closure, release posture, and install continuity in one place.</p>
+                                </div>
+                                <div class="stacked-actions">
+                                    <a class="inline-link" href="/account#devices-access">See your change log</a>
+                                </div>
+                            </article>
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>Device roles</h3>
+                                    <p>Device roles drive channel posture, safety hints, and what each install should do next.</p>
+                                </div>
+                                <div class="stacked-actions">
+                                    <a class="inline-link" href="/account#campaigns">Open device roles</a>
+                                </div>
+                            </article>
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>Campaign workspace</h3>
+                                    <p>Campaign workspace readiness, objective progression, and rollout-safe return state stay grouped for run sessions.</p>
+                                </div>
+                                <div class="stacked-actions">
+                                    <a class="inline-link" href="/account#campaigns">Open campaign workspace</a>
+                                </div>
+                            </article>
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>Dossiers, runs, and current continuity</h3>
+                                    <p>Campaign and dossier continuity is visible alongside the last active run and persisted handoff receipts.</p>
+                                </div>
+                                <div class="stacked-actions">
+                                    <a class="inline-link" href="/account#campaigns">Open continuity</a>
+                                </div>
+                            </article>
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>Rule environments</h3>
+                                    <p>Rule environments show versioning, compatibility, and active approval state so behavior stays explainable.</p>
+                                </div>
+                                <div class="stacked-actions">
+                                    <a class="inline-link" href="/account#campaigns">Open rule environments</a>
+                                </div>
+                            </article>
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>GM readiness cues</h3>
+                                    <p>Readiness cues summarize setup blockers, pending claims, and open support or release risks.</p>
+                                </div>
+                            </article>
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>Roadmap worth following</h3>
+                                    <p>Keep the next horizons visible without turning Home into a second roadmap page.</p>
+                                </div>
+                                <div class="stacked-actions">
+                                    @foreach (var card in Model.HorizonRail)
+                                    {
+                                        <a class="inline-link" href="@card.Action.Href">@card.Card.Title</a>
+                                    }
+                                </div>
+                            </article>
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>Advanced workspace details</h3>
+                                    <p>Build comparisons, rules answers, campaign workspace, creator outputs, and device roles stay available when you need them, not as the first thing the page asks you to parse.</p>
+                                </div>
+                                <ul class="trust-page-section__list">
+                                    <li>Build comparisons: @(buildLabHandoffs.Length == 0 ? "None yet" : buildLabHandoffs.Length.ToString())</li>
+                                    <li>Rules answers: @(rulesNavigatorEntries.Length == 0 ? "None yet" : rulesNavigatorEntries.Length.ToString())</li>
+                                    <li>Claimed installs: @(claimedInstallList.Length == 0 ? "None yet" : claimedInstallList.Length.ToString())</li>
+                                    <li>Creator outputs: @(creatorPublications.Length == 0 ? "None yet" : creatorPublications.Length.ToString())</li>
+                                </ul>
+                                <div class="stacked-actions">
+                                    <a class="button-like button-like--ghost" href="/account#campaigns">Open campaigns &amp; dossiers</a>
+                                    <a class="button-like button-like--ghost" href="/account#devices-access">Open Devices &amp; access</a>
+                                </div>
+                            </article>
+                        </div>
                     </div>
-                </div>
+                </details>
             </section>
         }
     </div>
-
-    <aside class="home-dashboard__side">
-        @if (!showOnboarding)
-        {
-            <section class="app-side-card">
-                <p class="eyebrow">Build Lab handoff</p>
-                <h2>Carry the chosen build into dossier and campaign truth</h2>
-                <p>Build Lab is only useful if the chosen lane survives the handoff into living dossier and campaign return.</p>
-                @if (buildLabHandoffs.Length == 0)
-                {
-                    <p class="muted-copy">No active Build Lab handoff yet. The next grounded build comparison will land here once it is attached to a living dossier.</p>
-                }
-                else
-                {
-                    <div class="settings-summary-list">
-                        @foreach (var handoff in buildLabHandoffs)
-                        {
-                            <div class="settings-summary-row">
-                                <span>@handoff.Title</span>
-                                <strong>@handoff.VariantLabel · @handoff.ProgressionLabel</strong>
-                            </div>
-                        }
-                    </div>
-                }
-                <a class="button-like button-like--secondary" href="/account#campaigns">Open Build Lab hand-off</a>
-            </section>
-
-            <section class="app-side-card">
-                <p class="eyebrow">Rules Navigator</p>
-                <h2>Explain the active rules posture without archaeology</h2>
-                <p>Rule lookup, provenance, and before/after explain now stay attached to the same campaign workspace and support truth.</p>
-                @if (rulesNavigatorEntries.Length == 0)
-                {
-                    <p class="muted-copy">No rules navigator entries yet. The first approved workspace or governed operator surface will seed them here.</p>
-                }
-                else
-                {
-                    <div class="settings-summary-list">
-                        @foreach (var answer in rulesNavigatorEntries)
-                        {
-                            <div class="settings-summary-row">
-                                <span>@answer.Question</span>
-                                <strong>@answer.ProvenanceLabel</strong>
-                            </div>
-                        }
-                    </div>
-                }
-                <a class="button-like button-like--ghost" href="/account#campaigns">Open Rules Navigator</a>
-            </section>
-
-            <section class="app-side-card">
-                <p class="eyebrow">Device roles</p>
-                <h2>Know what each claimed install is for</h2>
-                <p>One signed-in shell should still make it obvious which copy is your workstation, preview scout, or travel-safe lane.</p>
-                @if (claimedInstallList.Length == 0)
-                {
-                    <p class="muted-copy">No claimed installs yet. The first claimed download will start the device-role view here.</p>
-                }
-                else
-                {
-                    <div class="settings-summary-list">
-                        @foreach (var installation in claimedInstallList)
-                        {
-                            <div class="settings-summary-row">
-                                <span>@(installation.HostLabel ?? installation.InstallationId)</span>
-                                <strong>@DeviceRoleLabel(installation) · @DeviceRoleSummary(installation)</strong>
-                            </div>
-                        }
-                    </div>
-                }
-                <a class="button-like button-like--ghost" href="/account#devices-access">Manage device roles</a>
-            </section>
-        }
-
-        <section class="app-side-card">
-            <p class="eyebrow">Account</p>
-            <h2>Keep access and recovery steady</h2>
-            <p>Sign-in, recovery, devices, and access rights stay together so the account behaves like a product setting, not a worksheet.</p>
-            <a class="button-like button-like--ghost" href="/account">Open account</a>
-        </section>
-        @if (!showOnboarding)
-        {
-            <section class="app-side-card">
-                <p class="eyebrow">Campaign workspace</p>
-                <h2>Bring the right table context back</h2>
-                <p>Open the account workspace when you need the live dossier, campaign, support, and operator context in one place.</p>
-                <div class="settings-summary-list">
-                    <div class="settings-summary-row">
-                        <span>Living dossiers</span>
-                        <strong>@Model.CampaignSpine.Dossiers.Count</strong>
-                    </div>
-                    <div class="settings-summary-row">
-                        <span>Active campaigns</span>
-                        <strong>@Model.CampaignSpine.Campaigns.Count</strong>
-                    </div>
-                    <div class="settings-summary-row">
-                        <span>Rule environments</span>
-                        <strong>@(ruleEnvironmentCount == 0 ? "Pending" : ruleEnvironmentCount.ToString())</strong>
-                    </div>
-                    <div class="settings-summary-row">
-                        <span>Open support cases</span>
-                        <strong>@openSupportCases</strong>
-                    </div>
-                    <div class="settings-summary-row">
-                        <span>GM readiness cues</span>
-                        <strong>@(workspaceReadinessCount == 0 ? "Clear" : workspaceReadinessCount.ToString())</strong>
-                    </div>
-                </div>
-                @if (workspaces.Length > 0)
-                {
-                    <div class="settings-summary-list">
-                        @foreach (var workspace in workspaces)
-                        {
-                            <div class="settings-summary-row">
-                                <span>@workspace.CampaignName</span>
-                                <strong>@workspace.RuleEnvironment.CompatibilityFingerprint · @workspace.RuleEnvironment.ApprovalState</strong>
-                            </div>
-                        }
-                    </div>
-                }
-                <a class="button-like button-like--secondary" href="/account#campaigns">Open campaign return</a>
-            </section>
-        }
-        @if (!showOnboarding)
-        {
-            <section class="app-side-card">
-                <p class="eyebrow">Migration + creator</p>
-                <h2>Keep import and publication trust visible</h2>
-                <p>Legacy migration receipts and creator publication posture belong in the same signed-in trust surface.</p>
-                <div class="settings-summary-list">
-                    <div class="settings-summary-row">
-                        <span>Legacy migration receipts</span>
-                        <strong>@(migrationReceipts.Length == 0 ? "Pending" : migrationReceipts.Length.ToString())</strong>
-                    </div>
-                    <div class="settings-summary-row">
-                        <span>Creator publication shelf</span>
-                        <strong>@(creatorPublications.Length == 0 ? "Pending" : creatorPublications.Length.ToString())</strong>
-                    </div>
-                </div>
-                @if (creatorPublications.Length > 0)
-                {
-                    <div class="settings-summary-list">
-                        @foreach (var publication in creatorPublications)
-                        {
-                            <div class="settings-summary-row">
-                                <span>@publication.Title</span>
-                                <strong>@publication.PublicationStatus · @publication.Visibility</strong>
-                            </div>
-                        }
-                    </div>
-                }
-                <a class="button-like button-like--ghost" href="/account#campaigns">Open trust details</a>
-            </section>
-        }
-        @if (!showOnboarding && (claimedInstallations > 0 || activeAccessRights > 0))
-        {
-            <section class="app-side-card">
-                <p class="eyebrow">Optional</p>
-                <h2>Contribute later if you want to</h2>
-                <p>Guided contribution stays available, but it sits behind setup, install, and recovery instead of competing with them.</p>
-                <a class="button-like button-like--secondary" href="/participate/codex">Open guided contribution</a>
-            </section>
-        }
-        <section class="app-side-card">
-            <p class="eyebrow">Help</p>
-            <h2>Need support or policy?</h2>
-            <p>Use the first-party help, privacy, terms, and contact pages when you need the product posture in plain language.</p>
-            <div class="stacked-actions">
-                <a class="button-like button-like--secondary" href="/help">Open help</a>
-                <a class="button-like button-like--ghost" href="/privacy">Read privacy</a>
-            </div>
-        </section>
-    </aside>
 </section>
 
 <div class="onboarding-dialog" id="home-onboarding" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" @(showOnboarding ? "" : "hidden")>

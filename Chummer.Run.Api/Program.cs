@@ -80,13 +80,30 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 var app = builder.Build();
 app.Services.GetRequiredService<HubGoogleAuthService>().ValidateProductionReadiness();
+const string SearchRobotsPolicy = "noindex, nofollow, noarchive, nosnippet, noimageindex";
 
 // Configure the HTTP request pipeline.
 
 app.UseExceptionHandler();
 app.UseForwardedHeaders();
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers["X-Robots-Tag"] = SearchRobotsPolicy;
+        return Task.CompletedTask;
+    });
+
+    await next();
+});
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = static fileContext =>
+    {
+        fileContext.Context.Response.Headers["X-Robots-Tag"] = SearchRobotsPolicy;
+    }
+});
 
 app.UseAuthorization();
 

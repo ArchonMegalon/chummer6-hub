@@ -20,14 +20,20 @@
 </section>
 
 <section class="faq-stack">
+    <div class="trust-page-section">
+        <label class="field" for="faqFilter">
+            <span>Search the FAQ</span>
+            <input id="faqFilter" type="search" placeholder="preview, account, install, recovery" data-faq-filter />
+        </label>
+    </div>
     @foreach (var faqSection in Model.Sections)
     {
-        <article class="faq-block">
+        <article class="faq-block" data-faq-section>
             <p class="eyebrow">@faqSection.Title</p>
             <div class="faq-list">
                 @foreach (var entry in faqSection.Entries)
                 {
-                    <details class="faq-item">
+                    <details class="faq-item" data-faq-item data-faq-text="@($"{faqSection.Title} {entry.Question} {entry.Answer}")">
                         <summary>@entry.Question</summary>
                         <p>@entry.Answer</p>
                     </details>

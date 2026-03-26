@@ -9,8 +9,8 @@
 <section class="story-cinematic">
     <div class="story-cinematic__copy">
         <p class="eyebrow">Product</p>
-        <h1 class="page-title">Build, explain, run, publish, and improve from one explainable system.</h1>
-        <p class="page-copy">Chummer is a serious, explainable Shadowrun platform that keeps rules truth, living dossiers, campaign continuity, publication, and support closure in one visible product.</p>
+        <h1 class="page-title">A product for Shadowrun rules truth, living dossiers, and session continuity.</h1>
+        <p class="page-copy">Chummer keeps character math, explanation trails, installs, campaign return, and support follow-up inside one product surface you can actually inspect.</p>
     </div>
     @if (leadAsset is not null)
     {
@@ -20,14 +20,91 @@
     }
 </section>
 
+<section class="trust-rail-section">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">What it is</p>
+        <h2 class="editorial-title">One product, not a pile of disconnected tools</h2>
+        <p class="editorial-copy">Use Chummer when you want the builder, the explanation trail, and the return path after the session to agree with each other instead of drifting into separate apps and separate truths.</p>
+    </div>
+    <div class="trust-rail-list">
+        <article class="trust-rail">
+            <span class="tag">Use it when</span>
+            <h3>You need rules answers you can inspect</h3>
+            <p>Start with the preview when you want the current build, a real explanation trail, and a clear account path for follow-up.</p>
+        </article>
+        <article class="trust-rail">
+            <span class="tag">Where it fits</span>
+            <h3>Desk, session, and return path</h3>
+            <p>Chummer is strongest when the same runner, run, and support context need to survive more than one screen and more than one moment.</p>
+        </article>
+        <article class="trust-rail">
+            <span class="tag">Why it matters</span>
+            <h3>The answer should stay trustworthy after first contact</h3>
+            <p>Installer, receipt, dossier, and support all stay connected instead of turning into separate detective work later.</p>
+        </article>
+    </div>
+</section>
+
 <section class="role-matrix">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Product loop</p>
-        <h2 class="editorial-title">What Chummer helps you do</h2>
-        <p class="editorial-copy">These five jobs connect the builder, explanation trail, campaign continuity, publication, and support follow-through.</p>
+        <p class="eyebrow">Where it fits</p>
+        <h2 class="editorial-title">One path from install to session return</h2>
+        <p class="editorial-copy">The product is strongest when the current preview, the account shell, the live proof shelf, and support all point at the same truth instead of fragmenting into separate tools.</p>
     </div>
     <div class="role-matrix__grid">
-        @foreach (var card in Model.Workflows)
+        <article class="role-matrix__cell">
+            <span class="tag">Current preview</span>
+            <h3>Install the product that exists now</h3>
+            <p>Start from the current preview build so the install path, known issues, and account handoff all describe the same release.</p>
+            <a class="inline-link" href="/downloads">Open downloads</a>
+        </article>
+        <article class="role-matrix__cell">
+            <span class="tag">Proof shelf</span>
+            <h3>Verify the builder, trail, and continuity claims</h3>
+            <p>Use the live proof modules when you want to confirm what the preview can already demonstrate in public.</p>
+            <a class="inline-link" href="/now">See what works today</a>
+        </article>
+        <article class="role-matrix__cell">
+            <span class="tag">Account shell</span>
+            <h3>Keep access, devices, and recovery in one place</h3>
+            <p>The signed-in shell exists so downloads, claim codes, support history, and return context do not drift apart later.</p>
+            <a class="inline-link" href="/signup?next=%2Fhome">Create account</a>
+        </article>
+        <article class="role-matrix__cell">
+            <span class="tag">Support</span>
+            <h3>Escalate from the product surface first</h3>
+            <p>Use first-party support when install, account, or preview behavior breaks down instead of starting from a repo or issue search.</p>
+            <a class="inline-link" href="/contact#support-intake">Open support intake</a>
+        </article>
+    </div>
+</section>
+
+<section class="role-matrix">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Why it is different</p>
+        <h2 class="editorial-title">Trust stays visible instead of implied</h2>
+        <p class="editorial-copy">These are the checks that make Chummer feel like a product instead of a pretty wrapper around hidden logic.</p>
+    </div>
+    <div class="role-matrix__grid">
+        @foreach (var card in Model.TrustPillars)
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">@card.Badge</span>
+                <h3>@card.Title</h3>
+                <p>@card.Summary</p>
+            </article>
+        }
+    </div>
+</section>
+
+<section id="public-guide" class="role-matrix">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Who it is for</p>
+        <h2 class="editorial-title">Different table roles, one shared product truth</h2>
+        <p class="editorial-copy">Players, GMs, and creators hit different surfaces, but they still share the same install, rules, campaign, and support truth.</p>
+    </div>
+    <div class="role-matrix__grid">
+        @foreach (var card in Model.Lanes)
         {
             <article class="role-matrix__cell">
                 <span class="tag">@card.Card.Badge</span>
@@ -39,49 +116,13 @@
     </div>
 </section>
 
-<section class="trust-rail-section">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">How the pieces fit together</p>
-        <h2 class="editorial-title">One explainable system, three trust checks</h2>
-        <p class="editorial-copy">Rules truth, receipts, and continuity are how the same result stays usable across build, play, and follow-up.</p>
-    </div>
-    <div class="trust-rail-list">
-        @foreach (var card in Model.TrustPillars)
-        {
-            <article class="trust-rail">
-                <span class="tag">@card.Badge</span>
-                <h3>@card.Title</h3>
-                <p>@card.Summary</p>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="role-matrix">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Roles</p>
-        <h2 class="editorial-title">One product, different table needs</h2>
-        <p class="editorial-copy">Players, GMs, and creators hit different surfaces, but they still share the same install, rules, campaign, and support truth.</p>
-    </div>
-    <div class="role-matrix__grid">
-        @foreach (var card in Model.Lanes)
-        {
-            <article class="role-matrix__cell">
-                <h3>@card.Card.Title</h3>
-                <p>@card.Card.Summary</p>
-                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
-            </article>
-        }
-    </div>
-</section>
-
-<section id="public-guide" class="story-guide-tail">
+<section class="story-guide-tail">
     <p class="eyebrow">Keep going</p>
-    <h2 class="editorial-title">Choose the next useful read</h2>
-    <p class="editorial-copy">Stay inside the product front door for the practical next step: what works today, how help works, and which horizons are worth following.</p>
+    <h2 class="editorial-title">Take the next useful step</h2>
+    <p class="editorial-copy">Use the product path first: current proof, current installer, and first-party help before any deeper technical reading.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="/now">See what works today</a>
-        <a class="button-like button-like--secondary" href="/faq">Read the FAQ</a>
-        <a class="button-like button-like--ghost" href="/help">Open help</a>
+        <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
+        <a class="button-like button-like--ghost" href="/help">Get help</a>
     </div>
 </section>
