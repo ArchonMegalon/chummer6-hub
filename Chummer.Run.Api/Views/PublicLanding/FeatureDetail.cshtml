@@ -6,24 +6,24 @@
     var roadmapDetail = string.Equals(Model.Eyebrow, "Roadmap", StringComparison.OrdinalIgnoreCase);
     var liveArtifact = string.Equals(Model.StatusLabel, "Available today", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Model.StatusLabel, "Live now", StringComparison.OrdinalIgnoreCase);
-    var detailEyebrow = roadmapDetail ? "What this horizon is solving" : "What this artifact proves";
+    var detailEyebrow = roadmapDetail ? "Why this horizon matters now" : "What this artifact proves";
     var detailTitle = roadmapDetail
-        ? "Why it matters, what it unlocks, and what to compare today"
+        ? "Current user pain, expected unlock, and the live proof to compare first"
         : liveArtifact
-            ? "Why this live proof matters, what it unlocks, and how to verify it"
-            : "Why this preview concept matters, what it is trying to unlock, and how to verify it";
+            ? "What this live proof shows, who it helps, and how to verify it"
+            : "What this preview concept is aiming for, who it helps, and what to follow next";
     var detailCopy = roadmapDetail
-        ? "Start with the current proof shelf, then use the deeper brief only when you need the longer roadmap rationale."
+        ? "Start from the live proof shelf, then open the deeper roadmap brief only when you need the longer rationale."
         : liveArtifact
             ? "Start with the live product path, then use support only when the artifact proof is not enough to move forward."
             : "Treat this as a preview concept until it moves onto the live proof shelf, and use the related roadmap only when you need the longer read.";
     var nextTitle = roadmapDetail
-        ? "Compare this horizon with the live product path"
+        ? "Track this horizon from inside the product"
         : liveArtifact
             ? "Use this live proof next"
             : "Use the related roadmap before treating this as finished";
     var nextCopy = roadmapDetail
-        ? "Start from the current proof or related preview surface before you leave the product shell for the deeper brief."
+        ? "Compare the horizon against the current proof shelf first, then use the deeper brief as secondary context instead of the first stop."
         : liveArtifact
             ? "Go to the live product surface first, then use support only when the proof path stops being enough."
             : "Preview concepts should route you toward a roadmap or support path, not pretend they are already finished artifacts.";

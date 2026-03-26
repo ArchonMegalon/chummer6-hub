@@ -8,9 +8,9 @@
     var proofSectionAsset = Model.Assets.BySlot("scene_simulation_bench") ?? Model.Assets.BySlot("capability_check_rules") ?? heroProofAsset;
     var proofNotes = Model.Workflows.Take(3).ToArray();
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
-    var availableHighlights = Model.AvailableToday.Take(2).ToArray();
-    var previewHighlights = Model.PreviewItems.Take(2).ToArray();
-    var comingNextHighlights = Model.ComingNext.Take(2).ToArray();
+    var availableHighlight = Model.AvailableToday.FirstOrDefault();
+    var previewHighlight = Model.PreviewItems.FirstOrDefault();
+    var comingNextHighlight = Model.ComingNext.FirstOrDefault();
     var release = Model.ReleaseExperience;
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
@@ -106,7 +106,7 @@
     <div class="works-matrix__lead">
         <p class="eyebrow">@worksNowSection.Eyebrow</p>
         <h2 class="editorial-title">@worksNowSection.Title</h2>
-        <p class="editorial-copy">Use the front door to answer three practical questions fast, then go deeper on the proof shelf instead of turning landing into a second long explainer.</p>
+        <p class="editorial-copy">Use one short strip to answer what is live, what is still preview-only, and what is named on the roadmap before you go deeper.</p>
     </div>
     <div class="works-matrix__columns">
         <article class="works-column">
@@ -115,17 +115,17 @@
                 <h3>Available today</h3>
             </div>
             <div class="works-column__list">
-                @foreach (var card in availableHighlights)
+                @if (availableHighlight is not null)
                 {
-                    <article class="works-item" id="@card.Card.Id.Replace('_', '-')">
-                        <h4>@card.Card.Title</h4>
-                        <p>@card.Card.Summary</p>
-                        <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                    <article class="works-item" id="@availableHighlight.Card.Id.Replace('_', '-')">
+                        <h4>@availableHighlight.Card.Title</h4>
+                        <p>@availableHighlight.Card.Summary</p>
+                        <a class="inline-link" href="@availableHighlight.Action.Href">@availableHighlight.Action.Label</a>
                     </article>
                 }
-                @if (Model.AvailableToday.Count > availableHighlights.Length)
+                @if (Model.AvailableToday.Count > 1)
                 {
-                    <p class="muted-copy">+@(Model.AvailableToday.Count - availableHighlights.Length) more live proof items on the full shelf.</p>
+                    <p class="muted-copy">+@(Model.AvailableToday.Count - 1) more live proof items on the full shelf.</p>
                 }
             </div>
         </article>
@@ -135,17 +135,17 @@
                 <h3>Preview</h3>
             </div>
             <div class="works-column__list">
-                @foreach (var card in previewHighlights)
+                @if (previewHighlight is not null)
                 {
-                    <article class="works-item" id="@card.Card.Id.Replace('_', '-')">
-                        <h4>@card.Card.Title</h4>
-                        <p>@card.Card.Summary</p>
-                        <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                    <article class="works-item" id="@previewHighlight.Card.Id.Replace('_', '-')">
+                        <h4>@previewHighlight.Card.Title</h4>
+                        <p>@previewHighlight.Card.Summary</p>
+                        <a class="inline-link" href="@previewHighlight.Action.Href">@previewHighlight.Action.Label</a>
                     </article>
                 }
-                @if (Model.PreviewItems.Count > previewHighlights.Length)
+                @if (Model.PreviewItems.Count > 1)
                 {
-                    <p class="muted-copy">+@(Model.PreviewItems.Count - previewHighlights.Length) preview items still open on the proof shelf.</p>
+                    <p class="muted-copy">+@(Model.PreviewItems.Count - 1) preview proof items still open on the shelf.</p>
                 }
             </div>
         </article>
@@ -155,17 +155,17 @@
                 <h3>Coming next</h3>
             </div>
             <div class="works-column__list">
-                @foreach (var card in comingNextHighlights)
+                @if (comingNextHighlight is not null)
                 {
-                    <article class="works-item" id="@card.Card.Id.Replace('_', '-')">
-                        <h4>@card.Card.Title</h4>
-                        <p>@card.Card.Summary</p>
-                        <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                    <article class="works-item" id="@comingNextHighlight.Card.Id.Replace('_', '-')">
+                        <h4>@comingNextHighlight.Card.Title</h4>
+                        <p>@comingNextHighlight.Card.Summary</p>
+                        <a class="inline-link" href="@comingNextHighlight.Action.Href">@comingNextHighlight.Action.Label</a>
                     </article>
                 }
-                @if (Model.ComingNext.Count > comingNextHighlights.Length)
+                @if (Model.ComingNext.Count > 1)
                 {
-                    <p class="muted-copy">+@(Model.ComingNext.Count - comingNextHighlights.Length) named horizons waiting on the roadmap.</p>
+                    <p class="muted-copy">+@(Model.ComingNext.Count - 1) named horizons waiting on the roadmap.</p>
                 }
             </div>
         </article>

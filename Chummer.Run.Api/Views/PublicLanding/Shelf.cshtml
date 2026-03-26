@@ -44,6 +44,10 @@
                     <span class="tag">@DisplayStatus(card.Card.Badge)</span>
                     <h2>@card.Card.Title</h2>
                     <p>@card.Card.Summary</p>
+                    <div class="trust-claim__microproof">
+                        <span>@card.Card.Audience</span>
+                        <span>@card.Action.Label</span>
+                    </div>
                     @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
                     {
                         <p class="muted-copy"><strong>What this verifies:</strong> @card.Card.Payoff</p>
@@ -75,6 +79,10 @@
                     <span class="tag">@DisplayStatus(card.Card.Badge)</span>
                     <h2>@card.Card.Title</h2>
                     <p>@card.Card.Summary</p>
+                    <div class="trust-claim__microproof">
+                        <span>@card.Card.Audience</span>
+                        <span>@card.Action.Label</span>
+                    </div>
                     @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
                     {
                         <p class="muted-copy"><strong>Expected unlock:</strong> @card.Card.Payoff</p>

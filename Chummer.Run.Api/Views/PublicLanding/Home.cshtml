@@ -31,28 +31,33 @@
         <h1 class="page-title">Welcome back, @Model.User.DisplayName</h1>
         <p class="page-copy">Pick up where you left off: finish the basics, install the current preview, and keep track of what is opening next.</p>
     </div>
-    <div class="home-command__status">
-        <article class="home-status-card">
-            <span class="tag">Account setup</span>
-            <strong id="homeSetupState">@(showOnboarding ? "In progress" : "Ready")</strong>
-            <p id="homeSetupCopy">@(showOnboarding ? "Finish the short setup flow so Chummer can address you, route updates, and recover the account cleanly." : "Your basic account setup is already in place.")</p>
-        </article>
-        <article class="home-status-card">
-            <span class="tag">Interest profile</span>
-            <strong id="homeInterestState">@(followCount == 0 ? "Quiet" : $"{followCount} active")</strong>
-            <p id="homeInterestCopy">Roadmap and beta signals stay lightweight until you ask for more.</p>
-        </article>
-        <article class="home-status-card">
-            <span class="tag">Backup sign-in</span>
-            <strong id="homeRecoveryState">@(recoveryLinked ? "Ready" : "Add one")</strong>
-            <p id="homeRecoveryCopy">@(recoveryLinked ? "A backup recovery path is already attached." : "Add a verified recovery email from setup or Account.")</p>
-        </article>
-        <article class="home-status-card">
-            <span class="tag">Devices & access</span>
-            <strong>@(activeAccessRights > 0 ? $"{activeAccessRights} active" : claimedInstallations > 0 ? $"{claimedInstallations} linked" : pendingClaims > 0 ? $"{pendingClaims} pending" : "Not linked")</strong>
-            <p><a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a></p>
-        </article>
-    </div>
+    <details class="release-accordion" @(showOnboarding ? "open" : null)>
+        <summary>Account state at a glance</summary>
+        <div class="release-accordion__body">
+            <div class="home-command__status">
+                <article class="home-status-card">
+                    <span class="tag">Account setup</span>
+                    <strong id="homeSetupState">@(showOnboarding ? "In progress" : "Ready")</strong>
+                    <p id="homeSetupCopy">@(showOnboarding ? "Finish the short setup flow so Chummer can address you, route updates, and recover the account cleanly." : "Your basic account setup is already in place.")</p>
+                </article>
+                <article class="home-status-card">
+                    <span class="tag">Interest profile</span>
+                    <strong id="homeInterestState">@(followCount == 0 ? "Quiet" : $"{followCount} active")</strong>
+                    <p id="homeInterestCopy">Roadmap and beta signals stay lightweight until you ask for more.</p>
+                </article>
+                <article class="home-status-card">
+                    <span class="tag">Backup sign-in</span>
+                    <strong id="homeRecoveryState">@(recoveryLinked ? "Ready" : "Add one")</strong>
+                    <p id="homeRecoveryCopy">@(recoveryLinked ? "A backup recovery path is already attached." : "Add a verified recovery email from setup or Account.")</p>
+                </article>
+                <article class="home-status-card">
+                    <span class="tag">Devices & access</span>
+                    <strong>@(activeAccessRights > 0 ? $"{activeAccessRights} active" : claimedInstallations > 0 ? $"{claimedInstallations} linked" : pendingClaims > 0 ? $"{pendingClaims} pending" : "Not linked")</strong>
+                    <p><a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a></p>
+                </article>
+            </div>
+        </div>
+    </details>
 </section>
 
 <div class="sr-only" aria-hidden="true">
