@@ -118,6 +118,7 @@ public sealed class AuthController : Controller
         }
 
         var nextPath = HubBrowserAuthService.SanitizeNextPath(next);
+        var nextTarget = DescribeNextTarget(nextPath);
         var started = default(Chummer.Run.Contracts.Identity.EmailAuthStartResponse)!;
         try
         {
@@ -145,10 +146,10 @@ public sealed class AuthController : Controller
         var model = new AuthMessagePageViewModel(
             Chrome: _chrome.BuildPublicChrome("Check your email", "Finish the magic-link step and come back to your account.", "/login"),
             Heading: "Check your email",
-            SupportLine: started.PreviewNote,
-            Notice: $"Email: {started.Email} · expires {started.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC",
+            SupportLine: $"{started.PreviewNote} After verification, Chummer sends you back to {nextTarget}.",
+            Notice: $"Email: {started.Email} · expires {started.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC · next stop: {nextTarget}",
             PrimaryLabel: string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
-                ? "Continue with preview link"
+                ? $"Continue to {nextTarget}"
                 : "Return to sign in",
             PrimaryHref: string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
                 ? callback
@@ -588,6 +589,15 @@ public sealed class AuthController : Controller
             GoogleUnavailableReason: _google.DisabledReason(),
             GoogleStartHref: $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}");
     }
+
+    private static string DescribeNextTarget(string nextPath)
+        => nextPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
+            ? "Downloads"
+            : nextPath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)
+                ? "Account"
+                : nextPath.StartsWith("/home", StringComparison.OrdinalIgnoreCase)
+                    ? "Home"
+                    : "the signed-in product";
 
     private enum AuthEntrySessionState
     {

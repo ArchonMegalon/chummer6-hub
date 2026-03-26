@@ -12,6 +12,9 @@
     var supportLinks = chrome.SecondaryNavigation.Where(link =>
         link.Href is "/help" or "/faq" or "/privacy" or "/terms" or "/contact").ToArray();
     var productLinks = chrome.SecondaryNavigation.Except(supportLinks).ToArray();
+    var compactFooter = routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "artifacts" or "downloads" or "participate" or "help" or "faq" or "privacy" or "terms" or "contact"
+        || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
+        || routeKey.StartsWith("roadmap-", StringComparison.Ordinal);
 }
 <!doctype html>
 <html lang="en" data-theme="hub-front-door">
@@ -104,7 +107,7 @@
 
     @if (!authSurface)
     {
-        <footer class="site-footer">
+        <footer class="site-footer @(compactFooter ? "site-footer--compact" : string.Empty)">
             <div class="site-footer__inner">
                 <div class="site-footer__brand">
                     <a class="site-footer__wordmark" href="/">CHUMMER</a>
@@ -120,26 +123,56 @@
                             }
                         </div>
                     </div>
-                    <div class="site-footer__link-group">
-                        <p class="site-footer__heading">Help and legal</p>
-                        <div class="site-footer__links">
-                            @foreach (var link in supportLinks)
-                            {
-                                <a href="@link.Href">@link.Label</a>
-                            }
-                        </div>
-                    </div>
-                    @if (chrome.UtilityNavigation.Count > 0)
+                    @if (compactFooter)
                     {
-                        <div class="site-footer__link-group site-footer__link-group--utility">
-                            <p class="site-footer__heading">Utility</p>
-                            <div class="site-footer__links site-footer__links--utility">
-                                @foreach (var link in chrome.UtilityNavigation)
+                        <details class="site-footer__disclosure">
+                            <summary>Help, legal, and utility</summary>
+                            <div class="site-footer__link-group">
+                                <p class="site-footer__heading">Help and legal</p>
+                                <div class="site-footer__links">
+                                    @foreach (var link in supportLinks)
+                                    {
+                                        <a href="@link.Href">@link.Label</a>
+                                    }
+                                </div>
+                            </div>
+                            @if (chrome.UtilityNavigation.Count > 0)
+                            {
+                                <div class="site-footer__link-group site-footer__link-group--utility">
+                                    <p class="site-footer__heading">Utility</p>
+                                    <div class="site-footer__links site-footer__links--utility">
+                                        @foreach (var link in chrome.UtilityNavigation)
+                                        {
+                                            <a href="@link.Href">@link.Label</a>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </details>
+                    }
+                    else
+                    {
+                        <div class="site-footer__link-group">
+                            <p class="site-footer__heading">Help and legal</p>
+                            <div class="site-footer__links">
+                                @foreach (var link in supportLinks)
                                 {
                                     <a href="@link.Href">@link.Label</a>
                                 }
                             </div>
                         </div>
+                        @if (chrome.UtilityNavigation.Count > 0)
+                        {
+                            <div class="site-footer__link-group site-footer__link-group--utility">
+                                <p class="site-footer__heading">Utility</p>
+                                <div class="site-footer__links site-footer__links--utility">
+                                    @foreach (var link in chrome.UtilityNavigation)
+                                    {
+                                        <a href="@link.Href">@link.Label</a>
+                                    }
+                                </div>
+                            </div>
+                        }
                     }
                 </nav>
                 <div class="site-footer__meta">
@@ -156,6 +189,17 @@
                 </div>
             </div>
         </footer>
+
+        @if (!chrome.Authenticated && chrome.PublicPrimaryCta is not null)
+        {
+            <div class="site-bottom-cta" aria-label="Quick action">
+                <div class="site-bottom-cta__copy">
+                    <span class="site-bottom-cta__label">Preview access</span>
+                    <strong>@chrome.PublicPrimaryCta.Label</strong>
+                </div>
+                <a class="button-like button-like--primary" href="@chrome.PublicPrimaryCta.Href">@chrome.PublicPrimaryCta.Label</a>
+            </div>
+        }
     }
 
     <script src="~/js/site.js" asp-append-version="true"></script>

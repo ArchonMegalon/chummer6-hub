@@ -3,6 +3,13 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-auth";
+    var nextTarget = Model.NextPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
+        ? "Downloads"
+        : Model.NextPath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)
+            ? "Account"
+            : Model.NextPath.StartsWith("/home", StringComparison.OrdinalIgnoreCase)
+                ? "Home"
+                : "the signed-in product";
 }
 
 <section class="auth-entry">
@@ -42,6 +49,7 @@
                     <li>A calmer return path when you come back for the next preview.</li>
                 </ul>
             </div>
+            <p class="muted-copy">After verification you land in @nextTarget.</p>
             <form class="auth-form" method="post" action="/auth/email/start">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="next" value="@Model.NextPath" />
@@ -77,6 +85,7 @@
                     <li>Any beta interest, update follows, or optional participation history already on the account.</li>
                 </ul>
             </div>
+            <p class="muted-copy">After verification you return to @nextTarget.</p>
 
             <form class="auth-form" method="post" action="/auth/email/start">
                 @Html.AntiForgeryToken()

@@ -4,9 +4,13 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing";
     var hero = Model.Assets.BySlot("section_hero");
-    var proofAsset = Model.Assets.BySlot("product_proof_ui") ?? Model.Assets.BySlot("capability_check_rules");
+    var heroProofAsset = Model.Assets.BySlot("product_proof_ui") ?? Model.Assets.BySlot("capability_check_rules");
+    var proofSectionAsset = Model.Assets.BySlot("scene_simulation_bench") ?? Model.Assets.BySlot("capability_check_rules") ?? heroProofAsset;
     var proofNotes = Model.Workflows.Take(3).ToArray();
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
+    var availableHighlights = Model.AvailableToday.Take(2).ToArray();
+    var previewHighlights = Model.PreviewItems.Take(2).ToArray();
+    var comingNextHighlights = Model.ComingNext.Take(2).ToArray();
     var release = Model.ReleaseExperience;
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
@@ -57,10 +61,10 @@
                             <span>@step</span>
                         }
                     </div>
-                    @if (proofAsset is not null)
+                    @if (heroProofAsset is not null)
                     {
                         <div class="launch-hero__proof-shot">
-                            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", proofAsset)
+                            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", heroProofAsset)
                         </div>
                     }
                 </div>
@@ -90,10 +94,10 @@
             <a class="button-like button-like--secondary" href="@Model.Surface.ProductProofSecondaryHref">@Model.Surface.ProductProofSecondaryLabel</a>
         </div>
     </div>
-    @if (proofAsset is not null)
+    @if (proofSectionAsset is not null)
     {
         <div class="product-proof__media">
-            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", proofAsset)
+            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", proofSectionAsset)
         </div>
     }
 </section>
@@ -102,7 +106,7 @@
     <div class="works-matrix__lead">
         <p class="eyebrow">@worksNowSection.Eyebrow</p>
         <h2 class="editorial-title">@worksNowSection.Title</h2>
-        <p class="editorial-copy">The front door should answer three practical questions fast: what you can use now, what is still preview-only, and what is opening next.</p>
+        <p class="editorial-copy">Use the front door to answer three practical questions fast, then go deeper on the proof shelf instead of turning landing into a second long explainer.</p>
     </div>
     <div class="works-matrix__columns">
         <article class="works-column">
@@ -111,13 +115,17 @@
                 <h3>Available today</h3>
             </div>
             <div class="works-column__list">
-                @foreach (var card in Model.AvailableToday)
+                @foreach (var card in availableHighlights)
                 {
                     <article class="works-item" id="@card.Card.Id.Replace('_', '-')">
                         <h4>@card.Card.Title</h4>
                         <p>@card.Card.Summary</p>
                         <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                     </article>
+                }
+                @if (Model.AvailableToday.Count > availableHighlights.Length)
+                {
+                    <p class="muted-copy">+@(Model.AvailableToday.Count - availableHighlights.Length) more live proof items on the full shelf.</p>
                 }
             </div>
         </article>
@@ -127,13 +135,17 @@
                 <h3>Preview</h3>
             </div>
             <div class="works-column__list">
-                @foreach (var card in Model.PreviewItems)
+                @foreach (var card in previewHighlights)
                 {
                     <article class="works-item" id="@card.Card.Id.Replace('_', '-')">
                         <h4>@card.Card.Title</h4>
                         <p>@card.Card.Summary</p>
                         <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                     </article>
+                }
+                @if (Model.PreviewItems.Count > previewHighlights.Length)
+                {
+                    <p class="muted-copy">+@(Model.PreviewItems.Count - previewHighlights.Length) preview items still open on the proof shelf.</p>
                 }
             </div>
         </article>
@@ -143,7 +155,7 @@
                 <h3>Coming next</h3>
             </div>
             <div class="works-column__list">
-                @foreach (var card in Model.ComingNext)
+                @foreach (var card in comingNextHighlights)
                 {
                     <article class="works-item" id="@card.Card.Id.Replace('_', '-')">
                         <h4>@card.Card.Title</h4>
@@ -151,8 +163,15 @@
                         <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                     </article>
                 }
+                @if (Model.ComingNext.Count > comingNextHighlights.Length)
+                {
+                    <p class="muted-copy">+@(Model.ComingNext.Count - comingNextHighlights.Length) named horizons waiting on the roadmap.</p>
+                }
             </div>
         </article>
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--secondary" href="/now">Open the full proof shelf</a>
     </div>
 </section>
 

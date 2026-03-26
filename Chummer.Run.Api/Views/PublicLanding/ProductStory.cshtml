@@ -13,7 +13,7 @@
     <div class="story-cinematic__copy">
         <p class="eyebrow">Product</p>
         <h1 class="page-title">One product for rules truth, living dossiers, and session return.</h1>
-        <p class="page-copy">Chummer keeps the preview build, the explanation trail, the signed-in return path, and first-party support inside one product surface you can inspect without guessing.</p>
+        <p class="page-copy">Chummer is the product layer that keeps rules truth, account return, and first-party help in one place instead of asking you to stitch them together after the fact.</p>
     </div>
     @if (leadAsset is not null)
     {
@@ -27,18 +27,18 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">The short answer</p>
         <h2 class="editorial-title">What it is, where it fits, why it is different, and who it helps</h2>
-        <p class="editorial-copy">This page is the shortest useful explanation of the product. Install and proof still live elsewhere; this is the differentiation layer.</p>
+        <p class="editorial-copy">This page is the differentiation layer. Install, proof, and support stay on their own routes.</p>
     </div>
     <div class="role-matrix__grid">
         <article class="role-matrix__cell">
             <span class="tag">What it is</span>
             <h3>A hosted Shadowrun product shell</h3>
-            <p>Chummer combines the preview installer, rules explanation, account return path, and support follow-up instead of treating them as separate projects.</p>
+            <p>Chummer keeps the preview, the proof path, and the signed-in return surface inside one hosted product instead of scattering them across separate projects.</p>
         </article>
         <article class="role-matrix__cell">
             <span class="tag">Where it fits</span>
             <h3>From first install to next session</h3>
-            <p>Use it when the same runner, run, and support context need to survive more than one device and more than one moment.</p>
+            <p>Use it when the same runner, run, and support context need to survive more than one device and more than one session return.</p>
         </article>
         <article class="role-matrix__cell">
             <span class="tag">Why it is different</span>
@@ -53,63 +53,11 @@
     </div>
 </section>
 
-<section class="trust-rail-section">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">How the pieces fit together</p>
-        <h2 class="editorial-title">One path from install to session return</h2>
-        <p class="editorial-copy">The product should feel like one coherent path: install the preview, verify proof, keep the account connected, and use support only when the product path stops being enough.</p>
-    </div>
-    <div class="trust-rail-list">
-        <article class="trust-rail">
-            <span class="tag">Current preview</span>
-            <h3>Install the product that exists now</h3>
-            <p>Start from the current preview build so the install path, known issues, and account handoff all describe the same release.</p>
-            <a class="inline-link" href="/downloads">Open downloads</a>
-        </article>
-        <article class="trust-rail">
-            <span class="tag">Proof shelf</span>
-            <h3>Verify the builder, trail, and continuity claims</h3>
-            <p>Use the live proof modules when you want to confirm what the preview can already demonstrate in public.</p>
-            <a class="inline-link" href="/now">See what works today</a>
-        </article>
-        <article class="trust-rail">
-            <span class="tag">Account shell</span>
-            <h3>Keep access, devices, and recovery in one place</h3>
-            <p>The signed-in shell exists so downloads, claim codes, support history, and return context do not drift apart later.</p>
-            <a class="inline-link" href="/signup?next=%2Fhome">Create account</a>
-        </article>
-        <article class="trust-rail">
-            <span class="tag">Support</span>
-            <h3>Escalate from the product surface first</h3>
-            <p>Use first-party support when install, account, or preview behavior breaks down instead of starting from a repo or issue search.</p>
-            <a class="inline-link" href="/contact#support-intake">Open support intake</a>
-        </article>
-    </div>
-</section>
-
-<section class="role-matrix">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Why it is different</p>
-        <h2 class="editorial-title">Trust stays visible instead of implied</h2>
-        <p class="editorial-copy">These are the checks that make Chummer feel like a product instead of a wrapper around hidden logic.</p>
-    </div>
-    <div class="role-matrix__grid">
-        @foreach (var card in Model.TrustPillars)
-        {
-            <article class="role-matrix__cell">
-                <span class="tag">@card.Badge</span>
-                <h3>@card.Title</h3>
-                <p>@card.Summary</p>
-            </article>
-        }
-    </div>
-</section>
-
 <section id="public-guide" class="role-matrix">
     <div class="editorial-block__lead">
         <p class="eyebrow">Who it is for</p>
         <h2 class="editorial-title">Different table roles, one shared product truth</h2>
-        <p class="editorial-copy">Start from the lane that best matches your job, then use the shared release and proof surfaces to keep everyone on the same page.</p>
+        <p class="editorial-copy">Start from the lane that best matches your job, then use the same release, proof, and support surfaces so the table stays aligned.</p>
     </div>
     <div class="role-matrix__grid">
         @if (installLane is not null)
@@ -145,7 +93,7 @@
 <section class="story-guide-tail">
     <p class="eyebrow">Keep going</p>
     <h2 class="editorial-title">Take the next useful step</h2>
-    <p class="editorial-copy">Use the product path first: current proof, current installer, and first-party help before any deeper technical reading.</p>
+    <p class="editorial-copy">Use the product path first: current proof when you are evaluating, downloads when you are ready to install, and help when the product path stops being enough.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="/now">See what works today</a>
         <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>

@@ -96,31 +96,29 @@
             <a href="#recovery" data-account-tab>Recovery email</a>
             <a href="#support" data-account-tab>Support</a>
             <a href="#devices-access" data-account-tab>Devices &amp; access</a>
-            <a href="#privacy" data-account-tab>Privacy</a>
-            @if (showCampaignSection || showTeamsSection || showChannelsSection || showParticipationSection)
-            {
-                <details class="details-drawer">
-                    <summary>More settings</summary>
-                    <div class="stacked-actions">
-                        @if (showCampaignSection)
-                        {
-                            <a href="#campaigns" data-account-tab>Campaigns &amp; dossiers</a>
-                        }
-                        @if (showTeamsSection)
-                        {
-                            <a href="#community-ops" data-account-tab>Teams &amp; permissions</a>
-                        }
-                        @if (showChannelsSection)
-                        {
-                            <a href="#channels" data-account-tab>Linked channels</a>
-                        }
-                        @if (showParticipationSection)
-                        {
-                            <a href="#participation" data-account-tab>Participation</a>
-                        }
-                    </div>
-                </details>
-            }
+            <details class="details-drawer">
+                <summary>More settings</summary>
+                <div class="stacked-actions">
+                    <a href="#privacy" data-account-tab>Privacy</a>
+                    @if (showCampaignSection)
+                    {
+                        <a href="#campaigns" data-account-tab>Campaigns &amp; dossiers</a>
+                    }
+                    @if (showTeamsSection)
+                    {
+                        <a href="#community-ops" data-account-tab>Teams &amp; permissions</a>
+                    }
+                    @if (showChannelsSection)
+                    {
+                        <a href="#channels" data-account-tab>Linked channels</a>
+                    }
+                    @if (showParticipationSection)
+                    {
+                        <a href="#participation" data-account-tab>Participation</a>
+                    }
+                    <a href="#help-policy" data-account-tab>Help and policy</a>
+                </div>
+            </details>
         </aside>
 
         <div class="account-pane">
@@ -408,7 +406,7 @@
                     <a class="button-like button-like--ghost" href="/help#install-update">How install linking works</a>
                 </div>
                 <details class="details-drawer">
-                    <summary>Restore between devices</summary>
+                    <summary>Advanced continuity and restore</summary>
                     <div class="settings-summary-list">
                         <div class="settings-summary-row">
                             <span>Claimed restore devices</span>
@@ -546,7 +544,7 @@
                 {
                     @foreach (var workspace in Model.CampaignSpine.Workspaces)
                     {
-                        <details class="details-drawer" open>
+                        <details class="details-drawer">
                             <summary>@workspace.CampaignName · live run view</summary>
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
@@ -754,7 +752,7 @@
                 {
                     @foreach (var op in Model.CampaignSpine.CommunityOperations)
                     {
-                        <details class="details-drawer" open>
+                        <details class="details-drawer">
                             <summary>@op.GroupName · @HumanizeStatus(op.OperatorRole, "Member")</summary>
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
@@ -814,22 +812,25 @@
             </details>
             }
 
-            <section id="privacy" class="settings-section" data-account-panel>
-                <div class="settings-section__header">
-                    <h2>Privacy</h2>
-                    <p>Choose what stays visible while deeper identifiers remain tucked away.</p>
-                </div>
-                <div class="settings-summary-list">
-                    <div class="settings-summary-row">
-                        <span>Visibility</span>
-                        <strong>@HumanizeStatus(Model.User.Visibility, "Private")</strong>
+            <details class="details-drawer">
+                <summary>Privacy</summary>
+                <section id="privacy" class="settings-section" data-account-panel>
+                    <div class="settings-section__header">
+                        <h2>Privacy</h2>
+                        <p>Choose what stays visible while deeper identifiers remain tucked away.</p>
                     </div>
-                    <div class="settings-summary-row">
-                        <span>Recovery posture</span>
-                        <strong>@HumanizeStatus(Model.Links.RecoveryPosture, "Single method")</strong>
+                    <div class="settings-summary-list">
+                        <div class="settings-summary-row">
+                            <span>Visibility</span>
+                            <strong>@HumanizeStatus(Model.User.Visibility, "Private")</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Recovery posture</span>
+                            <strong>@HumanizeStatus(Model.Links.RecoveryPosture, "Single method")</strong>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            </details>
 
             @if (showParticipationSection)
             {
@@ -855,23 +856,26 @@
             </details>
             }
 
-            <section class="settings-section" data-account-panel id="help-policy">
-                <div class="settings-section__header">
-                    <h2>Help and policy</h2>
-                    <p>When you need support, privacy, or preview-use guidance, use the first-party pages instead of guessing.</p>
-                </div>
-                <div class="stacked-actions">
-                    <a class="button-like button-like--secondary" href="/help">Open help</a>
-                    <a class="button-like button-like--ghost" href="/privacy">Read privacy</a>
-                    <a class="button-like button-like--ghost" href="/terms">Read terms</a>
-                    <a class="button-like button-like--ghost" href="/contact">Contact Chummer</a>
-                </div>
-            </section>
+            <details class="details-drawer">
+                <summary>Help and policy</summary>
+                <section class="settings-section" data-account-panel id="help-policy">
+                    <div class="settings-section__header">
+                        <h2>Help and policy</h2>
+                        <p>When you need support, privacy, or preview-use guidance, use the first-party pages instead of guessing.</p>
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="/help">Open help</a>
+                        <a class="button-like button-like--ghost" href="/privacy">Read privacy</a>
+                        <a class="button-like button-like--ghost" href="/terms">Read terms</a>
+                        <a class="button-like button-like--ghost" href="/contact">Contact Chummer</a>
+                    </div>
+                </section>
+            </details>
         </div>
     </div>
 
     <details class="details-drawer">
-        <summary>Account details</summary>
+        <summary>Advanced account details</summary>
         <dl class="detail-grid detail-grid--account">
             <div>
                 <dt>Hub account id</dt>
