@@ -67,7 +67,7 @@ public sealed class PublicRouteCatalogService
             throw new InvalidOperationException($"{description} is missing an href.");
         }
 
-        if (Uri.TryCreate(href, UriKind.Absolute, out _))
+        if (PublicUrlPolicy.IsExternalHref(href))
         {
             return;
         }

@@ -35,7 +35,7 @@ public sealed class PublicTrustContentService
                         RequireText(entry.Answer, "faq entry answer")))
                     .ToArray()))
                 .ToArray(),
-            Actions: BuildActions(page.Actions));
+            Actions: BuildActions(page.Actions, chrome.Authenticated));
     }
 
     public TrustPageViewModel BuildPrivacyPage(SiteChromeViewModel chrome) => BuildTrustPage("privacy", chrome);
@@ -63,19 +63,31 @@ public sealed class PublicTrustContentService
                     RequireText(section.Body, $"trust page '{id}' section body"),
                     section.Bullets))
                 .ToArray(),
-            Actions: BuildActions(page.Actions),
+            Actions: BuildActions(page.Actions, chrome.Authenticated),
             EffectiveDate: page.EffectiveDate,
             UpdatedDate: page.UpdatedDate,
             SummaryPoints: page.SummaryPoints);
     }
 
-    private IReadOnlyList<TrustPageActionViewModel> BuildActions(IReadOnlyList<PublicTrustActionDocument>? actions)
+    private IReadOnlyList<TrustPageActionViewModel> BuildActions(IReadOnlyList<PublicTrustActionDocument>? actions, bool authenticated)
         => (actions ?? new List<PublicTrustActionDocument>())
             .Select(action =>
             {
                 var label = RequireText(action.Label, "trust action label");
-                _routes.ValidateRouteTarget(action.Href, $"trust action '{label}'");
-                return new TrustPageActionViewModel(label, action.Href, action.Tone);
+                var href = RequireText(action.Href, $"trust action '{label}' href");
+                if (!authenticated)
+                {
+                    var normalized = PublicRouteCatalog.NormalizeRoute(href);
+                    if (string.Equals(normalized, "/account", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalized, "/home", StringComparison.OrdinalIgnoreCase))
+                    {
+                        href = $"/signup?next={Uri.EscapeDataString(action.Href)}";
+                        label = "Create account";
+                    }
+                }
+
+                _routes.ValidateRouteTarget(href, $"trust action '{label}'");
+                return new TrustPageActionViewModel(label, href, action.Tone);
             })
             .ToArray();
 
@@ -84,12 +96,12 @@ public sealed class PublicTrustContentService
         var document = _canon.LoadRequiredYaml<PublicTrustContentDocument>(TrustContentRelativePath);
         foreach (var page in document.TrustPages ?? new List<PublicTrustPageDocument>())
         {
-            BuildActions(page.Actions);
+            BuildActions(page.Actions, authenticated: true);
         }
 
         foreach (var page in document.FaqPages ?? new List<PublicFaqPageDocument>())
         {
-            BuildActions(page.Actions);
+            BuildActions(page.Actions, authenticated: true);
         }
 
         return document;

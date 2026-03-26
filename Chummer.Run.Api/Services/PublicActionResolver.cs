@@ -20,7 +20,7 @@ public sealed class PublicActionResolver
     {
         var href = ResolveHref(card, authenticated);
         var label = ResolveLabel(card, href);
-        var external = Uri.TryCreate(href, UriKind.Absolute, out _);
+        var external = PublicUrlPolicy.IsExternalHref(href);
         var tone = ResolveTone(card);
         var current = IsSameRoute(href, currentPath);
 
@@ -37,7 +37,7 @@ public sealed class PublicActionResolver
 
         var href = ResolveHref(primaryCard, authenticated);
         var label = ResolveLabel(primaryCard, href);
-        var external = Uri.TryCreate(href, UriKind.Absolute, out _);
+        var external = PublicUrlPolicy.IsExternalHref(href);
         return new ResolvedPublicActionViewModel(label, href, ResolveTone(primaryCard), external, IsSameRoute(href, currentPath));
     }
 
@@ -52,7 +52,7 @@ public sealed class PublicActionResolver
 
         var href = ResolveHref(detailCard, authenticated);
         var label = ResolveLabel(detailCard, href);
-        var external = Uri.TryCreate(href, UriKind.Absolute, out _);
+        var external = PublicUrlPolicy.IsExternalHref(href);
         return new ResolvedPublicActionViewModel(label, href, ResolveTone(detailCard), external, IsSameRoute(href, currentPath));
     }
 
@@ -75,7 +75,7 @@ public sealed class PublicActionResolver
 
         foreach (var candidate in routeCandidates.Where(static value => !string.IsNullOrWhiteSpace(value)))
         {
-            if (Uri.TryCreate(candidate, UriKind.Absolute, out _))
+            if (PublicUrlPolicy.IsExternalHref(candidate))
             {
                 continue;
             }
@@ -109,7 +109,7 @@ public sealed class PublicActionResolver
             return card.ActionLabel!;
         }
 
-        if (Uri.TryCreate(href, UriKind.Absolute, out _))
+        if (PublicUrlPolicy.IsExternalHref(href))
         {
             if (!string.IsNullOrWhiteSpace(card.FallbackLabel))
             {

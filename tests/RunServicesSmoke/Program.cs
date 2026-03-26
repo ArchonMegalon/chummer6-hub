@@ -1466,6 +1466,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "artifact_runsite_pack", StringComparison.Ordinal) && string.Equals(card.Href, "/roadmap/runsite", StringComparison.Ordinal)), "artifact cards should point at related horizon details instead of self-linking to the shelf");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/participate/codex", StringComparison.Ordinal)), "booster participation should split guest and registered destinations");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/signup?next=/home", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/home#beta-interest", StringComparison.Ordinal)), "beta waitlist should split guest signup from registered-home follow-up");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open guided contribution", StringComparison.Ordinal)), "guided contribution should keep an explicit signed-in action label in canon.");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Join beta waitlist", StringComparison.Ordinal)), "beta waitlist should keep an explicit signed-in action label in canon.");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var campaignSpine = new CampaignSpineService(store);
@@ -1602,6 +1604,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(artifactDetailModel is not null && !string.IsNullOrWhiteSpace(artifactDetailModel.Payoff), "artifact detail pages should carry explicit product payoff.");
     Assert(!string.Equals(artifactDetailModel?.StatusEyebrow, "Current status", StringComparison.OrdinalIgnoreCase), "artifact detail pages should project an availability-specific status frame.");
     Assert(!string.Equals(artifactDetailModel?.PrimaryAction.Label, "Read the linked detail", StringComparison.OrdinalIgnoreCase), "artifact detail pages should not fall back to a generic linked-detail label.");
+    var participateView = await controller.ParticipatePage(CancellationToken.None) as ViewResult;
+    var participateModel = participateView?.Model as ParticipatePageViewModel;
+    Assert(participateModel is not null, "participate page should render through the MVC view layer.");
+    Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Open guided contribution", StringComparison.Ordinal)), "participate page should render an explicit guided-contribution label.");
+    Assert(participateModel.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Join beta waitlist", StringComparison.Ordinal)), "participate page should render an explicit beta-waitlist label.");
+    var privacyPage = trustContent.BuildPrivacyPage(chrome.BuildPublicChrome("Privacy", "What Chummer stores, and what it does not.", "/privacy"));
+    Assert(privacyPage.Actions.Any(static action => string.Equals(action.Label, "Create account", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "privacy page should adapt account-only actions into signup-first actions for guests.");
 
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
@@ -1809,9 +1818,6 @@ async Task VerifyPublicLandingProjectionAsync()
             && !string.Equals(card.Action.Href, "/artifacts", StringComparison.Ordinal)),
         "artifacts shelf should point teaser cards at deliberate related detail pages");
 
-    var participateView = await controller.ParticipatePage(CancellationToken.None) as ViewResult;
-    var participateModel = participateView?.Model as ParticipatePageViewModel;
-    Assert(participateModel is not null, "participate page should render through the MVC view layer.");
     Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal)), "participate page should preserve the booster guest-login handoff.");
     Assert(!participateModel.PublicLane.Any(static card => card.Card.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
 

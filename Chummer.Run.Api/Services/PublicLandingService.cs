@@ -202,7 +202,7 @@ public sealed class PublicLandingService
             throw new InvalidOperationException($"{description} is missing an href.");
         }
 
-        if (Uri.TryCreate(href, UriKind.Absolute, out _))
+        if (PublicUrlPolicy.IsExternalHref(href))
         {
             return;
         }
@@ -241,7 +241,7 @@ public sealed class PublicLandingService
 
         foreach (var candidate in new[] { card.Href, card.DetailRoute, card.GuestHref, card.RegisteredHref, card.DetailPrimaryHref })
         {
-            if (string.IsNullOrWhiteSpace(candidate) || Uri.TryCreate(candidate, UriKind.Absolute, out _))
+            if (string.IsNullOrWhiteSpace(candidate) || PublicUrlPolicy.IsExternalHref(candidate))
             {
                 continue;
             }
@@ -323,7 +323,7 @@ public sealed class PublicLandingService
 
     private static void ValidateStaticAssetPath(string? url, string webRoot, string slot, string fieldName)
     {
-        if (string.IsNullOrWhiteSpace(url) || Uri.TryCreate(url, UriKind.Absolute, out _))
+        if (string.IsNullOrWhiteSpace(url) || PublicUrlPolicy.IsExternalHref(url))
         {
             return;
         }
