@@ -581,7 +581,22 @@ public sealed class PublicLandingController : Controller
 
         var proofNote = BuildFeatureDetailProofNote(card);
         var payoff = BuildFeatureDetailPayoff(card);
-        var facts = BuildFeatureDetailFacts(card, proofNote, payoff);
+        var statusEyebrow = card.Bucket switch
+        {
+            "featured_artifacts" => "Availability",
+            "coming_next" => "Roadmap status",
+            _ => "Current status"
+        };
+        var statusHeading = card.Bucket switch
+        {
+            "featured_artifacts" when string.Equals(card.Badge, "Available today", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)
+                => "What is live today",
+            "featured_artifacts" => "What this artifact is proving next",
+            "coming_next" => "Where this horizon sits now",
+            _ => card.Badge
+        };
+        var facts = BuildFeatureDetailFacts(card);
         var model = new FeatureDetailPageViewModel(
             Chrome: chrome,
             Eyebrow: card.Bucket switch
@@ -592,6 +607,8 @@ public sealed class PublicLandingController : Controller
             },
             Heading: card.Title,
             Intro: card.Summary,
+            StatusEyebrow: statusEyebrow,
+            StatusHeading: statusHeading,
             StatusLabel: card.Badge,
             Asset: assets.ForCard(card),
             PrimaryAction: primaryAction,
@@ -604,8 +621,15 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/FeatureDetail.cshtml", model);
     }
 
-    private static IReadOnlyList<FeatureDetailFactViewModel> BuildFeatureDetailFacts(PublicFeatureCardDto card, string? proofNote, string? payoff)
-        => [new("Current status", $"{card.Badge}. {card.Summary}")];
+    private static IReadOnlyList<FeatureDetailFactViewModel> BuildFeatureDetailFacts(PublicFeatureCardDto card)
+        => [new(
+            card.Bucket switch
+            {
+                "featured_artifacts" => "Availability",
+                "coming_next" => "Roadmap",
+                _ => "Current status"
+            },
+            $"{card.Badge}. {card.Summary}")];
 
     private static string? BuildFeatureDetailProofNote(PublicFeatureCardDto card)
     {
