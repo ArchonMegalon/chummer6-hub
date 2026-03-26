@@ -28,6 +28,7 @@
         .Concat(Model.Inspectable)
         .Where(card => !proofTargets.Contains(NormalizeRoute(card.Action.Href)))
         .ToArray();
+    var signedInBenefits = Model.SignedInPreview.ToArray();
 }
 
 <section class="evidence-header">
@@ -107,22 +108,34 @@
     <article class="evidence-group">
         <div class="evidence-group__header">
             <span class="readiness-tag readiness-tag--horizon">Signed-in next step</span>
-            <h2>What your account adds</h2>
+            <h2>What the account adds</h2>
         </div>
         <div class="evidence-row-list">
-            @foreach (var overlay in Model.SignedInPreview)
-            {
-                <article class="evidence-row">
-                    <div class="evidence-row__copy">
-                        <h3>@overlay.Title</h3>
-                        <p>@overlay.Summary</p>
-                    </div>
-                    <span class="readiness-tag readiness-tag--horizon">Signed-in next step</span>
+            <article class="evidence-row">
+                <div class="evidence-row__copy">
+                    <h3>@(Model.Chrome.Authenticated ? "Use the signed-in shell" : "Create an account for the signed-in shell")</h3>
+                    <p>The account path keeps install receipts, roadmap follows, beta interest, and support follow-up attached to the same return surface.</p>
+                    @if (signedInBenefits.Length > 0)
+                    {
+                        <ul class="trust-page-section__list">
+                            @foreach (var overlay in signedInBenefits)
+                            {
+                                <li><strong>@overlay.Title:</strong> @overlay.Summary</li>
+                            }
+                        </ul>
+                    }
+                </div>
+                <span class="readiness-tag readiness-tag--horizon">Signed-in next step</span>
+                <div class="stacked-actions">
                     <a class="button-like button-like--ghost" href="@(Model.Chrome.Authenticated ? "/home" : "/signup?next=/home")">
                         @(Model.Chrome.Authenticated ? "Open home" : "Create account")
                     </a>
-                </article>
-            }
+                    @if (!Model.Chrome.Authenticated)
+                    {
+                        <a class="inline-link" href="/login?next=/home">Already have an account? Sign in</a>
+                    }
+                </div>
+            </article>
         </div>
     </article>
 </section>
