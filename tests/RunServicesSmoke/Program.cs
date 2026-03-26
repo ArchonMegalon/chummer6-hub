@@ -1443,6 +1443,15 @@ async Task VerifyPublicLandingProjectionAsync()
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
     var installLinking = new InstallLinkingService(installLinkingStore);
     var supportCases = new SupportCaseService(supportStore, loggerFactory.CreateLogger<SupportCaseService>());
+    var robotsPath = Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "wwwroot", "robots.txt");
+    Assert(File.Exists(robotsPath), "public shell should ship a robots.txt file.");
+    var robotsText = File.ReadAllText(robotsPath);
+    Assert(robotsText.Contains("Disallow: /", StringComparison.Ordinal), "robots.txt should disallow crawler access.");
+    Assert(robotsText.Contains("Noindex: /", StringComparison.Ordinal), "robots.txt should carry the explicit noindex directive requested for the public shell.");
+    var layoutSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
+    Assert(!layoutSource.Contains("site-nav-sheet", StringComparison.Ordinal), "layout should not render the old duplicate mobile nav sheet.");
+    var authEntrySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Auth", "Entry.cshtml"));
+    Assert(!authEntrySource.Contains("auth-panel__support", StringComparison.Ordinal), "auth entry should keep one quiet support row instead of duplicating support chrome inside the panel.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");

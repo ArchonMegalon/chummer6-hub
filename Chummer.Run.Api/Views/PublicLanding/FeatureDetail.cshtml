@@ -3,6 +3,31 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-feature-detail";
+    var roadmapDetail = string.Equals(Model.Eyebrow, "Roadmap", StringComparison.OrdinalIgnoreCase);
+    var liveArtifact = string.Equals(Model.StatusLabel, "Available today", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Model.StatusLabel, "Live now", StringComparison.OrdinalIgnoreCase);
+    var detailEyebrow = roadmapDetail ? "What this horizon is solving" : "What this artifact proves";
+    var detailTitle = roadmapDetail
+        ? "Why it matters, what it unlocks, and what to compare today"
+        : liveArtifact
+            ? "Why this live proof matters, what it unlocks, and how to verify it"
+            : "Why this preview concept matters, what it is trying to unlock, and how to verify it";
+    var detailCopy = roadmapDetail
+        ? "Start with the current proof shelf, then use the deeper brief only when you need the longer roadmap rationale."
+        : liveArtifact
+            ? "Start with the live product path, then use support only when the artifact proof is not enough to move forward."
+            : "Treat this as a preview concept until it moves onto the live proof shelf, and use the related roadmap only when you need the longer read.";
+    var tailEyebrow = roadmapDetail ? "Track this horizon" : liveArtifact ? "Use this proof next" : "Follow this preview concept";
+    var tailTitle = roadmapDetail
+        ? "Compare it with the live product path before you leave the site"
+        : liveArtifact
+            ? "Use the live product path first, then escalate only when you need help"
+            : "Follow the related roadmap or support lane only when you need more context";
+    var tailCopy = roadmapDetail
+        ? "Current proof stays first. The related live surface tells you what exists now, support helps when the path is unclear, and the external brief stays optional."
+        : liveArtifact
+            ? "Downloads, proof, and support should stay inside the product shell before you fall back to deeper technical reading."
+            : "Preview concepts should point back to a roadmap or support path, not trap you on a dead-end gallery card.";
 
     static string NormalizeDetailRoute(string href)
     {
@@ -66,9 +91,9 @@
 
 <section class="role-matrix">
     <div class="editorial-block__lead">
-        <p class="eyebrow">What to know</p>
-        <h2 class="editorial-title">Why it matters, what it unlocks, and how to verify it</h2>
-        <p class="editorial-copy">Start with the current product path, then use the deeper brief only when the first-party proof is not enough.</p>
+        <p class="eyebrow">@detailEyebrow</p>
+        <h2 class="editorial-title">@detailTitle</h2>
+        <p class="editorial-copy">@detailCopy</p>
     </div>
     <div class="role-matrix__grid">
         @if (!string.IsNullOrWhiteSpace(Model.Pain))
@@ -108,9 +133,9 @@
 </section>
 
 <section class="story-guide-tail">
-    <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Use support or the deeper brief only when you need them</h2>
-    <p class="editorial-copy">The product path should stay first. Support comes next, and the external brief is the deeper read when you want the longer rationale.</p>
+    <p class="eyebrow">@tailEyebrow</p>
+    <h2 class="editorial-title">@tailTitle</h2>
+    <p class="editorial-copy">@tailCopy</p>
     <div class="stacked-actions">
         <a class="button-like button-like--secondary" href="/contact#support-intake">Get help with this surface</a>
     </div>
