@@ -17,12 +17,17 @@
         : liveArtifact
             ? "Start with the live product path, then use support only when the artifact proof is not enough to move forward."
             : "Treat this as a preview concept until it moves onto the live proof shelf, and use the related roadmap only when you need the longer read.";
-    var tailEyebrow = roadmapDetail ? "Track this horizon" : liveArtifact ? "Use this proof next" : "Follow this preview concept";
-    var tailTitle = roadmapDetail
-        ? "Compare it with the live product path before you leave the site"
+    var nextTitle = roadmapDetail
+        ? "Compare this horizon with the live product path"
         : liveArtifact
-            ? "Use the live product path first, then escalate only when you need help"
-            : "Follow the related roadmap or support lane only when you need more context";
+            ? "Use this live proof next"
+            : "Use the related roadmap before treating this as finished";
+    var nextCopy = roadmapDetail
+        ? "Start from the current proof or related preview surface before you leave the product shell for the deeper brief."
+        : liveArtifact
+            ? "Go to the live product surface first, then use support only when the proof path stops being enough."
+            : "Preview concepts should route you toward a roadmap or support path, not pretend they are already finished artifacts.";
+    var tailEyebrow = roadmapDetail ? "Track this horizon" : liveArtifact ? "Use this proof next" : "Follow this preview concept";
     var tailCopy = roadmapDetail
         ? "Current proof stays first. The related live surface tells you what exists now, support helps when the path is unclear, and the external brief stays optional."
         : liveArtifact
@@ -89,54 +94,110 @@
     </div>
 </section>
 
-<section class="role-matrix">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">@detailEyebrow</p>
-        <h2 class="editorial-title">@detailTitle</h2>
-        <p class="editorial-copy">@detailCopy</p>
-    </div>
-    <div class="role-matrix__grid">
-        @if (!string.IsNullOrWhiteSpace(Model.Pain))
-        {
-            <article class="role-matrix__cell">
-                <span class="tag">Why it matters</span>
-                <p>@Model.Pain</p>
-            </article>
-        }
-        @if (!string.IsNullOrWhiteSpace(Model.Payoff))
-        {
-            <article class="role-matrix__cell">
-                <span class="tag">What it unlocks</span>
-                <p>@Model.Payoff</p>
-            </article>
-        }
-        @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
-        {
-            <article class="role-matrix__cell">
-                <span class="tag">How to verify it</span>
-                <p>@Model.ProofNote</p>
-            </article>
-        }
-        @if (Model.MicroProof.Count > 0)
-        {
-            <article class="role-matrix__cell">
-                <span class="tag">Verification markers</span>
-                <div class="trust-claim__microproof">
-                    @foreach (var item in Model.MicroProof)
-                    {
-                        <span>@item</span>
-                    }
-                </div>
-            </article>
-        }
-    </div>
-</section>
+@if (roadmapDetail)
+{
+    <section class="role-matrix">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">@detailEyebrow</p>
+            <h2 class="editorial-title">@detailTitle</h2>
+            <p class="editorial-copy">@detailCopy</p>
+        </div>
+        <div class="role-matrix__grid">
+            @if (!string.IsNullOrWhiteSpace(Model.Pain))
+            {
+                <article class="role-matrix__cell">
+                    <span class="tag">User pain</span>
+                    <p>@Model.Pain</p>
+                </article>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Payoff))
+            {
+                <article class="role-matrix__cell">
+                    <span class="tag">Expected unlock</span>
+                    <p>@Model.Payoff</p>
+                </article>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
+            {
+                <article class="role-matrix__cell">
+                    <span class="tag">Related live proof</span>
+                    <p>@Model.ProofNote</p>
+                </article>
+            }
+            @if (Model.MicroProof.Count > 0)
+            {
+                <article class="role-matrix__cell">
+                    <span class="tag">What to compare</span>
+                    <div class="trust-claim__microproof">
+                        @foreach (var item in Model.MicroProof)
+                        {
+                            <span>@item</span>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+else
+{
+    <section class="role-matrix">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">@detailEyebrow</p>
+            <h2 class="editorial-title">@detailTitle</h2>
+            <p class="editorial-copy">@detailCopy</p>
+        </div>
+        <div class="role-matrix__grid">
+            @if (liveArtifact)
+            {
+                <article class="role-matrix__cell">
+                    <span class="tag">Use it now</span>
+                    <p>Start from the live product surface attached to this artifact, then keep support as the fallback instead of the first step.</p>
+                </article>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Pain))
+            {
+                <article class="role-matrix__cell">
+                    <span class="tag">Why it matters</span>
+                    <p>@Model.Pain</p>
+                </article>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Payoff))
+            {
+                <article class="role-matrix__cell">
+                    <span class="tag">What it unlocks</span>
+                    <p>@Model.Payoff</p>
+                </article>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
+            {
+                <article class="role-matrix__cell">
+                    <span class="tag">How to verify it</span>
+                    <p>@Model.ProofNote</p>
+                </article>
+            }
+            @if (Model.MicroProof.Count > 0)
+            {
+                <article class="role-matrix__cell">
+                    <span class="tag">Verification markers</span>
+                    <div class="trust-claim__microproof">
+                        @foreach (var item in Model.MicroProof)
+                        {
+                            <span>@item</span>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
 
 <section class="story-guide-tail">
     <p class="eyebrow">@tailEyebrow</p>
-    <h2 class="editorial-title">@tailTitle</h2>
-    <p class="editorial-copy">@tailCopy</p>
+    <h2 class="editorial-title">@nextTitle</h2>
+    <p class="editorial-copy">@nextCopy</p>
     <div class="stacked-actions">
         <a class="button-like button-like--secondary" href="/contact#support-intake">Get help with this surface</a>
     </div>
+    <p class="muted-copy">@tailCopy</p>
 </section>
