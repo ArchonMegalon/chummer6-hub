@@ -288,12 +288,23 @@ public sealed class ReleaseSelectionService
     }
 
     private static bool IsInstaller(PublicReleaseArtifactDto download)
-        => download.Url.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-           || download.Url.EndsWith(".deb", StringComparison.OrdinalIgnoreCase)
-           || download.Url.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)
-           || download.Url.EndsWith(".dmg", StringComparison.OrdinalIgnoreCase)
-           || download.Url.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase)
-           || download.Id.Contains("installer", StringComparison.OrdinalIgnoreCase);
+    {
+        var kind = (download.Kind ?? string.Empty).Trim();
+        if (kind.Length > 0)
+        {
+            return kind.Equals("installer", StringComparison.OrdinalIgnoreCase)
+                || kind.Equals("dmg", StringComparison.OrdinalIgnoreCase)
+                || kind.Equals("pkg", StringComparison.OrdinalIgnoreCase)
+                || kind.Equals("msix", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return download.Url.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+               || download.Url.EndsWith(".deb", StringComparison.OrdinalIgnoreCase)
+               || download.Url.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)
+               || download.Url.EndsWith(".dmg", StringComparison.OrdinalIgnoreCase)
+               || download.Url.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase)
+               || download.Id.Contains("installer", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static string RecommendedSupport(PublicReleaseArtifactDto download)
         => IsInstaller(download)
