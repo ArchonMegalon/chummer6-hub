@@ -99,7 +99,7 @@ app.Use(async (context, next) =>
 });
 app.UseStaticFiles(new StaticFileOptions
 {
-    OnPrepareResponse = static fileContext =>
+    OnPrepareResponse = fileContext =>
     {
         fileContext.Context.Response.Headers["X-Robots-Tag"] = SearchRobotsPolicy;
     }
