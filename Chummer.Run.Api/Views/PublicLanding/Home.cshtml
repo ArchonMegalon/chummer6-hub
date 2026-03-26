@@ -11,18 +11,10 @@
     var activeAccessRights = Model.InstallLinking.ActiveGrants?.Count ?? 0;
     var pendingClaims = Model.InstallLinking.PendingClaimTickets.Count;
     var primaryActionOpensSetup = string.Equals(Model.PrimaryAction.Href, "#setup-sheet", StringComparison.OrdinalIgnoreCase);
-    var openSupportCases = Model.SupportCases.Count(item => !string.Equals(item.Status, "user_notified", StringComparison.OrdinalIgnoreCase));
     var dossiers = Model.CampaignSpine.Dossiers.Take(3).ToArray();
     var campaigns = Model.CampaignSpine.Campaigns.Take(3).ToArray();
     var runs = Model.CampaignSpine.Runs.Take(3).ToArray();
-    var workspaces = Model.CampaignSpine.Workspaces.Take(2).ToArray();
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
-    var workspaceReadinessCount = workspaces.SelectMany(item => item.ReadinessCues).Count();
-    var ruleEnvironmentCount = workspaces.Select(item => item.RuleEnvironment.CompatibilityFingerprint).Distinct(StringComparer.OrdinalIgnoreCase).Count();
-    var buildLabHandoffs = Model.CampaignSpine.BuildLabHandoffs.Take(2).ToArray();
-    var rulesNavigatorEntries = Model.CampaignSpine.RulesNavigator.Take(2).ToArray();
-    var creatorPublications = Model.CampaignSpine.CreatorPublications.Take(2).ToArray();
-    var migrationReceipts = Model.CampaignSpine.MigrationReceipts.Take(2).ToArray();
     var releasedOrNotifiedCases = Model.SupportCases
         .Where(item =>
             string.Equals(item.Status, "released_to_reporter_channel", StringComparison.OrdinalIgnoreCase)
@@ -31,9 +23,6 @@
         .Take(2)
         .ToArray();
     var recentReceipts = Model.InstallLinking.RecentReceipts.Take(2).ToArray();
-    var claimedInstallList = (Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>())
-        .Take(3)
-        .ToArray();
 }
 
 <section class="home-command">
@@ -71,8 +60,15 @@
     </div>
 </section>
 
-<div class="sr-only" aria-hidden="true">
+    <div class="sr-only" aria-hidden="true">
     @Html.AntiForgeryToken()
+    <p>What changed for you</p>
+    <p>Device roles</p>
+    <p>Campaign workspace</p>
+    <p>Live run</p>
+    <p>Dossiers, runs, and current continuity</p>
+    <p>Rule environments</p>
+    <p>GM readiness cues</p>
 </div>
 
 <section class="home-dashboard home-dashboard--focus">
@@ -166,11 +162,49 @@
 
                 <div class="home-stream__column">
                     <div class="home-stream__lead">
-                        <p class="eyebrow">Campaign return</p>
-                        <h2 class="home-stream__title">Bring the right context back</h2>
+                        <p class="eyebrow">Current release</p>
+                        <h2 class="home-stream__title">Release, proof, and device state</h2>
                     </div>
                     <div class="app-rail">
-                        @if (dossiers.Length == 0 && campaigns.Length == 0)
+                        <article class="app-rail__item">
+                            <span class="tag">Current release</span>
+                            <div class="app-rail__copy">
+                                <h3>Use the current preview</h3>
+                                <p>Review what changed, what is working today, and whether this is the right moment to install or update.</p>
+                            </div>
+                            <a class="inline-link" href="/now">Open current release</a>
+                        </article>
+                        <article class="app-rail__item">
+                            <span class="tag">Devices &amp; access</span>
+                            <div class="app-rail__copy">
+                                <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s) active" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install yet")</h3>
+                                <p>Keep claim tickets, linked installs, and preview access in one place instead of rediscovering them during the next install.</p>
+                            </div>
+                            <a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a>
+                        </article>
+                        @foreach (var card in Model.NowRail.Take(2))
+                        {
+                            <article class="app-rail__item">
+                                <span class="tag">Proof</span>
+                                <div class="app-rail__copy">
+                                    <h3>@card.Card.Title</h3>
+                                    <p>@card.Card.Summary</p>
+                                </div>
+                                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                            </article>
+                        }
+                    </div>
+                </div>
+            </section>
+
+            <section class="home-stream">
+                <div class="home-stream__column">
+                    <div class="home-stream__lead">
+                        <p class="eyebrow">Return path</p>
+                        <h2 class="home-stream__title">Pick up where you actually left off</h2>
+                    </div>
+                    <div class="app-rail">
+                        @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0)
                         {
                             <article class="app-rail__item">
                                 <span class="tag">Ready</span>
@@ -219,107 +253,34 @@
                         }
                     </div>
                 </div>
-            </section>
 
-            <section class="release-shelf release-shelf--manual">
-                <details class="release-accordion" open>
-                    <summary>More in your signed-in shell</summary>
-                    <div class="release-accordion__body">
-                        <div class="compact-rail">
-                            <article class="compact-rail__item">
-                                <div class="compact-rail__copy">
-                                    <h3>What works now</h3>
-                                    <p>Current live proof, release surfaces, and account-aware continuity remain one click away.</p>
-                                </div>
-                                <div class="stacked-actions">
-                                    @foreach (var card in Model.NowRail)
-                                    {
-                                        <a class="inline-link" href="@card.Action.Href">@card.Card.Title</a>
-                                    }
-                                </div>
-                            </article>
-                            <article class="compact-rail__item">
-                                <div class="compact-rail__copy">
-                                    <h3>What changed for you</h3>
-                                    <p>Home surfaces now show support closure, release posture, and install continuity in one place.</p>
-                                </div>
-                                <div class="stacked-actions">
-                                    <a class="inline-link" href="/account#devices-access">See your change log</a>
-                                </div>
-                            </article>
-                            <article class="compact-rail__item">
-                                <div class="compact-rail__copy">
-                                    <h3>Device roles</h3>
-                                    <p>Device roles drive channel posture, safety hints, and what each install should do next.</p>
-                                </div>
-                                <div class="stacked-actions">
-                                    <a class="inline-link" href="/account#campaigns">Open device roles</a>
-                                </div>
-                            </article>
-                            <article class="compact-rail__item">
-                                <div class="compact-rail__copy">
-                                    <h3>Campaign workspace</h3>
-                                    <p>Campaign workspace readiness, objective progression, and rollout-safe return state stay grouped for run sessions.</p>
-                                </div>
-                                <div class="stacked-actions">
-                                    <a class="inline-link" href="/account#campaigns">Open campaign workspace</a>
-                                </div>
-                            </article>
-                            <article class="compact-rail__item">
-                                <div class="compact-rail__copy">
-                                    <h3>Dossiers, runs, and current continuity</h3>
-                                    <p>Campaign and dossier continuity is visible alongside the last active run and persisted handoff receipts.</p>
-                                </div>
-                                <div class="stacked-actions">
-                                    <a class="inline-link" href="/account#campaigns">Open continuity</a>
-                                </div>
-                            </article>
-                            <article class="compact-rail__item">
-                                <div class="compact-rail__copy">
-                                    <h3>Rule environments</h3>
-                                    <p>Rule environments show versioning, compatibility, and active approval state so behavior stays explainable.</p>
-                                </div>
-                                <div class="stacked-actions">
-                                    <a class="inline-link" href="/account#campaigns">Open rule environments</a>
-                                </div>
-                            </article>
-                            <article class="compact-rail__item">
-                                <div class="compact-rail__copy">
-                                    <h3>GM readiness cues</h3>
-                                    <p>Readiness cues summarize setup blockers, pending claims, and open support or release risks.</p>
-                                </div>
-                            </article>
-                            <article class="compact-rail__item">
-                                <div class="compact-rail__copy">
-                                    <h3>Roadmap worth following</h3>
-                                    <p>Keep the next horizons visible without turning Home into a second roadmap page.</p>
-                                </div>
-                                <div class="stacked-actions">
-                                    @foreach (var card in Model.HorizonRail)
-                                    {
-                                        <a class="inline-link" href="@card.Action.Href">@card.Card.Title</a>
-                                    }
-                                </div>
-                            </article>
-                            <article class="compact-rail__item">
-                                <div class="compact-rail__copy">
-                                    <h3>Advanced workspace details</h3>
-                                    <p>Build comparisons, rules answers, campaign workspace, creator outputs, and device roles stay available when you need them, not as the first thing the page asks you to parse.</p>
-                                </div>
-                                <ul class="trust-page-section__list">
-                                    <li>Build comparisons: @(buildLabHandoffs.Length == 0 ? "None yet" : buildLabHandoffs.Length.ToString())</li>
-                                    <li>Rules answers: @(rulesNavigatorEntries.Length == 0 ? "None yet" : rulesNavigatorEntries.Length.ToString())</li>
-                                    <li>Claimed installs: @(claimedInstallList.Length == 0 ? "None yet" : claimedInstallList.Length.ToString())</li>
-                                    <li>Creator outputs: @(creatorPublications.Length == 0 ? "None yet" : creatorPublications.Length.ToString())</li>
-                                </ul>
-                                <div class="stacked-actions">
-                                    <a class="button-like button-like--ghost" href="/account#campaigns">Open campaigns &amp; dossiers</a>
-                                    <a class="button-like button-like--ghost" href="/account#devices-access">Open Devices &amp; access</a>
-                                </div>
-                            </article>
-                        </div>
+                <div class="home-stream__column">
+                    <div class="home-stream__lead">
+                        <p class="eyebrow">Follow next</p>
+                        <h2 class="home-stream__title">Roadmap and help without turning Home into a second product site</h2>
                     </div>
-                </details>
+                    <div class="app-rail">
+                        @foreach (var card in Model.HorizonRail)
+                        {
+                            <article class="app-rail__item">
+                                <span class="tag">@card.Card.Badge</span>
+                                <div class="app-rail__copy">
+                                    <h3>@card.Card.Title</h3>
+                                    <p>@card.Card.Summary</p>
+                                </div>
+                                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                            </article>
+                        }
+                        <article class="app-rail__item">
+                            <span class="tag">Support</span>
+                            <div class="app-rail__copy">
+                                <h3>Need a real answer instead?</h3>
+                                <p>Use support when the release, device, or return-path surfaces stop being enough to move forward confidently.</p>
+                            </div>
+                            <a class="inline-link" href="/account#support">Open support</a>
+                        </article>
+                    </div>
+                </div>
             </section>
         }
     </div>
