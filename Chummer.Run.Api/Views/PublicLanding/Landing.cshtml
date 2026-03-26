@@ -3,12 +3,6 @@
     ViewData["Title"] = "Chummer";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing";
-    static string DisplayStatus(string badge)
-        => string.Equals(badge, "Live now", StringComparison.OrdinalIgnoreCase)
-            ? "Available today"
-            : string.Equals(badge, "Inspectable", StringComparison.OrdinalIgnoreCase)
-                ? "Preview"
-                : badge;
     var hero = Model.Assets.BySlot("section_hero");
     var proofAsset = Model.Assets.BySlot("product_proof_ui") ?? Model.Assets.BySlot("capability_check_rules");
     var proofNotes = Model.Workflows.Take(3).ToArray();
@@ -18,7 +12,6 @@
     var heroSection = Section("hero");
     var productProofSection = Section("product_proof");
     var worksNowSection = Section("whats_real_now");
-    var artifactSection = Section("featured_artifacts");
     var closingSection = Section("closing_cta");
 
     PublicLandingSectionDto Section(string id)
@@ -81,30 +74,16 @@
         <p class="eyebrow">@Model.Surface.ProductProofEyebrow</p>
         <h2 class="editorial-title">@productProofSection.Title</h2>
         <p class="editorial-copy">@productProofSection.Intro</p>
-        <div class="proof-surface">
-            <div class="proof-surface__topline">
-                <span>@Model.Surface.ProductProofToplineLabel</span>
-                <span>@release.Display.ChannelLabel · @release.Display.BuildLabel</span>
-            </div>
-            <div class="proof-surface__result">
-                <strong>@Model.Surface.ProductProofResultTitle</strong>
-                <p>@Model.Surface.ProductProofResultSummary</p>
-            </div>
-            <div class="proof-surface__trail">
-                @foreach (var step in Model.Surface.ProductProofTrail)
-                {
-                    <span>@step</span>
-                }
-            </div>
-            <div class="proof-surface__notes">
-                @foreach (var workflow in proofNotes)
-                {
-                    <div>
-                        <span class="tag">@workflow.Card.Title</span>
-                        <p>@(workflow.Card.ProofNote ?? workflow.Card.Payoff ?? workflow.Card.Summary)</p>
-                    </div>
-                }
-            </div>
+        <div class="role-matrix__grid">
+            @foreach (var workflow in proofNotes)
+            {
+                <article class="role-matrix__cell">
+                    <span class="tag">@workflow.Card.Title</span>
+                    <h3>@workflow.Card.Summary</h3>
+                    <p>@(workflow.Card.ProofNote ?? workflow.Card.Payoff ?? workflow.Card.Summary)</p>
+                    <a class="inline-link" href="@workflow.Action.Href">@workflow.Action.Label</a>
+                </article>
+            }
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.Surface.ProductProofPrimaryHref">@Model.Surface.ProductProofPrimaryLabel</a>
@@ -123,7 +102,7 @@
     <div class="works-matrix__lead">
         <p class="eyebrow">@worksNowSection.Eyebrow</p>
         <h2 class="editorial-title">@worksNowSection.Title</h2>
-        <p class="editorial-copy">The current preview shelf should answer three practical questions fast: what you can use now, what is still preview-only, and what is opening next.</p>
+        <p class="editorial-copy">The front door should answer three practical questions fast: what you can use now, what is still preview-only, and what is opening next.</p>
     </div>
     <div class="works-matrix__columns">
         <article class="works-column">
@@ -177,45 +156,12 @@
     </div>
 </section>
 
-<section class="artifact-gallery">
-    <div class="artifact-gallery__lead">
-        <p class="eyebrow">@artifactSection.Eyebrow</p>
-        <h2 class="editorial-title">@artifactSection.Title</h2>
-        <p class="editorial-copy">Start with the live proof surfaces first. Preview concepts stay visible, but they should clearly read as next-step product work rather than finished things.</p>
-    </div>
-    <div class="artifact-gallery__grid">
-        @foreach (var card in Model.Artifacts)
-        {
-            <article class="artifact-card">
-                @if (card.Asset is not null)
-                {
-                    <div class="artifact-card__media">
-                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
-                    </div>
-                }
-                <div class="artifact-card__copy">
-                    <span class="tag @(string.Equals(card.Card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) || string.Equals(card.Card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--quiet")">@DisplayStatus(card.Card.Badge)</span>
-                    <h3>@card.Card.Title</h3>
-                    <p>@card.Card.Summary</p>
-                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
-                </div>
-            </article>
-        }
-    </div>
-</section>
-
 <section class="access-band">
     <div class="access-band__copy">
         <p class="eyebrow">@closingSection.Eyebrow</p>
         <h2 class="editorial-title">@closingSection.Title</h2>
         <p class="editorial-copy">Create the account when you want preview installs, install linking, roadmap follow-up, and support history to stay attached to one return path.</p>
-        <div class="interest-grid" aria-label="Interest options">
-            <span class="interest-pill">I’m here for play</span>
-            <span class="interest-pill">I want GM tools</span>
-            <span class="interest-pill">I want creator tools</span>
-            <span class="interest-pill">Send me roadmap updates</span>
-            <span class="interest-pill">Consider me for beta access</span>
-        </div>
+        <p class="muted-copy">Need deeper proof first? <a class="inline-link" href="/artifacts">Open the proof gallery</a>.</p>
     </div>
     <div class="access-band__actions">
         @if (Model.Chrome.Authenticated)
