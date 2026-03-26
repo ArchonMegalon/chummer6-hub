@@ -18,6 +18,13 @@
     var recapProjectionCount = Model.CampaignSpine.Workspaces.SelectMany(item => item.RecapShelf).Count();
     var communityOpsCount = Model.CampaignSpine.CommunityOperations.Count;
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
+    var restoreArtifactCount = Model.CampaignSpine.Restore.RecentArtifacts.Count;
+    var restoreEntitlementCount = Model.CampaignSpine.Restore.Entitlements.Count;
+    var restoreDeviceCount = Model.CampaignSpine.Restore.ClaimedDevices.Count;
+    var buildLabHandoffCount = Model.CampaignSpine.BuildLabHandoffs.Count;
+    var rulesNavigatorCount = Model.CampaignSpine.RulesNavigator.Count;
+    var migrationReceiptCount = Model.CampaignSpine.MigrationReceipts.Count;
+    var creatorPublicationCount = Model.CampaignSpine.CreatorPublications.Count;
     var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
     var showChannelsSection = telegramChannel is not null;
@@ -329,6 +336,10 @@
                         <span>Access rights</span>
                         <strong>@activeAccessRights</strong>
                     </div>
+                    <div class="settings-summary-row">
+                        <span>Roaming restore packet</span>
+                        <strong>@(restoreArtifactCount == 0 && restoreEntitlementCount == 0 ? "Ready to seed" : $"{restoreArtifactCount} artifacts · {restoreEntitlementCount} entitlements")</strong>
+                    </div>
                 </div>
                 @if (Model.InstallLinking.RecentReceipts.Count == 0)
                 {
@@ -394,6 +405,84 @@
                     <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
                     <a class="button-like button-like--ghost" href="/help#install-update">How install linking works</a>
                 </div>
+                <details class="details-drawer">
+                    <summary>Roaming workspace restore</summary>
+                    <div class="settings-summary-list">
+                        <div class="settings-summary-row">
+                            <span>Claimed restore devices</span>
+                            <strong>@(restoreDeviceCount == 0 ? "None yet" : restoreDeviceCount.ToString())</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Rule environments</span>
+                            <strong>@(Model.CampaignSpine.Restore.RecentRuleEnvironments.Count == 0 ? "Pending" : Model.CampaignSpine.Restore.RecentRuleEnvironments.Count.ToString())</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Artifacts</span>
+                            <strong>@(restoreArtifactCount == 0 ? "Pending" : restoreArtifactCount.ToString())</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Entitlements</span>
+                            <strong>@(restoreEntitlementCount == 0 ? "Pending" : restoreEntitlementCount.ToString())</strong>
+                        </div>
+                    </div>
+                    @if (Model.CampaignSpine.Restore.ClaimedDevices.Count > 0)
+                    {
+                        <details class="details-drawer">
+                            <summary>Claimed second-device restore posture</summary>
+                            <ul class="muted-copy">
+                                @foreach (var device in Model.CampaignSpine.Restore.ClaimedDevices)
+                                {
+                                    <li><strong>@device.DeviceRole</strong>: @device.Platform / @device.HeadId / @device.Channel. @device.RestoreSummary</li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                    @if (Model.CampaignSpine.Restore.RecentRuleEnvironments.Count > 0)
+                    {
+                        <details class="details-drawer">
+                            <summary>Rule environments</summary>
+                            <ul class="muted-copy">
+                                @foreach (var environment in Model.CampaignSpine.Restore.RecentRuleEnvironments)
+                                {
+                                    <li>@RuleEnvironmentSummary(environment)</li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                    @if (Model.CampaignSpine.Restore.RecentArtifacts.Count > 0)
+                    {
+                        <details class="details-drawer">
+                            <summary>Artifacts and reconnect receipts</summary>
+                            <ul class="muted-copy">
+                                @foreach (var artifact in Model.CampaignSpine.Restore.RecentArtifacts)
+                                {
+                                    <li><strong>@artifact.Label</strong>: @artifact.Summary</li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                    @if (Model.CampaignSpine.Restore.Entitlements.Count > 0)
+                    {
+                        <details class="details-drawer">
+                            <summary>Entitlements</summary>
+                            <ul class="muted-copy">
+                                @foreach (var entitlement in Model.CampaignSpine.Restore.Entitlements)
+                                {
+                                    <li><strong>@entitlement.Label</strong>: @entitlement.Summary</li>
+                                }
+                            </ul>
+                        </details>
+                    }
+                    <details class="details-drawer">
+                        <summary>Install-local guardrails</summary>
+                        <ul class="muted-copy">
+                            @foreach (var note in Model.CampaignSpine.Restore.LocalOnlyNotes)
+                            {
+                                <li>@note</li>
+                            }
+                        </ul>
+                    </details>
+                </details>
             </section>
 
             @if (showCampaignSection)
@@ -427,6 +516,22 @@
                     <div class="settings-summary-row">
                         <span>Support blockers</span>
                         <strong>@(openSupportCases == 0 ? "None" : openSupportCases.ToString())</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Build Lab handoffs</span>
+                        <strong>@(buildLabHandoffCount == 0 ? "Pending" : buildLabHandoffCount.ToString())</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Rules Navigator answers</span>
+                        <strong>@(rulesNavigatorCount == 0 ? "Pending" : rulesNavigatorCount.ToString())</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Legacy migration receipts</span>
+                        <strong>@(migrationReceiptCount == 0 ? "None yet" : migrationReceiptCount.ToString())</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Creator publication shelf</span>
+                        <strong>@(creatorPublicationCount == 0 ? "Pending" : creatorPublicationCount.ToString())</strong>
                     </div>
                 </div>
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
@@ -546,6 +651,70 @@
                             @foreach (var note in Model.CampaignSpine.Restore.ConflictSummaries)
                             {
                                 <li>@note</li>
+                            }
+                        </ul>
+                    </details>
+                }
+                @if (Model.CampaignSpine.BuildLabHandoffs.Count > 0)
+                {
+                    <details class="details-drawer">
+                        <summary>Build Lab hand-off</summary>
+                        <ul class="muted-copy">
+                            @foreach (var handoff in Model.CampaignSpine.BuildLabHandoffs)
+                            {
+                                <li>
+                                    <strong>@handoff.Title</strong>: @handoff.Summary
+                                    <span> Variant: @handoff.VariantLabel. Progression: @handoff.ProgressionLabel.</span>
+                                    @if (handoff.Outputs.Count > 0)
+                                    {
+                                        <span> Outputs: @string.Join(", ", handoff.Outputs.Select(item => item.Label)).</span>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    </details>
+                }
+                @if (Model.CampaignSpine.RulesNavigator.Count > 0)
+                {
+                    <details class="details-drawer">
+                        <summary>Rules Navigator</summary>
+                        <ul class="muted-copy">
+                            @foreach (var answer in Model.CampaignSpine.RulesNavigator)
+                            {
+                                <li>
+                                    <strong>@answer.Question</strong>: @answer.ShortAnswer
+                                    <span> Before: @answer.BeforeSummary. After: @answer.AfterSummary.</span>
+                                </li>
+                            }
+                        </ul>
+                    </details>
+                }
+                @if (Model.CampaignSpine.MigrationReceipts.Count > 0)
+                {
+                    <details class="details-drawer">
+                        <summary>Legacy migration receipts</summary>
+                        <ul class="muted-copy">
+                            @foreach (var receipt in Model.CampaignSpine.MigrationReceipts)
+                            {
+                                <li>
+                                    <strong>@receipt.SourceKind</strong>: @receipt.Summary
+                                    <span> Fields: @string.Join(", ", receipt.Fields.Select(field => $"{field.Label}={field.Status}")).</span>
+                                </li>
+                            }
+                        </ul>
+                    </details>
+                }
+                @if (Model.CampaignSpine.CreatorPublications.Count > 0)
+                {
+                    <details class="details-drawer">
+                        <summary>Creator publication</summary>
+                        <ul class="muted-copy">
+                            @foreach (var publication in Model.CampaignSpine.CreatorPublications)
+                            {
+                                <li>
+                                    <strong>@publication.Title</strong>: @publication.Summary
+                                    <span> Provenance: @publication.ProvenanceSummary. Discovery: @publication.DiscoverySummary.</span>
+                                </li>
                             }
                         </ul>
                     </details>

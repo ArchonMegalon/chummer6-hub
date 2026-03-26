@@ -1,4 +1,6 @@
 using Chummer.Control.Contracts.Support;
+using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Contracts.Community;
 
 namespace Chummer.Run.Api.Services.Support;
 
@@ -40,15 +42,18 @@ public sealed class SupportAssistantService
 
     private readonly SupportCaseService _supportCases;
     private readonly PublicCanonFileLoader _canon;
+    private readonly CampaignSpineService _campaignSpine;
     private readonly ILogger<SupportAssistantService> _logger;
 
     public SupportAssistantService(
         SupportCaseService supportCases,
         PublicCanonFileLoader canon,
+        CampaignSpineService campaignSpine,
         ILogger<SupportAssistantService> logger)
     {
         _supportCases = supportCases;
         _canon = canon;
+        _campaignSpine = campaignSpine;
         _logger = logger;
     }
 
@@ -77,6 +82,11 @@ public sealed class SupportAssistantService
                 Summary: $"Status: {HumanizeStatus(item.Status)}. Owner: {item.CandidateOwnerRepo}. Summary: {item.Summary}",
                 Status: item.Status,
                 Href: "/account#support"));
+        }
+
+        foreach (var citation in BuildRulesTruthCitations(reporterUserId, reporterSubjectId, tokens, maxCitations - citations.Count))
+        {
+            citations.Add(citation);
         }
 
         foreach (var rule in CanonRules)
@@ -115,6 +125,51 @@ public sealed class SupportAssistantService
 
         string answer = BuildAnswer(caseMatches, citations, tokens, escalationRecommended);
         return new SupportAssistantResponse(answer, confidence, escalationRecommended, citations, actions);
+    }
+
+    private IReadOnlyList<SupportAssistantCitation> BuildRulesTruthCitations(
+        string? reporterUserId,
+        string? reporterSubjectId,
+        IReadOnlySet<string> tokens,
+        int capacity)
+    {
+        if (capacity <= 0
+            || string.IsNullOrWhiteSpace(reporterUserId)
+            || !ShouldUseRulesTruth(tokens))
+        {
+            return Array.Empty<SupportAssistantCitation>();
+        }
+
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var summary = _campaignSpine.GetAccountSummary(new HubUserDto(
+                UserId: reporterUserId,
+                SubjectId: reporterSubjectId ?? reporterUserId,
+                DisplayName: reporterSubjectId ?? reporterUserId,
+                Handle: reporterSubjectId ?? reporterUserId,
+                Visibility: "private",
+                Timezone: "UTC",
+                CountryCode: "ZZ",
+                LinkedPrincipals: Array.Empty<string>(),
+                GroupIds: Array.Empty<string>(),
+                CreatedAtUtc: now,
+                UpdatedAtUtc: now));
+
+            return summary.RulesNavigator
+                .Take(capacity)
+                .Select(entry => new SupportAssistantCitation(
+                    SourceKind: "rules_truth",
+                    Label: entry.Question,
+                    Summary: TrimForSummary($"{entry.ShortAnswer} Evidence: {string.Join(" | ", entry.EvidenceLines.Take(2))}"),
+                    Href: "/home"))
+                .ToArray();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "support assistant could not hydrate rules-truth citations for reporter {ReporterUserId}", reporterUserId);
+            return Array.Empty<SupportAssistantCitation>();
+        }
     }
 
     private string BuildAnswer(
@@ -189,8 +244,24 @@ public sealed class SupportAssistantService
             Add("open_downloads", "Open downloads", "/downloads", "Check the current installer and release posture.");
         }
 
+        if (ShouldUseRulesTruth(tokens))
+        {
+            Add("open_home", "Open home", "/home", "Review the current rule environment, campaign workspace, and grounded answer path.");
+        }
+
         return actions.Values.ToList();
     }
+
+    private static bool ShouldUseRulesTruth(IReadOnlySet<string> tokens)
+        => tokens.Contains("rule")
+           || tokens.Contains("rules")
+           || tokens.Contains("environment")
+           || tokens.Contains("visibility")
+           || tokens.Contains("permission")
+           || tokens.Contains("permissions")
+           || tokens.Contains("change")
+           || tokens.Contains("changed")
+           || tokens.Contains("why");
 
     private bool MatchesCase(
         SupportCaseProjection item,

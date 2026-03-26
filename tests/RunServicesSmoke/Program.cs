@@ -1519,7 +1519,7 @@ async Task VerifyPublicLandingProjectionAsync()
         linkedIdentityClient,
         accounts,
         supportCases,
-        new SupportAssistantService(supportCases, canon, loggerFactory.CreateLogger<SupportAssistantService>()),
+        new SupportAssistantService(supportCases, canon, campaignSpine, loggerFactory.CreateLogger<SupportAssistantService>()),
         configuration)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -1528,7 +1528,7 @@ async Task VerifyPublicLandingProjectionAsync()
         linkedIdentityClient,
         accounts,
         supportCases,
-        new SupportAssistantService(supportCases, canon, loggerFactory.CreateLogger<SupportAssistantService>()),
+        new SupportAssistantService(supportCases, canon, campaignSpine, loggerFactory.CreateLogger<SupportAssistantService>()),
         configuration)
     {
         ControllerContext = AuthenticatedControllerContext("smoke-token")
@@ -1699,13 +1699,19 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(assistantPayload is not null && string.Equals(assistantPayload.Confidence, SupportAssistantConfidenceLevels.CaseTruth, StringComparison.Ordinal), "support assistant should ground answers on the signed-in reporter case when available.");
     Assert(assistantPayload!.Citations.Any(static item => string.Equals(item.SourceKind, "support_case", StringComparison.Ordinal)), "support assistant should cite the matching support case.");
     Assert(assistantPayload.Actions.Any(static item => string.Equals(item.ActionId, "open_account_support", StringComparison.Ordinal)), "support assistant should suggest the tracked case timeline when a matching case exists.");
-    SupportAssistantService supportAssistant = new(supportCases, canon, loggerFactory.CreateLogger<SupportAssistantService>());
+    SupportAssistantService supportAssistant = new(supportCases, canon, campaignSpine, loggerFactory.CreateLogger<SupportAssistantService>());
     var canonOnlyAssistant = supportAssistant.Answer(
         reporterUserId: "usr_runner",
         reporterSubjectId: "subject.runner",
         new SupportAssistantRequest(Query: "How do I install or update the preview build?", InstallationId: null));
     Assert(canonOnlyAssistant.Citations.Any(static item => string.Equals(item.SourceKind, "canon_doc", StringComparison.Ordinal)), "support assistant should ground install/update guidance in canon documents when no matching support case exists.");
     Assert(canonOnlyAssistant.Actions.Any(static item => string.Equals(item.ActionId, "open_downloads", StringComparison.Ordinal)), "support assistant should offer the downloads surface for install/update questions.");
+    var rulesAssistant = supportAssistant.Answer(
+        reporterUserId: linkedUser.UserId,
+        reporterSubjectId: "subject.demo",
+        new SupportAssistantRequest(Query: "Why did the rule environment change for my campaign visibility posture?", InstallationId: "install-smoke-001"));
+    Assert(rulesAssistant.Citations.Any(static item => string.Equals(item.SourceKind, "rules_truth", StringComparison.Ordinal)), "support assistant should reuse rules navigator truth for grounded campaign-rule questions.");
+    Assert(rulesAssistant.Actions.Any(static item => string.Equals(item.ActionId, "open_home", StringComparison.Ordinal)), "support assistant should route grounded rules questions back to the signed-in home cockpit.");
     var releasedResult = supportAutomationController.Transition(
         supportCase.CaseId,
         new SupportCaseTransitionRequest(
@@ -1740,6 +1746,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.Workspaces.Count >= 1, "account page should surface a first-class campaign workspace.");
     Assert(accountModel.CampaignSpine.Workspaces[0].ReadinessCues.Count >= 1, "campaign workspace should surface readiness cues.");
     Assert(accountModel.CampaignSpine.Workspaces[0].RecapShelf.Count >= 1, "campaign workspace should surface recap or publication-safe continuity outputs.");
+    Assert(accountModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "account page should surface Build Lab handoffs into living dossier and campaign truth.");
+    Assert(accountModel.CampaignSpine.RulesNavigator.Count >= 1, "account page should surface first-class rules navigator answers.");
+    Assert(accountModel.CampaignSpine.MigrationReceipts.Count >= 1, "account page should surface legacy migration receipts.");
+    Assert(accountModel.CampaignSpine.CreatorPublications.Count >= 1, "account page should surface creator publication posture.");
+    Assert(accountModel.CampaignSpine.Restore.RecentRuleEnvironments.Count >= 1, "account page should surface restore-ready rule environments.");
+    Assert(accountModel.CampaignSpine.Restore.RecentArtifacts.Count >= 1, "account page should surface reconnectable artifact truth.");
+    Assert(accountModel.CampaignSpine.Restore.Entitlements.Count >= 1, "account page should surface active entitlements in the roaming restore packet.");
+    Assert(accountModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1, "account page should surface claimed devices for roaming restore.");
+    Assert(accountModel.CampaignSpine.Restore.LocalOnlyNotes.Count >= 1, "account page should keep install-local restore guardrails explicit.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.OperatorRole)), "account page should surface organizer/operator role posture.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.CampaignVisibilitySummary)), "account page should surface explicit campaign visibility posture for operator groups.");
 
@@ -1750,6 +1765,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.Dossiers.Count >= 1, "signed-in home should surface living dossier continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.Runs.Count >= 1, "signed-in home should surface runboard continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Count >= 1, "signed-in home should keep the first-class campaign workspace attached to the signed-in shell.");
+    Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
+    Assert(authenticatedHomeModel.CampaignSpine.RulesNavigator.Count >= 1, "signed-in home should surface grounded rules navigator answers.");
+    Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Count >= 1, "signed-in home should surface creator publication posture.");
+    Assert(authenticatedHomeModel.CampaignSpine.MigrationReceipts.Count >= 1, "signed-in home should surface migration receipt truth.");
     Assert(authenticatedHomeModel.InstallLinking.ClaimedInstallations?.Any(static item => string.Equals(item.Platform, "linux", StringComparison.OrdinalIgnoreCase)) == true, "signed-in home should surface claimed install posture.");
 
     var progressHtml = (await progressController.ProgressPage(CancellationToken.None)).Content ?? string.Empty;
