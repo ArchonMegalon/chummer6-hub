@@ -1580,6 +1580,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var roadmapDetailView = await controller.RoadmapDetailPage("runsite", CancellationToken.None) as ViewResult;
     var roadmapDetailModel = roadmapDetailView?.Model as FeatureDetailPageViewModel;
     Assert(roadmapDetailModel is not null && !string.IsNullOrWhiteSpace(roadmapDetailModel.ProofNote), "roadmap detail pages should expose a verification note instead of a bare placeholder shell.");
+    Assert(!string.Equals(roadmapDetailModel?.StatusEyebrow, "Current status", StringComparison.OrdinalIgnoreCase), "roadmap detail pages should project a roadmap-specific status frame.");
     Assert(roadmapDetailModel!.MicroProof.Count > 0, "roadmap detail pages should surface micro-proof markers.");
     Assert(roadmapDetailModel.SecondaryAction is not null, "roadmap detail pages should keep a single deeper brief action.");
     var roadmapSecondaryAction = roadmapDetailModel.SecondaryAction!;
@@ -1590,6 +1591,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var artifactDetailView = await controller.ArtifactDetailPage("current-preview-build", CancellationToken.None) as ViewResult;
     var artifactDetailModel = artifactDetailView?.Model as FeatureDetailPageViewModel;
     Assert(artifactDetailModel is not null && !string.IsNullOrWhiteSpace(artifactDetailModel.Payoff), "artifact detail pages should carry explicit product payoff.");
+    Assert(!string.Equals(artifactDetailModel?.StatusEyebrow, "Current status", StringComparison.OrdinalIgnoreCase), "artifact detail pages should project an availability-specific status frame.");
     Assert(!string.Equals(artifactDetailModel?.PrimaryAction.Label, "Read the linked detail", StringComparison.OrdinalIgnoreCase), "artifact detail pages should not fall back to a generic linked-detail label.");
 
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;

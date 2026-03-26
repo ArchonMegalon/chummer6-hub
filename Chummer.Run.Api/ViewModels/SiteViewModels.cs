@@ -265,6 +265,8 @@ public sealed record FeatureDetailPageViewModel(
     string Eyebrow,
     string Heading,
     string Intro,
+    string StatusEyebrow,
+    string StatusHeading,
     string StatusLabel,
     PublicLandingAssetDto? Asset,
     ResolvedPublicActionViewModel PrimaryAction,
