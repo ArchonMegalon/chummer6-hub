@@ -238,7 +238,7 @@
                             @foreach (var run in runs)
                             {
                                 <article class="app-rail__item">
-                                    <span class="tag">Runboard</span>
+                                    <span class="tag">Live run</span>
                                     <div class="app-rail__copy">
                                         <h3>@run.Title</h3>
                                         <p>@run.Objectives.Count objectives · @(run.ActiveSceneId is null ? "No active scene" : "Scene live") · @(run.LatestContinuity?.Summary ?? run.Summary)</p>

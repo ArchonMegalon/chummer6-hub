@@ -3,6 +3,24 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-feature-detail";
+
+    static string NormalizeDetailRoute(string href)
+    {
+        var trimmed = (href ?? string.Empty).Trim();
+        var hash = trimmed.IndexOf('#');
+        if (hash >= 0)
+        {
+            trimmed = trimmed[..hash];
+        }
+
+        var query = trimmed.IndexOf('?');
+        if (query >= 0)
+        {
+            trimmed = trimmed[..query];
+        }
+
+        return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
+    }
 }
 
 <section class="story-cinematic">
@@ -12,7 +30,11 @@
         <p class="page-copy">@Model.Intro</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
-            @if (Model.SecondaryAction is not null)
+            @if (Model.SecondaryAction is not null
+                && !string.Equals(
+                    NormalizeDetailRoute(Model.SecondaryAction.Href),
+                    NormalizeDetailRoute(Model.PrimaryAction.Href),
+                    StringComparison.OrdinalIgnoreCase))
             {
                 <a class="button-like button-like--ghost" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
             }
@@ -44,7 +66,7 @@
 
 <section class="role-matrix">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Use it intelligently</p>
+        <p class="eyebrow">What to know</p>
         <h2 class="editorial-title">Why it matters, what it unlocks, and how to verify it</h2>
         <p class="editorial-copy">Start with the current product path, then use the deeper brief only when the first-party proof is not enough.</p>
     </div>

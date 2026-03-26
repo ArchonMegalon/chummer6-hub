@@ -88,7 +88,7 @@
             <strong>@(campaignCount == 0 ? "Ready to start" : campaignCount.ToString())</strong>
         </article>
         <article class="account-overview__card">
-            <span class="tag">Runboards</span>
+            <span class="tag">Live runs</span>
             <strong>@(runCount == 0 ? "Quiet" : runCount.ToString())</strong>
         </article>
         <article class="account-overview__card">
@@ -400,8 +400,8 @@
             {
             <section id="campaigns" class="settings-section">
                 <div class="settings-section__header">
-                    <h2>Campaign workspace</h2>
-                    <p>Living dossiers, crew context, rule-environment posture, GM runboard state, recap shelf, and restore signals stay tied together here instead of falling back to one-off build files.</p>
+                    <h2>Campaigns &amp; dossiers</h2>
+                    <p>Living dossiers, crew context, rules checks, live run state, recap material, and restore signals stay tied together here instead of falling back to one-off build files.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -413,7 +413,7 @@
                         <strong>@(workspaceCount == 0 ? "Ready to seed" : workspaceCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Active runboards</span>
+                        <span>Active runs</span>
                         <strong>@(runCount == 0 ? "Quiet" : runCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -431,14 +431,14 @@
                 </div>
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
                 {
-                    <p class="muted-copy">No campaign workspace yet. The first claimed install or campaign handoff will seed the long-lived runner identity and the first shared runboard.</p>
+                    <p class="muted-copy">No campaign workspace yet. The first claimed install or campaign handoff will seed the long-lived runner identity and the first shared live run view.</p>
                 }
                 else
                 {
                     @foreach (var workspace in Model.CampaignSpine.Workspaces)
                     {
                         <details class="details-drawer" open>
-                            <summary>@workspace.CampaignName · GM runboard</summary>
+                            <summary>@workspace.CampaignName · live run view</summary>
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
                                     <span>Visibility</span>
@@ -453,7 +453,7 @@
                                     <strong>@(workspace.LatestContinuity?.Summary ?? workspace.ReturnSummary)</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Runboard</span>
+                                    <span>Live run state</span>
                                     <strong>@(workspace.Runs.Count == 0 ? "No active run" : $"{workspace.Runs.Count} tracked")</strong>
                                 </div>
                                 <div class="settings-summary-row">
