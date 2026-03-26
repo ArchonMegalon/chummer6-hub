@@ -19,6 +19,10 @@
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
     var workspaceReadinessCount = workspaces.SelectMany(item => item.ReadinessCues).Count();
     var ruleEnvironmentCount = workspaces.Select(item => item.RuleEnvironment.CompatibilityFingerprint).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+    var buildLabHandoffs = Model.CampaignSpine.BuildLabHandoffs.Take(2).ToArray();
+    var rulesNavigatorEntries = Model.CampaignSpine.RulesNavigator.Take(2).ToArray();
+    var creatorPublications = Model.CampaignSpine.CreatorPublications.Take(2).ToArray();
+    var migrationReceipts = Model.CampaignSpine.MigrationReceipts.Take(2).ToArray();
     var releasedOrNotifiedCases = Model.SupportCases
         .Where(item =>
             string.Equals(item.Status, "released_to_reporter_channel", StringComparison.OrdinalIgnoreCase)
@@ -299,6 +303,52 @@
         @if (!showOnboarding)
         {
             <section class="app-side-card">
+                <p class="eyebrow">Build Lab handoff</p>
+                <h2>Carry the chosen build into dossier and campaign truth</h2>
+                <p>Build Lab is only useful if the chosen lane survives the handoff into living dossier and campaign return.</p>
+                @if (buildLabHandoffs.Length == 0)
+                {
+                    <p class="muted-copy">No active Build Lab handoff yet. The next grounded build comparison will land here once it is attached to a living dossier.</p>
+                }
+                else
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var handoff in buildLabHandoffs)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@handoff.Title</span>
+                                <strong>@handoff.VariantLabel · @handoff.ProgressionLabel</strong>
+                            </div>
+                        }
+                    </div>
+                }
+                <a class="button-like button-like--secondary" href="/account#campaigns">Open Build Lab hand-off</a>
+            </section>
+
+            <section class="app-side-card">
+                <p class="eyebrow">Rules Navigator</p>
+                <h2>Explain the active rules posture without archaeology</h2>
+                <p>Rule lookup, provenance, and before/after explain now stay attached to the same campaign workspace and support truth.</p>
+                @if (rulesNavigatorEntries.Length == 0)
+                {
+                    <p class="muted-copy">No rules navigator entries yet. The first approved workspace or governed operator surface will seed them here.</p>
+                }
+                else
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var answer in rulesNavigatorEntries)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@answer.Question</span>
+                                <strong>@answer.ProvenanceLabel</strong>
+                            </div>
+                        }
+                    </div>
+                }
+                <a class="button-like button-like--ghost" href="/account#campaigns">Open Rules Navigator</a>
+            </section>
+
+            <section class="app-side-card">
                 <p class="eyebrow">Device roles</p>
                 <h2>Know what each claimed install is for</h2>
                 <p>One signed-in shell should still make it obvious which copy is your workstation, preview scout, or travel-safe lane.</p>
@@ -369,6 +419,37 @@
                     </div>
                 }
                 <a class="button-like button-like--secondary" href="/account#campaigns">Open campaign return</a>
+            </section>
+        }
+        @if (!showOnboarding)
+        {
+            <section class="app-side-card">
+                <p class="eyebrow">Migration + creator</p>
+                <h2>Keep import and publication trust visible</h2>
+                <p>Legacy migration receipts and creator publication posture belong in the same signed-in trust surface.</p>
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Legacy migration receipts</span>
+                        <strong>@(migrationReceipts.Length == 0 ? "Pending" : migrationReceipts.Length.ToString())</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Creator publication shelf</span>
+                        <strong>@(creatorPublications.Length == 0 ? "Pending" : creatorPublications.Length.ToString())</strong>
+                    </div>
+                </div>
+                @if (creatorPublications.Length > 0)
+                {
+                    <div class="settings-summary-list">
+                        @foreach (var publication in creatorPublications)
+                        {
+                            <div class="settings-summary-row">
+                                <span>@publication.Title</span>
+                                <strong>@publication.PublicationStatus · @publication.Visibility</strong>
+                            </div>
+                        }
+                    </div>
+                }
+                <a class="button-like button-like--ghost" href="/account#campaigns">Open trust details</a>
             </section>
         }
         @if (!showOnboarding && (claimedInstallations > 0 || activeAccessRights > 0))

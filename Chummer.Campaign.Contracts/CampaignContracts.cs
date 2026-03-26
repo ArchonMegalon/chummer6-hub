@@ -133,8 +133,12 @@ public sealed record WorkspaceRestoreProjection(
     string UserId,
     IReadOnlyList<RunnerDossierProjection> RecentDossiers,
     IReadOnlyList<CampaignProjection> RecentCampaigns,
-    IReadOnlyList<string> RecentArtifactIds,
+    IReadOnlyList<RuleEnvironmentRef> RecentRuleEnvironments,
+    IReadOnlyList<RestoreArtifactProjection> RecentArtifacts,
+    IReadOnlyList<RestoreEntitlementProjection> Entitlements,
+    IReadOnlyList<ClaimedDeviceRestoreProjection> ClaimedDevices,
     IReadOnlyList<string> ConflictSummaries,
+    IReadOnlyList<string> LocalOnlyNotes,
     DateTimeOffset GeneratedAtUtc);
 
 public sealed record CommunityOperatorProjection(
@@ -171,6 +175,85 @@ public sealed record CampaignWorkspaceProjection(
     ContinuitySnapshotRef? LatestContinuity,
     string ReturnSummary);
 
+public sealed record RestoreArtifactProjection(
+    string ArtifactId,
+    string Label,
+    string Kind,
+    string Summary,
+    string? Channel = null,
+    string? Version = null);
+
+public sealed record RestoreEntitlementProjection(
+    string EntitlementId,
+    string Label,
+    string Scope,
+    string Status,
+    string Summary);
+
+public sealed record ClaimedDeviceRestoreProjection(
+    string InstallationId,
+    string DeviceRole,
+    string Platform,
+    string HeadId,
+    string Channel,
+    string? HostLabel,
+    string RestoreSummary);
+
+public sealed record BuildLabHandoffProjection(
+    string HandoffId,
+    string DossierId,
+    string? CampaignId,
+    string Title,
+    string Summary,
+    string VariantLabel,
+    string ProgressionLabel,
+    string ExplainEntryId,
+    IReadOnlyList<string> TradeoffLines,
+    IReadOnlyList<string> ProgressionOutcomes,
+    IReadOnlyList<PublicationSafeProjection> Outputs,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record RulesNavigatorAnswerProjection(
+    string EntryId,
+    string Question,
+    string ShortAnswer,
+    string BeforeSummary,
+    string AfterSummary,
+    string ExplainEntryId,
+    string ProvenanceLabel,
+    IReadOnlyList<string> EvidenceLines,
+    IReadOnlyList<string> SupportReuseHints);
+
+public sealed record LegacyMigrationFieldProjection(
+    string FieldId,
+    string Label,
+    string Status,
+    string Summary);
+
+public sealed record LegacyMigrationReceiptProjection(
+    string ReceiptId,
+    string SourceKind,
+    string SourceId,
+    string TargetDossierId,
+    string? TargetCampaignId,
+    string Summary,
+    IReadOnlyList<LegacyMigrationFieldProjection> Fields,
+    DateTimeOffset ImportedAtUtc);
+
+public sealed record CreatorPublicationProjection(
+    string PublicationId,
+    string Title,
+    string Kind,
+    string Summary,
+    string CampaignId,
+    string? DossierId,
+    string ArtifactId,
+    string ProvenanceSummary,
+    string DiscoverySummary,
+    string Visibility,
+    string PublicationStatus,
+    DateTimeOffset UpdatedAtUtc);
+
 public sealed record AccountCampaignSummary(
     IReadOnlyList<RunnerDossierProjection> Dossiers,
     IReadOnlyList<CampaignProjection> Campaigns,
@@ -178,4 +261,8 @@ public sealed record AccountCampaignSummary(
     IReadOnlyList<CrewProjection> Crews,
     IReadOnlyList<CampaignWorkspaceProjection> Workspaces,
     IReadOnlyList<CommunityOperatorProjection> CommunityOperations,
+    IReadOnlyList<BuildLabHandoffProjection> BuildLabHandoffs,
+    IReadOnlyList<RulesNavigatorAnswerProjection> RulesNavigator,
+    IReadOnlyList<LegacyMigrationReceiptProjection> MigrationReceipts,
+    IReadOnlyList<CreatorPublicationProjection> CreatorPublications,
     WorkspaceRestoreProjection Restore);

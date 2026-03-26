@@ -74,8 +74,23 @@ public sealed class CampaignSpineService
                         ActiveSponsorSessionCount: _store.SponsorSessionsById.Values.Count(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "stopped", StringComparison.OrdinalIgnoreCase)));
                 })
                 .ToArray();
+            var buildLabHandoffs = BuildBuildLabHandoffs(dossiers, workspaces);
+            var rulesNavigator = BuildRulesNavigatorEntries(workspaces, operations);
+            var migrationReceipts = BuildMigrationReceipts(dossiers, campaigns);
+            var creatorPublications = BuildCreatorPublications(workspaces, dossiers);
 
-            return new AccountCampaignSummary(dossiers, campaigns, runs, crews, workspaces, operations, restore);
+            return new AccountCampaignSummary(
+                dossiers,
+                campaigns,
+                runs,
+                crews,
+                workspaces,
+                operations,
+                buildLabHandoffs,
+                rulesNavigator,
+                migrationReceipts,
+                creatorPublications,
+                restore);
         }
     }
 
@@ -367,23 +382,78 @@ public sealed class CampaignSpineService
     {
         var conflictSummaries = new List<string>();
         var claimedInstallations = installLinking?.ClaimedInstallations ?? Array.Empty<ClaimedInstallationDto>();
+        var activeGrants = installLinking?.ActiveGrants ?? Array.Empty<InstallationGrantDto>();
         if (claimedInstallations.Select(item => item.Channel).Where(static item => !string.IsNullOrWhiteSpace(item)).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
         {
             conflictSummaries.Add("Claimed installs are on different channels; restore should confirm which campaign posture is current.");
         }
+
+        var ruleEnvironments = dossiers
+            .Select(static dossier => dossier.RuleEnvironment)
+            .Concat(campaigns.Select(static campaign => campaign.RuleEnvironment))
+            .Distinct()
+            .Take(6)
+            .ToArray();
+        if (ruleEnvironments.Select(static environment => environment.CompatibilityFingerprint).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
+        {
+            conflictSummaries.Add("Recent dossiers and campaigns carry different rule-environment fingerprints; restore should confirm the intended rules posture before applying sync.");
+        }
+
+        var recentArtifacts = (installLinking?.RecentReceipts ?? Array.Empty<DownloadReceiptDto>())
+            .Where(static item => !string.IsNullOrWhiteSpace(item.ArtifactId))
+            .Select(static item => new RestoreArtifactProjection(
+                ArtifactId: item.ArtifactId,
+                Label: item.ArtifactLabel,
+                Kind: item.Kind,
+                Summary: $"{item.Channel} {item.Version} for {item.Platform}/{item.Arch} remains reconnectable from the signed-in restore packet.",
+                Channel: item.Channel,
+                Version: item.Version))
+            .Distinct()
+            .Take(5)
+            .ToArray();
+
+        var entitlements = activeGrants
+            .Select(grant =>
+            {
+                var installation = claimedInstallations.FirstOrDefault(item => string.Equals(item.InstallationId, grant.InstallationId, StringComparison.OrdinalIgnoreCase));
+                var label = installation?.HostLabel ?? installation?.Platform ?? grant.InstallationId;
+                var scope = installation?.HeadId ?? "desktop";
+                return new RestoreEntitlementProjection(
+                    EntitlementId: grant.GrantId,
+                    Label: label,
+                    Scope: scope,
+                    Status: grant.Status,
+                    Summary: $"Restore can re-establish {scope} access for {label} until {grant.ExpiresAtUtc:yyyy-MM-dd}.");
+            })
+            .ToArray();
+
+        var claimedDevices = claimedInstallations
+            .Select(static installation => new ClaimedDeviceRestoreProjection(
+                InstallationId: installation.InstallationId,
+                DeviceRole: ResolveDeviceRole(installation),
+                Platform: installation.Platform ?? "unknown",
+                HeadId: installation.HeadId ?? "desktop",
+                Channel: installation.Channel,
+                HostLabel: installation.HostLabel,
+                RestoreSummary: $"{installation.Platform ?? "unknown"} · {installation.HeadId ?? "desktop"} · {installation.Version}"))
+            .Take(4)
+            .ToArray();
 
         return new WorkspaceRestoreProjection(
             RestoreId: StableId("restore", user.UserId),
             UserId: user.UserId,
             RecentDossiers: dossiers.Take(3).ToArray(),
             RecentCampaigns: campaigns.Take(3).ToArray(),
-            RecentArtifactIds: (installLinking?.RecentReceipts ?? Array.Empty<DownloadReceiptDto>())
-                .Select(static item => item.ArtifactId)
-                .Where(static item => !string.IsNullOrWhiteSpace(item))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Take(5)
-                .ToArray(),
+            RecentRuleEnvironments: ruleEnvironments,
+            RecentArtifacts: recentArtifacts,
+            Entitlements: entitlements,
+            ClaimedDevices: claimedDevices,
             ConflictSummaries: conflictSummaries,
+            LocalOnlyNotes:
+            [
+                "Secrets, grant tokens, and runtime caches stay install-local and are never mirrored into the roaming restore packet.",
+                "Second-device restore replays dossiers, campaigns, rule environments, artifacts, and entitlements, but it still asks the target device to mint its own local cache and observer continuity token."
+            ],
             GeneratedAtUtc: DateTimeOffset.UtcNow);
     }
 
@@ -529,6 +599,190 @@ public sealed class CampaignSpineService
             "gm" => 1,
             _ => 0
         };
+
+    private static IReadOnlyList<BuildLabHandoffProjection> BuildBuildLabHandoffs(
+        IReadOnlyList<RunnerDossierProjection> dossiers,
+        IReadOnlyList<CampaignWorkspaceProjection> workspaces)
+    {
+        return dossiers
+            .Select(dossier =>
+            {
+                var workspace = workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, dossier.CampaignId, StringComparison.OrdinalIgnoreCase));
+                var outputs = dossier.Projections
+                    .Concat(workspace?.RecapShelf ?? Array.Empty<PublicationSafeProjection>())
+                    .Distinct()
+                    .Take(3)
+                    .ToArray();
+                var variantLabel = workspace is null ? "Living dossier carry-forward" : "Ops-first dossier carry-forward";
+                var progressionLabel = workspace is null ? "Ready to seed into a campaign" : "25 / 50 / 100 Karma path stays attached to the campaign return";
+                return new BuildLabHandoffProjection(
+                    HandoffId: StableId("buildlab", dossier.DossierId),
+                    DossierId: dossier.DossierId,
+                    CampaignId: dossier.CampaignId,
+                    Title: $"{dossier.DisplayName} Build Lab handoff",
+                    Summary: "The chosen build lane now lands in living dossier and campaign return truth instead of a disposable comparison card.",
+                    VariantLabel: variantLabel,
+                    ProgressionLabel: progressionLabel,
+                    ExplainEntryId: $"buildlab.handoff.{dossier.DossierId}",
+                    TradeoffLines:
+                    [
+                        "Role overlap stays explicit before the handoff leaves Build Lab.",
+                        workspace is null
+                            ? "No campaign workspace is attached yet, so the handoff seeds the dossier first."
+                            : $"Campaign workspace {workspace.CampaignName} keeps the downstream continuity target visible."
+                    ],
+                    ProgressionOutcomes:
+                    [
+                        "Chosen variant keeps the next safe upgrade checkpoints attached to the dossier.",
+                        outputs.Length > 0
+                            ? "Export targets already point at dossier and campaign-safe outputs."
+                            : "Publication-safe outputs will appear as recap and dossier cards once the first run lands."
+                    ],
+                    Outputs: outputs,
+                    UpdatedAtUtc: dossier.UpdatedAtUtc);
+            })
+            .Take(3)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<RulesNavigatorAnswerProjection> BuildRulesNavigatorEntries(
+        IReadOnlyList<CampaignWorkspaceProjection> workspaces,
+        IReadOnlyList<CommunityOperatorProjection> operations)
+    {
+        var workspace = workspaces.FirstOrDefault();
+        var operation = operations.FirstOrDefault();
+        var entries = new List<RulesNavigatorAnswerProjection>();
+
+        if (workspace is not null)
+        {
+            entries.Add(new RulesNavigatorAnswerProjection(
+                EntryId: StableId("rules", workspace.WorkspaceId),
+                Question: "Why is this campaign return pinned to the current rule environment?",
+                ShortAnswer: "Because campaign continuity and support closure both follow the same approved compatibility fingerprint.",
+                BeforeSummary: "Before approval, restore posture is review-heavy and support has to caveat the answer path.",
+                AfterSummary: $"After approval, {workspace.RuleEnvironment.CompatibilityFingerprint} becomes the grounded answer path for build, play, and support.",
+                ExplainEntryId: $"rules.navigator.{workspace.WorkspaceId}",
+                ProvenanceLabel: $"{workspace.RuleEnvironment.OwnerScope} scope · {workspace.RuleEnvironment.CompatibilityFingerprint}",
+                EvidenceLines:
+                [
+                    $"{workspace.RuleEnvironment.CompatibilityFingerprint} is the active compatibility fingerprint.",
+                    $"{workspace.ReadinessCues.Count} campaign readiness cue(s) were computed from the same campaign workspace.",
+                    workspace.ReturnSummary
+                ],
+                SupportReuseHints:
+                [
+                    "Support can reuse this answer when a case asks which rules posture is live on the current channel.",
+                    "Operator review can link the same evidence when deciding whether to freeze or reroute a campaign change."
+                ]));
+        }
+
+        if (operation is not null)
+        {
+            entries.Add(new RulesNavigatorAnswerProjection(
+                EntryId: StableId("rules", operation.GroupId),
+                Question: "How does group visibility change the campaign operator posture?",
+                ShortAnswer: "Operator permissions stay subordinate to campaign visibility and the approved rule environment.",
+                BeforeSummary: "Before visibility is explicit, group operations tend to rely on memory and side channels.",
+                AfterSummary: $"After visibility is explicit, {operation.CampaignVisibilitySummary} becomes part of the grounded decision surface.",
+                ExplainEntryId: $"rules.navigator.group.{operation.GroupId}",
+                ProvenanceLabel: $"{operation.GroupType} group · {operation.OperatorRole}",
+                EvidenceLines:
+                [
+                    $"{operation.MemberCount} member(s) share this governed group.",
+                    $"{operation.ActiveCampaignCount} active campaign(s) inherit the same operator posture.",
+                    $"{operation.RuleEnvironment.CompatibilityFingerprint} is the group rule-environment fingerprint."
+                ],
+                SupportReuseHints:
+                [
+                    "Support can reuse this answer for permissions or campaign-visibility questions.",
+                    "Hub can cite the same operator posture in account and organizer surfaces."
+                ]));
+        }
+
+        return entries;
+    }
+
+    private static IReadOnlyList<LegacyMigrationReceiptProjection> BuildMigrationReceipts(
+        IReadOnlyList<RunnerDossierProjection> dossiers,
+        IReadOnlyList<CampaignProjection> campaigns)
+    {
+        var campaignById = campaigns.ToDictionary(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase);
+        return dossiers
+            .Select(dossier =>
+            {
+                campaignById.TryGetValue(dossier.CampaignId ?? string.Empty, out var campaign);
+                return new LegacyMigrationReceiptProjection(
+                    ReceiptId: StableId("migration", dossier.DossierId),
+                    SourceKind: "legacy_character_file",
+                    SourceId: $"legacy::{dossier.RunnerHandle}",
+                    TargetDossierId: dossier.DossierId,
+                    TargetCampaignId: dossier.CampaignId,
+                    Summary: "Legacy imports now land in the living dossier and campaign spine, with risky and blocked fields called out instead of silently discarded.",
+                    Fields:
+                    [
+                        new LegacyMigrationFieldProjection("identity", "Identity and handle", "safe", "Runner identity mapped cleanly into the living dossier."),
+                        new LegacyMigrationFieldProjection("campaign-link", "Campaign continuity link", campaign is null ? "risky" : "safe", campaign is null ? "No active campaign was linked yet, so the dossier is ready but still waiting for a campaign workspace." : $"Linked to {campaign.Name} without breaking the continuity spine."),
+                        new LegacyMigrationFieldProjection("legacy-notes", "Legacy notes blob", "blocked", "Opaque legacy notes require manual review before they can become provenance-backed dossier facts.")
+                    ],
+                    ImportedAtUtc: dossier.UpdatedAtUtc);
+            })
+            .Take(3)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<CreatorPublicationProjection> BuildCreatorPublications(
+        IReadOnlyList<CampaignWorkspaceProjection> workspaces,
+        IReadOnlyList<RunnerDossierProjection> dossiers)
+    {
+        return workspaces
+            .Select(workspace =>
+            {
+                var dossier = dossiers.FirstOrDefault(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase));
+                var artifact = workspace.RecapShelf.FirstOrDefault()?.ArtifactId ?? StableId("artifact", workspace.WorkspaceId);
+                return new CreatorPublicationProjection(
+                    PublicationId: StableId("publication", workspace.WorkspaceId),
+                    Title: $"{workspace.CampaignName} creator packet",
+                    Kind: "campaign_packet",
+                    Summary: "Campaign recap, dossier-safe briefings, and creator-ready outputs now share one governed publication posture.",
+                    CampaignId: workspace.CampaignId,
+                    DossierId: dossier?.DossierId,
+                    ArtifactId: artifact,
+                    ProvenanceSummary: $"{workspace.RuleEnvironment.CompatibilityFingerprint} + recap-safe output shelf",
+                    DiscoverySummary: $"{workspace.Visibility} visibility with grounded provenance and one truthful next action.",
+                    Visibility: workspace.Visibility,
+                    PublicationStatus: "preview_ready",
+                    UpdatedAtUtc: workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow);
+            })
+            .Take(3)
+            .ToArray();
+    }
+
+    private static string ResolveDeviceRole(ClaimedInstallationDto installation)
+    {
+        if (string.Equals(installation.Platform, "android", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(installation.Platform, "ios", StringComparison.OrdinalIgnoreCase))
+        {
+            return "play_tablet";
+        }
+
+        if ((installation.HeadId?.Contains("observer", StringComparison.OrdinalIgnoreCase) ?? false)
+            || (installation.HostLabel?.Contains("observer", StringComparison.OrdinalIgnoreCase) ?? false))
+        {
+            return "observer_screen";
+        }
+
+        if (string.Equals(installation.Channel, "preview", StringComparison.OrdinalIgnoreCase))
+        {
+            return "preview_scout";
+        }
+
+        if (string.Equals(installation.HeadId, "offline", StringComparison.OrdinalIgnoreCase))
+        {
+            return "travel_cache";
+        }
+
+        return "workstation";
+    }
 
     private static string StableId(string prefix, string seed)
     {
