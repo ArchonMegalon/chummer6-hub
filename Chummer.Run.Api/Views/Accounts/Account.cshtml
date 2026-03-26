@@ -485,6 +485,9 @@
                 </details>
             </section>
 
+            <details class="details-drawer">
+                <summary>More settings, workspaces, and policy</summary>
+
             @if (showCampaignSection)
             {
             <details class="details-drawer">
@@ -871,6 +874,7 @@
                     </div>
                 </section>
             </details>
+            </details>
         </div>
     </div>
 
@@ -915,9 +919,12 @@
     if (!hash) return;
     const target = document.querySelector(hash);
     if (!target) return;
-    const drawer = target.closest("details");
-    if (drawer) {
-      drawer.open = true;
+    let node = target.parentElement;
+    while (node) {
+      if (node.tagName === "DETAILS") {
+        node.open = true;
+      }
+      node = node.parentElement;
     }
   };
 

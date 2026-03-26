@@ -160,7 +160,6 @@
         </div>
     }
     <div class="stacked-actions">
-        <a class="cta-link cta-link--secondary" href="/downloads">Open downloads</a>
         <a class="cta-link cta-link--primary" href="@(Model.Chrome.Authenticated ? "/home" : "/signup?next=/home")">
             @(Model.Chrome.Authenticated ? "Open home" : "Create account")
         </a>
@@ -169,5 +168,5 @@
             <a class="cta-link cta-link--secondary" href="/login?next=/home">Already have an account? Sign in</a>
         }
     </div>
-    <p class="muted-copy">Need the broader fit instead? <a class="inline-link" href="/what-is-chummer">Read the product story</a>.</p>
+    <p class="muted-copy">Still deciding? <a class="inline-link" href="/downloads">Open downloads</a> or <a class="inline-link" href="/what-is-chummer">read the product story</a>.</p>
 </section>

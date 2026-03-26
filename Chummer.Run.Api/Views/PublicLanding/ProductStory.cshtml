@@ -4,9 +4,6 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-story";
     var leadAsset = Model.Assets.BySlot("scene_archive_stair");
-    var installLane = Model.Lanes.FirstOrDefault(card => string.Equals(card.Card.Title, "Player", StringComparison.OrdinalIgnoreCase));
-    var continuityLane = Model.Lanes.FirstOrDefault(card => string.Equals(card.Card.Title, "GM", StringComparison.OrdinalIgnoreCase));
-    var creatorLane = Model.Lanes.FirstOrDefault(card => string.Equals(card.Card.Title, "Creator", StringComparison.OrdinalIgnoreCase));
 }
 
 <section class="story-cinematic">
@@ -53,50 +50,15 @@
     </div>
 </section>
 
-<section id="public-guide" class="role-matrix">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Who it is for</p>
-        <h2 class="editorial-title">Start from the lane that matches your job</h2>
-        <p class="editorial-copy">These lanes share one proof shelf and one support path, but each starts from a different table job.</p>
-    </div>
-    <div class="role-matrix__grid">
-        @if (installLane is not null)
-        {
-            <article class="role-matrix__cell">
-                <span class="tag">@installLane.Card.Badge</span>
-                <h3>@installLane.Card.Title</h3>
-                <p>@installLane.Card.Summary</p>
-                <a class="inline-link" href="@installLane.Action.Href">@installLane.Action.Label</a>
-            </article>
-        }
-        @if (continuityLane is not null)
-        {
-            <article class="role-matrix__cell">
-                <span class="tag">@continuityLane.Card.Badge</span>
-                <h3>@continuityLane.Card.Title</h3>
-                <p>@continuityLane.Card.Summary</p>
-                <a class="inline-link" href="@continuityLane.Action.Href">@continuityLane.Action.Label</a>
-            </article>
-        }
-        @if (creatorLane is not null)
-        {
-            <article class="role-matrix__cell">
-                <span class="tag">@creatorLane.Card.Badge</span>
-                <h3>@creatorLane.Card.Title</h3>
-                <p>@creatorLane.Card.Summary</p>
-                <a class="inline-link" href="@creatorLane.Action.Href">@creatorLane.Action.Label</a>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="story-guide-tail">
+<section id="public-guide" class="story-guide-tail">
     <p class="eyebrow">Keep going</p>
-    <h2 class="editorial-title">Take the next useful step</h2>
-    <p class="editorial-copy">Start from proof when you are evaluating, move to downloads when you are ready to install, and use help only when the product path stops being enough.</p>
+    <h2 class="editorial-title">Go deeper only where you still need proof</h2>
+    <p class="editorial-copy">Use the proof shelf when you are evaluating behavior, move to downloads when you are ready to install, and use help only when the product path stops being enough.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="/now">See what works today</a>
-        <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
     </div>
-    <p class="muted-copy">Need help instead? <a class="inline-link" href="/help">Open the help hub</a>.</p>
+    <p class="muted-copy">
+        Ready to install? <a class="inline-link" href="/downloads">Open downloads</a>.
+        Need help instead? <a class="inline-link" href="/help">Open the help hub</a>.
+    </p>
 </section>

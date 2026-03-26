@@ -5,9 +5,13 @@
     ViewData["SurfaceClass"] = "surface-landing";
     var hero = Model.Assets.BySlot("section_hero");
     var heroProofAsset = Model.Assets.BySlot("product_proof_ui") ?? Model.Assets.BySlot("capability_check_rules");
-    var proofSectionAsset = Model.Assets.BySlot("scene_simulation_bench") ?? Model.Assets.BySlot("capability_check_rules") ?? heroProofAsset;
+    var proofSectionAsset = Model.Assets.BySlot("scene_dossier_desk")
+        ?? Model.Assets.BySlot("scene_simulation_bench")
+        ?? Model.Assets.BySlot("capability_check_rules")
+        ?? heroProofAsset;
     var proofNotes = Model.Workflows.Take(3).ToArray();
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
+    var proofSectionTrail = Model.Surface.ProductProofTrail.Skip(1).Take(3).ToArray();
     var availableHighlight = Model.AvailableToday.FirstOrDefault();
     var previewHighlight = Model.PreviewItems.FirstOrDefault();
     var comingNextHighlight = Model.ComingNext.FirstOrDefault();
@@ -78,6 +82,15 @@
         <p class="eyebrow">@Model.Surface.ProductProofEyebrow</p>
         <h2 class="editorial-title">@productProofSection.Title</h2>
         <p class="editorial-copy">@productProofSection.Intro</p>
+        @if (proofSectionTrail.Length > 0)
+        {
+            <div class="trust-claim__microproof">
+                @foreach (var step in proofSectionTrail)
+                {
+                    <span>@step</span>
+                }
+            </div>
+        }
         <div class="role-matrix__grid">
             @foreach (var workflow in proofNotes)
             {
@@ -106,7 +119,7 @@
     <div class="works-matrix__lead">
         <p class="eyebrow">@worksNowSection.Eyebrow</p>
         <h2 class="editorial-title">@worksNowSection.Title</h2>
-        <p class="editorial-copy">Use one short strip to answer what is live, what is still preview-only, and what is named on the roadmap before you go deeper.</p>
+        <p class="editorial-copy">Use one short strip to answer what is live, what is still preview-only, and what is named on the roadmap before you leave the front door.</p>
     </div>
     <div class="works-matrix__columns">
         <article class="works-column">

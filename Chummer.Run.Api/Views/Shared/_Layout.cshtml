@@ -15,6 +15,12 @@
     var compactFooter = routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "artifacts" or "downloads" or "participate" or "help" or "faq" or "privacy" or "terms" or "contact"
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
         || routeKey.StartsWith("roadmap-", StringComparison.Ordinal);
+    var compactProductLinks = productLinks
+        .Where(link => link.Href is "/what-is-chummer" or "/now" or "/downloads" or "/artifacts")
+        .ToArray();
+    var footerProductLinks = compactFooter && compactProductLinks.Length > 0
+        ? compactProductLinks
+        : productLinks;
 }
 <!doctype html>
 <html lang="en" data-theme="hub-front-door">
@@ -117,7 +123,7 @@
                     <div class="site-footer__link-group">
                         <p class="site-footer__heading">Product</p>
                         <div class="site-footer__links">
-                            @foreach (var link in productLinks)
+                            @foreach (var link in footerProductLinks)
                             {
                                 <a href="@link.Href">@link.Label</a>
                             }
@@ -175,18 +181,21 @@
                         }
                     }
                 </nav>
-                <div class="site-footer__meta">
-                    @if (chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel))
-                    {
-                        <p>Signed in as @chrome.SignedInLabel</p>
-                    }
-                    else
-                    {
-                        <p>Preview product. Honest status.</p>
-                    }
-                    <p><a class="quiet-link" href="/help">Need help?</a></p>
-                    <p><a class="quiet-link" href="/contact">Contact Chummer</a></p>
-                </div>
+                @if (!compactFooter)
+                {
+                    <div class="site-footer__meta">
+                        @if (chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel))
+                        {
+                            <p>Signed in as @chrome.SignedInLabel</p>
+                        }
+                        else
+                        {
+                            <p>Preview product. Honest status.</p>
+                        }
+                        <p><a class="quiet-link" href="/help">Need help?</a></p>
+                        <p><a class="quiet-link" href="/contact">Contact Chummer</a></p>
+                    </div>
+                }
             </div>
         </footer>
 

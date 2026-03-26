@@ -98,196 +98,195 @@
         {
             <section class="release-shelf release-shelf--manual">
                 <details class="release-accordion">
-                    <summary>Overview details and current release</summary>
+                    <summary>Overview, access, and follow-up</summary>
                     <div class="release-accordion__body">
-                        <div class="home-stream">
-                            <div class="home-stream__column">
-                                <div class="home-stream__lead">
-                                    <p class="eyebrow">Overview</p>
-                                    <h2 class="home-stream__title">What changed for you</h2>
-                                    <p class="home-stream__summary">Support closure, install return, and release follow-up stay grouped so the signed-in cockpit explains why something moved.</p>
+                        <details class="details-drawer">
+                            <summary>Overview and access</summary>
+                            <div class="home-stream">
+                                <div class="home-stream__column">
+                                    <div class="home-stream__lead">
+                                        <p class="eyebrow">Overview</p>
+                                        <h2 class="home-stream__title">What changed for you</h2>
+                                        <p class="home-stream__summary">Support closure, install return, and release follow-up stay grouped so the signed-in cockpit explains why something moved.</p>
+                                    </div>
+                                    <div class="app-rail">
+                                        @if (releasedOrNotifiedCases.Length == 0 && recentReceipts.Length == 0 && restoreConflicts == 0)
+                                        {
+                                            <article class="app-rail__item">
+                                                <span class="tag">Calm</span>
+                                                <div class="app-rail__copy">
+                                                    <h3>No urgent follow-up</h3>
+                                                    <p>The signed-in shell does not see a fresh support closure, install handoff, or restore conflict right now.</p>
+                                                </div>
+                                                <a class="inline-link" href="/now">See what works today</a>
+                                            </article>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var supportCase in releasedOrNotifiedCases)
+                                            {
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Support</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@supportCase.Title</h3>
+                                                        <p>@(supportCase.FixedVersion is null ? supportCase.Summary : $"Fixed in {supportCase.FixedVersion}: {supportCase.Summary}")</p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account#support">Open support</a>
+                                                </article>
+                                            }
+                                            @foreach (var receipt in recentReceipts)
+                                            {
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Install</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@receipt.ArtifactLabel</h3>
+                                                        <p>@receipt.Version on @receipt.Channel is still attached to this account if you need to reconnect the copy later.</p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a>
+                                                </article>
+                                            }
+                                            @if (restoreConflicts > 0)
+                                            {
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Return path</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>Campaign return needs confirmation</h3>
+                                                        <p>@Model.CampaignSpine.Restore.ConflictSummaries[0]</p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account#campaigns">Review campaign return</a>
+                                                </article>
+                                            }
+                                        }
+                                    </div>
                                 </div>
-                                <div class="app-rail">
-                                    @if (releasedOrNotifiedCases.Length == 0 && recentReceipts.Length == 0 && restoreConflicts == 0)
-                                    {
-                                        <article class="app-rail__item">
-                                            <span class="tag">Calm</span>
-                                            <div class="app-rail__copy">
-                                                <h3>No urgent follow-up</h3>
-                                                <p>The signed-in shell does not see a fresh support closure, install handoff, or restore conflict right now.</p>
-                                            </div>
-                                            <a class="inline-link" href="/now">See what works today</a>
-                                        </article>
-                                    }
-                                    else
-                                    {
-                                        @foreach (var supportCase in releasedOrNotifiedCases)
-                                        {
-                                            <article class="app-rail__item">
-                                                <span class="tag">Support</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>@supportCase.Title</h3>
-                                                    <p>@(supportCase.FixedVersion is null ? supportCase.Summary : $"Fixed in {supportCase.FixedVersion}: {supportCase.Summary}")</p>
-                                                </div>
-                                                <a class="inline-link" href="/account#support">Open support</a>
-                                            </article>
-                                        }
-                                        @foreach (var receipt in recentReceipts)
-                                        {
-                                            <article class="app-rail__item">
-                                                <span class="tag">Install</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>@receipt.ArtifactLabel</h3>
-                                                    <p>@receipt.Version on @receipt.Channel is still attached to this account if you need to reconnect the copy later.</p>
-                                                </div>
-                                                <a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a>
-                                            </article>
-                                        }
-                                        @if (restoreConflicts > 0)
-                                        {
-                                            <article class="app-rail__item">
-                                                <span class="tag">Return path</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>Campaign return needs confirmation</h3>
-                                                    <p>@Model.CampaignSpine.Restore.ConflictSummaries[0]</p>
-                                                </div>
-                                                <a class="inline-link" href="/account#campaigns">Review campaign return</a>
-                                            </article>
-                                        }
-                                    }
-                                </div>
-                            </div>
 
-                            <div class="home-stream__column">
-                                <div class="home-stream__lead">
-                                    <p class="eyebrow">Access</p>
-                                    <h2 class="home-stream__title">Release, proof, and device state</h2>
-                                </div>
-                                <div class="app-rail">
-                                    <article class="app-rail__item">
-                                        <span class="tag">Current release</span>
-                                        <div class="app-rail__copy">
-                                            <h3>Use the current preview</h3>
-                                            <p>Review what changed, what is working today, and whether this is the right moment to install or update.</p>
-                                        </div>
-                                        <a class="inline-link" href="/now">Open current release</a>
-                                    </article>
-                                    <article class="app-rail__item">
-                                        <span class="tag">Device state</span>
-                                        <div class="app-rail__copy">
-                                            <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s) active" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install yet")</h3>
-                                            <p>Device roles, claim tickets, linked installs, and preview access stay in one place instead of rediscovering them during the next install.</p>
-                                        </div>
-                                        <a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a>
-                                    </article>
-                                    @foreach (var card in Model.NowRail.Take(2))
-                                    {
+                                <div class="home-stream__column">
+                                    <div class="home-stream__lead">
+                                        <p class="eyebrow">Access</p>
+                                        <h2 class="home-stream__title">Release, proof, and device state</h2>
+                                    </div>
+                                    <div class="app-rail">
                                         <article class="app-rail__item">
-                                            <span class="tag">Proof</span>
+                                            <span class="tag">Current release</span>
                                             <div class="app-rail__copy">
-                                                <h3>@card.Card.Title</h3>
-                                                <p>@card.Card.Summary</p>
+                                                <h3>Use the current preview</h3>
+                                                <p>Review what changed, what is working today, and whether this is the right moment to install or update.</p>
                                             </div>
-                                            <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                                            <a class="inline-link" href="/now">Open current release</a>
                                         </article>
-                                    }
+                                        <article class="app-rail__item">
+                                            <span class="tag">Device state</span>
+                                            <div class="app-rail__copy">
+                                                <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s) active" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install yet")</h3>
+                                                <p>Device roles, claim tickets, linked installs, and preview access stay in one place instead of rediscovering them during the next install.</p>
+                                            </div>
+                                            <a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a>
+                                        </article>
+                                        @foreach (var card in Model.NowRail.Take(2))
+                                        {
+                                            <article class="app-rail__item">
+                                                <span class="tag">Proof</span>
+                                                <div class="app-rail__copy">
+                                                    <h3>@card.Card.Title</h3>
+                                                    <p>@card.Card.Summary</p>
+                                                </div>
+                                                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                                            </article>
+                                        }
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </details>
-            </section>
+                        </details>
 
-            <section class="release-shelf release-shelf--manual">
-                <details class="release-accordion">
-                    <summary>Work, return, and follow-up</summary>
-                    <div class="release-accordion__body">
-                        <div class="home-stream">
-                            <div class="home-stream__column">
-                                <div class="home-stream__lead">
-                                    <p class="eyebrow">Campaign workspace</p>
-                                    <h2 class="home-stream__title">Pick up where you actually left off</h2>
-                                    <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible with Rule environments and GM readiness cues without turning the default Home page into a full workspace.</p>
+                        <details class="details-drawer">
+                            <summary>Work and next</summary>
+                            <div class="home-stream">
+                                <div class="home-stream__column">
+                                    <div class="home-stream__lead">
+                                        <p class="eyebrow">Work</p>
+                                        <h2 class="home-stream__title">Pick up where you actually left off</h2>
+                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible with rule environments and GM readiness cues without turning the default Home page into a full workspace.</p>
+                                    </div>
+                                    <div class="app-rail">
+                                        @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0)
+                                        {
+                                            <article class="app-rail__item">
+                                                <span class="tag">Ready</span>
+                                                <div class="app-rail__copy">
+                                                    <h3>No long-lived runner yet</h3>
+                                                    <p>Your first claimed install or campaign handoff will seed the living dossier and current return context here.</p>
+                                                </div>
+                                                <a class="inline-link" href="/downloads">Start from downloads</a>
+                                            </article>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var dossier in dossiers)
+                                            {
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Dossier</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@dossier.DisplayName</h3>
+                                                        <p>@(dossier.LatestContinuity?.Summary ?? "Living dossier is ready for the next handoff.")</p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account#campaigns">Open dossiers</a>
+                                                </article>
+                                            }
+                                            @foreach (var campaign in campaigns)
+                                            {
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Campaign</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@campaign.Name</h3>
+                                                        <p>@(campaign.LatestContinuity?.Summary ?? "Campaign continuity is live.")</p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account#campaigns">Open campaign return</a>
+                                                </article>
+                                            }
+                                            @foreach (var run in runs)
+                                            {
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Live run</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@run.Title</h3>
+                                                        <p>@run.Objectives.Count objectives · @(run.ActiveSceneId is null ? "No active scene" : "Scene live") · @(run.LatestContinuity?.Summary ?? run.Summary)</p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account#campaigns">Open run context</a>
+                                                </article>
+                                            }
+                                        }
+                                    </div>
                                 </div>
-                                <div class="app-rail">
-                                    @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0)
-                                    {
-                                        <article class="app-rail__item">
-                                            <span class="tag">Ready</span>
-                                            <div class="app-rail__copy">
-                                                <h3>No long-lived runner yet</h3>
-                                                <p>Your first claimed install or campaign handoff will seed the living dossier and current return context here.</p>
-                                            </div>
-                                            <a class="inline-link" href="/downloads">Start from downloads</a>
-                                        </article>
-                                    }
-                                    else
-                                    {
-                                        @foreach (var dossier in dossiers)
-                                        {
-                                            <article class="app-rail__item">
-                                                <span class="tag">Dossier</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>@dossier.DisplayName</h3>
-                                                    <p>@(dossier.LatestContinuity?.Summary ?? "Living dossier is ready for the next handoff.")</p>
-                                                </div>
-                                                <a class="inline-link" href="/account#campaigns">Open dossiers</a>
-                                            </article>
-                                        }
-                                        @foreach (var campaign in campaigns)
-                                        {
-                                            <article class="app-rail__item">
-                                                <span class="tag">Campaign</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>@campaign.Name</h3>
-                                                    <p>@(campaign.LatestContinuity?.Summary ?? "Campaign continuity is live.")</p>
-                                                </div>
-                                                <a class="inline-link" href="/account#campaigns">Open campaign return</a>
-                                            </article>
-                                        }
-                                        @foreach (var run in runs)
-                                        {
-                                            <article class="app-rail__item">
-                                                <span class="tag">Live run</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>@run.Title</h3>
-                                                    <p>@run.Objectives.Count objectives · @(run.ActiveSceneId is null ? "No active scene" : "Scene live") · @(run.LatestContinuity?.Summary ?? run.Summary)</p>
-                                                </div>
-                                                <a class="inline-link" href="/account#campaigns">Open run context</a>
-                                            </article>
-                                        }
-                                    }
-                                </div>
-                            </div>
 
-                            <div class="home-stream__column">
-                                <div class="home-stream__lead">
-                                    <p class="eyebrow">Follow next</p>
-                                    <h2 class="home-stream__title">Roadmap and help without turning Home into a second product site</h2>
-                                </div>
-                                <div class="app-rail">
-                                    @foreach (var card in Model.HorizonRail)
-                                    {
+                                <div class="home-stream__column">
+                                    <div class="home-stream__lead">
+                                        <p class="eyebrow">Next</p>
+                                        <h2 class="home-stream__title">Roadmap and help without turning Home into a second product site</h2>
+                                    </div>
+                                    <div class="app-rail">
+                                        @foreach (var card in Model.HorizonRail)
+                                        {
+                                            <article class="app-rail__item">
+                                                <span class="tag">@card.Card.Badge</span>
+                                                <div class="app-rail__copy">
+                                                    <h3>@card.Card.Title</h3>
+                                                    <p>@card.Card.Summary</p>
+                                                </div>
+                                                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                                            </article>
+                                        }
                                         <article class="app-rail__item">
-                                            <span class="tag">@card.Card.Badge</span>
+                                            <span class="tag">Support</span>
                                             <div class="app-rail__copy">
-                                                <h3>@card.Card.Title</h3>
-                                                <p>@card.Card.Summary</p>
+                                                <h3>Need a real answer instead?</h3>
+                                                <p>Use support when the release, device, or return-path surfaces stop being enough to move forward confidently.</p>
                                             </div>
-                                            <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                                            <a class="inline-link" href="/account#support">Open support</a>
                                         </article>
-                                    }
-                                    <article class="app-rail__item">
-                                        <span class="tag">Support</span>
-                                        <div class="app-rail__copy">
-                                            <h3>Need a real answer instead?</h3>
-                                            <p>Use support when the release, device, or return-path surfaces stop being enough to move forward confidently.</p>
-                                        </div>
-                                        <a class="inline-link" href="/account#support">Open support</a>
-                                    </article>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        </details>
                     </div>
                 </details>
             </section>

@@ -44,11 +44,6 @@ else
                 <p class="muted-copy">@release.Display.ChannelLabel · @release.Display.BuildLabel · @release.Display.PublishedLabel</p>
                 <div class="recommended-download__meta">
                     <span>@release.Recommended.PlatformLabel</span>
-                    <span>@release.Recommended.SizeLabel</span>
-                    @if (!string.IsNullOrWhiteSpace(release.Recommended.ShaPreview))
-                    {
-                        <code class="mono-receipt">@release.Recommended.ShaPreview</code>
-                    }
                 </div>
                 <div class="stacked-actions">
                     @if (guestGateRequired)
@@ -66,6 +61,22 @@ else
                     }
                 </div>
                 <p class="muted-copy"><a class="quiet-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a></p>
+                <details class="details-drawer">
+                    <summary>Package details</summary>
+                    <div class="settings-summary-list">
+                        <div class="settings-summary-row">
+                            <span>Size</span>
+                            <strong>@release.Recommended.SizeLabel</strong>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(release.Recommended.ShaPreview))
+                        {
+                            <div class="settings-summary-row">
+                                <span>Integrity preview</span>
+                                <strong><code class="mono-receipt">@release.Recommended.ShaPreview</code></strong>
+                            </div>
+                        }
+                    </div>
+                </details>
             </div>
         </article>
     </section>
