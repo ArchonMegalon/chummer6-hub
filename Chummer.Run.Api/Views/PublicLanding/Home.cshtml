@@ -95,7 +95,8 @@
                 <div class="home-stream__column">
                     <div class="home-stream__lead">
                         <p class="eyebrow">Next up</p>
-                        <h2 class="home-stream__title">What needs attention right now</h2>
+                        <h2 class="home-stream__title">What changed for you</h2>
+                        <p class="home-stream__summary">Support closure, install return, and release follow-up stay grouped so the signed-in cockpit explains why something moved.</p>
                     </div>
                     <div class="app-rail">
                         @if (releasedOrNotifiedCases.Length == 0 && recentReceipts.Length == 0 && restoreConflicts == 0)
@@ -163,10 +164,10 @@
                             <a class="inline-link" href="/now">Open current release</a>
                         </article>
                         <article class="app-rail__item">
-                            <span class="tag">Devices &amp; access</span>
+                            <span class="tag">Device roles</span>
                             <div class="app-rail__copy">
                                 <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s) active" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install yet")</h3>
-                                <p>Keep claim tickets, linked installs, and preview access in one place instead of rediscovering them during the next install.</p>
+                                <p>Device roles, claim tickets, linked installs, and preview access stay in one place instead of rediscovering them during the next install.</p>
                             </div>
                             <a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a>
                         </article>
@@ -192,8 +193,9 @@
                         <div class="home-stream">
                             <div class="home-stream__column">
                                 <div class="home-stream__lead">
-                                    <p class="eyebrow">Return path</p>
+                                    <p class="eyebrow">Campaign workspace</p>
                                     <h2 class="home-stream__title">Pick up where you actually left off</h2>
+                                    <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible with Rule environments and GM readiness cues in one return path.</p>
                                 </div>
                                 <div class="app-rail">
                                     @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0)
