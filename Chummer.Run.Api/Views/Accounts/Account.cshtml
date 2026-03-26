@@ -193,24 +193,27 @@
 
             @if (showChannelsSection)
             {
-            <section id="channels" class="settings-section" data-account-panel>
-                <div class="settings-section__header">
-                    <h2>Linked channels</h2>
-                    <p>Companion channels stay separate from account access and recovery.</p>
-                </div>
-                <div class="settings-summary-row">
-                    <span>Telegram companion</span>
-                    <strong>@(telegramChannel is null ? "Not connected" : $"{telegramChannel.DisplayLabel} ({HumanizeStatus(telegramChannel.Status, "Ready")})")</strong>
-                </div>
-                <form id="telegramForm" class="settings-form">
-                    <div class="field">
-                        <label for="telegramHandle">Telegram handle</label>
-                        <input id="telegramHandle" placeholder="@@hubbrain" value="@(telegramChannel?.DisplayLabel ?? string.Empty)" />
-                    </div>
-                    <button class="button-like button-like--secondary" type="submit">Connect Telegram</button>
-                    <p id="telegramStatusNotice" class="muted-copy" hidden></p>
-                </form>
-            </section>
+                <details class="details-drawer">
+                    <summary>Linked channels</summary>
+                    <section id="channels" class="settings-section" data-account-panel>
+                        <div class="settings-section__header">
+                            <h2>Linked channels</h2>
+                            <p>Companion channels stay separate from account access and recovery.</p>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Telegram companion</span>
+                            <strong>@(telegramChannel is null ? "Not connected" : $"{telegramChannel.DisplayLabel} ({HumanizeStatus(telegramChannel.Status, "Ready")})")</strong>
+                        </div>
+                        <form id="telegramForm" class="settings-form">
+                            <div class="field">
+                                <label for="telegramHandle">Telegram handle</label>
+                                <input id="telegramHandle" placeholder="@@hubbrain" value="@(telegramChannel?.DisplayLabel ?? string.Empty)" />
+                            </div>
+                            <button class="button-like button-like--secondary" type="submit">Connect Telegram</button>
+                            <p id="telegramStatusNotice" class="muted-copy" hidden></p>
+                        </form>
+                    </section>
+                </details>
             }
 
             <section id="support" class="settings-section" data-account-panel>
@@ -486,6 +489,8 @@
 
             @if (showCampaignSection)
             {
+            <details class="details-drawer">
+            <summary>Campaigns &amp; dossiers</summary>
             <section id="campaigns" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Campaigns &amp; dossiers</h2>
@@ -719,10 +724,13 @@
                     </details>
                 }
             </section>
+            </details>
             }
 
             @if (showTeamsSection)
             {
+            <details class="details-drawer">
+            <summary>Teams &amp; permissions</summary>
             <section id="community-ops" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Teams &amp; permissions</h2>
@@ -803,6 +811,7 @@
                     <p class="muted-copy">Recognition, badges, and sponsor motion stay secondary to campaign ownership, permissions, and real support closure.</p>
                 }
             </section>
+            </details>
             }
 
             <section id="privacy" class="settings-section" data-account-panel>
@@ -824,6 +833,8 @@
 
             @if (showParticipationSection)
             {
+            <details class="details-drawer">
+            <summary>Participation</summary>
             <section id="participation" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Participation</h2>
@@ -841,6 +852,7 @@
                     <p id="experienceStatusNotice" class="muted-copy" hidden></p>
                 </form>
             </section>
+            </details>
             }
 
             <section class="settings-section" data-account-panel id="help-policy">
@@ -894,6 +906,22 @@
 (() => {
   const ui = window.ChummerUi;
   const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
+  const revealHashTarget = () => {
+    const hash = window.location.hash;
+    if (!hash) return;
+    const target = document.querySelector(hash);
+    if (!target) return;
+    const drawer = target.closest("details");
+    if (drawer) {
+      drawer.open = true;
+    }
+  };
+
+  revealHashTarget();
+  window.addEventListener("hashchange", revealHashTarget);
+  document.querySelectorAll("[data-account-tab]").forEach((link) => {
+    link.addEventListener("click", () => window.setTimeout(revealHashTarget, 0));
+  });
 
   document.getElementById("profileForm").addEventListener("submit", async (event) => {
     event.preventDefault();
