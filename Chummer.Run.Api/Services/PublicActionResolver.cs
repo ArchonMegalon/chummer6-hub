@@ -121,7 +121,7 @@ public sealed class PublicActionResolver
                 "coming_next" => "Read the horizon brief",
                 "featured_artifacts" => "Open the external release brief",
                 "supporting_reads" => "Read the external guide",
-                _ => "Open the linked brief"
+                _ => "Read the external brief"
             };
         }
 
@@ -133,6 +133,8 @@ public sealed class PublicActionResolver
             "whats_real_now" when string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) => "Inspect the live proof",
             "whats_real_now" => "See the preview proof",
             "choose_your_lane" => "See the lane fit",
+            "participate" when href.Contains("/participate/codex", StringComparison.OrdinalIgnoreCase) => "Open guided contribution",
+            "participate" when href.Contains("#beta-interest", StringComparison.OrdinalIgnoreCase) => "Join beta waitlist",
             "participate" when href.Contains("/signup", StringComparison.OrdinalIgnoreCase) => "Create account to continue",
             "participate" when href.Contains("/login", StringComparison.OrdinalIgnoreCase) => "Sign in to continue",
             "participate" => "Open the participation path",

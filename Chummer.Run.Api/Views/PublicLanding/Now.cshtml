@@ -88,9 +88,17 @@
     <article class="evidence-group">
         <div class="evidence-group__header">
             <span class="readiness-tag">Supporting proof</span>
-            <h2>Release and proof surfaces around the core loop</h2>
+            <h2>Current preview facts around the core loop</h2>
         </div>
         <div class="evidence-row-list">
+            <article class="evidence-row">
+                <div class="evidence-row__copy">
+                    <h3>Current release</h3>
+                    <p>@Model.ReleaseExperience.ReleaseNotesSummary</p>
+                </div>
+                <span class="readiness-tag">Live now</span>
+                <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
+            </article>
             @foreach (var card in supportingProof)
             {
                 <article class="evidence-row" id="@card.Card.Id.Replace('_', '-')">

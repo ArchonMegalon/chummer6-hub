@@ -11,18 +11,9 @@
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
     var productProofSection = Section("product_proof");
-    var startHereSection = Section("start_here");
-    var trustSection = Section("why_trust_it");
-    var laneSection = Section("choose_your_lane");
     var worksNowSection = Section("whats_real_now");
     var artifactSection = Section("featured_artifacts");
     var closingSection = Section("closing_cta");
-    var workflowFollowOns = Model.Workflows.Skip(3).ToArray();
-
-    static IReadOnlyList<string> MicroProof(PublicFeatureCardDto card)
-        => string.IsNullOrWhiteSpace(card.MicroProof)
-            ? Array.Empty<string>()
-            : card.MicroProof.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     PublicLandingSectionDto Section(string id)
         => sectionsById.TryGetValue(id, out var section)
@@ -122,103 +113,11 @@
     }
 </section>
 
-<section class="workflow-band">
-    <div class="workflow-band__lead">
-        <p class="eyebrow">@startHereSection.Eyebrow</p>
-        <h2 class="editorial-title">@startHereSection.Title</h2>
-        <p class="editorial-copy">@startHereSection.Intro</p>
-    </div>
-    <div class="workflow-grid">
-        @foreach (var card in workflowFollowOns)
-        {
-            <article class="workflow-card">
-                @if (card.Asset is not null)
-                {
-                    <div class="workflow-card__media">
-                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
-                    </div>
-                }
-                <div class="workflow-card__copy">
-                    <span class="tag">@card.Card.Badge</span>
-                    <h3>@card.Card.Title</h3>
-                    <p>@card.Card.Summary</p>
-                    <ul class="workflow-card__points">
-                        @if (!string.IsNullOrWhiteSpace(card.Card.Pain))
-                        {
-                            <li>@card.Card.Pain</li>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
-                        {
-                            <li>@card.Card.Payoff</li>
-                        }
-                    </ul>
-                    @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
-                    {
-                        <p class="workflow-card__proof">@card.Card.ProofNote</p>
-                    }
-                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
-                </div>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="trust-claims">
-    <div class="trust-claims__lead">
-        <p class="eyebrow">@trustSection.Eyebrow</p>
-        <h2 class="editorial-title">@trustSection.Title</h2>
-        <p class="editorial-copy">@trustSection.Intro</p>
-    </div>
-    <div class="trust-claims__grid">
-        @foreach (var card in Model.TrustPillars)
-        {
-            <article class="trust-claim">
-                <span class="tag">@card.Badge</span>
-                <h3>@card.Title</h3>
-                <p>@card.Summary</p>
-                <div class="trust-claim__microproof">
-                    @foreach (var item in MicroProof(card))
-                    {
-                        <span>@item</span>
-                    }
-                </div>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="audience-fit">
-    <div class="audience-fit__lead">
-        <p class="eyebrow">@laneSection.Eyebrow</p>
-        <h2 class="editorial-title">@laneSection.Title</h2>
-        <p class="editorial-copy">@laneSection.Intro</p>
-    </div>
-    <div class="audience-fit__grid">
-        @foreach (var card in Model.Lanes)
-        {
-            <article class="audience-card">
-                @if (card.Asset is not null)
-                {
-                    <div class="audience-card__media">
-                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
-                    </div>
-                }
-                <div class="audience-card__copy">
-                    <span class="tag tag--amber">@card.Card.Badge</span>
-                    <h3>@card.Card.Title</h3>
-                    <p>@card.Card.Summary</p>
-                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
-                </div>
-            </article>
-        }
-    </div>
-</section>
-
 <section class="works-matrix">
     <div class="works-matrix__lead">
         <p class="eyebrow">@worksNowSection.Eyebrow</p>
         <h2 class="editorial-title">@worksNowSection.Title</h2>
-        <p class="editorial-copy">@worksNowSection.Intro</p>
+        <p class="editorial-copy">The current preview shelf should answer three practical questions fast: what you can use now, what is still preview-only, and what is opening next.</p>
     </div>
     <div class="works-matrix__columns">
         <article class="works-column">
@@ -276,7 +175,7 @@
     <div class="artifact-gallery__lead">
         <p class="eyebrow">@artifactSection.Eyebrow</p>
         <h2 class="editorial-title">@artifactSection.Title</h2>
-        <p class="editorial-copy">@artifactSection.Intro</p>
+        <p class="editorial-copy">Start with the live proof surfaces first. Preview concepts stay visible, but they should clearly read as next-step product work rather than finished things.</p>
     </div>
     <div class="artifact-gallery__grid">
         @foreach (var card in Model.Artifacts)
@@ -303,7 +202,7 @@
     <div class="access-band__copy">
         <p class="eyebrow">@closingSection.Eyebrow</p>
         <h2 class="editorial-title">@closingSection.Title</h2>
-        <p class="editorial-copy">@closingSection.Intro</p>
+        <p class="editorial-copy">Create the account when you want preview installs, install linking, roadmap follow-up, and support history to stay attached to one return path.</p>
         <div class="interest-grid" aria-label="Interest options">
             <span class="interest-pill">I’m here for play</span>
             <span class="interest-pill">I want GM tools</span>
@@ -323,5 +222,6 @@
             <a class="button-like button-like--primary" href="/signup?next=/home">Create account</a>
             <p class="muted-copy">Already have one? <a class="inline-link" href="/login?next=/home">Sign in</a></p>
         }
+        <p class="muted-copy"><a class="quiet-link" href="/what-is-chummer">Why Chummer is different</a></p>
     </div>
 </section>
