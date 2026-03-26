@@ -3,6 +3,10 @@ WORKDIR /src
 COPY chummercomplete/chummer.run-services/Chummer.Run.Identity/Chummer.Run.Identity.csproj chummercomplete/chummer.run-services/Chummer.Run.Identity/
 COPY chummercomplete/chummer.run-services/Chummer.Control.Contracts/Chummer.Control.Contracts.csproj chummercomplete/chummer.run-services/Chummer.Control.Contracts/
 COPY chummercomplete/chummer.run-services/Chummer.Run.Contracts/Chummer.Run.Contracts.csproj chummercomplete/chummer.run-services/Chummer.Run.Contracts/
+COPY chummercomplete/chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj chummercomplete/chummer.run-services/Chummer.Play.Contracts/
+COPY chummercomplete/chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj chummercomplete/chummer-core-engine/Chummer.Contracts/
+COPY chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/
+COPY fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 RUN dotnet restore chummercomplete/chummer.run-services/Chummer.Run.Identity/Chummer.Run.Identity.csproj
 COPY chummercomplete/chummer.run-services/Chummer.Run.Identity/ chummercomplete/chummer.run-services/Chummer.Run.Identity/
 COPY chummercomplete/chummer.run-services/Chummer.Control.Contracts/ chummercomplete/chummer.run-services/Chummer.Control.Contracts/
