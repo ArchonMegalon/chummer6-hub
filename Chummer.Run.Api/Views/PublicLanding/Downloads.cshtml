@@ -11,7 +11,7 @@
     <div class="release-stage__lead">
         <p class="eyebrow">Downloads</p>
         <h1 class="page-title">Install the current preview</h1>
-        <p class="page-copy">@release.Display.ChannelLabel, @release.Display.BuildLabel, @release.Display.PublishedLabel.ToLowerInvariant().</p>
+        <p class="page-copy">Start with the recommended installer for this device. Release notes, known issues, and advanced packages stay underneath so the first decision stays simple.</p>
         <p class="release-stage__note">
             @(guestGateRequired
                 ? release.GuestGateSummary
@@ -41,6 +41,7 @@ else
                 <span class="tag">@(guestGateRequired ? release.GuestGateHeading : "Recommended")</span>
                 <h2>@release.Recommended.Title</h2>
                 <p>@release.Recommended.SupportLine</p>
+                <p class="muted-copy">@release.Display.ChannelLabel · @release.Display.BuildLabel · @release.Display.PublishedLabel</p>
                 <div class="recommended-download__meta">
                     <span>@release.Recommended.PlatformLabel</span>
                     <span>@release.Recommended.SizeLabel</span>

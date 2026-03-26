@@ -63,12 +63,12 @@
     <article class="evidence-group">
         <div class="evidence-group__header">
             <span class="readiness-tag">Current release</span>
-            <h2>What changed, what hurts, and what to expect</h2>
+            <h2>Release health before you install</h2>
         </div>
         <div class="evidence-row-list">
             <article class="evidence-row">
                 <div class="evidence-row__copy">
-                    <h3>Release summary</h3>
+                    <h3>What changed since the last preview</h3>
                     <p>@Model.ReleaseExperience.ReleaseNotesSummary</p>
                 </div>
                 <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
@@ -76,7 +76,7 @@
             <article class="evidence-row">
                 <div class="evidence-row__copy">
                     <h3>Known issues and install help</h3>
-                    <p>Check the install help and current known-issues lane before you commit a fresh device to the preview.</p>
+                    <p>Check the install and known-issue lane before you commit a fresh device to the preview.</p>
                 </div>
                 <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
             </article>
@@ -93,7 +93,7 @@
 
 <section class="workflow-band">
     <div class="workflow-band__lead">
-        <p class="eyebrow">Concrete proof modules</p>
+        <p class="eyebrow">What you can verify now</p>
         <h2 class="editorial-title">Build, explain, and run with visible evidence</h2>
         <p class="editorial-copy">These are the three product behaviors the current preview is already proving in public: builder truth, explanation trail, and continuity under drift.</p>
     </div>
@@ -122,60 +122,52 @@
     </div>
 </section>
 
-<section class="evidence-wall">
-    <article class="evidence-group">
-        <div class="evidence-group__header">
-            <span class="readiness-tag">Supporting proof</span>
-            <h2>Current preview facts around the core loop</h2>
-        </div>
-        <div class="evidence-row-list">
-            @foreach (var card in supportingProof)
+@if (supportingProof.Length > 0)
+{
+    <section class="release-shelf release-shelf--manual">
+        <details class="release-accordion">
+            <summary>More proof markers around the core loop</summary>
+            <div class="release-accordion__body">
+                <div class="evidence-row-list">
+                    @foreach (var card in supportingProof)
+                    {
+                        <article class="evidence-row" id="@card.Card.Id.Replace('_', '-')">
+                            <div class="evidence-row__copy">
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
+                            </div>
+                            <span class="readiness-tag @(string.Equals(card.Card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--amber")">@DisplayStatus(card.Card.Badge)</span>
+                            <a class="button-like button-like--ghost" href="@card.Action.Href">@card.Action.Label</a>
+                        </article>
+                    }
+                </div>
+            </div>
+        </details>
+    </section>
+}
+
+<section class="story-guide-tail">
+    <p class="eyebrow">Signed-in return</p>
+    <h2 class="editorial-title">Use the account path when you want continuity, not just one download</h2>
+    <p class="editorial-copy">The account path keeps install receipts, roadmap follows, beta interest, devices, and support follow-up attached to the same return surface.</p>
+    @if (signedInBenefits.Length > 0)
+    {
+        <div class="trust-claim__microproof">
+            @foreach (var overlay in signedInBenefits)
             {
-                <article class="evidence-row" id="@card.Card.Id.Replace('_', '-')">
-                    <div class="evidence-row__copy">
-                        <h3>@card.Card.Title</h3>
-                        <p>@card.Card.Summary</p>
-                    </div>
-                    <span class="readiness-tag @(string.Equals(card.Card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--amber")">@DisplayStatus(card.Card.Badge)</span>
-                    <a class="button-like button-like--ghost" href="@card.Action.Href">@card.Action.Label</a>
-                </article>
+                <span>@overlay.Title</span>
             }
         </div>
-    </article>
-
-    <article class="evidence-group">
-        <div class="evidence-group__header">
-            <span class="readiness-tag readiness-tag--horizon">Signed-in next step</span>
-            <h2>What the account adds</h2>
-        </div>
-        <div class="evidence-row-list">
-            <article class="evidence-row">
-                <div class="evidence-row__copy">
-                    <h3>@(Model.Chrome.Authenticated ? "Use the signed-in shell" : "Create an account for the signed-in shell")</h3>
-                    <p>The account path keeps install receipts, roadmap follows, beta interest, devices, and support follow-up attached to the same return surface.</p>
-                    @if (signedInBenefits.Length > 0)
-                    {
-                        <ul class="trust-page-section__list">
-                            @foreach (var overlay in signedInBenefits)
-                            {
-                                <li><strong>@overlay.Title:</strong> @overlay.Summary</li>
-                            }
-                        </ul>
-                    }
-                </div>
-                <span class="readiness-tag readiness-tag--horizon">Signed-in next step</span>
-                <div class="stacked-actions">
-                    <a class="button-like button-like--ghost" href="@(Model.Chrome.Authenticated ? "/home" : "/signup?next=/home")">
-                        @(Model.Chrome.Authenticated ? "Open home" : "Create account")
-                    </a>
-                    @if (!Model.Chrome.Authenticated)
-                    {
-                        <a class="inline-link" href="/login?next=/home">Already have an account? Sign in</a>
-                    }
-                </div>
-            </article>
-        </div>
-    </article>
+    }
+    <div class="stacked-actions">
+        <a class="cta-link cta-link--primary" href="@(Model.Chrome.Authenticated ? "/home" : "/signup?next=/home")">
+            @(Model.Chrome.Authenticated ? "Open home" : "Create account")
+        </a>
+        @if (!Model.Chrome.Authenticated)
+        {
+            <a class="cta-link cta-link--secondary" href="/login?next=/home">Already have an account? Sign in</a>
+        }
+    </div>
 </section>
 
 <section class="evidence-tail">
