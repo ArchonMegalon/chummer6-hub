@@ -9,7 +9,7 @@
         ?? Model.Assets.BySlot("scene_simulation_bench")
         ?? Model.Assets.BySlot("capability_check_rules")
         ?? heroProofAsset;
-    var proofNotes = Model.Workflows.Take(3).ToArray();
+    var proofNotes = Model.Workflows.Take(2).ToArray();
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
     var proofSectionTrail = Model.Surface.ProductProofTrail.Skip(1).Take(3).ToArray();
     var availableHighlight = Model.AvailableToday.FirstOrDefault();
@@ -104,8 +104,8 @@
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.Surface.ProductProofPrimaryHref">@Model.Surface.ProductProofPrimaryLabel</a>
-            <a class="button-like button-like--secondary" href="@Model.Surface.ProductProofSecondaryHref">@Model.Surface.ProductProofSecondaryLabel</a>
         </div>
+        <p class="muted-copy">Need the broader shelf? <a class="inline-link" href="@Model.Surface.ProductProofSecondaryHref">@Model.Surface.ProductProofSecondaryLabel</a>.</p>
     </div>
     @if (proofSectionAsset is not null)
     {
@@ -193,7 +193,6 @@
         <p class="eyebrow">@closingSection.Eyebrow</p>
         <h2 class="editorial-title">@closingSection.Title</h2>
         <p class="editorial-copy">Create the account when you want preview installs, install linking, roadmap follow-up, and support history to stay attached to one return path.</p>
-        <p class="muted-copy">Need deeper proof first? <a class="inline-link" href="/artifacts">Open the proof gallery</a>.</p>
     </div>
     <div class="access-band__actions">
         @if (Model.Chrome.Authenticated)
@@ -206,6 +205,6 @@
             <a class="button-like button-like--primary" href="/signup?next=/home">Create account</a>
             <p class="muted-copy">Already have one? <a class="inline-link" href="/login?next=/home">Sign in</a></p>
         }
-        <p class="muted-copy"><a class="quiet-link" href="/what-is-chummer">Why Chummer is different</a></p>
+        <p class="muted-copy">Still evaluating? <a class="quiet-link" href="/artifacts">Open the proof gallery</a> or <a class="quiet-link" href="/what-is-chummer">read the product story</a>.</p>
     </div>
 </section>
