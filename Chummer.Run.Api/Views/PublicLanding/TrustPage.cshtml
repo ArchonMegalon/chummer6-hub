@@ -14,6 +14,15 @@
         "product-question" => new TrustPageActionViewModel("Read the FAQ", "/faq", "secondary"),
         _ => null
     };
+
+    static TrustPageActionViewModel? HelpFallbackActionFor(string sectionId, bool authenticated) => sectionId switch
+    {
+        "install-update" => new TrustPageActionViewModel("Open support intake", "/contact#support-intake", "ghost"),
+        "sign-in-recovery" => new TrustPageActionViewModel("Open support intake", "/contact#support-intake", "ghost"),
+        "product-bug" => new TrustPageActionViewModel("See what works today", "/now", "ghost"),
+        "product-question" => new TrustPageActionViewModel("Open support intake", "/contact#support-intake", "ghost"),
+        _ => null
+    };
 }
 
 <section class="trust-page-hero">
@@ -78,6 +87,7 @@
             @foreach (var pageSection in Model.Sections)
             {
                 var quickAction = HelpActionFor(pageSection.Id, Model.Chrome.Authenticated);
+                var fallbackAction = HelpFallbackActionFor(pageSection.Id, Model.Chrome.Authenticated);
                 <article class="workflow-card">
                     <div class="workflow-card__copy">
                         <span class="tag">@pageSection.Eyebrow</span>
@@ -95,6 +105,10 @@
                         @if (quickAction is not null)
                         {
                             <a class="inline-link" href="@quickAction.Href">@quickAction.Label</a>
+                        }
+                        @if (fallbackAction is not null)
+                        {
+                            <p class="muted-copy">Fallback: <a class="inline-link" href="@fallbackAction.Href">@fallbackAction.Label</a></p>
                         }
                     </div>
                 </article>

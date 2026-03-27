@@ -1535,6 +1535,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(trustSource.Contains("supportHeadId", StringComparison.Ordinal), "contact intake should keep head context visible when install-aware support is available.");
     Assert(trustSource.Contains("supportArch", StringComparison.Ordinal), "contact intake should keep architecture context visible when install-aware support is available.");
     Assert(trustSource.Contains("What changed in this version", StringComparison.Ordinal), "privacy and terms should render a policy-delta block instead of leaving summary points buried in the generic hero chrome.");
+    Assert(trustSource.Contains("HelpFallbackActionFor", StringComparison.Ordinal), "help should expose a deliberate fallback action per lane instead of only one outbound link.");
+    Assert(trustSource.Contains("Fallback:", StringComparison.Ordinal), "help cards should render a visible fallback route under the primary next step.");
     var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
     Assert(supportSubmittedSource.Contains("Watch Account > Support", StringComparison.Ordinal), "support confirmation should explain the signed-in follow-up lane instead of stopping at a generic receipt.");
     Assert(supportSubmittedSource.Contains("Watch your reply email", StringComparison.Ordinal), "support confirmation should explain the guest follow-up lane instead of assuming an account-only workflow.");
