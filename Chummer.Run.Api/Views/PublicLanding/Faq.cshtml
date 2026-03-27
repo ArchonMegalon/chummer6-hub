@@ -3,6 +3,40 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-faq";
+
+    static TrustPageActionViewModel? FaqActionFor(string sectionTitle, string question, bool authenticated)
+    {
+        var combined = $"{sectionTitle} {question}".ToLowerInvariant();
+        if (combined.Contains("account creation", StringComparison.Ordinal)
+            || combined.Contains("github account", StringComparison.Ordinal))
+        {
+            return authenticated
+                ? new TrustPageActionViewModel("Open account", "/account", "secondary")
+                : new TrustPageActionViewModel("Create account", "/signup?next=/home", "secondary");
+        }
+
+        if (combined.Contains("install", StringComparison.Ordinal)
+            || combined.Contains("update", StringComparison.Ordinal)
+            || combined.Contains("personalized installer", StringComparison.Ordinal)
+            || combined.Contains("preview gated", StringComparison.Ordinal))
+        {
+            return new TrustPageActionViewModel("Open downloads", "/downloads", "secondary");
+        }
+
+        if (combined.Contains("report a bug", StringComparison.Ordinal)
+            || combined.Contains("help", StringComparison.Ordinal)
+            || combined.Contains("support", StringComparison.Ordinal))
+        {
+            return new TrustPageActionViewModel("Open support intake", "/contact#support-intake", "secondary");
+        }
+
+        if (combined.Contains("trust", StringComparison.Ordinal) || combined.Contains("use chummer right now", StringComparison.Ordinal))
+        {
+            return new TrustPageActionViewModel("See what works today", "/now", "secondary");
+        }
+
+        return null;
+    }
 }
 
 <section class="trust-page-hero">
@@ -36,6 +70,13 @@
                     <details class="faq-item" data-faq-item data-faq-text="@($"{faqSection.Title} {entry.Question} {entry.Answer}")">
                         <summary>@entry.Question</summary>
                         <p>@entry.Answer</p>
+                        @{
+                            var answerAction = FaqActionFor(faqSection.Title, entry.Question, Model.Chrome.Authenticated);
+                        }
+                        @if (answerAction is not null)
+                        {
+                            <p><a class="inline-link" href="@answerAction.Href">@answerAction.Label</a></p>
+                        }
                     </details>
                 }
             </div>
