@@ -40,6 +40,25 @@
     </div>
 </section>
 
+<section class="compact-rail">
+    <article class="compact-rail__item">
+        <div class="compact-rail__copy">
+            <h3>Keep the case id nearby</h3>
+            <p>Use <code class="mono-receipt">@Model.CaseId</code> whenever you need to refer back to this report from support, downloads, or a later signed-in return path.</p>
+        </div>
+    </article>
+    <article class="compact-rail__item">
+        <div class="compact-rail__copy">
+            <h3>@(Model.Chrome.Authenticated ? "Watch Account > Support" : "Watch your reply email")</h3>
+            <p>
+                @(Model.Chrome.Authenticated
+                    ? "Tracked cases stay in the signed-in shell, so routed fixes and reporter-ready updates should reappear there instead of vanishing into side channels."
+                    : "Guest support replies should come back through the email path attached to the case, so keep that inbox visible until the next routed update lands.")
+            </p>
+        </div>
+    </article>
+</section>
+
 @if (Model.Attachments.Count > 0)
 {
     <section class="trust-page-sections">
@@ -51,7 +70,13 @@
                 {
                     <div class="settings-summary-row">
                         <span>@attachment.FileName</span>
-                        <strong>@($"{attachment.SizeBytes / 1024.0:F1} KB · {attachment.UploadedAtUtc:yyyy-MM-dd HH:mm} UTC")</strong>
+                        <strong>
+                            @($"{attachment.SizeBytes / 1024.0:F1} KB · {attachment.UploadedAtUtc:yyyy-MM-dd HH:mm} UTC")
+                            @if (!string.IsNullOrWhiteSpace(attachment.DownloadHref))
+                            {
+                                <a class="inline-link" href="@attachment.DownloadHref">Download</a>
+                            }
+                        </strong>
                     </div>
                 }
             </div>

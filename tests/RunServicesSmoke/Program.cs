@@ -1534,6 +1534,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(trustSource.Contains("supportReleaseChannel", StringComparison.Ordinal), "contact intake should keep release-channel context visible when install-aware support is available.");
     Assert(trustSource.Contains("supportHeadId", StringComparison.Ordinal), "contact intake should keep head context visible when install-aware support is available.");
     Assert(trustSource.Contains("supportArch", StringComparison.Ordinal), "contact intake should keep architecture context visible when install-aware support is available.");
+    var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
+    Assert(supportSubmittedSource.Contains("Watch Account > Support", StringComparison.Ordinal), "support confirmation should explain the signed-in follow-up lane instead of stopping at a generic receipt.");
+    Assert(supportSubmittedSource.Contains("Watch your reply email", StringComparison.Ordinal), "support confirmation should explain the guest follow-up lane instead of assuming an account-only workflow.");
+    Assert(supportSubmittedSource.Contains("Download</a>", StringComparison.Ordinal), "support confirmation should keep saved attachment downloads visible on the first confirmation screen.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
