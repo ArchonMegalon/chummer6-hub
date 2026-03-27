@@ -29,15 +29,27 @@ public sealed class SupportCaseService
     ];
 
     private readonly SupportStore _store;
+    private readonly SupportAttachmentStorageService _attachments;
     private readonly ILogger<SupportCaseService> _logger;
 
-    public SupportCaseService(SupportStore store, ILogger<SupportCaseService> logger)
+    public SupportCaseService(
+        SupportStore store,
+        SupportAttachmentStorageService attachments,
+        ILogger<SupportCaseService> logger)
     {
         _store = store;
+        _attachments = attachments;
         _logger = logger;
     }
 
     public SupportCaseProjection Submit(string? reporterUserId, string? reporterSubjectId, SupportCaseSubmitRequest request)
+        => Submit(reporterUserId, reporterSubjectId, request, attachments: null);
+
+    public SupportCaseProjection Submit(
+        string? reporterUserId,
+        string? reporterSubjectId,
+        SupportCaseSubmitRequest request,
+        IReadOnlyList<SupportAttachmentUpload>? attachments)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -98,6 +110,7 @@ public sealed class SupportCaseService
                                 ("source", source),
                                 ("candidate_owner_repo", candidateOwnerRepo))))
                 };
+                updated = AttachUploadsLocked(updated, attachments, source, now);
                 _store.CasesById[updated.CaseId] = updated;
                 _store.PersistLocked();
                 return updated;
@@ -139,6 +152,7 @@ public sealed class SupportCaseService
                             ("design_impact_suspected", designImpact ? "true" : "false")))
                 ]);
 
+            created = AttachUploadsLocked(created, attachments, source, now);
             _store.CasesById[caseId] = created;
             _store.CaseIdByClusterKey[clusterKey] = caseId;
             _store.PersistLocked();
@@ -432,6 +446,50 @@ public sealed class SupportCaseService
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .ThenBy(static item => item.CaseId, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    private SupportCaseProjection AttachUploadsLocked(
+        SupportCaseProjection supportCase,
+        IReadOnlyList<SupportAttachmentUpload>? attachments,
+        string source,
+        DateTimeOffset occurredAtUtc)
+    {
+        if (attachments is null || attachments.Count == 0)
+        {
+            return supportCase;
+        }
+
+        IReadOnlyList<SupportCaseAttachmentProjection> saved = _attachments
+            .SaveAttachments(supportCase.CaseId, attachments)
+            .Select(item => item with
+            {
+                DownloadHref = $"/api/v1/support/cases/{Uri.EscapeDataString(supportCase.CaseId)}/attachments/{Uri.EscapeDataString(item.AttachmentId)}"
+            })
+            .ToArray();
+        if (saved.Count == 0)
+        {
+            return supportCase;
+        }
+
+        var merged = (supportCase.Attachments ?? Array.Empty<SupportCaseAttachmentProjection>())
+            .Concat(saved)
+            .OrderBy(static item => item.UploadedAtUtc)
+            .ThenBy(static item => item.AttachmentId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return supportCase with
+        {
+            UpdatedAtUtc = occurredAtUtc,
+            Attachments = merged,
+            Timeline = AppendTimeline(
+                supportCase.Timeline,
+                BuildEvent(
+                    status: supportCase.Status,
+                    summary: $"{saved.Count} attachment(s) added to the support case.",
+                    occurredAtUtc: occurredAtUtc,
+                    actor: source,
+                    metadata: BuildMetadata(("attachment_count", saved.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)))))
+        };
+    }
 
     private static SupportCaseTimelineEvent[] AppendTimeline(
         IReadOnlyList<SupportCaseTimelineEvent>? existing,

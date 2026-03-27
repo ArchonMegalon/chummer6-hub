@@ -62,6 +62,7 @@
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
     var showSettingsSection = string.Equals(Model.CurrentSection, "settings", StringComparison.OrdinalIgnoreCase);
     var showAdvancedSection = string.Equals(Model.CurrentSection, "advanced", StringComparison.OrdinalIgnoreCase);
+    var selectedSupportCase = Model.SelectedSupportCase;
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -245,6 +246,64 @@
                     <h2>Support</h2>
                     <p>Report a bug, confusing copy, install trouble, or product feedback without leaving the account surface. Visible status stays attached to the case instead of disappearing into email.</p>
                 </div>
+                @if (selectedSupportCase is not null)
+                {
+                    <article class="app-action-card app-action-card--primary" id="case-@selectedSupportCase.CaseId">
+                        <span class="tag">Tracked case</span>
+                        <h3>@selectedSupportCase.Title</h3>
+                        <p>@selectedSupportCase.Summary</p>
+                        <div class="settings-summary-list">
+                            <div class="settings-summary-row">
+                                <span>Case id</span>
+                                <strong>@selectedSupportCase.CaseId</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Status</span>
+                                <strong>@HumanizeStatus(selectedSupportCase.Status, "New")</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Updated</span>
+                                <strong>@selectedSupportCase.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                            </div>
+                        </div>
+                        @if (selectedSupportCase.Attachments is { Count: > 0 })
+                        {
+                            <details class="details-drawer">
+                                <summary>Saved attachments</summary>
+                                <div class="settings-summary-list">
+                                    @foreach (var attachment in selectedSupportCase.Attachments)
+                                    {
+                                        <div class="settings-summary-row">
+                                            <span>@attachment.FileName</span>
+                                            <strong>
+                                                @($"{attachment.SizeBytes / 1024.0:F1} KB")
+                                                @if (!string.IsNullOrWhiteSpace(attachment.DownloadHref))
+                                                {
+                                                    <a class="inline-link" href="@attachment.DownloadHref">Download</a>
+                                                }
+                                            </strong>
+                                        </div>
+                                    }
+                                </div>
+                            </details>
+                        }
+                        @if (selectedSupportCase.Timeline is { Count: > 0 })
+                        {
+                            <details class="details-drawer" open>
+                                <summary>Case timeline</summary>
+                                <div class="settings-summary-list">
+                                    @foreach (var eventItem in selectedSupportCase.Timeline.OrderByDescending(item => item.OccurredAtUtc).Take(6))
+                                    {
+                                        <div class="settings-summary-row">
+                                            <span>@eventItem.OccurredAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</span>
+                                            <strong>@eventItem.Summary</strong>
+                                        </div>
+                                    }
+                                </div>
+                            </details>
+                        }
+                    </article>
+                }
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
                         <span>Open or active cases</span>
@@ -313,6 +372,12 @@
                         <label for="supportCaseDetail">What happened</label>
                         <textarea id="supportCaseDetail" rows="6" placeholder="Tell Chummer what you expected, what actually happened, and anything that would help route the fix."></textarea>
                     </div>
+                    <div class="field">
+                        <label for="supportCaseAttachments">Attachments</label>
+                        <input id="supportCaseAttachments" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.txt,.log,.json,.zip,.md" />
+                        <p class="muted-copy">Attach screenshots, logs, or a small archive when that will route the case faster.</p>
+                    </div>
+                    <div id="supportCaseContextPreview" class="settings-summary-list" hidden></div>
                     <button class="button-like button-like--primary" type="submit">Submit support case</button>
                     <p id="supportCaseStatusNotice" class="muted-copy" hidden></p>
                 </form>
@@ -327,7 +392,10 @@
                         {
                             <div class="settings-summary-row">
                                 <span>@supportCase.Title</span>
-                                <strong>@HumanizeStatus(supportCase.Status, "New") · @supportCase.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                                <strong>
+                                    <a class="inline-link" href="/account/support/@supportCase.CaseId">@HumanizeStatus(supportCase.Status, "New")</a>
+                                    · @supportCase.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC
+                                </strong>
                             </div>
                         }
                     </div>
@@ -1174,37 +1242,71 @@
     const notice = document.getElementById("supportCaseStatusNotice");
     const button = event.currentTarget.querySelector("button[type='submit']");
     const installationSelect = document.getElementById("supportCaseInstallation");
+    const attachmentsField = document.getElementById("supportCaseAttachments");
+    const contextPreview = document.getElementById("supportCaseContextPreview");
     const installationOption = installationSelect.options[installationSelect.selectedIndex];
     ui.clearNotice(notice);
     ui.setButtonBusy(button, true, "Submitting...");
     try {
-      await ui.requestJson("/api/v1/support/cases", {
+      const formData = new FormData();
+      formData.set("kind", document.getElementById("supportCaseKind").value);
+      formData.set("title", document.getElementById("supportCaseTitle").value);
+      formData.set("summary", document.getElementById("supportCaseSummary").value);
+      formData.set("detail", document.getElementById("supportCaseDetail").value);
+      if (installationSelect.value) formData.set("installationId", installationSelect.value);
+      if (installationOption?.dataset?.version) formData.set("applicationVersion", installationOption.dataset.version);
+      if (installationOption?.dataset?.channel) formData.set("releaseChannel", installationOption.dataset.channel);
+      if (installationOption?.dataset?.head) formData.set("headId", installationOption.dataset.head);
+      if (installationOption?.dataset?.platform) formData.set("platform", installationOption.dataset.platform);
+      if (installationOption?.dataset?.arch) formData.set("arch", installationOption.dataset.arch);
+      Array.from(attachmentsField.files || []).forEach((file) => formData.append("attachments", file, file.name));
+
+      const response = await fetch("/api/v1/support/cases/form", {
         method: "POST",
-        json: {
-          kind: document.getElementById("supportCaseKind").value,
-          title: document.getElementById("supportCaseTitle").value,
-          summary: document.getElementById("supportCaseSummary").value,
-          detail: document.getElementById("supportCaseDetail").value,
-          installationId: installationSelect.value || null,
-          applicationVersion: installationOption?.dataset?.version || null,
-          releaseChannel: installationOption?.dataset?.channel || null,
-          headId: installationOption?.dataset?.head || null,
-          platform: installationOption?.dataset?.platform || null,
-          arch: installationOption?.dataset?.arch || null,
-          source: "hub_account"
-        }
+        headers: {
+          "RequestVerificationToken": ui.getRequestVerificationToken()
+        },
+        body: formData,
+        credentials: "same-origin"
       });
-      document.getElementById("supportCaseTitle").value = "";
-      document.getElementById("supportCaseSummary").value = "";
-      document.getElementById("supportCaseDetail").value = "";
-      installationSelect.selectedIndex = 0;
-      ui.setNotice(notice, "Support case submitted. Refresh the page in a moment to see the new status entry.");
+
+      const payload = await ui.readJsonResponse(response, "Support case could not be submitted right now.");
+      window.location.href = `/account/support/${encodeURIComponent(payload.caseId)}`;
     } catch (error) {
       ui.setNotice(notice, ui.describeError(error, "Support case could not be submitted right now."), true);
     } finally {
       ui.setButtonBusy(button, false, "Submitting...");
     }
   });
+
+  const supportInstallation = document.getElementById("supportCaseInstallation");
+  const supportContextPreview = document.getElementById("supportCaseContextPreview");
+  const syncSupportContextPreview = () => {
+    if (!supportInstallation || !supportContextPreview) return;
+    const option = supportInstallation.options[supportInstallation.selectedIndex];
+    if (!option || !option.value) {
+      supportContextPreview.hidden = true;
+      supportContextPreview.innerHTML = "";
+      return;
+    }
+
+    const rows = [
+      ["Linked install", option.textContent?.trim() || option.value],
+      ["Version", option.dataset.version || "Unknown"],
+      ["Channel", option.dataset.channel || "Unknown"],
+      ["Platform", [option.dataset.platform, option.dataset.arch].filter(Boolean).join(" / ") || "Unknown"]
+    ];
+
+    supportContextPreview.hidden = false;
+    supportContextPreview.innerHTML = rows.map(([label, value]) => `
+      <div class="settings-summary-row">
+        <span>${label}</span>
+        <strong>${value}</strong>
+      </div>`).join("");
+  };
+
+  syncSupportContextPreview();
+  supportInstallation?.addEventListener("change", syncSupportContextPreview);
 })();
 </script>
 }

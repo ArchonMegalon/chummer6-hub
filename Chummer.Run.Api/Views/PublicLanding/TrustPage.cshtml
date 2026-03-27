@@ -125,7 +125,7 @@ else
                 <p class="status-copy status-copy--success">@Model.SupportIntake.SubmissionNotice</p>
             }
 
-            <form class="settings-form" method="post" action="@Model.SupportIntake.ActionHref">
+            <form class="settings-form" method="post" action="@Model.SupportIntake.ActionHref" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="field">
                     <label for="supportKind">Case type</label>
@@ -168,6 +168,14 @@ else
                     <div class="field">
                         <label for="supportInstallationId">Install or claim code</label>
                         <input id="supportInstallationId" name="installationId" maxlength="64" placeholder="Optional install id or claim code" />
+                    </div>
+                </details>
+                <details class="details-drawer">
+                    <summary>Attachments</summary>
+                    <p class="muted-copy">@Model.SupportIntake.AttachmentHelp</p>
+                    <div class="field">
+                        <label for="supportAttachments">Screenshots, logs, or small bundles</label>
+                        <input id="supportAttachments" name="attachments" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.txt,.log,.json,.zip,.md" />
                     </div>
                 </details>
                 <div class="stacked-actions">

@@ -468,6 +468,7 @@ internal static class HubExtractionReadinessVerification
         }
 
         var apiProgramText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Program.cs"));
+        var boundedContextExtensionsText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs"));
         foreach (var requiredToken in new[]
                  {
                      "AddHttpClient<HubIdentityClient>()",
@@ -475,7 +476,12 @@ internal static class HubExtractionReadinessVerification
                  })
         {
             VerificationAssert.True(
-                apiProgramText.Contains(requiredToken, StringComparison.Ordinal),
+                apiProgramText.Contains(requiredToken, StringComparison.Ordinal)
+                || boundedContextExtensionsText.Contains(requiredToken, StringComparison.Ordinal)
+                || (string.Equals(requiredToken, "AddHttpClient<HubIdentityClient>()", StringComparison.Ordinal)
+                    && apiProgramText.Contains("AddHubInstallAndOrchestrationAdapters()", StringComparison.Ordinal))
+                || (string.Equals(requiredToken, "AddSingleton<FleetReceiptVerifier>()", StringComparison.Ordinal)
+                    && apiProgramText.Contains("AddHubInstallAndOrchestrationAdapters()", StringComparison.Ordinal)),
                 $"Chummer.Run.Api must keep community-plane security registration '{requiredToken}'.");
         }
 

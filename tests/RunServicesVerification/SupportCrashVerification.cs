@@ -40,7 +40,8 @@ internal static class SupportCrashVerification
             InstallLinkingStore installStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
             InstallLinkingService installLinking = new(installStore);
             SupportStore store = new(configuration, NullLogger<SupportStore>.Instance);
-            SupportCaseService supportCases = new(store, NullLogger<SupportCaseService>.Instance);
+            SupportAttachmentStorageService attachments = new(configuration);
+            SupportCaseService supportCases = new(store, attachments, NullLogger<SupportCaseService>.Instance);
             CrashSupportService service = new(store, supportCases, installLinking, NullLogger<CrashSupportService>.Instance);
             SeedInstallationGrant(installStore, "install-verified", "usr_linked", "subject.linked", "grant-active");
 
@@ -200,7 +201,8 @@ internal static class SupportCrashVerification
             VerificationAssert.True(notified.UserNotifiedAtUtc.HasValue, "Notification hooks should stamp the notification time.");
 
             SupportStore reloadedStore = new(configuration, NullLogger<SupportStore>.Instance);
-            SupportCaseService reloadedSupportCases = new(reloadedStore, NullLogger<SupportCaseService>.Instance);
+            SupportAttachmentStorageService reloadedAttachments = new(configuration);
+            SupportCaseService reloadedSupportCases = new(reloadedStore, reloadedAttachments, NullLogger<SupportCaseService>.Instance);
             InstallLinkingStore reloadedInstallStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
             InstallLinkingService reloadedInstallLinking = new(reloadedInstallStore);
             CrashSupportService reloadedService = new(reloadedStore, reloadedSupportCases, reloadedInstallLinking, NullLogger<CrashSupportService>.Instance);

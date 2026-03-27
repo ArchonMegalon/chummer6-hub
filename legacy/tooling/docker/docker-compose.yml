@@ -202,6 +202,17 @@ services:
       CHUMMER_API_KEY: "${CHUMMER_API_KEY:-}"
     command: >
       node /work/scripts/e2e-ui-playwright.cjs
+  chummer-playwright-hub:
+    image: chummer-playwright:local
+    build:
+      context: ../../..
+      dockerfile: legacy/tooling/docker/Docker/Dockerfile.playwright
+    profiles: ["test"]
+    network_mode: host
+    environment:
+      CHUMMER_HUB_PLAYWRIGHT_BASE_URL: "${CHUMMER_HUB_PLAYWRIGHT_BASE_URL:-http://127.0.0.1:8091}"
+    command: >
+      node /work/scripts/e2e-hub-playwright.cjs
   chummer-playwright-portal:
     image: chummer-playwright:local
     build:

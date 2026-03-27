@@ -17,6 +17,7 @@ public sealed class SupportCasesController : ControllerBase
     private readonly AccountService _accounts;
     private readonly SupportCaseService _supportCases;
     private readonly SupportAssistantService _assistant;
+    private readonly SupportAttachmentStorageService _attachments;
     private readonly IConfiguration _configuration;
 
     public SupportCasesController(
@@ -24,12 +25,14 @@ public sealed class SupportCasesController : ControllerBase
         AccountService accounts,
         SupportCaseService supportCases,
         SupportAssistantService assistant,
+        SupportAttachmentStorageService attachments,
         IConfiguration configuration)
     {
         _identity = identity;
         _accounts = accounts;
         _supportCases = supportCases;
         _assistant = assistant;
+        _attachments = attachments;
         _configuration = configuration;
     }
 
@@ -75,6 +78,40 @@ public sealed class SupportCasesController : ControllerBase
         }
     }
 
+    [HttpGet("{caseId}/attachments/{attachmentId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadAttachment(
+        [FromRoute] string caseId,
+        [FromRoute] string attachmentId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(caseId) || string.IsNullOrWhiteSpace(attachmentId))
+        {
+            return NotFound();
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            SupportCaseProjection? item = _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
+            if (item?.Attachments?.Any(candidate => string.Equals(candidate.AttachmentId, attachmentId, StringComparison.OrdinalIgnoreCase)) != true)
+            {
+                return NotFound();
+            }
+
+            var stored = _attachments.TryOpenAttachment(caseId, attachmentId);
+            return stored is null
+                ? NotFound()
+                : File(stored.Value.Stream, stored.Value.ContentType, stored.Value.FileName);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpPost]
     [ProducesResponseType<SupportCaseProjection>(StatusCodes.Status202Accepted)]
     public async Task<ActionResult<SupportCaseProjection>> Submit(
@@ -91,6 +128,57 @@ public sealed class SupportCasesController : ControllerBase
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             SupportCaseProjection created = _supportCases.Submit(user.UserId, subject.SubjectId, request);
+            return AcceptedAtAction(nameof(GetCase), new { caseId = created.CaseId }, created);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("form")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType<SupportCaseProjection>(StatusCodes.Status202Accepted)]
+    public async Task<ActionResult<SupportCaseProjection>> SubmitFromForm(
+        [FromForm] string? kind,
+        [FromForm] string? title,
+        [FromForm] string? summary,
+        [FromForm] string? detail,
+        [FromForm] string? installationId,
+        [FromForm] string? applicationVersion,
+        [FromForm] string? releaseChannel,
+        [FromForm] string? headId,
+        [FromForm] string? platform,
+        [FromForm] string? arch,
+        [FromForm] List<IFormFile>? attachments,
+        CancellationToken cancellationToken)
+    {
+        var request = new SupportCaseSubmitRequest(
+            Kind: kind ?? string.Empty,
+            Title: title ?? string.Empty,
+            Summary: summary ?? string.Empty,
+            Detail: detail ?? string.Empty,
+            InstallationId: installationId,
+            ApplicationVersion: applicationVersion,
+            ReleaseChannel: releaseChannel,
+            HeadId: headId,
+            Platform: platform,
+            Arch: arch,
+            Source: SupportCaseSourceKinds.HubAccount);
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            SupportCaseProjection created = _supportCases.Submit(
+                user.UserId,
+                subject.SubjectId,
+                request,
+                await ReadUploadsAsync(attachments, cancellationToken));
             return AcceptedAtAction(nameof(GetCase), new { caseId = created.CaseId }, created);
         }
         catch (HubRequestAuthException ex)
@@ -229,5 +317,31 @@ public sealed class SupportCasesController : ControllerBase
         byte[] leftBytes = Encoding.UTF8.GetBytes(left);
         byte[] rightBytes = Encoding.UTF8.GetBytes(right);
         return CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
+    }
+
+    private static async Task<IReadOnlyList<SupportAttachmentUpload>> ReadUploadsAsync(
+        IReadOnlyList<IFormFile>? files,
+        CancellationToken cancellationToken)
+    {
+        if (files is null || files.Count == 0)
+        {
+            return Array.Empty<SupportAttachmentUpload>();
+        }
+
+        List<SupportAttachmentUpload> uploads = new(files.Count);
+        foreach (var file in files)
+        {
+            if (file.Length <= 0)
+            {
+                continue;
+            }
+
+            await using var stream = file.OpenReadStream();
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer, cancellationToken);
+            uploads.Add(new SupportAttachmentUpload(file.FileName, file.ContentType, buffer.ToArray()));
+        }
+
+        return uploads;
     }
 }
