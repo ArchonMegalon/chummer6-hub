@@ -21,6 +21,8 @@
     var dossiers = Model.CampaignSpine.Dossiers.Take(3).ToArray();
     var campaigns = Model.CampaignSpine.Campaigns.Take(3).ToArray();
     var runs = Model.CampaignSpine.Runs.Take(3).ToArray();
+    var buildHandoffs = Model.CampaignSpine.BuildLabHandoffs.Take(2).ToArray();
+    var rulesAnswers = Model.CampaignSpine.RulesNavigator.Take(2).ToArray();
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
     var releasedOrNotifiedCases = Model.SupportCases
         .Where(item =>
@@ -274,28 +276,47 @@
                                 <div class="home-stream__column">
                                     <div class="home-stream__lead">
                                         <p class="eyebrow">Next</p>
-                                        <h2 class="home-stream__title">Roadmap and help without turning Home into a second product site</h2>
+                                        <h2 class="home-stream__title">Build, explain, and move forward without losing continuity</h2>
+                                        <p class="home-stream__summary">Build paths and grounded rule answers stay next to the signed-in return surface so you can see what to inspect before reopening a dossier, session, or support thread.</p>
                                     </div>
                                     <div class="app-rail">
-                                        <article class="app-rail__item">
-                                            <span class="tag">Roadmap</span>
-                                            <div class="app-rail__copy">
-                                                <h3>See what is opening next</h3>
-                                                <p>The roadmap, preview concepts, and follow state stay on dedicated routes until you explicitly need them.</p>
-                                            </div>
-                                            <a class="inline-link" href="/horizons">Open roadmap</a>
-                                        </article>
-                                        @if (Model.HorizonRail.Count > 0)
+                                        @if (buildHandoffs.Length == 0 && rulesAnswers.Length == 0)
                                         {
-                                            var nextCard = Model.HorizonRail[0];
                                             <article class="app-rail__item">
-                                                <span class="tag">@nextCard.Card.Badge</span>
+                                                <span class="tag">Build path</span>
                                                 <div class="app-rail__copy">
-                                                    <h3>@nextCard.Card.Title</h3>
-                                                    <p>@nextCard.Card.Summary</p>
+                                                    <h3>Continuity is ready for the first grounded handoff</h3>
+                                                    <p>Your next build comparison and rules answer will land here once the first dossier or campaign workspace is seeded.</p>
                                                 </div>
-                                                <a class="inline-link" href="@nextCard.Action.Href">@nextCard.Action.Label</a>
+                                                <a class="inline-link" href="/downloads">Start from downloads</a>
                                             </article>
+                                        }
+                                        else
+                                        {
+                                            @if (buildHandoffs.Length > 0)
+                                            {
+                                                var handoff = buildHandoffs[0];
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Build path</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@handoff.Title</h3>
+                                                        <p>@handoff.Summary Variant: @handoff.VariantLabel. Next: @handoff.ProgressionLabel.</p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account/work">Open build follow-through</a>
+                                                </article>
+                                            }
+                                            @if (rulesAnswers.Length > 0)
+                                            {
+                                                var answer = rulesAnswers[0];
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Grounded rule answer</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@answer.Question</h3>
+                                                        <p>@answer.ShortAnswer Provenance: @answer.ProvenanceLabel.</p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account/work">Open grounded rule context</a>
+                                                </article>
+                                            }
                                         }
                                         <article class="app-rail__item">
                                             <span class="tag">Support</span>

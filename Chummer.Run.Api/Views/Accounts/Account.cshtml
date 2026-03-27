@@ -637,11 +637,11 @@
                         <strong>@(openSupportCases == 0 ? "None" : openSupportCases.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Build comparisons</span>
+                        <span>Build paths</span>
                         <strong>@(buildLabHandoffCount == 0 ? "Pending" : buildLabHandoffCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Rules answers</span>
+                        <span>Grounded rule answers</span>
                         <strong>@(rulesNavigatorCount == 0 ? "Pending" : rulesNavigatorCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -777,13 +777,17 @@
                 @if (Model.CampaignSpine.BuildLabHandoffs.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Build comparisons</summary>
+                        <summary>Build paths</summary>
                         <ul class="muted-copy">
                             @foreach (var handoff in Model.CampaignSpine.BuildLabHandoffs)
                             {
                                 <li>
                                     <strong>@handoff.Title</strong>: @handoff.Summary
                                     <span> Variant: @handoff.VariantLabel. Progression: @handoff.ProgressionLabel.</span>
+                                    @if (handoff.TradeoffLines.Count > 0)
+                                    {
+                                        <span> Tradeoffs: @string.Join(" ", handoff.TradeoffLines.Take(2)).</span>
+                                    }
                                     @if (handoff.Outputs.Count > 0)
                                     {
                                         <span> Outputs: @string.Join(", ", handoff.Outputs.Select(item => item.Label)).</span>
@@ -796,13 +800,18 @@
                 @if (Model.CampaignSpine.RulesNavigator.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Rules answers</summary>
+                        <summary>Grounded rule answers</summary>
                         <ul class="muted-copy">
                             @foreach (var answer in Model.CampaignSpine.RulesNavigator)
                             {
                                 <li>
                                     <strong>@answer.Question</strong>: @answer.ShortAnswer
                                     <span> Before: @answer.BeforeSummary. After: @answer.AfterSummary.</span>
+                                    <span> Provenance: @answer.ProvenanceLabel.</span>
+                                    @if (answer.EvidenceLines.Count > 0)
+                                    {
+                                        <span> Evidence: @answer.EvidenceLines[0].</span>
+                                    }
                                 </li>
                             }
                         </ul>
