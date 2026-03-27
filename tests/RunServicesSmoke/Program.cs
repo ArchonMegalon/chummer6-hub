@@ -1520,12 +1520,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
     Assert(homeSource.Contains("Tradeoffs:", StringComparison.Ordinal), "home work should surface the first build tradeoff instead of reducing build follow-through to a headline only.");
     Assert(homeSource.Contains("Evidence:", StringComparison.Ordinal), "home work should surface the first grounded rule evidence line instead of only a generic provenance label.");
+    Assert(homeSource.Contains("Next safe action:", StringComparison.Ordinal), "home work should surface the next safe action for the build path instead of hiding the new decision rail fields.");
+    Assert(homeSource.Contains("Support reuse:", StringComparison.Ordinal), "home work should surface how grounded rule answers feed support closure instead of treating rules explain as standalone copy.");
     var accountSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"));
     Assert(!accountSource.Contains("Build Lab handoffs", StringComparison.Ordinal), "account copy should avoid internal Build Lab wording on the customer-facing surface.");
     Assert(!accountSource.Contains("Rules Navigator answers", StringComparison.Ordinal), "account copy should avoid internal Rules Navigator wording on the customer-facing surface.");
     Assert(accountSource.Contains("Build paths", StringComparison.Ordinal), "account should describe Build Lab follow-through as customer-facing build paths.");
     Assert(accountSource.Contains("Grounded rule answers", StringComparison.Ordinal), "account should describe Rules Navigator follow-through as grounded rule answers.");
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
+    Assert(accountSource.Contains("Closure:", StringComparison.Ordinal), "account build-path details should surface support-closure truth instead of leaving the new rail data unused.");
     Assert(accountSource.Contains("More settings", StringComparison.Ordinal), "account should keep non-core sections behind a calmer secondary settings disclosure.");
     Assert(accountSource.Contains("<summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should keep primary sign-in inside a calmer drawer instead of a full stacked section.");
     Assert(accountSource.Contains("<summary>Recovery email</summary>", StringComparison.Ordinal), "account profile should keep recovery email inside a calmer drawer instead of stacking it inline on the main profile route.");
@@ -1863,6 +1866,12 @@ async Task VerifyPublicLandingProjectionAsync()
         new SupportAssistantRequest(Query: "Why did the rule environment change for my campaign visibility posture?", InstallationId: "install-smoke-001"));
     Assert(rulesAssistant.Citations.Any(static item => string.Equals(item.SourceKind, "rules_truth", StringComparison.Ordinal)), "support assistant should reuse rules navigator truth for grounded campaign-rule questions.");
     Assert(rulesAssistant.Actions.Any(static item => string.Equals(item.ActionId, "open_home", StringComparison.Ordinal)), "support assistant should route grounded rules questions back to the signed-in home cockpit.");
+    var buildAssistant = supportAssistant.Answer(
+        reporterUserId: linkedUser.UserId,
+        reporterSubjectId: "subject.demo",
+        new SupportAssistantRequest(Query: "What is the safest build handoff before I export this dossier back into the campaign?", InstallationId: "install-smoke-001"));
+    Assert(buildAssistant.Citations.Any(static item => string.Equals(item.SourceKind, "build_truth", StringComparison.Ordinal)), "support assistant should reuse build-path truth for dossier handoff questions.");
+    Assert(buildAssistant.Actions.Any(static item => string.Equals(item.ActionId, "open_work", StringComparison.Ordinal)), "support assistant should route build-path questions back to the signed-in work surface.");
     var releasedResult = supportAutomationController.Transition(
         supportCase.CaseId,
         new SupportCaseTransitionRequest(
@@ -1901,7 +1910,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.Workspaces[0].RecapShelf.Count >= 1, "campaign workspace should surface recap or publication-safe continuity outputs.");
     Assert(accountModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "account page should surface Build Lab handoffs into living dossier and campaign truth.");
     Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "account page should receive customer-facing build-path titles directly from the campaign spine service.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "account page should receive the next safe action directly from the campaign spine service.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].RuntimeCompatibilitySummary), "account page should receive runtime compatibility truth for the build handoff.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].SupportClosureSummary), "account page should receive support-closure truth for the build handoff.");
+    Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].Watchouts?.Count > 0, "account page should receive explicit build-handoff watchouts.");
     Assert(accountModel.CampaignSpine.RulesNavigator.Count >= 1, "account page should surface first-class rules navigator answers.");
+    Assert(accountModel.CampaignSpine.RulesNavigator[0].SupportReuseHints.Count >= 1, "account page should receive support reuse hints for grounded rule answers.");
     Assert(accountModel.CampaignSpine.MigrationReceipts.Count >= 1, "account page should surface legacy migration receipts.");
     Assert(accountModel.CampaignSpine.CreatorPublications.Count >= 1, "account page should surface creator publication posture.");
     Assert(accountModel.CampaignSpine.Restore.RecentRuleEnvironments.Count >= 1, "account page should surface restore-ready rule environments.");
@@ -1934,6 +1948,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Count >= 1, "signed-in home should keep the first-class campaign workspace attached to the signed-in shell.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "signed-in home should receive customer-facing build-path titles directly from the campaign spine service.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "signed-in home should receive the next safe build action directly from the campaign spine service.");
     var authenticatedContactPage = await authenticatedLandingController.ContactPage(CancellationToken.None) as ViewResult;
     var authenticatedContactModel = authenticatedContactPage?.Model as TrustPageViewModel;
     Assert(authenticatedContactModel?.SupportIntake is not null, "authenticated contact page should project the first-party support intake.");

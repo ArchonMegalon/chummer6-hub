@@ -74,7 +74,7 @@ public sealed class CampaignSpineService
                         ActiveSponsorSessionCount: _store.SponsorSessionsById.Values.Count(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "stopped", StringComparison.OrdinalIgnoreCase)));
                 })
                 .ToArray();
-            var buildLabHandoffs = BuildBuildLabHandoffs(dossiers, workspaces);
+            var buildLabHandoffs = BuildBuildLabHandoffs(dossiers, workspaces, restore);
             var rulesNavigator = BuildRulesNavigatorEntries(workspaces, operations);
             var migrationReceipts = BuildMigrationReceipts(dossiers, campaigns);
             var creatorPublications = BuildCreatorPublications(workspaces, dossiers);
@@ -602,7 +602,8 @@ public sealed class CampaignSpineService
 
     private static IReadOnlyList<BuildLabHandoffProjection> BuildBuildLabHandoffs(
         IReadOnlyList<RunnerDossierProjection> dossiers,
-        IReadOnlyList<CampaignWorkspaceProjection> workspaces)
+        IReadOnlyList<CampaignWorkspaceProjection> workspaces,
+        WorkspaceRestoreProjection restore)
     {
         return dossiers
             .Select(dossier =>
@@ -613,8 +614,15 @@ public sealed class CampaignSpineService
                     .Distinct()
                     .Take(3)
                     .ToArray();
+                var runtimeFingerprint = workspace?.RuleEnvironment.CompatibilityFingerprint ?? dossier.RuleEnvironment.CompatibilityFingerprint;
                 var variantLabel = workspace is null ? "Living dossier carry-forward" : "Ops-first dossier carry-forward";
                 var progressionLabel = workspace is null ? "Ready to seed into a campaign" : "25 / 50 / 100 Karma path stays attached to the campaign return";
+                var nextSafeAction = ResolveBuildLabNextSafeAction(workspace, outputs, restore);
+                var runtimeCompatibilitySummary = DescribeBuildLabRuntimeCompatibility(runtimeFingerprint, workspace, restore);
+                var campaignReturnSummary = workspace?.ReturnSummary
+                    ?? "No campaign workspace is attached yet, so return still lands on the living dossier until the first governed campaign handoff exists.";
+                var supportClosureSummary = DescribeBuildLabSupportClosure(runtimeFingerprint, restore);
+                var watchouts = BuildBuildLabWatchouts(workspace, outputs, restore);
                 return new BuildLabHandoffProjection(
                     HandoffId: StableId("buildlab", dossier.DossierId),
                     DossierId: dossier.DossierId,
@@ -639,9 +647,106 @@ public sealed class CampaignSpineService
                             : "Publication-safe outputs will appear as recap and dossier cards once the first run lands."
                     ],
                     Outputs: outputs,
-                    UpdatedAtUtc: dossier.UpdatedAtUtc);
+                    UpdatedAtUtc: dossier.UpdatedAtUtc,
+                    NextSafeAction: nextSafeAction,
+                    RuntimeCompatibilitySummary: runtimeCompatibilitySummary,
+                    CampaignReturnSummary: campaignReturnSummary,
+                    SupportClosureSummary: supportClosureSummary,
+                    Watchouts: watchouts);
             })
             .Take(3)
+            .ToArray();
+    }
+
+    private static string ResolveBuildLabNextSafeAction(
+        CampaignWorkspaceProjection? workspace,
+        IReadOnlyList<PublicationSafeProjection> outputs,
+        WorkspaceRestoreProjection restore)
+    {
+        if (restore.ConflictSummaries.Count > 0)
+        {
+            return "Confirm restore conflicts and current channel posture before you export, publish, or reopen campaign continuity.";
+        }
+
+        if (workspace is null)
+        {
+            return "Attach this dossier to a governed campaign workspace before you trust the handoff as the table-safe return path.";
+        }
+
+        if (outputs.Count == 0)
+        {
+            return $"Open {workspace.CampaignName} and generate the first recap-safe output before you hand the build path back to play.";
+        }
+
+        return $"Open {workspace.CampaignName} and verify readiness cues before you hand the build path back into active play.";
+    }
+
+    private static string DescribeBuildLabRuntimeCompatibility(
+        string runtimeFingerprint,
+        CampaignWorkspaceProjection? workspace,
+        WorkspaceRestoreProjection restore)
+    {
+        if (restore.ConflictSummaries.Count > 0)
+        {
+            return $"{runtimeFingerprint} is the active compatibility fingerprint, but restore still needs review before the handoff is campaign-safe.";
+        }
+
+        return workspace is null
+            ? $"{runtimeFingerprint} is pinned on the living dossier, but the first campaign workspace still needs to confirm the same rule posture."
+            : $"{runtimeFingerprint} is pinned across the dossier, workspace, and return rail for this handoff.";
+    }
+
+    private static string DescribeBuildLabSupportClosure(
+        string runtimeFingerprint,
+        WorkspaceRestoreProjection restore)
+    {
+        var claimedDevice = restore.ClaimedDevices
+            .FirstOrDefault(item => string.Equals(item.Channel, "preview", StringComparison.OrdinalIgnoreCase))
+            ?? restore.ClaimedDevices.FirstOrDefault();
+        var artifact = restore.RecentArtifacts
+            .FirstOrDefault(item => !string.IsNullOrWhiteSpace(item.Channel) && string.Equals(item.Channel, claimedDevice?.Channel, StringComparison.OrdinalIgnoreCase))
+            ?? restore.RecentArtifacts.FirstOrDefault();
+
+        if (claimedDevice is null)
+        {
+            return $"Support can cite the same runtime fingerprint ({runtimeFingerprint}), but no claimed install is attached yet for release-aware closure.";
+        }
+
+        if (artifact is null)
+        {
+            return $"Support can anchor closure on the claimed {claimedDevice.Platform} {claimedDevice.HeadId} install on {claimedDevice.Channel} and the same runtime fingerprint ({runtimeFingerprint}).";
+        }
+
+        return $"Support can anchor closure on {artifact.Channel} {artifact.Version ?? "current"} for {artifact.Label} and the same runtime fingerprint ({runtimeFingerprint}).";
+    }
+
+    private static IReadOnlyList<string> BuildBuildLabWatchouts(
+        CampaignWorkspaceProjection? workspace,
+        IReadOnlyList<PublicationSafeProjection> outputs,
+        WorkspaceRestoreProjection restore)
+    {
+        var watchouts = new List<string>();
+
+        if (workspace is null)
+        {
+            watchouts.Add("No governed campaign workspace is attached yet, so the handoff is still dossier-first rather than table-return first.");
+        }
+
+        if (outputs.Count == 0)
+        {
+            watchouts.Add("No publication-safe recap or dossier output is attached yet, so return and support still rely on the dossier summary alone.");
+        }
+
+        watchouts.AddRange(restore.ConflictSummaries);
+
+        if (restore.ClaimedDevices.Count == 0)
+        {
+            watchouts.Add("No claimed install is attached yet, so release-aware support closure still depends on manual install details.");
+        }
+
+        return watchouts
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
 

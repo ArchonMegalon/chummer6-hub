@@ -89,6 +89,11 @@ public sealed class SupportAssistantService
             citations.Add(citation);
         }
 
+        foreach (var citation in BuildBuildJourneyTruthCitations(reporterUserId, reporterSubjectId, tokens, maxCitations - citations.Count))
+        {
+            citations.Add(citation);
+        }
+
         foreach (var rule in CanonRules)
         {
             if (citations.Count >= maxCitations)
@@ -172,6 +177,51 @@ public sealed class SupportAssistantService
         }
     }
 
+    private IReadOnlyList<SupportAssistantCitation> BuildBuildJourneyTruthCitations(
+        string? reporterUserId,
+        string? reporterSubjectId,
+        IReadOnlySet<string> tokens,
+        int capacity)
+    {
+        if (capacity <= 0
+            || string.IsNullOrWhiteSpace(reporterUserId)
+            || !ShouldUseBuildJourneyTruth(tokens))
+        {
+            return Array.Empty<SupportAssistantCitation>();
+        }
+
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var summary = _campaignSpine.GetAccountSummary(new HubUserDto(
+                UserId: reporterUserId,
+                SubjectId: reporterSubjectId ?? reporterUserId,
+                DisplayName: reporterSubjectId ?? reporterUserId,
+                Handle: reporterSubjectId ?? reporterUserId,
+                Visibility: "private",
+                Timezone: "UTC",
+                CountryCode: "ZZ",
+                LinkedPrincipals: Array.Empty<string>(),
+                GroupIds: Array.Empty<string>(),
+                CreatedAtUtc: now,
+                UpdatedAtUtc: now));
+
+            return summary.BuildLabHandoffs
+                .Take(capacity)
+                .Select(entry => new SupportAssistantCitation(
+                    SourceKind: "build_truth",
+                    Label: entry.Title,
+                    Summary: TrimForSummary($"{entry.NextSafeAction ?? entry.Summary} Return: {entry.CampaignReturnSummary ?? entry.ProgressionLabel} Support: {entry.SupportClosureSummary ?? string.Join(" | ", entry.ProgressionOutcomes.Take(1))}"),
+                    Href: "/account/work"))
+                .ToArray();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "support assistant could not hydrate build-truth citations for reporter {ReporterUserId}", reporterUserId);
+            return Array.Empty<SupportAssistantCitation>();
+        }
+    }
+
     private string BuildAnswer(
         IReadOnlyList<SupportCaseProjection> caseMatches,
         IReadOnlyList<SupportAssistantCitation> citations,
@@ -200,6 +250,8 @@ public sealed class SupportAssistantService
         {
             string guidance = tokens.Contains("update") || tokens.Contains("restart")
                 ? "I did not find an account-linked case yet, but the first-party release and update docs match your question."
+                : ShouldUseBuildJourneyTruth(tokens)
+                    ? "I did not find an account-linked case yet, but I did find a grounded build or campaign follow-through path in your signed-in workspace."
                 : tokens.Contains("install") || tokens.Contains("download") || tokens.Contains("claim")
                     ? "I did not find an account-linked case yet, but the first-party install and downloads docs cover this path."
                     : "I did not find an account-linked case yet, but I did find first-party help that matches your question.";
@@ -249,6 +301,11 @@ public sealed class SupportAssistantService
             Add("open_home", "Open home", "/home", "Review the current rule environment, campaign workspace, and grounded answer path.");
         }
 
+        if (ShouldUseBuildJourneyTruth(tokens))
+        {
+            Add("open_work", "Open work", "/account/work", "Review the current build path, living dossier, and campaign return rail.");
+        }
+
         return actions.Values.ToList();
     }
 
@@ -262,6 +319,18 @@ public sealed class SupportAssistantService
            || tokens.Contains("change")
            || tokens.Contains("changed")
            || tokens.Contains("why");
+
+    private static bool ShouldUseBuildJourneyTruth(IReadOnlySet<string> tokens)
+        => tokens.Contains("build")
+           || tokens.Contains("compare")
+           || tokens.Contains("variant")
+           || tokens.Contains("export")
+           || tokens.Contains("publish")
+           || tokens.Contains("dossier")
+           || tokens.Contains("campaign")
+           || tokens.Contains("return")
+           || tokens.Contains("continuity")
+           || tokens.Contains("handoff");
 
     private bool MatchesCase(
         SupportCaseProjection item,
