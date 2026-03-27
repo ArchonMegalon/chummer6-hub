@@ -29,6 +29,12 @@ async function assertNoBannedCopy(page, label) {
   assert.equal(bannedCopy.test(text), false, `${label} rendered banned generic CTA copy.`);
 }
 
+async function assertTextCount(page, needle, expected, label) {
+  const text = await page.locator('body').innerText();
+  const matches = text.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || [];
+  assert.equal(matches.length, expected, `${label} should render "${needle}" ${expected} time(s), got ${matches.length}.`);
+}
+
 function assertLoginRedirect(page, expectedNext, label) {
   const current = new URL(page.url());
   assert.equal(current.pathname, '/login', `${label} should redirect to /login.`);
@@ -60,6 +66,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'header[data-site-header]', 'Landing header should render once.');
     assert.equal(await page.locator('header[data-site-header]').count(), 1, 'Landing should only render one site header.');
     await expectVisible(page, 'text=Create account to get preview');
+    await assertTextCount(page, 'Final pool 9', 1, 'Landing');
     await assertNoBannedCopy(page, 'Landing');
   });
 
@@ -79,6 +86,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Create account to get preview');
     await expectVisible(page, 'text=Advanced download options');
     await assertNoBannedCopy(page, 'Downloads');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/now', async () => {
+    await expectVisible(page, 'text=What you can verify now');
+    await expectVisible(page, 'text=Supporting proof around the core loop');
+    await assertNoBannedCopy(page, 'Now');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/horizons', async () => {
+    await expectVisible(page, 'text=Preparing next');
+    await expectVisible(page, 'text=Designing in public');
+    await expectVisible(page, 'text=Research track');
+    const bodyText = await page.locator('body').innerText();
+    assert.equal(bodyText.includes('Research tracks'), false, 'Horizons should use the unified research-track label.');
+    await assertNoBannedCopy(page, 'Horizons');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/artifacts', async () => {
+    await expectVisible(page, 'text=Current proof surfaces');
+    await expectVisible(page, 'text=Preview in progress');
+    await assertNoBannedCopy(page, 'Artifacts');
   });
 
   await page.goto(`${baseUrl}/signup?next=${encodeURIComponent(signupNext)}`, { waitUntil: 'domcontentloaded' });
@@ -197,6 +225,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/artifacts/current-preview-build', async () => {
     await expectVisible(page, 'text=Use and verify this proof');
+    await expectVisible(page, 'text=Available today');
     await expectVisible(page, 'text=Start from the live surface');
   });
 
