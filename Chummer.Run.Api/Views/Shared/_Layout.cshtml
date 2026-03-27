@@ -132,7 +132,7 @@
                     @if (compactFooter)
                     {
                         <details class="site-footer__disclosure">
-                            <summary>Help, legal, and utility</summary>
+                            <summary>Help and legal</summary>
                             <div class="site-footer__link-group">
                                 <p class="site-footer__heading">Help and legal</p>
                                 <div class="site-footer__links">
@@ -142,18 +142,6 @@
                                     }
                                 </div>
                             </div>
-                            @if (chrome.UtilityNavigation.Count > 0)
-                            {
-                                <div class="site-footer__link-group site-footer__link-group--utility">
-                                    <p class="site-footer__heading">Utility</p>
-                                    <div class="site-footer__links site-footer__links--utility">
-                                        @foreach (var link in chrome.UtilityNavigation)
-                                        {
-                                            <a href="@link.Href">@link.Label</a>
-                                        }
-                                    </div>
-                                </div>
-                            }
                         </details>
                     }
                     else

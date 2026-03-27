@@ -1482,6 +1482,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var layoutSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
     Assert(!layoutSource.Contains("site-nav-sheet", StringComparison.Ordinal), "layout should not render the old duplicate mobile nav sheet.");
     Assert(layoutSource.Contains("site-bottom-cta", StringComparison.Ordinal), "layout should keep a mobile-first sticky primary CTA for the public shell.");
+    Assert(!layoutSource.Contains("Help, legal, and utility", StringComparison.Ordinal), "compact public footer should stop carrying utility links in the product-route disclosure.");
     var authEntrySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Auth", "Entry.cshtml"));
     Assert(!authEntrySource.Contains("auth-panel__support", StringComparison.Ordinal), "auth entry should keep one quiet support row instead of duplicating support chrome inside the panel.");
     var landingSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml"));
