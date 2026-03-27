@@ -3,6 +3,8 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-trust-page";
+    var policyPage = string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Model.PageId, "terms", StringComparison.OrdinalIgnoreCase);
 
     static TrustPageActionViewModel? HelpActionFor(string sectionId, bool authenticated) => sectionId switch
     {
@@ -32,7 +34,7 @@
                 }
             </div>
         }
-        @if (Model.SummaryPoints is { Count: > 0 })
+        @if (!policyPage && Model.SummaryPoints is { Count: > 0 })
         {
             <div class="trust-claim__microproof">
                 @foreach (var point in Model.SummaryPoints)
@@ -49,6 +51,25 @@
         }
     </div>
 </section>
+
+@if (policyPage && Model.SummaryPoints is { Count: > 0 })
+{
+    <section class="trust-rail-section">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">What changed in this version</p>
+            <h2 class="editorial-title">Read the current policy delta before you dive into the full document</h2>
+        </div>
+        <div class="trust-rail-list">
+            @foreach (var point in Model.SummaryPoints)
+            {
+                <article class="trust-rail">
+                    <span class="tag">Policy</span>
+                    <p>@point</p>
+                </article>
+            }
+        </div>
+    </section>
+}
 
 @if (string.Equals(Model.PageId, "help", StringComparison.OrdinalIgnoreCase))
 {
