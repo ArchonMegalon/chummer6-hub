@@ -1,0 +1,87 @@
+product: chummer
+surface: desktop_and_hosted_language_system
+version: 1
+source_locale: en-US
+fallback_locale: en-US
+shipping_locales:
+  - en-US
+  - de-DE
+  - fr-FR
+  - ja-JP
+  - pt-BR
+  - zh-CN
+domains:
+  - id: app_chrome
+    label: App chrome
+    description: Shell chrome, navigation, dialogs, settings, and workbench framing.
+  - id: install_update_support
+    label: Install, update, and support
+    description: Downloads, first-launch claim, updater, crash, bug, feedback, and support closure surfaces.
+  - id: explain_receipts
+    label: Explain and receipts
+    description: Grounded explanations, receipts, migration explanations, and update/support decision text.
+  - id: data_rules_names
+    label: Data and rules names
+    description: Catalog, rules, and data-facing names carried through the language corpus.
+  - id: generated_artifacts
+    label: Generated artifacts
+    description: Exported or published text that leaves the immediate UI shell.
+acceptance_gates:
+  - pseudo_localization
+  - missing_key_fail_fast
+  - top_surface_overflow_checks
+  - locale_smoke_first_launch
+  - locale_smoke_settings
+  - locale_smoke_explain
+  - locale_smoke_updater
+  - locale_smoke_support
+  - non_english_generated_artifact_smoke
+locale_matrix:
+  - locale: en-US
+    role: source
+    domains:
+      app_chrome: release_required
+      install_update_support: release_required
+      explain_receipts: release_required
+      data_rules_names: release_required
+      generated_artifacts: release_required
+  - locale: de-DE
+    role: shipping_target
+    domains:
+      app_chrome: release_required
+      install_update_support: release_required
+      explain_receipts: release_required
+      data_rules_names: release_required
+      generated_artifacts: release_required
+  - locale: fr-FR
+    role: shipping_target
+    domains:
+      app_chrome: release_required
+      install_update_support: release_required
+      explain_receipts: release_required
+      data_rules_names: release_required
+      generated_artifacts: release_required
+  - locale: ja-JP
+    role: shipping_target
+    domains:
+      app_chrome: release_required
+      install_update_support: release_required
+      explain_receipts: release_required
+      data_rules_names: release_required
+      generated_artifacts: release_required
+  - locale: pt-BR
+    role: shipping_target
+    domains:
+      app_chrome: release_required
+      install_update_support: release_required
+      explain_receipts: release_required
+      data_rules_names: release_required
+      generated_artifacts: release_required
+  - locale: zh-CN
+    role: shipping_target
+    domains:
+      app_chrome: release_required
+      install_update_support: release_required
+      explain_receipts: release_required
+      data_rules_names: release_required
+      generated_artifacts: release_required

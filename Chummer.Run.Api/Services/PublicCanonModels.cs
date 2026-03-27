@@ -217,6 +217,10 @@ internal sealed class PublicReleaseExperienceDocument
     public int Version { get; init; }
     public List<string>? GuestReadableChannels { get; init; }
     public string ReleaseNotesSummary { get; init; } = string.Empty;
+    public string? DesktopFlagshipHead { get; init; }
+    public string? DesktopFallbackHead { get; init; }
+    public string? DesktopCutSummary { get; init; }
+    public List<string>? SupportedLocaleTargets { get; init; }
     public string KnownIssuesLabel { get; init; } = string.Empty;
     public string KnownIssuesHref { get; init; } = string.Empty;
     public string InstallHelpLabel { get; init; } = string.Empty;
@@ -248,4 +252,28 @@ internal sealed class PublicReleaseChannelLabelDocument
 {
     public string Id { get; init; } = string.Empty;
     public string Label { get; init; } = string.Empty;
+}
+
+internal sealed class DesktopPlatformAcceptanceDocument
+{
+    public string Product { get; init; } = string.Empty;
+    public string Surface { get; init; } = string.Empty;
+    public int Version { get; init; }
+    public string FlagshipHead { get; init; } = string.Empty;
+    public string FallbackHead { get; init; } = string.Empty;
+    public List<DesktopPlatformAcceptancePlatformDocument>? Platforms { get; init; }
+}
+
+internal sealed class DesktopPlatformAcceptancePlatformDocument
+{
+    public string Id { get; init; } = string.Empty;
+    public string PublicShelfStatus { get; init; } = string.Empty;
+    public string PrimaryPackageKind { get; init; } = string.Empty;
+    public List<string>? FallbackPackageKinds { get; init; }
+    public string StartupSmokeGate { get; init; } = string.Empty;
+    public string SigningPosture { get; init; } = string.Empty;
+    public string UpdaterMode { get; init; } = string.Empty;
+    public string Supportability { get; init; } = string.Empty;
+    public string? PublicManifestVisibility { get; init; }
+    public string? PublicPromotionGate { get; init; }
 }

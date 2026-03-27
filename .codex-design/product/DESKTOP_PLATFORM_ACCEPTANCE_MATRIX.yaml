@@ -1,0 +1,35 @@
+product: chummer
+surface: desktop_delivery
+version: 1
+flagship_head: Chummer.Avalonia
+fallback_head: Chummer.Blazor.Desktop
+platforms:
+  - id: windows
+    public_shelf_status: promoted_preview
+    primary_package_kind: installer
+    fallback_package_kinds:
+      - portable_exe
+    startup_smoke_gate: required
+    signing_posture: required_for_promoted_release
+    updater_mode: in_app_apply_helper
+    supportability: primary
+  - id: linux
+    public_shelf_status: preview_support_directed
+    primary_package_kind: deb
+    fallback_package_kinds:
+      - archive
+    startup_smoke_gate: required
+    signing_posture: package_integrity_required
+    updater_mode: in_app_or_installer_handoff
+    supportability: secondary
+  - id: macOS
+    public_shelf_status: buildable_not_publicly_promoted
+    primary_package_kind: dmg
+    fallback_package_kinds:
+      - none
+    startup_smoke_gate: required
+    signing_posture: codesign_and_notarization_required
+    updater_mode: handoff_until_public_promotion
+    supportability: gated_by_signing_and_notarization
+    public_manifest_visibility: hidden_until_signed_and_promoted
+    public_promotion_gate: signed_dmg_notarized_and_release_truth_promoted

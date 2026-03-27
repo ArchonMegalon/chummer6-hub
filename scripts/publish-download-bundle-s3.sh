@@ -47,14 +47,49 @@ if ! command -v aws >/dev/null 2>&1; then
   exit 1
 fi
 
+to_bool() {
+  local value
+  value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
+}
+
+is_public_artifact() {
+  local artifact_name
+  artifact_name="$(basename "$1")"
+  if ! to_bool "${CHUMMER_MACOS_PUBLIC_SHELF_ENABLED:-false}" && [[ "$artifact_name" == chummer-*-osx-* ]]; then
+    return 1
+  fi
+  return 0
+}
+
 endpoint_args=()
 if [[ -n "$S3_ENDPOINT_URL" ]]; then
   endpoint_args=(--endpoint-url "$S3_ENDPOINT_URL")
 fi
 
+filtered_files_dir="$(mktemp -d)"
+cleanup() {
+  rm -rf "$filtered_files_dir"
+}
+trap cleanup EXIT
+
+mkdir -p "$filtered_files_dir"
+while IFS= read -r artifact; do
+  [[ -f "$artifact" ]] || continue
+  if is_public_artifact "$artifact"; then
+    cp "$artifact" "$filtered_files_dir/"
+  fi
+done < <(find "$FILES_SOURCE" -maxdepth 1 -type f \( \
+  -name 'chummer-*-installer.exe' -o \
+  -name 'chummer-*-installer.deb' -o \
+  -name 'chummer-*-installer.pkg' -o \
+  -name 'chummer-*-installer.dmg' -o \
+  -name 'chummer-*-installer.msix' \
+\) | sort)
+
 copy_target() {
   local target_uri="$1"
-  aws s3 cp "$FILES_SOURCE/" "$target_uri/files/" --recursive "${endpoint_args[@]}"
+  aws s3 cp "$filtered_files_dir/" "$target_uri/files/" --recursive "${endpoint_args[@]}"
   aws s3 cp "$MANIFEST_SOURCE" "$target_uri/releases.json" "${endpoint_args[@]}"
   aws s3 cp "$CANONICAL_MANIFEST_SOURCE" "$target_uri/RELEASE_CHANNEL.generated.json" "${endpoint_args[@]}"
 }
@@ -66,14 +101,14 @@ fi
 
 bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$VERIFY_URL"
 
-artifact_count="$(find "$FILES_SOURCE" -maxdepth 1 -type f \( \
+artifact_count="$(find "$filtered_files_dir" -maxdepth 1 -type f \( \
   -name 'chummer-*-installer.exe' -o \
   -name 'chummer-*-installer.deb' -o \
   -name 'chummer-*-installer.pkg' -o \
   -name 'chummer-*-installer.dmg' -o \
   -name 'chummer-*-installer.msix' \
 \) | wc -l | tr -d ' ')"
-echo "Published ${artifact_count} desktop artifact(s) to object storage target: $S3_TARGET_URI"
+echo "Published ${artifact_count} public desktop artifact(s) to object storage target: $S3_TARGET_URI"
 if [[ -n "$S3_LATEST_URI" ]]; then
   echo "Also published latest alias target: $S3_LATEST_URI"
 fi

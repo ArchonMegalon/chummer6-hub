@@ -1369,6 +1369,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var downloadsFilesRoot = Path.Combine(downloadsRoot, "files");
     Directory.CreateDirectory(downloadsFilesRoot);
     File.WriteAllText(Path.Combine(downloadsFilesRoot, "smoke-poc-linux-x64.zip"), "smoke");
+    File.WriteAllText(Path.Combine(downloadsFilesRoot, "smoke-poc-osx-arm64-installer.dmg"), "smoke-mac");
     File.WriteAllText(
         Path.Combine(downloadsRoot, "RELEASE_CHANNEL.generated.json"),
         JsonSerializer.Serialize(
@@ -1395,6 +1396,19 @@ async Task VerifyPublicLandingProjectionAsync()
                         sha256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                         sizeBytes = 4096,
                         platformLabel = "Smoke Linux x64"
+                    },
+                    new
+                    {
+                        artifactId = "smoke-poc-osx-arm64-installer",
+                        head = "avalonia",
+                        platform = "macOS",
+                        arch = "arm64",
+                        kind = "dmg",
+                        fileName = "smoke-poc-osx-arm64-installer.dmg",
+                        downloadUrl = "/downloads/files/smoke-poc-osx-arm64-installer.dmg",
+                        sha256 = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+                        sizeBytes = 8192,
+                        platformLabel = "Smoke macOS ARM64"
                     }
                 }
             },
@@ -1413,7 +1427,18 @@ async Task VerifyPublicLandingProjectionAsync()
                         Platform: "linux-x64",
                         Url: "/downloads/files/smoke-poc-linux-x64.zip",
                         Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                        SizeBytes: 4096)
+                        SizeBytes: 4096),
+                    new PublicReleaseArtifactDto(
+                        Id: "smoke-poc-osx-arm64-installer",
+                        Platform: "macOS ARM64",
+                        Url: "/downloads/files/smoke-poc-osx-arm64-installer.dmg",
+                        Sha256: "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+                        SizeBytes: 8192,
+                        Head: "avalonia",
+                        PlatformId: "osx-arm64",
+                        Arch: "arm64",
+                        Kind: "dmg",
+                        FileName: "smoke-poc-osx-arm64-installer.dmg")
                 ]),
             new JsonSerializerOptions(JsonSerializerDefaults.Web)));
 
@@ -1644,13 +1669,23 @@ async Task VerifyPublicLandingProjectionAsync()
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
     Assert(downloadsModel is not null && downloadsModel.Manifest.Downloads.Any(static item => string.Equals(item.Id, "smoke-poc-linux-x64", StringComparison.Ordinal)), "downloads page should render artifacts from the live release manifest");
+    Assert(downloadsModel.Manifest.Downloads.All(static item => !string.Equals(item.Id, "smoke-poc-osx-arm64-installer", StringComparison.Ordinal)), "downloads page should filter withheld macOS artifacts from the public manifest.");
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
     Assert(downloadsModel!.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Create your Chummer account first.", StringComparison.OrdinalIgnoreCase)), "account-gated releases should keep account-required install steps for the current preview recommendation.");
     Assert(string.Equals(downloadsModel.ReleaseExperience.GuestGatePrimaryLabel, "Create account to get preview", StringComparison.Ordinal), "downloads page should keep the signup-first guest gate label.");
     Assert(string.Equals(downloadsModel.ReleaseExperience.KnownIssuesLabel, "Known issues and install help", StringComparison.Ordinal), "downloads page should keep a single known-issues/install-help label for the current preview.");
+    controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)";
+    var macDownloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
+    var macDownloadsModel = macDownloadsView?.Model as DownloadsPageViewModel;
+    Assert(macDownloadsModel is not null, "downloads page should still render for a macOS user agent even when the platform is withheld.");
+    Assert(string.Equals(macDownloadsModel!.ReleaseExperience.RequestedPlatformLabel, "macOS", StringComparison.Ordinal), "downloads page should detect the macOS user agent.");
+    Assert(!string.IsNullOrWhiteSpace(macDownloadsModel.ReleaseExperience.PlatformShelfNoticeTitle), "downloads page should surface a shelf note when macOS is not publicly promoted.");
+    Assert(macDownloadsModel.ReleaseExperience.PlatformShelfNoticeSummary?.Contains("does not publish a promoted macOS installer yet", StringComparison.OrdinalIgnoreCase) == true, "downloads page should explain that the macOS build lane is not yet on the public shelf.");
     var authenticatedDownloadResult = await downloadsController.DownloadArtifact("smoke-poc-linux-x64", CancellationToken.None);
     var authenticatedRedirect = authenticatedDownloadResult as RedirectResult;
     Assert(authenticatedRedirect is not null && string.Equals(authenticatedRedirect.Url, "/downloads/install/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in compatibility downloads should route through the install handoff.");
+    var blockedMacFile = await downloadsController.DownloadFile("smoke-poc-osx-arm64-installer.dmg", CancellationToken.None);
+    Assert(blockedMacFile is NotFoundResult, "direct file routes should not serve macOS artifacts that were withheld from the public shelf.");
     var dispatchView = await authenticatedLandingController.DownloadDispatchPage("smoke-poc-linux-x64", CancellationToken.None) as ViewResult;
     var dispatchModel = dispatchView?.Model as DownloadDispatchPageViewModel;
     Assert(dispatchModel is not null && string.Equals(dispatchModel.DownloadHref, "/downloads/file/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in download handoff should expose the canonical file route.");
