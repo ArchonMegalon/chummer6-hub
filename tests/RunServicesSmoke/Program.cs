@@ -1482,7 +1482,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!landingSource.Contains("artifact-gallery", StringComparison.Ordinal), "landing should keep artifact depth off the main conversion spine.");
     Assert(landingSource.Contains("proofSectionAsset", StringComparison.Ordinal), "landing should use a separate lower proof asset instead of rendering the same proof screenshot twice.");
     Assert(landingSource.Contains("scene_dossier_desk", StringComparison.Ordinal), "landing should pair the hero proof teaser with a different lower proof asset.");
-    Assert(landingSource.Contains("var proofNotes = Model.Workflows.Take(2).ToArray();", StringComparison.Ordinal), "landing should trim the front door proof band to a smaller workflow set.");
+    Assert(landingSource.Contains("var proofNotes = Model.Workflows.Take(1).ToArray();", StringComparison.Ordinal), "landing should keep the proof band to one tighter workflow note instead of restating the whole product loop.");
+    Assert(!landingSource.Contains("works-column__header", StringComparison.Ordinal), "landing should collapse the what-works-now strip instead of restating three full column headers.");
     var storySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml"));
     Assert(!storySource.Contains("One path from install to session return", StringComparison.Ordinal), "product story should not drift back into a second install/support explainer.");
     Assert(!storySource.Contains("From first install to next session", StringComparison.Ordinal), "product story should stay focused on differentiation instead of retelling the install path.");
@@ -1492,12 +1493,14 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!nowSource.Contains("Integrity stays visible. Use downloads when you are ready to install", StringComparison.Ordinal), "now should not end with a second generic CTA band after the signed-in return callout.");
     var homeSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"));
     Assert(!homeSource.Contains("More in your signed-in shell", StringComparison.Ordinal), "home should not fall back to the old catch-all signed-in shell accordion.");
-    Assert(homeSource.Contains("Account state at a glance", StringComparison.Ordinal), "home should keep top-level account state behind a calmer at-a-glance disclosure.");
+    Assert(!homeSource.Contains("Account state at a glance", StringComparison.Ordinal), "home should keep the overview route focused instead of adding a second top-level summary disclosure.");
+    Assert(homeSource.Contains("Open what works today", StringComparison.Ordinal), "home access should point proof needs to the dedicated now route instead of repeating proof cards inline.");
     var accountSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"));
     Assert(!accountSource.Contains("Build Lab handoffs", StringComparison.Ordinal), "account copy should avoid internal Build Lab wording on the customer-facing surface.");
     Assert(!accountSource.Contains("Rules Navigator answers", StringComparison.Ordinal), "account copy should avoid internal Rules Navigator wording on the customer-facing surface.");
     Assert(accountSource.Contains("More settings", StringComparison.Ordinal), "account should keep non-core sections behind a calmer secondary settings disclosure.");
     Assert(accountSource.Contains("Advanced account details", StringComparison.Ordinal), "account should hide raw account identifiers behind an advanced disclosure.");
+    Assert(accountSource.Contains("var sectionTitle = Model.CurrentSection switch", StringComparison.Ordinal), "account routes should expose route-specific headings instead of one generic account title.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
@@ -1518,6 +1521,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "horizon_local_co_processor", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open the horizon page", StringComparison.Ordinal)), "local co-processor should route through its roadmap detail page instead of pretending the overview card is an install action.");
     var downloadsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"));
     Assert(downloadsSource.Contains("Advanced download options", StringComparison.Ordinal), "downloads should group advanced distribution paths under one calmer disclosure.");
+    Assert(!downloadsSource.Contains("What changed and what to expect", StringComparison.Ordinal), "downloads should not carry a second release explainer block under the primary install path.");
+    Assert(downloadsSource.Contains("Release notes, known issues, and requirements", StringComparison.Ordinal), "downloads should tuck release education into one calmer drawer on the primary card.");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var campaignSpine = new CampaignSpineService(store);
@@ -1665,7 +1670,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
     Assert(downloadsModel is not null && downloadsModel.Manifest.Downloads.Any(static item => string.Equals(item.Id, "smoke-poc-linux-x64", StringComparison.Ordinal)), "downloads page should render artifacts from the live release manifest");
-    Assert(downloadsModel.Manifest.Downloads.All(static item => !string.Equals(item.Id, "smoke-poc-osx-arm64-installer", StringComparison.Ordinal)), "downloads page should filter withheld macOS artifacts from the public manifest.");
+    Assert(downloadsModel!.Manifest.Downloads.All(static item => !string.Equals(item.Id, "smoke-poc-osx-arm64-installer", StringComparison.Ordinal)), "downloads page should filter withheld macOS artifacts from the public manifest.");
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
     Assert(downloadsModel!.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Create your Chummer account first.", StringComparison.OrdinalIgnoreCase)), "account-gated releases should keep account-required install steps for the current preview recommendation.");
     Assert(string.Equals(downloadsModel.ReleaseExperience.GuestGatePrimaryLabel, "Create account to get preview", StringComparison.Ordinal), "downloads page should keep the signup-first guest gate label.");
@@ -1842,9 +1847,11 @@ async Task VerifyPublicLandingProjectionAsync()
     var accountSupportPage = await accountController.AccountPage("support", CancellationToken.None) as ViewResult;
     var accountSupportModel = accountSupportPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountSupportModel?.CurrentSection, "support", StringComparison.Ordinal), "account support route should render the support section.");
+    Assert(string.Equals(accountSupportModel?.Chrome.Title, "Account · Support", StringComparison.Ordinal), "account support route should project its own chrome title.");
     var accountAccessPage = await accountController.AccountPage("access", CancellationToken.None) as ViewResult;
     var accountAccessModel = accountAccessPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountAccessModel?.CurrentSection, "access", StringComparison.Ordinal), "account access route should render the devices-and-access section.");
+    Assert(string.Equals(accountAccessModel?.Chrome.Title, "Account · Devices & access", StringComparison.Ordinal), "account access route should project its own chrome title.");
 
     var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
@@ -1863,9 +1870,11 @@ async Task VerifyPublicLandingProjectionAsync()
     var accessHomePage = await authenticatedLandingController.HomePage("access", CancellationToken.None) as ViewResult;
     var accessHomeModel = accessHomePage?.Model as HomePageViewModel;
     Assert(string.Equals(accessHomeModel?.CurrentSection, "access", StringComparison.Ordinal), "home access route should render the access section.");
+    Assert(string.Equals(accessHomeModel?.Chrome.Title, "Home · Access", StringComparison.Ordinal), "home access route should project its own chrome title.");
     var workHomePage = await authenticatedLandingController.HomePage("work", CancellationToken.None) as ViewResult;
     var workHomeModel = workHomePage?.Model as HomePageViewModel;
     Assert(string.Equals(workHomeModel?.CurrentSection, "work", StringComparison.Ordinal), "home work route should render the work section.");
+    Assert(string.Equals(workHomeModel?.Chrome.Title, "Home · Work", StringComparison.Ordinal), "home work route should project its own chrome title.");
 
     var progressHtml = (await progressController.ProgressPage(CancellationToken.None)).Content ?? string.Empty;
     Assert(progressHtml.Contains("Core Rules Engine", StringComparison.Ordinal), "progress page should render the generated product-part report");

@@ -351,6 +351,7 @@ public sealed class PublicLandingController : Controller
     {
         var selectedSection = NormalizeHomeSection(section);
         var currentPath = selectedSection == "overview" ? "/home" : $"/home/{selectedSection}";
+        var (chromeTitle, chromeDescription) = DescribeHomeSection(selectedSection);
 
         try
         {
@@ -364,7 +365,7 @@ public sealed class PublicLandingController : Controller
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
             var model = new HomePageViewModel(
-                Chrome: _chrome.BuildAuthenticatedChrome("Home", "Pick the next action and keep track of what is opening next.", currentPath, user.DisplayName),
+                Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
                 CurrentSection: selectedSection,
                 Sections: BuildHomeSections(selectedSection),
                 Surface: surface,
@@ -512,6 +513,15 @@ public sealed class PublicLandingController : Controller
             new SectionLinkViewModel("access", "Access", "/home/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("work", "Work", "/home/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("setup", "Setup", "/home/setup", string.Equals(currentSection, "setup", StringComparison.OrdinalIgnoreCase))
+        };
+
+    private static (string Title, string Description) DescribeHomeSection(string currentSection)
+        => currentSection switch
+        {
+            "access" => ("Home · Access", "Install return, support closure, and access state without the rest of the dashboard."),
+            "work" => ("Home · Work", "Continuity, current work, and the next useful product path without the full overview shell."),
+            "setup" => ("Home · Setup", "Finish the short account setup flow, then come back to access and work."),
+            _ => ("Home", "Pick the next action and keep track of what is opening next.")
         };
 
     private async Task<bool> TryIsAuthenticatedAsync(CancellationToken cancellationToken)

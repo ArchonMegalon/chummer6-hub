@@ -1,6 +1,13 @@
 @model HomePageViewModel
 @{
-    ViewData["Title"] = "Home";
+    var pageTitle = Model.CurrentSection switch
+    {
+        "access" => "Home · Access",
+        "work" => "Home · Work",
+        "setup" => "Home · Setup",
+        _ => "Home"
+    };
+    ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-home";
     var showOnboarding = !Model.Experience.OnboardingCompleted;
@@ -28,13 +35,27 @@
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
     var showSetupSection = string.Equals(Model.CurrentSection, "setup", StringComparison.OrdinalIgnoreCase);
     var openSetupDialog = showOnboarding || showSetupSection;
+    var heading = Model.CurrentSection switch
+    {
+        "access" => "Access and return",
+        "work" => "Work and continuity",
+        "setup" => "Finish setup",
+        _ => $"Welcome back, {Model.User.DisplayName}"
+    };
+    var summary = Model.CurrentSection switch
+    {
+        "access" => "Keep install return, release posture, and support follow-up in one calmer route instead of searching the whole signed-in shell.",
+        "work" => "Pick up dossiers, campaign continuity, and the next useful route without turning Home into a full workspace.",
+        "setup" => "Finish the short setup flow first, then come back to access and work with a steadier account.",
+        _ => "Pick up where you left off: finish the basics, install the current preview, and keep track of what is opening next."
+    };
 }
 
 <section class="home-command">
     <div class="home-command__intro">
         <p class="eyebrow">Home</p>
-        <h1 class="page-title">Welcome back, @Model.User.DisplayName</h1>
-        <p class="page-copy">Pick up where you left off: finish the basics, install the current preview, and keep track of what is opening next.</p>
+        <h1 class="page-title">@heading</h1>
+        <p class="page-copy">@summary</p>
     </div>
     <nav class="account-nav" aria-label="Home sections">
         @foreach (var navItem in Model.Sections)
@@ -42,36 +63,6 @@
             <a href="@navItem.Href" aria-current="@(navItem.Current ? "page" : "false")">@navItem.Label</a>
         }
     </nav>
-    @if (showOverviewSection)
-    {
-        <details class="release-accordion" @(showOnboarding ? "open" : null)>
-            <summary>Account state at a glance</summary>
-            <div class="release-accordion__body">
-                <div class="home-command__status">
-                    <article class="home-status-card">
-                        <span class="tag">Account setup</span>
-                        <strong id="homeSetupState">@(showOnboarding ? "In progress" : "Ready")</strong>
-                        <p id="homeSetupCopy">@(showOnboarding ? "Finish the short setup flow so Chummer can address you, route updates, and recover the account cleanly." : "Your basic account setup is already in place.")</p>
-                    </article>
-                    <article class="home-status-card">
-                        <span class="tag">Interest profile</span>
-                        <strong id="homeInterestState">@(followCount == 0 ? "Quiet" : $"{followCount} active")</strong>
-                        <p id="homeInterestCopy">Roadmap and beta signals stay lightweight until you ask for more.</p>
-                    </article>
-                    <article class="home-status-card">
-                        <span class="tag">Backup sign-in</span>
-                        <strong id="homeRecoveryState">@(recoveryLinked ? "Ready" : "Add one")</strong>
-                        <p id="homeRecoveryCopy">@(recoveryLinked ? "A backup recovery path is already attached." : "Add a verified recovery email from setup or Account.")</p>
-                    </article>
-                    <article class="home-status-card">
-                        <span class="tag">Devices & access</span>
-                        <strong>@(activeAccessRights > 0 ? $"{activeAccessRights} active" : claimedInstallations > 0 ? $"{claimedInstallations} linked" : pendingClaims > 0 ? $"{pendingClaims} pending" : "Not linked")</strong>
-                        <p><a class="inline-link" href="/account/access">Open Devices &amp; access</a></p>
-                    </article>
-                </div>
-            </div>
-        </details>
-    }
 </section>
 
 <div class="sr-only" aria-hidden="true">
@@ -194,17 +185,14 @@
                                             </div>
                                             <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
                                         </article>
-                                        @foreach (var card in Model.NowRail.Take(2))
-                                        {
-                                            <article class="app-rail__item">
-                                                <span class="tag">Proof</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>@card.Card.Title</h3>
-                                                    <p>@card.Card.Summary</p>
-                                                </div>
-                                                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
-                                            </article>
-                                        }
+                                        <article class="app-rail__item">
+                                            <span class="tag">Proof</span>
+                                            <div class="app-rail__copy">
+                                                <h3>Need product proof before you act?</h3>
+                                                <p>The proof shelf stays separate so this route can stay focused on access, return, and device state.</p>
+                                            </div>
+                                            <a class="inline-link" href="/now">Open what works today</a>
+                                        </article>
                                     </div>
                                 </div>
                 </div>
@@ -289,25 +277,34 @@
                                         <h2 class="home-stream__title">Roadmap and help without turning Home into a second product site</h2>
                                     </div>
                                     <div class="app-rail">
-                                        @foreach (var card in Model.HorizonRail)
+                                        <article class="app-rail__item">
+                                            <span class="tag">Roadmap</span>
+                                            <div class="app-rail__copy">
+                                                <h3>See what is opening next</h3>
+                                                <p>The roadmap, preview concepts, and follow state stay on dedicated routes until you explicitly need them.</p>
+                                            </div>
+                                            <a class="inline-link" href="/horizons">Open roadmap</a>
+                                        </article>
+                                        @if (Model.HorizonRail.Count > 0)
                                         {
+                                            var nextCard = Model.HorizonRail[0];
                                             <article class="app-rail__item">
-                                                <span class="tag">@card.Card.Badge</span>
+                                                <span class="tag">@nextCard.Card.Badge</span>
                                                 <div class="app-rail__copy">
-                                                    <h3>@card.Card.Title</h3>
-                                                    <p>@card.Card.Summary</p>
+                                                    <h3>@nextCard.Card.Title</h3>
+                                                    <p>@nextCard.Card.Summary</p>
                                                 </div>
-                                                <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                                                <a class="inline-link" href="@nextCard.Action.Href">@nextCard.Action.Label</a>
                                             </article>
                                         }
-                                                <article class="app-rail__item">
-                                                    <span class="tag">Support</span>
-                                                    <div class="app-rail__copy">
-                                                        <h3>Need a real answer instead?</h3>
-                                                        <p>Use support when the release, device, or return-path surfaces stop being enough to move forward confidently.</p>
-                                                    </div>
-                                                    <a class="inline-link" href="/account/support">Open support</a>
-                                                </article>
+                                        <article class="app-rail__item">
+                                            <span class="tag">Support</span>
+                                            <div class="app-rail__copy">
+                                                <h3>Need a real answer instead?</h3>
+                                                <p>Use support when release, device, or return-path surfaces stop being enough to move forward confidently.</p>
+                                            </div>
+                                            <a class="inline-link" href="/account/support">Open support</a>
+                                        </article>
                                     </div>
                                 </div>
                 </div>

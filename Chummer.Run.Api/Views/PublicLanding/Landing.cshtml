@@ -9,7 +9,7 @@
         ?? Model.Assets.BySlot("scene_simulation_bench")
         ?? Model.Assets.BySlot("capability_check_rules")
         ?? heroProofAsset;
-    var proofNotes = Model.Workflows.Take(2).ToArray();
+    var proofNotes = Model.Workflows.Take(1).ToArray();
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
     var proofSectionTrail = Model.Surface.ProductProofTrail.Skip(1).Take(3).ToArray();
     var availableHighlight = Model.AvailableToday.FirstOrDefault();
@@ -119,69 +119,42 @@
     <div class="works-matrix__lead">
         <p class="eyebrow">@worksNowSection.Eyebrow</p>
         <h2 class="editorial-title">@worksNowSection.Title</h2>
-        <p class="editorial-copy">Use one short strip to answer what is live, what is still preview-only, and what is named on the roadmap before you leave the front door.</p>
+        <p class="editorial-copy">@worksNowSection.Intro</p>
     </div>
-    <div class="works-matrix__columns">
-        <article class="works-column">
-            <div class="works-column__header">
-                <span class="tag">Available today</span>
-                <h3>Available today</h3>
-            </div>
-            <div class="works-column__list">
-                @if (availableHighlight is not null)
-                {
-                    <article class="works-item" id="@availableHighlight.Card.Id.Replace('_', '-')">
-                        <h4>@availableHighlight.Card.Title</h4>
-                        <p>@availableHighlight.Card.Summary</p>
-                        <a class="inline-link" href="@availableHighlight.Action.Href">@availableHighlight.Action.Label</a>
-                    </article>
-                }
-                @if (Model.AvailableToday.Count > 1)
-                {
-                    <p class="muted-copy">+@(Model.AvailableToday.Count - 1) more live proof items on the full shelf.</p>
-                }
-            </div>
-        </article>
-        <article class="works-column">
-            <div class="works-column__header">
-                <span class="tag tag--amber">Preview</span>
-                <h3>Preview</h3>
-            </div>
-            <div class="works-column__list">
-                @if (previewHighlight is not null)
-                {
-                    <article class="works-item" id="@previewHighlight.Card.Id.Replace('_', '-')">
-                        <h4>@previewHighlight.Card.Title</h4>
-                        <p>@previewHighlight.Card.Summary</p>
-                        <a class="inline-link" href="@previewHighlight.Action.Href">@previewHighlight.Action.Label</a>
-                    </article>
-                }
-                @if (Model.PreviewItems.Count > 1)
-                {
-                    <p class="muted-copy">+@(Model.PreviewItems.Count - 1) preview proof items still open on the shelf.</p>
-                }
-            </div>
-        </article>
-        <article class="works-column">
-            <div class="works-column__header">
-                <span class="tag tag--quiet">Coming next</span>
-                <h3>Coming next</h3>
-            </div>
-            <div class="works-column__list">
-                @if (comingNextHighlight is not null)
-                {
-                    <article class="works-item" id="@comingNextHighlight.Card.Id.Replace('_', '-')">
-                        <h4>@comingNextHighlight.Card.Title</h4>
-                        <p>@comingNextHighlight.Card.Summary</p>
-                        <a class="inline-link" href="@comingNextHighlight.Action.Href">@comingNextHighlight.Action.Label</a>
-                    </article>
-                }
-                @if (Model.ComingNext.Count > 1)
-                {
-                    <p class="muted-copy">+@(Model.ComingNext.Count - 1) named horizons waiting on the roadmap.</p>
-                }
-            </div>
-        </article>
+    <div class="compact-rail">
+        @if (availableHighlight is not null)
+        {
+            <article class="compact-rail__item" id="@availableHighlight.Card.Id.Replace('_', '-')">
+                <div class="compact-rail__copy">
+                    <span class="tag">Available today</span>
+                    <h3>@availableHighlight.Card.Title</h3>
+                    <p>@availableHighlight.Card.Summary @(Model.AvailableToday.Count > 1 ? $"+{Model.AvailableToday.Count - 1} more live proof item(s) sit on the full shelf." : string.Empty)</p>
+                </div>
+                <a class="inline-link" href="@availableHighlight.Action.Href">@availableHighlight.Action.Label</a>
+            </article>
+        }
+        @if (previewHighlight is not null)
+        {
+            <article class="compact-rail__item" id="@previewHighlight.Card.Id.Replace('_', '-')">
+                <div class="compact-rail__copy">
+                    <span class="tag tag--amber">Preview</span>
+                    <h3>@previewHighlight.Card.Title</h3>
+                    <p>@previewHighlight.Card.Summary @(Model.PreviewItems.Count > 1 ? $"+{Model.PreviewItems.Count - 1} more preview proof item(s) stay on the shelf." : string.Empty)</p>
+                </div>
+                <a class="inline-link" href="@previewHighlight.Action.Href">@previewHighlight.Action.Label</a>
+            </article>
+        }
+        @if (comingNextHighlight is not null)
+        {
+            <article class="compact-rail__item" id="@comingNextHighlight.Card.Id.Replace('_', '-')">
+                <div class="compact-rail__copy">
+                    <span class="tag tag--quiet">Coming next</span>
+                    <h3>@comingNextHighlight.Card.Title</h3>
+                    <p>@comingNextHighlight.Card.Summary @(Model.ComingNext.Count > 1 ? $"+{Model.ComingNext.Count - 1} more named horizons stay on the roadmap." : string.Empty)</p>
+                </div>
+                <a class="inline-link" href="@comingNextHighlight.Action.Href">@comingNextHighlight.Action.Label</a>
+            </article>
+        }
     </div>
     <div class="stacked-actions">
         <a class="button-like button-like--secondary" href="/now">Open the full proof shelf</a>
