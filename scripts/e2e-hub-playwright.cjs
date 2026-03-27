@@ -88,6 +88,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await assertNoBannedCopy(page, 'Downloads');
   });
 
+  await gotoAndAssert(page, pageErrors, '/contact', async () => {
+    await expectVisible(page, 'text=Open a first-party support case');
+  });
+  await page.selectOption('#supportKind', 'bug_report');
+  await page.fill('#supportTitle', 'Guest support intake smoke');
+  await page.fill('#supportSummary', 'Guest support submission should land on the first-party confirmation page.');
+  await page.fill('#supportDetail', 'Browser harness is validating the public support intake route, reply-email requirement, and confirmation flow.');
+  await page.fill('#supportReplyEmail', uniqueEmail);
+  await page.getByText('Optional environment details').click();
+  await page.fill('#supportPlatform', 'Linux');
+  await page.fill('#supportVersion', 'preview-smoke');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: /Submit support case/i }).click()
+  ]);
+  assert(/\/contact\/submitted\/support_case_/i.test(page.url()), 'Public contact form should redirect to the support confirmation route.');
+  await expectVisible(page, 'text=Support case received');
+  await expectVisible(page, 'text=Watch your reply email');
+  await assertNoBannedCopy(page, 'Public support confirmation');
+  await assertNoPageErrors(page, pageErrors, 'Public support confirmation');
+
   await gotoAndAssert(page, pageErrors, '/now', async () => {
     await expectVisible(page, 'text=What you can verify now');
     await expectVisible(page, 'text=Build, explain, and run with visible evidence');
