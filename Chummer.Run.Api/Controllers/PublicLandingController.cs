@@ -72,16 +72,20 @@ public sealed class PublicLandingController : Controller
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
+        var manifestPrimaryHeroAction = surface.HeroCtas.FirstOrDefault(static action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase));
         var secondaryHeroAction = surface.HeroCtas.FirstOrDefault(static action => string.Equals(action.Emphasis, "secondary", StringComparison.OrdinalIgnoreCase))
             ?? surface.HeroCtas.Skip(1).FirstOrDefault()
             ?? new PublicLandingActionDto("See what works today", "/now", "secondary");
+        var primaryHeroAction = !authenticated && manifestPrimaryHeroAction is not null
+            ? manifestPrimaryHeroAction
+            : _releaseSelection.BuildPublicPrimaryAction(manifest, authenticated);
         var model = new LandingPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", surface.Subhead, "/", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
             Manifest: manifest,
             ReleaseExperience: releaseExperience,
-            PrimaryHeroAction: _releaseSelection.BuildPublicPrimaryAction(manifest, authenticated),
+            PrimaryHeroAction: primaryHeroAction,
             SecondaryHeroAction: secondaryHeroAction,
             Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/"),
             TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),

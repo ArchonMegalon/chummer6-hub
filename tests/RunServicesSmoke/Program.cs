@@ -1457,6 +1457,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!landingSource.Contains("artifact-gallery", StringComparison.Ordinal), "landing should keep artifact depth off the main conversion spine.");
     Assert(landingSource.Contains("proofSectionAsset", StringComparison.Ordinal), "landing should use a separate lower proof asset instead of rendering the same proof screenshot twice.");
     Assert(landingSource.Contains("scene_dossier_desk", StringComparison.Ordinal), "landing should pair the hero proof teaser with a different lower proof asset.");
+    Assert(landingSource.Contains("var proofNotes = Model.Workflows.Take(2).ToArray();", StringComparison.Ordinal), "landing should trim the front door proof band to a smaller workflow set.");
     var storySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml"));
     Assert(!storySource.Contains("One path from install to session return", StringComparison.Ordinal), "product story should not drift back into a second install/support explainer.");
     Assert(!storySource.Contains("From first install to next session", StringComparison.Ordinal), "product story should stay focused on differentiation instead of retelling the install path.");
@@ -1484,6 +1485,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/signup", StringComparison.Ordinal)), "landing surface should expose the signup route");
     Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/login?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Sign in", StringComparison.Ordinal)), "landing guest shell should expose the sign-in action");
     Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/signup?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Create account", StringComparison.Ordinal)), "landing guest shell should expose the create-account action");
+    Assert(surface.HeroCtas.Any(static action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase) && string.Equals(action.Label, "Create account to get preview", StringComparison.Ordinal)), "landing canon should single-source the guest hero access CTA.");
     Assert(surface.Assets.Any(static asset => string.Equals(asset.AssetSlot, "section_hero", StringComparison.Ordinal)), "landing surface should load the hero asset slot");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Title, "KARMA FORGE", StringComparison.Ordinal) && string.Equals(card.Badge, "Research", StringComparison.Ordinal)), "landing feature registry should carry the updated readiness posture for KARMA FORGE");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "real_public_guide", StringComparison.Ordinal) && string.Equals(card.Href, "/what-is-chummer#public-guide", StringComparison.Ordinal) && card.ExternalOk), "landing guide card should keep a first-party route with an explicit external fallback");
@@ -1493,6 +1495,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open guided contribution", StringComparison.Ordinal)), "guided contribution should keep an explicit signed-in action label in canon.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Join beta waitlist", StringComparison.Ordinal)), "beta waitlist should keep an explicit signed-in action label in canon.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "horizon_local_co_processor", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open the horizon page", StringComparison.Ordinal)), "local co-processor should route through its roadmap detail page instead of pretending the overview card is an install action.");
+    var downloadsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"));
+    Assert(downloadsSource.Contains("Advanced download options", StringComparison.Ordinal), "downloads should group advanced distribution paths under one calmer disclosure.");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var campaignSpine = new CampaignSpineService(store);

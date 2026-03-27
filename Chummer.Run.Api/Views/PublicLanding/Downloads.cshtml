@@ -118,85 +118,83 @@ else
         </details>
     </section>
 
-    @if (release.Alternatives.Count > 0)
+    @if (release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0 || release.ManualPackages.Count > 0)
     {
         <section class="release-shelf release-shelf--manual">
             <details class="release-accordion">
-                <summary>More options for @release.Recommended.PlatformLabel</summary>
+                <summary>Advanced download options</summary>
                 <div class="release-accordion__body">
-                    <div class="evidence-row-list">
-                        @foreach (var download in release.Alternatives)
-                        {
-                            <article class="evidence-row evidence-row--download">
-                                <div class="evidence-row__copy">
-                                    <h3>@download.Title</h3>
-                                    <p>@download.SupportLine</p>
-                                </div>
-                                <div class="download-row__meta">
-                                    <span class="platform-pill">@download.SizeLabel</span>
-                                    @if (!string.IsNullOrWhiteSpace(download.ShaPreview))
-                                    {
-                                        <code class="mono-receipt">@download.ShaPreview</code>
-                                    }
-                                </div>
-                                <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
-                            </article>
-                        }
-                    </div>
-                </div>
-            </details>
-        </section>
-    }
+                    @if (release.Alternatives.Count > 0)
+                    {
+                        <details class="details-drawer">
+                            <summary>More options for @release.Recommended.PlatformLabel</summary>
+                            <div class="evidence-row-list">
+                                @foreach (var download in release.Alternatives)
+                                {
+                                    <article class="evidence-row evidence-row--download">
+                                        <div class="evidence-row__copy">
+                                            <h3>@download.Title</h3>
+                                            <p>@download.SupportLine</p>
+                                        </div>
+                                        <div class="download-row__meta">
+                                            <span class="platform-pill">@download.SizeLabel</span>
+                                            @if (!string.IsNullOrWhiteSpace(download.ShaPreview))
+                                            {
+                                                <code class="mono-receipt">@download.ShaPreview</code>
+                                            }
+                                        </div>
+                                        <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
+                                    </article>
+                                }
+                            </div>
+                        </details>
+                    }
 
-    @if (release.OtherPlatforms.Count > 0)
-    {
-        <section class="release-shelf release-shelf--manual">
-            <details class="release-accordion">
-                <summary>Other platforms</summary>
-                <div class="release-accordion__body">
-                    <div class="evidence-row-list">
-                        @foreach (var download in release.OtherPlatforms)
-                        {
-                            <article class="evidence-row evidence-row--download">
-                                <div class="evidence-row__copy">
-                                    <h3>@download.Title</h3>
-                                    <p>@download.SupportLine</p>
-                                </div>
-                                <div class="download-row__meta">
-                                    <span class="platform-pill">@download.PlatformLabel</span>
-                                    <span class="muted-copy">@download.SizeLabel</span>
-                                </div>
-                                <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
-                            </article>
-                        }
-                    </div>
-                </div>
-            </details>
-        </section>
-    }
+                    @if (release.OtherPlatforms.Count > 0)
+                    {
+                        <details class="details-drawer">
+                            <summary>Other platforms</summary>
+                            <div class="evidence-row-list">
+                                @foreach (var download in release.OtherPlatforms)
+                                {
+                                    <article class="evidence-row evidence-row--download">
+                                        <div class="evidence-row__copy">
+                                            <h3>@download.Title</h3>
+                                            <p>@download.SupportLine</p>
+                                        </div>
+                                        <div class="download-row__meta">
+                                            <span class="platform-pill">@download.PlatformLabel</span>
+                                            <span class="muted-copy">@download.SizeLabel</span>
+                                        </div>
+                                        <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
+                                    </article>
+                                }
+                            </div>
+                        </details>
+                    }
 
-    @if (release.ManualPackages.Count > 0)
-    {
-        <section class="release-shelf release-shelf--manual">
-            <details class="release-accordion">
-                <summary>Manual packages for advanced installs</summary>
-                <div class="release-accordion__body">
-                    <div class="evidence-row-list">
-                        @foreach (var download in release.ManualPackages)
-                        {
-                            <article class="evidence-row evidence-row--download">
-                                <div class="evidence-row__copy">
-                                    <h3>@download.Title</h3>
-                                    <p>@download.SupportLine</p>
-                                </div>
-                                <div class="download-row__meta">
-                                    <span class="platform-pill">@download.PlatformLabel</span>
-                                    <span class="muted-copy">@download.SizeLabel</span>
-                                </div>
-                                <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
-                            </article>
-                        }
-                    </div>
+                    @if (release.ManualPackages.Count > 0)
+                    {
+                        <details class="details-drawer">
+                            <summary>Manual packages for advanced installs</summary>
+                            <div class="evidence-row-list">
+                                @foreach (var download in release.ManualPackages)
+                                {
+                                    <article class="evidence-row evidence-row--download">
+                                        <div class="evidence-row__copy">
+                                            <h3>@download.Title</h3>
+                                            <p>@download.SupportLine</p>
+                                        </div>
+                                        <div class="download-row__meta">
+                                            <span class="platform-pill">@download.PlatformLabel</span>
+                                            <span class="muted-copy">@download.SizeLabel</span>
+                                        </div>
+                                        <a class="button-like button-like--ghost" href="@download.DispatchHref">@download.ActionLabel</a>
+                                    </article>
+                                }
+                            </div>
+                        </details>
+                    }
                 </div>
             </details>
         </section>
