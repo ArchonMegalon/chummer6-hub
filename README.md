@@ -55,6 +55,7 @@ The public-facing customer and access spine now lives here too:
 - `docs/HOSTED_BOUNDARY.md`
 - `docs/HUB_EXTRACTION_ACCEPTANCE.md`
 - `docs/HUB_COMMUNITY_LEDGER_PLANE.md`
+- `docs/HUB_BOUNDED_CONTEXT_MAP.md`
 - `docs/HUB_IDENTITY_AND_CHANNEL_MODEL.md`
 - `docs/PUBLIC_LANDING_SURFACE.md`
 - `.codex-design/repo/IMPLEMENTATION_SCOPE.md`

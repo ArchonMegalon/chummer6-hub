@@ -41,6 +41,14 @@ public sealed record SupportCaseTimelineEvent(
     string? Actor = null,
     IReadOnlyDictionary<string, string>? Metadata = null);
 
+public sealed record SupportCaseAttachmentProjection(
+    string AttachmentId,
+    string FileName,
+    string ContentType,
+    long SizeBytes,
+    DateTimeOffset UploadedAtUtc,
+    string? DownloadHref = null);
+
 public sealed record SupportCaseProjection(
     string CaseId,
     string ClusterKey,
@@ -68,7 +76,8 @@ public sealed record SupportCaseProjection(
     DateTimeOffset? ReleasedToReporterChannelAtUtc = null,
     DateTimeOffset? UserNotifiedAtUtc = null,
     IReadOnlyList<string>? RelatedIds = null,
-    IReadOnlyList<SupportCaseTimelineEvent>? Timeline = null);
+    IReadOnlyList<SupportCaseTimelineEvent>? Timeline = null,
+    IReadOnlyList<SupportCaseAttachmentProjection>? Attachments = null);
 
 public sealed record SupportCaseSubmitRequest(
     [property: Required(AllowEmptyStrings = false), StringLength(64)] string Kind,

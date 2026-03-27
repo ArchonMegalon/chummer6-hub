@@ -596,6 +596,33 @@ if [[ "$RUNBOOK_MODE" == "portal-e2e" ]]; then
   exit "$status"
 fi
 
+if [[ "$RUNBOOK_MODE" == "hub-e2e" ]]; then
+  HUB_E2E_LOG_FILE="${HUB_E2E_LOG_FILE:-$(resolve_runbook_log_file chummer-hub-e2e)}"
+  export CHUMMER_HUB_PLAYWRIGHT="${CHUMMER_HUB_PLAYWRIGHT:-1}"
+  set +e
+  bash scripts/e2e-hub.sh 2>&1 | tee "$HUB_E2E_LOG_FILE"
+  status=${PIPESTATUS[0]}
+  set -e
+  echo
+  echo "== hub e2e summary =="
+  rg -n "hub e2e completed|hub playwright e2e failed|skipping hub e2e|skipping hub playwright e2e|hub playwright e2e completed" "$HUB_E2E_LOG_FILE" | tail -n 200 || true
+  exit "$status"
+fi
+
+if [[ "$RUNBOOK_MODE" == "hub-live-audit" ]]; then
+  HUB_LIVE_AUDIT_LOG_FILE="${HUB_LIVE_AUDIT_LOG_FILE:-$(resolve_runbook_log_file chummer-hub-live-audit)}"
+  HUB_LIVE_AUDIT_BASE_URL="${HUB_LIVE_AUDIT_BASE_URL:-https://chummer.run}"
+  HUB_LIVE_AUDIT_DELAY_SECONDS="${HUB_LIVE_AUDIT_DELAY_SECONDS:-0}"
+  set +e
+  python3 scripts/hub-live-audit.py --base-url "$HUB_LIVE_AUDIT_BASE_URL" --poll-seconds "$HUB_LIVE_AUDIT_DELAY_SECONDS" 2>&1 | tee "$HUB_LIVE_AUDIT_LOG_FILE"
+  status=${PIPESTATUS[0]}
+  set -e
+  echo
+  echo "== hub live audit summary =="
+  tail -n 40 "$HUB_LIVE_AUDIT_LOG_FILE" || true
+  exit "$status"
+fi
+
 if [[ "$RUNBOOK_MODE" == "docker-tests" ]]; then
   TEST_PROJECT="${TEST_PROJECT:-Chummer.Tests/Chummer.Tests.csproj}"
   TEST_FRAMEWORK="${TEST_FRAMEWORK:-${RUNBOOK_ARG_FRAMEWORK:-net10.0}}"
@@ -673,6 +700,21 @@ if [[ "$RUNBOOK_MODE" == "push" ]]; then
   "${git_cmd[@]}" push "$RUNBOOK_PUSH_REMOTE" "$REF_SPEC"
   echo "push completed"
   exit "$?"
+fi
+
+if [[ "$RUNBOOK_MODE" == "hub-ship" ]]; then
+  RUNBOOK_PUSH_ENABLE="${RUNBOOK_PUSH_ENABLE:-0}"
+  if [[ "$RUNBOOK_PUSH_ENABLE" != "1" && "$RUNBOOK_PUSH_ENABLE" != "true" && "$RUNBOOK_PUSH_ENABLE" != "TRUE" ]]; then
+    echo "hub-ship mode is disabled by default."
+    echo "Set RUNBOOK_PUSH_ENABLE=1 to push and then audit live."
+    exit 2
+  fi
+
+  RUNBOOK_HUB_SHIP_DELAY_SECONDS="${RUNBOOK_HUB_SHIP_DELAY_SECONDS:-15}"
+  RUNBOOK_HUB_SHIP_BASE_URL="${RUNBOOK_HUB_SHIP_BASE_URL:-https://chummer.run}"
+  bash "$SCRIPT_DIR/runbook.sh" push
+  python3 scripts/hub-live-audit.py --base-url "$RUNBOOK_HUB_SHIP_BASE_URL" --poll-seconds "$RUNBOOK_HUB_SHIP_DELAY_SECONDS"
+  exit 0
 fi
 
 echo "== docker ps (chummer/cloudflared) =="

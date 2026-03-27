@@ -221,7 +221,20 @@ public sealed record SupportIntakeViewModel(
     string AccountSupportLabel,
     string ResponseExpectation,
     string? SubmissionNotice,
+    string AttachmentHelp,
     IReadOnlyList<SupportIntakeOptionViewModel> Options);
+
+public sealed record SupportSubmittedPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string CaseId,
+    string StatusLabel,
+    string ResponseExpectation,
+    IReadOnlyList<string> Highlights,
+    IReadOnlyList<TrustPageActionViewModel> Actions,
+    IReadOnlyList<SupportCaseAttachmentProjection> Attachments);
 
 public sealed record TrustPageViewModel(
     string PageId,
@@ -321,6 +334,7 @@ public sealed record AccountPageViewModel(
     bool GoogleAvailable,
     InstallLinkingSummaryDto InstallLinking,
     IReadOnlyList<SupportCaseProjection> SupportCases,
+    SupportCaseProjection? SelectedSupportCase,
     AccountCampaignSummary CampaignSpine);
 
 public sealed record AuthPageViewModel(

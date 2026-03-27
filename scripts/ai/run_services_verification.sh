@@ -63,7 +63,7 @@ rg -n 'public sealed class IdentityLinkService|Google|Facebook|Telegram|EA' \
   Chummer.Run.Api/Services/Community/IdentityLinkService.cs >/dev/null
 rg -n 'public sealed class PublicLandingService|PUBLIC_LANDING_MANIFEST\.yaml|PUBLIC_FEATURE_REGISTRY\.yaml|PUBLIC_LANDING_ASSET_REGISTRY\.yaml|guest_shell_actions|asset_slot|auth_routes|registered_overlays|feature registry' \
   Chummer.Run.Api/Services/PublicLandingService.cs >/dev/null
-rg -n 'AddSingleton<PublicLandingService>\(\)|AddHttpClient<HubBrowserAuthService>\(\)' Chummer.Run.Api/Program.cs >/dev/null
+rg -n 'AddHubPublicGuideContext\(\)|AddHubInstallAndOrchestrationAdapters\(\)|AddSingleton<PublicLandingService>\(\)|AddHttpClient<HubBrowserAuthService>\(\)' Chummer.Run.Api/Program.cs Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs >/dev/null
 rg -n 'EmailAuthStartRequest|EmailAuthStartResponse|EmailAuthCompleteRequest|IdentitySessionRevokeRequest|IdentitySessionRevokeResponse' \
   Chummer.Run.Contracts/IdentityContracts.cs >/dev/null
 rg -n 'StartEmailEntry|CompleteEmailEntry|RevokeSession|CHUMMER_IDENTITY_STORE_PATH|preview_inline_link' \

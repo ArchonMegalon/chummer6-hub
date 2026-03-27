@@ -232,6 +232,7 @@ async Task VerifySupportCrashWorkflowAsync()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
+                ["CHUMMER_SUPPORT_ATTACHMENT_ROOT"] = Path.Combine(tempRoot, "support-attachments"),
                 ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
                 ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
             })
@@ -241,7 +242,8 @@ async Task VerifySupportCrashWorkflowAsync()
         InstallLinkingStore installLinkingStore = new(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
         InstallLinkingService installLinking = new(installLinkingStore);
         SupportStore store = new(configuration, loggerFactory.CreateLogger<SupportStore>());
-        SupportCaseService supportCases = new(store, loggerFactory.CreateLogger<SupportCaseService>());
+        SupportAttachmentStorageService supportAttachments = new(configuration);
+        SupportCaseService supportCases = new(store, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
         CrashSupportService service = new(store, supportCases, installLinking, loggerFactory.CreateLogger<CrashSupportService>());
         SupportCrashesController controller = new(service, configuration)
         {
@@ -502,6 +504,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         {
             ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json"),
             ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
+            ["CHUMMER_SUPPORT_ATTACHMENT_ROOT"] = Path.Combine(tempRoot, "support-attachments"),
             ["FLEET_RECEIPT_SIGNING_SECRET"] = "smoke-secret",
             ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
         })
@@ -510,8 +513,9 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
+    var supportAttachments = new SupportAttachmentStorageService(configuration);
     var installLinking = new InstallLinkingService(installLinkingStore);
-    var supportCases = new SupportCaseService(supportStore, loggerFactory.CreateLogger<SupportCaseService>());
+    var supportCases = new SupportCaseService(supportStore, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
     var campaignSpine = new CampaignSpineService(store);
     var accounts = new AccountService(store);
     var groups = new GroupService(store, accounts);
@@ -1449,6 +1453,7 @@ async Task VerifyPublicLandingProjectionAsync()
             ["CHUMMER_COMMUNITY_STORE_PATH"] = storePath,
             ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
             ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
+            ["CHUMMER_SUPPORT_ATTACHMENT_ROOT"] = Path.Combine(tempRoot, "support-attachments"),
             ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot,
             ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
         })
@@ -1466,8 +1471,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var trustContent = new PublicTrustContentService(canon, routes);
     var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
+    var supportAttachments = new SupportAttachmentStorageService(configuration);
     var installLinking = new InstallLinkingService(installLinkingStore);
-    var supportCases = new SupportCaseService(supportStore, loggerFactory.CreateLogger<SupportCaseService>());
+    var supportCases = new SupportCaseService(supportStore, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
     var robotsPath = Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "wwwroot", "robots.txt");
     Assert(File.Exists(robotsPath), "public shell should ship a robots.txt file.");
     var robotsText = File.ReadAllText(robotsPath);
@@ -1586,6 +1592,7 @@ async Task VerifyPublicLandingProjectionAsync()
         accounts,
         supportCases,
         new SupportAssistantService(supportCases, canon, campaignSpine, loggerFactory.CreateLogger<SupportAssistantService>()),
+        supportAttachments,
         configuration)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -1595,6 +1602,7 @@ async Task VerifyPublicLandingProjectionAsync()
         accounts,
         supportCases,
         new SupportAssistantService(supportCases, canon, campaignSpine, loggerFactory.CreateLogger<SupportAssistantService>()),
+        supportAttachments,
         configuration)
     {
         ControllerContext = AuthenticatedControllerContext("smoke-token")
@@ -1765,8 +1773,24 @@ async Task VerifyPublicLandingProjectionAsync()
     var supportAccepted = supportSubmitResult.Result as AcceptedAtActionResult;
     var supportPayload = supportAccepted?.Value as SupportCaseProjection;
     Assert(supportPayload is not null && string.Equals(supportPayload.Status, SupportCaseStatuses.New, StringComparison.Ordinal), "support case submission should create a new support case.");
-    SupportCaseProjection supportCase = supportPayload!;
+    SupportCaseProjection supportCase = supportCases.Submit(
+        linkedUser.UserId,
+        "subject.demo",
+        new SupportCaseSubmitRequest(
+            Kind: supportPayload!.Kind,
+            Title: supportPayload.Title,
+            Summary: supportPayload.Summary,
+            Detail: supportPayload.Detail,
+            InstallationId: supportPayload.InstallationId,
+            ApplicationVersion: supportPayload.ApplicationVersion,
+            ReleaseChannel: supportPayload.ReleaseChannel,
+            HeadId: supportPayload.HeadId,
+            Platform: supportPayload.Platform,
+            Arch: supportPayload.Arch,
+            Source: supportPayload.Source),
+        [new SupportAttachmentUpload("smoke-support.log", "text/plain", Encoding.UTF8.GetBytes("smoke support attachment"))]);
     Assert(string.Equals(supportCase.InstallationId, "install-smoke-001", StringComparison.Ordinal), "support case submission should retain installation linkage.");
+    Assert(supportCase.Attachments?.Count == 1, "support case submission should retain uploaded attachments.");
 
     var myCasesResult = await supportCasesController.GetMyCases(status: null, kind: null, CancellationToken.None);
     var myCasesPayload = (myCasesResult.Result as OkObjectResult)?.Value as SupportCaseListResponse;
@@ -1823,7 +1847,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var notifiedPayload = (notifiedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
     Assert(notifiedPayload is not null && string.Equals(notifiedPayload.Status, SupportCaseStatuses.UserNotified, StringComparison.Ordinal), "internal notify should close the user-facing loop.");
 
-    var accountPage = await accountController.AccountPage(null, CancellationToken.None) as ViewResult;
+    var accountPage = await accountController.AccountPage(section: null, caseId: null, CancellationToken.None) as ViewResult;
     var accountModel = accountPage?.Model as AccountPageViewModel;
     Assert(accountModel is not null && accountModel.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "account page should surface support-case history beside installs and access.");
     Assert(string.Equals(accountModel!.CurrentSection, "profile", StringComparison.Ordinal), "default account route should land on the profile section.");
@@ -1844,11 +1868,14 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.Restore.LocalOnlyNotes.Count >= 1, "account page should keep install-local restore guardrails explicit.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.OperatorRole)), "account page should surface organizer/operator role posture.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.CampaignVisibilitySummary)), "account page should surface explicit campaign visibility posture for operator groups.");
-    var accountSupportPage = await accountController.AccountPage("support", CancellationToken.None) as ViewResult;
+    var accountSupportPage = await accountController.AccountPage(section: "support", caseId: null, CancellationToken.None) as ViewResult;
     var accountSupportModel = accountSupportPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountSupportModel?.CurrentSection, "support", StringComparison.Ordinal), "account support route should render the support section.");
     Assert(string.Equals(accountSupportModel?.Chrome.Title, "Account · Support", StringComparison.Ordinal), "account support route should project its own chrome title.");
-    var accountAccessPage = await accountController.AccountPage("access", CancellationToken.None) as ViewResult;
+    var accountSupportDetailPage = await accountController.AccountPage(section: "support", caseId: supportCase.CaseId, CancellationToken.None) as ViewResult;
+    var accountSupportDetailModel = accountSupportDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(accountSupportDetailModel?.SelectedSupportCase?.CaseId, supportCase.CaseId, StringComparison.Ordinal), "account support detail route should load the selected tracked case.");
+    var accountAccessPage = await accountController.AccountPage(section: "access", caseId: null, CancellationToken.None) as ViewResult;
     var accountAccessModel = accountAccessPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountAccessModel?.CurrentSection, "access", StringComparison.Ordinal), "account access route should render the devices-and-access section.");
     Assert(string.Equals(accountAccessModel?.Chrome.Title, "Account · Devices & access", StringComparison.Ordinal), "account access route should project its own chrome title.");
@@ -1863,6 +1890,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.Runs.Count >= 1, "signed-in home should surface runboard continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Count >= 1, "signed-in home should keep the first-class campaign workspace attached to the signed-in shell.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
+    var contactSubmittedPage = await authenticatedLandingController.ContactSubmittedPage(supportCase.CaseId, CancellationToken.None) as ViewResult;
+    var contactSubmittedModel = contactSubmittedPage?.Model as SupportSubmittedPageViewModel;
+    Assert(contactSubmittedModel is not null && string.Equals(contactSubmittedModel.CaseId, supportCase.CaseId, StringComparison.Ordinal), "contact submitted route should render a stable support confirmation page.");
+    Assert(contactSubmittedModel!.Attachments.Count == 1, "contact submitted route should surface saved support attachments for signed-in reporters.");
     Assert(authenticatedHomeModel.CampaignSpine.RulesNavigator.Count >= 1, "signed-in home should surface grounded rules navigator answers.");
     Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Count >= 1, "signed-in home should surface creator publication posture.");
     Assert(authenticatedHomeModel.CampaignSpine.MigrationReceipts.Count >= 1, "signed-in home should surface migration receipt truth.");
@@ -1961,7 +1992,7 @@ async Task VerifyPublicLandingProjectionAsync()
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
-    var unavailableAccountResult = await unavailableAccountController.AccountPage(null, CancellationToken.None);
+    var unavailableAccountResult = await unavailableAccountController.AccountPage(section: null, caseId: null, CancellationToken.None);
     var unavailableAccountModel = (unavailableAccountResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableAccountModel?.Heading, "Account is unavailable right now", StringComparison.Ordinal), "account page should show an unavailable message when identity is down instead of redirecting to login.");
 

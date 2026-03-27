@@ -8,6 +8,7 @@ using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Control.Contracts.Support;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 
 namespace Chummer.Run.Api.Controllers;
 
@@ -292,9 +293,67 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/TrustPage.cshtml", BuildContactPageModel(chrome));
     }
 
+    [HttpGet("/contact/submitted/{caseId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> ContactSubmittedPage([FromRoute] string caseId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(caseId))
+        {
+            return NotFound();
+        }
+
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Support case submitted", "What happens next after a first-party support report reaches Chummer.", $"/contact/submitted/{caseId}", cancellationToken);
+        var subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        var authenticated = subject is not null;
+        var trackedCase = subject is null
+            ? null
+            : _supportCases.GetForReporter(caseId, _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email).UserId, subject.SubjectId);
+        var highlights = new List<string>
+        {
+            $"Case id {caseId}",
+            authenticated ? "Tracked inside the signed-in shell" : "Guest follow-up stays on the reply email you provided"
+        };
+        if (trackedCase?.Attachments is { Count: > 0 })
+        {
+            highlights.Add($"{trackedCase.Attachments.Count} attachment(s) saved");
+        }
+
+        var actions = new List<TrustPageActionViewModel>();
+        if (trackedCase is not null)
+        {
+            actions.Add(new TrustPageActionViewModel("Open tracked support", $"/account/support/{trackedCase.CaseId}", "primary"));
+        }
+        else if (authenticated)
+        {
+            actions.Add(new TrustPageActionViewModel("Open account support", "/account/support", "primary"));
+        }
+        else
+        {
+            actions.Add(new TrustPageActionViewModel("Create account for tracked support", "/signup?next=%2Faccount%2Fsupport", "primary"));
+        }
+
+        actions.Add(new TrustPageActionViewModel("Return to help", "/help", "secondary"));
+
+        return View("~/Views/PublicLanding/SupportSubmitted.cshtml", new SupportSubmittedPageViewModel(
+            Chrome: chrome,
+            Eyebrow: "Support",
+            Heading: "Support case received",
+            Intro: trackedCase is null
+                ? "Chummer accepted the report. Keep the case id nearby if you need to mention it later."
+                : "Chummer accepted the report and linked it to the signed-in product shell so the next routed update stays visible.",
+            CaseId: caseId,
+            StatusLabel: trackedCase?.Status ?? SupportCaseStatuses.New,
+            ResponseExpectation: authenticated
+                ? "Tracked support updates should appear inside Account > Support when the case moves through triage or a release reaches reporter-ready state."
+                : "Guest reports should include a reply email. Clear preview reports usually get an answer within two working days.",
+            Highlights: highlights,
+            Actions: actions,
+            Attachments: trackedCase?.Attachments ?? Array.Empty<SupportCaseAttachmentProjection>()));
+    }
+
     [HttpPost("/contact")]
     [ValidateAntiForgeryToken]
-    [Consumes("application/x-www-form-urlencoded")]
+    [Consumes("multipart/form-data", "application/x-www-form-urlencoded")]
     [Produces("text/html")]
     public async Task<IActionResult> SubmitContactCase(
         [FromForm] string? kind,
@@ -305,6 +364,7 @@ public sealed class PublicLandingController : Controller
         [FromForm] string? installationId,
         [FromForm] string? applicationVersion,
         [FromForm] string? platform,
+        [FromForm] List<IFormFile>? attachments,
         CancellationToken cancellationToken)
     {
         var request = new SupportCaseSubmitRequest(
@@ -327,9 +387,8 @@ public sealed class PublicLandingController : Controller
             }
 
             var user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            var created = _supportCases.Submit(user?.UserId, subject?.SubjectId, request);
-            TempData["ContactSubmittedCaseId"] = created.CaseId;
-            return Redirect("/contact#support-intake");
+            var created = _supportCases.Submit(user?.UserId, subject?.SubjectId, request, await ReadSupportUploadsAsync(attachments, cancellationToken));
+            return Redirect($"/contact/submitted/{Uri.EscapeDataString(created.CaseId)}");
         }
         catch (ArgumentException ex)
         {
@@ -550,17 +609,12 @@ public sealed class PublicLandingController : Controller
     }
 
     private TrustPageViewModel BuildContactPageModel(SiteChromeViewModel chrome)
-    {
-        var submittedCaseId = TempData["ContactSubmittedCaseId"] as string;
-        return _trustContent.BuildContactPage(chrome) with
+        => _trustContent.BuildContactPage(chrome) with
         {
             SupportIntake = BuildSupportIntakeModel(
                 authenticated: chrome.Authenticated,
-                submissionNotice: string.IsNullOrWhiteSpace(submittedCaseId)
-                    ? null
-                    : $"Support case {submittedCaseId} was accepted. Create an account or use Account > Support if you want tracked follow-up in the product shell.")
+                submissionNotice: null)
         };
-    }
 
     private static SupportIntakeViewModel BuildSupportIntakeModel(bool authenticated, string? submissionNotice)
         => new(
@@ -576,12 +630,42 @@ public sealed class PublicLandingController : Controller
                 ? "Tracked cases stay visible in Account. When the report is actionable, the next routed update should show up there without sending you into side channels."
                 : "Guest cases should include a reply email. We usually answer preview support within two working days when the report includes a clear reproduction path.",
             SubmissionNotice: submissionNotice,
+            AttachmentHelp: "Add screenshots, logs, or a small diagnostic bundle when they make the bug or install problem easier to route.",
             Options:
             [
                 new SupportIntakeOptionViewModel(SupportCaseKinds.InstallHelp, "Install or update", "Choose this when the installer, updater, or download handoff is the problem."),
                 new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Product bug", "Use this for broken behavior, bad routing, or product regressions."),
                 new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Use this when the product direction is right but the current surface is getting in your way.")
             ]);
+
+    private static async Task<IReadOnlyList<SupportAttachmentUpload>> ReadSupportUploadsAsync(
+        IReadOnlyList<IFormFile>? files,
+        CancellationToken cancellationToken)
+    {
+        if (files is null || files.Count == 0)
+        {
+            return Array.Empty<SupportAttachmentUpload>();
+        }
+
+        List<SupportAttachmentUpload> uploads = new(files.Count);
+        foreach (var file in files)
+        {
+            if (file.Length <= 0)
+            {
+                continue;
+            }
+
+            await using var stream = file.OpenReadStream();
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer, cancellationToken);
+            uploads.Add(new SupportAttachmentUpload(
+                FileName: file.FileName,
+                ContentType: file.ContentType,
+                Content: buffer.ToArray()));
+        }
+
+        return uploads;
+    }
 
     private async Task<IActionResult> BuildFeatureDetailPageAsync(
         string currentPath,

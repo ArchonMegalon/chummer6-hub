@@ -1,9 +1,7 @@
 using System.IO;
 using System.Net;
+using Chummer.Run.Api;
 using Chummer.Run.Api.Services;
-using Chummer.Run.Api.Services.Community;
-using Chummer.Run.Api.Services.InstallLinking;
-using Chummer.Run.Api.Services.Support;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
@@ -38,39 +36,12 @@ if (string.IsNullOrWhiteSpace(dataProtectionPath))
 builder.Services.AddDataProtection()
     .SetApplicationName("Chummer.Run.Api")
     .PersistKeysToFileSystem(new DirectoryInfo(Path.GetFullPath(dataProtectionPath)));
-builder.Services.AddHttpClient<FleetBridgeService>();
-builder.Services.AddHttpClient<HubIdentityClient>();
-builder.Services.AddHttpClient<HubBrowserAuthService>();
-builder.Services.AddHttpClient<HubGoogleAuthService>();
-builder.Services.AddSingleton<CommunityStore>();
-builder.Services.AddSingleton<InstallLinkingStore>();
-builder.Services.AddSingleton<SupportStore>();
-builder.Services.AddSingleton<PublicCanonFileLoader>();
-builder.Services.AddSingleton<PublicRouteCatalogService>();
-builder.Services.AddSingleton<PublicActionResolver>();
-builder.Services.AddSingleton<PublicLandingService>();
-builder.Services.AddSingleton<PublicTrustContentService>();
-builder.Services.AddSingleton<PublicNavigationService>();
-builder.Services.AddSingleton<HubPageChromeService>();
-builder.Services.AddSingleton<HubEmailLinkVerificationService>();
-builder.Services.AddSingleton<PublicProgressService>();
-builder.Services.AddSingleton<PublicReleaseManifestService>();
-builder.Services.AddSingleton<ReleaseSelectionService>();
-builder.Services.AddSingleton<InstallLinkingService>();
-builder.Services.AddSingleton<FleetReceiptVerifier>();
-builder.Services.AddSingleton<AccountService>();
-builder.Services.AddSingleton<IdentityLinkService>();
-builder.Services.AddSingleton<UserExperienceService>();
-builder.Services.AddSingleton<GroupService>();
-builder.Services.AddSingleton<RewardService>();
-builder.Services.AddSingleton<EntitlementService>();
-builder.Services.AddSingleton<LeaderboardService>();
-builder.Services.AddSingleton<LedgerService>();
-builder.Services.AddSingleton<SupportCaseService>();
-builder.Services.AddSingleton<SupportAssistantService>();
-builder.Services.AddSingleton<CrashSupportService>();
-builder.Services.AddSingleton<CampaignSpineService>();
-builder.Services.AddScoped<BoostSessionService>();
+builder.Services
+    .AddHubPublicGuideContext()
+    .AddHubAccountsAndCommunityContext()
+    .AddHubCampaignSpineContext()
+    .AddHubControlAndSupportContext()
+    .AddHubInstallAndOrchestrationAdapters();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;

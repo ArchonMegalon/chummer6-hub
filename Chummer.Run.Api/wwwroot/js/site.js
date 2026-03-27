@@ -5,6 +5,10 @@
     return root.querySelector("input[name='__RequestVerificationToken']")?.value || "";
   };
 
+  ChummerUi.getRequestVerificationToken = function getRequestVerificationToken(root = document) {
+    return ChummerUi.getAntiForgeryToken(root);
+  };
+
   ChummerUi.setButtonBusy = function setButtonBusy(button, busy, busyLabel) {
     if (!button) return;
     if (!button.dataset.defaultLabel) {
@@ -74,6 +78,17 @@
     } catch {
       return { detail: text };
     }
+  };
+
+  ChummerUi.readJsonResponse = async function readJsonResponse(response, fallback) {
+    const data = await ChummerUi.readResponseData(response);
+    if (!response.ok) {
+      const error = new Error(data?.detail || data?.title || fallback || "Request failed.");
+      error.payload = data;
+      throw error;
+    }
+
+    return data;
   };
 
   ChummerUi.requestJson = async function requestJson(url, options = {}) {

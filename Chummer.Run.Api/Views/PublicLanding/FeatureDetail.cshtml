@@ -104,6 +104,7 @@
     <p class="editorial-copy">@nextCopy</p>
     <div class="stacked-actions">
         <a class="button-like button-like--secondary" href="/contact#support-intake">Get help with this surface</a>
+        <a class="button-like button-like--ghost" href="@(roadmapDetail ? "/horizons" : liveArtifact ? "/artifacts" : "/now")">@(roadmapDetail ? "Open roadmap browser" : liveArtifact ? "Open proof gallery" : "Open what works today")</a>
     </div>
     <p class="muted-copy">@tailCopy</p>
 </section>

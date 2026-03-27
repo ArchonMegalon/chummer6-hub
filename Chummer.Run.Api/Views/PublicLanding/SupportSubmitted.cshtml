@@ -1,0 +1,60 @@
+@model SupportSubmittedPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-support-submitted";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">@Model.Eyebrow</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            <span>@Model.CaseId</span>
+            <span>@Model.StatusLabel.Replace('_', ' ')</span>
+        </div>
+    </div>
+    <div class="stacked-actions">
+        @foreach (var action in Model.Actions)
+        {
+            <a class="button-like button-like--@action.Tone" href="@action.Href">@action.Label</a>
+        }
+    </div>
+</section>
+
+<section class="trust-rail-section">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">What happens next</p>
+        <h2 class="editorial-title">The case is in Chummer now, with one stable id and the next honest route attached</h2>
+        <p class="editorial-copy">@Model.ResponseExpectation</p>
+    </div>
+    <div class="trust-rail-list">
+        @foreach (var item in Model.Highlights)
+        {
+            <article class="trust-rail">
+                <span class="tag">Support</span>
+                <p>@item</p>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.Attachments.Count > 0)
+{
+    <section class="trust-page-sections">
+        <article class="trust-page-section">
+            <p class="eyebrow">Saved evidence</p>
+            <h2>Attachments that stayed with the case</h2>
+            <div class="settings-summary-list">
+                @foreach (var attachment in Model.Attachments)
+                {
+                    <div class="settings-summary-row">
+                        <span>@attachment.FileName</span>
+                        <strong>@($"{attachment.SizeBytes / 1024.0:F1} KB · {attachment.UploadedAtUtc:yyyy-MM-dd HH:mm} UTC")</strong>
+                    </div>
+                }
+            </div>
+        </article>
+    </section>
+}

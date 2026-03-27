@@ -50,11 +50,16 @@ public sealed class AccountsController : Controller
 
     [HttpGet("/account")]
     [HttpGet("/account/{section}")]
+    [HttpGet("/account/support/{caseId}")]
     [Produces("text/html")]
-    public async Task<IActionResult> AccountPage([FromRoute] string? section, CancellationToken cancellationToken)
+    public async Task<IActionResult> AccountPage([FromRoute] string? section, [FromRoute] string? caseId, CancellationToken cancellationToken)
     {
-        var selectedSection = NormalizeAccountSection(section);
-        var currentPath = selectedSection == "profile" ? "/account" : $"/account/{selectedSection}";
+        var selectedSection = string.IsNullOrWhiteSpace(caseId) ? NormalizeAccountSection(section) : "support";
+        var currentPath = !string.IsNullOrWhiteSpace(caseId)
+            ? $"/account/support/{caseId}"
+            : selectedSection == "profile"
+                ? "/account"
+                : $"/account/{selectedSection}";
         var (chromeTitle, chromeDescription) = DescribeAccountSection(selectedSection);
 
         try
@@ -62,6 +67,10 @@ public sealed class AccountsController : Controller
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
+            var selectedSupportCase = string.IsNullOrWhiteSpace(caseId)
+                ? null
+                : _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
             var model = new AccountPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
                 CurrentSection: selectedSection,
@@ -72,7 +81,8 @@ public sealed class AccountsController : Controller
                 Experience: _experience.GetOrCreate(subject.SubjectId),
                 GoogleAvailable: _google.IsConfigured(),
                 InstallLinking: installLinking,
-                SupportCases: _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items,
+                SupportCases: supportCases,
+                SelectedSupportCase: selectedSupportCase,
                 CampaignSpine: _campaignSpine.GetAccountSummary(user, installLinking));
             return View("~/Views/Accounts/Account.cshtml", model);
         }
