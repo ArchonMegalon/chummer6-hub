@@ -19,6 +19,15 @@ to_bool() {
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
 }
 
+is_public_artifact() {
+  local artifact_name
+  artifact_name="$(basename "$1")"
+  if ! to_bool "${CHUMMER_MACOS_PUBLIC_SHELF_ENABLED:-false}" && [[ "$artifact_name" == chummer-*-osx-* ]]; then
+    return 1
+  fi
+  return 0
+}
+
 if [[ -z "$PORTAL_MANIFEST_PATH" ]]; then
   if [[ "$(realpath "$DEPLOY_DIR")" == "$(realpath "$REPO_ROOT/legacy/tooling/docker/Docker/Downloads")" ]]; then
     PORTAL_MANIFEST_PATH="$REPO_ROOT/Chummer.Portal/downloads/releases.json"
@@ -48,7 +57,12 @@ mapfile -t artifacts < <(find "$FILES_SOURCE" -maxdepth 1 -type f \
      -name "chummer-avalonia-*-installer.msix" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
      -name "chummer-blazor-desktop-*-installer.deb" -o -name "chummer-blazor-desktop-*-installer.pkg" -o \
      -name "chummer-blazor-desktop-*-installer.dmg" -o -name "chummer-blazor-desktop-*-installer.msix" \) \
-  | sort)
+  | sort | while IFS= read -r artifact; do
+      [[ -f "$artifact" ]] || continue
+      if is_public_artifact "$artifact"; then
+        printf '%s\n' "$artifact"
+      fi
+    done)
 
 if [[ "${#artifacts[@]}" -eq 0 ]]; then
   echo "No desktop artifacts found under $FILES_SOURCE" >&2
@@ -123,4 +137,4 @@ if [[ -n "$LIVE_VERIFY_TARGET" ]]; then
   bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$LIVE_VERIFY_TARGET"
 fi
 
-echo "Published ${#artifacts[@]} desktop artifact(s) into $DEPLOY_DIR"
+echo "Published ${#artifacts[@]} public desktop artifact(s) into $DEPLOY_DIR"

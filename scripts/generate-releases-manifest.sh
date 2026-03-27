@@ -12,6 +12,7 @@ PORTAL_DOWNLOADS_DIR="${PORTAL_DOWNLOADS_DIR:-$REPO_ROOT/Chummer.Portal/download
 RELEASE_VERSION="${RELEASE_VERSION:-unpublished}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL:-docker}"
 RELEASE_PUBLISHED_AT="${RELEASE_PUBLISHED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+CHUMMER_MACOS_PUBLIC_SHELF_ENABLED="${CHUMMER_MACOS_PUBLIC_SHELF_ENABLED:-false}"
 CANONICAL_MANIFEST_PATH="${CANONICAL_MANIFEST_PATH:-$(dirname "$MANIFEST_PATH")/RELEASE_CHANNEL.generated.json}"
 PORTAL_CANONICAL_MANIFEST_PATH="${PORTAL_CANONICAL_MANIFEST_PATH:-$(dirname "$PORTAL_MANIFEST_PATH")/RELEASE_CHANNEL.generated.json}"
 
@@ -24,8 +25,44 @@ mkdir -p "$(dirname "$MANIFEST_PATH")"
 mkdir -p "$(dirname "$PORTAL_MANIFEST_PATH")"
 mkdir -p "$DOWNLOADS_DIR"
 
+to_bool() {
+  local value
+  value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
+}
+
+is_public_artifact() {
+  local artifact_name
+  artifact_name="$(basename "$1")"
+  if ! to_bool "$CHUMMER_MACOS_PUBLIC_SHELF_ENABLED" && [[ "$artifact_name" == chummer-*-osx-* ]]; then
+    return 1
+  fi
+  return 0
+}
+
+filtered_downloads_dir="$(mktemp -d)"
+cleanup() {
+  rm -rf "$filtered_downloads_dir"
+}
+trap cleanup EXIT
+
+while IFS= read -r artifact; do
+  [[ -f "$artifact" ]] || continue
+  if is_public_artifact "$artifact"; then
+    cp "$artifact" "$filtered_downloads_dir/"
+  fi
+done < <(find "$DOWNLOADS_DIR" -maxdepth 1 -type f \( \
+  -name "chummer-*.zip" -o \
+  -name "chummer-*.tar.gz" -o \
+  -name "chummer-*.exe" -o \
+  -name "chummer-*.deb" -o \
+  -name "chummer-*.pkg" -o \
+  -name "chummer-*.dmg" -o \
+  -name "chummer-*.msix" \
+\) | sort)
+
 python3 "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" \
-  --downloads-dir "$DOWNLOADS_DIR" \
+  --downloads-dir "$filtered_downloads_dir" \
   --channel "$RELEASE_CHANNEL" \
   --version "$RELEASE_VERSION" \
   --published-at "$RELEASE_PUBLISHED_AT" \
@@ -43,7 +80,7 @@ else
 
   portal_files_dir="$PORTAL_DOWNLOADS_DIR/files"
   mkdir -p "$portal_files_dir"
-  mapfile -t portal_artifacts < <(find "$DOWNLOADS_DIR" -maxdepth 1 -type f \( \
+  mapfile -t portal_artifacts < <(find "$filtered_downloads_dir" -maxdepth 1 -type f \( \
     -name "chummer-*-installer.exe" -o \
     -name "chummer-*-installer.deb" -o \
     -name "chummer-*-installer.pkg" -o \

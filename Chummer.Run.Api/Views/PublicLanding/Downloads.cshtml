@@ -5,18 +5,31 @@
     ViewData["SurfaceClass"] = "surface-downloads";
     var release = Model.ReleaseExperience;
     var guestGateRequired = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
+    var platformShelfNotice = !string.IsNullOrWhiteSpace(release.PlatformShelfNoticeSummary);
 }
 
 <section class="release-stage">
     <div class="release-stage__lead">
         <p class="eyebrow">Downloads</p>
         <h1 class="page-title">Install the current preview</h1>
-        <p class="page-copy">Start with the recommended installer for this device. Release notes, known issues, and advanced packages stay underneath so the first decision stays simple.</p>
+        <p class="page-copy">
+            @(platformShelfNotice
+                ? "This device platform is not on the current public shelf. Read the current platform note before treating the preview as installable on this machine."
+                : "Start with the recommended installer for this device. Release notes, known issues, and advanced packages stay underneath so the first decision stays simple.")
+        </p>
         <p class="release-stage__note">
-            @(guestGateRequired
+            @(platformShelfNotice
+                ? release.PlatformShelfNoticeSummary
+                : guestGateRequired
                 ? release.GuestGateSummary
                 : "Start with the recommended installer for this platform. Everything else stays collapsed underneath unless you know you need it.")
         </p>
+        @if (platformShelfNotice)
+        {
+            <div class="release-stage__note">
+                <strong>@release.PlatformShelfNoticeTitle</strong>
+            </div>
+        }
     </div>
 </section>
 

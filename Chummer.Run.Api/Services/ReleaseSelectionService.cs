@@ -8,6 +8,7 @@ public sealed class ReleaseSelectionService
 {
     private readonly PublicCanonFileLoader _canon;
     private const string ExperienceRelativePath = ".codex-design/product/PUBLIC_RELEASE_EXPERIENCE.yaml";
+    private const string PlatformAcceptanceRelativePath = ".codex-design/product/DESKTOP_PLATFORM_ACCEPTANCE_MATRIX.yaml";
     private const string DefaultGuestReadableChannel = "stable";
 
     public ReleaseSelectionService(PublicCanonFileLoader canon)
@@ -18,7 +19,8 @@ public sealed class ReleaseSelectionService
     public PublicReleaseManifestDto ApplyAccessPolicy(PublicReleaseManifestDto manifest)
     {
         var experience = LoadExperience();
-        return ApplyAccessPolicy(manifest, experience);
+        var platformAcceptance = LoadPlatformAcceptance();
+        return ApplyAccessPolicy(manifest, experience, platformAcceptance);
     }
 
     public bool HasGuestReadableDownloads(PublicReleaseManifestDto manifest)
@@ -34,7 +36,10 @@ public sealed class ReleaseSelectionService
     public ReleaseExperienceViewModel BuildExperience(PublicReleaseManifestDto manifest, string userAgent, bool authenticated)
     {
         var experience = LoadExperience();
-        manifest = ApplyAccessPolicy(manifest, experience);
+        var platformAcceptance = LoadPlatformAcceptance();
+        manifest = ApplyAccessPolicy(manifest, experience, platformAcceptance);
+        var requestedPlatform = DetectPreferredPlatform(userAgent);
+        var shelfNotice = BuildPlatformShelfNotice(manifest, platformAcceptance, requestedPlatform);
 
         var installers = manifest.Downloads.Where(IsInstaller).ToArray();
         var manualDownloads = manifest.Downloads.Where(download => !IsInstaller(download)).ToArray();
@@ -78,6 +83,9 @@ public sealed class ReleaseSelectionService
             UpdatePostureSummary: experience.UpdatePostureSummary,
             GuestDownloadAvailable: manifest.Downloads.Any(static artifact =>
                 !string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)),
+            PlatformShelfNoticeTitle: shelfNotice?.Title,
+            PlatformShelfNoticeSummary: shelfNotice?.Summary,
+            RequestedPlatformLabel: RequestedPlatformLabel(requestedPlatform),
             GuestGateHeading: experience.GuestGateHeading,
             GuestGateSummary: experience.GuestGateSummary,
             GuestGatePrimaryLabel: experience.GuestGatePrimaryLabel,
@@ -92,7 +100,7 @@ public sealed class ReleaseSelectionService
             SignedInDispatchSummary: experience.SignedInDispatchSummary,
             SignedInDispatchSteps: experience.SignedInDispatchSteps ?? new List<string>(),
             InstallSteps: installSteps,
-            SystemRequirements: RequirementsFor(experience, recommended));
+            SystemRequirements: RequirementsFor(experience, recommended, requestedPlatform, shelfNotice is not null));
     }
 
     public PublicLandingActionDto BuildPublicPrimaryAction(PublicReleaseManifestDto manifest, bool authenticated)
@@ -125,10 +133,17 @@ public sealed class ReleaseSelectionService
     private PublicReleaseExperienceDocument LoadExperience()
         => _canon.LoadRequiredYaml<PublicReleaseExperienceDocument>(ExperienceRelativePath);
 
-    private static PublicReleaseManifestDto ApplyAccessPolicy(PublicReleaseManifestDto manifest, PublicReleaseExperienceDocument experience)
+    private DesktopPlatformAcceptanceDocument LoadPlatformAcceptance()
+        => _canon.LoadRequiredYaml<DesktopPlatformAcceptanceDocument>(PlatformAcceptanceRelativePath);
+
+    private static PublicReleaseManifestDto ApplyAccessPolicy(
+        PublicReleaseManifestDto manifest,
+        PublicReleaseExperienceDocument experience,
+        DesktopPlatformAcceptanceDocument platformAcceptance)
         => manifest with
         {
             Downloads = manifest.Downloads
+                .Where(download => IsPublicShelfVisible(download, platformAcceptance))
                 .Select(download => download with
                 {
                     InstallAccessClass = ResolveInstallAccessClass(manifest.Channel, download.InstallAccessClass, experience)
@@ -165,14 +180,23 @@ public sealed class ReleaseSelectionService
             GuestDownloadAllowed: guestDownloadAllowed);
     }
 
-    private static IReadOnlyList<string> RequirementsFor(PublicReleaseExperienceDocument experience, PublicReleaseArtifactDto? recommended)
-        => PlatformFamily(recommended) switch
+    private static IReadOnlyList<string> RequirementsFor(
+        PublicReleaseExperienceDocument experience,
+        PublicReleaseArtifactDto? recommended,
+        string? requestedPlatform,
+        bool requestedPlatformUnavailable)
+        => ResolveRequirementsPlatform(recommended, requestedPlatform, requestedPlatformUnavailable) switch
         {
             "windows" => experience.WindowsRequirements ?? new List<string>(),
             "linux" => experience.LinuxRequirements ?? new List<string>(),
             "macos" => experience.MacosRequirements ?? new List<string>(),
             _ => experience.WindowsRequirements ?? new List<string>()
         };
+
+    private static string ResolveRequirementsPlatform(PublicReleaseArtifactDto? recommended, string? requestedPlatform, bool requestedPlatformUnavailable)
+        => requestedPlatformUnavailable && !string.IsNullOrWhiteSpace(requestedPlatform)
+            ? requestedPlatform
+            : PlatformFamily(recommended);
 
     private static ReleaseDisplayViewModel BuildDisplay(PublicReleaseManifestDto manifest, PublicReleaseExperienceDocument experience)
     {
@@ -257,19 +281,7 @@ public sealed class ReleaseSelectionService
             return null;
         }
 
-        string? preferredPlatform = null;
-        if (userAgent.Contains("Windows", StringComparison.OrdinalIgnoreCase))
-        {
-            preferredPlatform = "windows";
-        }
-        else if (userAgent.Contains("Linux", StringComparison.OrdinalIgnoreCase))
-        {
-            preferredPlatform = "linux";
-        }
-        else if (userAgent.Contains("Mac OS", StringComparison.OrdinalIgnoreCase) || userAgent.Contains("Macintosh", StringComparison.OrdinalIgnoreCase))
-        {
-            preferredPlatform = "macos";
-        }
+        string? preferredPlatform = DetectPreferredPlatform(userAgent);
 
         var pool = preferredPlatform is null
             ? candidates
@@ -426,6 +438,99 @@ public sealed class ReleaseSelectionService
 
         return "generic";
     }
+
+    private static string? DetectPreferredPlatform(string userAgent)
+    {
+        if (userAgent.Contains("Windows", StringComparison.OrdinalIgnoreCase))
+        {
+            return "windows";
+        }
+
+        if (userAgent.Contains("Linux", StringComparison.OrdinalIgnoreCase))
+        {
+            return "linux";
+        }
+
+        if (userAgent.Contains("Mac OS", StringComparison.OrdinalIgnoreCase) || userAgent.Contains("Macintosh", StringComparison.OrdinalIgnoreCase))
+        {
+            return "macos";
+        }
+
+        return null;
+    }
+
+    private static bool IsPublicShelfVisible(PublicReleaseArtifactDto download, DesktopPlatformAcceptanceDocument platformAcceptance)
+    {
+        var platform = ResolvePlatformAcceptance(platformAcceptance, PlatformFamily(download));
+        if (platform is null)
+        {
+            return true;
+        }
+
+        return !string.Equals(platform.PublicShelfStatus, "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static DesktopPlatformAcceptancePlatformDocument? ResolvePlatformAcceptance(DesktopPlatformAcceptanceDocument platformAcceptance, string? platformFamily)
+    {
+        if (string.IsNullOrWhiteSpace(platformFamily))
+        {
+            return null;
+        }
+
+        return (platformAcceptance.Platforms ?? new List<DesktopPlatformAcceptancePlatformDocument>())
+            .FirstOrDefault(item => string.Equals(NormalizePlatformId(item.Id), platformFamily, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizePlatformId(string? value)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        if (normalized.Equals("macOS", StringComparison.OrdinalIgnoreCase))
+        {
+            return "macos";
+        }
+
+        return normalized.ToLowerInvariant();
+    }
+
+    private static PlatformShelfNoticeViewModel? BuildPlatformShelfNotice(
+        PublicReleaseManifestDto manifest,
+        DesktopPlatformAcceptanceDocument platformAcceptance,
+        string? requestedPlatform)
+    {
+        if (string.IsNullOrWhiteSpace(requestedPlatform))
+        {
+            return null;
+        }
+
+        if (manifest.Downloads.Any(download => string.Equals(PlatformFamily(download), requestedPlatform, StringComparison.OrdinalIgnoreCase)))
+        {
+            return null;
+        }
+
+        var label = RequestedPlatformLabel(requestedPlatform) ?? "This platform";
+        var platform = ResolvePlatformAcceptance(platformAcceptance, requestedPlatform);
+        if (platform is not null && string.Equals(platform.PublicShelfStatus, "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase))
+        {
+            return new PlatformShelfNoticeViewModel(
+                $"{label} is not on the public shelf yet",
+                $"The current preview does not publish a promoted {label} installer yet. Built artifacts may exist as internal release evidence, but /downloads only exposes platforms that have cleared signing, promotion, and public release-truth checks.");
+        }
+
+        return new PlatformShelfNoticeViewModel(
+            $"{label} is not on the current shelf",
+            $"The current preview does not publish a download for {label}. Use the release-truth and install-help surfaces before assuming this platform is currently supported.");
+    }
+
+    private static string? RequestedPlatformLabel(string? requestedPlatform)
+        => requestedPlatform switch
+        {
+            "windows" => "Windows",
+            "linux" => "Linux",
+            "macos" => "macOS",
+            _ => null
+        };
+
+    private sealed record PlatformShelfNoticeViewModel(string Title, string Summary);
 
     private static string PlatformLabel(PublicReleaseArtifactDto download)
         => PlatformFamily(download) switch

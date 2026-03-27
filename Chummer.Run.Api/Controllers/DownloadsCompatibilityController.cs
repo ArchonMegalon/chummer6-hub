@@ -106,14 +106,18 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     [HttpGet("/downloads/files/{**path}")]
     public async Task<IActionResult> DownloadFile([FromRoute] string? path, CancellationToken cancellationToken)
     {
-        var artifact = _releases.FindDownloadByPath(path);
-        if (artifact is null)
+        var originalArtifact = _releases.FindDownloadByPath(path);
+        if (originalArtifact is null)
         {
             return NotFound();
         }
 
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        artifact = manifest.Downloads.FirstOrDefault(item => string.Equals(item.Id, artifact.Id, StringComparison.OrdinalIgnoreCase)) ?? artifact;
+        var artifact = manifest.Downloads.FirstOrDefault(item => string.Equals(item.Id, originalArtifact.Id, StringComparison.OrdinalIgnoreCase));
+        if (artifact is null)
+        {
+            return NotFound();
+        }
 
         var filePath = _releases.ResolveDownloadFilePath(path);
         if (filePath is null)
