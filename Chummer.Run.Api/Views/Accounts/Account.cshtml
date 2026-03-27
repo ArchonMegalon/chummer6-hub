@@ -169,49 +169,57 @@
                 </form>
             </section>
 
-            <section id="sign-in" class="settings-section" data-account-panel>
-                <div class="settings-section__header">
-                    <h2>Primary sign-in</h2>
-                    <p>Choose the sign-in path that feels stable for daily use, then keep recovery separate.</p>
-                </div>
-                <div class="settings-summary-list">
-                    <div class="settings-summary-row">
-                        <span>Primary sign-in</span>
-                        <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
+            <details class="details-drawer" open>
+                <summary>Primary sign-in</summary>
+                <section id="sign-in" class="settings-section" data-account-panel>
+                    <div class="settings-section__header">
+                        <h2>Primary sign-in</h2>
+                        <p>Keep the daily sign-in path visible here without turning the profile route into a second full settings page.</p>
                     </div>
-                    <div class="settings-summary-row">
-                        <span>Google</span>
-                        <strong>@(googleLink is null ? (Model.GoogleAvailable ? "Not linked" : "Unavailable on this host") : $"Connected ({HumanizeStatus(googleLink.Status, "Ready")})")</strong>
+                    <div class="settings-summary-list">
+                        <div class="settings-summary-row">
+                            <span>Primary sign-in</span>
+                            <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Google</span>
+                            <strong>@(googleLink is null ? (Model.GoogleAvailable ? "Not linked" : "Unavailable on this host") : $"Connected ({HumanizeStatus(googleLink.Status, "Ready")})")</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Email</span>
+                            <strong>@(emailLink is null ? "Not linked" : $"{emailLink.DisplayLabel} ({HumanizeStatus(emailLink.Status, "Ready")})")</strong>
+                        </div>
                     </div>
-                    <div class="settings-summary-row">
-                        <span>Email</span>
-                        <strong>@(emailLink is null ? "Not linked" : $"{emailLink.DisplayLabel} ({HumanizeStatus(emailLink.Status, "Ready")})")</strong>
-                    </div>
-                </div>
-                @if (Model.GoogleAvailable)
-                {
-                    <a class="button-like button-like--secondary" href="/auth/google/link?next=/account">@(googleLink is null ? "Link Google" : "Refresh Google link")</a>
-                }
-            </section>
+                    @if (Model.GoogleAvailable)
+                    {
+                        <div class="stacked-actions">
+                            <a class="button-like button-like--secondary" href="/auth/google/link?next=/account/profile">@(googleLink is null ? "Link Google" : "Refresh Google link")</a>
+                        </div>
+                    }
+                </section>
+            </details>
 
-            <section id="recovery" class="settings-section" data-account-panel>
-                <div class="settings-section__header">
-                    <h2>Recovery email</h2>
-                    <p>Add a verified backup path so one sign-in method is never the whole story.</p>
-                </div>
-                <div class="settings-summary-row">
-                    <span>Status</span>
-                    <strong id="recoveryEmailStatus">@(emailLink is null ? "Missing" : HumanizeStatus(emailLink.Status, "Missing"))</strong>
-                </div>
-                <form id="recoveryForm" class="settings-form">
-                    <div class="field">
-                        <label for="recoveryEmail">Recovery email</label>
-                        <input id="recoveryEmail" type="email" placeholder="runner@example.com" />
+            <details class="details-drawer">
+                <summary>Recovery email</summary>
+                <section id="recovery" class="settings-section" data-account-panel>
+                    <div class="settings-section__header">
+                        <h2>Recovery email</h2>
+                        <p>Add a verified backup path so one sign-in method is never the whole story.</p>
                     </div>
-                    <button class="button-like button-like--secondary" type="submit">Start verification</button>
-                    <p id="recoveryStatusNotice" class="muted-copy" hidden></p>
-                </form>
-            </section>
+                    <div class="settings-summary-row">
+                        <span>Status</span>
+                        <strong id="recoveryEmailStatus">@(emailLink is null ? "Missing" : HumanizeStatus(emailLink.Status, "Missing"))</strong>
+                    </div>
+                    <form id="recoveryForm" class="settings-form">
+                        <div class="field">
+                            <label for="recoveryEmail">Recovery email</label>
+                            <input id="recoveryEmail" type="email" placeholder="runner@example.com" />
+                        </div>
+                        <button class="button-like button-like--secondary" type="submit">Start verification</button>
+                        <p id="recoveryStatusNotice" class="muted-copy" hidden></p>
+                    </form>
+                </section>
+            </details>
             }
 
             @if (showSettingsSection && showChannelsSection)
