@@ -55,6 +55,7 @@ public sealed class AccountsController : Controller
     {
         var selectedSection = NormalizeAccountSection(section);
         var currentPath = selectedSection == "profile" ? "/account" : $"/account/{selectedSection}";
+        var (chromeTitle, chromeDescription) = DescribeAccountSection(selectedSection);
 
         try
         {
@@ -62,7 +63,7 @@ public sealed class AccountsController : Controller
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var model = new AccountPageViewModel(
-                Chrome: _chrome.BuildAuthenticatedChrome("Account", "Profile, sign-in methods, recovery posture, and channel settings.", currentPath, user.DisplayName),
+                Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
                 CurrentSection: selectedSection,
                 CoreSections: BuildAccountCoreSections(selectedSection),
                 SecondarySections: BuildAccountSecondarySections(selectedSection),
@@ -122,6 +123,17 @@ public sealed class AccountsController : Controller
         {
             new SectionLinkViewModel("settings", "More settings", "/account/settings", string.Equals(currentSection, "settings", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("advanced", "Advanced", "/account/advanced", string.Equals(currentSection, "advanced", StringComparison.OrdinalIgnoreCase))
+        };
+
+    private static (string Title, string Description) DescribeAccountSection(string currentSection)
+        => currentSection switch
+        {
+            "support" => ("Account · Support", "Open, track, and close support without leaving the signed-in product shell."),
+            "access" => ("Account · Devices & access", "Linked installs, access rights, and claim handoff in one calmer route."),
+            "work" => ("Account · Workspaces", "Campaign continuity, teams, and work-return details when you explicitly need them."),
+            "settings" => ("Account · Settings", "Preferences, linked channels, participation, and help policy outside the customer core."),
+            "advanced" => ("Account · Advanced", "Raw identifiers and technical account detail kept behind an explicit advanced route."),
+            _ => ("Account", "Profile, sign-in methods, recovery posture, and channel settings.")
         };
 
     [HttpGet("me")]

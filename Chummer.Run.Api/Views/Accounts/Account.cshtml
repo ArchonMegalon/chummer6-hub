@@ -1,6 +1,33 @@
 @model AccountPageViewModel
 @{
-    ViewData["Title"] = "Account";
+    var pageTitle = Model.CurrentSection switch
+    {
+        "support" => "Account · Support",
+        "access" => "Account · Devices & access",
+        "work" => "Account · Workspaces",
+        "settings" => "Account · Settings",
+        "advanced" => "Account · Advanced",
+        _ => "Account"
+    };
+    var sectionTitle = Model.CurrentSection switch
+    {
+        "support" => "Support",
+        "access" => "Devices & access",
+        "work" => "Workspaces and continuity",
+        "settings" => "Settings",
+        "advanced" => "Advanced account details",
+        _ => "Account"
+    };
+    var sectionCopy = Model.CurrentSection switch
+    {
+        "support" => "Open, track, and close support without leaving the signed-in shell.",
+        "access" => "Keep linked installs, access rights, and claim handoff in one calmer route.",
+        "work" => "Campaign continuity, work-return surfaces, and team posture stay here when you explicitly need them.",
+        "settings" => "Preferences, participation, and linked channels stay out of the customer core until you ask for them.",
+        "advanced" => "Raw identifiers and technical account detail stay behind an explicit advanced route.",
+        _ => "Keep sign-in, recovery, devices, support, and account preferences in one calmer product settings surface."
+    };
+    ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account";
     var emailLink = Model.Links.LinkedIdentities.FirstOrDefault(link => string.Equals(link.Provider, "email", StringComparison.OrdinalIgnoreCase));
@@ -71,28 +98,31 @@
     </div>
     <div class="account-stage__lead">
         <p class="eyebrow">Account</p>
-        <h1 class="page-title">Account</h1>
-        <p class="page-copy">Keep sign-in, recovery, devices, support, and account preferences in one calmer product settings surface.</p>
+        <h1 class="page-title">@sectionTitle</h1>
+        <p class="page-copy">@sectionCopy</p>
     </div>
 
-    <div class="account-overview">
-        <article class="account-overview__card">
-            <span class="tag">Primary sign-in</span>
-            <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
-        </article>
-        <article class="account-overview__card">
-            <span class="tag">Recovery</span>
-            <strong>@(emailLink is null ? "Add one" : HumanizeStatus(emailLink.Status, "Add one"))</strong>
-        </article>
-        <article class="account-overview__card">
-            <span class="tag">Devices &amp; access</span>
-            <strong>@(activeAccessRights > 0 ? $"{activeAccessRights} active" : claimedInstallations > 0 ? $"{claimedInstallations} linked" : "Ready to link")</strong>
-        </article>
-        <article class="account-overview__card">
-            <span class="tag">Support</span>
-            <strong>@(openSupportCases == 0 ? "Quiet" : $"{openSupportCases} active")</strong>
-        </article>
-    </div>
+    @if (showProfileSection)
+    {
+        <div class="account-overview">
+            <article class="account-overview__card">
+                <span class="tag">Primary sign-in</span>
+                <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
+            </article>
+            <article class="account-overview__card">
+                <span class="tag">Recovery</span>
+                <strong>@(emailLink is null ? "Add one" : HumanizeStatus(emailLink.Status, "Add one"))</strong>
+            </article>
+            <article class="account-overview__card">
+                <span class="tag">Devices &amp; access</span>
+                <strong>@(activeAccessRights > 0 ? $"{activeAccessRights} active" : claimedInstallations > 0 ? $"{claimedInstallations} linked" : "Ready to link")</strong>
+            </article>
+            <article class="account-overview__card">
+                <span class="tag">Support</span>
+                <strong>@(openSupportCases == 0 ? "Quiet" : $"{openSupportCases} active")</strong>
+            </article>
+        </div>
+    }
 
     <div class="account-shell">
         <aside class="account-nav" aria-label="Account sections">

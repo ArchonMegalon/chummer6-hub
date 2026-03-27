@@ -75,6 +75,38 @@ else
                 </div>
                 <p class="muted-copy"><a class="quiet-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a></p>
                 <details class="details-drawer">
+                    <summary>Release notes, known issues, and requirements</summary>
+                    <div class="compact-rail">
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>Release notes</h3>
+                                <p>@release.ReleaseNotesSummary</p>
+                            </div>
+                        </article>
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>Known issues</h3>
+                                <p>Known issues and install posture stay in the trust surface before you commit a device to this preview.</p>
+                            </div>
+                        </article>
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>Updates</h3>
+                                <p>@release.UpdatePostureSummary</p>
+                            </div>
+                        </article>
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>System requirements</h3>
+                                <p>@string.Join(" ", release.SystemRequirements)</p>
+                            </div>
+                        </article>
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
+                    </div>
+                </details>
+                <details class="details-drawer">
                     <summary>Package details</summary>
                     <div class="settings-summary-list">
                         <div class="settings-summary-row">
@@ -92,43 +124,6 @@ else
                 </details>
             </div>
         </article>
-    </section>
-
-    <section class="release-shelf release-shelf--manual">
-        <details class="release-accordion">
-            <summary>What changed and what to expect</summary>
-            <div class="release-accordion__body">
-                <div class="compact-rail">
-                    <article class="compact-rail__item">
-                        <div class="compact-rail__copy">
-                            <h3>Release notes</h3>
-                            <p>@release.ReleaseNotesSummary</p>
-                        </div>
-                    </article>
-                    <article class="compact-rail__item">
-                        <div class="compact-rail__copy">
-                            <h3>Known issues</h3>
-                            <p>Known issues and channel-posture notes live in the trust surface before you install or continue.</p>
-                        </div>
-                    </article>
-                    <article class="compact-rail__item">
-                        <div class="compact-rail__copy">
-                            <h3>Updates</h3>
-                            <p>@release.UpdatePostureSummary</p>
-                        </div>
-                    </article>
-                    <article class="compact-rail__item">
-                        <div class="compact-rail__copy">
-                            <h3>System requirements</h3>
-                            <p>@string.Join(" ", release.SystemRequirements)</p>
-                        </div>
-                    </article>
-                </div>
-                <div class="stacked-actions">
-                    <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
-                </div>
-            </div>
-        </details>
     </section>
 
     @if (release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0 || release.ManualPackages.Count > 0)
