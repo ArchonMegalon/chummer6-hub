@@ -20,8 +20,9 @@
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
     var proofSectionTrail = Model.Surface.ProductProofTrail.Skip(1).Take(3).ToArray();
     var availableHighlight = Model.AvailableToday.FirstOrDefault();
-    var previewHighlight = Model.PreviewItems.FirstOrDefault();
     var comingNextHighlight = Model.ComingNext.FirstOrDefault();
+    var previewCount = Model.PreviewItems.Count;
+    var previewHighlight = Model.PreviewItems.FirstOrDefault();
     var release = Model.ReleaseExperience;
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
@@ -140,17 +141,6 @@
                 <a class="inline-link" href="@availableHighlight.Action.Href">@availableHighlight.Action.Label</a>
             </article>
         }
-        @if (previewHighlight is not null)
-        {
-            <article class="compact-rail__item" id="@previewHighlight.Card.Id.Replace('_', '-')">
-                <div class="compact-rail__copy">
-                    <span class="tag @PublicSurfaceStatus.CssTone(previewHighlight.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(previewHighlight.Card.Badge)</span>
-                    <h3>@previewHighlight.Card.Title</h3>
-                    <p>@previewHighlight.Card.Summary @(Model.PreviewItems.Count > 1 ? $"+{Model.PreviewItems.Count - 1} more preview-in-progress surface(s) stay on the shelf." : string.Empty)</p>
-                </div>
-                <a class="inline-link" href="@previewHighlight.Action.Href">@previewHighlight.Action.Label</a>
-            </article>
-        }
         @if (comingNextHighlight is not null)
         {
             <article class="compact-rail__item" id="@comingNextHighlight.Card.Id.Replace('_', '-')">
@@ -163,6 +153,16 @@
             </article>
         }
     </div>
+    @if (previewHighlight is not null)
+    {
+        <p class="muted-copy">
+            Preview in progress: <a class="inline-link" href="@previewHighlight.Action.Href">@previewHighlight.Card.Title</a>
+            @if (previewCount > 1)
+            {
+                <span> plus @(previewCount - 1) more opening surface(s) on the full proof shelf.</span>
+            }
+        </p>
+    }
     <div class="stacked-actions">
         <a class="button-like button-like--secondary" href="/now">Open the full proof shelf</a>
     </div>
