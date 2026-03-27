@@ -1506,6 +1506,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Inspectable"), PublicSurfaceStatus.AvailableToday, StringComparison.Ordinal), "inspectable proof should present as available-today proof on the public surface.");
     Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Preview"), PublicSurfaceStatus.PreviewInProgress, StringComparison.Ordinal), "preview artifact concepts should present as preview-in-progress on the public surface.");
     Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Designing"), PublicSurfaceStatus.DesigningInPublic, StringComparison.Ordinal), "designing horizons should present with the shared customer-facing roadmap label.");
+    var runbookSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "scripts", "runbook.sh"));
+    Assert(runbookSource.Contains("RUNBOOK_MODE=push bash \"$SCRIPT_DIR/runbook.sh\"", StringComparison.Ordinal), "hub-ship should force push mode explicitly instead of recursively inheriting RUNBOOK_MODE from the parent shell.");
+    Assert(!runbookSource.Contains("bash \"$SCRIPT_DIR/runbook.sh\" push", StringComparison.Ordinal), "hub-ship should not recurse back into itself through an inherited RUNBOOK_MODE environment.");
     var homeSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"));
     Assert(!homeSource.Contains("More in your signed-in shell", StringComparison.Ordinal), "home should not fall back to the old catch-all signed-in shell accordion.");
     Assert(!homeSource.Contains("Account state at a glance", StringComparison.Ordinal), "home should keep the overview route focused instead of adding a second top-level summary disclosure.");
