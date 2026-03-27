@@ -781,9 +781,8 @@
                         <ul class="muted-copy">
                             @foreach (var handoff in Model.CampaignSpine.BuildLabHandoffs)
                             {
-                                var buildPathTitle = handoff.Title.Replace("Build Lab handoff", "Build path", StringComparison.OrdinalIgnoreCase);
                                 <li>
-                                    <strong>@buildPathTitle</strong>: @handoff.Summary
+                                    <strong>@handoff.Title</strong>: @handoff.Summary
                                     <span> Variant: @handoff.VariantLabel. Progression: @handoff.ProgressionLabel.</span>
                                     @if (handoff.TradeoffLines.Count > 0)
                                     {
