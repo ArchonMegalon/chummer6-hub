@@ -18,6 +18,8 @@ BANNED_COPY = re.compile(r"\b(Read the linked detail|Read more|Learn more)\b", r
 class AuditRoute:
     path: str
     expected_text: str | None = None
+    required_texts: tuple[str, ...] = ()
+    forbidden_texts: tuple[str, ...] = ()
     expected_status: int = 200
     expects_header_count: int | None = None
     allows_redirect: bool = False
@@ -57,11 +59,12 @@ def main() -> int:
         time.sleep(args.poll_seconds)
 
     routes = [
-        AuditRoute("/", "Create account to get preview", expects_header_count=1),
+        AuditRoute("/", "Create account to get preview", required_texts=("Final pool 9",), expects_header_count=1),
         AuditRoute("/what-is-chummer", "One product for rules truth, living dossiers, and session return.", expects_header_count=1),
-        AuditRoute("/now", "Current preview, visible proof, and known posture", expects_header_count=1),
+        AuditRoute("/now", "Current preview, visible proof, and known posture", required_texts=("What you can verify now", "Available today"), expects_header_count=1),
         AuditRoute("/downloads", "Install the current preview", expects_header_count=1),
-        AuditRoute("/horizons", "What Chummer is building toward", expects_header_count=1),
+        AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track"), forbidden_texts=("Research tracks",), expects_header_count=1),
+        AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Preview in progress",), expects_header_count=1),
         AuditRoute("/artifacts/current-preview-build", "Current preview build", expects_header_count=1),
         AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", expects_header_count=1),
         AuditRoute("/participate", "Choose how to participate", expects_header_count=1),
@@ -79,12 +82,20 @@ def main() -> int:
             raise AssertionError(f"{route.path} returned {status}, expected {route.expected_status}")
         if route.expected_text and route.expected_text not in body:
             raise AssertionError(f"{route.path} missing expected text: {route.expected_text}")
+        for snippet in route.required_texts:
+            if snippet not in body:
+                raise AssertionError(f"{route.path} missing required text: {snippet}")
+        for snippet in route.forbidden_texts:
+            if snippet in body:
+                raise AssertionError(f"{route.path} rendered forbidden text: {snippet}")
         if route.path != "/robots.txt":
             robots = headers.get("x-robots-tag", "")
             if "noindex" not in robots.lower():
                 raise AssertionError(f"{route.path} missing X-Robots-Tag noindex header")
             if BANNED_COPY.search(body):
                 raise AssertionError(f"{route.path} rendered banned generic CTA copy")
+            if route.path == "/" and body.count("Final pool 9") != 1:
+                raise AssertionError("/ rendered the proof teaser more than once")
             if route.expects_header_count is not None:
                 parser_ = HeaderCounter()
                 parser_.feed(body)
