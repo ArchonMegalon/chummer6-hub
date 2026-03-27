@@ -1492,6 +1492,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("string.Equals(proofSectionAsset.AssetSlot, heroProofAsset.AssetSlot", StringComparison.Ordinal), "landing should guard against reusing the same proof asset slot in both the hero and lower proof band.");
     Assert(landingSource.Contains("var proofNotes = Model.Workflows.Take(1).ToArray();", StringComparison.Ordinal), "landing should keep the proof band to one tighter workflow note instead of restating the whole product loop.");
     Assert(!landingSource.Contains("works-column__header", StringComparison.Ordinal), "landing should collapse the what-works-now strip instead of restating three full column headers.");
+    Assert(landingSource.Contains("Preview in progress:", StringComparison.Ordinal), "landing should demote preview-in-progress copy to a quieter shelf note instead of a full third state card.");
     Assert(landingSource.Contains("PublicSurfaceStatus.DisplayLabel", StringComparison.Ordinal), "landing should use the shared public status presenter instead of route-local badge labels.");
     var storySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml"));
     Assert(!storySource.Contains("One path from install to session return", StringComparison.Ordinal), "product story should not drift back into a second install/support explainer.");
