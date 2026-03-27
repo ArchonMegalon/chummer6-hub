@@ -226,6 +226,9 @@ public sealed record SupportIntakeViewModel(
     string? DefaultPlatform = null,
     string? DefaultApplicationVersion = null,
     string? DefaultInstallationId = null,
+    string? DefaultReleaseChannel = null,
+    string? DefaultHeadId = null,
+    string? DefaultArch = null,
     string? ContextHint = null);
 
 public sealed record SupportSubmittedPageViewModel(

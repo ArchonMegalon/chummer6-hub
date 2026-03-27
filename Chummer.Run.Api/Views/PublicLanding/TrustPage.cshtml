@@ -170,8 +170,20 @@ else
                         <input id="supportVersion" name="applicationVersion" maxlength="64" placeholder="Current preview build or version number" value="@Model.SupportIntake.DefaultApplicationVersion" />
                     </div>
                     <div class="field">
+                        <label for="supportReleaseChannel">Release channel</label>
+                        <input id="supportReleaseChannel" name="releaseChannel" maxlength="64" placeholder="preview, beta, or stable" value="@Model.SupportIntake.DefaultReleaseChannel" />
+                    </div>
+                    <div class="field">
+                        <label for="supportHeadId">Desktop head</label>
+                        <input id="supportHeadId" name="headId" maxlength="64" placeholder="avalonia or another shipped head" value="@Model.SupportIntake.DefaultHeadId" />
+                    </div>
+                    <div class="field">
                         <label for="supportInstallationId">Install or claim code</label>
                         <input id="supportInstallationId" name="installationId" maxlength="64" placeholder="Optional install id or claim code" value="@Model.SupportIntake.DefaultInstallationId" />
+                    </div>
+                    <div class="field">
+                        <label for="supportArch">Architecture</label>
+                        <input id="supportArch" name="arch" maxlength="32" placeholder="x64 or arm64" value="@Model.SupportIntake.DefaultArch" />
                     </div>
                 </details>
                 <details class="details-drawer">

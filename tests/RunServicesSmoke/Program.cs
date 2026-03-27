@@ -1514,6 +1514,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("More settings", StringComparison.Ordinal), "account should keep non-core sections behind a calmer secondary settings disclosure.");
     Assert(accountSource.Contains("Advanced account details", StringComparison.Ordinal), "account should hide raw account identifiers behind an advanced disclosure.");
     Assert(accountSource.Contains("var sectionTitle = Model.CurrentSection switch", StringComparison.Ordinal), "account routes should expose route-specific headings instead of one generic account title.");
+    var trustSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml"));
+    Assert(trustSource.Contains("supportReleaseChannel", StringComparison.Ordinal), "contact intake should keep release-channel context visible when install-aware support is available.");
+    Assert(trustSource.Contains("supportHeadId", StringComparison.Ordinal), "contact intake should keep head context visible when install-aware support is available.");
+    Assert(trustSource.Contains("supportArch", StringComparison.Ordinal), "contact intake should keep architecture context visible when install-aware support is available.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
@@ -1904,6 +1908,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedContactModel?.SupportIntake is not null, "authenticated contact page should project the first-party support intake.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedContactModel!.SupportIntake!.DefaultInstallationId), "authenticated contact page should prefill install-aware support context when a linked install exists.");
     Assert(authenticatedContactModel.SupportIntake.ContextHint?.Contains("linked install", StringComparison.OrdinalIgnoreCase) == true, "authenticated contact page should explain where the prefilled install context came from.");
+    Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultReleaseChannel, "preview", StringComparison.Ordinal), "authenticated contact page should prefill the install release channel.");
+    Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultHeadId, "avalonia", StringComparison.Ordinal), "authenticated contact page should prefill the shipped desktop head.");
+    Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultArch, "x64", StringComparison.Ordinal), "authenticated contact page should prefill the install architecture.");
     var contactSubmittedPage = await authenticatedLandingController.ContactSubmittedPage(supportCase.CaseId, CancellationToken.None) as ViewResult;
     var contactSubmittedModel = contactSubmittedPage?.Model as SupportSubmittedPageViewModel;
     Assert(contactSubmittedModel is not null && string.Equals(contactSubmittedModel.CaseId, supportCase.CaseId, StringComparison.Ordinal), "contact submitted route should render a stable support confirmation page.");

@@ -363,7 +363,10 @@ public sealed class PublicLandingController : Controller
         [FromForm] string? replyEmail,
         [FromForm] string? installationId,
         [FromForm] string? applicationVersion,
+        [FromForm] string? releaseChannel,
+        [FromForm] string? headId,
         [FromForm] string? platform,
+        [FromForm] string? arch,
         [FromForm] List<IFormFile>? attachments,
         CancellationToken cancellationToken)
     {
@@ -375,7 +378,10 @@ public sealed class PublicLandingController : Controller
             ReporterEmail: replyEmail,
             InstallationId: installationId,
             ApplicationVersion: applicationVersion,
+            ReleaseChannel: releaseChannel,
+            HeadId: headId,
             Platform: platform,
+            Arch: arch,
             Source: SupportCaseSourceKinds.PublicWeb);
 
         try
@@ -643,6 +649,9 @@ public sealed class PublicLandingController : Controller
             DefaultPlatform: installDefaults.Platform,
             DefaultApplicationVersion: installDefaults.ApplicationVersion,
             DefaultInstallationId: installDefaults.InstallationId,
+            DefaultReleaseChannel: installDefaults.ReleaseChannel,
+            DefaultHeadId: installDefaults.HeadId,
+            DefaultArch: installDefaults.Arch,
             ContextHint: installDefaults.ContextHint);
 
     private async Task<SupportIntakeDefaults> ResolveSupportIntakeDefaultsAsync(CancellationToken cancellationToken)
@@ -663,12 +672,18 @@ public sealed class PublicLandingController : Controller
                 {
                     installation.Platform,
                     installation.Version,
+                    installation.Channel,
+                    installation.HeadId,
+                    installation.Arch,
                     installation.InstallationId
                 }.Where(static item => !string.IsNullOrWhiteSpace(item)));
             return new SupportIntakeDefaults(
                 Platform: installation.Platform,
                 ApplicationVersion: installation.Version,
                 InstallationId: installation.InstallationId,
+                ReleaseChannel: installation.Channel,
+                HeadId: installation.HeadId,
+                Arch: installation.Arch,
                 ContextHint: string.IsNullOrWhiteSpace(descriptor)
                     ? "Prefilled from your most recent linked install."
                     : $"Prefilled from your most recent linked install: {descriptor}.");
@@ -684,12 +699,16 @@ public sealed class PublicLandingController : Controller
                 {
                     pendingTicket.ArtifactLabel,
                     pendingTicket.Version,
+                    pendingTicket.Channel,
                     pendingTicket.ClaimCode
                 }.Where(static item => !string.IsNullOrWhiteSpace(item)));
             return new SupportIntakeDefaults(
                 Platform: pendingTicket.ArtifactLabel,
                 ApplicationVersion: pendingTicket.Version,
                 InstallationId: pendingTicket.ClaimCode,
+                ReleaseChannel: pendingTicket.Channel,
+                HeadId: null,
+                Arch: null,
                 ContextHint: string.IsNullOrWhiteSpace(descriptor)
                     ? "Prefilled from your latest pending install handoff."
                     : $"Prefilled from your latest pending install handoff: {descriptor}.");
@@ -702,9 +721,12 @@ public sealed class PublicLandingController : Controller
         string? Platform,
         string? ApplicationVersion,
         string? InstallationId,
+        string? ReleaseChannel,
+        string? HeadId,
+        string? Arch,
         string? ContextHint)
     {
-        public static SupportIntakeDefaults Empty { get; } = new(null, null, null, null);
+        public static SupportIntakeDefaults Empty { get; } = new(null, null, null, null, null, null, null);
     }
 
     private static async Task<IReadOnlyList<SupportAttachmentUpload>> ReadSupportUploadsAsync(
