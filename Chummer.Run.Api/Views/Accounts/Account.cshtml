@@ -268,7 +268,7 @@
                         </div>
                         @if (selectedSupportCase.Attachments is { Count: > 0 })
                         {
-                            <details class="details-drawer">
+                            <details class="details-drawer" open>
                                 <summary>Saved attachments</summary>
                                 <div class="settings-summary-list">
                                     @foreach (var attachment in selectedSupportCase.Attachments)
@@ -1058,7 +1058,16 @@
     link.addEventListener("click", () => window.setTimeout(revealHashTarget, 0));
   });
 
-  document.getElementById("profileForm").addEventListener("submit", async (event) => {
+  const bindSubmit = (formId, handler) => {
+    const form = document.getElementById(formId);
+    if (!form) {
+      return;
+    }
+
+    form.addEventListener("submit", handler);
+  };
+
+  bindSubmit("profileForm", async (event) => {
     event.preventDefault();
     const notice = document.getElementById("profileStatusNotice");
     const button = event.currentTarget.querySelector("button[type='submit']");
@@ -1086,7 +1095,7 @@
     }
   });
 
-  document.getElementById("recoveryForm").addEventListener("submit", async (event) => {
+  bindSubmit("recoveryForm", async (event) => {
     event.preventDefault();
     const notice = document.getElementById("recoveryStatusNotice");
     const button = event.currentTarget.querySelector("button[type='submit']");
@@ -1113,7 +1122,7 @@
     }
   });
 
-  document.getElementById("telegramForm").addEventListener("submit", async (event) => {
+  bindSubmit("telegramForm", async (event) => {
     event.preventDefault();
     const notice = document.getElementById("telegramStatusNotice");
     const button = event.currentTarget.querySelector("button[type='submit']");
@@ -1137,7 +1146,7 @@
     }
   });
 
-  document.getElementById("experienceForm").addEventListener("submit", async (event) => {
+  bindSubmit("experienceForm", async (event) => {
     event.preventDefault();
     const notice = document.getElementById("experienceStatusNotice");
     const laneInterests = Array.from(document.querySelectorAll("#experienceForm input[type='checkbox'][value]:checked")).map((input) => input.value);
@@ -1167,7 +1176,7 @@
     }
   });
 
-  document.getElementById("supportAssistantForm").addEventListener("submit", async (event) => {
+  bindSubmit("supportAssistantForm", async (event) => {
     event.preventDefault();
     const notice = document.getElementById("supportAssistantStatusNotice");
     const button = event.currentTarget.querySelector("button[type='submit']");
@@ -1237,7 +1246,7 @@
     }
   });
 
-  document.getElementById("supportCaseForm").addEventListener("submit", async (event) => {
+  bindSubmit("supportCaseForm", async (event) => {
     event.preventDefault();
     const notice = document.getElementById("supportCaseStatusNotice");
     const button = event.currentTarget.querySelector("button[type='submit']");
