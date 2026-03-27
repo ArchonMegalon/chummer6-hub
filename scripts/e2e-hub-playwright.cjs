@@ -89,13 +89,14 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     page.click('button[type="submit"]')
   ]);
   await expectVisible(page, 'text=Check your email');
-  await expectVisible(page, 'text=Continue to Downloads');
+  await expectVisible(page, 'text=Magic link sent');
+  await expectVisible(page, 'text=Open the verification link for Downloads');
   await assertNoBannedCopy(page, 'Signup confirmation');
   await assertNoPageErrors(page, pageErrors, 'Signup confirmation');
 
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-    page.getByRole('link', { name: /Continue to Downloads/i }).click()
+    page.getByRole('link', { name: /Open the verification link for Downloads/i }).click()
   ]);
   assert(page.url().includes('/downloads/install/avalonia-linux-x64-installer'), 'Signup callback should land on the signed-in handoff route.');
   await expectVisible(page, 'text=Claim code');
