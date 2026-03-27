@@ -26,9 +26,26 @@ is_docker_permission_error_text() {
   grep -Eqi "permission denied while trying to connect to the Docker daemon socket|operation not permitted|got permission denied while trying to connect to the docker daemon socket" "$source_file"
 }
 
+compose_rm_log="$(mktemp)"
+set +e
+docker compose -f "$HUB_EDGE_COMPOSE_FILE" rm -fsv chummer-run-identity chummer-portal 2>&1 | tee "$compose_rm_log"
+compose_rm_status=${PIPESTATUS[0]}
+set -e
+if [[ "$compose_rm_status" -ne 0 ]]; then
+  if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$compose_rm_log"; then
+    echo "skipping hub e2e: docker daemon permission denied in this environment."
+    rm -f "$compose_rm_log"
+    exit 0
+  fi
+
+  rm -f "$compose_rm_log"
+  exit "$compose_rm_status"
+fi
+rm -f "$compose_rm_log"
+
 compose_up_log="$(mktemp)"
 set +e
-docker compose -f "$HUB_EDGE_COMPOSE_FILE" up -d --build chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"
+docker compose -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"
 compose_up_status=${PIPESTATUS[0]}
 set -e
 if [[ "$compose_up_status" -ne 0 ]]; then
