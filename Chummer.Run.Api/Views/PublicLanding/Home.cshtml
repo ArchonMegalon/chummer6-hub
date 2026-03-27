@@ -296,11 +296,27 @@
                                             @if (buildHandoffs.Length > 0)
                                             {
                                                 var handoff = buildHandoffs[0];
+                                                var buildPathTitle = handoff.Title.Replace("Build Lab handoff", "Build path", StringComparison.OrdinalIgnoreCase);
                                                 <article class="app-rail__item">
                                                     <span class="tag">Build path</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>@handoff.Title</h3>
-                                                        <p>@handoff.Summary Variant: @handoff.VariantLabel. Next: @handoff.ProgressionLabel.</p>
+                                                        <h3>@buildPathTitle</h3>
+                                                        <p>
+                                                            @handoff.Summary
+                                                            <span> Variant: @handoff.VariantLabel. Next: @handoff.ProgressionLabel.</span>
+                                                            @if (handoff.TradeoffLines.Count > 0)
+                                                            {
+                                                                <span> Tradeoffs: @handoff.TradeoffLines[0]</span>
+                                                            }
+                                                            @if (handoff.ProgressionOutcomes.Count > 0)
+                                                            {
+                                                                <span> Outcome: @handoff.ProgressionOutcomes[0]</span>
+                                                            }
+                                                            @if (handoff.Outputs.Count > 0)
+                                                            {
+                                                                <span> Outputs: @string.Join(", ", handoff.Outputs.Select(item => item.Label))</span>
+                                                            }
+                                                        </p>
                                                     </div>
                                                     <a class="inline-link" href="/account/work">Open build follow-through</a>
                                                 </article>
@@ -312,7 +328,16 @@
                                                     <span class="tag">Grounded rule answer</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@answer.Question</h3>
-                                                        <p>@answer.ShortAnswer Provenance: @answer.ProvenanceLabel.</p>
+                                                        <p>
+                                                            @answer.ShortAnswer
+                                                            <span> Before: @answer.BeforeSummary</span>
+                                                            <span> After: @answer.AfterSummary</span>
+                                                            <span> Provenance: @answer.ProvenanceLabel.</span>
+                                                            @if (answer.EvidenceLines.Count > 0)
+                                                            {
+                                                                <span> Evidence: @answer.EvidenceLines[0]</span>
+                                                            }
+                                                        </p>
                                                     </div>
                                                     <a class="inline-link" href="/account/work">Open grounded rule context</a>
                                                 </article>
