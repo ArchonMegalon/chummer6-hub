@@ -18,7 +18,12 @@ public sealed record BuildLabConceptIntakeProjection(
     IReadOnlyList<BuildLabActionDescriptor>? Actions = null,
     string? ExplainEntryId = null,
     string? SourceDocumentId = null,
-    bool CanContinue = false);
+    bool CanContinue = false,
+    string? NextSafeAction = null,
+    string? RuntimeCompatibilitySummary = null,
+    string? CampaignFitSummary = null,
+    string? SupportClosureSummary = null,
+    IReadOnlyList<string>? Watchouts = null);
 
 public sealed record BuildLabIntakeField(
     string FieldId,

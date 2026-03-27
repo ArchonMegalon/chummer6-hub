@@ -211,7 +211,12 @@ public sealed record BuildLabHandoffProjection(
     IReadOnlyList<string> TradeoffLines,
     IReadOnlyList<string> ProgressionOutcomes,
     IReadOnlyList<PublicationSafeProjection> Outputs,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string? NextSafeAction = null,
+    string? RuntimeCompatibilitySummary = null,
+    string? CampaignReturnSummary = null,
+    string? SupportClosureSummary = null,
+    IReadOnlyList<string>? Watchouts = null);
 
 public sealed record RulesNavigatorAnswerProjection(
     string EntryId,
