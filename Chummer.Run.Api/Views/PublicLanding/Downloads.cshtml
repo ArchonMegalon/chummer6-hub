@@ -102,15 +102,9 @@ else
                             </div>
                         </article>
                     </div>
-                    <div class="stacked-actions">
-                        <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
-                    </div>
-                </details>
-                <details class="details-drawer">
-                    <summary>Package details</summary>
                     <div class="settings-summary-list">
                         <div class="settings-summary-row">
-                            <span>Size</span>
+                            <span>Package size</span>
                             <strong>@release.Recommended.SizeLabel</strong>
                         </div>
                         @if (!string.IsNullOrWhiteSpace(release.Recommended.ShaPreview))
@@ -120,6 +114,9 @@ else
                                 <strong><code class="mono-receipt">@release.Recommended.ShaPreview</code></strong>
                             </div>
                         }
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
                     </div>
                 </details>
             </div>
