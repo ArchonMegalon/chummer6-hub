@@ -29,6 +29,12 @@ async function assertNoBannedCopy(page, label) {
   assert.equal(bannedCopy.test(text), false, `${label} rendered banned generic CTA copy.`);
 }
 
+function assertLoginRedirect(page, expectedNext, label) {
+  const current = new URL(page.url());
+  assert.equal(current.pathname, '/login', `${label} should redirect to /login.`);
+  assert.equal(current.searchParams.get('next'), expectedNext, `${label} should preserve next.`);
+}
+
 async function gotoAndAssert(page, pageErrors, path, checks) {
   const response = await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
   assert(response, `No response for ${path}`);
@@ -58,12 +64,16 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await page.goto(`${baseUrl}/home/access`, { waitUntil: 'domcontentloaded' });
-  assert(page.url().includes('/login?next=%2Fhome%2Faccess'), 'Signed-out /home/access should preserve next.');
+  assertLoginRedirect(page, '/home/access', 'Signed-out /home/access');
   await assertNoPageErrors(page, pageErrors, 'Signed-out /home/access redirect');
 
   await page.goto(`${baseUrl}/account/support`, { waitUntil: 'domcontentloaded' });
-  assert(page.url().includes('/login?next=%2Faccount%2Fsupport'), 'Signed-out /account/support should preserve next.');
+  assertLoginRedirect(page, '/account/support', 'Signed-out /account/support');
   await assertNoPageErrors(page, pageErrors, 'Signed-out /account/support redirect');
+
+  await page.goto(`${baseUrl}/participate/codex`, { waitUntil: 'domcontentloaded' });
+  assertLoginRedirect(page, '/participate/codex', 'Signed-out /participate/codex');
+  await assertNoPageErrors(page, pageErrors, 'Signed-out /participate/codex redirect');
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {
     await expectVisible(page, 'text=Create account to get preview');
@@ -167,6 +177,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   assert(/playwright-support\.log$/i.test(attachmentDownload.suggestedFilename()), 'Tracked support case should download the uploaded attachment.');
 
   await assertNoBannedCopy(page, 'Tracked support case');
+
+  await gotoAndAssert(page, pageErrors, '/participate/codex', async () => {
+    await expectVisible(page, 'text=Authorize in ChatGPT');
+  });
 
   await gotoAndAssert(page, pageErrors, '/roadmap/nexus-pan', async () => {
     await expectVisible(page, 'text=Why this horizon matters now');
