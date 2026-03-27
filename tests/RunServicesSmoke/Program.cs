@@ -1965,6 +1965,11 @@ async Task VerifyPublicLandingProjectionAsync()
     var signupModel = (signupResult as ViewResult)?.Model as AuthPageViewModel;
     Assert(signupModel is not null && signupModel.CreateAccount, "signup page should keep the reciprocal auth lane visible.");
 
+    var emailStartMessage = await authController.StartEmail("runner@example.invalid", null, "/downloads", CancellationToken.None);
+    var emailStartModel = (emailStartMessage as ViewResult)?.Model as AuthMessagePageViewModel;
+    Assert(string.Equals(emailStartModel?.StateLabel, "Magic link sent", StringComparison.Ordinal), "email sign-in start should render the explicit magic-link-sent state.");
+    Assert(emailStartModel?.Highlights?.Any(static item => item.Contains("Downloads", StringComparison.Ordinal)) == true, "email sign-in start should explain the post-verification return target.");
+
     var unavailableIdentityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
         new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
         {
@@ -2016,6 +2021,25 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableEmailStartModel = (unavailableEmailStart as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableEmailStartModel?.Heading, "Email sign-in is unavailable", StringComparison.Ordinal), "email sign-in start should render an unavailable message when identity mail transport is down.");
     Assert(!(unavailableEmailStartModel?.SupportLine?.Contains("identity-mailer-secret", StringComparison.OrdinalIgnoreCase) ?? false), "email sign-in start should not leak raw identity transport details.");
+
+    var expiredAuthService = new HubBrowserAuthService(new HttpClient(new StubHttpMessageHandler(_ =>
+        new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent("{\"detail\":\"Unknown or expired email entry ticket 'expired-ticket'.\"}", Encoding.UTF8, "application/json")
+        })), configuration);
+    var expiredEmailAuthController = new AuthController(expiredAuthService, identityClient, landing, chrome, google, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
+    {
+        ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        }
+    };
+    var expiredEmailResult = await expiredEmailAuthController.CompleteEmail("expired-ticket", "/downloads", CancellationToken.None);
+    var expiredEmailModel = (expiredEmailResult as ViewResult)?.Model as AuthMessagePageViewModel;
+    Assert(string.Equals(expiredEmailModel?.Heading, "Magic link expired", StringComparison.Ordinal), "expired email callback should render a stable expired-link state.");
+    Assert(string.Equals(expiredEmailModel?.StateLabel, "Verification expired", StringComparison.Ordinal), "expired email callback should expose the verification-expired state label.");
+    Assert(expiredEmailModel?.Highlights?.Any(static item => item.Contains("Downloads", StringComparison.Ordinal)) == true, "expired email callback should preserve the requested return target.");
+    Assert(!(expiredEmailModel?.SupportLine?.Contains("expired-ticket", StringComparison.OrdinalIgnoreCase) ?? false), "expired email callback should not leak raw identity ticket details.");
 
     var googleFailureConfiguration = new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?>
