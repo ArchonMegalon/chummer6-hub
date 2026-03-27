@@ -91,6 +91,35 @@
 
     static string RuleEnvironmentSummary(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
         => $"{environment.OwnerScope} scope · {environment.CompatibilityFingerprint} · {HumanizeStatus(environment.ApprovalState, "Review")}";
+
+    static string InstallationLabelFor(
+        IReadOnlyList<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>? installations,
+        string installationId)
+    {
+        var installation = installations?.FirstOrDefault(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase));
+        if (installation is null)
+        {
+            return "Linked install";
+        }
+
+        return installation.HostLabel
+            ?? installation.HeadId
+            ?? installation.ArtifactId
+            ?? "Linked install";
+    }
+
+    static string InstallationReleaseFor(
+        IReadOnlyList<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>? installations,
+        string installationId)
+    {
+        var installation = installations?.FirstOrDefault(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase));
+        if (installation is null)
+        {
+            return "Current preview";
+        }
+
+        return $"{installation.Version} on {installation.Channel}";
+    }
 }
 
 <section class="account-stage">
@@ -479,8 +508,8 @@
                             @foreach (var grant in Model.InstallLinking.ActiveGrants!)
                             {
                                 <div class="settings-summary-row">
-                                    <span>@grant.InstallationId</span>
-                                    <strong>@HumanizeStatus(grant.Status, "Active") until @grant.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                                    <span>@InstallationLabelFor(Model.InstallLinking.ClaimedInstallations, grant.InstallationId)</span>
+                                    <strong>@InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, grant.InstallationId) · @HumanizeStatus(grant.Status, "Active") until @grant.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
                                 </div>
                             }
                         </div>
