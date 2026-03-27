@@ -91,8 +91,8 @@ public sealed class PublicLandingController : Controller
             Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/"),
             TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),
             Lanes: ResolveCards(_landing.CardsForBucket(surface, "choose_your_lane"), assetCatalog, authenticated: false, "/"),
-            AvailableToday: ResolveCards(nowCards.Where(static card => string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/"),
-            PreviewItems: ResolveCards(nowCards.Where(static card => !string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/"),
+            AvailableToday: ResolveCards(nowCards.Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/"),
+            PreviewItems: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/"),
             ComingNext: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: false, "/"),
             Artifacts: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/"));
         return View("~/Views/PublicLanding/Landing.cshtml", model);
@@ -129,8 +129,8 @@ public sealed class PublicLandingController : Controller
             Assets: assetCatalog,
             ReleaseExperience: _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated),
             ProofModules: ResolveCards(_landing.CardsForBucket(surface, "start_here").Take(3).ToArray(), assetCatalog, authenticated: false, "/now"),
-            AvailableToday: ResolveCards(nowCards.Where(static card => string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/now"),
-            Inspectable: ResolveCards(nowCards.Where(static card => !string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray(), assetCatalog, authenticated: false, "/now"),
+            AvailableToday: ResolveCards(nowCards.Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/now"),
+            Inspectable: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/now"),
             SignedInPreview: surface.RegisteredOverlays,
             Manifest: manifest);
         return View("~/Views/PublicLanding/Now.cshtml", model);
@@ -805,8 +805,7 @@ public sealed class PublicLandingController : Controller
         };
         var statusHeading = card.Bucket switch
         {
-            "featured_artifacts" when string.Equals(card.Badge, "Available today", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)
+            "featured_artifacts" when PublicSurfaceStatus.IsAvailableToday(card.Badge)
                 => "What is live today",
             "featured_artifacts" => "What this artifact is proving next",
             "coming_next" => "Where this horizon sits now",
@@ -842,8 +841,7 @@ public sealed class PublicLandingController : Controller
         => card.Bucket switch
         {
             "coming_next" => "roadmap",
-            "featured_artifacts" when string.Equals(card.Badge, "Available today", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)
+            "featured_artifacts" when PublicSurfaceStatus.IsAvailableToday(card.Badge)
                 => "live-proof",
             "featured_artifacts" => "preview-concept",
             _ => "detail"
@@ -852,8 +850,7 @@ public sealed class PublicLandingController : Controller
     private static IReadOnlyList<FeatureDetailFactViewModel> BuildFeatureDetailFacts(PublicFeatureCardDto card)
     {
         var facts = new List<FeatureDetailFactViewModel>();
-        var liveArtifact = string.Equals(card.Badge, "Available today", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase);
+        var liveArtifact = PublicSurfaceStatus.IsAvailableToday(card.Badge);
 
         facts.Add(new(
             card.Bucket switch
@@ -862,7 +859,7 @@ public sealed class PublicLandingController : Controller
                 "coming_next" => "Roadmap status",
                 _ => "Current status"
             },
-            $"{card.Badge}. {card.Summary}"));
+            $"{PublicSurfaceStatus.DisplayLabel(card.Badge)}. {card.Summary}"));
 
         if (!string.IsNullOrWhiteSpace(card.Audience))
         {

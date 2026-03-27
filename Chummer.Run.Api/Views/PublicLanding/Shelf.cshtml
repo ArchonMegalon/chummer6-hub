@@ -2,11 +2,7 @@
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
-    static string DisplayStatus(string badge)
-        => string.Equals(badge, "Live now", StringComparison.OrdinalIgnoreCase)
-            ? "Available today"
-            : badge;
-    var liveItems = Model.Items.Where(card => string.Equals(card.Card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) || string.Equals(card.Card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)).ToArray();
+    var liveItems = Model.Items.Where(card => PublicSurfaceStatus.IsAvailableToday(card.Card.Badge)).ToArray();
     var previewItems = Model.Items.Except(liveItems).ToArray();
 }
 
@@ -29,7 +25,7 @@
     @if (liveItems.Length > 0)
     {
         <div class="editorial-block__lead" id="live-artifacts">
-            <p class="eyebrow">Available today</p>
+            <p class="eyebrow">@PublicSurfaceStatus.AvailableToday</p>
             <h2 class="editorial-title">Current proof surfaces</h2>
             <p class="editorial-copy">These are the artifacts you can use or inspect against the current preview today.</p>
         </div>
@@ -41,7 +37,7 @@
                     {
                         @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
                     }
-                    <span class="tag">@DisplayStatus(card.Card.Badge)</span>
+                    <span class="tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                     <h2>@card.Card.Title</h2>
                     <p>@card.Card.Summary</p>
                     <div class="trust-claim__microproof">
@@ -64,9 +60,9 @@
     @if (previewItems.Length > 0)
     {
         <div class="editorial-block__lead" id="preview-artifacts">
-            <p class="eyebrow">Preview concepts</p>
-            <h2 class="editorial-title">What these cards are trying to verify next</h2>
-            <p class="editorial-copy">These stay visible so you can compare future-facing artifact ideas against what is already live.</p>
+            <p class="eyebrow">@PublicSurfaceStatus.PreviewInProgress</p>
+            <h2 class="editorial-title">What these proof surfaces are still preparing</h2>
+            <p class="editorial-copy">These stay visible so you can compare future-facing artifact work against what is already live today.</p>
         </div>
         <div class="shelf-stack">
             @foreach (var card in previewItems)
@@ -76,7 +72,7 @@
                     {
                         @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
                     }
-                    <span class="tag">@DisplayStatus(card.Card.Badge)</span>
+                    <span class="tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                     <h2>@card.Card.Title</h2>
                     <p>@card.Card.Summary</p>
                     <div class="trust-claim__microproof">

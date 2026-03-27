@@ -126,9 +126,9 @@
         {
             <article class="compact-rail__item" id="@availableHighlight.Card.Id.Replace('_', '-')">
                 <div class="compact-rail__copy">
-                    <span class="tag">Available today</span>
+                    <span class="tag">@PublicSurfaceStatus.DisplayLabel(availableHighlight.Card.Badge)</span>
                     <h3>@availableHighlight.Card.Title</h3>
-                    <p>@availableHighlight.Card.Summary @(Model.AvailableToday.Count > 1 ? $"+{Model.AvailableToday.Count - 1} more live proof item(s) sit on the full shelf." : string.Empty)</p>
+                    <p>@availableHighlight.Card.Summary @(Model.AvailableToday.Count > 1 ? $"+{Model.AvailableToday.Count - 1} more available proof surface(s) sit on the full shelf." : string.Empty)</p>
                 </div>
                 <a class="inline-link" href="@availableHighlight.Action.Href">@availableHighlight.Action.Label</a>
             </article>
@@ -137,9 +137,9 @@
         {
             <article class="compact-rail__item" id="@previewHighlight.Card.Id.Replace('_', '-')">
                 <div class="compact-rail__copy">
-                    <span class="tag tag--amber">Preview</span>
+                    <span class="tag @PublicSurfaceStatus.CssTone(previewHighlight.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(previewHighlight.Card.Badge)</span>
                     <h3>@previewHighlight.Card.Title</h3>
-                    <p>@previewHighlight.Card.Summary @(Model.PreviewItems.Count > 1 ? $"+{Model.PreviewItems.Count - 1} more preview proof item(s) stay on the shelf." : string.Empty)</p>
+                    <p>@previewHighlight.Card.Summary @(Model.PreviewItems.Count > 1 ? $"+{Model.PreviewItems.Count - 1} more preview-in-progress surface(s) stay on the shelf." : string.Empty)</p>
                 </div>
                 <a class="inline-link" href="@previewHighlight.Action.Href">@previewHighlight.Action.Label</a>
             </article>
@@ -148,9 +148,9 @@
         {
             <article class="compact-rail__item" id="@comingNextHighlight.Card.Id.Replace('_', '-')">
                 <div class="compact-rail__copy">
-                    <span class="tag tag--quiet">Coming next</span>
+                    <span class="tag @PublicSurfaceStatus.CssTone(comingNextHighlight.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(comingNextHighlight.Card.Badge)</span>
                     <h3>@comingNextHighlight.Card.Title</h3>
-                    <p>@comingNextHighlight.Card.Summary @(Model.ComingNext.Count > 1 ? $"+{Model.ComingNext.Count - 1} more named horizons stay on the roadmap." : string.Empty)</p>
+                    <p>@comingNextHighlight.Card.Summary @(Model.ComingNext.Count > 1 ? $"+{Model.ComingNext.Count - 1} more roadmap surface(s) stay visible." : string.Empty)</p>
                 </div>
                 <a class="inline-link" href="@comingNextHighlight.Action.Href">@comingNextHighlight.Action.Label</a>
             </article>
