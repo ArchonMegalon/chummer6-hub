@@ -10,7 +10,7 @@
     var claimedInstallations = Model.InstallLinking.ClaimedInstallations?.Count ?? 0;
     var activeAccessRights = Model.InstallLinking.ActiveGrants?.Count ?? 0;
     var pendingClaims = Model.InstallLinking.PendingClaimTickets.Count;
-    var primaryActionOpensSetup = string.Equals(Model.PrimaryAction.Href, "#setup-sheet", StringComparison.OrdinalIgnoreCase);
+    var primaryActionTargetsSetup = string.Equals(Model.PrimaryAction.Href, "/home/setup", StringComparison.OrdinalIgnoreCase);
     var dossiers = Model.CampaignSpine.Dossiers.Take(3).ToArray();
     var campaigns = Model.CampaignSpine.Campaigns.Take(3).ToArray();
     var runs = Model.CampaignSpine.Runs.Take(3).ToArray();
@@ -23,6 +23,11 @@
         .Take(2)
         .ToArray();
     var recentReceipts = Model.InstallLinking.RecentReceipts.Take(2).ToArray();
+    var showOverviewSection = string.Equals(Model.CurrentSection, "overview", StringComparison.OrdinalIgnoreCase);
+    var showAccessSection = string.Equals(Model.CurrentSection, "access", StringComparison.OrdinalIgnoreCase);
+    var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
+    var showSetupSection = string.Equals(Model.CurrentSection, "setup", StringComparison.OrdinalIgnoreCase);
+    var openSetupDialog = showOnboarding || showSetupSection;
 }
 
 <section class="home-command">
@@ -31,33 +36,42 @@
         <h1 class="page-title">Welcome back, @Model.User.DisplayName</h1>
         <p class="page-copy">Pick up where you left off: finish the basics, install the current preview, and keep track of what is opening next.</p>
     </div>
-    <details class="release-accordion" @(showOnboarding ? "open" : null)>
-        <summary>Account state at a glance</summary>
-        <div class="release-accordion__body">
-            <div class="home-command__status">
-                <article class="home-status-card">
-                    <span class="tag">Account setup</span>
-                    <strong id="homeSetupState">@(showOnboarding ? "In progress" : "Ready")</strong>
-                    <p id="homeSetupCopy">@(showOnboarding ? "Finish the short setup flow so Chummer can address you, route updates, and recover the account cleanly." : "Your basic account setup is already in place.")</p>
-                </article>
-                <article class="home-status-card">
-                    <span class="tag">Interest profile</span>
-                    <strong id="homeInterestState">@(followCount == 0 ? "Quiet" : $"{followCount} active")</strong>
-                    <p id="homeInterestCopy">Roadmap and beta signals stay lightweight until you ask for more.</p>
-                </article>
-                <article class="home-status-card">
-                    <span class="tag">Backup sign-in</span>
-                    <strong id="homeRecoveryState">@(recoveryLinked ? "Ready" : "Add one")</strong>
-                    <p id="homeRecoveryCopy">@(recoveryLinked ? "A backup recovery path is already attached." : "Add a verified recovery email from setup or Account.")</p>
-                </article>
-                <article class="home-status-card">
-                    <span class="tag">Devices & access</span>
-                    <strong>@(activeAccessRights > 0 ? $"{activeAccessRights} active" : claimedInstallations > 0 ? $"{claimedInstallations} linked" : pendingClaims > 0 ? $"{pendingClaims} pending" : "Not linked")</strong>
-                    <p><a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a></p>
-                </article>
+    <nav class="account-nav" aria-label="Home sections">
+        @foreach (var navItem in Model.Sections)
+        {
+            <a href="@navItem.Href" aria-current="@(navItem.Current ? "page" : "false")">@navItem.Label</a>
+        }
+    </nav>
+    @if (showOverviewSection)
+    {
+        <details class="release-accordion" @(showOnboarding ? "open" : null)>
+            <summary>Account state at a glance</summary>
+            <div class="release-accordion__body">
+                <div class="home-command__status">
+                    <article class="home-status-card">
+                        <span class="tag">Account setup</span>
+                        <strong id="homeSetupState">@(showOnboarding ? "In progress" : "Ready")</strong>
+                        <p id="homeSetupCopy">@(showOnboarding ? "Finish the short setup flow so Chummer can address you, route updates, and recover the account cleanly." : "Your basic account setup is already in place.")</p>
+                    </article>
+                    <article class="home-status-card">
+                        <span class="tag">Interest profile</span>
+                        <strong id="homeInterestState">@(followCount == 0 ? "Quiet" : $"{followCount} active")</strong>
+                        <p id="homeInterestCopy">Roadmap and beta signals stay lightweight until you ask for more.</p>
+                    </article>
+                    <article class="home-status-card">
+                        <span class="tag">Backup sign-in</span>
+                        <strong id="homeRecoveryState">@(recoveryLinked ? "Ready" : "Add one")</strong>
+                        <p id="homeRecoveryCopy">@(recoveryLinked ? "A backup recovery path is already attached." : "Add a verified recovery email from setup or Account.")</p>
+                    </article>
+                    <article class="home-status-card">
+                        <span class="tag">Devices & access</span>
+                        <strong>@(activeAccessRights > 0 ? $"{activeAccessRights} active" : claimedInstallations > 0 ? $"{claimedInstallations} linked" : pendingClaims > 0 ? $"{pendingClaims} pending" : "Not linked")</strong>
+                        <p><a class="inline-link" href="/account/access">Open Devices &amp; access</a></p>
+                    </article>
+                </div>
             </div>
-        </div>
-    </details>
+        </details>
+    }
 </section>
 
 <div class="sr-only" aria-hidden="true">
@@ -66,46 +80,44 @@
 
 <section class="home-dashboard home-dashboard--focus">
     <div class="home-dashboard__main">
-        <div class="home-action-grid">
-            <article class="app-action-card app-action-card--primary">
-                <span class="tag">@Model.PrimaryAction.Eyebrow</span>
-                <h2 id="setupCardTitle">@Model.PrimaryAction.Title</h2>
-                <p id="setupCardCopy">@Model.PrimaryAction.Summary</p>
-                @if (primaryActionOpensSetup)
-                {
-                    <button class="button-like button-like--primary" type="button" data-open-onboarding id="openSetupButton">@Model.PrimaryAction.Label</button>
-                }
-                else
-                {
-                    <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href" id="openSetupButton">@Model.PrimaryAction.Label</a>
-                }
-            </article>
-            <article class="app-action-card">
-                <span class="tag">Current release</span>
-                <h2>Use the current preview</h2>
-                <p>See what changed, what is working today, and whether the current release is the right moment to install or update.</p>
-                <a class="button-like button-like--secondary" href="/now">Open current release</a>
-            </article>
-            <article class="app-action-card">
-                <span class="tag">Devices &amp; access</span>
-                <h2>Keep this copy connected</h2>
-                <p>Link this install, review access rights, and keep the claim path visible without digging through support copy.</p>
-                <a class="button-like button-like--ghost" href="/account#devices-access">Open Devices &amp; access</a>
-            </article>
-        </div>
+        @if (showOverviewSection)
+        {
+            <div class="home-action-grid">
+                <article class="app-action-card app-action-card--primary">
+                    <span class="tag">@Model.PrimaryAction.Eyebrow</span>
+                    <h2 id="setupCardTitle">@Model.PrimaryAction.Title</h2>
+                    <p id="setupCardCopy">@Model.PrimaryAction.Summary</p>
+                    @if (primaryActionTargetsSetup && showSetupSection)
+                    {
+                        <button class="button-like button-like--primary" type="button" data-open-onboarding id="openSetupButton">@Model.PrimaryAction.Label</button>
+                    }
+                    else
+                    {
+                        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href" id="openSetupButton">@Model.PrimaryAction.Label</a>
+                    }
+                </article>
+                <article class="app-action-card">
+                    <span class="tag">Current release</span>
+                    <h2>Use the current preview</h2>
+                    <p>See what changed, what is working today, and whether the current release is the right moment to install or update.</p>
+                    <a class="button-like button-like--secondary" href="/now">Open current release</a>
+                </article>
+                <article class="app-action-card">
+                    <span class="tag">Devices &amp; access</span>
+                    <h2>Keep this copy connected</h2>
+                    <p>Link this install, review access rights, and keep the claim path visible without digging through support copy.</p>
+                    <a class="button-like button-like--ghost" href="/account/access">Open Devices &amp; access</a>
+                </article>
+            </div>
+        }
 
-        @if (!showOnboarding)
+        @if (showAccessSection && !showOnboarding)
         {
             <section class="release-shelf release-shelf--manual">
-                <details class="release-accordion">
-                    <summary>Overview, access, and follow-up</summary>
-                    <div class="release-accordion__body">
-                        <details class="details-drawer">
-                            <summary>Overview and access</summary>
-                            <div class="home-stream">
+                <div class="home-stream">
                                 <div class="home-stream__column">
                                     <div class="home-stream__lead">
-                                        <p class="eyebrow">Overview</p>
+                                        <p class="eyebrow">Access</p>
                                         <h2 class="home-stream__title">What changed for you</h2>
                                         <p class="home-stream__summary">Support closure, install return, and release follow-up stay grouped so the signed-in cockpit explains why something moved.</p>
                                     </div>
@@ -131,7 +143,7 @@
                                                         <h3>@supportCase.Title</h3>
                                                         <p>@(supportCase.FixedVersion is null ? supportCase.Summary : $"Fixed in {supportCase.FixedVersion}: {supportCase.Summary}")</p>
                                                     </div>
-                                                    <a class="inline-link" href="/account#support">Open support</a>
+                                                    <a class="inline-link" href="/account/support">Open support</a>
                                                 </article>
                                             }
                                             @foreach (var receipt in recentReceipts)
@@ -142,7 +154,7 @@
                                                         <h3>@receipt.ArtifactLabel</h3>
                                                         <p>@receipt.Version on @receipt.Channel is still attached to this account if you need to reconnect the copy later.</p>
                                                     </div>
-                                                    <a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a>
+                                                    <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
                                                 </article>
                                             }
                                             @if (restoreConflicts > 0)
@@ -153,7 +165,7 @@
                                                         <h3>Campaign return needs confirmation</h3>
                                                         <p>@Model.CampaignSpine.Restore.ConflictSummaries[0]</p>
                                                     </div>
-                                                    <a class="inline-link" href="/account#campaigns">Review campaign return</a>
+                                                    <a class="inline-link" href="/account/work">Review campaign return</a>
                                                 </article>
                                             }
                                         }
@@ -180,7 +192,7 @@
                                                 <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s) active" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install yet")</h3>
                                                 <p>Device roles, claim tickets, linked installs, and preview access stay in one place instead of rediscovering them during the next install.</p>
                                             </div>
-                                            <a class="inline-link" href="/account#devices-access">Open Devices &amp; access</a>
+                                            <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
                                         </article>
                                         @foreach (var card in Model.NowRail.Take(2))
                                         {
@@ -195,12 +207,25 @@
                                         }
                                     </div>
                                 </div>
-                            </div>
-                        </details>
+                </div>
+            </section>
+        }
+        else if (showAccessSection)
+        {
+            <section class="story-guide-tail">
+                <p class="eyebrow">Access</p>
+                <h2 class="editorial-title">Finish setup before you worry about devices and follow-up</h2>
+                <p class="editorial-copy">The access surface becomes more useful once the account basics and recovery path are in place.</p>
+                <div class="stacked-actions">
+                    <a class="button-like button-like--primary" href="/home/setup">Open setup</a>
+                </div>
+            </section>
+        }
 
-                        <details class="details-drawer">
-                            <summary>Work and next</summary>
-                            <div class="home-stream">
+        @if (showWorkSection && !showOnboarding)
+        {
+            <section class="release-shelf release-shelf--manual">
+                <div class="home-stream">
                                 <div class="home-stream__column">
                                     <div class="home-stream__lead">
                                         <p class="eyebrow">Work</p>
@@ -210,14 +235,14 @@
                                     <div class="app-rail">
                                         @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0)
                                         {
-                                            <article class="app-rail__item">
-                                                <span class="tag">Ready</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>No long-lived runner yet</h3>
-                                                    <p>Your first claimed install or campaign handoff will seed the living dossier and current return context here.</p>
-                                                </div>
-                                                <a class="inline-link" href="/downloads">Start from downloads</a>
-                                            </article>
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Ready</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>No long-lived runner yet</h3>
+                                                        <p>Your first claimed install or campaign handoff will seed the living dossier and current return context here.</p>
+                                                    </div>
+                                                    <a class="inline-link" href="/downloads">Start from downloads</a>
+                                                </article>
                                         }
                                         else
                                         {
@@ -229,7 +254,7 @@
                                                         <h3>@dossier.DisplayName</h3>
                                                         <p>@(dossier.LatestContinuity?.Summary ?? "Living dossier is ready for the next handoff.")</p>
                                                     </div>
-                                                    <a class="inline-link" href="/account#campaigns">Open dossiers</a>
+                                                    <a class="inline-link" href="/account/work">Open dossiers</a>
                                                 </article>
                                             }
                                             @foreach (var campaign in campaigns)
@@ -240,7 +265,7 @@
                                                         <h3>@campaign.Name</h3>
                                                         <p>@(campaign.LatestContinuity?.Summary ?? "Campaign continuity is live.")</p>
                                                     </div>
-                                                    <a class="inline-link" href="/account#campaigns">Open campaign return</a>
+                                                    <a class="inline-link" href="/account/work">Open campaign return</a>
                                                 </article>
                                             }
                                             @foreach (var run in runs)
@@ -251,7 +276,7 @@
                                                         <h3>@run.Title</h3>
                                                         <p>@run.Objectives.Count objectives · @(run.ActiveSceneId is null ? "No active scene" : "Scene live") · @(run.LatestContinuity?.Summary ?? run.Summary)</p>
                                                     </div>
-                                                    <a class="inline-link" href="/account#campaigns">Open run context</a>
+                                                    <a class="inline-link" href="/account/work">Open run context</a>
                                                 </article>
                                             }
                                         }
@@ -275,26 +300,47 @@
                                                 <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                                             </article>
                                         }
-                                        <article class="app-rail__item">
-                                            <span class="tag">Support</span>
-                                            <div class="app-rail__copy">
-                                                <h3>Need a real answer instead?</h3>
-                                                <p>Use support when the release, device, or return-path surfaces stop being enough to move forward confidently.</p>
-                                            </div>
-                                            <a class="inline-link" href="/account#support">Open support</a>
-                                        </article>
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Support</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>Need a real answer instead?</h3>
+                                                        <p>Use support when the release, device, or return-path surfaces stop being enough to move forward confidently.</p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account/support">Open support</a>
+                                                </article>
                                     </div>
                                 </div>
-                            </div>
-                        </details>
-                    </div>
-                </details>
+                </div>
+            </section>
+        }
+        else if (showWorkSection)
+        {
+            <section class="story-guide-tail">
+                <p class="eyebrow">Work</p>
+                <h2 class="editorial-title">Finish setup before the work surfaces try to carry too much</h2>
+                <p class="editorial-copy">The work route gets useful once Chummer has a stable identity, install path, and return context attached to the account.</p>
+                <div class="stacked-actions">
+                    <a class="button-like button-like--primary" href="/home/setup">Open setup</a>
+                </div>
+            </section>
+        }
+
+        @if (showSetupSection)
+        {
+            <section class="story-guide-tail">
+                <p class="eyebrow">Setup</p>
+                <h2 class="editorial-title">Finish the small setup flow, then come back to access and work</h2>
+                <p class="editorial-copy">Profile, recovery, and update preferences live here so the rest of the signed-in shell can stay calmer by default.</p>
+                <div class="stacked-actions">
+                    <button class="button-like button-like--primary" type="button" data-open-onboarding id="openSetupButton">@(showOnboarding ? "Complete setup" : "Open setup")</button>
+                    <a class="button-like button-like--ghost" href="/account/profile">Open account settings instead</a>
+                </div>
             </section>
         }
     </div>
 </section>
 
-<div class="onboarding-dialog" id="home-onboarding" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" @(showOnboarding ? "" : "hidden")>
+<div class="onboarding-dialog" id="home-onboarding" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" @(openSetupDialog ? "" : "hidden")>
     <div class="onboarding-dialog__panel">
         <div class="onboarding-dialog__topline">
             <div>

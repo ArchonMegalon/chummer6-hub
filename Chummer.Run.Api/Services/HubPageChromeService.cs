@@ -69,10 +69,11 @@ public sealed class HubPageChromeService
     {
         var surface = _landing.LoadSurface();
         var nav = _navigation.LoadNavigation();
+        var normalizedCurrentPath = NormalizeRoute(currentPath);
         var actions = new[]
         {
-            new SiteChromeActionViewModel("Home", "/home", "secondary", string.Equals(currentPath, "/home", StringComparison.OrdinalIgnoreCase)),
-            new SiteChromeActionViewModel("Account", "/account", "secondary", string.Equals(currentPath, "/account", StringComparison.OrdinalIgnoreCase)),
+            new SiteChromeActionViewModel("Home", "/home", "secondary", normalizedCurrentPath.StartsWith("/home", StringComparison.OrdinalIgnoreCase)),
+            new SiteChromeActionViewModel("Account", "/account", "secondary", normalizedCurrentPath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)),
             new SiteChromeActionViewModel("Sign out", "/logout", "primary")
         };
 

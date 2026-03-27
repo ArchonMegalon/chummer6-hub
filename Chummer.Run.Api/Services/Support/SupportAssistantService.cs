@@ -37,7 +37,7 @@ public sealed class SupportAssistantService
             Label: "Support status model",
             RelativePath: ".codex-design/product/FEEDBACK_AND_CRASH_STATUS_MODEL.md",
             Keywords: ["status", "triage", "fixed", "released", "notified", "deferred", "rejected"],
-            Href: "/account#support"),
+            Href: "/account/support"),
     ];
 
     private readonly SupportCaseService _supportCases;
@@ -81,7 +81,7 @@ public sealed class SupportAssistantService
                 Label: item.Title,
                 Summary: $"Status: {HumanizeStatus(item.Status)}. Owner: {item.CandidateOwnerRepo}. Summary: {item.Summary}",
                 Status: item.Status,
-                Href: "/account#support"));
+                Href: "/account/support"));
         }
 
         foreach (var citation in BuildRulesTruthCitations(reporterUserId, reporterSubjectId, tokens, maxCitations - citations.Count))
@@ -224,7 +224,7 @@ public sealed class SupportAssistantService
 
         if (caseMatches.Count > 0)
         {
-            Add("open_account_support", "Open support timeline", "/account#support", "Review the tracked case and its latest status.");
+            Add("open_account_support", "Open support timeline", "/account/support", "Review the tracked case and its latest status.");
 
             if (caseMatches.Any(item =>
                     string.Equals(item.Status, SupportCaseStatuses.ReleasedToReporterChannel, StringComparison.OrdinalIgnoreCase)
@@ -236,7 +236,7 @@ public sealed class SupportAssistantService
         }
         else
         {
-            Add("open_support_case", "Open support case", "/account#support", "Create a tracked case if the docs do not resolve the issue.");
+            Add("open_support_case", "Open support case", "/account/support", "Create a tracked case if the docs do not resolve the issue.");
         }
 
         if (tokens.Contains("install") || tokens.Contains("download") || tokens.Contains("update") || tokens.Contains("claim") || tokens.Contains("restart"))

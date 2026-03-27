@@ -1,0 +1,52 @@
+@model FeatureDetailPageViewModel
+
+<section class="role-matrix">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Use and verify this proof</p>
+        <h2 class="editorial-title">What this live artifact shows, who it helps, and what to check next</h2>
+        <p class="editorial-copy">Live proof pages should help you use the product surface immediately, then verify the evidence markers before you leave for support.</p>
+    </div>
+    <div class="role-matrix__grid">
+        <article class="role-matrix__cell">
+            <span class="tag">Use it now</span>
+            <p>Start from the live product surface attached to this artifact, then use support only if the proof path stops being enough to move forward.</p>
+        </article>
+        @if (!string.IsNullOrWhiteSpace(Model.Pain))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">Why it matters</span>
+                <p>@Model.Pain</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Payoff))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">What it unlocks</span>
+                <p>@Model.Payoff</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">How to verify it</span>
+                <p>@Model.ProofNote</p>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.MicroProof.Count > 0)
+{
+    <section class="trust-rail-section">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Verification markers</p>
+            <h2 class="editorial-title">Keep these cues in view before you assume the proof is complete</h2>
+        </div>
+        <div class="trust-claim__microproof">
+            @foreach (var item in Model.MicroProof)
+            {
+                <span>@item</span>
+            }
+        </div>
+    </section>
+}

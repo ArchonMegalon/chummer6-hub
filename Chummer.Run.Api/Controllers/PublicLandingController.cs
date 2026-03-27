@@ -191,7 +191,7 @@ public sealed class PublicLandingController : Controller
                 ArtifactSupportLine: option.SupportLine,
                 DownloadHref: option.DirectFileHref,
                 DownloadLabel: "Start download again",
-                AccountHref: "/account#devices-access",
+                AccountHref: "/account/access",
                 AccountLabel: "Open Devices and access",
                 HelpHref: release.InstallHelpHref,
                 HelpLabel: release.InstallHelpLabel,
@@ -345,9 +345,13 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/home")]
+    [HttpGet("/home/{section}")]
     [Produces("text/html")]
-    public async Task<IActionResult> HomePage(CancellationToken cancellationToken)
+    public async Task<IActionResult> HomePage([FromRoute] string? section, CancellationToken cancellationToken)
     {
+        var selectedSection = NormalizeHomeSection(section);
+        var currentPath = selectedSection == "overview" ? "/home" : $"/home/{selectedSection}";
+
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
@@ -360,7 +364,9 @@ public sealed class PublicLandingController : Controller
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
             var model = new HomePageViewModel(
-                Chrome: _chrome.BuildAuthenticatedChrome("Home", "Pick the next action and keep track of what is opening next.", "/home", user.DisplayName),
+                Chrome: _chrome.BuildAuthenticatedChrome("Home", "Pick the next action and keep track of what is opening next.", currentPath, user.DisplayName),
+                CurrentSection: selectedSection,
+                Sections: BuildHomeSections(selectedSection),
                 Surface: surface,
                 Assets: assetCatalog,
                 User: user,
@@ -370,24 +376,24 @@ public sealed class PublicLandingController : Controller
                 SupportCases: supportCases,
                 CampaignSpine: campaignSpine,
                 PrimaryAction: BuildHomePrimaryAction(experience, installLinking),
-                NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, "/home"),
-                HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, "/home"));
+                NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath),
+                HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath));
             return View("~/Views/PublicLanding/Home.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
-            return Redirect("/login?next=/home");
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
         }
         catch (HubRequestAuthException ex)
         {
             _logger.LogWarning(ex, "Home page could not confirm the signed-in identity.");
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
-                Chrome: _chrome.BuildPublicChrome("Home unavailable", "Hub could not confirm the signed-in home surface right now.", "/home"),
+                Chrome: _chrome.BuildPublicChrome("Home unavailable", "Hub could not confirm the signed-in home surface right now.", currentPath),
                 Heading: "Home is unavailable right now",
                 SupportLine: "Chummer could not open the signed-in home surface right now. Your session may still be valid, so try again in a moment.",
                 Notice: null,
                 PrimaryLabel: "Try home again",
-                PrimaryHref: "/home",
+                PrimaryHref: currentPath,
                 SecondaryLabel: "Return to landing",
                 SecondaryHref: "/"));
         }
@@ -452,7 +458,7 @@ public sealed class PublicLandingController : Controller
                 "Finish setup",
                 "Complete the short setup flow so Chummer can recover your account, route updates, and keep the signed-in shell calm.",
                 "Complete setup",
-                "#setup-sheet",
+                "/home/setup",
                 "primary");
         }
 
@@ -473,8 +479,8 @@ public sealed class PublicLandingController : Controller
                 "Devices & access",
                 "Link this copy",
                 "You already have a signed-in download handoff. Open Devices and access to claim the install instead of starting over.",
-                "Open account",
-                "/account#devices-access",
+                "Open Devices and access",
+                "/account/access",
                 "primary");
         }
 
@@ -486,6 +492,27 @@ public sealed class PublicLandingController : Controller
             "/now",
             "primary");
     }
+
+    private static string NormalizeHomeSection(string? section)
+        => string.IsNullOrWhiteSpace(section)
+            ? "overview"
+            : section.Trim().ToLowerInvariant() switch
+            {
+                "overview" => "overview",
+                "access" => "access",
+                "work" => "work",
+                "setup" => "setup",
+                _ => "overview"
+            };
+
+    private static IReadOnlyList<SectionLinkViewModel> BuildHomeSections(string currentSection)
+        => new[]
+        {
+            new SectionLinkViewModel("overview", "Overview", "/home", string.Equals(currentSection, "overview", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("access", "Access", "/home/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("work", "Work", "/home/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("setup", "Setup", "/home/setup", string.Equals(currentSection, "setup", StringComparison.OrdinalIgnoreCase))
+        };
 
     private async Task<bool> TryIsAuthenticatedAsync(CancellationToken cancellationToken)
     {
@@ -533,7 +560,7 @@ public sealed class PublicLandingController : Controller
                 ? "Use the form for a quick report here, or open Account > Support when you want the full tracked case view."
                 : "Use the first-party intake here when you want help without a GitHub account. Create an account later if you want tracked follow-up inside Chummer.",
             Authenticated: authenticated,
-            AccountSupportHref: authenticated ? "/account#support" : "/signup?next=%2Faccount%23support",
+            AccountSupportHref: authenticated ? "/account/support" : "/signup?next=%2Faccount%2Fsupport",
             AccountSupportLabel: authenticated ? "Open tracked support" : "Create account for tracked support",
             ResponseExpectation: authenticated
                 ? "Tracked cases stay visible in Account. When the report is actionable, the next routed update should show up there without sending you into side channels."
@@ -603,6 +630,7 @@ public sealed class PublicLandingController : Controller
         var facts = BuildFeatureDetailFacts(card);
         var model = new FeatureDetailPageViewModel(
             Chrome: chrome,
+            Family: ResolveFeatureDetailFamily(card),
             Eyebrow: card.Bucket switch
             {
                 "featured_artifacts" => "Artifact",
@@ -624,6 +652,17 @@ public sealed class PublicLandingController : Controller
             MicroProof: BuildFeatureDetailMicroProof(card));
         return View("~/Views/PublicLanding/FeatureDetail.cshtml", model);
     }
+
+    private static string ResolveFeatureDetailFamily(PublicFeatureCardDto card)
+        => card.Bucket switch
+        {
+            "coming_next" => "roadmap",
+            "featured_artifacts" when string.Equals(card.Badge, "Available today", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase)
+                => "live-proof",
+            "featured_artifacts" => "preview-concept",
+            _ => "detail"
+        };
 
     private static IReadOnlyList<FeatureDetailFactViewModel> BuildFeatureDetailFacts(PublicFeatureCardDto card)
     {
