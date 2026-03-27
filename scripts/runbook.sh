@@ -28,6 +28,47 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 1
 fi
 
+run_compose_with_optional_env_file() {
+  local env_file="$REPO_ROOT/.env"
+  if [[ -f "$env_file" ]]; then
+    docker compose --env-file "$env_file" "$@"
+  else
+    docker compose "$@"
+  fi
+}
+
+ensure_hub_cloudflare_tunnel() {
+  local env_file="$REPO_ROOT/.env"
+  local log_file="${1:-/dev/null}"
+  local token_available=0
+  if [[ -f "$env_file" ]] && rg -q '^CHUMMER_RUN_CF_TUNNEL_TOKEN=.+' "$env_file"; then
+    token_available=1
+  elif [[ -n "${CHUMMER_RUN_CF_TUNNEL_TOKEN:-}" ]]; then
+    token_available=1
+  fi
+
+  if [[ "$token_available" -ne 1 ]]; then
+    echo "hub live audit: CHUMMER_RUN_CF_TUNNEL_TOKEN is unavailable; skipping tunnel bootstrap." | tee -a "$log_file" >/dev/null
+    return 0
+  fi
+
+  local compose_file="$REPO_ROOT/legacy/tooling/docker/docker-compose.yml"
+  local tunnel_log
+  tunnel_log="$(mktemp)"
+  set +e
+  run_compose_with_optional_env_file -f "$compose_file" --profile portal up -d chummer-run-cloudflared 2>&1 | tee "$tunnel_log"
+  local status=${PIPESTATUS[0]}
+  set -e
+  cat "$tunnel_log" >> "$log_file" 2>/dev/null || true
+  if [[ "$status" -ne 0 ]]; then
+    rm -f "$tunnel_log"
+    return "$status"
+  fi
+  rm -f "$tunnel_log"
+  TUNNEL_CONTAINER="chummer-run-cloudflared"
+  export TUNNEL_CONTAINER
+}
+
 resolve_runbook_log_file() {
   local base_name="$1"
   local uid_suffix
@@ -613,6 +654,7 @@ if [[ "$RUNBOOK_MODE" == "hub-live-audit" ]]; then
   HUB_LIVE_AUDIT_LOG_FILE="${HUB_LIVE_AUDIT_LOG_FILE:-$(resolve_runbook_log_file chummer-hub-live-audit)}"
   HUB_LIVE_AUDIT_BASE_URL="${HUB_LIVE_AUDIT_BASE_URL:-https://chummer.run}"
   HUB_LIVE_AUDIT_DELAY_SECONDS="${HUB_LIVE_AUDIT_DELAY_SECONDS:-0}"
+  ensure_hub_cloudflare_tunnel "$HUB_LIVE_AUDIT_LOG_FILE"
   set +e
   python3 scripts/hub-live-audit.py --base-url "$HUB_LIVE_AUDIT_BASE_URL" --poll-seconds "$HUB_LIVE_AUDIT_DELAY_SECONDS" 2>&1 | tee "$HUB_LIVE_AUDIT_LOG_FILE"
   status=${PIPESTATUS[0]}
@@ -713,6 +755,7 @@ if [[ "$RUNBOOK_MODE" == "hub-ship" ]]; then
   RUNBOOK_HUB_SHIP_DELAY_SECONDS="${RUNBOOK_HUB_SHIP_DELAY_SECONDS:-15}"
   RUNBOOK_HUB_SHIP_BASE_URL="${RUNBOOK_HUB_SHIP_BASE_URL:-https://chummer.run}"
   bash "$SCRIPT_DIR/runbook.sh" push
+  ensure_hub_cloudflare_tunnel "/dev/null"
   python3 scripts/hub-live-audit.py --base-url "$RUNBOOK_HUB_SHIP_BASE_URL" --poll-seconds "$RUNBOOK_HUB_SHIP_DELAY_SECONDS"
   exit 0
 fi
