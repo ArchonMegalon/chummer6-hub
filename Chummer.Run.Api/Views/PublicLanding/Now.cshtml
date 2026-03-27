@@ -3,12 +3,6 @@
     ViewData["Title"] = "What Is Real Now";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-now";
-    static string DisplayStatus(string badge)
-        => string.Equals(badge, "Live now", StringComparison.OrdinalIgnoreCase)
-            ? "Available today"
-            : string.Equals(badge, "Inspectable", StringComparison.OrdinalIgnoreCase)
-                ? "Preview"
-                : badge;
     static string NormalizeRoute(string href)
     {
         var trimmed = (href ?? string.Empty).Trim();
@@ -136,7 +130,7 @@
                                 <h3>@card.Card.Title</h3>
                                 <p>@card.Card.Summary</p>
                             </div>
-                            <span class="readiness-tag @(string.Equals(card.Card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) ? string.Empty : "tag--amber")">@DisplayStatus(card.Card.Badge)</span>
+                            <span class="readiness-tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                             <a class="button-like button-like--ghost" href="@card.Action.Href">@card.Action.Label</a>
                         </article>
                     }

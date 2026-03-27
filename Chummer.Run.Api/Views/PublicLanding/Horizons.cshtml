@@ -5,9 +5,9 @@
     ViewData["SurfaceClass"] = "surface-horizons";
     var groups = new[]
     {
-        new { Badge = "Preparing", Heading = "Preparing next", Intro = "These horizons are closest to the current proof shelf and the next release-adjacent work." },
-        new { Badge = "Designing", Heading = "Designing in public", Intro = "These horizons have clearer product shape, but they still need proof work before they belong on the live shelf." },
-        new { Badge = "Research", Heading = "Research tracks", Intro = "These are worth following early, but they are not current-preview promises yet." }
+        new { Badge = "Preparing", Label = PublicSurfaceStatus.PreparingNext, Heading = "Preparing next", Intro = "These horizons are closest to the current proof shelf and the next release-adjacent work." },
+        new { Badge = "Designing", Label = PublicSurfaceStatus.DesigningInPublic, Heading = "Designing in public", Intro = "These horizons have clearer product shape, but they still need proof work before they belong on the live shelf." },
+        new { Badge = "Research", Label = PublicSurfaceStatus.ResearchTrack, Heading = "Research track", Intro = "These are worth following early, but they are not current-preview promises yet." }
     };
     var rendered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }
@@ -19,7 +19,7 @@
     <div class="stacked-actions">
         <a class="button-like button-like--ghost" href="#preparing">Preparing next</a>
         <a class="button-like button-like--ghost" href="#designing">Designing in public</a>
-        <a class="button-like button-like--ghost" href="#research">Research tracks</a>
+        <a class="button-like button-like--ghost" href="#research">Research track</a>
     </div>
 </section>
 
@@ -38,7 +38,7 @@
 
     <section class="section-band" id="@group.Badge.ToLowerInvariant()">
         <div class="editorial-block__lead">
-            <p class="eyebrow">@group.Badge</p>
+            <p class="eyebrow">@group.Label</p>
             <h2 class="editorial-title">@group.Heading</h2>
             <p class="editorial-copy">@group.Intro</p>
         </div>
@@ -56,7 +56,7 @@
                         </div>
                     }
                     <div class="horizon-band__copy">
-                        <span class="readiness-tag readiness-tag--horizon">@card.Card.Badge</span>
+                        <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                         <h3>@card.Card.Title</h3>
                         <p>@card.Card.Summary</p>
                         <div class="horizon-band__claims">
@@ -116,7 +116,7 @@
                         </div>
                     }
                     <div class="horizon-band__copy">
-                        <span class="readiness-tag readiness-tag--horizon">@card.Card.Badge</span>
+                        <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
                         <h3>@card.Card.Title</h3>
                         <p>@card.Card.Summary</p>
                         <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>

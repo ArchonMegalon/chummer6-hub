@@ -1490,6 +1490,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("scene_dossier_desk", StringComparison.Ordinal), "landing should pair the hero proof teaser with a different lower proof asset.");
     Assert(landingSource.Contains("var proofNotes = Model.Workflows.Take(1).ToArray();", StringComparison.Ordinal), "landing should keep the proof band to one tighter workflow note instead of restating the whole product loop.");
     Assert(!landingSource.Contains("works-column__header", StringComparison.Ordinal), "landing should collapse the what-works-now strip instead of restating three full column headers.");
+    Assert(landingSource.Contains("PublicSurfaceStatus.DisplayLabel", StringComparison.Ordinal), "landing should use the shared public status presenter instead of route-local badge labels.");
     var storySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml"));
     Assert(!storySource.Contains("One path from install to session return", StringComparison.Ordinal), "product story should not drift back into a second install/support explainer.");
     Assert(!storySource.Contains("From first install to next session", StringComparison.Ordinal), "product story should stay focused on differentiation instead of retelling the install path.");
@@ -1497,6 +1498,14 @@ async Task VerifyPublicLandingProjectionAsync()
     var nowSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml"));
     Assert(nowSource.Contains("Supporting proof around the core loop", StringComparison.Ordinal), "now should keep supporting proof behind a calmer secondary disclosure.");
     Assert(!nowSource.Contains("Integrity stays visible. Use downloads when you are ready to install", StringComparison.Ordinal), "now should not end with a second generic CTA band after the signed-in return callout.");
+    Assert(!nowSource.Contains("static string DisplayStatus", StringComparison.Ordinal), "now should use the shared public status presenter instead of a local badge mapper.");
+    var shelfSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml"));
+    Assert(!shelfSource.Contains("static string DisplayStatus", StringComparison.Ordinal), "artifact shelf should use the shared public status presenter instead of a local badge mapper.");
+    var horizonsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml"));
+    Assert(horizonsSource.Contains("PublicSurfaceStatus.ResearchTrack", StringComparison.Ordinal), "roadmap should use the shared public status presenter for its visible maturity language.");
+    Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Inspectable"), PublicSurfaceStatus.AvailableToday, StringComparison.Ordinal), "inspectable proof should present as available-today proof on the public surface.");
+    Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Preview"), PublicSurfaceStatus.PreviewInProgress, StringComparison.Ordinal), "preview artifact concepts should present as preview-in-progress on the public surface.");
+    Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Designing"), PublicSurfaceStatus.DesigningInPublic, StringComparison.Ordinal), "designing horizons should present with the shared customer-facing roadmap label.");
     var homeSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"));
     Assert(!homeSource.Contains("More in your signed-in shell", StringComparison.Ordinal), "home should not fall back to the old catch-all signed-in shell accordion.");
     Assert(!homeSource.Contains("Account state at a glance", StringComparison.Ordinal), "home should keep the overview route focused instead of adding a second top-level summary disclosure.");
@@ -1658,6 +1667,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Create account to get preview", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "landing page chrome should expose the release-aware signup CTA beside sign in");
     Assert(landingModel.Lanes.Any(static card => string.Equals(card.Card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
     Assert(!string.IsNullOrWhiteSpace(landingModel.Assets.BySlot("section_hero")?.PosterUrl), "landing hero should use a non-empty media asset.");
+    Assert(landingModel.AvailableToday.Any(static card => string.Equals(card.Card.Id, "real_mobile_prep", StringComparison.Ordinal)), "landing should treat inspectable continuity proof as available today instead of relegating it to a preview bucket.");
+    Assert(!landingModel.PreviewItems.Any(static card => string.Equals(card.Card.Id, "real_mobile_prep", StringComparison.Ordinal)), "landing preview strip should not keep inspectable continuity proof in a second-class bucket.");
 
     var storyView = await controller.ProductStoryPage(CancellationToken.None) as ViewResult;
     var storyModel = storyView?.Model as StoryPageViewModel;
