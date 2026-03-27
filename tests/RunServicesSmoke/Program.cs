@@ -1493,14 +1493,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var homeSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"));
     Assert(!homeSource.Contains("More in your signed-in shell", StringComparison.Ordinal), "home should not fall back to the old catch-all signed-in shell accordion.");
     Assert(homeSource.Contains("Account state at a glance", StringComparison.Ordinal), "home should keep top-level account state behind a calmer at-a-glance disclosure.");
-    Assert(homeSource.Contains("Overview, access, and follow-up", StringComparison.Ordinal), "home should keep deeper state behind one calmer secondary disclosure.");
-    Assert(homeSource.Contains("Overview and access", StringComparison.Ordinal), "home should split overview and access behind calmer secondary drawers.");
-    Assert(homeSource.Contains("Work and next", StringComparison.Ordinal), "home should keep work-return depth behind its own calmer secondary drawer.");
     var accountSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"));
     Assert(!accountSource.Contains("Build Lab handoffs", StringComparison.Ordinal), "account copy should avoid internal Build Lab wording on the customer-facing surface.");
     Assert(!accountSource.Contains("Rules Navigator answers", StringComparison.Ordinal), "account copy should avoid internal Rules Navigator wording on the customer-facing surface.");
     Assert(accountSource.Contains("More settings", StringComparison.Ordinal), "account should keep non-core sections behind a calmer secondary settings disclosure.");
-    Assert(accountSource.Contains("More settings, workspaces, and policy", StringComparison.Ordinal), "account should keep secondary workspace and policy depth behind one calmer outer disclosure.");
     Assert(accountSource.Contains("Advanced account details", StringComparison.Ordinal), "account should hide raw account identifiers behind an advanced disclosure.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
@@ -1516,7 +1512,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "real_public_guide", StringComparison.Ordinal) && string.Equals(card.Href, "/what-is-chummer#public-guide", StringComparison.Ordinal) && card.ExternalOk), "landing guide card should keep a first-party route with an explicit external fallback");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "artifact_runsite_pack", StringComparison.Ordinal) && string.Equals(card.Href, "/roadmap/runsite", StringComparison.Ordinal)), "artifact cards should point at related horizon details instead of self-linking to the shelf");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/participate/codex", StringComparison.Ordinal)), "booster participation should split guest and registered destinations");
-    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/signup?next=/home", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/home#beta-interest", StringComparison.Ordinal)), "beta waitlist should split guest signup from registered-home follow-up");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/signup?next=/account/settings", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/account/settings", StringComparison.Ordinal)), "beta waitlist should split guest signup from the calmer account-settings follow-up path");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open guided contribution", StringComparison.Ordinal)), "guided contribution should keep an explicit signed-in action label in canon.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Join beta waitlist", StringComparison.Ordinal)), "beta waitlist should keep an explicit signed-in action label in canon.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "horizon_local_co_processor", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open the horizon page", StringComparison.Ordinal)), "local co-processor should route through its roadmap detail page instead of pretending the overview card is an install action.");
@@ -1822,9 +1818,11 @@ async Task VerifyPublicLandingProjectionAsync()
     var notifiedPayload = (notifiedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
     Assert(notifiedPayload is not null && string.Equals(notifiedPayload.Status, SupportCaseStatuses.UserNotified, StringComparison.Ordinal), "internal notify should close the user-facing loop.");
 
-    var accountPage = await accountController.AccountPage(CancellationToken.None) as ViewResult;
+    var accountPage = await accountController.AccountPage(null, CancellationToken.None) as ViewResult;
     var accountModel = accountPage?.Model as AccountPageViewModel;
     Assert(accountModel is not null && accountModel.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "account page should surface support-case history beside installs and access.");
+    Assert(string.Equals(accountModel!.CurrentSection, "profile", StringComparison.Ordinal), "default account route should land on the profile section.");
+    Assert(accountModel.CoreSections.Any(static section => string.Equals(section.Href, "/account/access", StringComparison.Ordinal)), "account should expose the devices-and-access section link.");
     Assert(accountModel!.CampaignSpine.Dossiers.Count >= 1, "account page should surface the living dossier summary.");
     Assert(accountModel.CampaignSpine.Runs.Count >= 1, "account page should surface the current runboard summary.");
     Assert(accountModel.CampaignSpine.Workspaces.Count >= 1, "account page should surface a first-class campaign workspace.");
@@ -1841,10 +1839,18 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.Restore.LocalOnlyNotes.Count >= 1, "account page should keep install-local restore guardrails explicit.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.OperatorRole)), "account page should surface organizer/operator role posture.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.CampaignVisibilitySummary)), "account page should surface explicit campaign visibility posture for operator groups.");
+    var accountSupportPage = await accountController.AccountPage("support", CancellationToken.None) as ViewResult;
+    var accountSupportModel = accountSupportPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(accountSupportModel?.CurrentSection, "support", StringComparison.Ordinal), "account support route should render the support section.");
+    var accountAccessPage = await accountController.AccountPage("access", CancellationToken.None) as ViewResult;
+    var accountAccessModel = accountAccessPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(accountAccessModel?.CurrentSection, "access", StringComparison.Ordinal), "account access route should render the devices-and-access section.");
 
-    var authenticatedHomePage = await authenticatedLandingController.HomePage(CancellationToken.None) as ViewResult;
+    var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
     Assert(authenticatedHomeModel is not null, "signed-in home page should render through the MVC view layer.");
+    Assert(string.Equals(authenticatedHomeModel!.CurrentSection, "overview", StringComparison.Ordinal), "default home route should land on the overview section.");
+    Assert(authenticatedHomeModel.Sections.Any(static section => string.Equals(section.Href, "/home/access", StringComparison.Ordinal)), "home should expose the dedicated access section link.");
     Assert(authenticatedHomeModel!.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "signed-in home should surface tracked support context.");
     Assert(authenticatedHomeModel.CampaignSpine.Dossiers.Count >= 1, "signed-in home should surface living dossier continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.Runs.Count >= 1, "signed-in home should surface runboard continuity.");
@@ -1854,6 +1860,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Count >= 1, "signed-in home should surface creator publication posture.");
     Assert(authenticatedHomeModel.CampaignSpine.MigrationReceipts.Count >= 1, "signed-in home should surface migration receipt truth.");
     Assert(authenticatedHomeModel.InstallLinking.ClaimedInstallations?.Any(static item => string.Equals(item.Platform, "linux", StringComparison.OrdinalIgnoreCase)) == true, "signed-in home should surface claimed install posture.");
+    var accessHomePage = await authenticatedLandingController.HomePage("access", CancellationToken.None) as ViewResult;
+    var accessHomeModel = accessHomePage?.Model as HomePageViewModel;
+    Assert(string.Equals(accessHomeModel?.CurrentSection, "access", StringComparison.Ordinal), "home access route should render the access section.");
+    var workHomePage = await authenticatedLandingController.HomePage("work", CancellationToken.None) as ViewResult;
+    var workHomeModel = workHomePage?.Model as HomePageViewModel;
+    Assert(string.Equals(workHomeModel?.CurrentSection, "work", StringComparison.Ordinal), "home work route should render the work section.");
 
     var progressHtml = (await progressController.ProgressPage(CancellationToken.None)).Content ?? string.Empty;
     Assert(progressHtml.Contains("Core Rules Engine", StringComparison.Ordinal), "progress page should render the generated product-part report");
@@ -1885,9 +1897,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal)), "participate page should preserve the booster guest-login handoff.");
     Assert(!participateModel.PublicLane.Any(static card => card.Card.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
 
-    var homeResult = await controller.HomePage(CancellationToken.None);
+    var homeResult = await controller.HomePage(null, CancellationToken.None);
     var homeRedirect = homeResult as RedirectResult;
-    Assert(homeRedirect is not null && string.Equals(homeRedirect.Url, "/login?next=/home", StringComparison.Ordinal), "home page should redirect signed-out guests to the login route.");
+    Assert(homeRedirect is not null
+        && homeRedirect.Url is not null
+        && homeRedirect.Url.StartsWith("/login?next=", StringComparison.Ordinal)
+        && Uri.UnescapeDataString(homeRedirect.Url["/login?next=".Length..]).Contains("/home", StringComparison.Ordinal),
+        "home page should redirect signed-out guests to login while preserving the requested home route.");
 
     var authController = new AuthController(authService, identityClient, landing, chrome, google, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
     {
@@ -1919,7 +1935,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLandingModel = unavailableLandingView?.Model as LandingPageViewModel;
     Assert(unavailableLandingModel?.Chrome.Authenticated == true, "public landing chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
     Assert(unavailableLandingModel!.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Sign out", StringComparison.Ordinal)), "authenticated public landing chrome should keep the signed-in actions during identity outages.");
-    var unavailableHomeResult = await unavailableLandingController.HomePage(CancellationToken.None);
+    var unavailableHomeResult = await unavailableLandingController.HomePage(null, CancellationToken.None);
     var unavailableHomeModel = (unavailableHomeResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableHomeModel?.Heading, "Home is unavailable right now", StringComparison.Ordinal), "home page should show an unavailable message when identity is down instead of redirecting to login.");
 
@@ -1936,7 +1952,7 @@ async Task VerifyPublicLandingProjectionAsync()
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
-    var unavailableAccountResult = await unavailableAccountController.AccountPage(CancellationToken.None);
+    var unavailableAccountResult = await unavailableAccountController.AccountPage(null, CancellationToken.None);
     var unavailableAccountModel = (unavailableAccountResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableAccountModel?.Heading, "Account is unavailable right now", StringComparison.Ordinal), "account page should show an unavailable message when identity is down instead of redirecting to login.");
 

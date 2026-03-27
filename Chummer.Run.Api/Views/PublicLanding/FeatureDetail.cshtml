@@ -3,25 +3,13 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-feature-detail";
-    var roadmapDetail = string.Equals(Model.Eyebrow, "Roadmap", StringComparison.OrdinalIgnoreCase);
-    var liveArtifact = string.Equals(Model.StatusLabel, "Available today", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(Model.StatusLabel, "Live now", StringComparison.OrdinalIgnoreCase);
-    var detailEyebrow = roadmapDetail ? "Why this horizon matters now" : "What this artifact proves";
-    var detailTitle = roadmapDetail
-        ? "Current user pain, expected unlock, and the live proof to compare first"
-        : liveArtifact
-            ? "What this live proof shows, who it helps, and how to verify it"
-            : "What this preview concept is aiming for, who it helps, and what to follow next";
-    var detailCopy = roadmapDetail
-        ? "Start from the live proof shelf, then open the deeper roadmap brief only when you need the longer rationale."
-        : liveArtifact
-            ? "Start with the live product path, then use support only when the artifact proof is not enough to move forward."
-            : "Treat this as a preview concept until it moves onto the live proof shelf, and use the related roadmap only when you need the longer read.";
+    var roadmapDetail = string.Equals(Model.Family, "roadmap", StringComparison.OrdinalIgnoreCase);
+    var liveArtifact = string.Equals(Model.Family, "live-proof", StringComparison.OrdinalIgnoreCase);
     var nextTitle = roadmapDetail
         ? "Track this horizon from inside the product"
         : liveArtifact
             ? "Use this live proof next"
-            : "Use the related roadmap before treating this as finished";
+            : "Follow this preview concept from the roadmap";
     var nextCopy = roadmapDetail
         ? "Compare the horizon against the current proof shelf first, then use the deeper brief as secondary context instead of the first stop."
         : liveArtifact
@@ -94,102 +82,20 @@
     </div>
 </section>
 
-@if (roadmapDetail)
+@switch (Model.Family)
 {
-    <section class="role-matrix">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">@detailEyebrow</p>
-            <h2 class="editorial-title">@detailTitle</h2>
-            <p class="editorial-copy">@detailCopy</p>
-        </div>
-        <div class="role-matrix__grid">
-            @if (!string.IsNullOrWhiteSpace(Model.Pain))
-            {
-                <article class="role-matrix__cell">
-                    <span class="tag">User pain</span>
-                    <p>@Model.Pain</p>
-                </article>
-            }
-            @if (!string.IsNullOrWhiteSpace(Model.Payoff))
-            {
-                <article class="role-matrix__cell">
-                    <span class="tag">Expected unlock</span>
-                    <p>@Model.Payoff</p>
-                </article>
-            }
-            @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
-            {
-                <article class="role-matrix__cell">
-                    <span class="tag">Related live proof</span>
-                    <p>@Model.ProofNote</p>
-                </article>
-            }
-            @if (Model.MicroProof.Count > 0)
-            {
-                <article class="role-matrix__cell">
-                    <span class="tag">What to compare</span>
-                    <div class="trust-claim__microproof">
-                        @foreach (var item in Model.MicroProof)
-                        {
-                            <span>@item</span>
-                        }
-                    </div>
-                </article>
-            }
-        </div>
-    </section>
-}
-else
-{
-    <section class="role-matrix">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">@detailEyebrow</p>
-            <h2 class="editorial-title">@detailTitle</h2>
-            <p class="editorial-copy">@detailCopy</p>
-        </div>
-        <div class="role-matrix__grid">
-            @if (liveArtifact)
-            {
-                <article class="role-matrix__cell">
-                    <span class="tag">Use it now</span>
-                    <p>Start from the live product surface attached to this artifact, then keep support as the fallback instead of the first step.</p>
-                </article>
-            }
-            @if (!string.IsNullOrWhiteSpace(Model.Pain))
-            {
-                <article class="role-matrix__cell">
-                    <span class="tag">Why it matters</span>
-                    <p>@Model.Pain</p>
-                </article>
-            }
-            @if (!string.IsNullOrWhiteSpace(Model.Payoff))
-            {
-                <article class="role-matrix__cell">
-                    <span class="tag">What it unlocks</span>
-                    <p>@Model.Payoff</p>
-                </article>
-            }
-            @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
-            {
-                <article class="role-matrix__cell">
-                    <span class="tag">How to verify it</span>
-                    <p>@Model.ProofNote</p>
-                </article>
-            }
-            @if (Model.MicroProof.Count > 0)
-            {
-                <article class="role-matrix__cell">
-                    <span class="tag">Verification markers</span>
-                    <div class="trust-claim__microproof">
-                        @foreach (var item in Model.MicroProof)
-                        {
-                            <span>@item</span>
-                        }
-                    </div>
-                </article>
-            }
-        </div>
-    </section>
+    case "roadmap":
+        @await Html.PartialAsync("~/Views/PublicLanding/_FeatureDetailRoadmap.cshtml", Model)
+        break;
+    case "live-proof":
+        @await Html.PartialAsync("~/Views/PublicLanding/_FeatureDetailLiveProof.cshtml", Model)
+        break;
+    case "preview-concept":
+        @await Html.PartialAsync("~/Views/PublicLanding/_FeatureDetailPreviewConcept.cshtml", Model)
+        break;
+    default:
+        @await Html.PartialAsync("~/Views/PublicLanding/_FeatureDetailPreviewConcept.cshtml", Model)
+        break;
 }
 
 <section class="story-guide-tail">

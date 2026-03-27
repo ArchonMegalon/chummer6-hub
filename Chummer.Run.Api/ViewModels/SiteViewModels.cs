@@ -263,8 +263,15 @@ public sealed record FeatureDetailFactViewModel(
     string Label,
     string Body);
 
+public sealed record SectionLinkViewModel(
+    string Key,
+    string Label,
+    string Href,
+    bool Current);
+
 public sealed record FeatureDetailPageViewModel(
     SiteChromeViewModel Chrome,
+    string Family,
     string Eyebrow,
     string Heading,
     string Intro,
@@ -289,6 +296,8 @@ public sealed record LeaderboardsPageViewModel(
 
 public sealed record HomePageViewModel(
     SiteChromeViewModel Chrome,
+    string CurrentSection,
+    IReadOnlyList<SectionLinkViewModel> Sections,
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
     HubUserDto User,
@@ -303,6 +312,9 @@ public sealed record HomePageViewModel(
 
 public sealed record AccountPageViewModel(
     SiteChromeViewModel Chrome,
+    string CurrentSection,
+    IReadOnlyList<SectionLinkViewModel> CoreSections,
+    IReadOnlyList<SectionLinkViewModel> SecondarySections,
     HubUserDto User,
     AccountLinkSummaryDto Links,
     HubUserExperienceDto Experience,

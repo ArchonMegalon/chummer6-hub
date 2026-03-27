@@ -29,6 +29,12 @@
     var showTeamsSection = communityOpsCount > 0;
     var showChannelsSection = telegramChannel is not null;
     var showParticipationSection = Model.Experience.OnboardingCompleted || laneInterests.Count > 0 || Model.Experience.FollowHorizons || Model.Experience.BetaInterest;
+    var showProfileSection = string.Equals(Model.CurrentSection, "profile", StringComparison.OrdinalIgnoreCase);
+    var showSupportSection = string.Equals(Model.CurrentSection, "support", StringComparison.OrdinalIgnoreCase);
+    var showAccessSection = string.Equals(Model.CurrentSection, "access", StringComparison.OrdinalIgnoreCase);
+    var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
+    var showSettingsSection = string.Equals(Model.CurrentSection, "settings", StringComparison.OrdinalIgnoreCase);
+    var showAdvancedSection = string.Equals(Model.CurrentSection, "advanced", StringComparison.OrdinalIgnoreCase);
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -91,37 +97,24 @@
     <div class="account-shell">
         <aside class="account-nav" aria-label="Account sections">
             <p class="eyebrow">Core settings</p>
-            <a href="#profile" data-account-tab>Profile</a>
-            <a href="#sign-in" data-account-tab>Primary sign-in</a>
-            <a href="#recovery" data-account-tab>Recovery email</a>
-            <a href="#support" data-account-tab>Support</a>
-            <a href="#devices-access" data-account-tab>Devices &amp; access</a>
+            @foreach (var navItem in Model.CoreSections)
+            {
+                <a href="@navItem.Href" aria-current="@(navItem.Current ? "page" : "false")">@navItem.Label</a>
+            }
             <details class="details-drawer">
                 <summary>More settings</summary>
                 <div class="stacked-actions">
-                    <a href="#privacy" data-account-tab>Privacy</a>
-                    @if (showCampaignSection)
+                    @foreach (var navItem in Model.SecondarySections)
                     {
-                        <a href="#campaigns" data-account-tab>Campaigns &amp; dossiers</a>
+                        <a href="@navItem.Href" aria-current="@(navItem.Current ? "page" : "false")">@navItem.Label</a>
                     }
-                    @if (showTeamsSection)
-                    {
-                        <a href="#community-ops" data-account-tab>Teams &amp; permissions</a>
-                    }
-                    @if (showChannelsSection)
-                    {
-                        <a href="#channels" data-account-tab>Linked channels</a>
-                    }
-                    @if (showParticipationSection)
-                    {
-                        <a href="#participation" data-account-tab>Participation</a>
-                    }
-                    <a href="#help-policy" data-account-tab>Help and policy</a>
                 </div>
             </details>
         </aside>
 
         <div class="account-pane">
+            @if (showProfileSection)
+            {
             <section id="profile" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Profile</h2>
@@ -188,8 +181,9 @@
                     <p id="recoveryStatusNotice" class="muted-copy" hidden></p>
                 </form>
             </section>
+            }
 
-            @if (showChannelsSection)
+            @if (showSettingsSection && showChannelsSection)
             {
                 <details class="details-drawer">
                     <summary>Linked channels</summary>
@@ -214,6 +208,8 @@
                 </details>
             }
 
+            @if (showSupportSection)
+            {
             <section id="support" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Support</h2>
@@ -307,7 +303,10 @@
                     </div>
                 }
             </section>
+            }
 
+            @if (showAccessSection)
+            {
             <section id="devices-access" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Devices &amp; access</h2>
@@ -484,11 +483,28 @@
                     </details>
                 </details>
             </section>
+            }
 
-            <details class="details-drawer">
-                <summary>More settings, workspaces, and policy</summary>
+            @if (showWorkSection || showSettingsSection)
+            {
+            <details class="details-drawer" open>
+                <summary>@(showWorkSection ? "Workspaces and teams" : "More settings and policy")</summary>
 
-            @if (showCampaignSection)
+            @if (showWorkSection && !showCampaignSection && !showTeamsSection)
+            {
+                <section class="settings-section" data-account-panel id="workspaces-empty">
+                    <div class="settings-section__header">
+                        <h2>Workspaces and teams</h2>
+                        <p>No campaign workspace, team operator role, or return-path load is attached to this account yet. When that changes, this route keeps the work surface separate from the customer core.</p>
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="/home">Return to home</a>
+                        <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
+                    </div>
+                </section>
+            }
+
+            @if (showWorkSection && showCampaignSection)
             {
             <details class="details-drawer">
             <summary>Campaigns &amp; dossiers</summary>
@@ -728,7 +744,7 @@
             </details>
             }
 
-            @if (showTeamsSection)
+            @if (showWorkSection && showTeamsSection)
             {
             <details class="details-drawer">
             <summary>Teams &amp; permissions</summary>
@@ -815,6 +831,8 @@
             </details>
             }
 
+            @if (showSettingsSection)
+            {
             <details class="details-drawer">
                 <summary>Privacy</summary>
                 <section id="privacy" class="settings-section" data-account-panel>
@@ -834,8 +852,9 @@
                     </div>
                 </section>
             </details>
+            }
 
-            @if (showParticipationSection)
+            @if (showSettingsSection && showParticipationSection)
             {
             <details class="details-drawer">
             <summary>Participation</summary>
@@ -859,6 +878,8 @@
             </details>
             }
 
+            @if (showSettingsSection)
+            {
             <details class="details-drawer">
                 <summary>Help and policy</summary>
                 <section class="settings-section" data-account-panel id="help-policy">
@@ -874,11 +895,15 @@
                     </div>
                 </section>
             </details>
+            }
             </details>
+            }
         </div>
     </div>
 
-    <details class="details-drawer">
+    @if (showAdvancedSection)
+    {
+    <details class="details-drawer" open>
         <summary>Advanced account details</summary>
         <dl class="detail-grid detail-grid--account">
             <div>
@@ -907,6 +932,7 @@
             </div>
         </dl>
     </details>
+    }
 </section>
 
 @section Scripts {

@@ -49,16 +49,23 @@ public sealed class AccountsController : Controller
     }
 
     [HttpGet("/account")]
+    [HttpGet("/account/{section}")]
     [Produces("text/html")]
-    public async Task<IActionResult> AccountPage(CancellationToken cancellationToken)
+    public async Task<IActionResult> AccountPage([FromRoute] string? section, CancellationToken cancellationToken)
     {
+        var selectedSection = NormalizeAccountSection(section);
+        var currentPath = selectedSection == "profile" ? "/account" : $"/account/{selectedSection}";
+
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var model = new AccountPageViewModel(
-                Chrome: _chrome.BuildAuthenticatedChrome("Account", "Profile, sign-in methods, recovery posture, and channel settings.", "/account", user.DisplayName),
+                Chrome: _chrome.BuildAuthenticatedChrome("Account", "Profile, sign-in methods, recovery posture, and channel settings.", currentPath, user.DisplayName),
+                CurrentSection: selectedSection,
+                CoreSections: BuildAccountCoreSections(selectedSection),
+                SecondarySections: BuildAccountSecondarySections(selectedSection),
                 User: user,
                 Links: _links.GetSummary(subject.SubjectId),
                 Experience: _experience.GetOrCreate(subject.SubjectId),
@@ -70,22 +77,52 @@ public sealed class AccountsController : Controller
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
-            return Redirect("/login?next=/account");
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
         }
         catch (HubRequestAuthException ex)
         {
             _logger.LogWarning(ex, "Account page could not confirm the signed-in identity.");
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
-                Chrome: _chrome.BuildPublicChrome("Account unavailable", "Hub could not confirm the signed-in account surface right now.", "/account"),
+                Chrome: _chrome.BuildPublicChrome("Account unavailable", "Hub could not confirm the signed-in account surface right now.", currentPath),
                 Heading: "Account is unavailable right now",
                 SupportLine: "Chummer could not open the signed-in account surface right now. Your account details were not changed.",
                 Notice: null,
                 PrimaryLabel: "Try account again",
-                PrimaryHref: "/account",
+                PrimaryHref: currentPath,
                 SecondaryLabel: "Return home",
                 SecondaryHref: "/home"));
         }
     }
+
+    private static string NormalizeAccountSection(string? section)
+        => string.IsNullOrWhiteSpace(section)
+            ? "profile"
+            : section.Trim().ToLowerInvariant() switch
+            {
+                "profile" => "profile",
+                "support" => "support",
+                "access" => "access",
+                "work" => "work",
+                "settings" => "settings",
+                "advanced" => "advanced",
+                _ => "profile"
+            };
+
+    private static IReadOnlyList<SectionLinkViewModel> BuildAccountCoreSections(string currentSection)
+        => new[]
+        {
+            new SectionLinkViewModel("profile", "Profile", "/account", string.Equals(currentSection, "profile", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("support", "Support", "/account/support", string.Equals(currentSection, "support", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("access", "Devices & access", "/account/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("work", "Workspaces", "/account/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase))
+        };
+
+    private static IReadOnlyList<SectionLinkViewModel> BuildAccountSecondarySections(string currentSection)
+        => new[]
+        {
+            new SectionLinkViewModel("settings", "More settings", "/account/settings", string.Equals(currentSection, "settings", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("advanced", "Advanced", "/account/advanced", string.Equals(currentSection, "advanced", StringComparison.OrdinalIgnoreCase))
+        };
 
     [HttpGet("me")]
     [ProducesResponseType<HubUserDto>(StatusCodes.Status200OK)]

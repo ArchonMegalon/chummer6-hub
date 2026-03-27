@@ -1,0 +1,58 @@
+@model FeatureDetailPageViewModel
+@{
+    var audienceFact = Model.Facts.FirstOrDefault(fact => fact.Label.Contains("Who", StringComparison.OrdinalIgnoreCase));
+}
+
+<section class="role-matrix">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Why this horizon matters now</p>
+        <h2 class="editorial-title">Current pain, expected unlock, and the live proof you should compare first</h2>
+        <p class="editorial-copy">Roadmap pages should explain why the horizon exists, what it changes for users, and which live proof keeps the promise honest today.</p>
+    </div>
+    <div class="role-matrix__grid">
+        @if (!string.IsNullOrWhiteSpace(Model.Pain))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">Why now</span>
+                <p>@Model.Pain</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Payoff))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">Expected unlock</span>
+                <p>@Model.Payoff</p>
+            </article>
+        }
+        @if (audienceFact is not null)
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">Audience impact</span>
+                <p>@audienceFact.Body</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">Related live proof</span>
+                <p>@Model.ProofNote</p>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.MicroProof.Count > 0)
+{
+    <section class="trust-rail-section">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">What following this horizon means</p>
+            <h2 class="editorial-title">Compare it against the current product before treating it as promised</h2>
+        </div>
+        <div class="trust-claim__microproof">
+            @foreach (var item in Model.MicroProof)
+            {
+                <span>@item</span>
+            }
+        </div>
+    </section>
+}

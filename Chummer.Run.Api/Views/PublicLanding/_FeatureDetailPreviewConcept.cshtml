@@ -1,0 +1,52 @@
+@model FeatureDetailPageViewModel
+
+<section class="role-matrix">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Preview concept</p>
+        <h2 class="editorial-title">What this concept is aiming for, who it would help, and what to follow next</h2>
+        <p class="editorial-copy">Preview concept pages should explain readiness honestly and point you back to roadmap or support instead of pretending the artifact is already live.</p>
+    </div>
+    <div class="role-matrix__grid">
+        <article class="role-matrix__cell">
+            <span class="tag">Readiness</span>
+            <p>This concept is still preview-only. Treat the related roadmap and support path as the next honest places to go.</p>
+        </article>
+        @if (!string.IsNullOrWhiteSpace(Model.Pain))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">Why it matters</span>
+                <p>@Model.Pain</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Payoff))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">What it could unlock</span>
+                <p>@Model.Payoff</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.ProofNote))
+        {
+            <article class="role-matrix__cell">
+                <span class="tag">What to watch for next</span>
+                <p>@Model.ProofNote</p>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.MicroProof.Count > 0)
+{
+    <section class="trust-rail-section">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Follow this concept</p>
+            <h2 class="editorial-title">These cues should move onto the live proof shelf before you treat the concept as real</h2>
+        </div>
+        <div class="trust-claim__microproof">
+            @foreach (var item in Model.MicroProof)
+            {
+                <span>@item</span>
+            }
+        </div>
+    </section>
+}
