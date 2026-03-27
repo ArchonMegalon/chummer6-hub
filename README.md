@@ -67,3 +67,9 @@ Run:
 ```bash
 bash scripts/ai/verify.sh
 ```
+
+For the signed-in Hub browser journey proof, run:
+
+```bash
+CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/ai/run_services_verification.sh
+```
