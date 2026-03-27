@@ -804,6 +804,26 @@
                                     {
                                         <span> Outputs: @string.Join(", ", handoff.Outputs.Select(item => item.Label)).</span>
                                     }
+                                    @if (!string.IsNullOrWhiteSpace(handoff.NextSafeAction))
+                                    {
+                                        <span> Next safe action: @handoff.NextSafeAction</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(handoff.RuntimeCompatibilitySummary))
+                                    {
+                                        <span> Runtime: @handoff.RuntimeCompatibilitySummary</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(handoff.CampaignReturnSummary))
+                                    {
+                                        <span> Return: @handoff.CampaignReturnSummary</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(handoff.SupportClosureSummary))
+                                    {
+                                        <span> Closure: @handoff.SupportClosureSummary</span>
+                                    }
+                                    @if (handoff.Watchouts is { Count: > 0 })
+                                    {
+                                        <span> Watchouts: @string.Join(" ", handoff.Watchouts.Take(2)).</span>
+                                    }
                                 </li>
                             }
                         </ul>
@@ -823,6 +843,10 @@
                                     @if (answer.EvidenceLines.Count > 0)
                                     {
                                         <span> Evidence: @answer.EvidenceLines[0].</span>
+                                    }
+                                    @if (answer.SupportReuseHints.Count > 0)
+                                    {
+                                        <span> Support reuse: @answer.SupportReuseHints[0].</span>
                                     }
                                 </li>
                             }
