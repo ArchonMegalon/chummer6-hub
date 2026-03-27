@@ -754,7 +754,7 @@ if [[ "$RUNBOOK_MODE" == "hub-ship" ]]; then
 
   RUNBOOK_HUB_SHIP_DELAY_SECONDS="${RUNBOOK_HUB_SHIP_DELAY_SECONDS:-15}"
   RUNBOOK_HUB_SHIP_BASE_URL="${RUNBOOK_HUB_SHIP_BASE_URL:-https://chummer.run}"
-  bash "$SCRIPT_DIR/runbook.sh" push
+  RUNBOOK_MODE=push bash "$SCRIPT_DIR/runbook.sh"
   ensure_hub_cloudflare_tunnel "/dev/null"
   python3 scripts/hub-live-audit.py --base-url "$RUNBOOK_HUB_SHIP_BASE_URL" --poll-seconds "$RUNBOOK_HUB_SHIP_DELAY_SECONDS"
   exit 0
