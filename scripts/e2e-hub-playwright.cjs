@@ -144,13 +144,20 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Support');
   });
 
+  const supportCaseTitleField = page.locator('#supportCaseTitle');
+  if (await supportCaseTitleField.count() === 0) {
+    const currentUrl = page.url();
+    const bodyText = await page.locator('body').innerText();
+    assert.fail(`/account/support should render the support form, but #supportCaseTitle was missing on ${currentUrl}.\n\n${bodyText.slice(0, 1200)}`);
+  }
+
   const installOptions = page.locator('#supportCaseInstallation option');
   if (await installOptions.count() > 1) {
     await page.selectOption('#supportCaseInstallation', { index: 1 });
     await expectVisible(page, '#supportCaseContextPreview');
   }
 
-  await page.fill('#supportCaseTitle', 'Playwright support case');
+  await supportCaseTitleField.fill('Playwright support case');
   await page.fill('#supportCaseSummary', 'Tracked support submission with attachment');
   await page.fill('#supportCaseDetail', 'Browser harness is validating tracked support submission, attachment persistence, and the signed-in return path.');
   await page.setInputFiles('#supportCaseAttachments', {
