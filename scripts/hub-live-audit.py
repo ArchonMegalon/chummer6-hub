@@ -61,7 +61,7 @@ def main() -> int:
     routes = [
         AuditRoute("/", "Create account to get preview", required_texts=("Final pool 9",), expects_header_count=1),
         AuditRoute("/what-is-chummer", "One product for rules truth, living dossiers, and session return.", expects_header_count=1),
-        AuditRoute("/now", "Current preview, visible proof, and known posture", required_texts=("What you can verify now", "Available today"), expects_header_count=1),
+        AuditRoute("/now", "Current preview, visible proof, and known posture", required_texts=("What you can verify now", "Build, explain, and run with visible evidence"), expects_header_count=1),
         AuditRoute("/downloads", "Install the current preview", expects_header_count=1),
         AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track"), forbidden_texts=("Research tracks",), expects_header_count=1),
         AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Preview in progress",), expects_header_count=1),
