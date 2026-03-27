@@ -90,7 +90,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/now', async () => {
     await expectVisible(page, 'text=What you can verify now');
-    await expectVisible(page, 'text=Supporting proof around the core loop');
+    await expectVisible(page, 'text=Build, explain, and run with visible evidence');
     await assertNoBannedCopy(page, 'Now');
   });
 
