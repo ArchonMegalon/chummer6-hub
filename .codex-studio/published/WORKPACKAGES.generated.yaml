@@ -1,6 +1,6 @@
-source_queue_fingerprint: 3d7a708d10892399fe37154154bd057b625591a6
+source_queue_fingerprint: 71de843b4f3f8b72e39ca73df3617588673da54c
 work_packages:
-- package_id: hub-package-compile-3d7a708d10
+- package_id: hub-package-compile-71de843b4f
   package_kind: package_compile
   horizon_family: package-compile
   title: Compile booster-ready work packages from queue truth
