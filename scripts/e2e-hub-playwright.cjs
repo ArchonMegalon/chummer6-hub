@@ -14,27 +14,43 @@ async function expectVisible(page, selector, message) {
   assert.equal(visible, true, message || `Expected ${selector} to be visible.`);
 }
 
+async function assertNoPageErrors(page, pageErrors, label) {
+  await page.waitForTimeout(50);
+  if (pageErrors.length === 0) {
+    return;
+  }
+
+  const errors = pageErrors.splice(0, pageErrors.length);
+  assert.fail(`${label} produced client-side page errors:\n${errors.join('\n\n')}`);
+}
+
 async function assertNoBannedCopy(page, label) {
   const text = await page.locator('body').innerText();
   assert.equal(bannedCopy.test(text), false, `${label} rendered banned generic CTA copy.`);
 }
 
-async function gotoAndAssert(page, path, checks) {
+async function gotoAndAssert(page, pageErrors, path, checks) {
   const response = await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
   assert(response, `No response for ${path}`);
   assert.equal(response.status(), 200, `${path} should return 200.`);
   if (checks) {
     await checks();
   }
+  await assertNoPageErrors(page, pageErrors, path);
 }
 
 (async () => {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ acceptDownloads: true });
   const page = await context.newPage();
+  const pageErrors = [];
   const uniqueEmail = `hub-e2e-${Date.now()}@example.com`;
 
-  await gotoAndAssert(page, '/', async () => {
+  page.on('pageerror', (error) => {
+    pageErrors.push(error?.stack || error?.message || String(error));
+  });
+
+  await gotoAndAssert(page, pageErrors, '/', async () => {
     await expectVisible(page, 'header[data-site-header]', 'Landing header should render once.');
     assert.equal(await page.locator('header[data-site-header]').count(), 1, 'Landing should only render one site header.');
     await expectVisible(page, 'text=Create account to get preview');
@@ -43,11 +59,13 @@ async function gotoAndAssert(page, path, checks) {
 
   await page.goto(`${baseUrl}/home/access`, { waitUntil: 'domcontentloaded' });
   assert(page.url().includes('/login?next=%2Fhome%2Faccess'), 'Signed-out /home/access should preserve next.');
+  await assertNoPageErrors(page, pageErrors, 'Signed-out /home/access redirect');
 
   await page.goto(`${baseUrl}/account/support`, { waitUntil: 'domcontentloaded' });
   assert(page.url().includes('/login?next=%2Faccount%2Fsupport'), 'Signed-out /account/support should preserve next.');
+  await assertNoPageErrors(page, pageErrors, 'Signed-out /account/support redirect');
 
-  await gotoAndAssert(page, '/downloads', async () => {
+  await gotoAndAssert(page, pageErrors, '/downloads', async () => {
     await expectVisible(page, 'text=Create account to get preview');
     await expectVisible(page, 'text=Advanced download options');
     await assertNoBannedCopy(page, 'Downloads');
@@ -63,6 +81,7 @@ async function gotoAndAssert(page, path, checks) {
   await expectVisible(page, 'text=Check your email');
   await expectVisible(page, 'text=Continue to Downloads');
   await assertNoBannedCopy(page, 'Signup confirmation');
+  await assertNoPageErrors(page, pageErrors, 'Signup confirmation');
 
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -70,6 +89,7 @@ async function gotoAndAssert(page, path, checks) {
   ]);
   assert(page.url().includes('/downloads/install/avalonia-linux-x64-installer'), 'Signup callback should land on the signed-in handoff route.');
   await expectVisible(page, 'text=Claim code');
+  await assertNoPageErrors(page, pageErrors, 'Download handoff');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
@@ -78,19 +98,39 @@ async function gotoAndAssert(page, path, checks) {
   const suggestedFilename = download.suggestedFilename();
   assert(/avalonia.*(deb|AppImage|rpm|tar)/i.test(suggestedFilename), `Unexpected installer filename: ${suggestedFilename}`);
 
-  await gotoAndAssert(page, '/home/access', async () => {
+  await gotoAndAssert(page, pageErrors, '/home/access', async () => {
     await expectVisible(page, 'text=Access and return');
   });
 
-  await gotoAndAssert(page, '/home/work', async () => {
+  await gotoAndAssert(page, pageErrors, '/home/work', async () => {
     await expectVisible(page, 'text=Work and continuity');
   });
 
-  await gotoAndAssert(page, '/account/access', async () => {
+  await gotoAndAssert(page, pageErrors, '/home/setup', async () => {
+    await expectVisible(page, 'text=Finish the small setup flow, then come back to access and work');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/account', async () => {
+    await expectVisible(page, 'text=Profile');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/account/access', async () => {
     await expectVisible(page, 'text=Devices & access');
   });
 
-  await gotoAndAssert(page, '/account/support', async () => {
+  await gotoAndAssert(page, pageErrors, '/account/work', async () => {
+    await expectVisible(page, 'text=Workspaces and continuity');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/account/settings', async () => {
+    await expectVisible(page, 'text=More settings');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/account/advanced', async () => {
+    await expectVisible(page, 'text=Advanced account details');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/account/support', async () => {
     await expectVisible(page, 'text=Support');
   });
 
@@ -118,18 +158,22 @@ async function gotoAndAssert(page, path, checks) {
   await expectVisible(page, 'text=Tracked case');
   await expectVisible(page, 'text=Saved attachments');
   await expectVisible(page, 'text=playwright-support.log');
+  await assertNoPageErrors(page, pageErrors, 'Tracked support case');
 
-  const attachmentLinkCount = await page.locator('a', { hasText: 'Download' }).count();
-  assert(attachmentLinkCount >= 1, 'Tracked support case should expose attachment downloads.');
+  const [attachmentDownload] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('a', { hasText: 'Download' }).first().click()
+  ]);
+  assert(/playwright-support\.log$/i.test(attachmentDownload.suggestedFilename()), 'Tracked support case should download the uploaded attachment.');
 
   await assertNoBannedCopy(page, 'Tracked support case');
 
-  await gotoAndAssert(page, '/roadmap/nexus-pan', async () => {
+  await gotoAndAssert(page, pageErrors, '/roadmap/nexus-pan', async () => {
     await expectVisible(page, 'text=Why this horizon matters now');
     await expectVisible(page, 'text=Compare with current proof');
   });
 
-  await gotoAndAssert(page, '/artifacts/current-preview-build', async () => {
+  await gotoAndAssert(page, pageErrors, '/artifacts/current-preview-build', async () => {
     await expectVisible(page, 'text=Use and verify this proof');
     await expectVisible(page, 'text=Start from the live surface');
   });
