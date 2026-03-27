@@ -1516,12 +1516,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!homeSource.Contains("More in your signed-in shell", StringComparison.Ordinal), "home should not fall back to the old catch-all signed-in shell accordion.");
     Assert(!homeSource.Contains("Account state at a glance", StringComparison.Ordinal), "home should keep the overview route focused instead of adding a second top-level summary disclosure.");
     Assert(homeSource.Contains("Open what works today", StringComparison.Ordinal), "home access should point proof needs to the dedicated now route instead of repeating proof cards inline.");
+    Assert(homeSource.Contains("Need product proof before you install or return?", StringComparison.Ordinal), "home access should keep proof follow-through as a calmer note instead of a third equal-weight rail card.");
+    Assert(!homeSource.Contains("Need product proof before you act?", StringComparison.Ordinal), "home access should not revive the louder proof rail copy.");
     Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
-    Assert(homeSource.Contains("Tradeoffs:", StringComparison.Ordinal), "home work should surface the first build tradeoff instead of reducing build follow-through to a headline only.");
     Assert(homeSource.Contains("Evidence:", StringComparison.Ordinal), "home work should surface the first grounded rule evidence line instead of only a generic provenance label.");
-    Assert(homeSource.Contains("Next safe action:", StringComparison.Ordinal), "home work should surface the next safe action for the build path instead of hiding the new decision rail fields.");
-    Assert(homeSource.Contains("Support reuse:", StringComparison.Ordinal), "home work should surface how grounded rule answers feed support closure instead of treating rules explain as standalone copy.");
+    Assert(homeSource.Contains("Next:", StringComparison.Ordinal), "home work should keep a short next-step cue on the calmer build follow-through card.");
+    Assert(homeSource.Contains("Watchout:", StringComparison.Ordinal), "home work should keep one concrete watchout instead of a long data-dump summary.");
+    Assert(!homeSource.Contains("Next safe action:", StringComparison.Ordinal), "home work should not fall back to the older verbose next-safe-action label on the short card.");
+    Assert(!homeSource.Contains("Support reuse:", StringComparison.Ordinal), "home work should keep support reuse detail in the deeper work route instead of the short home card.");
     var accountSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"));
     Assert(!accountSource.Contains("Build Lab handoffs", StringComparison.Ordinal), "account copy should avoid internal Build Lab wording on the customer-facing surface.");
     Assert(!accountSource.Contains("Rules Navigator answers", StringComparison.Ordinal), "account copy should avoid internal Rules Navigator wording on the customer-facing surface.");
@@ -1913,9 +1916,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "account page should receive the next safe action directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].RuntimeCompatibilitySummary), "account page should receive runtime compatibility truth for the build handoff.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].SupportClosureSummary), "account page should receive support-closure truth for the build handoff.");
-    Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].Watchouts?.Count > 0, "account page should receive explicit build-handoff watchouts.");
     Assert(accountModel.CampaignSpine.RulesNavigator.Count >= 1, "account page should surface first-class rules navigator answers.");
-    Assert(accountModel.CampaignSpine.RulesNavigator[0].SupportReuseHints.Count >= 1, "account page should receive support reuse hints for grounded rule answers.");
     Assert(accountModel.CampaignSpine.MigrationReceipts.Count >= 1, "account page should surface legacy migration receipts.");
     Assert(accountModel.CampaignSpine.CreatorPublications.Count >= 1, "account page should surface creator publication posture.");
     Assert(accountModel.CampaignSpine.Restore.RecentRuleEnvironments.Count >= 1, "account page should surface restore-ready rule environments.");

@@ -187,15 +187,8 @@
                                             </div>
                                             <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
                                         </article>
-                                        <article class="app-rail__item">
-                                            <span class="tag">Proof</span>
-                                            <div class="app-rail__copy">
-                                                <h3>Need product proof before you act?</h3>
-                                                <p>The proof shelf stays separate so this route can stay focused on access, return, and device state.</p>
-                                            </div>
-                                            <a class="inline-link" href="/now">Open what works today</a>
-                                        </article>
                                     </div>
+                                    <p class="muted-copy">Need product proof before you install or return? <a class="inline-link" href="/now">Open what works today</a>.</p>
                                 </div>
                 </div>
             </section>
@@ -302,34 +295,17 @@
                                                         <h3>@handoff.Title</h3>
                                                         <p>
                                                             @handoff.Summary
-                                                            <span> Variant: @handoff.VariantLabel. Next: @handoff.ProgressionLabel.</span>
-                                                            @if (handoff.TradeoffLines.Count > 0)
-                                                            {
-                                                                <span> Tradeoffs: @handoff.TradeoffLines[0]</span>
-                                                            }
-                                                            @if (handoff.ProgressionOutcomes.Count > 0)
-                                                            {
-                                                                <span> Outcome: @handoff.ProgressionOutcomes[0]</span>
-                                                            }
-                                                            @if (handoff.Outputs.Count > 0)
-                                                            {
-                                                                <span> Outputs: @string.Join(", ", handoff.Outputs.Select(item => item.Label))</span>
-                                                            }
                                                             @if (!string.IsNullOrWhiteSpace(handoff.NextSafeAction))
                                                             {
-                                                                <span> Next safe action: @handoff.NextSafeAction</span>
+                                                                <span> Next: @handoff.NextSafeAction.</span>
                                                             }
-                                                            @if (!string.IsNullOrWhiteSpace(handoff.RuntimeCompatibilitySummary))
+                                                            else if (handoff.ProgressionOutcomes.Count > 0)
                                                             {
-                                                                <span> Runtime: @handoff.RuntimeCompatibilitySummary</span>
-                                                            }
-                                                            @if (!string.IsNullOrWhiteSpace(handoff.SupportClosureSummary))
-                                                            {
-                                                                <span> Closure: @handoff.SupportClosureSummary</span>
+                                                                <span> Next: @handoff.ProgressionOutcomes[0].</span>
                                                             }
                                                             @if (handoff.Watchouts is { Count: > 0 })
                                                             {
-                                                                <span> Watchouts: @handoff.Watchouts[0]</span>
+                                                                <span> Watchout: @handoff.Watchouts[0]</span>
                                                             }
                                                         </p>
                                                     </div>
@@ -345,16 +321,10 @@
                                                         <h3>@answer.Question</h3>
                                                         <p>
                                                             @answer.ShortAnswer
-                                                            <span> Before: @answer.BeforeSummary</span>
-                                                            <span> After: @answer.AfterSummary</span>
                                                             <span> Provenance: @answer.ProvenanceLabel.</span>
                                                             @if (answer.EvidenceLines.Count > 0)
                                                             {
                                                                 <span> Evidence: @answer.EvidenceLines[0]</span>
-                                                            }
-                                                            @if (answer.SupportReuseHints.Count > 0)
-                                                            {
-                                                                <span> Support reuse: @answer.SupportReuseHints[0]</span>
                                                             }
                                                         </p>
                                                     </div>

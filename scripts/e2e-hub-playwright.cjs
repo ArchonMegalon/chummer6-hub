@@ -160,6 +160,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/home/access', async () => {
     await expectVisible(page, 'text=Access and return');
+    await expectVisible(page, 'text=Finish setup before you worry about devices and follow-up');
+    const bodyText = await page.locator('body').innerText();
+    assert.equal(bodyText.includes('Need product proof before you act?'), false, '/home/access should use the calmer proof follow-through note.');
   });
 
   await gotoAndAssert(page, pageErrors, '/home/work', async () => {
@@ -176,6 +179,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/account/access', async () => {
     await expectVisible(page, 'text=Devices & access');
+    const bodyText = await page.locator('body').innerText();
+    assert.equal(bodyText.includes('grant_installation_'), false, '/account/access should not leak raw install grant ids.');
   });
 
   await gotoAndAssert(page, pageErrors, '/account/work', async () => {
