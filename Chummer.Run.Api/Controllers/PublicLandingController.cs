@@ -290,7 +290,7 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> ContactPage(CancellationToken cancellationToken)
     {
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Where to send bugs, account questions, and public product feedback right now.", "/contact", cancellationToken);
-        return View("~/Views/PublicLanding/TrustPage.cshtml", BuildContactPageModel(chrome));
+        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildContactPageModelAsync(chrome, cancellationToken));
     }
 
     [HttpGet("/contact/submitted/{caseId}")]
@@ -393,11 +393,13 @@ public sealed class PublicLandingController : Controller
         catch (ArgumentException ex)
         {
             var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Where to send bugs, account questions, and public product feedback right now.", "/contact", cancellationToken);
-            var model = BuildContactPageModel(chrome) with
+            var installDefaults = await ResolveSupportIntakeDefaultsAsync(cancellationToken);
+            var model = (await BuildContactPageModelAsync(chrome, cancellationToken)) with
             {
                 SupportIntake = BuildSupportIntakeModel(
                     authenticated: chrome.Authenticated,
-                    submissionNotice: ex.Message)
+                    submissionNotice: ex.Message,
+                    installDefaults)
             };
             return View("~/Views/PublicLanding/TrustPage.cshtml", model);
         }
@@ -608,15 +610,16 @@ public sealed class PublicLandingController : Controller
         }
     }
 
-    private TrustPageViewModel BuildContactPageModel(SiteChromeViewModel chrome)
+    private async Task<TrustPageViewModel> BuildContactPageModelAsync(SiteChromeViewModel chrome, CancellationToken cancellationToken)
         => _trustContent.BuildContactPage(chrome) with
         {
             SupportIntake = BuildSupportIntakeModel(
                 authenticated: chrome.Authenticated,
-                submissionNotice: null)
+                submissionNotice: null,
+                await ResolveSupportIntakeDefaultsAsync(cancellationToken))
         };
 
-    private static SupportIntakeViewModel BuildSupportIntakeModel(bool authenticated, string? submissionNotice)
+    private static SupportIntakeViewModel BuildSupportIntakeModel(bool authenticated, string? submissionNotice, SupportIntakeDefaults installDefaults)
         => new(
             ActionHref: "/contact",
             Heading: "Open a first-party support case",
@@ -636,7 +639,73 @@ public sealed class PublicLandingController : Controller
                 new SupportIntakeOptionViewModel(SupportCaseKinds.InstallHelp, "Install or update", "Choose this when the installer, updater, or download handoff is the problem."),
                 new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Product bug", "Use this for broken behavior, bad routing, or product regressions."),
                 new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Use this when the product direction is right but the current surface is getting in your way.")
-            ]);
+            ],
+            DefaultPlatform: installDefaults.Platform,
+            DefaultApplicationVersion: installDefaults.ApplicationVersion,
+            DefaultInstallationId: installDefaults.InstallationId,
+            ContextHint: installDefaults.ContextHint);
+
+    private async Task<SupportIntakeDefaults> ResolveSupportIntakeDefaultsAsync(CancellationToken cancellationToken)
+    {
+        var subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        if (subject is null)
+        {
+            return SupportIntakeDefaults.Empty;
+        }
+
+        var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var summary = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        var installation = summary.ClaimedInstallations?.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
+        if (installation is not null)
+        {
+            var descriptor = string.Join(" · ",
+                new[]
+                {
+                    installation.Platform,
+                    installation.Version,
+                    installation.InstallationId
+                }.Where(static item => !string.IsNullOrWhiteSpace(item)));
+            return new SupportIntakeDefaults(
+                Platform: installation.Platform,
+                ApplicationVersion: installation.Version,
+                InstallationId: installation.InstallationId,
+                ContextHint: string.IsNullOrWhiteSpace(descriptor)
+                    ? "Prefilled from your most recent linked install."
+                    : $"Prefilled from your most recent linked install: {descriptor}.");
+        }
+
+        var pendingTicket = summary.PendingClaimTickets
+            .OrderByDescending(static item => item.CreatedAtUtc)
+            .FirstOrDefault();
+        if (pendingTicket is not null)
+        {
+            var descriptor = string.Join(" · ",
+                new[]
+                {
+                    pendingTicket.ArtifactLabel,
+                    pendingTicket.Version,
+                    pendingTicket.ClaimCode
+                }.Where(static item => !string.IsNullOrWhiteSpace(item)));
+            return new SupportIntakeDefaults(
+                Platform: pendingTicket.ArtifactLabel,
+                ApplicationVersion: pendingTicket.Version,
+                InstallationId: pendingTicket.ClaimCode,
+                ContextHint: string.IsNullOrWhiteSpace(descriptor)
+                    ? "Prefilled from your latest pending install handoff."
+                    : $"Prefilled from your latest pending install handoff: {descriptor}.");
+        }
+
+        return SupportIntakeDefaults.Empty;
+    }
+
+    private sealed record SupportIntakeDefaults(
+        string? Platform,
+        string? ApplicationVersion,
+        string? InstallationId,
+        string? ContextHint)
+    {
+        public static SupportIntakeDefaults Empty { get; } = new(null, null, null, null);
+    }
 
     private static async Task<IReadOnlyList<SupportAttachmentUpload>> ReadSupportUploadsAsync(
         IReadOnlyList<IFormFile>? files,
