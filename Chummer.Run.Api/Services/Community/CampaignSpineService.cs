@@ -619,14 +619,14 @@ public sealed class CampaignSpineService
                     HandoffId: StableId("buildlab", dossier.DossierId),
                     DossierId: dossier.DossierId,
                     CampaignId: dossier.CampaignId,
-                    Title: $"{dossier.DisplayName} Build Lab handoff",
+                    Title: $"{dossier.DisplayName} build path",
                     Summary: "The chosen build lane now lands in living dossier and campaign return truth instead of a disposable comparison card.",
                     VariantLabel: variantLabel,
                     ProgressionLabel: progressionLabel,
                     ExplainEntryId: $"buildlab.handoff.{dossier.DossierId}",
                     TradeoffLines:
                     [
-                        "Role overlap stays explicit before the handoff leaves Build Lab.",
+                        "Role overlap stays explicit before the handoff leaves build comparison.",
                         workspace is null
                             ? "No campaign workspace is attached yet, so the handoff seeds the dossier first."
                             : $"Campaign workspace {workspace.CampaignName} keeps the downstream continuity target visible."

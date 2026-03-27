@@ -296,11 +296,10 @@
                                             @if (buildHandoffs.Length > 0)
                                             {
                                                 var handoff = buildHandoffs[0];
-                                                var buildPathTitle = handoff.Title.Replace("Build Lab handoff", "Build path", StringComparison.OrdinalIgnoreCase);
                                                 <article class="app-rail__item">
                                                     <span class="tag">Build path</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>@buildPathTitle</h3>
+                                                        <h3>@handoff.Title</h3>
                                                         <p>
                                                             @handoff.Summary
                                                             <span> Variant: @handoff.VariantLabel. Next: @handoff.ProgressionLabel.</span>
