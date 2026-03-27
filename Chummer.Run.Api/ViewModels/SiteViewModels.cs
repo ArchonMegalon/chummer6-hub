@@ -222,7 +222,11 @@ public sealed record SupportIntakeViewModel(
     string ResponseExpectation,
     string? SubmissionNotice,
     string AttachmentHelp,
-    IReadOnlyList<SupportIntakeOptionViewModel> Options);
+    IReadOnlyList<SupportIntakeOptionViewModel> Options,
+    string? DefaultPlatform = null,
+    string? DefaultApplicationVersion = null,
+    string? DefaultInstallationId = null,
+    string? ContextHint = null);
 
 public sealed record SupportSubmittedPageViewModel(
     SiteChromeViewModel Chrome,

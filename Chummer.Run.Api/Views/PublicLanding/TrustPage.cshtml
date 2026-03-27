@@ -157,17 +157,21 @@ else
                 }
                 <details class="details-drawer">
                     <summary>Optional environment details</summary>
+                    @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.ContextHint))
+                    {
+                        <p class="muted-copy">@Model.SupportIntake.ContextHint</p>
+                    }
                     <div class="field">
                         <label for="supportPlatform">Platform</label>
-                        <input id="supportPlatform" name="platform" maxlength="64" placeholder="Windows, Linux, or macOS" />
+                        <input id="supportPlatform" name="platform" maxlength="64" placeholder="Windows, Linux, or macOS" value="@Model.SupportIntake.DefaultPlatform" />
                     </div>
                     <div class="field">
                         <label for="supportVersion">Version</label>
-                        <input id="supportVersion" name="applicationVersion" maxlength="64" placeholder="Current preview build or version number" />
+                        <input id="supportVersion" name="applicationVersion" maxlength="64" placeholder="Current preview build or version number" value="@Model.SupportIntake.DefaultApplicationVersion" />
                     </div>
                     <div class="field">
                         <label for="supportInstallationId">Install or claim code</label>
-                        <input id="supportInstallationId" name="installationId" maxlength="64" placeholder="Optional install id or claim code" />
+                        <input id="supportInstallationId" name="installationId" maxlength="64" placeholder="Optional install id or claim code" value="@Model.SupportIntake.DefaultInstallationId" />
                     </div>
                 </details>
                 <details class="details-drawer">
