@@ -1568,6 +1568,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(downloadsSource.Contains("Advanced download options", StringComparison.Ordinal), "downloads should group advanced distribution paths under one calmer disclosure.");
     Assert(!downloadsSource.Contains("What changed and what to expect", StringComparison.Ordinal), "downloads should not carry a second release explainer block under the primary install path.");
     Assert(downloadsSource.Contains("Release notes, known issues, and requirements", StringComparison.Ordinal), "downloads should tuck release education into one calmer drawer on the primary card.");
+    Assert(!downloadsSource.Contains("<summary>Package details</summary>", StringComparison.Ordinal), "downloads should keep package details inside the existing release-information drawer instead of adding a second top-card drawer.");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var campaignSpine = new CampaignSpineService(store);
