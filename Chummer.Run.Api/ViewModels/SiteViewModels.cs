@@ -355,7 +355,9 @@ public sealed record AuthMessagePageViewModel(
     string PrimaryLabel,
     string PrimaryHref,
     string SecondaryLabel,
-    string SecondaryHref);
+    string SecondaryHref,
+    string? StateLabel = null,
+    IReadOnlyList<string>? Highlights = null);
 
 public sealed record GoogleMergePageViewModel(
     SiteChromeViewModel Chrome,

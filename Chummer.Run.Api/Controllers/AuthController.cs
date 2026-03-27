@@ -149,13 +149,20 @@ public sealed class AuthController : Controller
             SupportLine: $"{started.PreviewNote} After verification, Chummer sends you back to {nextTarget}.",
             Notice: $"Email: {started.Email} · expires {started.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC · next stop: {nextTarget}",
             PrimaryLabel: string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
-                ? $"Continue to {nextTarget}"
+                ? $"Open the verification link for {nextTarget}"
                 : "Return to sign in",
             PrimaryHref: string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
                 ? callback
                 : $"/login?next={Uri.EscapeDataString(nextPath)}",
             SecondaryLabel: "Use a different email",
-            SecondaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}");
+            SecondaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}",
+            StateLabel: "Magic link sent",
+            Highlights:
+            [
+                $"Check {started.Email} for the Chummer sign-in email.",
+                "Open the verification link in the same browser when possible.",
+                $"After verification, Chummer sends you back to {nextTarget}."
+            ]);
         return View("~/Views/Auth/Message.cshtml", model);
     }
 
@@ -172,6 +179,28 @@ public sealed class AuthController : Controller
         try
         {
             session = await _browserAuth.CompleteEmailEntryAsync(ticket, cancellationToken);
+        }
+        catch (HubBrowserAuthRequestFailedException ex) when (ex.StatusCode == StatusCodes.Status400BadRequest)
+        {
+            var nextTarget = DescribeNextTarget(nextPath);
+            return BuildAuthMessage(
+                chromeTitle: "Magic link expired",
+                chromeDescription: "The Chummer email verification link is no longer valid.",
+                currentPath: "/login",
+                heading: "Magic link expired",
+                supportLine: "That link is missing, invalid, or too old to finish the sign-in step. Start again and Chummer will issue a fresh one.",
+                notice: $"Requested return: {nextTarget}",
+                primaryLabel: "Send a fresh link",
+                primaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}",
+                secondaryLabel: "Create account instead",
+                secondaryHref: $"/signup?next={Uri.EscapeDataString(nextPath)}",
+                stateLabel: "Verification expired",
+                highlights:
+                [
+                    "The old verification link cannot be reused.",
+                    $"A fresh link will still return you to {nextTarget}.",
+                    "If you switched devices, open the new link in the browser you want to keep signed in."
+                ]);
         }
         catch (HubBrowserAuthUnavailableException ex)
         {
@@ -551,7 +580,9 @@ public sealed class AuthController : Controller
         string primaryLabel,
         string primaryHref,
         string secondaryLabel,
-        string secondaryHref)
+        string secondaryHref,
+        string? stateLabel = null,
+        IReadOnlyList<string>? highlights = null)
         => View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
             Chrome: _chrome.BuildPublicChrome(chromeTitle, chromeDescription, currentPath),
             Heading: heading,
@@ -560,7 +591,9 @@ public sealed class AuthController : Controller
             PrimaryLabel: primaryLabel,
             PrimaryHref: primaryHref,
             SecondaryLabel: secondaryLabel,
-            SecondaryHref: secondaryHref));
+            SecondaryHref: secondaryHref,
+            StateLabel: stateLabel,
+            Highlights: highlights));
 
     private async Task TryClearBrowserSessionAsync(CancellationToken cancellationToken)
     {

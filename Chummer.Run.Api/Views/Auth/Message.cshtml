@@ -8,7 +8,7 @@
 <section class="auth-stage">
     <div class="auth-shell auth-shell--message">
         <div class="auth-shell__story auth-visual">
-            <p class="auth-visual__eyebrow">Chummer account</p>
+            <p class="auth-visual__eyebrow">@(Model.StateLabel ?? "Chummer account")</p>
             <h1 class="hero-brand">CHUMMER</h1>
             <h2 class="hero-headline">@Model.Heading</h2>
             <p class="auth-visual__copy">@Model.SupportLine</p>
@@ -17,6 +17,15 @@
             @if (!string.IsNullOrWhiteSpace(Model.Notice))
             {
                 <p class="auth-panel__notice">@Model.Notice</p>
+            }
+            @if (Model.Highlights is { Count: > 0 })
+            {
+                <ul class="auth-benefits auth-benefits--message">
+                    @foreach (var item in Model.Highlights)
+                    {
+                        <li>@item</li>
+                    }
+                </ul>
             }
             <div class="stacked-actions">
                 <a class="button-like button-like--primary" href="@Model.PrimaryHref">@Model.PrimaryLabel</a>

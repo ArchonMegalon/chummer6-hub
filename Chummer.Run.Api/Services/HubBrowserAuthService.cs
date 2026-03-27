@@ -9,12 +9,29 @@ public static class HubBrowserAuthConstants
     public const string AccessTokenCookieName = "chummer_hub_access_token";
 }
 
-public sealed class HubBrowserAuthUnavailableException : InvalidOperationException
+public class HubBrowserAuthUnavailableException : InvalidOperationException
 {
     public HubBrowserAuthUnavailableException(string message, Exception? innerException = null)
         : base(message, innerException)
     {
     }
+}
+
+public sealed class HubBrowserAuthRequestFailedException : HubBrowserAuthUnavailableException
+{
+    public HubBrowserAuthRequestFailedException(string message, string operation, int statusCode, string? detail, Exception? innerException = null)
+        : base(message, innerException)
+    {
+        Operation = operation;
+        StatusCode = statusCode;
+        Detail = detail;
+    }
+
+    public string Operation { get; }
+
+    public int StatusCode { get; }
+
+    public string? Detail { get; }
 }
 
 public sealed class HubBrowserAuthService
@@ -237,7 +254,11 @@ public sealed class HubBrowserAuthService
                 (int)response.StatusCode,
                 string.IsNullOrWhiteSpace(detail) ? "<empty>" : detail);
             response.Dispose();
-            throw new HubBrowserAuthUnavailableException(publicMessage);
+            throw new HubBrowserAuthRequestFailedException(
+                publicMessage,
+                operation,
+                (int)response.StatusCode,
+                detail);
         }
         catch (HttpRequestException ex)
         {
