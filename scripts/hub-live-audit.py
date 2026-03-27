@@ -42,7 +42,7 @@ def fetch(base_url: str, path: str) -> tuple[int, str, dict[str, str], str]:
     with urlopen(request, timeout=20) as response:
         status = response.status
         body = response.read().decode("utf-8", errors="replace")
-        headers = {key: value for key, value in response.headers.items()}
+        headers = {key.lower(): value for key, value in response.headers.items()}
         final_url = response.geturl()
     return status, body, headers, final_url
 
@@ -80,7 +80,7 @@ def main() -> int:
         if route.expected_text and route.expected_text not in body:
             raise AssertionError(f"{route.path} missing expected text: {route.expected_text}")
         if route.path != "/robots.txt":
-            robots = headers.get("X-Robots-Tag", "")
+            robots = headers.get("x-robots-tag", "")
             if "noindex" not in robots.lower():
                 raise AssertionError(f"{route.path} missing X-Robots-Tag noindex header")
             if BANNED_COPY.search(body):
