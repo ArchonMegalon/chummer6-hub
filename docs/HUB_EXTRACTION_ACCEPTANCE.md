@@ -119,6 +119,7 @@ Issue and migration anchors preserved in this acceptance narrative:
   - `tests/RunServicesVerification/CompatibilityVerification.cs`
   - `tests/RunServicesVerification/PipelineProjectionVerification.cs`
   - `scripts/ai/verify.sh`
+  - `CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/ai/run_services_verification.sh`
 
 ## WL-219 docs / feedback / operator projection materialization (`E2b`)
 
