@@ -9,6 +9,13 @@
         ?? Model.Assets.BySlot("scene_simulation_bench")
         ?? Model.Assets.BySlot("capability_check_rules")
         ?? heroProofAsset;
+    if (proofSectionAsset is not null
+        && heroProofAsset is not null
+        && string.Equals(proofSectionAsset.AssetSlot, heroProofAsset.AssetSlot, StringComparison.OrdinalIgnoreCase))
+    {
+        proofSectionAsset = Model.Assets.BySlot("scene_simulation_bench")
+            ?? Model.Assets.BySlot("scene_dossier_desk");
+    }
     var proofNotes = Model.Workflows.Take(1).ToArray();
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
     var proofSectionTrail = Model.Surface.ProductProofTrail.Skip(1).Take(3).ToArray();
