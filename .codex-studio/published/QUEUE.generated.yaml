@@ -29,3 +29,4 @@ items:
 - Keep registry, relay, Spider, media, and identity in the hosted repo and move legacy app/tooling surfaces into a separate legacy or interoperability boundary.
 - Keep compatibility wrappers server-side only during migration and stop exposing them as a peer contract surface.
 - Break the catch-all contract file into narrower hosted contract families for relay, memory, media, docs, and AI gateway surfaces.
+source_queue_fingerprint: 97d170e1550eee4afc0af065b78cda302a97674c
