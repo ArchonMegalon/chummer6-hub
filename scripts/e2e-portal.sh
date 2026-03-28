@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 CHUMMER_API_KEY="${CHUMMER_API_KEY:-}"
 PORTAL_PLAYWRIGHT_TIMEOUT_SECONDS="${CHUMMER_PORTAL_E2E_TIMEOUT_SECONDS:-240}"
+PORTAL_EDGE_COMPOSE_FILE="${CHUMMER_PORTAL_EDGE_COMPOSE_FILE:-$ROOT_DIR/docker-compose.public-edge.yml}"
+PORTAL_BASE_URL="${CHUMMER_PORTAL_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
+PORTAL_SKIP_EDGE_REBUILD="${CHUMMER_PORTAL_E2E_SKIP_EDGE_REBUILD:-0}"
 if [[ -n "${CHUMMER_PORTAL_PLAYWRIGHT:-}" ]]; then
   RUN_PORTAL_PLAYWRIGHT="$CHUMMER_PORTAL_PLAYWRIGHT"
 elif [[ "${CI:-}" == "true" || "${GITHUB_ACTIONS:-}" == "true" ]]; then
@@ -27,32 +33,49 @@ if [[ -n "$CHUMMER_API_KEY" ]]; then
   export CHUMMER_API_KEY
 fi
 
-compose_args=(-f legacy/tooling/docker/docker-compose.yml)
+if [[ "$PORTAL_SKIP_EDGE_REBUILD" == "1" || "$PORTAL_SKIP_EDGE_REBUILD" == "true" || "$PORTAL_SKIP_EDGE_REBUILD" == "TRUE" ]]; then
+  echo "reusing current public-edge containers for portal playwright e2e"
+else
+  compose_rm_log="$(mktemp)"
+  set +e
+  docker compose -f "$PORTAL_EDGE_COMPOSE_FILE" rm -fsv chummer-run-identity chummer-portal 2>&1 | tee "$compose_rm_log"
+  compose_rm_status=${PIPESTATUS[0]}
+  set -e
+  if [[ "$compose_rm_status" -ne 0 ]]; then
+    if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$compose_rm_log"; then
+      echo "skipping portal e2e: docker daemon permission denied in this environment."
+      rm -f "$compose_rm_log"
+      exit 0
+    fi
 
-compose_up_log="$(mktemp)"
-set +e
-docker compose "${compose_args[@]}" --profile portal up -d --build chummer-api chummer-blazor-portal chummer-hub-web-portal chummer-avalonia-browser chummer-portal \
-  chummer-session-web-portal chummer-coach-web-portal \
-  2>&1 | tee "$compose_up_log"
-compose_up_status=${PIPESTATUS[0]}
-set -e
-if [[ "$compose_up_status" -ne 0 ]]; then
-  if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$compose_up_log"; then
-    echo "skipping portal e2e: docker daemon permission denied in this environment."
-    rm -f "$compose_up_log"
-    exit 0
+    rm -f "$compose_rm_log"
+    exit "$compose_rm_status"
   fi
+  rm -f "$compose_rm_log"
 
+  compose_up_log="$(mktemp)"
+  set +e
+  docker compose -f "$PORTAL_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"
+  compose_up_status=${PIPESTATUS[0]}
+  set -e
+  if [[ "$compose_up_status" -ne 0 ]]; then
+    if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$compose_up_log"; then
+      echo "skipping portal e2e: docker daemon permission denied in this environment."
+      rm -f "$compose_up_log"
+      exit 0
+    fi
+
+    rm -f "$compose_up_log"
+    exit "$compose_up_status"
+  fi
   rm -f "$compose_up_log"
-  exit "$compose_up_status"
 fi
-rm -f "$compose_up_log"
 
 if [[ "$RUN_PORTAL_PLAYWRIGHT" == "1" ]]; then
   echo "running portal playwright e2e (timeout: ${PORTAL_PLAYWRIGHT_TIMEOUT_SECONDS}s)"
   playwright_log="$(mktemp)"
   set +e
-  timeout "${PORTAL_PLAYWRIGHT_TIMEOUT_SECONDS}"s docker compose "${compose_args[@]}" --profile test --profile portal run --build --rm chummer-playwright-portal \
+  timeout "${PORTAL_PLAYWRIGHT_TIMEOUT_SECONDS}"s env CHUMMER_PORTAL_BASE_URL="$PORTAL_BASE_URL" node "$SCRIPT_DIR/e2e-portal.cjs" \
     2>&1 | tee "$playwright_log"
   playwright_status=${PIPESTATUS[0]}
   set -e

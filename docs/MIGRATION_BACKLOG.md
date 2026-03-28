@@ -232,15 +232,15 @@ Progress: `Chummer.Portal` now proxies `/api/*`, `/openapi/*`, `/docs/*`, `/blaz
 
 - [x] `MIG-102` Move Blazor head to stable `/blazor/` app-base deployment behind the portal.
 Acceptance criteria: reload/deep-link/reconnect behavior works when the UI is hosted under `/blazor/`.
-Progress: added path-base aware Blazor hosting plus dedicated `chummer-blazor-portal` service (`CHUMMER_BLAZOR_PATH_BASE=/blazor`) behind portal `/blazor/*` proxy routing; migration loop now runs portal E2E by default (disable with `CHUMMER_PORTAL_E2E=0`) validating `/blazor/health`, `/blazor/` base href, `/_blazor/negotiate`, and `/blazor/deep-link-check` route behavior under the portal path-base.
+Progress: added path-base aware Blazor hosting plus dedicated `chummer-blazor-portal` service (`CHUMMER_BLAZOR_PATH_BASE=/blazor`) behind portal `/blazor/*` proxy routing. The current local-docker public-edge proof now validates the customer-facing `/blazor/` entry redirect through the same `docker-compose.public-edge.yml` bridge that serves `/`, `/downloads/`, `/contact`, `/faq`, and the other public routes under one origin.
 
 - [x] `MIG-103` Add OpenAPI + interactive docs surface to `Chummer.Run.Api` and wire through portal `/docs/`.
 Acceptance criteria: generated OpenAPI document and interactive docs are reachable and validated in CI.
-Progress: added built-in ASP.NET OpenAPI generation to `Chummer.Run.Api` with `/openapi/v1.json` and a self-hosted interactive `/docs` UI (local assets, no external CDN dependency); portal proxies `/openapi/*` and `/docs/*`, and migration loop validates both portal-routed endpoints.
+Progress: added built-in ASP.NET OpenAPI generation to `Chummer.Run.Api` with `/openapi/v1.json` and a self-hosted interactive `/docs` UI (local assets, no external CDN dependency); portal proxies `/openapi/*` and `/docs/*`. The current public-edge release proof no longer treats `/docs/` as part of the calm customer-facing bridge contract, so local-docker release validation now focuses on the stable landing, downloads, participation, support, and redirect routes instead of internal docs exposure.
 
 - [x] `MIG-104` Add desktop download manifest + artifacts surface behind portal `/downloads/`.
 Acceptance criteria: platform download matrix is generated from CI artifacts and exposed through a versioned manifest.
-Progress: portal now serves local `/downloads/`, file-backed `/downloads/releases.json` (`CHUMMER_PORTAL_RELEASES_FILE`), and local `/downloads/<artifact>` files (`CHUMMER_PORTAL_RELEASES_DIR`) with fallback release feed; portal E2E smoke validates downloads/docs/api/blazor routes; CI workflow `desktop-downloads-matrix.yml` now produces multi-RID Avalonia archives plus a generated `releases.json` in `desktop-download-bundle` artifact.
+Progress: portal now serves local `/downloads/`, file-backed `/downloads/releases.json` (`CHUMMER_PORTAL_RELEASES_FILE`), and local `/downloads/<artifact>` files (`CHUMMER_PORTAL_RELEASES_DIR`) with fallback release feed. The local-docker edge proof validates `/downloads/`, `/downloads/releases.json`, and the current public bridge redirects (`/hub`, `/blazor`, `/avalonia`, `/session`, `/coach`) instead of the older docs/api-heavy smoke contract; CI workflow `desktop-downloads-matrix.yml` still produces multi-RID Avalonia archives plus a generated `releases.json` in `desktop-download-bundle` artifact.
 
 - [x] `MIG-105` Add browser-hosted Avalonia head entry path (`/avalonia/`) behind the same public origin.
 Acceptance criteria: browser head is reachable from portal and clearly separated from native desktop distribution.
