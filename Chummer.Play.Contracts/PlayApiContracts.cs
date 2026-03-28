@@ -170,6 +170,15 @@ public sealed record PlayCachePressureSnapshot(
     DateTimeOffset MeasuredAtUtc
 );
 
+public sealed record PlaySupportClosureNotice(
+    string StatusLabel,
+    string KnownIssueSummary,
+    string FixAvailabilitySummary,
+    string NextSafeAction,
+    string FollowThroughHref,
+    string? CaseId = null
+);
+
 public sealed record PlayResumeResponse(
     string SessionId,
     PlaySurfaceRole Role,
@@ -177,5 +186,6 @@ public sealed record PlayResumeResponse(
     PlayBootstrapResponse Bootstrap,
     Chummer.Play.Core.Sync.SyncCheckpoint? Checkpoint,
     PlayRuntimeBundleMetadata? RuntimeBundle,
-    PlayCachePressureSnapshot CachePressure
+    PlayCachePressureSnapshot CachePressure,
+    PlaySupportClosureNotice? SupportNotice = null
 );
