@@ -38,6 +38,11 @@
     @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
 }
 
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
 @if (Model.Manifest.Downloads.Count == 0 || release.Recommended is null)
 {
     <section class="release-shelf">

@@ -66,6 +66,11 @@
     @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
 }
 
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
 @if (policyPage && Model.SummaryPoints is { Count: > 0 })
 {
     <section class="trust-rail-section">

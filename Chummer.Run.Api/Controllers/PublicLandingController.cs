@@ -29,6 +29,7 @@ public sealed class PublicLandingController : Controller
     private readonly CampaignSpineService _campaignSpine;
     private readonly HubPageChromeService _chrome;
     private readonly PublicTrustContentService _trustContent;
+    private readonly PublicTrustPulseService _trustPulse;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly ILogger<PublicLandingController> _logger;
@@ -47,6 +48,7 @@ public sealed class PublicLandingController : Controller
         CampaignSpineService campaignSpine,
         HubPageChromeService chrome,
         PublicTrustContentService trustContent,
+        PublicTrustPulseService trustPulse,
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
         ILogger<PublicLandingController> logger)
@@ -64,6 +66,7 @@ public sealed class PublicLandingController : Controller
         _campaignSpine = campaignSpine;
         _chrome = chrome;
         _trustContent = trustContent;
+        _trustPulse = trustPulse;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
         _logger = logger;
@@ -141,6 +144,7 @@ public sealed class PublicLandingController : Controller
             SignedInPreview: surface.RegisteredOverlays,
             Manifest: manifest,
             CampaignOsProof: _campaignOsProof.LoadProof(),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Now.cshtml", model);
     }
@@ -173,6 +177,7 @@ public sealed class PublicLandingController : Controller
             Assets: new AssetCatalogViewModel(surface.Assets),
             Manifest: manifest,
             ReleaseExperience: releaseExperience,
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Downloads.cshtml", model);
     }
@@ -275,6 +280,7 @@ public sealed class PublicLandingController : Controller
             "~/Views/PublicLanding/TrustPage.cshtml",
             _trustContent.BuildHelpPage(chrome) with
             {
+                TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
                 SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken)
             });
     }
@@ -676,6 +682,68 @@ public sealed class PublicLandingController : Controller
         };
     }
 
+    private PublicTrustPulsePanelViewModel? BuildPublicTrustPulsePanel(
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience)
+    {
+        var pulse = _trustPulse.LoadSnapshot();
+        if (pulse is null)
+        {
+            return null;
+        }
+
+        List<string> microProof =
+        [
+            string.IsNullOrWhiteSpace(pulse.AsOf) ? "Current weekly pulse" : $"As of {pulse.AsOf}"
+        ];
+
+        if (!string.IsNullOrWhiteSpace(pulse.ActiveCheckpointTitle))
+        {
+            microProof.Add(string.IsNullOrWhiteSpace(pulse.ActiveCheckpointId)
+                ? pulse.ActiveCheckpointTitle!
+                : $"{pulse.ActiveCheckpointId} · {pulse.ActiveCheckpointTitle}");
+        }
+
+        if (pulse.OverallProgressPercent is int overallProgressPercent && !string.IsNullOrWhiteSpace(pulse.PhaseLabel))
+        {
+            microProof.Add($"{overallProgressPercent}% · {pulse.PhaseLabel}");
+        }
+        else if (pulse.OverallProgressPercent is int progressOnly)
+        {
+            microProof.Add($"{progressOnly}% weighted progress");
+        }
+
+        if (pulse.HistorySnapshotCount is int historySnapshotCount && historySnapshotCount > 0)
+        {
+            microProof.Add($"{historySnapshotCount} measured snapshot(s)");
+        }
+
+        var rows = new List<PublicTrustPulseRowViewModel>
+        {
+            new("Recommended now", BuildTrustPulseRecommendedSummary(manifest, releaseExperience)),
+            new("Release proof", BuildReleaseProofSummary(manifest)),
+            new("Journey pulse", BuildJourneyPulseSummary(pulse)),
+            new("Current caution", BuildTrustPulseCautionSummary(pulse))
+        };
+
+        string journeyState = HumanizeToken(pulse.JourneyGateState, "Current");
+        string heading = string.IsNullOrWhiteSpace(pulse.LongestPoleLabel)
+            ? $"{journeyState} trust posture this week"
+            : $"{journeyState} trust posture; {pulse.LongestPoleLabel} still needs caution";
+        string summary = string.IsNullOrWhiteSpace(pulse.Summary)
+            ? "The weekly pulse keeps the release posture, journey evidence, and caution lane visible in one customer-safe panel."
+            : pulse.Summary;
+
+        return new PublicTrustPulsePanelViewModel(
+            Eyebrow: "Weekly trust pulse",
+            Heading: heading,
+            Summary: summary,
+            MicroProof: microProof,
+            Rows: rows,
+            PrimaryAction: new TrustPageActionViewModel("Open progress", "/progress", "secondary"),
+            SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "ghost"));
+    }
+
     private async Task<SignedInTrustStatusPanelViewModel?> BuildSignedInTrustStatusPanelAsync(
         PublicReleaseManifestDto manifest,
         ReleaseExperienceViewModel releaseExperience,
@@ -987,6 +1055,64 @@ public sealed class PublicLandingController : Controller
         }
 
         return proof;
+    }
+
+    private static string BuildTrustPulseRecommendedSummary(
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience)
+    {
+        if (manifest.Downloads.Count == 0 || releaseExperience.Recommended is null)
+        {
+            return string.IsNullOrWhiteSpace(manifest.Message)
+                ? "No published build is on the shelf yet."
+                : manifest.Message;
+        }
+
+        string accessSummary = releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
+            ? "Signed-in handoff is the recommended path so the install can stay linked."
+            : "Guest-readable handoff is live on the current shelf.";
+        return $"{releaseExperience.Recommended.Title} on {releaseExperience.Display.ChannelLabel}. {accessSummary}";
+    }
+
+    private static string BuildJourneyPulseSummary(PublicTrustPulseSnapshot pulse)
+    {
+        string state = HumanizeToken(pulse.JourneyGateState, "Unknown");
+        string reason = string.IsNullOrWhiteSpace(pulse.JourneyGateReason)
+            ? "Current published evidence is holding."
+            : pulse.JourneyGateReason!;
+        string counts = $"{pulse.BlockedJourneyCount ?? 0} blocked / {pulse.WarningJourneyCount ?? 0} warning";
+        return $"{state} · {reason} · {counts}";
+    }
+
+    private static string BuildTrustPulseCautionSummary(PublicTrustPulseSnapshot pulse)
+    {
+        List<string> segments = [];
+
+        if (!string.IsNullOrWhiteSpace(pulse.LongestPoleLabel))
+        {
+            segments.Add($"{pulse.LongestPoleLabel} remains the current longest pole.");
+        }
+
+        if (pulse.HistorySnapshotCount is int historySnapshotCount && historySnapshotCount > 0)
+        {
+            segments.Add(historySnapshotCount < 6
+                ? $"{historySnapshotCount} weekly snapshots are measured so far, so adoption history is still early."
+                : $"{historySnapshotCount} weekly snapshots are on record.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(pulse.NextCheckpointQuestion))
+        {
+            segments.Add(pulse.NextCheckpointQuestion!);
+        }
+
+        if (!string.IsNullOrWhiteSpace(pulse.ReleaseHealthReason))
+        {
+            segments.Add(pulse.ReleaseHealthReason!);
+        }
+
+        return segments.Count == 0
+            ? "No extra caution note is published right now."
+            : string.Join(" ", segments);
     }
 
     private static string HumanizeToken(string? value, string fallback)

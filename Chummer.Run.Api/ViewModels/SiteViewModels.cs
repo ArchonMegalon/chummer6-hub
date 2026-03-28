@@ -153,6 +153,7 @@ public sealed record NowPageViewModel(
     IReadOnlyList<PublicLandingOverlayDto> SignedInPreview,
     PublicReleaseManifestDto Manifest,
     CampaignOsLocalProofSnapshot? CampaignOsProof = null,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record HorizonsPageViewModel(
@@ -176,6 +177,7 @@ public sealed record DownloadsPageViewModel(
     AssetCatalogViewModel Assets,
     PublicReleaseManifestDto Manifest,
     ReleaseExperienceViewModel ReleaseExperience,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record DownloadDispatchPageViewModel(
@@ -220,6 +222,19 @@ public sealed record SignedInTrustStatusPanelViewModel(
     string Heading,
     string Summary,
     IReadOnlyList<SignedInTrustStatusRowViewModel> Rows,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel? SecondaryAction = null);
+
+public sealed record PublicTrustPulseRowViewModel(
+    string Label,
+    string Value);
+
+public sealed record PublicTrustPulsePanelViewModel(
+    string Eyebrow,
+    string Heading,
+    string Summary,
+    IReadOnlyList<string> MicroProof,
+    IReadOnlyList<PublicTrustPulseRowViewModel> Rows,
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel? SecondaryAction = null);
 
@@ -276,6 +291,7 @@ public sealed record TrustPageViewModel(
     string? UpdatedDate = null,
     IReadOnlyList<string>? SummaryPoints = null,
     SupportIntakeViewModel? SupportIntake = null,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record FaqEntryViewModel(

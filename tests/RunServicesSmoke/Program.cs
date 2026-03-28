@@ -1727,15 +1727,16 @@ async Task VerifyPublicLandingProjectionAsync()
         DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(tempRoot, "email-links"))));
     var google = CreateGoogleService(configuration, authService, identityLinks, accounts, loggerFactory, tempRoot);
     var campaignOsProof = new CampaignOsLocalProofService(configuration);
+    var trustPulse = new PublicTrustPulseService(configuration, loggerFactory.CreateLogger<PublicTrustPulseService>());
     var supportPresentation = new SupportCasePresentationService();
-    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2187,16 +2188,22 @@ async Task VerifyPublicLandingProjectionAsync()
     var authenticatedDownloadsPage = await authenticatedLandingController.DownloadsPage(CancellationToken.None) as ViewResult;
     var authenticatedDownloadsModel = authenticatedDownloadsPage?.Model as DownloadsPageViewModel;
     Assert(authenticatedDownloadsModel?.SignedInStatus is not null, "signed-in downloads should project install-specific trust status.");
+    Assert(authenticatedDownloadsModel?.TrustPulse is not null, "downloads should surface the weekly public trust pulse next to the release shelf.");
     Assert(string.Equals(authenticatedDownloadsModel!.SignedInStatus!.Heading, "Update your linked install", StringComparison.Ordinal), "signed-in downloads should tell the reporter to update the linked install before verification when the fix is on a newer build.");
     Assert(authenticatedDownloadsModel.SignedInStatus.Summary.Contains("preview 0.6.3-smoke", StringComparison.Ordinal), "signed-in downloads should project the exact reporter-ready build in the trust panel.");
+    Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Cloud & Publishing", StringComparison.Ordinal)), "downloads should surface the weekly caution lane from the trust pulse.");
     var authenticatedHelpPage = await authenticatedLandingController.HelpPage(CancellationToken.None) as ViewResult;
     var authenticatedHelpModel = authenticatedHelpPage?.Model as TrustPageViewModel;
     Assert(authenticatedHelpModel?.SignedInStatus is not null, "signed-in help should project install-specific trust status.");
+    Assert(authenticatedHelpModel?.TrustPulse is not null, "help should surface the weekly public trust pulse.");
     Assert(authenticatedHelpModel!.SignedInStatus!.Summary.Contains("preview 0.6.3-smoke", StringComparison.Ordinal), "signed-in help should carry the same install-specific follow-through summary.");
+    Assert(authenticatedHelpModel.TrustPulse!.MicroProof.Any(static item => item.Contains("2026-04", StringComparison.Ordinal)), "help should surface the active nine-month checkpoint in the weekly trust pulse.");
     var authenticatedNowPage = await authenticatedLandingController.NowPage(CancellationToken.None) as ViewResult;
     var authenticatedNowModel = authenticatedNowPage?.Model as NowPageViewModel;
     Assert(authenticatedNowModel?.SignedInStatus is not null, "signed-in current-release page should project install-specific trust status.");
+    Assert(authenticatedNowModel?.TrustPulse is not null, "current-release should surface the weekly public trust pulse.");
     Assert(authenticatedNowModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Support follow-through", StringComparison.Ordinal) && row.Value.Contains("Closed with notice", StringComparison.Ordinal)), "signed-in current-release page should surface the current support follow-through stage.");
+    Assert(authenticatedNowModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Recommended now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "current-release should explain who can get the recommended build now.");
     var fixedReadyRefreshResult = installLinkingController.RefreshGrant(new RefreshInstallationGrantRequestDto(
         InstallationId: redeemPayload.Installation.InstallationId,
         AccessToken: currentGrantAccessToken,
@@ -2477,7 +2484,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2490,14 +2497,17 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableNowModel = unavailableNowView?.Model as NowPageViewModel;
     Assert(unavailableNowModel?.Chrome.Authenticated == true, "current-release chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
     Assert(unavailableNowModel?.SignedInStatus is null, "current-release projection should suppress install-specific trust status when identity is temporarily unavailable.");
+    Assert(unavailableNowModel?.TrustPulse is not null, "current-release should keep the public trust pulse even when identity lookups are temporarily unavailable.");
     var unavailableDownloadsView = await unavailableLandingController.DownloadsPage(CancellationToken.None) as ViewResult;
     var unavailableDownloadsModel = unavailableDownloadsView?.Model as DownloadsPageViewModel;
     Assert(unavailableDownloadsModel?.Chrome.Authenticated == true, "downloads chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
     Assert(unavailableDownloadsModel?.SignedInStatus is null, "downloads projection should suppress install-specific trust status when identity is temporarily unavailable.");
+    Assert(unavailableDownloadsModel?.TrustPulse is not null, "downloads should keep the public trust pulse even when identity lookups are temporarily unavailable.");
     var unavailableHelpView = await unavailableLandingController.HelpPage(CancellationToken.None) as ViewResult;
     var unavailableHelpModel = unavailableHelpView?.Model as TrustPageViewModel;
     Assert(unavailableHelpModel?.Chrome.Authenticated == true, "help chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
     Assert(unavailableHelpModel?.SignedInStatus is null, "help projection should suppress install-specific trust status when identity is temporarily unavailable.");
+    Assert(unavailableHelpModel?.TrustPulse is not null, "help should keep the public trust pulse even when identity lookups are temporarily unavailable.");
     var unavailableHomeResult = await unavailableLandingController.HomePage(null, CancellationToken.None);
     var unavailableHomeModel = (unavailableHomeResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableHomeModel?.Heading, "Home is unavailable right now", StringComparison.Ordinal), "home page should show an unavailable message when identity is down instead of redirecting to login.");
