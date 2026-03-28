@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer6-hub.campaign_os_local_proof",
-  "generated_at": "2026-03-28T15:19:08Z",
+  "generated_at": "2026-03-28T15:23:56Z",
   "status": "passed",
   "proof_kind": "source_backed_local_smoke_contract",
   "source_file": "tests/RunServicesSmoke/Program.cs",
@@ -24,9 +24,17 @@
       "accountModel.CampaignSpine.Workspaces.Count >= 1",
       "accountModel.CampaignSpine.Workspaces[0].ReadinessCues.Count >= 1",
       "accountModel.CampaignSpine.Workspaces[0].RecapShelf.Count >= 1",
+      "accountModel.CampaignSpine.Workspaces[0].ActiveSceneSummary",
+      "accountModel.CampaignSpine.Workspaces[0].NextSafeAction",
+      "accountModel.CampaignSpine.Workspaces[0].ChangePackets?.Count >= 1",
       "campaignSpineController.GetMyCampaignWorkspace",
       "campaignSpineController.GetMyRun",
+      "workspacePayload?.ActiveSceneSummary",
+      "workspacePayload?.NextSafeAction",
+      "workspacePayload?.ChangePackets?.Count >= 1",
       "workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary",
+      "homeSource.Contains(\"@workspace.ActiveSceneSummary\"",
+      "homeSource.Contains(\"@workspace.NextSafeAction\"",
       "workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1"
     ],
     "report_cluster_release_notify": [
