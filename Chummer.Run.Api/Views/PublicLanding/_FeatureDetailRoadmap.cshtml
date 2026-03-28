@@ -1,6 +1,5 @@
 @model FeatureDetailPageViewModel
 @{
-    var audienceFact = Model.Facts.FirstOrDefault(fact => fact.Label.Contains("Who", StringComparison.OrdinalIgnoreCase));
 }
 
 <section class="role-matrix">
@@ -22,13 +21,6 @@
             <article class="role-matrix__cell">
                 <span class="tag">Expected unlock</span>
                 <p>@Model.Payoff</p>
-            </article>
-        }
-        @if (audienceFact is not null)
-        {
-            <article class="role-matrix__cell">
-                <span class="tag">Audience impact</span>
-                <p>@audienceFact.Body</p>
             </article>
         }
         @if (!string.IsNullOrWhiteSpace(Model.ProofNote))

@@ -154,12 +154,14 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await expectVisible(page, 'text=Claim code');
   await assertNoPageErrors(page, pageErrors, 'Download handoff');
 
-  const [download] = await Promise.all([
-    page.waitForEvent('download'),
-    page.getByRole('link', { name: /Start download again/i }).click()
-  ]);
-  const suggestedFilename = download.suggestedFilename();
-  assert(/avalonia.*(deb|AppImage|rpm|tar)/i.test(suggestedFilename), `Unexpected installer filename: ${suggestedFilename}`);
+  const downloadRequest = page.waitForResponse((response) => {
+    const url = response.url();
+    return url.includes('/downloads/file/avalonia-linux-x64-installer') && response.status() === 200;
+  });
+  await page.getByRole('link', { name: /Start download again/i }).click();
+  const downloadResponse = await downloadRequest;
+  const contentDisposition = downloadResponse.headers()['content-disposition'] || '';
+  assert(/avalonia.*(deb|appimage|rpm|tar)/i.test(contentDisposition), `Unexpected installer response headers: ${contentDisposition}`);
 
   await gotoAndAssert(page, pageErrors, '/home/access', async () => {
     await expectVisible(page, 'text=Access and return');
