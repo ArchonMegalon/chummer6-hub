@@ -851,6 +851,10 @@
                             {
                                 <p><strong>Lead consequence:</strong> @selectedWorkspace.Consequences[0].Label — @selectedWorkspace.Consequences[0].Summary</p>
                             }
+                            @if (selectedWorkspace.RosterTransfers is { Count: > 0 })
+                            {
+                                <p><strong>Lead transfer:</strong> @selectedWorkspace.RosterTransfers[0].Summary</p>
+                            }
                         </div>
                         @if (selectedWorkspaceServerPlane is not null)
                         {
@@ -868,6 +872,10 @@
                                     <div class="settings-summary-row">
                                         <span>Next safe action</span>
                                         <strong>@selectedWorkspaceServerPlane.NextSafeAction.Label · @selectedWorkspaceServerPlane.NextSafeAction.Summary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Transfer audit</span>
+                                        <strong>@(selectedWorkspaceServerPlane.RosterTransfers.Count == 0 ? "No recent moves" : $"{selectedWorkspaceServerPlane.RosterTransfers.Count} receipts")</strong>
                                     </div>
                                 </div>
                                 @if (selectedWorkspaceServerPlane.SupportClosures.Count > 0)
@@ -912,6 +920,25 @@
                                     }
                                 </ul>
                             </details>
+
+                            @if (selectedWorkspaceServerPlane.RosterTransfers.Count > 0)
+                            {
+                                <details class="details-drawer">
+                                    <summary>Roster transfer audit</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var transfer in selectedWorkspaceServerPlane.RosterTransfers)
+                                        {
+                                            <li>
+                                                <strong>@transfer.RunnerHandle:</strong> @transfer.Summary
+                                                @foreach (var auditLine in transfer.AuditLines)
+                                                {
+                                                    <span> @auditLine</span>
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
 
                             <details class="details-drawer">
                                 <summary>Rule and continuity health</summary>
@@ -1121,6 +1148,10 @@
                                     <span>Consequence ledger</span>
                                     <strong>@(workspace.Consequences is { Count: > 0 } ? $"{workspace.Consequences.Count} tracked" : "Pending")</strong>
                                 </div>
+                                <div class="settings-summary-row">
+                                    <span>Roster transfer audit</span>
+                                    <strong>@(workspace.RosterTransfers is { Count: > 0 } ? $"{workspace.RosterTransfers.Count} receipts" : "No recent moves")</strong>
+                                </div>
                             </div>
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open shared campaign view</a>
@@ -1147,6 +1178,19 @@
                                     }
                                 }
                             </div>
+
+                            @if (workspace.RosterTransfers is { Count: > 0 })
+                            {
+                                <details class="details-drawer">
+                                    <summary>Roster transfer audit</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var transfer in workspace.RosterTransfers)
+                                        {
+                                            <li><strong>@transfer.RunnerHandle:</strong> @transfer.Summary</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
 
                             <div class="settings-summary-list">
                                 @foreach (var run in workspace.Runs)

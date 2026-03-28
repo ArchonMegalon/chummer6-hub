@@ -59,6 +59,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 digest?.UpdatedAtUtc,
                 accountSummary.Restore.GeneratedAtUtc,
                 workspace.LatestContinuity?.CapturedAtUtc,
+                workspace.RosterTransfers?.FirstOrDefault()?.TransferredAtUtc,
                 leadRun?.UpdatedAtUtc
             }
             .Concat(relevantCases.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
@@ -74,6 +75,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             ReadinessCues: workspace.ReadinessCues,
             ChangePackets: workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>(),
             Consequences: workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>(),
+            RosterTransfers: workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>(),
             DossierFreshness: BuildDossierFreshness(workspace),
             RuleEnvironmentHealth: BuildRuleEnvironmentHealth(workspace, accountSummary.Restore),
             Runboard: BuildRunboardSummary(workspace, leadRun),
@@ -121,6 +123,10 @@ public sealed class CampaignWorkspaceServerPlaneService
         {
             publicationSummary = $"{publicationSummary} {workspace.Consequences.Count} governed consequence signal(s) stay attached to the same workspace.";
         }
+        if (workspace.RosterTransfers is { Count: > 0 })
+        {
+            publicationSummary = $"{publicationSummary} {workspace.RosterTransfers.Count} roster-transfer receipt(s) keep source, target, and ownership changes reviewable from the same workspace.";
+        }
 
         return new CampaignWorkspaceSummary(
             WorkspaceId: workspace.WorkspaceId,
@@ -154,6 +160,11 @@ public sealed class CampaignWorkspaceServerPlaneService
                 workspace.Consequences?
                     .Take(2)
                     .Select(static consequence => $"{consequence.Label} — {consequence.Summary}")
+                ?? Array.Empty<string>())
+            .Concat(
+                workspace.RosterTransfers?
+                    .Take(2)
+                    .Select(static transfer => $"Roster transfer — {transfer.Summary}")
                 ?? Array.Empty<string>())
             .Take(4)
             .ToArray();

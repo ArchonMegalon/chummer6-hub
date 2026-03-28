@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Chummer.Campaign.Contracts;
 
 public static class DossierStatuses
@@ -61,6 +63,38 @@ public sealed record CampaignConsequenceProjection(
     IReadOnlyList<string> EvidenceLines,
     IReadOnlyList<CampaignConsequenceReceipt> Receipts,
     DateTimeOffset UpdatedAtUtc);
+
+public sealed record RosterTransferProjection(
+    string TransferId,
+    string DossierId,
+    string RunnerHandle,
+    string PreviousOwnerUserId,
+    string CurrentOwnerUserId,
+    string SourceGroupId,
+    string SourceGroupName,
+    string SourceCampaignId,
+    string SourceCampaignName,
+    string SourceCrewId,
+    string SourceCrewName,
+    string TargetGroupId,
+    string TargetGroupName,
+    string TargetCampaignId,
+    string TargetCampaignName,
+    string TargetCrewId,
+    string TargetCrewName,
+    string InitiatedByUserId,
+    string Summary,
+    IReadOnlyList<string> AuditLines,
+    IReadOnlyList<CampaignConsequenceReceipt> Receipts,
+    DateTimeOffset TransferredAtUtc);
+
+public sealed record RosterTransferRequest(
+    [property: Required(AllowEmptyStrings = false), StringLength(128)] string DossierId,
+    [property: Required(AllowEmptyStrings = false), StringLength(128)] string TargetGroupId,
+    [property: StringLength(128)] string? TargetCampaignId = null,
+    [property: StringLength(128)] string? TargetCampaignTitle = null,
+    [property: StringLength(128)] string? TargetOwnerUserId = null,
+    [property: StringLength(256)] string? Note = null);
 
 public sealed record RunnerDossierProjection(
     string DossierId,
@@ -200,7 +234,8 @@ public sealed record CampaignWorkspaceProjection(
     string? ActiveSceneSummary = null,
     string? NextSafeAction = null,
     IReadOnlyList<WorkspaceChangePacketProjection>? ChangePackets = null,
-    IReadOnlyList<CampaignConsequenceProjection>? Consequences = null);
+    IReadOnlyList<CampaignConsequenceProjection>? Consequences = null,
+    IReadOnlyList<RosterTransferProjection>? RosterTransfers = null);
 
 public sealed record CampaignWorkspaceDigestProjection(
     string WorkspaceId,
