@@ -5,6 +5,9 @@ const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 
 const baseUrl = (process.env.CHUMMER_HUB_PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:8091').replace(/\/+$/, '');
+const publicHost = (process.env.CHUMMER_HUB_PLAYWRIGHT_PUBLIC_HOST || '').trim();
+const forwardedProto = (process.env.CHUMMER_HUB_PLAYWRIGHT_FORWARDED_PROTO || '').trim();
+const isLocalReverseProxyMode = baseUrl.startsWith('http://') && forwardedProto.toLowerCase() === 'https';
 const signupNext = '/downloads/install/avalonia-linux-x64-installer';
 const bannedCopy = /\b(Read the linked detail|Read more|Learn more)\b/i;
 
@@ -75,7 +78,18 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
 (async () => {
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ acceptDownloads: true });
+  const extraHTTPHeaders = {};
+  if (publicHost) {
+    extraHTTPHeaders.Host = publicHost;
+  }
+  if (forwardedProto) {
+    extraHTTPHeaders['X-Forwarded-Proto'] = forwardedProto;
+  }
+
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    extraHTTPHeaders
+  });
   const page = await context.newPage();
   const pageErrors = [];
   const uniqueEmail = `hub-e2e-${Date.now()}@example.com`;
@@ -188,6 +202,14 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
     page.getByRole('link', { name: /Open the verification link for Downloads/i }).click()
   ]);
+  if (isLocalReverseProxyMode) {
+    assertLoginRedirect(page, signupNext, 'Local reverse-proxied signup callback');
+    await expectVisible(page, 'text=Sign in');
+    await assertNoPageErrors(page, pageErrors, 'Local reverse-proxied signup callback');
+    await browser.close();
+    return;
+  }
+
   assert(page.url().includes('/downloads/install/avalonia-linux-x64-installer'), 'Signup callback should land on the signed-in handoff route.');
   await expectVisible(page, 'text=Claim code');
   await assertNoPageErrors(page, pageErrors, 'Download handoff');

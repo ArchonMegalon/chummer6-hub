@@ -1,6 +1,7 @@
 using Chummer.Run.Identity.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+var enableHttpsRedirection = builder.Configuration.GetValue("IDENTITY_ENABLE_HTTPS_REDIRECTION", false);
 
 // Add services to the container.
 
@@ -12,7 +13,10 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
-app.UseHttpsRedirection();
+if (enableHttpsRedirection)
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthorization();
 

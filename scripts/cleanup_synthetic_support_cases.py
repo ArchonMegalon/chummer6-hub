@@ -32,18 +32,32 @@ def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
         description="Close synthetic Hub support cases created by local browser/E2E verification flows.",
     )
     parser.add_argument("--base-url", required=True, help="Hub base URL, for example http://127.0.0.1:8091")
+    parser.add_argument("--public-host", default=None, help="Optional Host header for reverse-proxied local edge checks")
+    parser.add_argument("--forwarded-proto", default=None, help="Optional X-Forwarded-Proto header for reverse-proxied local edge checks")
     parser.add_argument("--token", required=True, help="Internal support automation bearer token")
     parser.add_argument("--actor", default=DEFAULT_ACTOR, help="Actor name recorded in the case timeline")
     parser.add_argument("--note", default=DEFAULT_NOTE, help="Closure note recorded in the case timeline")
     return parser.parse_args(argv or sys.argv[1:])
 
 
-def _request_json(method: str, url: str, token: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def _request_json(
+    method: str,
+    url: str,
+    token: str,
+    payload: Dict[str, Any] | None = None,
+    *,
+    public_host: str | None = None,
+    forwarded_proto: str | None = None,
+) -> Dict[str, Any]:
     body = None
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
     }
+    if public_host:
+        headers["Host"] = public_host
+    if forwarded_proto:
+        headers["X-Forwarded-Proto"] = forwarded_proto
     if payload is not None:
         body = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
@@ -90,7 +104,13 @@ def main(argv: List[str] | None = None) -> int:
     args = parse_args(argv)
     base_url = args.base_url.rstrip("/")
     triage_url = f"{base_url}/api/v1/support/cases/triage"
-    triage_payload = _request_json("GET", triage_url, args.token)
+    triage_payload = _request_json(
+        "GET",
+        triage_url,
+        args.token,
+        public_host=args.public_host,
+        forwarded_proto=args.forwarded_proto,
+    )
     cases = list(_iter_cases(triage_payload))
     matched = [item for item in cases if _is_synthetic_case(item)]
 
@@ -118,6 +138,8 @@ def main(argv: List[str] | None = None) -> int:
                 "note": args.note,
                 "actor": args.actor,
             },
+            public_host=args.public_host,
+            forwarded_proto=args.forwarded_proto,
         )
         closed.append(case_id)
 
