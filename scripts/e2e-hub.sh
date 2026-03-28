@@ -4,6 +4,7 @@ set -euo pipefail
 HUB_EDGE_COMPOSE_FILE="${HUB_EDGE_COMPOSE_FILE:-docker-compose.public-edge.yml}"
 HUB_PLAYWRIGHT_TIMEOUT_SECONDS="${CHUMMER_HUB_E2E_TIMEOUT_SECONDS:-300}"
 HUB_BASE_URL="${CHUMMER_HUB_PLAYWRIGHT_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
+HUB_SKIP_EDGE_REBUILD="${CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD:-0}"
 
 if [[ -n "${CHUMMER_HUB_PLAYWRIGHT:-}" ]]; then
   RUN_HUB_PLAYWRIGHT="$CHUMMER_HUB_PLAYWRIGHT"
@@ -26,39 +27,43 @@ is_docker_permission_error_text() {
   grep -Eqi "permission denied while trying to connect to the Docker daemon socket|operation not permitted|got permission denied while trying to connect to the docker daemon socket" "$source_file"
 }
 
-compose_rm_log="$(mktemp)"
-set +e
-docker compose -f "$HUB_EDGE_COMPOSE_FILE" rm -fsv chummer-run-identity chummer-portal 2>&1 | tee "$compose_rm_log"
-compose_rm_status=${PIPESTATUS[0]}
-set -e
-if [[ "$compose_rm_status" -ne 0 ]]; then
-  if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$compose_rm_log"; then
-    echo "skipping hub e2e: docker daemon permission denied in this environment."
+if [[ "$HUB_SKIP_EDGE_REBUILD" == "1" || "$HUB_SKIP_EDGE_REBUILD" == "true" || "$HUB_SKIP_EDGE_REBUILD" == "TRUE" ]]; then
+  echo "reusing current hub edge containers for playwright e2e"
+else
+  compose_rm_log="$(mktemp)"
+  set +e
+  docker compose -f "$HUB_EDGE_COMPOSE_FILE" rm -fsv chummer-run-identity chummer-portal 2>&1 | tee "$compose_rm_log"
+  compose_rm_status=${PIPESTATUS[0]}
+  set -e
+  if [[ "$compose_rm_status" -ne 0 ]]; then
+    if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$compose_rm_log"; then
+      echo "skipping hub e2e: docker daemon permission denied in this environment."
+      rm -f "$compose_rm_log"
+      exit 0
+    fi
+
     rm -f "$compose_rm_log"
-    exit 0
+    exit "$compose_rm_status"
   fi
-
   rm -f "$compose_rm_log"
-  exit "$compose_rm_status"
-fi
-rm -f "$compose_rm_log"
 
-compose_up_log="$(mktemp)"
-set +e
-docker compose -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"
-compose_up_status=${PIPESTATUS[0]}
-set -e
-if [[ "$compose_up_status" -ne 0 ]]; then
-  if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$compose_up_log"; then
-    echo "skipping hub e2e: docker daemon permission denied in this environment."
+  compose_up_log="$(mktemp)"
+  set +e
+  docker compose -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"
+  compose_up_status=${PIPESTATUS[0]}
+  set -e
+  if [[ "$compose_up_status" -ne 0 ]]; then
+    if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$compose_up_log"; then
+      echo "skipping hub e2e: docker daemon permission denied in this environment."
+      rm -f "$compose_up_log"
+      exit 0
+    fi
+
     rm -f "$compose_up_log"
-    exit 0
+    exit "$compose_up_status"
   fi
-
   rm -f "$compose_up_log"
-  exit "$compose_up_status"
 fi
-rm -f "$compose_up_log"
 
 if [[ "$RUN_HUB_PLAYWRIGHT" != "1" ]]; then
   echo "skipping hub playwright e2e (set CHUMMER_HUB_PLAYWRIGHT=1 to enable)"
