@@ -2030,6 +2030,13 @@ async Task VerifyPublicLandingProjectionAsync()
     var campaignSummaryResult = await campaignSpineController.GetMyCampaignSummary(CancellationToken.None);
     var campaignSummaryPayload = (campaignSummaryResult.Result as OkObjectResult)?.Value as AccountCampaignSummary ?? campaignSummaryResult.Value;
     Assert(campaignSummaryPayload is not null, "campaign spine api should return the signed-in campaign summary.");
+    var freshPreviewUser = accounts.EnsureUser("subject.preview", "Preview Bootstrap", "preview-bootstrap@example.invalid");
+    var freshPreviewSummary = campaignSpine.GetAccountSummary(freshPreviewUser);
+    Assert(freshPreviewSummary.Workspaces.Count >= 1, "freshly created accounts should receive a seeded preview campaign workspace instead of an empty work shell.");
+    Assert(freshPreviewSummary.BuildLabHandoffs.Count >= 1, "freshly created accounts should receive a seeded build-path handoff.");
+    Assert(freshPreviewSummary.RulesNavigator.Count >= 1, "freshly created accounts should receive a seeded grounded rule answer.");
+    Assert(freshPreviewSummary.CreatorPublications.Count >= 1, "freshly created accounts should receive a seeded publication follow-through.");
+    Assert(freshPreviewSummary.CommunityOperations.Count >= 1, "freshly created accounts should receive a seeded operator-aware campaign group.");
     var restoreResult = await campaignSpineController.GetMyRestoreProjection(CancellationToken.None);
     var restorePayload = (restoreResult.Result as OkObjectResult)?.Value as WorkspaceRestoreProjection ?? restoreResult.Value;
     Assert(restorePayload is not null && restorePayload.ClaimedDevices.Count >= 1, "campaign spine api should expose the restore packet for claimed-device recovery.");

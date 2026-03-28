@@ -109,6 +109,8 @@ payload = {
     "edge_rebuild_skipped": skip_rebuild.lower() in {"1", "true"},
     "journeys_passed": [
         "install_claim_restore_continue",
+        "build_explain_publish",
+        "campaign_session_recover_recap",
         "report_cluster_release_notify",
     ],
     "proof_routes": [

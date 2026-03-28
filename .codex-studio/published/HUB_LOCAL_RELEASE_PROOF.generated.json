@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer6-hub.local_release_proof",
-  "generated_at": "2026-03-28T15:25:29Z",
+  "generated_at": "2026-03-28T15:38:09Z",
   "status": "passed",
   "base_url": "http://127.0.0.1:8091",
   "compose_file": "docker-compose.public-edge.yml",
@@ -8,6 +8,8 @@
   "edge_rebuild_skipped": false,
   "journeys_passed": [
     "install_claim_restore_continue",
+    "build_explain_publish",
+    "campaign_session_recover_recap",
     "report_cluster_release_notify"
   ],
   "proof_routes": [
