@@ -161,6 +161,13 @@ public sealed record CampaignReadinessCue(
     string Title,
     string Summary);
 
+public sealed record WorkspaceChangePacketProjection(
+    string PacketId,
+    string Kind,
+    string Label,
+    string Summary,
+    DateTimeOffset UpdatedAtUtc);
+
 public sealed record CampaignWorkspaceProjection(
     string WorkspaceId,
     string CampaignId,
@@ -173,7 +180,10 @@ public sealed record CampaignWorkspaceProjection(
     IReadOnlyList<PublicationSafeProjection> RecapShelf,
     IReadOnlyList<CampaignReadinessCue> ReadinessCues,
     ContinuitySnapshotRef? LatestContinuity,
-    string ReturnSummary);
+    string ReturnSummary,
+    string? ActiveSceneSummary = null,
+    string? NextSafeAction = null,
+    IReadOnlyList<WorkspaceChangePacketProjection>? ChangePackets = null);
 
 public sealed record RestoreArtifactProjection(
     string ArtifactId,

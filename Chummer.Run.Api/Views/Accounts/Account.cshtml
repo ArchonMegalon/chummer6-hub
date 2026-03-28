@@ -789,8 +789,16 @@
                                 <strong>@(selectedWorkspace.Runs.Count == 0 ? "No active run" : $"{selectedWorkspace.Runs.Count} tracked")</strong>
                             </div>
                             <div class="settings-summary-row">
+                                <span>Active scene</span>
+                                <strong>@(selectedWorkspace.ActiveSceneSummary ?? "No active scene summary yet")</strong>
+                            </div>
+                            <div class="settings-summary-row">
                                 <span>Readiness cues</span>
                                 <strong>@(selectedWorkspace.ReadinessCues.Count == 0 ? "No blockers" : selectedWorkspace.ReadinessCues[0].Summary)</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Next safe action</span>
+                                <strong>@(selectedWorkspace.NextSafeAction ?? "Open the shared campaign view and confirm the current return lane before you continue.")</strong>
                             </div>
                         </div>
                         <div class="stacked-copy">
@@ -801,6 +809,10 @@
                             @if (selectedWorkspace.RecapShelf.Count > 0)
                             {
                                 <p><strong>Recap shelf:</strong> @selectedWorkspace.RecapShelf[0].Summary</p>
+                            }
+                            @if (selectedWorkspace.ChangePackets is { Count: > 0 })
+                            {
+                                <p><strong>Recent change:</strong> @selectedWorkspace.ChangePackets[0].Label — @selectedWorkspace.ChangePackets[0].Summary</p>
                             }
                         </div>
                     </article>
@@ -952,6 +964,14 @@
                                     <strong>@(workspace.Runs.Count == 0 ? "No active run" : $"{workspace.Runs.Count} tracked")</strong>
                                 </div>
                                 <div class="settings-summary-row">
+                                    <span>Active scene</span>
+                                    <strong>@(workspace.ActiveSceneSummary ?? "No scene pinned yet")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Next safe action</span>
+                                    <strong>@(workspace.NextSafeAction ?? "Open the shared campaign view and confirm the current return lane before you continue.")</strong>
+                                </div>
+                                <div class="settings-summary-row">
                                     <span>Recap shelf</span>
                                     <strong>@(workspace.RecapShelf.Count == 0 ? "Pending" : $"{workspace.RecapShelf.Count} ready")</strong>
                                 </div>
@@ -1033,6 +1053,19 @@
                                                     <span> (@item.ArtifactId)</span>
                                                 }
                                             </li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+
+                            @if (workspace.ChangePackets is { Count: > 0 })
+                            {
+                                <details class="details-drawer">
+                                    <summary>Recent change packets</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var packet in workspace.ChangePackets)
+                                        {
+                                            <li><strong>@packet.Label</strong>: @packet.Summary</li>
                                         }
                                     </ul>
                                 </details>
