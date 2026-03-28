@@ -14,6 +14,7 @@ await StateStoreBackupVerification.RunAsync();
 CompatibilityVerification.Run();
 await HubApiRuntimeGuardrailVerification.RunAsync();
 await WorkspaceLifecycleRetentionVerification.RunAsync();
+await HubRequestObservabilityVerification.RunAsync();
 HubExtractionReadinessVerification.Run();
 
 Console.WriteLine("run-services verification passed");
