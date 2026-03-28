@@ -2158,6 +2158,16 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultReleaseChannel, "preview", StringComparison.Ordinal), "authenticated contact page should prefill the install release channel.");
     Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultHeadId, "avalonia", StringComparison.Ordinal), "authenticated contact page should prefill the shipped desktop head.");
     Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultArch, "x64", StringComparison.Ordinal), "authenticated contact page should prefill the install architecture.");
+    authenticatedLandingController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?kind=install_help&title=Mobile%20follow-through%20needs%20grounded%20runtime&summary=Scene%20resume%20needs%20support%20review&detail=Session%3A%20session-redmond&sessionId=session-redmond&sceneId=scene-redmond&runtime=sr6.preview.v1&bundle=bundle-redmond");
+    var queryPrefilledContactPage = await authenticatedLandingController.ContactPage(CancellationToken.None) as ViewResult;
+    var queryPrefilledContactModel = queryPrefilledContactPage?.Model as TrustPageViewModel;
+    Assert(queryPrefilledContactModel?.SupportIntake is not null, "query-prefilled contact page should keep the first-party support intake intact.");
+    Assert(string.Equals(queryPrefilledContactModel!.SupportIntake!.DefaultKind, SupportCaseKinds.InstallHelp, StringComparison.Ordinal), "query-prefilled contact page should preserve the requested support case type.");
+    Assert(string.Equals(queryPrefilledContactModel.SupportIntake.DefaultTitle, "Mobile follow-through needs grounded runtime", StringComparison.Ordinal), "query-prefilled contact page should preserve the requested support title.");
+    Assert(string.Equals(queryPrefilledContactModel.SupportIntake.DefaultSummary, "Scene resume needs support review", StringComparison.Ordinal), "query-prefilled contact page should preserve the requested support summary.");
+    Assert(queryPrefilledContactModel.SupportIntake.DefaultDetail?.Contains("session-redmond", StringComparison.Ordinal) == true, "query-prefilled contact page should preserve the requested support detail.");
+    Assert(queryPrefilledContactModel.SupportIntake.ContextHint?.Contains("scene scene-redmond", StringComparison.OrdinalIgnoreCase) == true, "query-prefilled contact page should surface the follow-through scene context.");
+    authenticatedLandingController.ControllerContext.HttpContext.Request.QueryString = QueryString.Empty;
     var contactSubmittedPage = await authenticatedLandingController.ContactSubmittedPage(supportCase.CaseId, CancellationToken.None) as ViewResult;
     var contactSubmittedModel = contactSubmittedPage?.Model as SupportSubmittedPageViewModel;
     Assert(contactSubmittedModel is not null && string.Equals(contactSubmittedModel.CaseId, supportCase.CaseId, StringComparison.Ordinal), "contact submitted route should render a stable support confirmation page.");

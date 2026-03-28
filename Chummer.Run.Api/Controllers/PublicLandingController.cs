@@ -404,12 +404,24 @@ public sealed class PublicLandingController : Controller
         {
             var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Where to send bugs, account questions, and public product feedback right now.", "/contact", cancellationToken);
             var installDefaults = await ResolveSupportIntakeDefaultsAsync(cancellationToken);
-            var model = (await BuildContactPageModelAsync(chrome, cancellationToken)) with
+            var model = _trustContent.BuildContactPage(chrome) with
             {
                 SupportIntake = BuildSupportIntakeModel(
                     authenticated: chrome.Authenticated,
                     submissionNotice: ex.Message,
-                    installDefaults)
+                    installDefaults,
+                    new SupportIntakeOverrides(
+                        Kind: kind,
+                        Title: title,
+                        Summary: summary,
+                        Detail: detail,
+                        Platform: platform,
+                        ApplicationVersion: applicationVersion,
+                        InstallationId: installationId,
+                        ReleaseChannel: releaseChannel,
+                        HeadId: headId,
+                        Arch: arch,
+                        ContextHint: ResolveSupportContextHintFromRequestQuery()))
             };
             return View("~/Views/PublicLanding/TrustPage.cshtml", model);
         }
@@ -623,15 +635,87 @@ public sealed class PublicLandingController : Controller
     }
 
     private async Task<TrustPageViewModel> BuildContactPageModelAsync(SiteChromeViewModel chrome, CancellationToken cancellationToken)
-        => _trustContent.BuildContactPage(chrome) with
+    {
+        var installDefaults = await ResolveSupportIntakeDefaultsAsync(cancellationToken);
+        var overrides = ResolveSupportIntakeOverridesFromQuery();
+        return _trustContent.BuildContactPage(chrome) with
         {
             SupportIntake = BuildSupportIntakeModel(
                 authenticated: chrome.Authenticated,
                 submissionNotice: null,
-                await ResolveSupportIntakeDefaultsAsync(cancellationToken))
+                installDefaults,
+                overrides)
         };
+    }
 
-    private static SupportIntakeViewModel BuildSupportIntakeModel(bool authenticated, string? submissionNotice, SupportIntakeDefaults installDefaults)
+    private SupportIntakeOverrides ResolveSupportIntakeOverridesFromQuery()
+    {
+        string? kind = NormalizeSupportPrefill(Request.Query.TryGetValue("kind", out var kindValues) ? kindValues.ToString() : null);
+        string? title = NormalizeSupportPrefill(Request.Query.TryGetValue("title", out var titleValues) ? titleValues.ToString() : null);
+        string? summary = NormalizeSupportPrefill(Request.Query.TryGetValue("summary", out var summaryValues) ? summaryValues.ToString() : null);
+        string? detail = NormalizeSupportPrefill(Request.Query.TryGetValue("detail", out var detailValues) ? detailValues.ToString() : null);
+        string? platform = NormalizeSupportPrefill(Request.Query.TryGetValue("platform", out var platformValues) ? platformValues.ToString() : null);
+        string? applicationVersion = NormalizeSupportPrefill(Request.Query.TryGetValue("applicationVersion", out var versionValues) ? versionValues.ToString() : null);
+        string? installationId = NormalizeSupportPrefill(Request.Query.TryGetValue("installationId", out var installationValues) ? installationValues.ToString() : null);
+        string? releaseChannel = NormalizeSupportPrefill(Request.Query.TryGetValue("releaseChannel", out var channelValues) ? channelValues.ToString() : null);
+        string? headId = NormalizeSupportPrefill(Request.Query.TryGetValue("headId", out var headValues) ? headValues.ToString() : null);
+        string? arch = NormalizeSupportPrefill(Request.Query.TryGetValue("arch", out var archValues) ? archValues.ToString() : null);
+
+        return new SupportIntakeOverrides(
+            Kind: kind,
+            Title: title,
+            Summary: summary,
+            Detail: detail,
+            Platform: platform,
+            ApplicationVersion: applicationVersion,
+            InstallationId: installationId,
+            ReleaseChannel: releaseChannel,
+            HeadId: headId,
+            Arch: arch,
+            ContextHint: ResolveSupportContextHintFromRequestQuery());
+    }
+
+    private string? ResolveSupportContextHintFromRequestQuery()
+    {
+        List<string> segments = [];
+
+        string? sessionId = NormalizeSupportPrefill(Request.Query.TryGetValue("sessionId", out var sessionValues) ? sessionValues.ToString() : null);
+        if (!string.IsNullOrWhiteSpace(sessionId))
+        {
+            segments.Add($"session {sessionId}");
+        }
+
+        string? sceneId = NormalizeSupportPrefill(Request.Query.TryGetValue("sceneId", out var sceneValues) ? sceneValues.ToString() : null);
+        if (!string.IsNullOrWhiteSpace(sceneId))
+        {
+            segments.Add($"scene {sceneId}");
+        }
+
+        string? runtime = NormalizeSupportPrefill(Request.Query.TryGetValue("runtime", out var runtimeValues) ? runtimeValues.ToString() : null);
+        if (!string.IsNullOrWhiteSpace(runtime))
+        {
+            segments.Add($"runtime {runtime}");
+        }
+
+        string? bundle = NormalizeSupportPrefill(Request.Query.TryGetValue("bundle", out var bundleValues) ? bundleValues.ToString() : null);
+        if (!string.IsNullOrWhiteSpace(bundle))
+        {
+            segments.Add($"bundle {bundle}");
+        }
+
+        return segments.Count == 0
+            ? null
+            : $"Follow-through opened with {string.Join(" · ", segments)}.";
+    }
+
+    private static string? NormalizeSupportPrefill(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static SupportIntakeViewModel BuildSupportIntakeModel(
+        bool authenticated,
+        string? submissionNotice,
+        SupportIntakeDefaults installDefaults,
+        SupportIntakeOverrides overrides)
         => new(
             ActionHref: "/contact",
             Heading: "Open a first-party support case",
@@ -652,13 +736,22 @@ public sealed class PublicLandingController : Controller
                 new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Product bug", "Use this for broken behavior, bad routing, or product regressions."),
                 new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Use this when the product direction is right but the current surface is getting in your way.")
             ],
-            DefaultPlatform: installDefaults.Platform,
-            DefaultApplicationVersion: installDefaults.ApplicationVersion,
-            DefaultInstallationId: installDefaults.InstallationId,
-            DefaultReleaseChannel: installDefaults.ReleaseChannel,
-            DefaultHeadId: installDefaults.HeadId,
-            DefaultArch: installDefaults.Arch,
-            ContextHint: installDefaults.ContextHint);
+            DefaultKind: overrides.Kind,
+            DefaultTitle: overrides.Title,
+            DefaultSummary: overrides.Summary,
+            DefaultDetail: overrides.Detail,
+            DefaultPlatform: overrides.Platform ?? installDefaults.Platform,
+            DefaultApplicationVersion: overrides.ApplicationVersion ?? installDefaults.ApplicationVersion,
+            DefaultInstallationId: overrides.InstallationId ?? installDefaults.InstallationId,
+            DefaultReleaseChannel: overrides.ReleaseChannel ?? installDefaults.ReleaseChannel,
+            DefaultHeadId: overrides.HeadId ?? installDefaults.HeadId,
+            DefaultArch: overrides.Arch ?? installDefaults.Arch,
+            ContextHint: string.Join(" ",
+                new[]
+                {
+                    installDefaults.ContextHint,
+                    overrides.ContextHint
+                }.Where(static item => !string.IsNullOrWhiteSpace(item))));
 
     private async Task<SupportIntakeDefaults> ResolveSupportIntakeDefaultsAsync(CancellationToken cancellationToken)
     {
@@ -734,6 +827,19 @@ public sealed class PublicLandingController : Controller
     {
         public static SupportIntakeDefaults Empty { get; } = new(null, null, null, null, null, null, null);
     }
+
+    private sealed record SupportIntakeOverrides(
+        string? Kind = null,
+        string? Title = null,
+        string? Summary = null,
+        string? Detail = null,
+        string? Platform = null,
+        string? ApplicationVersion = null,
+        string? InstallationId = null,
+        string? ReleaseChannel = null,
+        string? HeadId = null,
+        string? Arch = null,
+        string? ContextHint = null);
 
     private static async Task<IReadOnlyList<SupportAttachmentUpload>> ReadSupportUploadsAsync(
         IReadOnlyList<IFormFile>? files,
