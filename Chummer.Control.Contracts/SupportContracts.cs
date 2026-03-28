@@ -89,35 +89,35 @@ public sealed record SupportCaseProjection(
     IReadOnlyList<SupportCaseAttachmentProjection>? Attachments = null);
 
 public sealed record SupportCaseSubmitRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(64)] string Kind,
-    [property: Required(AllowEmptyStrings = false), StringLength(160)] string Title,
-    [property: Required(AllowEmptyStrings = false), StringLength(280)] string Summary,
-    [property: Required(AllowEmptyStrings = false)] string Detail,
-    [property: StringLength(256)] string? ReporterEmail = null,
-    [property: StringLength(64)] string? InstallationId = null,
-    [property: StringLength(64)] string? ApplicationVersion = null,
-    [property: StringLength(64)] string? ReleaseChannel = null,
-    [property: StringLength(64)] string? HeadId = null,
-    [property: StringLength(64)] string? Platform = null,
-    [property: StringLength(32)] string? Arch = null,
-    [property: StringLength(64)] string? Source = null);
+    [Required(AllowEmptyStrings = false), StringLength(64)] string Kind,
+    [Required(AllowEmptyStrings = false), StringLength(160)] string Title,
+    [Required(AllowEmptyStrings = false), StringLength(280)] string Summary,
+    [Required(AllowEmptyStrings = false)] string Detail,
+    [StringLength(256)] string? ReporterEmail = null,
+    [StringLength(64)] string? InstallationId = null,
+    [StringLength(64)] string? ApplicationVersion = null,
+    [StringLength(64)] string? ReleaseChannel = null,
+    [StringLength(64)] string? HeadId = null,
+    [StringLength(64)] string? Platform = null,
+    [StringLength(32)] string? Arch = null,
+    [StringLength(64)] string? Source = null);
 
 public sealed record SupportCaseTransitionRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(64)] string TargetStatus,
-    [property: StringLength(160)] string? Note = null,
-    [property: StringLength(64)] string? FixedVersion = null,
-    [property: StringLength(64)] string? FixedChannel = null,
-    [property: StringLength(64)] string? Actor = null);
+    [Required(AllowEmptyStrings = false), StringLength(64)] string TargetStatus,
+    [StringLength(160)] string? Note = null,
+    [StringLength(64)] string? FixedVersion = null,
+    [StringLength(64)] string? FixedChannel = null,
+    [StringLength(64)] string? Actor = null);
 
 public sealed record SupportCaseNotificationRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(160)] string Note,
-    [property: StringLength(64)] string? Actor = null,
-    [property: StringLength(64)] string? Channel = null);
+    [Required(AllowEmptyStrings = false), StringLength(160)] string Note,
+    [StringLength(64)] string? Actor = null,
+    [StringLength(64)] string? Channel = null);
 
 public sealed record SupportCaseVerificationRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(64)] string Outcome,
-    [property: StringLength(160)] string? Note = null,
-    [property: StringLength(64)] string? Actor = null);
+    [Required(AllowEmptyStrings = false), StringLength(64)] string Outcome,
+    [StringLength(160)] string? Note = null,
+    [StringLength(64)] string? Actor = null);
 
 public sealed record SupportCaseListResponse(
     IReadOnlyList<SupportCaseProjection> Items,
