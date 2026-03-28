@@ -113,16 +113,16 @@
                                     <div class="home-stream__lead">
                                         <p class="eyebrow">Access</p>
                                         <h2 class="home-stream__title">What changed for you</h2>
-                                        <p class="home-stream__summary">Support closure, install return, and release follow-up stay grouped so the signed-in cockpit explains why something moved.</p>
+                                        <p class="home-stream__summary">Support closure, install return, and release follow-up stay grouped so this route explains why something moved.</p>
                                     </div>
                                     <div class="app-rail">
                                         @if (releasedOrNotifiedCases.Length == 0 && recentReceipts.Length == 0 && restoreConflicts == 0)
                                         {
                                             <article class="app-rail__item">
-                                                <span class="tag">Calm</span>
+                                                    <span class="tag">Calm</span>
                                                 <div class="app-rail__copy">
                                                     <h3>No urgent follow-up</h3>
-                                                    <p>The signed-in shell does not see a fresh support closure, install handoff, or restore conflict right now.</p>
+                                                    <p>This route does not see a fresh support closure, install handoff, or restore conflict right now.</p>
                                                 </div>
                                                 <a class="inline-link" href="/now">See what works today</a>
                                             </article>
@@ -189,7 +189,7 @@
                                             <span class="tag">Device state</span>
                                             <div class="app-rail__copy">
                                                 <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s) active" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install yet")</h3>
-                                                <p>Device roles, claim tickets, linked installs, and preview access stay in one place instead of rediscovering them during the next install.</p>
+                                                <p>Claim tickets, linked installs, and preview access stay in one place instead of being rediscovered during the next install.</p>
                                             </div>
                                             <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
                                         </article>
@@ -219,7 +219,7 @@
                                     <div class="home-stream__lead">
                                         <p class="eyebrow">Work</p>
                                         <h2 class="home-stream__title">Pick up where you actually left off</h2>
-                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible with Campaign workspace context, Rule environments, and GM readiness cues without turning the default Home page into a full workspace.</p>
+                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible with GM-ready context and clear next routes without turning Home into a full workspace.</p>
                                     </div>
                                     <div class="app-rail">
                                         @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0)
@@ -276,7 +276,7 @@
                                     <div class="home-stream__lead">
                                         <p class="eyebrow">Next</p>
                                         <h2 class="home-stream__title">Build, explain, and move forward without losing continuity</h2>
-                                        <p class="home-stream__summary">Build paths and grounded rule answers stay next to the signed-in return surface so you can see what to inspect before reopening a dossier, session, or support thread.</p>
+                                        <p class="home-stream__summary">Build paths and grounded rule answers stay next to your return path so you can see what to inspect before reopening a dossier, session, or support thread.</p>
                                     </div>
                                     <div class="app-rail">
                                         @if (buildHandoffs.Length == 0 && rulesAnswers.Length == 0)
@@ -285,7 +285,7 @@
                                                 <span class="tag">Build path</span>
                                                 <div class="app-rail__copy">
                                                     <h3>Continuity is ready for the first grounded handoff</h3>
-                                                    <p>Your next build comparison and rules answer will land here once the first dossier or campaign workspace is seeded.</p>
+                                                    <p>Your next build comparison and rules answer will land here once the first dossier or campaign return is seeded.</p>
                                                 </div>
                                                 <a class="inline-link" href="/downloads">Start from downloads</a>
                                             </article>
