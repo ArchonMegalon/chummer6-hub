@@ -23,6 +23,8 @@
     </div>
 </section>
 
+@await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
+
 @foreach (var group in groups)
 {
     var items = Model.Horizons.Where(card => string.Equals(card.Card.Badge, group.Badge, StringComparison.OrdinalIgnoreCase)).ToArray();

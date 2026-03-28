@@ -1,0 +1,38 @@
+@using Chummer.Run.Api.Services
+<details class="release-accordion status-guide">
+    <summary>Status guide</summary>
+    <div class="release-accordion__body">
+        <div class="evidence-row-list">
+            <article class="evidence-row">
+                <div class="evidence-row__copy">
+                    <span class="tag">@PublicSurfaceStatus.AvailableToday</span>
+                    <p>There is a real public surface or build you can use right now.</p>
+                </div>
+            </article>
+            <article class="evidence-row">
+                <div class="evidence-row__copy">
+                    <span class="tag tag--amber">@PublicSurfaceStatus.PreviewInProgress</span>
+                    <p>The shape is visible and usable, but release, support, or compatibility is still moving.</p>
+                </div>
+            </article>
+            <article class="evidence-row">
+                <div class="evidence-row__copy">
+                    <span class="tag tag--quiet">@PublicSurfaceStatus.PreparingNext</span>
+                    <p>This is the closest roadmap work after the current proof shelf.</p>
+                </div>
+            </article>
+            <article class="evidence-row">
+                <div class="evidence-row__copy">
+                    <span class="tag tag--amber">@PublicSurfaceStatus.DesigningInPublic</span>
+                    <p>The product shape is visible, but it still needs more proof before it belongs on the live shelf.</p>
+                </div>
+            </article>
+            <article class="evidence-row">
+                <div class="evidence-row__copy">
+                    <span class="tag tag--quiet">@PublicSurfaceStatus.ResearchTrack</span>
+                    <p>Worth following early, but not a current-preview promise.</p>
+                </div>
+            </article>
+        </div>
+    </div>
+</details>

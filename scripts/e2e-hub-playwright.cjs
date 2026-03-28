@@ -112,6 +112,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/now', async () => {
     await expectVisible(page, 'text=What you can verify now');
     await expectVisible(page, 'text=Build, explain, and run with visible evidence');
+    await expectVisible(page, 'text=Status guide');
     await assertNoBannedCopy(page, 'Now');
   });
 
@@ -119,6 +120,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Preparing next');
     await expectVisible(page, 'text=Designing in public');
     await expectVisible(page, 'text=Research track');
+    await expectVisible(page, 'text=Status guide');
     const bodyText = await page.locator('body').innerText();
     assert.equal(bodyText.includes('Research tracks'), false, 'Horizons should use the unified research-track label.');
     await assertNoBannedCopy(page, 'Horizons');
@@ -127,6 +129,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/artifacts', async () => {
     await expectVisible(page, 'text=Current proof surfaces');
     await expectVisible(page, 'text=Preview in progress');
+    await expectVisible(page, 'text=Status guide');
     await assertNoBannedCopy(page, 'Artifacts');
   });
 

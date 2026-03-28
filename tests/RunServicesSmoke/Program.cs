@@ -1500,12 +1500,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!storySource.Contains("From first install to next session", StringComparison.Ordinal), "product story should stay focused on differentiation instead of retelling the install path.");
     Assert(!storySource.Contains("Start from the lane that matches your job", StringComparison.Ordinal), "product story should not fall back to a second lane selector once landing already owns that job.");
     var nowSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml"));
+    Assert(nowSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "now page should include the unified public status guide.");
     Assert(nowSource.Contains("Supporting proof around the core loop", StringComparison.Ordinal), "now should keep supporting proof behind a calmer secondary disclosure.");
     Assert(!nowSource.Contains("Integrity stays visible. Use downloads when you are ready to install", StringComparison.Ordinal), "now should not end with a second generic CTA band after the signed-in return callout.");
     Assert(!nowSource.Contains("static string DisplayStatus", StringComparison.Ordinal), "now should use the shared public status presenter instead of a local badge mapper.");
     var shelfSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml"));
+    Assert(shelfSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "artifact shelf should include the unified public status guide.");
     Assert(!shelfSource.Contains("static string DisplayStatus", StringComparison.Ordinal), "artifact shelf should use the shared public status presenter instead of a local badge mapper.");
     var horizonsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml"));
+    Assert(horizonsSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "horizons should include the unified public status guide.");
     Assert(horizonsSource.Contains("PublicSurfaceStatus.ResearchTrack", StringComparison.Ordinal), "roadmap should use the shared public status presenter for its visible maturity language.");
     Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Inspectable"), PublicSurfaceStatus.AvailableToday, StringComparison.Ordinal), "inspectable proof should present as available-today proof on the public surface.");
     Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Preview"), PublicSurfaceStatus.PreviewInProgress, StringComparison.Ordinal), "preview artifact concepts should present as preview-in-progress on the public surface.");
