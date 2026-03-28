@@ -144,6 +144,29 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void PublicTrustPagesSurfaceWeeklyPulseAndCaution()
+    {
+        string serviceCollectionPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
+        string servicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "PublicTrustPulseService.cs");
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
+        string partialPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PublicTrustPulsePanel.cshtml");
+
+        string serviceCollection = File.ReadAllText(serviceCollectionPath);
+        string service = File.ReadAllText(servicePath);
+        string controller = File.ReadAllText(controllerPath);
+        string viewModel = File.ReadAllText(viewModelPath);
+        string partial = File.ReadAllText(partialPath);
+
+        Assert.Contains("PublicTrustPulseService", serviceCollection, StringComparison.Ordinal);
+        Assert.Contains("WEEKLY_PRODUCT_PULSE.generated.json", service, StringComparison.Ordinal);
+        Assert.Contains("BuildPublicTrustPulsePanel", controller, StringComparison.Ordinal);
+        Assert.Contains("PublicTrustPulsePanelViewModel? TrustPulse", viewModel, StringComparison.Ordinal);
+        Assert.Contains("Weekly trust pulse", partial, StringComparison.Ordinal);
+        Assert.Contains("Current caution", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ReleaseWorkflowPublishesApiAndDownloadsMirrorArtifacts()
     {
         string workflowPath = RepoPaths.FromRoot(".github", "workflows", "desktop-downloads-matrix.yml");
