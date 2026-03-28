@@ -1499,6 +1499,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!storySource.Contains("One path from install to session return", StringComparison.Ordinal), "product story should not drift back into a second install/support explainer.");
     Assert(!storySource.Contains("From first install to next session", StringComparison.Ordinal), "product story should stay focused on differentiation instead of retelling the install path.");
     Assert(!storySource.Contains("Start from the lane that matches your job", StringComparison.Ordinal), "product story should not fall back to a second lane selector once landing already owns that job.");
+    Assert(!storySource.Contains("story-guide-tail", StringComparison.Ordinal), "product story should not end in a second landing-style CTA band.");
+    Assert(!storySource.Contains("Go deeper only where you still need proof", StringComparison.Ordinal), "product story should not end with another full-width guidance section after the differentiation grid.");
+    Assert(storySource.Contains("Need proof?", StringComparison.Ordinal), "product story should end with a quieter inline route note instead of a second hero-like CTA cluster.");
     var nowSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml"));
     Assert(nowSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "now page should include the unified public status guide.");
     Assert(nowSource.Contains("Supporting proof around the core loop", StringComparison.Ordinal), "now should keep supporting proof behind a calmer secondary disclosure.");
