@@ -63,6 +63,7 @@
     var showSettingsSection = string.Equals(Model.CurrentSection, "settings", StringComparison.OrdinalIgnoreCase);
     var showAdvancedSection = string.Equals(Model.CurrentSection, "advanced", StringComparison.OrdinalIgnoreCase);
     var selectedSupportCase = Model.SelectedSupportCase;
+    var selectedSupportCaseSummary = Model.SelectedSupportCaseSummary;
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -296,13 +297,37 @@
                             </div>
                             <div class="settings-summary-row">
                                 <span>Status</span>
-                                <strong>@HumanizeStatus(selectedSupportCase.Status, "New")</strong>
+                                <strong>@(selectedSupportCaseSummary?.StatusLabel ?? HumanizeStatus(selectedSupportCase.Status, "New"))</strong>
                             </div>
                             <div class="settings-summary-row">
+                                <span>Current stage</span>
+                                <strong>@(selectedSupportCaseSummary?.StageLabel ?? "Tracked case")</strong>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(selectedSupportCaseSummary?.FixedReleaseLabel))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Reporter-ready release</span>
+                                    <strong>@selectedSupportCaseSummary.FixedReleaseLabel</strong>
+                                </div>
+                            }
+                            <div class="settings-summary-row">
                                 <span>Updated</span>
-                                <strong>@selectedSupportCase.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                                <strong>@(selectedSupportCaseSummary?.UpdatedLabel ?? selectedSupportCase.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") + " UTC")</strong>
                             </div>
                         </div>
+                        @if (selectedSupportCaseSummary is not null)
+                        {
+                            <div class="stacked-copy">
+                                <p><strong>Next safe action:</strong> @selectedSupportCaseSummary.NextSafeAction</p>
+                                <p><strong>Closure:</strong> @selectedSupportCaseSummary.ClosureSummary</p>
+                            </div>
+                            @if (string.Equals(selectedSupportCaseSummary.PrimaryActionHref, "/downloads", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <div class="stacked-actions">
+                                    <a class="button-like button-like--secondary" href="@selectedSupportCaseSummary.PrimaryActionHref">@selectedSupportCaseSummary.PrimaryActionLabel</a>
+                                </div>
+                            }
+                        }
                         @if (selectedSupportCase.Attachments is { Count: > 0 })
                         {
                             <details class="details-drawer" open>
@@ -425,13 +450,15 @@
                 else
                 {
                     <div class="settings-summary-list">
-                        @foreach (var supportCase in Model.SupportCases)
+                        @foreach (var supportCase in Model.SupportCaseSummaries)
                         {
                             <div class="settings-summary-row">
-                                <span>@supportCase.Title</span>
+                                <span>
+                                    <a class="inline-link" href="@supportCase.DetailHref">@supportCase.Case.Title</a>
+                                    <span class="muted-copy">@supportCase.ClosureSummary</span>
+                                </span>
                                 <strong>
-                                    <a class="inline-link" href="/account/support/@supportCase.CaseId">@HumanizeStatus(supportCase.Status, "New")</a>
-                                    · @supportCase.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC
+                                    @supportCase.StatusLabel · @supportCase.UpdatedLabel
                                 </strong>
                             </div>
                         }

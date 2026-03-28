@@ -241,7 +241,8 @@ public sealed record SupportSubmittedPageViewModel(
     string ResponseExpectation,
     IReadOnlyList<string> Highlights,
     IReadOnlyList<TrustPageActionViewModel> Actions,
-    IReadOnlyList<SupportCaseAttachmentProjection> Attachments);
+    IReadOnlyList<SupportCaseAttachmentProjection> Attachments,
+    SupportCasePresentationViewModel? TrackedCaseSummary = null);
 
 public sealed record TrustPageViewModel(
     string PageId,
@@ -325,10 +326,24 @@ public sealed record HomePageViewModel(
     HubUserExperienceDto Experience,
     InstallLinkingSummaryDto InstallLinking,
     IReadOnlyList<SupportCaseProjection> SupportCases,
+    IReadOnlyList<SupportCasePresentationViewModel> SupportCaseSummaries,
     AccountCampaignSummary CampaignSpine,
     HomePrimaryActionViewModel PrimaryAction,
     IReadOnlyList<ResolvedPublicCardViewModel> NowRail,
     IReadOnlyList<ResolvedPublicCardViewModel> HorizonRail);
+
+public sealed record SupportCasePresentationViewModel(
+    SupportCaseProjection Case,
+    string StatusLabel,
+    string StageLabel,
+    string NextSafeAction,
+    string ClosureSummary,
+    string DetailHref,
+    string PrimaryActionLabel,
+    string PrimaryActionHref,
+    string UpdatedLabel,
+    string? FixedReleaseLabel,
+    bool ReporterActionNeeded);
 
 public sealed record AccountPageViewModel(
     SiteChromeViewModel Chrome,
@@ -341,7 +356,9 @@ public sealed record AccountPageViewModel(
     bool GoogleAvailable,
     InstallLinkingSummaryDto InstallLinking,
     IReadOnlyList<SupportCaseProjection> SupportCases,
+    IReadOnlyList<SupportCasePresentationViewModel> SupportCaseSummaries,
     SupportCaseProjection? SelectedSupportCase,
+    SupportCasePresentationViewModel? SelectedSupportCaseSummary,
     AccountCampaignSummary CampaignSpine);
 
 public sealed record AuthPageViewModel(
