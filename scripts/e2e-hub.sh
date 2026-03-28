@@ -119,37 +119,10 @@ fi
 rm -f "$playwright_log"
 cleanup_synthetic_support_cases
 mkdir -p "$(dirname "$HUB_LOCAL_PROOF_PATH")"
-python3 - "$HUB_LOCAL_PROOF_PATH" "$HUB_BASE_URL" "$HUB_EDGE_COMPOSE_FILE" "$HUB_PLAYWRIGHT_TIMEOUT_SECONDS" "$HUB_SKIP_EDGE_REBUILD" <<'PY'
-import datetime as dt
-import json
-import sys
-
-out_path, base_url, compose_file, timeout_seconds, skip_rebuild = sys.argv[1:]
-payload = {
-    "contract_name": "chummer6-hub.local_release_proof",
-    "generated_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-    "status": "passed",
-    "base_url": base_url,
-    "compose_file": compose_file,
-    "playwright_timeout_seconds": int(timeout_seconds),
-    "edge_rebuild_skipped": skip_rebuild.lower() in {"1", "true"},
-    "journeys_passed": [
-        "install_claim_restore_continue",
-        "build_explain_publish",
-        "campaign_session_recover_recap",
-        "report_cluster_release_notify",
-    ],
-    "proof_routes": [
-        "/downloads/install/avalonia-linux-x64-installer",
-        "/home/access",
-        "/home/work",
-        "/account/work",
-        "/account/support",
-        "/contact",
-    ],
-}
-with open(out_path, "w", encoding="utf-8") as handle:
-    json.dump(payload, handle, indent=2)
-    handle.write("\n")
-PY
+python3 scripts/materialize_hub_local_release_proof.py \
+  "$HUB_LOCAL_PROOF_PATH" \
+  "$HUB_BASE_URL" \
+  "$HUB_EDGE_COMPOSE_FILE" \
+  "$HUB_PLAYWRIGHT_TIMEOUT_SECONDS" \
+  "$HUB_SKIP_EDGE_REBUILD" >/dev/null
 echo "hub e2e completed"
