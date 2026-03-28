@@ -76,6 +76,15 @@ cleanup_synthetic_support_cases() {
     --token "$token"
 }
 
+resolve_hub_proof_base_url() {
+  if [[ "$HUB_BASE_URL" == http://* ]]; then
+    printf 'https://%s\n' "$HUB_PUBLIC_HOST"
+    return 0
+  fi
+
+  printf '%s\n' "$HUB_BASE_URL"
+}
+
 if [[ "$HUB_SKIP_EDGE_REBUILD" == "1" || "$HUB_SKIP_EDGE_REBUILD" == "true" || "$HUB_SKIP_EDGE_REBUILD" == "TRUE" ]]; then
   echo "reusing current hub edge containers for playwright e2e"
 else
@@ -158,9 +167,10 @@ else
 fi
 
 mkdir -p "$(dirname "$HUB_LOCAL_PROOF_PATH")"
+hub_proof_base_url="$(resolve_hub_proof_base_url)"
 python3 scripts/materialize_hub_local_release_proof.py \
   "$HUB_LOCAL_PROOF_PATH" \
-  "$HUB_BASE_URL" \
+  "$hub_proof_base_url" \
   "$HUB_EDGE_COMPOSE_FILE" \
   "$HUB_PLAYWRIGHT_TIMEOUT_SECONDS" \
   "$HUB_SKIP_EDGE_REBUILD" >/dev/null

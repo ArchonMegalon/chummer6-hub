@@ -12,6 +12,9 @@ public sealed class HubLocalReleaseProofMaterializerTests
         string script = File.ReadAllText(scriptPath);
 
         Assert.Contains("materialize_hub_local_release_proof.py", script, StringComparison.Ordinal);
+        Assert.Contains("resolve_hub_proof_base_url", script, StringComparison.Ordinal);
+        Assert.Contains("https://%s", script, StringComparison.Ordinal);
+        Assert.Contains("\"$hub_proof_base_url\"", script, StringComparison.Ordinal);
     }
 
     [Fact]
