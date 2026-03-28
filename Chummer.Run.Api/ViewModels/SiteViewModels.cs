@@ -152,6 +152,7 @@ public sealed record NowPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> Inspectable,
     IReadOnlyList<PublicLandingOverlayDto> SignedInPreview,
     PublicReleaseManifestDto Manifest,
+    CampaignOsLocalProofSnapshot? CampaignOsProof = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record HorizonsPageViewModel(

@@ -21,6 +21,11 @@
         return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
     }
 
+    static string HumanizeToken(string value)
+        => string.IsNullOrWhiteSpace(value)
+            ? "Unknown"
+            : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
+
     var proofTargets = Model.ProofModules
         .Select(card => NormalizeRoute(card.Action.Href))
         .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -88,6 +93,36 @@
                 </div>
                 <span class="readiness-tag">Preview channel</span>
             </article>
+            @if (Model.CampaignOsProof is not null)
+            {
+                <article class="evidence-row">
+                    <div class="evidence-row__copy">
+                        <h3>Campaign OS local proof</h3>
+                        <p>
+                            Source-backed local smoke contract
+                            @if (!string.IsNullOrWhiteSpace(Model.CampaignOsProof.SourceFile))
+                            {
+                                <text> from <code class="mono-receipt">@Model.CampaignOsProof.SourceFile</code></text>
+                            }
+                            covering @Model.CampaignOsProof.JourneysPassed.Count journey(s)
+                            @if (Model.CampaignOsProof.GeneratedAt is not null)
+                            {
+                                <text> as of @Model.CampaignOsProof.GeneratedAt.Value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'")</text>
+                            }.
+                        </p>
+                        @if (Model.CampaignOsProof.JourneysPassed.Count > 0)
+                        {
+                            <div class="trust-claim__microproof">
+                                @foreach (var journey in Model.CampaignOsProof.JourneysPassed)
+                                {
+                                    <span>@HumanizeToken(journey)</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <span class="readiness-tag">@HumanizeToken(Model.CampaignOsProof.Status)</span>
+                </article>
+            }
         </div>
     </article>
 </section>
