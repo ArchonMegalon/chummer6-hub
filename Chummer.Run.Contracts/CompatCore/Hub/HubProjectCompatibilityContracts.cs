@@ -14,6 +14,8 @@ public static class HubProjectCompatibilityRowKinds
     public const string HostedPublic = "hosted-public";
     public const string RuntimeFingerprint = "runtime-fingerprint";
     public const string RuntimeRequirements = "runtime-requirements";
+    public const string CampaignReturn = "campaign-return";
+    public const string SupportClosure = "support-closure";
 }
 
 public static class HubProjectCompatibilityStates
