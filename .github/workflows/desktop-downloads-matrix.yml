@@ -1,10 +1,10 @@
-name: Desktop Downloads Matrix
+name: Public Edge Release Artifacts
 
 on:
   workflow_dispatch:
     inputs:
       deploy_portal_downloads:
-        description: "Publish desktop-download-bundle into configured portal downloads directory"
+        description: "Publish desktop-download-bundle into configured public downloads directory"
         required: false
         default: false
         type: boolean
@@ -14,20 +14,12 @@ on:
       - Docker
     paths:
       - '.github/workflows/desktop-downloads-matrix.yml'
-      - 'Chummer.Avalonia/**'
-      - 'Chummer.Application/**'
-      - 'Chummer.Blazor.Desktop/**'
-      - 'Chummer.Blazor/**'
-      - 'Chummer.Core/**'
-      - 'Chummer.Contracts/**'
       - 'Chummer.Run.Api/**'
-      - 'Chummer.Rulesets.Sr5/**'
-      - 'Chummer.Desktop.Runtime/**'
-      - 'Chummer.Infrastructure/**'
       - 'Chummer.Portal/**'
-      - 'Chummer.Presentation/**'
+      - 'legacy/tooling/docker/Docker/Downloads/**'
       - 'docs/ACTIVE_HEAD_RELEASE_ARTIFACTS.md'
       - 'docs/SELF_HOSTED_DOWNLOADS_RUNBOOK.md'
+      - 'docs/examples/self-hosted-downloads.env.example'
       - 'global.json'
       - 'scripts/generate-releases-manifest.sh'
       - 'scripts/publish-download-bundle.sh'
@@ -75,130 +67,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  build-desktop:
-    name: Build ${{ matrix.app }} ${{ matrix.rid }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - app: avalonia
-            project: Chummer.Avalonia/Chummer.Avalonia.csproj
-            os: windows-latest
-            rid: win-x64
-            archive_ext: zip
-          - app: avalonia
-            project: Chummer.Avalonia/Chummer.Avalonia.csproj
-            os: windows-latest
-            rid: win-arm64
-            archive_ext: zip
-          - app: avalonia
-            project: Chummer.Avalonia/Chummer.Avalonia.csproj
-            os: ubuntu-latest
-            rid: linux-x64
-            archive_ext: tar.gz
-          - app: avalonia
-            project: Chummer.Avalonia/Chummer.Avalonia.csproj
-            os: ubuntu-latest
-            rid: linux-arm64
-            archive_ext: tar.gz
-          - app: avalonia
-            project: Chummer.Avalonia/Chummer.Avalonia.csproj
-            os: macos-latest
-            rid: osx-arm64
-            archive_ext: tar.gz
-          - app: avalonia
-            project: Chummer.Avalonia/Chummer.Avalonia.csproj
-            os: macos-latest
-            rid: osx-x64
-            archive_ext: tar.gz
-          - app: blazor-desktop
-            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
-            os: windows-latest
-            rid: win-x64
-            archive_ext: zip
-          - app: blazor-desktop
-            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
-            os: windows-latest
-            rid: win-arm64
-            archive_ext: zip
-          - app: blazor-desktop
-            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
-            os: ubuntu-latest
-            rid: linux-x64
-            archive_ext: tar.gz
-          - app: blazor-desktop
-            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
-            os: ubuntu-latest
-            rid: linux-arm64
-            archive_ext: tar.gz
-          - app: blazor-desktop
-            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
-            os: macos-latest
-            rid: osx-arm64
-            archive_ext: tar.gz
-          - app: blazor-desktop
-            project: Chummer.Blazor.Desktop/Chummer.Blazor.Desktop.csproj
-            os: macos-latest
-            rid: osx-x64
-            archive_ext: tar.gz
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Restore
-        run: dotnet restore ${{ matrix.project }}
-
-      - name: Publish desktop app
-        shell: bash
-        run: |
-          set -euo pipefail
-          out_dir="out/${{ matrix.app }}/${{ matrix.rid }}"
-          dotnet publish "${{ matrix.project }}" \
-            -c Release \
-            -r "${{ matrix.rid }}" \
-            --self-contained true \
-            -p:PublishSingleFile=true \
-            -p:PublishTrimmed=false \
-            -p:IncludeNativeLibrariesForSelfExtract=true \
-            -o "$out_dir"
-
-      - name: Package archive (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
-          $archive = "dist/chummer-${{ matrix.app }}-${{ matrix.rid }}.zip"
-          if (Test-Path $archive) { Remove-Item $archive -Force }
-          Compress-Archive -Path "out/${{ matrix.app }}/${{ matrix.rid }}/*" -DestinationPath $archive -Force
-
-      - name: Package archive (Linux/macOS)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          tar -C "out/${{ matrix.app }}/${{ matrix.rid }}" -czf "dist/chummer-${{ matrix.app }}-${{ matrix.rid }}.tar.gz" .
-
-      - name: Upload RID artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-${{ matrix.app }}-${{ matrix.rid }}
-          path: dist/chummer-${{ matrix.app }}-${{ matrix.rid }}.${{ matrix.archive_ext }}
-          if-no-files-found: error
-          retention-days: 14
-
   generate-manifest:
-    name: Generate Downloads Manifest
+    name: Package Public Downloads Mirror
     needs:
       - build-api
-      - build-desktop
     runs-on: ubuntu-latest
 
     steps:
@@ -208,29 +80,13 @@ jobs:
       - name: Validate amend manifests checksums
         run: bash scripts/validate-amend-manifests.sh
 
-      - name: Download desktop artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: desktop-*
-          merge-multiple: true
-          path: dist
-
-      - name: Stage portal downloads directory
+      - name: Stage public downloads mirror
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p dist/files
-          shopt -s nullglob
-          moved=0
-          for artifact in dist/chummer-*.zip dist/chummer-*.tar.gz; do
-            [[ -f "$artifact" ]] || continue
-            mv "$artifact" dist/files/
-            moved=1
-          done
-          if [[ "$moved" -ne 1 ]]; then
-            echo "No desktop artifacts were staged for manifest generation." >&2
-            exit 1
-          fi
+          test -d Chummer.Portal/downloads/files
+          mkdir -p dist
+          cp -R Chummer.Portal/downloads/. dist/
 
       - name: Generate releases.json
         shell: bash
@@ -257,7 +113,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo "## Desktop Download Bundle"
+            echo "## Public Downloads Bundle"
             echo
             echo "Generated manifest artifact: \`desktop-download-bundle\`"
             echo "Generated API artifact: \`release-api-portable\`"

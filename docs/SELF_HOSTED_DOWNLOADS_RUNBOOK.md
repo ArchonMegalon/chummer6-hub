@@ -33,7 +33,7 @@ Repository variables:
 2. `CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL`
 
 Workflow path:
-1. Run workflow `Desktop Downloads Matrix`.
+1. Run workflow `Public Edge Release Artifacts`.
 2. If `CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR` is configured, deploy job `deploy-downloads` runs automatically after bundle generation.
 3. `scripts/publish-download-bundle.sh` prunes superseded desktop artifacts from the target downloads root before syncing the freshly built bundle.
 4. Job verifies local deployed manifest and live manifest URL.
@@ -58,7 +58,7 @@ Repository secrets:
 3. `CHUMMER_PORTAL_DOWNLOADS_AWS_SESSION_TOKEN` (optional)
 
 Workflow path:
-1. Run workflow `Desktop Downloads Matrix`.
+1. Run workflow `Public Edge Release Artifacts`.
 2. If `CHUMMER_PORTAL_DOWNLOADS_S3_URI` is configured, deploy job `deploy-downloads-object-storage` runs automatically after bundle generation.
 3. Job syncs bundle using `scripts/publish-download-bundle-s3.sh`.
 4. Job verifies live manifest URL.
