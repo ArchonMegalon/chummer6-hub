@@ -63,17 +63,23 @@ public sealed class VerificationEntryPointTests
     {
         string closeoutPath = RepoPaths.FromRoot("scripts", "ai", "hub_closeout.sh");
         string e2ePath = RepoPaths.FromRoot("scripts", "e2e-hub.sh");
+        string cleanupPath = RepoPaths.FromRoot("scripts", "cleanup_synthetic_support_cases.py");
         string closeout = File.ReadAllText(closeoutPath);
         string e2e = File.ReadAllText(e2ePath);
+        string cleanup = File.ReadAllText(cleanupPath);
 
         Assert.Contains("HUB_PUBLIC_HOST", closeout, StringComparison.Ordinal);
         Assert.Contains("--forwarded-proto https", closeout, StringComparison.Ordinal);
         Assert.Contains("--verify-http-redirects", closeout, StringComparison.Ordinal);
         Assert.Contains("hub-live-audit.py", e2e, StringComparison.Ordinal);
         Assert.Contains("wait_for_hub_edge", e2e, StringComparison.Ordinal);
+        Assert.Contains("--public-host \"$HUB_PUBLIC_HOST\"", e2e, StringComparison.Ordinal);
         Assert.Contains("HUB_PUBLIC_HOST", e2e, StringComparison.Ordinal);
         Assert.Contains("--forwarded-proto https", e2e, StringComparison.Ordinal);
         Assert.Contains("--verify-http-redirects", e2e, StringComparison.Ordinal);
+        Assert.Contains("--public-host", cleanup, StringComparison.Ordinal);
+        Assert.Contains("--forwarded-proto", cleanup, StringComparison.Ordinal);
+        Assert.Contains("X-Forwarded-Proto", cleanup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -142,5 +148,24 @@ public sealed class VerificationEntryPointTests
         Assert.DoesNotContain("CHUMMER_PORTAL_DEV_AUTH_ENABLED", backlog, StringComparison.Ordinal);
         Assert.DoesNotContain("CHUMMER_PORTAL_REQUIRE_AUTH", backlog, StringComparison.Ordinal);
         Assert.Contains("Chummer.Run.Api", backlog, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WorkspaceBenchmarkGuardrailsAreOwnedByCoreEngineRepo()
+    {
+        string backlogPath = RepoPaths.FromRoot("docs", "MIGRATION_BACKLOG.md");
+        string boundaryPath = RepoPaths.FromRoot("docs", "HOSTED_BOUNDARY.md");
+        string coreEngineRoot = Path.GetFullPath(Path.Combine(RepoPaths.Root, "..", "chummer-core-engine"));
+        string benchmarkWorkflowPath = Path.Combine(coreEngineRoot, ".github", "workflows", "benchmark-guardrails.yml");
+        string benchmarkBudgetPath = Path.Combine(coreEngineRoot, "Chummer.Benchmarks", "workspace-benchmark-budgets.json");
+
+        string backlog = File.ReadAllText(backlogPath);
+        string boundary = File.ReadAllText(boundaryPath);
+
+        Assert.Contains("- [x] `MIG-095`", backlog, StringComparison.Ordinal);
+        Assert.Contains("../chummer-core-engine/Chummer.Benchmarks", backlog, StringComparison.Ordinal);
+        Assert.Contains("Chummer.Benchmarks", boundary, StringComparison.Ordinal);
+        Assert.True(File.Exists(benchmarkWorkflowPath), "Core engine owner repo should publish the benchmark CI workflow.");
+        Assert.True(File.Exists(benchmarkBudgetPath), "Core engine owner repo should publish benchmark budgets.");
     }
 }
