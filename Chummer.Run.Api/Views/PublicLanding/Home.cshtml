@@ -280,9 +280,21 @@
                                                         <h3>@workspace.CampaignName</h3>
                                                         <p>
                                                             @workspace.ReturnSummary
-                                                            @if (workspace.ReadinessCues.Count > 0)
+                                                            @if (!string.IsNullOrWhiteSpace(workspace.ActiveSceneSummary))
+                                                            {
+                                                                <span> Scene: @workspace.ActiveSceneSummary</span>
+                                                            }
+                                                            @if (!string.IsNullOrWhiteSpace(workspace.NextSafeAction))
+                                                            {
+                                                                <span> Next: @workspace.NextSafeAction</span>
+                                                            }
+                                                            else if (workspace.ReadinessCues.Count > 0)
                                                             {
                                                                 <span> Readiness: @workspace.ReadinessCues[0].Summary</span>
+                                                            }
+                                                            else if (workspace.ChangePackets is { Count: > 0 })
+                                                            {
+                                                                <span> Change: @workspace.ChangePackets[0].Summary</span>
                                                             }
                                                             else if (workspace.RecapShelf.Count > 0)
                                                             {

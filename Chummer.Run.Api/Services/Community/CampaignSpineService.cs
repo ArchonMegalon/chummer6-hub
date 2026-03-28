@@ -590,6 +590,15 @@ public sealed class CampaignSpineService
                 || item.Kind.Contains("dossier", StringComparison.OrdinalIgnoreCase))
             .Distinct()
             .ToArray();
+        var leadRun = workspaceRuns.FirstOrDefault();
+        var activeScene = leadRun is null ? null : ResolveActiveScene(leadRun);
+        var leadObjective = leadRun?.Objectives
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault(item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase));
+        var activeSceneSummary = DescribeActiveSceneSummary(leadRun, activeScene, leadObjective);
+        var nextSafeAction = ResolveWorkspaceNextSafeAction(campaign, restore, recapShelf, readinessCues, leadRun, activeScene, leadObjective);
+        var changePackets = BuildWorkspaceChangePackets(campaign, recapShelf, leadRun, activeScene, leadObjective);
 
         return new CampaignWorkspaceProjection(
             WorkspaceId: StableId("workspace", campaign.CampaignId),
@@ -603,7 +612,10 @@ public sealed class CampaignSpineService
             RecapShelf: recapShelf,
             ReadinessCues: readinessCues,
             LatestContinuity: campaign.LatestContinuity,
-            ReturnSummary: campaign.LatestContinuity?.Summary ?? campaign.Summary);
+            ReturnSummary: campaign.LatestContinuity?.Summary ?? campaign.Summary,
+            ActiveSceneSummary: activeSceneSummary,
+            NextSafeAction: nextSafeAction,
+            ChangePackets: changePackets);
     }
 
     private static bool IsOperatorRole(string role)
@@ -766,6 +778,130 @@ public sealed class CampaignSpineService
         }
 
         return $"Support can anchor closure on {artifact.Channel} {artifact.Version ?? "current"} for {artifact.Label} and the same runtime fingerprint ({runtimeFingerprint}).";
+    }
+
+    private static SceneProjection? ResolveActiveScene(RunProjection run)
+        => run.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, run.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
+           ?? run.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
+
+    private static string? DescribeActiveSceneSummary(
+        RunProjection? leadRun,
+        SceneProjection? activeScene,
+        ObjectiveProjection? leadObjective)
+    {
+        if (leadRun is null)
+        {
+            return null;
+        }
+
+        var objectiveSummary = leadObjective is null
+            ? "No open objective is pinned yet."
+            : $"{leadObjective.Title} stays {leadObjective.Status} with {leadObjective.Pressure} pressure.";
+
+        if (activeScene is null)
+        {
+            return $"{leadRun.Title} has no pinned live scene yet. {objectiveSummary}";
+        }
+
+        return $"{leadRun.Title} is currently on {activeScene.Title} ({activeScene.Revision}). {objectiveSummary}";
+    }
+
+    private static string ResolveWorkspaceNextSafeAction(
+        CampaignProjection campaign,
+        WorkspaceRestoreProjection restore,
+        IReadOnlyList<PublicationSafeProjection> recapShelf,
+        IReadOnlyList<CampaignReadinessCue> readinessCues,
+        RunProjection? leadRun,
+        SceneProjection? activeScene,
+        ObjectiveProjection? leadObjective)
+    {
+        string? restoreConflict = restore.ConflictSummaries.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item));
+        if (!string.IsNullOrWhiteSpace(restoreConflict))
+        {
+            return $"Resolve restore review before you reopen {campaign.Name}: {restoreConflict}";
+        }
+
+        CampaignReadinessCue? attentionCue = readinessCues.FirstOrDefault(static cue =>
+            !string.Equals(cue.Severity, "ready", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(cue.Severity, "healthy", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(cue.Severity, "ok", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(cue.Severity, "info", StringComparison.OrdinalIgnoreCase));
+        if (attentionCue is not null)
+        {
+            return $"Review {attentionCue.Title} before you continue {campaign.Name}: {attentionCue.Summary}";
+        }
+
+        if (activeScene is not null && leadObjective is not null)
+        {
+            return $"Resume {activeScene.Title} in {leadRun!.Title} and clear {leadObjective.Title} before you advance the next recap-safe handoff.";
+        }
+
+        if (activeScene is not null)
+        {
+            return $"Resume {activeScene.Title} in {leadRun!.Title} and confirm the next scene-safe recap before you switch devices.";
+        }
+
+        if (recapShelf.Count == 0)
+        {
+            return $"Open {campaign.Name} and publish the first recap-safe output before you trust this workspace as the return lane.";
+        }
+
+        return $"Open {campaign.Name} from the latest continuity snapshot and keep the shared return lane attached to the current claimed install.";
+    }
+
+    private static IReadOnlyList<WorkspaceChangePacketProjection> BuildWorkspaceChangePackets(
+        CampaignProjection campaign,
+        IReadOnlyList<PublicationSafeProjection> recapShelf,
+        RunProjection? leadRun,
+        SceneProjection? activeScene,
+        ObjectiveProjection? leadObjective)
+    {
+        List<WorkspaceChangePacketProjection> packets = [];
+        if (campaign.LatestContinuity is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:continuity"),
+                Kind: "continuity",
+                Label: "Continuity snapshot",
+                Summary: campaign.LatestContinuity.Summary,
+                UpdatedAtUtc: campaign.LatestContinuity.CapturedAtUtc));
+        }
+
+        if (activeScene is not null && leadRun is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:scene:{activeScene.SceneId}"),
+                Kind: "scene",
+                Label: "Active scene",
+                Summary: $"{activeScene.Title} is live on {leadRun.Title} at {activeScene.Revision}.",
+                UpdatedAtUtc: activeScene.UpdatedAtUtc));
+        }
+
+        if (leadObjective is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:objective:{leadObjective.ObjectiveId}"),
+                Kind: "objective",
+                Label: "Objective pressure",
+                Summary: $"{leadObjective.Title} remains {leadObjective.Status} with {leadObjective.Pressure} pressure.",
+                UpdatedAtUtc: leadObjective.UpdatedAtUtc));
+        }
+
+        PublicationSafeProjection? recap = recapShelf.FirstOrDefault();
+        if (recap is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:recap:{recap.ProjectionId}"),
+                Kind: "artifact",
+                Label: recap.Label,
+                Summary: recap.Summary,
+                UpdatedAtUtc: campaign.UpdatedAtUtc));
+        }
+
+        return packets
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
     }
 
     private static IReadOnlyList<string> BuildBuildLabWatchouts(

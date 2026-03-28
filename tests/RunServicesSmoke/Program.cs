@@ -1538,6 +1538,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Shared campaign view", StringComparison.Ordinal), "home work should surface the calmer shared campaign view card instead of hiding workspace return behind the deeper account route.");
     Assert(homeSource.Contains("Open campaign workspace", StringComparison.Ordinal), "home work should keep an explicit route back into the shared campaign view.");
     Assert(homeSource.Contains("/account/work/workspaces/", StringComparison.Ordinal), "home work should deep-link the shared campaign view instead of sending every route back to the generic work shell.");
+    Assert(homeSource.Contains("@workspace.ActiveSceneSummary", StringComparison.Ordinal), "home work should surface active-scene change truth directly on the calmer shared campaign card.");
+    Assert(homeSource.Contains("@workspace.NextSafeAction", StringComparison.Ordinal), "home work should surface the next safe action directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
     Assert(homeSource.Contains("Evidence:", StringComparison.Ordinal), "home work should surface the first grounded rule evidence line instead of only a generic provenance label.");
@@ -1583,6 +1585,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Finish on another device", StringComparison.Ordinal), "account access should describe pending claim codes as the remaining device handoff step.");
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
     Assert(accountSource.Contains("Closure:", StringComparison.Ordinal), "account build-path details should surface support-closure truth instead of leaving the new rail data unused.");
+    Assert(accountSource.Contains("Recent change packets", StringComparison.Ordinal), "account work should surface recent change packets for the shared campaign view.");
+    Assert(accountSource.Contains("@selectedWorkspace.NextSafeAction", StringComparison.Ordinal), "account work should surface the workspace next safe action directly on the selected campaign card.");
     Assert(accountSource.Contains("Follow-up lane", StringComparison.Ordinal), "account support detail should surface the follow-up lane instead of assuming the user remembers it.");
     Assert(accountSource.Contains("Release progress:", StringComparison.Ordinal), "account support detail should surface reporter-lane release progress instead of only the closure summary.");
     Assert(accountSource.Contains("Affected install", StringComparison.Ordinal), "account support detail should surface the install linked to the tracked case.");
@@ -2005,6 +2009,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.Workspaces.Count >= 1, "account page should surface a first-class campaign workspace.");
     Assert(accountModel.CampaignSpine.Workspaces[0].ReadinessCues.Count >= 1, "campaign workspace should surface readiness cues.");
     Assert(accountModel.CampaignSpine.Workspaces[0].RecapShelf.Count >= 1, "campaign workspace should surface recap or publication-safe continuity outputs.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "campaign workspace should surface an explicit active-scene summary.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.Workspaces[0].NextSafeAction), "campaign workspace should surface an explicit next safe action.");
+    Assert(accountModel.CampaignSpine.Workspaces[0].ChangePackets?.Count >= 1, "campaign workspace should surface recent change packets.");
     Assert(accountModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "account page should surface Build Lab handoffs into living dossier and campaign truth.");
     Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "account page should receive customer-facing build-path titles directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "account page should receive the next safe action directly from the campaign spine service.");
@@ -2035,6 +2042,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var workspacePayload = (workspaceResult.Result as OkObjectResult)?.Value as CampaignWorkspaceProjection ?? workspaceResult.Value;
     Assert(workspacePayload is not null && string.Equals(workspacePayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine api should expose a stable workspace summary.");
     Assert(workspacePayload?.ReadinessCues.Count >= 1, "campaign spine workspace api should keep readiness cues attached to the workspace summary.");
+    Assert(!string.IsNullOrWhiteSpace(workspacePayload?.ActiveSceneSummary), "campaign spine workspace api should expose an active-scene summary.");
+    Assert(!string.IsNullOrWhiteSpace(workspacePayload?.NextSafeAction), "campaign spine workspace api should expose a next safe action.");
+    Assert(workspacePayload?.ChangePackets?.Count >= 1, "campaign spine workspace api should expose recent change packets.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
@@ -2152,6 +2162,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.Dossiers.Count >= 1, "signed-in home should surface living dossier continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.Runs.Count >= 1, "signed-in home should surface runboard continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Count >= 1, "signed-in home should keep the first-class campaign workspace attached to the signed-in shell.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "signed-in home should keep the active-scene summary attached to the shared campaign view.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].NextSafeAction), "signed-in home should keep the workspace next safe action attached to the shared campaign view.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "signed-in home should receive customer-facing build-path titles directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "signed-in home should receive the next safe build action directly from the campaign spine service.");
