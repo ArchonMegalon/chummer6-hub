@@ -1639,6 +1639,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!shelfSource.Contains("@card.Card.Audience", StringComparison.Ordinal), "artifact shelf cards should not render raw audience values.");
     Assert(publicLandingControllerSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Audience)", StringComparison.Ordinal), "detail-page facts should humanize audience labels before projecting them.");
     Assert(publicLandingControllerSource.Contains("\"Who should use this now\"", StringComparison.Ordinal), "live proof details should use customer-facing audience copy.");
+    Assert(!publicLandingControllerSource.Contains("signed-in shell", StringComparison.Ordinal), "controller-built landing and support copy should avoid signed-in shell wording on customer-facing routes.");
     Assert(!featureDetailSource.Contains("story-guide-tail", StringComparison.Ordinal), "detail-family pages should not end with one generic shared tail after the family-specific sections.");
     Assert(!featureDetailSource.Contains("Get help with this surface", StringComparison.Ordinal), "detail-family pages should keep next-step help inside the family-specific route blocks.");
     Assert(!roadmapDetailSource.Contains("Audience impact", StringComparison.Ordinal), "roadmap detail should not repeat audience copy once the fact rail already states who should follow it.");
