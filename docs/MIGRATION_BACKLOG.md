@@ -221,8 +221,9 @@ Progress: `WorkspaceLifecyclePolicyService` now prunes expired/orphaned restore 
 Acceptance criteria: CI produces versioned, reproducible deliverables for all active heads and documents deployment procedures.
 Progress: workflow `Public Edge Release Artifacts` now triggers on `main`, publishes `release-api-portable`, and packages the checked-in public downloads mirror into `desktop-download-bundle` with a freshly generated manifest. Deployment guidance is explicit in `docs/ACTIVE_HEAD_RELEASE_ARTIFACTS.md` plus `docs/SELF_HOSTED_DOWNLOADS_RUNBOOK.md`, and the repo no longer claims to source-build boundary-external desktop heads it does not contain.
 
-- [ ] `MIG-095` Add benchmark guardrails for import/section/save paths.
+- [x] `MIG-095` Add benchmark guardrails for import/section/save paths.
 Acceptance criteria: `Chummer.Benchmarks` includes migration-critical workloads with performance budgets checked in CI.
+Progress: benchmark ownership stays in `../chummer-core-engine/Chummer.Benchmarks`, where `workspace.import.bastion`, `workspace.section.skills.bastion`, and `workspace.save.bastion` now run against explicit budgets in CI via `.github/workflows/benchmark-guardrails.yml`; this repo consumes that owner-repo proof instead of cloning the benchmark surface locally.
 
 ### Phase 10: Public edge and tunnel gateway
 
