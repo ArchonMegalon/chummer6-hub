@@ -70,6 +70,11 @@ Primary services:
 - `PublicReleaseManifestService`
 - `ReleaseSelectionService`
 
+Runtime truth note:
+- `PublicReleaseManifestService` may read the registry-owned current release-channel projection from `chummer6-hub-registry`
+  over `CHUMMER_RELEASE_REGISTRY_CURRENT_URL` / `CHUMMER_HUB_REGISTRY_BASE_URL` before falling back to the file-backed
+  `RELEASE_CHANNEL.generated.json` snapshot.
+
 ## Install and Orchestration Adapters
 
 Owns:

@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer6-hub.campaign_os_local_proof",
-  "generated_at": "2026-03-28T16:30:44Z",
+  "generated_at": "2026-03-28T16:48:08Z",
   "status": "passed",
   "proof_kind": "source_backed_local_smoke_contract",
   "source_file": "tests/RunServicesSmoke/Program.cs",

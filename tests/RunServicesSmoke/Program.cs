@@ -1855,6 +1855,32 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(downloadsModel.Manifest.SupportabilityState, "local_docker_proven", StringComparison.Ordinal), "downloads page should preserve registry-owned supportability posture.");
     Assert(string.Equals(downloadsModel.Manifest.ProofStatus, "passed", StringComparison.Ordinal), "downloads page should preserve registry-owned release proof posture.");
     Assert(downloadsModel.Manifest.FixAvailabilitySummary?.Contains("affected install", StringComparison.OrdinalIgnoreCase) == true, "downloads page should preserve registry-owned fix availability guidance.");
+    var runtimeManifestConfiguration = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot,
+            ["CHUMMER_RELEASE_REGISTRY_CURRENT_URL"] = "http://registry.local/api/v1/registry/release-channel/current",
+        })
+        .Build();
+    var runtimeManifestService = new PublicReleaseManifestService(
+        runtimeManifestConfiguration,
+        new HttpClient(new StubHttpMessageHandler(request =>
+        {
+            Assert(
+                string.Equals(request.RequestUri?.AbsoluteUri, "http://registry.local/api/v1/registry/release-channel/current", StringComparison.Ordinal),
+                "runtime manifest fetch should target the registry release-channel endpoint.");
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    File.ReadAllText(Path.Combine(downloadsRoot, "RELEASE_CHANNEL.generated.json")),
+                    Encoding.UTF8,
+                    "application/json")
+            };
+        })));
+    var runtimeManifest = runtimeManifestService.LoadManifest();
+    Assert(string.Equals(runtimeManifest.Source, "registry_runtime", StringComparison.Ordinal), "release manifest service should prefer the registry runtime endpoint when configured.");
+    Assert(string.Equals(runtimeManifest.SupportabilityState, "local_docker_proven", StringComparison.Ordinal), "runtime manifest fetch should preserve supportability posture.");
+    Assert(string.Equals(runtimeManifest.ProofStatus, "passed", StringComparison.Ordinal), "runtime manifest fetch should preserve proof posture.");
     controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)";
     var macDownloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var macDownloadsModel = macDownloadsView?.Model as DownloadsPageViewModel;
