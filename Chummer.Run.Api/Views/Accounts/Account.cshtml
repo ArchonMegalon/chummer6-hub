@@ -1083,14 +1083,14 @@
                     @foreach (var workspace in Model.CampaignSpine.Workspaces)
                     {
                         <details class="details-drawer">
-                            <summary>@workspace.CampaignName · shared campaign view</summary>
+                            <summary>@workspace.CampaignName · Campaign workspace</summary>
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
                                     <span>Visibility</span>
                                     <strong>@HumanizeStatus(workspace.Visibility, "Private")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Reference context</span>
+                                    <span>Rule environment</span>
                                     <strong>@RuleEnvironmentSummary(workspace.RuleEnvironment)</strong>
                                 </div>
                                 <div class="settings-summary-row">

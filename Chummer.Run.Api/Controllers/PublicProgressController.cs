@@ -65,6 +65,12 @@ public sealed class PublicProgressController : ControllerBase
     public ContentResult ProgressPoster()
         => Content(_progress.LoadPosterSvg(), "image/svg+xml");
 
+    [HttpGet("weekly-pulse")]
+    [HttpGet("/api/public/weekly-pulse")]
+    [Produces("application/json")]
+    public ContentResult WeeklyPulse()
+        => Content(_progress.LoadWeeklyPulseJson(), "application/json");
+
     private string RenderShell(string reportHtml, SiteChromeViewModel chrome, string? antiForgeryToken)
     {
         var navigation = _navigation.LoadNavigation();
