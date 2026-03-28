@@ -123,6 +123,35 @@ public sealed record SupportCaseListResponse(
     IReadOnlyList<SupportCaseProjection> Items,
     int TotalCount);
 
+public sealed record SupportClosureCue(
+    string CaseId,
+    string Status,
+    string StageLabel,
+    string Summary,
+    string NextSafeAction,
+    string? FixedReleaseLabel = null,
+    string? AffectedInstallSummary = null);
+
+public sealed record KnownIssueAffectingInstall(
+    string CaseId,
+    string Severity,
+    string Summary,
+    string? AffectedInstallSummary,
+    string? DetailHref = null);
+
+public sealed record DecisionNotice(
+    string NoticeId,
+    string Kind,
+    string Summary,
+    string ActionLabel,
+    string ActionHref);
+
+public sealed record NextSafeActionCue(
+    string ActionId,
+    string Label,
+    string Summary,
+    string SourceKind);
+
 public static class SupportAssistantConfidenceLevels
 {
     public const string CaseTruth = "case_truth";

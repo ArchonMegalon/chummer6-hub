@@ -34,6 +34,7 @@ Owns:
 Primary services:
 
 - `CampaignSpineService`
+- `CampaignWorkspaceServerPlaneService`
 
 ## Control and Support
 
