@@ -28,6 +28,7 @@ Primary services:
 Owns:
 
 - dossier, crew, campaign, run, scene, objective, and continuity summaries exposed from Hub
+- workspace digests and calmer client follow-through read models derived from the same campaign truth
 - account and workspace summaries derived from package-owned campaign truth
 
 Primary services:
