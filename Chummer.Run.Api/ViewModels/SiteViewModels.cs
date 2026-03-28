@@ -354,7 +354,11 @@ public sealed record SupportCasePresentationViewModel(
     string ReleaseProgressSummary,
     IReadOnlyList<SupportCaseTimelineHighlightViewModel> TimelineHighlights,
     bool ReporterActionNeeded,
-    bool CanVerifyFix);
+    bool CanVerifyFix,
+    string InstallReadinessSummary,
+    bool FixReadyOnLinkedInstall,
+    bool NeedsInstallUpdate,
+    bool NeedsLinkedInstall);
 
 public sealed record SupportCaseDigestViewModel(
     string CaseId,
@@ -374,7 +378,11 @@ public sealed record SupportCaseDigestViewModel(
     string FollowUpLaneSummary,
     string ReleaseProgressSummary,
     bool ReporterActionNeeded,
-    bool CanVerifyFix);
+    bool CanVerifyFix,
+    string InstallReadinessSummary,
+    bool FixReadyOnLinkedInstall,
+    bool NeedsInstallUpdate,
+    bool NeedsLinkedInstall);
 
 public sealed record SupportCaseTimelineHighlightViewModel(
     string Label,

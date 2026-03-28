@@ -1,5 +1,7 @@
 using Chummer.Control.Contracts.Support;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 
 namespace Chummer.Run.Api.Services.Support;
@@ -43,17 +45,23 @@ public sealed class SupportAssistantService
     private readonly SupportCaseService _supportCases;
     private readonly PublicCanonFileLoader _canon;
     private readonly CampaignSpineService _campaignSpine;
+    private readonly InstallLinkingService _installLinking;
+    private readonly SupportCasePresentationService _supportPresentation;
     private readonly ILogger<SupportAssistantService> _logger;
 
     public SupportAssistantService(
         SupportCaseService supportCases,
         PublicCanonFileLoader canon,
         CampaignSpineService campaignSpine,
+        InstallLinkingService installLinking,
+        SupportCasePresentationService supportPresentation,
         ILogger<SupportAssistantService> logger)
     {
         _supportCases = supportCases;
         _canon = canon;
         _campaignSpine = campaignSpine;
+        _installLinking = installLinking;
+        _supportPresentation = supportPresentation;
         _logger = logger;
     }
 
@@ -68,20 +76,26 @@ public sealed class SupportAssistantService
         HashSet<string> tokens = Tokenize(query);
 
         IReadOnlyList<SupportCaseProjection> reporterCases = _supportCases.ListForReporter(reporterUserId, reporterSubjectId).Items;
+        var installLinking = string.IsNullOrWhiteSpace(reporterUserId) && string.IsNullOrWhiteSpace(reporterSubjectId)
+            ? null
+            : _installLinking.GetSummary(reporterUserId, reporterSubjectId);
         List<SupportCaseProjection> caseMatches = reporterCases
             .Where(item => MatchesCase(item, caseId, installationId, tokens))
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .ToList();
+        List<SupportCasePresentationViewModel> presentedMatches = _supportPresentation
+            .BuildList(caseMatches, installLinking)
+            .ToList();
 
         List<SupportAssistantCitation> citations = new();
-        foreach (var item in caseMatches.Take(maxCitations))
+        foreach (var item in presentedMatches.Take(maxCitations))
         {
             citations.Add(new SupportAssistantCitation(
                 SourceKind: "support_case",
-                Label: item.Title,
-                Summary: $"Status: {HumanizeStatus(item.Status)}. Owner: {item.CandidateOwnerRepo}. Summary: {item.Summary}",
-                Status: item.Status,
-                Href: "/account/support"));
+                Label: item.Case.Title,
+                Summary: TrimForSummary($"{item.StageLabel}. {item.ReleaseProgressSummary} {item.VerificationSummary}"),
+                Status: item.Case.Status,
+                Href: item.DetailHref));
         }
 
         foreach (var citation in BuildRulesTruthCitations(reporterUserId, reporterSubjectId, tokens, maxCitations - citations.Count))
@@ -119,16 +133,16 @@ public sealed class SupportAssistantService
                 Href: rule.Href));
         }
 
-        List<SupportAssistantAction> actions = BuildActions(caseMatches, tokens);
-        string confidence = caseMatches.Count > 0
+        List<SupportAssistantAction> actions = BuildActions(presentedMatches, tokens);
+        string confidence = presentedMatches.Count > 0
             ? SupportAssistantConfidenceLevels.CaseTruth
             : citations.Count > 0
                 ? SupportAssistantConfidenceLevels.CanonHelp
                 : SupportAssistantConfidenceLevels.NeedsCase;
         bool escalationRecommended = confidence == SupportAssistantConfidenceLevels.NeedsCase
-            || caseMatches.Any(static item => string.Equals(item.Status, SupportCaseStatuses.AwaitingEvidence, StringComparison.OrdinalIgnoreCase));
+            || presentedMatches.Any(static item => string.Equals(item.Case.Status, SupportCaseStatuses.AwaitingEvidence, StringComparison.OrdinalIgnoreCase));
 
-        string answer = BuildAnswer(caseMatches, citations, tokens, escalationRecommended);
+        string answer = BuildAnswer(presentedMatches, citations, tokens, escalationRecommended);
         return new SupportAssistantResponse(answer, confidence, escalationRecommended, citations, actions);
     }
 
@@ -223,19 +237,24 @@ public sealed class SupportAssistantService
     }
 
     private string BuildAnswer(
-        IReadOnlyList<SupportCaseProjection> caseMatches,
+        IReadOnlyList<SupportCasePresentationViewModel> caseMatches,
         IReadOnlyList<SupportAssistantCitation> citations,
         IReadOnlySet<string> tokens,
         bool escalationRecommended)
     {
         if (caseMatches.Count > 0)
         {
-            SupportCaseProjection latest = caseMatches[0];
-            string status = HumanizeStatus(latest.Status);
-            string guidance = latest.Status switch
+            SupportCasePresentationViewModel latest = caseMatches[0];
+            string guidance = latest.Case.Status switch
             {
                 SupportCaseStatuses.ReleasedToReporterChannel or SupportCaseStatuses.Fixed or SupportCaseStatuses.UserNotified
-                    => "The tracked fix is already tied to a release or notification state, so the next useful step is to confirm you are on the matching channel and installer head.",
+                    when latest.FixReadyOnLinkedInstall
+                        => $"{latest.InstallReadinessSummary} Confirm the result on this same tracked case instead of opening a duplicate thread.",
+                SupportCaseStatuses.ReleasedToReporterChannel or SupportCaseStatuses.Fixed or SupportCaseStatuses.UserNotified
+                    when latest.NeedsLinkedInstall
+                        => $"{latest.InstallReadinessSummary} Once that copy is linked, come back to this same case to verify the fix.",
+                SupportCaseStatuses.ReleasedToReporterChannel or SupportCaseStatuses.Fixed or SupportCaseStatuses.UserNotified
+                    => $"{latest.InstallReadinessSummary} After the linked install is current, come back to this same case to confirm whether the fix worked here.",
                 SupportCaseStatuses.AwaitingEvidence
                     => "The tracked case is waiting for more evidence, so add the missing repro details or diagnostics instead of opening a duplicate report.",
                 SupportCaseStatuses.Deferred or SupportCaseStatuses.Rejected
@@ -243,7 +262,7 @@ public sealed class SupportAssistantService
                 _ => "The tracked case is still live, so follow that case instead of creating a duplicate thread."
             };
 
-            return $"I found {caseMatches.Count} matching support case(s). The latest is '{latest.Title}' in {status}. {guidance}";
+            return $"I found {caseMatches.Count} matching support case(s). The latest is '{latest.Case.Title}' in {latest.StageLabel}. {guidance}";
         }
 
         if (citations.Count > 0)
@@ -265,7 +284,7 @@ public sealed class SupportAssistantService
         return "I could not ground an answer from your current support cases or the first-party help docs. Open a support case so the problem can be tracked against your install, channel, or release state.";
     }
 
-    private List<SupportAssistantAction> BuildActions(IReadOnlyList<SupportCaseProjection> caseMatches, IReadOnlySet<string> tokens)
+    private List<SupportAssistantAction> BuildActions(IReadOnlyList<SupportCasePresentationViewModel> caseMatches, IReadOnlySet<string> tokens)
     {
         Dictionary<string, SupportAssistantAction> actions = new(StringComparer.OrdinalIgnoreCase);
 
@@ -278,10 +297,12 @@ public sealed class SupportAssistantService
         {
             Add("open_account_support", "Open support timeline", "/account/support", "Review the tracked case and its latest status.");
 
-            if (caseMatches.Any(item =>
-                    string.Equals(item.Status, SupportCaseStatuses.ReleasedToReporterChannel, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(item.Status, SupportCaseStatuses.Fixed, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(item.Status, SupportCaseStatuses.UserNotified, StringComparison.OrdinalIgnoreCase)))
+            if (caseMatches.Any(static item => item.NeedsLinkedInstall))
+            {
+                Add("open_account_access", "Open Devices and access", "/account/access", "Link or reclaim the affected install before you verify the fix.");
+            }
+
+            if (caseMatches.Any(static item => item.NeedsInstallUpdate))
             {
                 Add("open_downloads", "Open downloads", "/downloads", "Confirm you are on the fixed channel and installer head.");
             }

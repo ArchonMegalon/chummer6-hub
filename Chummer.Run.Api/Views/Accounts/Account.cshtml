@@ -64,6 +64,7 @@
     var showAdvancedSection = string.Equals(Model.CurrentSection, "advanced", StringComparison.OrdinalIgnoreCase);
     var selectedSupportCase = Model.SelectedSupportCase;
     var selectedSupportCaseSummary = Model.SelectedSupportCaseSummary;
+    var selectedSupportInstallationId = selectedSupportCase?.InstallationId;
     var selectedWorkspace = Model.SelectedWorkspace;
     var selectedWorkspaceServerPlane = Model.SelectedWorkspaceServerPlane;
     var selectedRun = Model.SelectedRun;
@@ -365,6 +366,7 @@
                                 <p><strong>Next safe action:</strong> @selectedSupportCaseSummary.NextSafeAction</p>
                                 <p><strong>Closure:</strong> @selectedSupportCaseSummary.ClosureSummary</p>
                                 <p><strong>Release progress:</strong> @selectedSupportCaseSummary.ReleaseProgressSummary</p>
+                                <p><strong>Linked install state:</strong> @selectedSupportCaseSummary.InstallReadinessSummary</p>
                                 <p><strong>Fix confirmation:</strong> @selectedSupportCaseSummary.VerificationSummary</p>
                             </div>
                             <div class="stacked-actions">
@@ -441,10 +443,10 @@
                         <div class="field">
                             <label for="supportAssistantInstallation">Related install</label>
                             <select id="supportAssistantInstallation">
-                                <option value="">Any install or no install yet</option>
+                                <option value="" selected="@(string.IsNullOrWhiteSpace(selectedSupportInstallationId) ? "selected" : null)">Any install or no install yet</option>
                                 @foreach (var installation in Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>())
                                 {
-                                    <option value="@installation.InstallationId">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
+                                    <option value="@installation.InstallationId" selected="@(string.Equals(selectedSupportInstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
                                 }
                             </select>
                         </div>
