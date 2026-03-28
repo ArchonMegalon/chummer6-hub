@@ -11,7 +11,7 @@
         <p class="eyebrow">Signed-in download</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Summary</p>
-        <p class="release-stage__note">This handoff keeps the published installer canonical while attaching the install relationship to your account through a short-lived claim code.</p>
+        <p class="release-stage__note">This handoff keeps the published installer unchanged while attaching the install relationship to your account through a short-lived claim code.</p>
     </div>
     <div class="release-stage__integrity">
         <span class="tag">Current release</span>
@@ -78,7 +78,7 @@
 }
 
 <section class="release-footnote">
-    <p class="muted-copy">The installer bytes stay canonical for every user. The account-aware part is the short-lived claim ticket, not a personalized binary.</p>
+    <p class="muted-copy">The installer bytes stay the same for every user. The account-aware part is the short-lived claim ticket, not a personalized binary.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--secondary" href="@Model.AccountHref">@Model.AccountLabel</a>
         <a class="button-like button-like--ghost" href="/downloads">Back to downloads</a>

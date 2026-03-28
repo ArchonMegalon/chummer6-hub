@@ -1523,6 +1523,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!homeSource.Contains("More in your signed-in shell", StringComparison.Ordinal), "home should not fall back to the old catch-all signed-in shell accordion.");
     Assert(!homeSource.Contains("Account state at a glance", StringComparison.Ordinal), "home should keep the overview route focused instead of adding a second top-level summary disclosure.");
     Assert(!homeSource.Contains("signed-in cockpit", StringComparison.Ordinal), "home access should avoid cockpit phrasing on the customer-facing route.");
+    Assert(!homeSource.Contains("signed-in shell", StringComparison.Ordinal), "home should avoid signed-in shell wording on customer-facing routes.");
     Assert(!homeSource.Contains("Campaign workspace context", StringComparison.Ordinal), "home work should avoid internal campaign-workspace phrasing.");
     Assert(!homeSource.Contains("Rule environments", StringComparison.Ordinal), "home work should avoid internal rule-environment phrasing.");
     Assert(homeSource.Contains("Open what works today", StringComparison.Ordinal), "home access should point proof needs to the dedicated now route instead of repeating proof cards inline.");
@@ -1548,9 +1549,14 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!accountSource.Contains("Campaign continuity, work-return surfaces, and team posture", StringComparison.Ordinal), "account work copy should avoid internal continuity posture phrasing.");
     Assert(!accountSource.Contains("Advanced continuity and restore", StringComparison.Ordinal), "account access should avoid internal restore drawer wording.");
     Assert(!accountSource.Contains("Claimed second-device restore posture", StringComparison.Ordinal), "account access should avoid internal second-device restore jargon.");
+    Assert(!accountSource.Contains("signed-in shell", StringComparison.Ordinal), "account should avoid signed-in shell wording on customer-facing surfaces.");
     Assert(!accountSource.Contains("Campaign workspaces", StringComparison.Ordinal), "account work summary should describe shared campaign views in customer-facing language.");
     Assert(accountSource.Contains("Work and continuity", StringComparison.Ordinal), "account should use the calmer work section heading.");
     Assert(accountSource.Contains("Advanced device recovery", StringComparison.Ordinal), "account access should use customer-facing recovery wording for advanced device details.");
+    var downloadDispatchSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
+    var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
+    Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
+    Assert(!supportSubmittedSource.Contains("signed-in shell", StringComparison.Ordinal), "support confirmation should avoid signed-in shell wording.");
     Assert(accountSource.Contains("Recent install handoffs", StringComparison.Ordinal), "account access should describe recent downloads as install handoffs instead of raw receipts.");
     Assert(accountSource.Contains("Finish on another device", StringComparison.Ordinal), "account access should describe pending claim codes as the remaining device handoff step.");
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
@@ -1571,7 +1577,6 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(trustSource.Contains("What changed in this version", StringComparison.Ordinal), "privacy and terms should render a policy-delta block instead of leaving summary points buried in the generic hero chrome.");
     Assert(trustSource.Contains("HelpFallbackActionFor", StringComparison.Ordinal), "help should expose a deliberate fallback action per lane instead of only one outbound link.");
     Assert(trustSource.Contains("Fallback:", StringComparison.Ordinal), "help cards should render a visible fallback route under the primary next step.");
-    var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
     Assert(supportSubmittedSource.Contains("Watch Account > Support", StringComparison.Ordinal), "support confirmation should explain the signed-in follow-up lane instead of stopping at a generic receipt.");
     Assert(supportSubmittedSource.Contains("Watch your reply email", StringComparison.Ordinal), "support confirmation should explain the guest follow-up lane instead of assuming an account-only workflow.");
     Assert(supportSubmittedSource.Contains("Next safe action", StringComparison.Ordinal), "support confirmation should keep the tracked case next-step visible when the reporter is signed in.");
