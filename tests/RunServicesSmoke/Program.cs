@@ -1517,6 +1517,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!landingSource.Contains("role-matrix__grid", StringComparison.Ordinal), "landing proof should not reopen a second mini-grid once the hero already carries the main conversion story.");
     Assert(!landingSource.Contains("works-column__header", StringComparison.Ordinal), "landing should collapse the what-works-now strip instead of restating three full column headers.");
     Assert(landingSource.Contains("Preview in progress:", StringComparison.Ordinal), "landing should demote preview-in-progress copy to a quieter shelf note instead of a full third state card.");
+    Assert(landingSource.Contains("Need the full picture?", StringComparison.Ordinal), "landing should route deeper proof evaluation through one quiet inline note instead of a second button stack.");
     Assert(landingSource.Contains("PublicSurfaceStatus.DisplayLabel", StringComparison.Ordinal), "landing should use the shared public status presenter instead of route-local badge labels.");
     var storySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml"));
     Assert(!storySource.Contains("One path from install to session return", StringComparison.Ordinal), "product story should not drift back into a second install/support explainer.");
@@ -1525,6 +1526,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!storySource.Contains("product loop", StringComparison.Ordinal), "product story should avoid internal loop phrasing on the customer-facing differentiation page.");
     Assert(!storySource.Contains("story-guide-tail", StringComparison.Ordinal), "product story should not end in a second landing-style CTA band.");
     Assert(!storySource.Contains("Go deeper only where you still need proof", StringComparison.Ordinal), "product story should not end with another full-width guidance section after the differentiation grid.");
+    Assert(storySource.Contains("Use this page to decide whether Chummer fits.", StringComparison.Ordinal), "product story should frame itself as a fit-and-differentiation page instead of a second action surface.");
     Assert(storySource.Contains("Need proof?", StringComparison.Ordinal), "product story should end with a quieter inline route note instead of a second hero-like CTA cluster.");
     var nowSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml"));
     Assert(nowSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "now page should include the unified public status guide.");
@@ -1679,6 +1681,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!downloadsSource.Contains("What changed and what to expect", StringComparison.Ordinal), "downloads should not carry a second release explainer block under the primary install path.");
     Assert(downloadsSource.Contains("Release notes, known issues, and requirements", StringComparison.Ordinal), "downloads should tuck release education into one calmer drawer on the primary card.");
     Assert(!downloadsSource.Contains("<summary>Package details</summary>", StringComparison.Ordinal), "downloads should keep package details inside the existing release-information drawer instead of adding a second top-card drawer.");
+    Assert(downloadsSource.Contains("Install path", StringComparison.Ordinal), "downloads should move the technical install-path explanation under the release-information drawer.");
+    Assert(downloadsSource.Contains("Use the recommended installer first. Release detail, alternate packages, and manual paths stay collapsed underneath.", StringComparison.Ordinal), "downloads should keep the top card focused on the first install decision instead of technical support wording.");
+    Assert(!downloadsSource.Contains("<p>@release.Recommended.SupportLine</p>", StringComparison.Ordinal), "downloads should not surface the technical install-path line as the primary top-card copy.");
     Assert(downloadsSource.Contains("Open current release", StringComparison.Ordinal), "downloads should route broader release posture back to the dedicated current-release page instead of turning the install card into a second status page.");
     Assert(shelfSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Card.Audience)", StringComparison.Ordinal), "artifact shelf cards should humanize audience labels instead of leaking raw canon values.");
     Assert(!shelfSource.Contains("@card.Card.Audience", StringComparison.Ordinal), "artifact shelf cards should not render raw audience values.");

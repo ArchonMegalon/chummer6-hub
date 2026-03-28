@@ -18,7 +18,7 @@
     }
     var proofNotes = Model.Workflows.Take(1).ToArray();
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
-    var proofSectionTrail = Model.Surface.ProductProofTrail.Skip(1).Take(3).ToArray();
+    var proofSectionTrail = Model.Surface.ProductProofTrail.Skip(1).Take(2).ToArray();
     var availableHighlight = Model.AvailableToday.FirstOrDefault();
     var comingNextHighlight = Model.ComingNext.FirstOrDefault();
     var previewCount = Model.PreviewItems.Count;
@@ -103,8 +103,7 @@
         {
             var workflow = proofNotes[0];
             <div class="release-footnote">
-                <p><strong>@workflow.Card.Title:</strong> @(workflow.Card.ProofNote ?? workflow.Card.Payoff ?? workflow.Card.Summary)</p>
-                <p><a class="inline-link" href="@workflow.Action.Href">@workflow.Action.Label</a></p>
+                <p><strong>@workflow.Card.Title:</strong> @(workflow.Card.ProofNote ?? workflow.Card.Payoff ?? workflow.Card.Summary) <a class="inline-link" href="@workflow.Action.Href">@workflow.Action.Label</a>.</p>
             </div>
         }
         <div class="stacked-actions">
@@ -133,7 +132,7 @@
                 <div class="compact-rail__copy">
                     <span class="tag">@PublicSurfaceStatus.DisplayLabel(availableHighlight.Card.Badge)</span>
                     <h3>@availableHighlight.Card.Title</h3>
-                    <p>@availableHighlight.Card.Summary @(Model.AvailableToday.Count > 1 ? $"+{Model.AvailableToday.Count - 1} more available proof surface(s) sit on the full shelf." : string.Empty)</p>
+                    <p>@availableHighlight.Card.Summary @(Model.AvailableToday.Count > 1 ? $"+{Model.AvailableToday.Count - 1} more live proof surface(s) sit on the full shelf." : string.Empty)</p>
                 </div>
                 <a class="inline-link" href="@availableHighlight.Action.Href">@availableHighlight.Action.Label</a>
             </article>
@@ -144,7 +143,7 @@
                 <div class="compact-rail__copy">
                     <span class="tag @PublicSurfaceStatus.CssTone(comingNextHighlight.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(comingNextHighlight.Card.Badge)</span>
                     <h3>@comingNextHighlight.Card.Title</h3>
-                    <p>@comingNextHighlight.Card.Summary @(Model.ComingNext.Count > 1 ? $"+{Model.ComingNext.Count - 1} more roadmap surface(s) stay visible." : string.Empty)</p>
+                    <p>@comingNextHighlight.Card.Summary @(Model.ComingNext.Count > 1 ? $"+{Model.ComingNext.Count - 1} more roadmap surface(s) stay visible on the full roadmap." : string.Empty)</p>
                 </div>
                 <a class="inline-link" href="@comingNextHighlight.Action.Href">@comingNextHighlight.Action.Label</a>
             </article>
@@ -160,16 +159,14 @@
             }
         </p>
     }
-    <div class="stacked-actions">
-        <a class="button-like button-like--secondary" href="/now">Open the full proof shelf</a>
-    </div>
+    <p class="muted-copy">Need the full picture? <a class="inline-link" href="/now">Open the full proof shelf</a>.</p>
 </section>
 
 <section class="access-band">
     <div class="access-band__copy">
         <p class="eyebrow">@closingSection.Eyebrow</p>
         <h2 class="editorial-title">@closingSection.Title</h2>
-        <p class="editorial-copy">Create the account when you want preview installs, install linking, roadmap follow-up, and support history to stay attached to one return path.</p>
+        <p class="editorial-copy">Create the account when you want installs, devices, roadmap follow-up, and support history to stay attached to one return path.</p>
     </div>
     <div class="access-band__actions">
         @if (Model.Chrome.Authenticated)
