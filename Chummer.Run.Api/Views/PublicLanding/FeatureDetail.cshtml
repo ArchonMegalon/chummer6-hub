@@ -3,25 +3,6 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-feature-detail";
-    var roadmapDetail = string.Equals(Model.Family, "roadmap", StringComparison.OrdinalIgnoreCase);
-    var liveArtifact = string.Equals(Model.Family, "live-proof", StringComparison.OrdinalIgnoreCase);
-    var nextTitle = roadmapDetail
-        ? "Track this horizon from inside the product"
-        : liveArtifact
-            ? "Use this live proof next"
-            : "Follow this preview concept from the roadmap";
-    var nextCopy = roadmapDetail
-        ? "Compare the horizon against the current proof shelf first, then use the deeper brief as secondary context instead of the first stop."
-        : liveArtifact
-            ? "Go to the live product surface first, then use support only when the proof path stops being enough."
-            : "Preview concepts should route you toward a roadmap or support path, not pretend they are already finished artifacts.";
-    var tailEyebrow = roadmapDetail ? "Track this horizon" : liveArtifact ? "Use this proof next" : "Follow this preview concept";
-    var tailCopy = roadmapDetail
-        ? "Current proof stays first. The related live surface tells you what exists now, support helps when the path is unclear, and the external brief stays optional."
-        : liveArtifact
-            ? "Downloads, proof, and support should stay inside the product shell before you fall back to deeper technical reading."
-            : "Preview concepts should point back to a roadmap or support path, not trap you on a dead-end gallery card.";
-
     static string NormalizeDetailRoute(string href)
     {
         var trimmed = (href ?? string.Empty).Trim();
@@ -97,14 +78,3 @@
         @await Html.PartialAsync("~/Views/PublicLanding/_FeatureDetailPreviewConcept.cshtml", Model)
         break;
 }
-
-<section class="story-guide-tail">
-    <p class="eyebrow">@tailEyebrow</p>
-    <h2 class="editorial-title">@nextTitle</h2>
-    <p class="editorial-copy">@nextCopy</p>
-    <div class="stacked-actions">
-        <a class="button-like button-like--secondary" href="/contact#support-intake">Get help with this surface</a>
-        <a class="button-like button-like--ghost" href="@(roadmapDetail ? "/horizons" : liveArtifact ? "/artifacts" : "/now")">@(roadmapDetail ? "Open roadmap browser" : liveArtifact ? "Open proof gallery" : "Open what works today")</a>
-    </div>
-    <p class="muted-copy">@tailCopy</p>
-</section>
