@@ -1828,6 +1828,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(landingModel.PrimaryHeroAction.Label, "Create account to get preview", StringComparison.Ordinal), "landing page should source the guest-gated primary CTA from release canon.");
     Assert(landingModel.PrimaryHeroAction.Href.StartsWith("/signup?next=", StringComparison.Ordinal), "guest-gated primary CTA should route to signup through the install handoff.");
     Assert(string.Equals(landingModel.SecondaryHeroAction.Label, "See what works today", StringComparison.Ordinal), "landing page should keep the manifest-backed secondary CTA.");
+    Assert(landingModel.TrustPulse is not null, "landing page should surface a compact weekly trust pulse on the front door.");
+    Assert(landingModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Cloud & Publishing", StringComparison.Ordinal)), "landing page should surface the current caution lane from the weekly trust pulse.");
     Assert(landingModel.Workflows.Any(static card => string.Equals(card.Action.Href, "/downloads", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
     Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Create account to get preview", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "landing page chrome should expose the release-aware signup CTA beside sign in");
     Assert(landingModel.Lanes.Any(static card => string.Equals(card.Card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");

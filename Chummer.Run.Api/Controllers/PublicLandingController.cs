@@ -95,6 +95,7 @@ public sealed class PublicLandingController : Controller
             Assets: assetCatalog,
             Manifest: manifest,
             ReleaseExperience: releaseExperience,
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             PrimaryHeroAction: primaryHeroAction,
             SecondaryHeroAction: secondaryHeroAction,
             Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/"),

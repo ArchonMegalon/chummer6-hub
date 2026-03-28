@@ -124,6 +124,7 @@ public sealed record LandingPageViewModel(
     AssetCatalogViewModel Assets,
     PublicReleaseManifestDto Manifest,
     ReleaseExperienceViewModel ReleaseExperience,
+    PublicTrustPulsePanelViewModel? TrustPulse,
     PublicLandingActionDto PrimaryHeroAction,
     PublicLandingActionDto SecondaryHeroAction,
     IReadOnlyList<ResolvedPublicCardViewModel> Workflows,
