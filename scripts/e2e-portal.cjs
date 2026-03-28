@@ -2,6 +2,16 @@
 'use strict';
 
 const baseUrl = (process.env.CHUMMER_PORTAL_BASE_URL || 'http://127.0.0.1:8091').replace(/\/$/, '');
+const publicHost = (process.env.CHUMMER_PORTAL_PUBLIC_HOST || '').trim();
+const forwardedProto = (process.env.CHUMMER_PORTAL_FORWARDED_PROTO || '').trim();
+const defaultHeaders = {};
+
+if (publicHost) {
+  defaultHeaders.Host = publicHost;
+}
+if (forwardedProto) {
+  defaultHeaders['X-Forwarded-Proto'] = forwardedProto;
+}
 
 const requiredLandingLinks = [
   '/downloads',
@@ -97,7 +107,10 @@ const checks = [
   for (const check of checks) {
     const response = await fetch(check.url, {
       method: check.method ?? 'GET',
-      headers: check.headers,
+      headers: {
+        ...defaultHeaders,
+        ...(check.headers ?? {})
+      },
       body: check.body
     });
     const body = await response.text();

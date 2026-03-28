@@ -8,6 +8,8 @@ CHUMMER_API_KEY="${CHUMMER_API_KEY:-}"
 PORTAL_PLAYWRIGHT_TIMEOUT_SECONDS="${CHUMMER_PORTAL_E2E_TIMEOUT_SECONDS:-240}"
 PORTAL_EDGE_COMPOSE_FILE="${CHUMMER_PORTAL_EDGE_COMPOSE_FILE:-$ROOT_DIR/docker-compose.public-edge.yml}"
 PORTAL_BASE_URL="${CHUMMER_PORTAL_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
+PORTAL_PUBLIC_HOST="${CHUMMER_PORTAL_PUBLIC_HOST:-chummer.run}"
+PORTAL_FORWARDED_PROTO="${CHUMMER_PORTAL_FORWARDED_PROTO:-https}"
 PORTAL_SKIP_EDGE_REBUILD="${CHUMMER_PORTAL_E2E_SKIP_EDGE_REBUILD:-0}"
 if [[ -n "${CHUMMER_PORTAL_PLAYWRIGHT:-}" ]]; then
   RUN_PORTAL_PLAYWRIGHT="$CHUMMER_PORTAL_PLAYWRIGHT"
@@ -27,6 +29,28 @@ fi
 is_docker_permission_error_text() {
   local source_file="$1"
   grep -Eqi "permission denied while trying to connect to the Docker daemon socket|operation not permitted|got permission denied while trying to connect to the docker daemon socket" "$source_file"
+}
+
+wait_for_portal_edge() {
+  local max_attempts="${CHUMMER_PORTAL_E2E_READY_ATTEMPTS:-30}"
+  local sleep_seconds="${CHUMMER_PORTAL_E2E_READY_SLEEP_SECONDS:-1}"
+  local curl_args=(--connect-timeout 5 --max-time 15 --silent --show-error --fail)
+  local header_args=()
+
+  if [[ "$PORTAL_BASE_URL" == http://* ]]; then
+    header_args=(-H "Host: $PORTAL_PUBLIC_HOST" -H "X-Forwarded-Proto: $PORTAL_FORWARDED_PROTO")
+  fi
+
+  local attempt
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    if curl "${curl_args[@]}" "${header_args[@]}" "$PORTAL_BASE_URL/" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "$sleep_seconds"
+  done
+
+  echo "timed out waiting for portal edge readiness at $PORTAL_BASE_URL/" >&2
+  return 1
 }
 
 if [[ -n "$CHUMMER_API_KEY" ]]; then
@@ -71,11 +95,17 @@ else
   rm -f "$compose_up_log"
 fi
 
+wait_for_portal_edge
+
 if [[ "$RUN_PORTAL_PLAYWRIGHT" == "1" ]]; then
   echo "running portal playwright e2e (timeout: ${PORTAL_PLAYWRIGHT_TIMEOUT_SECONDS}s)"
   playwright_log="$(mktemp)"
   set +e
-  timeout "${PORTAL_PLAYWRIGHT_TIMEOUT_SECONDS}"s env CHUMMER_PORTAL_BASE_URL="$PORTAL_BASE_URL" node "$SCRIPT_DIR/e2e-portal.cjs" \
+  timeout "${PORTAL_PLAYWRIGHT_TIMEOUT_SECONDS}"s env \
+    CHUMMER_PORTAL_BASE_URL="$PORTAL_BASE_URL" \
+    CHUMMER_PORTAL_PUBLIC_HOST="$PORTAL_PUBLIC_HOST" \
+    CHUMMER_PORTAL_FORWARDED_PROTO="$PORTAL_FORWARDED_PROTO" \
+    node "$SCRIPT_DIR/e2e-portal.cjs" \
     2>&1 | tee "$playwright_log"
   playwright_status=${PIPESTATUS[0]}
   set -e

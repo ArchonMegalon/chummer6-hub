@@ -74,6 +74,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("hub-live-audit.py", e2e, StringComparison.Ordinal);
         Assert.Contains("wait_for_hub_edge", e2e, StringComparison.Ordinal);
         Assert.Contains("--public-host \"$HUB_PUBLIC_HOST\"", e2e, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_HUB_PLAYWRIGHT_FORWARDED_PROTO", e2e, StringComparison.Ordinal);
         Assert.Contains("HUB_PUBLIC_HOST", e2e, StringComparison.Ordinal);
         Assert.Contains("--forwarded-proto https", e2e, StringComparison.Ordinal);
         Assert.Contains("--verify-http-redirects", e2e, StringComparison.Ordinal);
@@ -83,14 +84,33 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void PortalE2EUsesReverseProxiedLocalEdgeHeaders()
+    {
+        string shellPath = RepoPaths.FromRoot("scripts", "e2e-portal.sh");
+        string nodePath = RepoPaths.FromRoot("scripts", "e2e-portal.cjs");
+
+        string shell = File.ReadAllText(shellPath);
+        string node = File.ReadAllText(nodePath);
+
+        Assert.Contains("wait_for_portal_edge", shell, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_PORTAL_PUBLIC_HOST", shell, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_PORTAL_FORWARDED_PROTO", shell, StringComparison.Ordinal);
+        Assert.Contains("X-Forwarded-Proto", node, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_PORTAL_PUBLIC_HOST", node, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_PORTAL_FORWARDED_PROTO", node, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void HubRequestObservabilityIsWiredIntoProgramAndVerification()
     {
         string programPath = RepoPaths.FromRoot("Chummer.Run.Api", "Program.cs");
+        string identityProgramPath = RepoPaths.FromRoot("Chummer.Run.Identity", "Program.cs");
         string verificationProgramPath = RepoPaths.FromRoot("tests", "RunServicesVerification", "Program.cs");
         string backlogPath = RepoPaths.FromRoot("docs", "MIGRATION_BACKLOG.md");
         string middlewarePath = RepoPaths.FromRoot("Chummer.Run.Api", "HubRequestObservabilityMiddleware.cs");
 
         string program = File.ReadAllText(programPath);
+        string identityProgram = File.ReadAllText(identityProgramPath);
         string verificationProgram = File.ReadAllText(verificationProgramPath);
         string backlog = File.ReadAllText(backlogPath);
         string middleware = File.ReadAllText(middlewarePath);
@@ -100,6 +120,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("HubRequestObservabilityVerification.RunAsync", verificationProgram, StringComparison.Ordinal);
         Assert.Contains("MIG-091", backlog, StringComparison.Ordinal);
         Assert.Contains("Response.OnStarting", middleware, StringComparison.Ordinal);
+        Assert.Contains("IDENTITY_ENABLE_HTTPS_REDIRECTION", identityProgram, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -142,6 +163,7 @@ public sealed class VerificationEntryPointTests
         Assert.DoesNotContain("Chummer.Portal/appsettings.json", runbook, StringComparison.Ordinal);
         Assert.Contains("Chummer.Run.Api/Chummer.Run.Api.csproj", workflow, StringComparison.Ordinal);
         Assert.Contains("Chummer.Run.Api/Dockerfile", compose, StringComparison.Ordinal);
+        Assert.Contains("chummer.run:host-gateway", compose, StringComparison.Ordinal);
         Assert.Contains("PublicLandingController.cs", runbook, StringComparison.Ordinal);
         Assert.DoesNotContain("chummer-blazor", migrationLoop, StringComparison.Ordinal);
         Assert.Contains("docker-compose.public-edge.yml", migrationLoop, StringComparison.Ordinal);

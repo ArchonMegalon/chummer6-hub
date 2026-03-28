@@ -30,6 +30,28 @@ is_docker_permission_error_text() {
   grep -Eqi "permission denied while trying to connect to the Docker daemon socket|operation not permitted|got permission denied while trying to connect to the docker daemon socket" "$source_file"
 }
 
+wait_for_hub_edge() {
+  local max_attempts="${CHUMMER_HUB_E2E_READY_ATTEMPTS:-30}"
+  local sleep_seconds="${CHUMMER_HUB_E2E_READY_SLEEP_SECONDS:-1}"
+  local curl_args=(--connect-timeout 5 --max-time 15 --silent --show-error --fail)
+  local header_args=()
+
+  if [[ "$HUB_BASE_URL" == http://* ]]; then
+    header_args=(-H "Host: $HUB_PUBLIC_HOST" -H "X-Forwarded-Proto: https")
+  fi
+
+  local attempt
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    if curl "${curl_args[@]}" "${header_args[@]}" "$HUB_BASE_URL/" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "$sleep_seconds"
+  done
+
+  echo "timed out waiting for hub edge readiness at $HUB_BASE_URL/" >&2
+  return 1
+}
+
 resolve_hub_internal_token() {
   docker compose -f "$HUB_EDGE_COMPOSE_FILE" ps -q chummer-portal \
     | head -n 1 \
@@ -49,6 +71,8 @@ cleanup_synthetic_support_cases() {
 
   python3 "$HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT" \
     --base-url "$HUB_BASE_URL" \
+    --public-host "$HUB_PUBLIC_HOST" \
+    --forwarded-proto https \
     --token "$token"
 }
 
@@ -90,6 +114,8 @@ else
   rm -f "$compose_up_log"
 fi
 
+wait_for_hub_edge
+
 hub_live_audit_args=(--base-url "$HUB_BASE_URL")
 if [[ "$HUB_BASE_URL" == http://* ]]; then
   hub_live_audit_args+=(--public-host "$HUB_PUBLIC_HOST" --forwarded-proto https --verify-http-redirects)
@@ -101,10 +127,15 @@ if [[ "$RUN_HUB_PLAYWRIGHT" == "1" ]]; then
   cleanup_synthetic_support_cases
 
   playwright_log="$(mktemp)"
+  playwright_base_url="$HUB_BASE_URL"
+  if [[ "$HUB_BASE_URL" == http://127.0.0.1:* || "$HUB_BASE_URL" == http://localhost:* ]]; then
+    playwright_base_url="http://$HUB_PUBLIC_HOST:${CHUMMER_PUBLIC_EDGE_PORT:-8091}"
+  fi
   export CHUMMER_RUN_CF_TUNNEL_TOKEN="${CHUMMER_RUN_CF_TUNNEL_TOKEN:-disabled-for-local-hub-e2e}"
   set +e
   timeout "${HUB_PLAYWRIGHT_TIMEOUT_SECONDS}"s docker compose -f legacy/tooling/docker/docker-compose.yml --profile test run --build --rm \
-    -e CHUMMER_HUB_PLAYWRIGHT_BASE_URL="$HUB_BASE_URL" \
+    -e CHUMMER_HUB_PLAYWRIGHT_BASE_URL="$playwright_base_url" \
+    -e CHUMMER_HUB_PLAYWRIGHT_FORWARDED_PROTO="https" \
     chummer-playwright-hub 2>&1 | tee "$playwright_log"
   playwright_status=${PIPESTATUS[0]}
   set -e

@@ -191,7 +191,8 @@ services:
       context: ../../..
       dockerfile: legacy/tooling/docker/Docker/Dockerfile.playwright
     profiles: ["test"]
-    network_mode: host
+    extra_hosts:
+      - "chummer.run:host-gateway"
     environment:
       CHUMMER_HUB_PLAYWRIGHT_BASE_URL: "${CHUMMER_HUB_PLAYWRIGHT_BASE_URL:-http://127.0.0.1:8091}"
     command: >
