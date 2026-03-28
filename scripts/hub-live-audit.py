@@ -61,15 +61,19 @@ def main() -> int:
     routes = [
         AuditRoute("/", "Create account to get preview", required_texts=("Final pool 9",), expects_header_count=1),
         AuditRoute("/what-is-chummer", "One product for rules truth, living dossiers, and session return.", expects_header_count=1),
-        AuditRoute("/now", "Current preview, visible proof, and known posture", required_texts=("What you can verify now", "Build, explain, and run with visible evidence"), expects_header_count=1),
+        AuditRoute(
+            "/now",
+            "Current preview, visible proof, and known posture",
+            required_texts=("What you can verify now", "Build, explain, and run with visible evidence", "Status guide"),
+            expects_header_count=1),
         AuditRoute(
             "/downloads",
             "Install the current preview",
-            required_texts=("Advanced download options", "Release notes, known issues, and requirements"),
+            required_texts=("Create account to get preview", "Already have an account? Sign in", "Advanced download options", "Release notes, known issues, and requirements"),
             forbidden_texts=("Package details",),
             expects_header_count=1),
-        AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track"), forbidden_texts=("Research tracks",), expects_header_count=1),
-        AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Preview in progress",), expects_header_count=1),
+        AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Status guide"), forbidden_texts=("Research tracks",), expects_header_count=1),
+        AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Preview in progress", "Status guide"), expects_header_count=1),
         AuditRoute("/artifacts/current-preview-build", "Current preview build", expects_header_count=1),
         AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", expects_header_count=1),
         AuditRoute("/participate", "Choose how to participate", expects_header_count=1),
