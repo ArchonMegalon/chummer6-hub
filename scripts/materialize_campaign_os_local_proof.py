@@ -3,13 +3,25 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "tests" / "RunServicesSmoke" / "Program.cs"
-OUT = ROOT / ".codex-studio" / "published" / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+DEFAULT_ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("CHUMMER_CAMPAIGN_OS_LOCAL_PROOF_ROOT", DEFAULT_ROOT))
+SOURCE = Path(
+    os.environ.get(
+        "CHUMMER_CAMPAIGN_OS_LOCAL_PROOF_SOURCE",
+        ROOT / "tests" / "RunServicesSmoke" / "Program.cs",
+    )
+)
+OUT = Path(
+    os.environ.get(
+        "CHUMMER_CAMPAIGN_OS_LOCAL_PROOF_OUT",
+        ROOT / ".codex-studio" / "published" / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json",
+    )
+)
 
 REQUIRED_MARKERS = {
     "build_explain_publish": [
@@ -54,6 +66,17 @@ def iso_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def canonical_source_path() -> str:
+    try:
+        return str(SOURCE.relative_to(ROOT))
+    except ValueError:
+        return str(SOURCE)
+
+
+def without_generated_at(payload: dict[str, object]) -> dict[str, object]:
+    return {key: value for key, value in payload.items() if key != "generated_at"}
+
+
 def main() -> int:
     if not SOURCE.is_file():
         print(f"missing smoke source: {SOURCE}", file=sys.stderr)
@@ -78,13 +101,24 @@ def main() -> int:
 
     payload = {
         "contract_name": "chummer6-hub.campaign_os_local_proof",
-        "generated_at": iso_now(),
         "status": "passed",
         "proof_kind": "source_backed_local_smoke_contract",
-        "source_file": str(SOURCE.relative_to(ROOT)),
+        "source_file": canonical_source_path(),
         "journeys_passed": journeys_passed,
         "required_markers": REQUIRED_MARKERS,
     }
+
+    if OUT.is_file():
+        try:
+            existing_payload = json.loads(OUT.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            existing_payload = None
+
+        if isinstance(existing_payload, dict) and without_generated_at(existing_payload) == payload:
+            print(f"campaign-os local proof unchanged: {OUT}")
+            return 0
+
+    payload["generated_at"] = iso_now()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(f"wrote campaign-os local proof: {OUT}")
