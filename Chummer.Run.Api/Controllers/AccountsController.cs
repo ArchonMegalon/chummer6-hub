@@ -21,6 +21,7 @@ public sealed class AccountsController : Controller
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly CampaignSpineService _campaignSpine;
+    private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
     private readonly ILogger<AccountsController> _logger;
@@ -34,6 +35,7 @@ public sealed class AccountsController : Controller
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
         CampaignSpineService campaignSpine,
+        CampaignWorkspaceServerPlaneService workspaceServerPlane,
         HubPageChromeService chrome,
         HubGoogleAuthService google,
         ILogger<AccountsController> logger)
@@ -46,6 +48,7 @@ public sealed class AccountsController : Controller
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
         _campaignSpine = campaignSpine;
+        _workspaceServerPlane = workspaceServerPlane;
         _chrome = chrome;
         _google = google;
         _logger = logger;
@@ -91,6 +94,9 @@ public sealed class AccountsController : Controller
             var selectedSupportCaseSummary = selectedSupportCase is null ? null : _supportPresentation.Build(selectedSupportCase);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
             var selectedWorkspace = FindById(campaignSpine.Workspaces, workspaceId, static item => item.WorkspaceId);
+            var selectedWorkspaceServerPlane = selectedWorkspace is null
+                ? null
+                : _workspaceServerPlane.GetWorkspaceServerPlane(user, selectedWorkspace.WorkspaceId, installLinking);
             var selectedRun = FindById(campaignSpine.Runs, runId, static item => item.RunId);
             var selectedBuildLabHandoff = FindById(campaignSpine.BuildLabHandoffs, handoffId, static item => item.HandoffId);
             var selectedRulesNavigatorAnswer = FindById(campaignSpine.RulesNavigator, entryId, static item => item.EntryId);
@@ -111,6 +117,7 @@ public sealed class AccountsController : Controller
                 SelectedSupportCaseSummary: selectedSupportCaseSummary,
                 CampaignSpine: campaignSpine,
                 SelectedWorkspace: selectedWorkspace,
+                SelectedWorkspaceServerPlane: selectedWorkspaceServerPlane,
                 SelectedRun: selectedRun,
                 SelectedBuildLabHandoff: selectedBuildLabHandoff,
                 SelectedRulesNavigatorAnswer: selectedRulesNavigatorAnswer,

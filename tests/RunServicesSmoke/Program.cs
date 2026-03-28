@@ -559,7 +559,8 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         CountryCode: "AT"));
     var experience = new UserExperienceService(store, accounts);
     var supportPresentation = new SupportCasePresentationService();
-    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
+    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1775,6 +1776,7 @@ async Task VerifyPublicLandingProjectionAsync()
     {
         ControllerContext = AuthenticatedControllerContext("smoke-token")
     };
+    var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
     var accountController = new AccountsController(
         accounts,
         linkedIdentityClient,
@@ -1784,6 +1786,7 @@ async Task VerifyPublicLandingProjectionAsync()
         supportCases,
         supportPresentation,
         campaignSpine,
+        workspaceServerPlane,
         chrome,
         google,
         loggerFactory.CreateLogger<AccountsController>())
@@ -1795,7 +1798,7 @@ async Task VerifyPublicLandingProjectionAsync()
         accounts,
         installLinking,
         campaignSpine,
-        new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation))
+        workspaceServerPlane)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2237,6 +2240,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var accountWorkspaceDetailModel = accountWorkspaceDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountWorkspaceDetailModel?.CurrentSection, "work", StringComparison.Ordinal), "account workspace detail route should land inside the work section.");
     Assert(string.Equals(accountWorkspaceDetailModel?.SelectedWorkspace?.WorkspaceId, workspaceId, StringComparison.Ordinal), "account workspace detail route should load the selected shared campaign view.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane is not null, "account workspace detail route should project the bounded workspace server plane.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.SupportClosures.Count >= 1, "account workspace detail route should expose support-closure cues from the workspace server plane.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.DecisionNotices.Count >= 1, "account workspace detail route should expose bounded decision notices from the workspace server plane.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RuleEnvironmentHealth.Count >= 1, "account workspace detail route should expose rule-environment health cues from the workspace server plane.");
     var accountRunDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, runId: runId) as ViewResult;
     var accountRunDetailModel = accountRunDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountRunDetailModel?.SelectedRun?.RunId, runId, StringComparison.Ordinal), "account run detail route should load the selected live run context.");
@@ -2392,7 +2399,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
     Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
-    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

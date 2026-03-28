@@ -65,10 +65,16 @@
     var selectedSupportCase = Model.SelectedSupportCase;
     var selectedSupportCaseSummary = Model.SelectedSupportCaseSummary;
     var selectedWorkspace = Model.SelectedWorkspace;
+    var selectedWorkspaceServerPlane = Model.SelectedWorkspaceServerPlane;
     var selectedRun = Model.SelectedRun;
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
     var selectedCreatorPublication = Model.SelectedCreatorPublication;
+    var openCampaignDetailSection = selectedWorkspace is not null
+        || selectedRun is not null
+        || selectedBuildLabHandoff is not null
+        || selectedRulesNavigatorAnswer is not null
+        || selectedCreatorPublication is not null;
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -720,7 +726,7 @@
 
             @if (showWorkSection && showCampaignSection)
             {
-            <details class="details-drawer">
+            <details class="details-drawer"@Html.Raw(openCampaignDetailSection ? " open" : string.Empty)>
             <summary>Campaigns &amp; dossiers</summary>
             <section id="campaigns" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
@@ -774,7 +780,7 @@
                     <article class="app-action-card app-action-card--primary" id="workspace-@selectedWorkspace.WorkspaceId">
                         <span class="tag">Shared campaign view</span>
                         <h3>@selectedWorkspace.CampaignName</h3>
-                        <p>@selectedWorkspace.ReturnSummary</p>
+                        <p>@(selectedWorkspaceServerPlane?.CampaignSummary.SessionReadinessSummary ?? selectedWorkspace.ReturnSummary)</p>
                         <div class="settings-summary-list">
                             <div class="settings-summary-row">
                                 <span>Visibility</span>
@@ -785,6 +791,10 @@
                                 <strong>@RuleEnvironmentSummary(selectedWorkspace.RuleEnvironment)</strong>
                             </div>
                             <div class="settings-summary-row">
+                                <span>Device role</span>
+                                <strong>@(selectedWorkspaceServerPlane?.Workspace.DeviceRoleSummary ?? "No claimed device role is attached yet.")</strong>
+                            </div>
+                            <div class="settings-summary-row">
                                 <span>Live runs</span>
                                 <strong>@(selectedWorkspace.Runs.Count == 0 ? "No active run" : $"{selectedWorkspace.Runs.Count} tracked")</strong>
                             </div>
@@ -793,13 +803,17 @@
                                 <strong>@(selectedWorkspace.ActiveSceneSummary ?? "No active scene summary yet")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Readiness cues</span>
-                                <strong>@(selectedWorkspace.ReadinessCues.Count == 0 ? "No blockers" : selectedWorkspace.ReadinessCues[0].Summary)</strong>
+                                <span>Support follow-through</span>
+                                <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support follow-through stays attached to the linked install and release lane that reopen this shared campaign view.")</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>Next safe action</span>
                                 <strong>
-                                    @if (!string.IsNullOrWhiteSpace(selectedWorkspace.NextSafeAction))
+                                    @if (!string.IsNullOrWhiteSpace(selectedWorkspaceServerPlane?.NextSafeAction.Label))
+                                    {
+                                        @selectedWorkspaceServerPlane.NextSafeAction.Label
+                                    }
+                                    else if (!string.IsNullOrWhiteSpace(selectedWorkspace.NextSafeAction))
                                     {
                                         @selectedWorkspace.NextSafeAction
                                     }
@@ -815,6 +829,14 @@
                             {
                                 <p><strong>Current return:</strong> @selectedWorkspace.LatestContinuity.Summary</p>
                             }
+                            @if (!string.IsNullOrWhiteSpace(selectedWorkspaceServerPlane?.CampaignSummary.RestoreSummary))
+                            {
+                                <p><strong>Restore posture:</strong> @selectedWorkspaceServerPlane.CampaignSummary.RestoreSummary</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(selectedWorkspaceServerPlane?.NextSafeAction.Summary))
+                            {
+                                <p><strong>Follow-through:</strong> @selectedWorkspaceServerPlane.NextSafeAction.Summary</p>
+                            }
                             @if (selectedWorkspace.RecapShelf.Count > 0)
                             {
                                 <p><strong>Recent recap:</strong> @selectedWorkspace.RecapShelf[0].Summary</p>
@@ -824,6 +846,111 @@
                                 <p><strong>Recent change:</strong> @selectedWorkspace.ChangePackets[0].Label — @selectedWorkspace.ChangePackets[0].Summary</p>
                             }
                         </div>
+                        @if (selectedWorkspaceServerPlane is not null)
+                        {
+                            <details class="details-drawer" open>
+                                <summary>Server-plane follow-through</summary>
+                                <div class="settings-summary-list">
+                                    <div class="settings-summary-row">
+                                        <span>Roster readiness</span>
+                                        <strong>@selectedWorkspaceServerPlane.RosterReadiness.Summary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Publication summary</span>
+                                        <strong>@selectedWorkspaceServerPlane.CampaignSummary.PublicationSummary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Next safe action</span>
+                                        <strong>@selectedWorkspaceServerPlane.NextSafeAction.Label · @selectedWorkspaceServerPlane.NextSafeAction.Summary</strong>
+                                    </div>
+                                </div>
+                                @if (selectedWorkspaceServerPlane.SupportClosures.Count > 0)
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var closure in selectedWorkspaceServerPlane.SupportClosures)
+                                        {
+                                            <li><strong>@closure.StageLabel:</strong> @closure.Summary <span>Next: @closure.NextSafeAction</span></li>
+                                        }
+                                    </ul>
+                                }
+                                @if (selectedWorkspaceServerPlane.KnownIssues.Count > 0)
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var issue in selectedWorkspaceServerPlane.KnownIssues)
+                                        {
+                                            <li><strong>@HumanizeStatus(issue.Severity, "Info"):</strong> @issue.Summary</li>
+                                        }
+                                    </ul>
+                                }
+                                @if (selectedWorkspaceServerPlane.DecisionNotices.Count > 0)
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var notice in selectedWorkspaceServerPlane.DecisionNotices)
+                                        {
+                                            <li><strong>@notice.ActionLabel:</strong> @notice.Summary</li>
+                                        }
+                                    </ul>
+                                }
+                            </details>
+
+                            <details class="details-drawer">
+                                <summary>Roster readiness and dossier freshness</summary>
+                                <ul class="muted-copy">
+                                    @foreach (var highlight in selectedWorkspaceServerPlane.RosterReadiness.Highlights)
+                                    {
+                                        <li>@highlight</li>
+                                    }
+                                    @foreach (var dossierCue in selectedWorkspaceServerPlane.DossierFreshness)
+                                    {
+                                        <li><strong>@dossierCue.RunnerHandle:</strong> @dossierCue.Summary</li>
+                                    }
+                                </ul>
+                            </details>
+
+                            <details class="details-drawer">
+                                <summary>Rule and continuity health</summary>
+                                <ul class="muted-copy">
+                                    @foreach (var cue in selectedWorkspaceServerPlane.RuleEnvironmentHealth)
+                                    {
+                                        <li><strong>@cue.Title:</strong> @cue.Summary</li>
+                                    }
+                                    @foreach (var conflict in selectedWorkspaceServerPlane.ContinuityConflicts)
+                                    {
+                                        <li><strong>@HumanizeStatus(conflict.Severity, "Info"):</strong> @conflict.Summary <span>@conflict.ResolutionAction</span></li>
+                                    }
+                                </ul>
+                            </details>
+
+                            @if (selectedWorkspaceServerPlane.Runboard is not null)
+                            {
+                                <details class="details-drawer">
+                                    <summary>Runboard follow-through</summary>
+                                    <div class="settings-summary-list">
+                                        <div class="settings-summary-row">
+                                            <span>Status</span>
+                                            <strong>@HumanizeStatus(selectedWorkspaceServerPlane.Runboard.Status, "Active")</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Objective pressure</span>
+                                            <strong>@selectedWorkspaceServerPlane.Runboard.ObjectiveSummary</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Current return</span>
+                                            <strong>@selectedWorkspaceServerPlane.Runboard.ReturnSummary</strong>
+                                        </div>
+                                    </div>
+                                    @if (selectedWorkspaceServerPlane.Runboard.Blockers.Count > 0)
+                                    {
+                                        <ul class="muted-copy">
+                                            @foreach (var blocker in selectedWorkspaceServerPlane.Runboard.Blockers)
+                                            {
+                                                <li>@blocker</li>
+                                            }
+                                        </ul>
+                                    }
+                                </details>
+                            }
+                        }
                     </article>
                 }
                 else if (selectedRun is not null)
