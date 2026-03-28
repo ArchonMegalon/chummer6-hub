@@ -6,9 +6,16 @@
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
   "progress_history_source": "products/chummer/PROGRESS_HISTORY.generated.json",
-  "summary": "Next 20 Big Wins After Post-Audit Closeout remains the active wave; journey proof is ready; overall progress is 73% in 'Scale & stabilize'; the longest pole remains Cloud & Publishing.",
+  "nine_month_execution_source": "products/chummer/NINE_MONTH_EXECUTION_REGISTRY.yaml",
+  "summary": "Next 20 Big Wins After Post-Audit Closeout remains the active wave; April 2026 now sharpens the next checkpoint into golden journey operating proof; overall progress is 73% in 'Scale & stabilize'; the longest pole remains Cloud & Publishing.",
   "active_wave": "Next 20 Big Wins After Post-Audit Closeout",
   "active_wave_status": "in_progress",
+  "active_nine_month_checkpoint": {
+    "id": "2026-04",
+    "title": "Golden journey operating proof",
+    "status": "next",
+    "source": "products/chummer/NINE_MONTH_EXECUTION_REGISTRY.yaml"
+  },
   "journey_gate_health": {
     "state": "ready",
     "reason": "Journey proof is steady on current published evidence.",
@@ -19,18 +26,24 @@
     {
       "decision_id": "2026-03-28-closeout-and-continue-next-20-big-wins-after-post-audit-closeout",
       "action": "closeout_and_continue",
-      "reason": "Keep the recommended wave on Next 20 Big Wins After Post-Audit Closeout now that the Post-Audit Next 20 Big Wins program is materially closed. The pulse shows 73% overall progress in 'Scale & stabilize', history depth has reached 4 snapshots, and the pacing risk is still concentrated in Cloud & Publishing rather than in reopened foundation, campaign-middle, or trust-surface blockers.",
+      "reason": "Keep the recommended wave on Next 20 Big Wins After Post-Audit Closeout now that the Post-Audit Next 20 Big Wins program is materially closed. The pulse shows 73% overall progress in 'Scale & stabilize', history depth has reached 4 snapshots, and the pacing risk is still concentrated in Cloud & Publishing rather than in reopened foundation, campaign-middle, or trust-surface blockers. The next bounded checkpoint is April 2026 golden journey operating proof, so release-control work should prefer lived journey evidence over broader additive scope.",
       "cited_signals": [
         "overall_progress_percent=73",
         "history_snapshot_count=4",
         "oldest_blocker_days=0",
         "phase_label=Scale & stabilize",
-        "longest_pole=Cloud & Publishing"
+        "longest_pole=Cloud & Publishing",
+        "active_nine_month_checkpoint=2026-04"
       ]
     }
   ],
-  "next_checkpoint_question": "What is the smallest cross-repo slice that makes the campaign OS indispensable and turns trust, adoption, and publication depth into a real launch advantage?",
+  "next_checkpoint_question": "What is the thinnest April 2026 cross-repo slice that turns golden journey proof into release-control evidence?",
   "snapshot": {
+    "active_nine_month_checkpoint": {
+      "id": "2026-04",
+      "title": "Golden journey operating proof",
+      "status": "next"
+    },
     "release_health": {
       "state": "green_or_explained",
       "reason": "No red blockers are open. Foundation release remains closed and the active work is additive middle-layer and trust-surface depth.",
@@ -75,17 +88,18 @@
       {
         "decision_id": "2026-03-28-closeout-and-continue-next-20-big-wins-after-post-audit-closeout",
         "action": "closeout_and_continue",
-        "reason": "Keep the recommended wave on Next 20 Big Wins After Post-Audit Closeout now that the Post-Audit Next 20 Big Wins program is materially closed. The pulse shows 73% overall progress in 'Scale & stabilize', history depth has reached 4 snapshots, and the pacing risk is still concentrated in Cloud & Publishing rather than in reopened foundation, campaign-middle, or trust-surface blockers.",
+        "reason": "Keep the recommended wave on Next 20 Big Wins After Post-Audit Closeout now that the Post-Audit Next 20 Big Wins program is materially closed. The pulse shows 73% overall progress in 'Scale & stabilize', history depth has reached 4 snapshots, and the pacing risk is still concentrated in Cloud & Publishing rather than in reopened foundation, campaign-middle, or trust-surface blockers. The next bounded checkpoint is April 2026 golden journey operating proof, so release-control work should prefer lived journey evidence over broader additive scope.",
         "cited_signals": [
           "overall_progress_percent=73",
           "history_snapshot_count=4",
           "oldest_blocker_days=0",
           "phase_label=Scale & stabilize",
-          "longest_pole=Cloud & Publishing"
+          "longest_pole=Cloud & Publishing",
+          "active_nine_month_checkpoint=2026-04"
         ]
       }
     ],
-    "next_checkpoint_question": "What is the smallest cross-repo slice that makes the campaign OS indispensable and turns trust, adoption, and publication depth into a real launch advantage?"
+    "next_checkpoint_question": "What is the thinnest April 2026 cross-repo slice that turns golden journey proof into release-control evidence?"
   },
   "supporting_signals": {
     "current_recommended_wave": "Next 20 Big Wins After Post-Audit Closeout",
@@ -96,6 +110,8 @@
     "journey_gate_source": "/docker/fleet/.codex-studio/published/JOURNEY_GATES.generated.json",
     "post_audit_next20_status": "complete",
     "active_wave_registry": "products/chummer/NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_REGISTRY.yaml",
+    "nine_month_execution_source": "products/chummer/NINE_MONTH_EXECUTION_REGISTRY.yaml",
+    "active_nine_month_checkpoint": "2026-04",
     "scorecard_metric_count": 16
   }
 }

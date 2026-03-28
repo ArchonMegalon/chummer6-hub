@@ -108,8 +108,11 @@ weekly_snapshot:
     - public_promise_drift_count
     - governor_decisions
     - next_checkpoint_question
+  recommended_fields:
+    - active_nine_month_checkpoint
 
 rules:
   - This scorecard is an operating pulse, not a release-gate replacement.
   - Scorecard regressions may force reroute, freeze, or canon patch decisions even when repo-local tests are green.
   - Weekly snapshots must prefer bounded reasons and next actions over long narrative diaries.
+  - When `NINE_MONTH_EXECUTION_REGISTRY.yaml` is active, weekly snapshots should cite the active month and its next bounded checkpoint question.
