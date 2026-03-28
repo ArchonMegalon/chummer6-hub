@@ -83,12 +83,26 @@ else
                         </div>
                         <div class="settings-summary-row">
                             <span>Known issues</span>
-                            <strong>Check the install and trust lane before you commit a fresh device to this preview.</strong>
+                            <strong>@(Model.Manifest.KnownIssueSummary ?? "Check the install and trust lane before you commit a fresh device to this preview.")</strong>
                         </div>
                         <div class="settings-summary-row">
                             <span>Update posture</span>
                             <strong>@release.UpdatePostureSummary</strong>
                         </div>
+                        @if (!string.IsNullOrWhiteSpace(Model.Manifest.SupportabilitySummary))
+                        {
+                            <div class="settings-summary-row">
+                                <span>Supportability</span>
+                                <strong>@Model.Manifest.SupportabilitySummary</strong>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Manifest.FixAvailabilitySummary))
+                        {
+                            <div class="settings-summary-row">
+                                <span>Fix availability</span>
+                                <strong>@Model.Manifest.FixAvailabilitySummary</strong>
+                            </div>
+                        }
                         <div class="settings-summary-row">
                             <span>System requirements</span>
                             <strong>@string.Join(" ", release.SystemRequirements)</strong>
@@ -104,6 +118,26 @@ else
                             <div class="settings-summary-row">
                                 <span>Integrity preview</span>
                                 <strong><code class="mono-receipt">@release.Recommended.ShaPreview</code></strong>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Manifest.RolloutReason))
+                        {
+                            <div class="settings-summary-row">
+                                <span>Release posture</span>
+                                <strong>@Model.Manifest.RolloutReason</strong>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus))
+                        {
+                            <div class="settings-summary-row">
+                                <span>Local release proof</span>
+                                <strong>
+                                    @Model.Manifest.ProofStatus
+                                    @if (Model.Manifest.ProofGeneratedAt is not null)
+                                    {
+                                        <text> · @Model.Manifest.ProofGeneratedAt.Value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'")</text>
+                                    }
+                                </strong>
                             </div>
                         }
                     </div>

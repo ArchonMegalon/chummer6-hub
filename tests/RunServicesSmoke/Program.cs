@@ -1387,6 +1387,27 @@ async Task VerifyPublicLandingProjectionAsync()
                 publishedAt = "2026-03-20T12:00:00Z",
                 status = "published",
                 artifactSource = "ui_desktop_bundle",
+                rolloutState = "local_docker_preview",
+                rolloutReason = "Current release shelf was exercised by the local docker release proof harness before publication.",
+                supportabilityState = "local_docker_proven",
+                supportabilitySummary = "Local release proof passed for install, build/explain, campaign recovery, and support closure journeys.",
+                knownIssueSummary = "Preview caveats still apply, but the current shelf has recent proof instead of only manifest presence.",
+                fixAvailabilitySummary = "Only send fixed notices after the affected install can receive the published channel artifact now on the shelf.",
+                releaseProof = new
+                {
+                    status = "passed",
+                    generatedAt = "2026-03-20T12:15:00Z",
+                    baseUrl = "http://127.0.0.1:8091",
+                    journeysPassed = new[]
+                    {
+                        "install_claim_restore_continue",
+                        "build_explain_publish",
+                    },
+                    proofRoutes = new[]
+                    {
+                        "/downloads/install/smoke-poc-linux-x64"
+                    }
+                },
                 artifacts = new[]
                 {
                     new
@@ -1831,6 +1852,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(downloadsModel!.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Create your Chummer account first.", StringComparison.OrdinalIgnoreCase)), "account-gated releases should keep account-required install steps for the current preview recommendation.");
     Assert(string.Equals(downloadsModel.ReleaseExperience.GuestGatePrimaryLabel, "Create account to get preview", StringComparison.Ordinal), "downloads page should keep the signup-first guest gate label.");
     Assert(string.Equals(downloadsModel.ReleaseExperience.KnownIssuesLabel, "Known issues and install help", StringComparison.Ordinal), "downloads page should keep a single known-issues/install-help label for the current preview.");
+    Assert(string.Equals(downloadsModel.Manifest.SupportabilityState, "local_docker_proven", StringComparison.Ordinal), "downloads page should preserve registry-owned supportability posture.");
+    Assert(string.Equals(downloadsModel.Manifest.ProofStatus, "passed", StringComparison.Ordinal), "downloads page should preserve registry-owned release proof posture.");
+    Assert(downloadsModel.Manifest.FixAvailabilitySummary?.Contains("affected install", StringComparison.OrdinalIgnoreCase) == true, "downloads page should preserve registry-owned fix availability guidance.");
     controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)";
     var macDownloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var macDownloadsModel = macDownloadsView?.Model as DownloadsPageViewModel;
