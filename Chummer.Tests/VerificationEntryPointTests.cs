@@ -35,4 +35,14 @@ public sealed class VerificationEntryPointTests
 
         Assert.Contains("TryGetOptionalPublicSurfaceSubjectAsync", controller, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void PublicEdgeComposePinsHttpsPortForLocalChummerRunRedirects()
+    {
+        string composePath = RepoPaths.FromRoot("docker-compose.public-edge.yml");
+        string compose = File.ReadAllText(composePath);
+
+        Assert.Contains("ASPNETCORE_HTTPS_PORT", compose, StringComparison.Ordinal);
+        Assert.Contains("${ASPNETCORE_HTTPS_PORT:-443}", compose, StringComparison.Ordinal);
+    }
 }

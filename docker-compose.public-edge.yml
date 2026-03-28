@@ -5,6 +5,7 @@ services:
       context: /docker
       dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Identity/Dockerfile
     environment:
+      ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
       CHUMMER_IDENTITY_STORE_PATH: /app/state/identity-store.json
       CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH: /app/state/identity-email-delivery.json
       IDENTITY_PUBLIC_BASE_URL: ${IDENTITY_PUBLIC_BASE_URL:-https://chummer.run}
@@ -38,6 +39,7 @@ services:
     depends_on:
       - chummer-run-identity
     environment:
+      ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
       CHUMMER_PUBLIC_CANON_ROOT: /repo
       CHUMMER_COMMUNITY_STORE_PATH: /app/state/community-store.json
       CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
