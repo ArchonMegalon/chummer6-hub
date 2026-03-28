@@ -1,5 +1,6 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Control.Contracts.Support;
@@ -21,6 +22,7 @@ public sealed class SupportCasesController : ControllerBase
     private readonly SupportAssistantService _assistant;
     private readonly SupportAttachmentStorageService _attachments;
     private readonly IConfiguration _configuration;
+    private readonly InstallLinkingService _installLinking;
 
     public SupportCasesController(
         HubIdentityClient identity,
@@ -29,6 +31,7 @@ public sealed class SupportCasesController : ControllerBase
         SupportCasePresentationService supportPresentation,
         SupportAssistantService assistant,
         SupportAttachmentStorageService attachments,
+        InstallLinkingService installLinking,
         IConfiguration configuration)
     {
         _identity = identity;
@@ -37,6 +40,7 @@ public sealed class SupportCasesController : ControllerBase
         _supportPresentation = supportPresentation;
         _assistant = assistant;
         _attachments = attachments;
+        _installLinking = installLinking;
         _configuration = configuration;
     }
 
@@ -71,7 +75,8 @@ public sealed class SupportCasesController : ControllerBase
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var items = _supportCases.ListForReporter(user.UserId, subject.SubjectId, status, kind).Items;
-            return Ok(_supportPresentation.BuildDigestList(items));
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(_supportPresentation.BuildDigestList(items, installLinking));
         }
         catch (HubRequestAuthException ex)
         {

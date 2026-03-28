@@ -87,11 +87,11 @@ public sealed class AccountsController : Controller
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
-            var supportCaseSummaries = _supportPresentation.BuildList(supportCases);
+            var supportCaseSummaries = _supportPresentation.BuildList(supportCases, installLinking);
             var selectedSupportCase = string.IsNullOrWhiteSpace(caseId)
                 ? null
                 : _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
-            var selectedSupportCaseSummary = selectedSupportCase is null ? null : _supportPresentation.Build(selectedSupportCase);
+            var selectedSupportCaseSummary = selectedSupportCase is null ? null : _supportPresentation.Build(selectedSupportCase, installLinking);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
             var selectedWorkspace = FindById(campaignSpine.Workspaces, workspaceId, static item => item.WorkspaceId);
             var selectedWorkspaceServerPlane = selectedWorkspace is null

@@ -52,7 +52,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<SupportCaseProjection> relevantCases = SelectRelevantSupportCases(
             _supportCases.ListForReporter(user.UserId, user.SubjectId).Items,
             installLinking);
-        IReadOnlyList<SupportCaseDigestViewModel> supportDigests = _supportPresentation.BuildDigestList(relevantCases);
+        IReadOnlyList<SupportCaseDigestViewModel> supportDigests = _supportPresentation.BuildDigestList(relevantCases, installLinking);
 
         DateTimeOffset generatedAtUtc = new[]
             {

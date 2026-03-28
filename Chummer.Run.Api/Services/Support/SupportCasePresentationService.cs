@@ -1,20 +1,21 @@
 using System.Globalization;
 using Chummer.Control.Contracts.Support;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.ViewModels;
 
 namespace Chummer.Run.Api.Services.Support;
 
 public sealed class SupportCasePresentationService
 {
-    public IReadOnlyList<SupportCaseDigestViewModel> BuildDigestList(IReadOnlyList<SupportCaseProjection>? cases)
-        => BuildList(cases)
+    public IReadOnlyList<SupportCaseDigestViewModel> BuildDigestList(IReadOnlyList<SupportCaseProjection>? cases, InstallLinkingSummaryDto? installLinking = null)
+        => BuildList(cases, installLinking)
             .Select(BuildDigest)
             .ToArray();
 
-    public IReadOnlyList<SupportCasePresentationViewModel> BuildList(IReadOnlyList<SupportCaseProjection>? cases)
+    public IReadOnlyList<SupportCasePresentationViewModel> BuildList(IReadOnlyList<SupportCaseProjection>? cases, InstallLinkingSummaryDto? installLinking = null)
         => cases is null
             ? Array.Empty<SupportCasePresentationViewModel>()
-            : cases.Select(Build)
+            : cases.Select(item => Build(item, installLinking))
                 .OrderByDescending(static item => item.Case.UpdatedAtUtc)
                 .ThenBy(static item => item.Case.CaseId, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -41,10 +42,14 @@ public sealed class SupportCasePresentationService
             FollowUpLaneSummary: item.FollowUpLaneSummary,
             ReleaseProgressSummary: item.ReleaseProgressSummary,
             ReporterActionNeeded: item.ReporterActionNeeded,
-            CanVerifyFix: item.CanVerifyFix);
+            CanVerifyFix: item.CanVerifyFix,
+            InstallReadinessSummary: item.InstallReadinessSummary,
+            FixReadyOnLinkedInstall: item.FixReadyOnLinkedInstall,
+            NeedsInstallUpdate: item.NeedsInstallUpdate,
+            NeedsLinkedInstall: item.NeedsLinkedInstall);
     }
 
-    public SupportCasePresentationViewModel Build(SupportCaseProjection supportCase)
+    public SupportCasePresentationViewModel Build(SupportCaseProjection supportCase, InstallLinkingSummaryDto? installLinking = null)
     {
         ArgumentNullException.ThrowIfNull(supportCase);
 
@@ -54,9 +59,11 @@ public sealed class SupportCasePresentationService
         string? affectedInstallSummary = BuildAffectedInstallSummary(supportCase);
         string followUpLaneSummary = BuildFollowUpLaneSummary(supportCase);
         string verificationState = NormalizeVerificationState(supportCase.ReporterVerificationState);
-        string releaseProgressSummary = BuildReleaseProgressSummary(supportCase, status, fixedReleaseLabel, verificationState);
-        string verificationSummary = BuildVerificationSummary(supportCase, fixedReleaseLabel, verificationState);
-        bool canVerifyFix = CanVerifyFix(status, verificationState);
+        bool verificationAvailable = CanVerifyFix(status, verificationState);
+        InstallVerificationReadiness installReadiness = BuildInstallReadiness(supportCase, status, fixedReleaseLabel, installLinking, verificationAvailable);
+        string releaseProgressSummary = BuildReleaseProgressSummary(supportCase, status, fixedReleaseLabel, verificationState, installReadiness);
+        string verificationSummary = BuildVerificationSummary(supportCase, fixedReleaseLabel, verificationState, installReadiness);
+        bool canVerifyFix = verificationAvailable && installReadiness.FixReadyOnLinkedInstall;
         IReadOnlyList<SupportCaseTimelineHighlightViewModel> timelineHighlights = BuildTimelineHighlights(supportCase);
         var (stageLabel, nextSafeAction, closureSummary, primaryActionLabel, primaryActionHref, reporterActionNeeded) = verificationState switch
         {
@@ -173,7 +180,11 @@ public sealed class SupportCasePresentationService
             ReleaseProgressSummary: releaseProgressSummary,
             TimelineHighlights: timelineHighlights,
             ReporterActionNeeded: reporterActionNeeded,
-            CanVerifyFix: canVerifyFix);
+            CanVerifyFix: canVerifyFix,
+            InstallReadinessSummary: installReadiness.Summary,
+            FixReadyOnLinkedInstall: installReadiness.FixReadyOnLinkedInstall,
+            NeedsInstallUpdate: installReadiness.NeedsInstallUpdate,
+            NeedsLinkedInstall: installReadiness.NeedsLinkedInstall);
     }
 
     private static string NormalizeStatus(string? value)
@@ -298,7 +309,8 @@ public sealed class SupportCasePresentationService
         SupportCaseProjection supportCase,
         string normalizedStatus,
         string fixedReleaseLabel,
-        string verificationState)
+        string verificationState,
+        InstallVerificationReadiness installReadiness)
     {
         if (verificationState == SupportCaseVerificationStates.ConfirmedFixed)
         {
@@ -310,7 +322,7 @@ public sealed class SupportCasePresentationService
             return "The reporter said the fix did not hold on the affected install, so the case reopened for follow-up and fresh evidence.";
         }
 
-        return normalizedStatus switch
+        string baseSummary = normalizedStatus switch
         {
             SupportCaseStatuses.UserNotified => string.IsNullOrWhiteSpace(fixedReleaseLabel)
                 ? "The fix already reached the reporter lane and the closure notice went out."
@@ -325,12 +337,20 @@ public sealed class SupportCasePresentationService
             _ when supportCase.ReleasedToReporterChannelAtUtc.HasValue => "A reporter-ready fix exists, but the final user-facing closure step is still catching up.",
             _ => "No reporter-ready release is attached yet, so the visible next step is still triage or fix work."
         };
+
+        if (!CanVerifyFix(normalizedStatus, verificationState) || string.IsNullOrWhiteSpace(installReadiness.Summary))
+        {
+            return baseSummary;
+        }
+
+        return $"{baseSummary} {installReadiness.Summary}";
     }
 
     private static string BuildVerificationSummary(
         SupportCaseProjection supportCase,
         string fixedReleaseLabel,
-        string verificationState)
+        string verificationState,
+        InstallVerificationReadiness installReadiness)
     {
         string verifiedAt = supportCase.ReporterVerifiedAtUtc?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") ?? "an unknown time";
         return verificationState switch
@@ -341,8 +361,10 @@ public sealed class SupportCasePresentationService
             SupportCaseVerificationStates.StillBroken => string.IsNullOrWhiteSpace(supportCase.ReporterVerificationNote)
                 ? $"Reporter said the fix is still broken on the affected install at {verifiedAt} UTC."
                 : $"Reporter said the fix is still broken at {verifiedAt} UTC: {supportCase.ReporterVerificationNote}",
+            _ when CanVerifyFix(NormalizeStatus(supportCase.Status), verificationState) && installReadiness.FixReadyOnLinkedInstall
+                => $"{installReadiness.Summary} Use the buttons here to confirm whether the fix worked here or whether the same issue still reproduces.",
             _ when CanVerifyFix(NormalizeStatus(supportCase.Status), verificationState)
-                => "After you update or reinstall on the affected device, confirm whether the fix worked here or whether the same issue still reproduces.",
+                => $"{installReadiness.Summary} After that update, use the buttons here to confirm whether the fix worked here or whether the same issue still reproduces.",
             _ => "No fix confirmation is requested yet."
         };
     }
@@ -352,6 +374,168 @@ public sealed class SupportCasePresentationService
            && (normalizedStatus == SupportCaseStatuses.Fixed
                || normalizedStatus == SupportCaseStatuses.ReleasedToReporterChannel
                || normalizedStatus == SupportCaseStatuses.UserNotified);
+
+    private static InstallVerificationReadiness BuildInstallReadiness(
+        SupportCaseProjection supportCase,
+        string normalizedStatus,
+        string fixedReleaseLabel,
+        InstallLinkingSummaryDto? installLinking,
+        bool verificationAvailable)
+    {
+        var installations = installLinking?.ClaimedInstallations ?? Array.Empty<ClaimedInstallationDto>();
+        if (installations.Count == 0)
+        {
+            return verificationAvailable
+                ? new InstallVerificationReadiness(
+                    Summary: "No linked install is available yet. Link or reclaim the affected copy in Devices and access before you verify the fix here.",
+                    FixReadyOnLinkedInstall: false,
+                    NeedsInstallUpdate: false,
+                    NeedsLinkedInstall: true)
+                : new InstallVerificationReadiness(
+                    Summary: "No linked install is attached yet, so this case is still waiting on the first claimed device context.",
+                    FixReadyOnLinkedInstall: false,
+                    NeedsInstallUpdate: false,
+                    NeedsLinkedInstall: true);
+        }
+
+        ClaimedInstallationDto? installation = ResolveRelevantInstallation(supportCase, installations);
+        if (installation is null)
+        {
+            return verificationAvailable
+                ? new InstallVerificationReadiness(
+                    Summary: "The affected install is not currently linked here. Reclaim the affected copy in Devices and access before you verify the fix.",
+                    FixReadyOnLinkedInstall: false,
+                    NeedsInstallUpdate: false,
+                    NeedsLinkedInstall: true)
+                : new InstallVerificationReadiness(
+                    Summary: "The current linked devices do not include the install this case was filed against yet.",
+                    FixReadyOnLinkedInstall: false,
+                    NeedsInstallUpdate: false,
+                    NeedsLinkedInstall: true);
+        }
+
+        string installationLabel = BuildInstallationLabel(installation);
+        string installationRelease = $"{installation.Channel} {installation.Version}";
+
+        if (!verificationAvailable)
+        {
+            return new InstallVerificationReadiness(
+                Summary: $"{installationLabel} stays linked on {installationRelease}.",
+                FixReadyOnLinkedInstall: false,
+                NeedsInstallUpdate: false,
+                NeedsLinkedInstall: false);
+        }
+
+        string? fixedChannel = NormalizeOptional(supportCase.FixedChannel, 64);
+        string? fixedVersion = NormalizeOptional(supportCase.FixedVersion, 64);
+        bool channelMatches = string.IsNullOrWhiteSpace(fixedChannel)
+            || string.Equals(installation.Channel, fixedChannel, StringComparison.OrdinalIgnoreCase);
+        bool versionMatches = string.IsNullOrWhiteSpace(fixedVersion)
+            || string.Equals(installation.Version, fixedVersion, StringComparison.OrdinalIgnoreCase);
+        string releaseLabel = string.IsNullOrWhiteSpace(fixedReleaseLabel)
+            ? "the reporter-ready release"
+            : fixedReleaseLabel;
+
+        if (channelMatches && versionMatches)
+        {
+            return new InstallVerificationReadiness(
+                Summary: $"{installationLabel} is already on {installationRelease}.",
+                FixReadyOnLinkedInstall: true,
+                NeedsInstallUpdate: false,
+                NeedsLinkedInstall: false);
+        }
+
+        if (channelMatches)
+        {
+            return new InstallVerificationReadiness(
+                Summary: $"{installationLabel} is still on {installationRelease}. Update it to {releaseLabel} first.",
+                FixReadyOnLinkedInstall: false,
+                NeedsInstallUpdate: true,
+                NeedsLinkedInstall: false);
+        }
+
+        return new InstallVerificationReadiness(
+            Summary: $"{installationLabel} is on {installationRelease}, but this fix is staged for {releaseLabel}. Switch or update that linked copy first.",
+            FixReadyOnLinkedInstall: false,
+            NeedsInstallUpdate: true,
+            NeedsLinkedInstall: false);
+    }
+
+    private static ClaimedInstallationDto? ResolveRelevantInstallation(
+        SupportCaseProjection supportCase,
+        IReadOnlyList<ClaimedInstallationDto> installations)
+    {
+        string? installationId = NormalizeOptional(supportCase.InstallationId, 64);
+        if (installationId is not null)
+        {
+            ClaimedInstallationDto? direct = installations
+                .FirstOrDefault(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase));
+            if (direct is not null)
+            {
+                return direct;
+            }
+        }
+
+        string? releaseChannel = NormalizeOptional(supportCase.ReleaseChannel, 64);
+        string? headId = NormalizeOptional(supportCase.HeadId, 64);
+        string? platform = NormalizeOptional(supportCase.Platform, 64);
+        string? arch = NormalizeOptional(supportCase.Arch, 32);
+
+        return installations
+            .OrderByDescending(item => ScoreInstallationMatch(item, releaseChannel, headId, platform, arch))
+            .ThenByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+    }
+
+    private static int ScoreInstallationMatch(
+        ClaimedInstallationDto installation,
+        string? releaseChannel,
+        string? headId,
+        string? platform,
+        string? arch)
+    {
+        int score = 0;
+        if (!string.IsNullOrWhiteSpace(releaseChannel)
+            && string.Equals(installation.Channel, releaseChannel, StringComparison.OrdinalIgnoreCase))
+        {
+            score += 8;
+        }
+
+        if (!string.IsNullOrWhiteSpace(headId)
+            && string.Equals(installation.HeadId, headId, StringComparison.OrdinalIgnoreCase))
+        {
+            score += 4;
+        }
+
+        if (!string.IsNullOrWhiteSpace(platform)
+            && string.Equals(installation.Platform, platform, StringComparison.OrdinalIgnoreCase))
+        {
+            score += 2;
+        }
+
+        if (!string.IsNullOrWhiteSpace(arch)
+            && string.Equals(installation.Arch, arch, StringComparison.OrdinalIgnoreCase))
+        {
+            score += 1;
+        }
+
+        return score;
+    }
+
+    private static string BuildInstallationLabel(ClaimedInstallationDto installation)
+    {
+        string anchor = NormalizeOptional(installation.HostLabel, 128)
+            ?? NormalizeOptional(installation.HeadId, 64)
+            ?? NormalizeOptional(installation.ArtifactId, 128)
+            ?? "The linked install";
+        string? platformSummary = JoinNonEmpty(
+            NormalizeOptional(installation.Platform, 64),
+            NormalizeOptional(installation.Arch, 32),
+            " ");
+        return string.IsNullOrWhiteSpace(platformSummary)
+            ? anchor
+            : $"{anchor} ({platformSummary})";
+    }
 
     private static IReadOnlyList<SupportCaseTimelineHighlightViewModel> BuildTimelineHighlights(SupportCaseProjection supportCase)
     {
@@ -406,4 +590,10 @@ public sealed class SupportCasePresentationService
 
         return $"{left}{separator}{right}";
     }
+
+    private sealed record InstallVerificationReadiness(
+        string Summary,
+        bool FixReadyOnLinkedInstall,
+        bool NeedsInstallUpdate,
+        bool NeedsLinkedInstall);
 }

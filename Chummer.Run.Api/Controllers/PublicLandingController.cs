@@ -446,7 +446,7 @@ public sealed class PublicLandingController : Controller
             var experience = _experience.GetOrCreate(subject.SubjectId);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
-            var supportCaseSummaries = _supportPresentation.BuildList(supportCases);
+            var supportCaseSummaries = _supportPresentation.BuildList(supportCases, installLinking);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
             var model = new HomePageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),

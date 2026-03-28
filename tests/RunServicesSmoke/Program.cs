@@ -1759,8 +1759,9 @@ async Task VerifyPublicLandingProjectionAsync()
         accounts,
         supportCases,
         supportPresentation,
-        new SupportAssistantService(supportCases, canon, campaignSpine, loggerFactory.CreateLogger<SupportAssistantService>()),
+        new SupportAssistantService(supportCases, canon, campaignSpine, installLinking, supportPresentation, loggerFactory.CreateLogger<SupportAssistantService>()),
         supportAttachments,
+        installLinking,
         configuration)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -1770,8 +1771,9 @@ async Task VerifyPublicLandingProjectionAsync()
         accounts,
         supportCases,
         supportPresentation,
-        new SupportAssistantService(supportCases, canon, campaignSpine, loggerFactory.CreateLogger<SupportAssistantService>()),
+        new SupportAssistantService(supportCases, canon, campaignSpine, installLinking, supportPresentation, loggerFactory.CreateLogger<SupportAssistantService>()),
         supportAttachments,
+        installLinking,
         configuration)
     {
         ControllerContext = AuthenticatedControllerContext("smoke-token")
@@ -1961,6 +1963,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(refreshPayload is not null && refreshPayload.Rotated, "grant refresh should rotate the installation grant.");
     Assert(!string.Equals(refreshPayload!.Grant.AccessToken, redeemPayload.Grant.AccessToken, StringComparison.Ordinal), "grant refresh should issue a new installation token.");
     Assert(string.Equals(refreshPayload.Installation.Version, "0.6.2-smoke", StringComparison.Ordinal), "grant refresh should update the current install version metadata.");
+    string currentGrantAccessToken = refreshPayload.Grant.AccessToken;
     var linkedSummaryResult = await installLinkingController.GetSummary(CancellationToken.None);
     var linkedSummaryPayload = (linkedSummaryResult.Result as OkObjectResult)?.Value as InstallLinkingSummaryDto;
     Assert(linkedSummaryPayload is not null, "install linking summary endpoint should return the signed-in account state.");
@@ -2027,7 +2030,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(assistantPayload is not null && string.Equals(assistantPayload.Confidence, SupportAssistantConfidenceLevels.CaseTruth, StringComparison.Ordinal), "support assistant should ground answers on the signed-in reporter case when available.");
     Assert(assistantPayload!.Citations.Any(static item => string.Equals(item.SourceKind, "support_case", StringComparison.Ordinal)), "support assistant should cite the matching support case.");
     Assert(assistantPayload.Actions.Any(static item => string.Equals(item.ActionId, "open_account_support", StringComparison.Ordinal)), "support assistant should suggest the tracked case timeline when a matching case exists.");
-    SupportAssistantService supportAssistant = new(supportCases, canon, campaignSpine, loggerFactory.CreateLogger<SupportAssistantService>());
+    SupportAssistantService supportAssistant = new(supportCases, canon, campaignSpine, installLinking, supportPresentation, loggerFactory.CreateLogger<SupportAssistantService>());
     var canonOnlyAssistant = supportAssistant.Answer(
         reporterUserId: "usr_runner",
         reporterSubjectId: "subject.runner",
@@ -2063,6 +2066,7 @@ async Task VerifyPublicLandingProjectionAsync()
         CancellationToken.None);
     var postReleaseAssistantPayload = (postReleaseAssistant.Result as OkObjectResult)?.Value as SupportAssistantResponse;
     Assert(postReleaseAssistantPayload is not null && postReleaseAssistantPayload.Actions.Any(static item => string.Equals(item.ActionId, "open_downloads", StringComparison.Ordinal)), "support assistant should route released fixes back to the downloads surface.");
+    Assert(postReleaseAssistantPayload!.Answer.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal), "support assistant should explain that the linked install needs the reporter-ready build before verification.");
     var notifiedResult = supportAutomationController.NotifyReporter(
         supportCase.CaseId,
         new SupportCaseNotificationRequest(
@@ -2172,12 +2176,31 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(accountSupportDetailModel!.SelectedSupportCaseSummary!.StatusLabel, "Notified", StringComparison.Ordinal), "account support detail should humanize notified support closure for the signed-in reporter.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.FixedReleaseLabel?.Contains("preview", StringComparison.OrdinalIgnoreCase) == true, "account support detail should tie closure truth to the released reporter channel.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.ClosureSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase), "account support detail should explain that the reporter-facing closure already went out.");
-    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.CanVerifyFix, "account support detail should let the reporter confirm whether the fix worked on the affected install.");
-    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.VerificationSummary.Contains("fix worked here", StringComparison.OrdinalIgnoreCase) || accountSupportDetailModel.SelectedSupportCaseSummary.VerificationSummary.Contains("still reproduces", StringComparison.OrdinalIgnoreCase), "account support detail should explain the available verification loop before confirmation.");
+    Assert(!accountSupportDetailModel.SelectedSupportCaseSummary.CanVerifyFix, "account support detail should hold back verification until the linked install is actually on the released fix.");
+    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.VerificationSummary.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal), "account support detail should explain the exact linked-install update required before verification.");
+    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.InstallReadinessSummary.Contains("preview 0.6.3-smoke", StringComparison.Ordinal), "account support detail should project the reporter-ready install target.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.FollowUpLaneSummary.Contains("Account > Support", StringComparison.Ordinal), "account support detail should keep the signed-in follow-up lane explicit.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.ReleaseProgressSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase), "account support detail should project the user-facing release progress summary.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.AffectedInstallSummary?.Contains("install-smoke-001", StringComparison.Ordinal) == true, "account support detail should keep the affected install attached to the tracked case.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.TimelineHighlights.Count >= 1, "account support detail should project timeline highlights through the shared presenter.");
+    var fixedReadyRefreshResult = installLinkingController.RefreshGrant(new RefreshInstallationGrantRequestDto(
+        InstallationId: redeemPayload.Installation.InstallationId,
+        AccessToken: currentGrantAccessToken,
+        HeadId: "avalonia",
+        ApplicationVersion: "0.6.3-smoke",
+        ChannelId: "preview",
+        Platform: "linux",
+        Arch: "x64",
+        PublicKey: "smoke-public-key-v3",
+        HostLabel: "smoke-host"));
+    var fixedReadyRefreshPayload = (fixedReadyRefreshResult.Result as OkObjectResult)?.Value as RefreshInstallationGrantResponseDto;
+    Assert(fixedReadyRefreshPayload is not null && fixedReadyRefreshPayload.Rotated, "linked install refresh should move the signed-in install onto the reporter-ready fix build.");
+    currentGrantAccessToken = fixedReadyRefreshPayload!.Grant.AccessToken;
+    var readyToVerifyAccountDetailPage = await accountController.AccountPage(section: "support", caseId: supportCase.CaseId, CancellationToken.None) as ViewResult;
+    var readyToVerifyAccountDetailModel = readyToVerifyAccountDetailPage?.Model as AccountPageViewModel;
+    Assert(readyToVerifyAccountDetailModel?.SelectedSupportCaseSummary?.CanVerifyFix == true, "account support detail should reopen the verification controls once the linked install reaches the fixed build.");
+    Assert(readyToVerifyAccountDetailModel?.SelectedSupportCaseSummary?.FixReadyOnLinkedInstall == true, "account support detail should mark the linked install as ready to verify.");
+    Assert(readyToVerifyAccountDetailModel?.SelectedSupportCaseSummary?.VerificationSummary.Contains("fix worked here", StringComparison.OrdinalIgnoreCase) == true, "account support detail should return the reporter verification loop once the linked install is current.");
     var verifiedFixedResult = await supportCasesController.VerifyReporterFix(
         supportCase.CaseId,
         new SupportCaseVerificationRequest(
@@ -2218,6 +2241,19 @@ async Task VerifyPublicLandingProjectionAsync()
             Actor: "fleet"));
     var reopenReleasedPayload = (reopenReleasedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
     Assert(reopenReleasedPayload is not null && string.Equals(reopenReleasedPayload.Status, SupportCaseStatuses.ReleasedToReporterChannel, StringComparison.Ordinal), "secondary support case should enter reporter-facing release state before reopen verification.");
+    var reopenReadyRefreshResult = installLinkingController.RefreshGrant(new RefreshInstallationGrantRequestDto(
+        InstallationId: redeemPayload.Installation.InstallationId,
+        AccessToken: currentGrantAccessToken,
+        HeadId: "avalonia",
+        ApplicationVersion: "0.6.4-smoke",
+        ChannelId: "preview",
+        Platform: "linux",
+        Arch: "x64",
+        PublicKey: "smoke-public-key-v4",
+        HostLabel: "smoke-host"));
+    var reopenReadyRefreshPayload = (reopenReadyRefreshResult.Result as OkObjectResult)?.Value as RefreshInstallationGrantResponseDto;
+    Assert(reopenReadyRefreshPayload is not null && reopenReadyRefreshPayload.Rotated, "secondary verification path should be able to move the linked install onto the next reporter-ready fix build.");
+    currentGrantAccessToken = reopenReadyRefreshPayload!.Grant.AccessToken;
     var stillBrokenResult = await supportCasesController.VerifyReporterFix(
         reopenCase.CaseId,
         new SupportCaseVerificationRequest(
