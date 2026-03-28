@@ -161,7 +161,10 @@ public sealed class InteropExportService : IInteropExportService
             yield break;
         }
 
-        var prepFromOps = _opsBoard.ListPrepAssets(campaignId: campaignId, sessionId: sessionId).Items;
+        var prepFromOps = _opsBoard.ListPrepAssets(
+            campaignId: campaignId,
+            sessionId: sessionId,
+            includeReusableCampaignAssets: true).Items;
         foreach (var item in prepFromOps)
         {
             var payload = JsonSerializer.Serialize(new

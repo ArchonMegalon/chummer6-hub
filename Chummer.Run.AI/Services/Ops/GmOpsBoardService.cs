@@ -10,10 +10,20 @@ public interface IGmOpsBoardService
     OpsBoardProjection GetProjection(string sessionId, string sceneId, string? sceneRevision = null);
     GmPrepAssetRecord CreatePrepAsset(GmPrepAssetCreateRequest request);
     GmPrepAssetRecord? GetPrepAsset(string assetId);
-    GmPrepAssetListResponse ListPrepAssets(string? campaignId = null, string? sessionId = null, string? sceneId = null, GmPrepAssetKind? kind = null);
+    GmPrepAssetListResponse ListPrepAssets(
+        string? campaignId = null,
+        string? sessionId = null,
+        string? sceneId = null,
+        GmPrepAssetKind? kind = null,
+        bool includeReusableCampaignAssets = false);
     GmPrepAssetRecord? UpdateChecklist(string assetId, GmPrepChecklistUpdateRequest request);
     GmPrepAssetRevealResult Reveal(string assetId, GmPrepAssetRevealRequest request);
-    IReadOnlyList<GmPrepAssetRecord> ExportPortableAssets(string campaignId, string sessionId, string sceneId, IReadOnlyList<string>? assetIds = null);
+    IReadOnlyList<GmPrepAssetRecord> ExportPortableAssets(
+        string campaignId,
+        string sessionId,
+        string sceneId,
+        IReadOnlyList<string>? assetIds = null,
+        bool includeReusableCampaignAssets = false);
     OfflineSyncSurfaceMergeResult ReconcilePortableAssets(IReadOnlyList<OfflineSyncPrepAsset> assets);
 }
 
@@ -175,13 +185,24 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         return _assets.TryGetValue(assetId, out var state) ? ToRecord(state) : null;
     }
 
-    public GmPrepAssetListResponse ListPrepAssets(string? campaignId = null, string? sessionId = null, string? sceneId = null, GmPrepAssetKind? kind = null)
+    public GmPrepAssetListResponse ListPrepAssets(
+        string? campaignId = null,
+        string? sessionId = null,
+        string? sceneId = null,
+        GmPrepAssetKind? kind = null,
+        bool includeReusableCampaignAssets = false)
     {
+        var normalizedCampaignId = NormalizeOptional(campaignId);
+        var normalizedSessionId = NormalizeOptional(sessionId);
+        var normalizedSceneId = NormalizeOptional(sceneId);
         var items = _assets.Values
-            .Where(item => campaignId is null || string.Equals(item.CampaignId, campaignId, StringComparison.OrdinalIgnoreCase))
-            .Where(item => sessionId is null || string.Equals(item.SessionId, sessionId, StringComparison.OrdinalIgnoreCase))
-            .Where(item => sceneId is null || string.Equals(item.SceneId, sceneId, StringComparison.OrdinalIgnoreCase))
             .Where(item => kind is null || item.Kind == kind)
+            .Where(item => MatchesPrepAssetContext(
+                item,
+                normalizedCampaignId,
+                normalizedSessionId,
+                normalizedSceneId,
+                includeReusableCampaignAssets))
             .OrderByDescending(item => item.UpdatedAtUtc)
             .ThenBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
             .Select(ToSummary)
@@ -278,12 +299,21 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         }
     }
 
-    public IReadOnlyList<GmPrepAssetRecord> ExportPortableAssets(string campaignId, string sessionId, string sceneId, IReadOnlyList<string>? assetIds = null)
+    public IReadOnlyList<GmPrepAssetRecord> ExportPortableAssets(
+        string campaignId,
+        string sessionId,
+        string sceneId,
+        IReadOnlyList<string>? assetIds = null,
+        bool includeReusableCampaignAssets = false)
     {
         var filter = assetIds is { Count: > 0 }
             ? assetIds.Where(static item => !string.IsNullOrWhiteSpace(item)).Select(static item => item.Trim()).ToHashSet(StringComparer.Ordinal)
             : null;
-        var summaries = ListPrepAssets(campaignId, sessionId, sceneId).Items;
+        var summaries = ListPrepAssets(
+            campaignId,
+            sessionId,
+            sceneId,
+            includeReusableCampaignAssets: includeReusableCampaignAssets).Items;
         var exported = new List<GmPrepAssetRecord>(summaries.Count);
         foreach (var summary in summaries)
         {
@@ -300,6 +330,39 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         }
 
         return exported;
+    }
+
+    private static bool MatchesPrepAssetContext(
+        PrepAssetState item,
+        string? campaignId,
+        string? sessionId,
+        string? sceneId,
+        bool includeReusableCampaignAssets)
+    {
+        if (campaignId is not null && !string.Equals(item.CampaignId, campaignId, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        bool directSessionMatch = sessionId is null || string.Equals(item.SessionId, sessionId, StringComparison.OrdinalIgnoreCase);
+        bool directSceneMatch = sceneId is null || string.Equals(item.SceneId, sceneId, StringComparison.OrdinalIgnoreCase);
+        if (directSessionMatch && directSceneMatch)
+        {
+            return true;
+        }
+
+        if (!includeReusableCampaignAssets || !item.Reusable || campaignId is null)
+        {
+            return false;
+        }
+
+        bool reusableSessionMatch = sessionId is null
+            || string.IsNullOrWhiteSpace(item.SessionId)
+            || string.Equals(item.SessionId, sessionId, StringComparison.OrdinalIgnoreCase);
+        bool reusableSceneMatch = sceneId is null
+            || string.IsNullOrWhiteSpace(item.SceneId)
+            || string.Equals(item.SceneId, sceneId, StringComparison.OrdinalIgnoreCase);
+        return reusableSessionMatch && reusableSceneMatch;
     }
 
     public OfflineSyncSurfaceMergeResult ReconcilePortableAssets(IReadOnlyList<OfflineSyncPrepAsset> assets)

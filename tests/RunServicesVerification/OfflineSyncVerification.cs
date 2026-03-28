@@ -47,6 +47,17 @@ internal static class OfflineSyncVerification
                 new GmPrepChecklistItem("check-1", "Ping drones", false)
             ],
             CreatedBy: "gm.ops"));
+        var reusableLibraryAsset = ops.CreatePrepAsset(new GmPrepAssetCreateRequest(
+            CampaignId: "campaign-offline",
+            SessionId: null,
+            SceneId: null,
+            Title: "Reusable chase ladder",
+            Kind: GmPrepAssetKind.Note,
+            Audience: GmPrepAssetAudience.GameMaster,
+            Summary: "Campaign-level chase beats",
+            Body: "Escalate from roadblock to drone tail to full strike-team response.",
+            Tags: ["library", "travel"],
+            CreatedBy: "gm.ops"));
 
         var snapshot = sync.CreateSnapshot(new OfflineSyncSnapshotRequest(
             CampaignId: "campaign-offline",
@@ -56,7 +67,8 @@ internal static class OfflineSyncVerification
             DeviceId: "tablet-1"));
 
         VerificationAssert.Equal("offline_sync_snapshot_v1", snapshot.ContractFamily, "Offline snapshots should use canonical family.");
-        VerificationAssert.True(snapshot.PrepAssets.Count == 1, "Snapshot should include prep assets for the scene.");
+        VerificationAssert.True(snapshot.PrepAssets.Count == 2, "Snapshot should include scene prep plus reusable campaign prep assets.");
+        VerificationAssert.True(snapshot.PrepAssets.Any(item => item.AssetId == reusableLibraryAsset.AssetId), "Snapshot should include reusable campaign prep assets for offline library continuity.");
         VerificationAssert.True(snapshot.SessionProjection.Events.Count == 2, "Snapshot should include current ledger events.");
 
         var reconcile = await sync.ReconcileAsync(new OfflineSyncReconcileRequest(
