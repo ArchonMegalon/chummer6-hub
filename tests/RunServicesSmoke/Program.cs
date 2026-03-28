@@ -1595,6 +1595,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(faqSource.Contains("FaqActionFor", StringComparison.Ordinal), "faq should attach direct next-step routing under answers instead of stopping at a text-only sheet.");
     Assert(faqSource.Contains("Open downloads", StringComparison.Ordinal), "faq should expose a direct downloads route for install/update answers.");
     Assert(faqSource.Contains("Open support intake", StringComparison.Ordinal), "faq should expose a direct support route for help and bug-report answers.");
+    Assert(!faqSource.Contains("story-guide-tail", StringComparison.Ordinal), "faq should end with a quieter footnote instead of a full landing-style CTA band.");
+    var participateSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml"));
+    Assert(!participateSource.Contains("story-guide-tail", StringComparison.Ordinal), "participate should open with a quieter route intro instead of a generic CTA band.");
+    Assert(participateSource.Contains("Public feedback", StringComparison.Ordinal), "participate should keep the public lane explicit.");
+    Assert(participateSource.Contains("Signed-in participation", StringComparison.Ordinal), "participate should keep the signed-in lane explicit.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
@@ -1720,6 +1725,14 @@ async Task VerifyPublicLandingProjectionAsync()
         chrome,
         google,
         loggerFactory.CreateLogger<AccountsController>())
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var campaignSpineController = new CampaignSpineController(
+        linkedIdentityClient,
+        accounts,
+        installLinking,
+        campaignSpine)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1983,6 +1996,36 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.Restore.LocalOnlyNotes.Count >= 1, "account page should keep install-local restore guardrails explicit.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.OperatorRole)), "account page should surface organizer/operator role posture.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.CampaignVisibilitySummary)), "account page should surface explicit campaign visibility posture for operator groups.");
+    var campaignSummaryResult = await campaignSpineController.GetMyCampaignSummary(CancellationToken.None);
+    var campaignSummaryPayload = (campaignSummaryResult.Result as OkObjectResult)?.Value as AccountCampaignSummary ?? campaignSummaryResult.Value;
+    Assert(campaignSummaryPayload is not null, "campaign spine api should return the signed-in campaign summary.");
+    var restoreResult = await campaignSpineController.GetMyRestoreProjection(CancellationToken.None);
+    var restorePayload = (restoreResult.Result as OkObjectResult)?.Value as WorkspaceRestoreProjection ?? restoreResult.Value;
+    Assert(restorePayload is not null && restorePayload.ClaimedDevices.Count >= 1, "campaign spine api should expose the restore packet for claimed-device recovery.");
+    string workspaceId = campaignSummaryPayload!.Workspaces[0].WorkspaceId;
+    string runId = campaignSummaryPayload.Runs[0].RunId;
+    string handoffId = campaignSummaryPayload.BuildLabHandoffs[0].HandoffId;
+    string rulesEntryId = campaignSummaryPayload.RulesNavigator[0].EntryId;
+    string publicationId = campaignSummaryPayload.CreatorPublications[0].PublicationId;
+    var workspaceResult = await campaignSpineController.GetMyCampaignWorkspace(workspaceId, CancellationToken.None);
+    var workspacePayload = (workspaceResult.Result as OkObjectResult)?.Value as CampaignWorkspaceProjection ?? workspaceResult.Value;
+    Assert(workspacePayload is not null && string.Equals(workspacePayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine api should expose a stable workspace summary.");
+    Assert(workspacePayload.ReadinessCues.Count >= 1, "campaign spine workspace api should keep readiness cues attached to the workspace summary.");
+    var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
+    var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
+    Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
+    var handoffResult = await campaignSpineController.GetMyBuildLabHandoff(handoffId, CancellationToken.None);
+    var handoffPayload = (handoffResult.Result as OkObjectResult)?.Value as BuildLabHandoffProjection ?? handoffResult.Value;
+    Assert(handoffPayload is not null && handoffPayload.Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "campaign spine api should expose the customer-facing build-path handoff detail.");
+    Assert(!string.IsNullOrWhiteSpace(handoffPayload!.CampaignReturnSummary), "campaign spine handoff api should keep campaign return truth attached.");
+    var rulesResult = await campaignSpineController.GetMyRulesNavigatorAnswer(rulesEntryId, CancellationToken.None);
+    var rulesPayload = (rulesResult.Result as OkObjectResult)?.Value as RulesNavigatorAnswerProjection ?? rulesResult.Value;
+    Assert(rulesPayload is not null && rulesPayload.EvidenceLines.Count >= 1, "campaign spine api should expose grounded rule-environment evidence.");
+    var publicationResult = await campaignSpineController.GetMyCreatorPublication(publicationId, CancellationToken.None);
+    var publicationPayload = (publicationResult.Result as OkObjectResult)?.Value as CreatorPublicationProjection ?? publicationResult.Value;
+    Assert(publicationPayload is not null && string.Equals(publicationPayload.PublicationId, publicationId, StringComparison.Ordinal), "campaign spine api should expose creator-publication posture from the same campaign truth.");
+    var missingWorkspaceResult = await campaignSpineController.GetMyCampaignWorkspace("workspace-missing", CancellationToken.None);
+    Assert(missingWorkspaceResult.Result is NotFoundResult, "campaign spine workspace api should return 404 when the signed-in workspace does not exist.");
     var accountSupportPage = await accountController.AccountPage(section: "support", caseId: null, CancellationToken.None) as ViewResult;
     var accountSupportModel = accountSupportPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountSupportModel?.CurrentSection, "support", StringComparison.Ordinal), "account support route should render the support section.");
