@@ -5,6 +5,8 @@ Purpose: publish desktop artifacts to a self-hosted downloads surface and verify
 Registry note:
 `/downloads/releases.json` is now treated as a compatibility projection.
 The canonical promoted release record is `RELEASE_CHANNEL.generated.json`, materialized by `chummer6-hub-registry`.
+When available, Hub may consume the registry runtime endpoint directly via `CHUMMER_RELEASE_REGISTRY_CURRENT_URL`
+or `CHUMMER_HUB_REGISTRY_BASE_URL`; the file-backed manifest remains the fallback.
 
 ## Prerequisites
 

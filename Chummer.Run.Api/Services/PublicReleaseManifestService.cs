@@ -6,16 +6,35 @@ namespace Chummer.Run.Api.Services;
 public sealed class PublicReleaseManifestService
 {
     private const string DefaultRoot = "/downloads-source";
+    private const string RegistryCurrentUrlKey = "CHUMMER_RELEASE_REGISTRY_CURRENT_URL";
+    private const string RegistryBaseUrlKey = "CHUMMER_HUB_REGISTRY_BASE_URL";
     private readonly IConfiguration _configuration;
+    private readonly HttpClient? _httpClient;
 
     public PublicReleaseManifestService(IConfiguration configuration)
+        : this(configuration, httpClient: null)
+    {
+    }
+
+    public PublicReleaseManifestService(IConfiguration configuration, HttpClient? httpClient)
     {
         _configuration = configuration;
+        _httpClient = httpClient;
     }
 
     public PublicReleaseManifestDto LoadManifest()
     {
         var root = ResolveDownloadsRoot();
+        var registryManifestUrl = ResolveRegistryManifestUrl();
+        if (!string.IsNullOrWhiteSpace(registryManifestUrl))
+        {
+            var runtimeManifest = TryLoadRegistryReleaseManifestFromUrl(registryManifestUrl);
+            if (runtimeManifest is not null)
+            {
+                return runtimeManifest;
+            }
+        }
+
         var registryManifestPath = ResolveRegistryManifestPath(root);
         if (File.Exists(registryManifestPath))
         {
@@ -124,6 +143,21 @@ public sealed class PublicReleaseManifestService
             ? configured
             : Path.Combine(downloadsRoot, "RELEASE_CHANNEL.generated.json");
 
+    private string? ResolveRegistryManifestUrl()
+    {
+        if (_configuration[RegistryCurrentUrlKey]?.Trim() is { Length: > 0 } currentUrl)
+        {
+            return currentUrl;
+        }
+
+        if (_configuration[RegistryBaseUrlKey]?.Trim() is not { Length: > 0 } baseUrl)
+        {
+            return null;
+        }
+
+        return $"{baseUrl.TrimEnd('/')}/api/v1/registry/release-channel/current";
+    }
+
     private static PublicReleaseManifestDto LoadReleaseManifest(string manifestPath)
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
@@ -166,13 +200,29 @@ public sealed class PublicReleaseManifestService
     }
 
     private static PublicReleaseManifestDto LoadRegistryReleaseManifest(string manifestPath)
+        => LoadRegistryReleaseManifestPayload(File.ReadAllText(manifestPath), "registry");
+
+    private PublicReleaseManifestDto? TryLoadRegistryReleaseManifestFromUrl(string manifestUrl)
+    {
+        try
+        {
+            using var client = _httpClient is null ? new HttpClient() : null;
+            string json = (_httpClient ?? client!).GetStringAsync(manifestUrl).GetAwaiter().GetResult();
+            return LoadRegistryReleaseManifestPayload(json, "registry_runtime");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static PublicReleaseManifestDto LoadRegistryReleaseManifestPayload(string json, string source)
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
         {
             PropertyNameCaseInsensitive = true
         };
 
-        var json = File.ReadAllText(manifestPath);
         var parsed = JsonSerializer.Deserialize<RegistryReleaseChannelManifest>(json, options);
         if (parsed is null)
         {
@@ -181,7 +231,7 @@ public sealed class PublicReleaseManifestService
                 Channel: "preview",
                 PublishedAt: DateTimeOffset.UtcNow,
                 Downloads: [],
-                Source: "registry",
+                Source: source,
                 Status: "manifest-error",
                 Message: "Registry release manifest exists but could not be parsed.",
                 HasFallbackSource: false);
@@ -219,7 +269,7 @@ public sealed class PublicReleaseManifestService
             Channel: parsed.ChannelId ?? "preview",
             PublishedAt: parsed.PublishedAt ?? DateTimeOffset.UtcNow,
             Downloads: downloads,
-            Source: "registry",
+            Source: source,
             Status: status,
             Message: message,
             HasFallbackSource: false,
