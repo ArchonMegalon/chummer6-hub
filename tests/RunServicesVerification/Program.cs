@@ -12,6 +12,7 @@ await PipelineProjectionVerification.RunAsync();
 await SupportCrashVerification.RunAsync();
 await StateStoreBackupVerification.RunAsync();
 CompatibilityVerification.Run();
+await HubApiRuntimeGuardrailVerification.RunAsync();
 HubExtractionReadinessVerification.Run();
 
 Console.WriteLine("run-services verification passed");
