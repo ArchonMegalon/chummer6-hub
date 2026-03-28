@@ -800,7 +800,7 @@ public sealed class CodexParticipationController : Controller
         => session.Status switch
         {
             "lane_pending" => "Authorization is confirmed. Chummer is finishing lane setup.",
-            "active" => "You can leave this page now. Stop or revoke later from your account or technical details.",
+            "active" => "You can leave this page now. Stop or revoke later from your account settings.",
             "waiting_for_slot" => session.AuthorizedAtUtc is null
                 ? "All contribution slots are currently busy. Chummer saved your request and will move you forward when a slot opens."
                 : "Authorization is complete. Chummer is waiting for the next available contribution slot.",
