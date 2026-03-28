@@ -24,6 +24,9 @@
     var previewCount = Model.PreviewItems.Count;
     var previewHighlight = Model.PreviewItems.FirstOrDefault();
     var release = Model.ReleaseExperience;
+    var trustPulse = Model.TrustPulse;
+    var trustPulseRecommended = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Recommended now", StringComparison.Ordinal));
+    var trustPulseCaution = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal));
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
     var productProofSection = Section("product_proof");
@@ -84,6 +87,36 @@
         }
     </div>
 </section>
+
+@if (trustPulse is not null)
+{
+    <section class="release-footnote">
+        <p class="eyebrow">What changed this week</p>
+        <h2 class="editorial-title">@trustPulse.Heading</h2>
+        <p class="editorial-copy">@trustPulse.Summary</p>
+        @if (trustPulse.MicroProof.Count > 0)
+        {
+            <div class="trust-claim__microproof">
+                @foreach (var item in trustPulse.MicroProof)
+                {
+                    <span>@item</span>
+                }
+            </div>
+        }
+        @if (trustPulseRecommended is not null)
+        {
+            <p><strong>@trustPulseRecommended.Label:</strong> @trustPulseRecommended.Value</p>
+        }
+        @if (trustPulseCaution is not null)
+        {
+            <p><strong>@trustPulseCaution.Label:</strong> @trustPulseCaution.Value</p>
+        }
+        <div class="stacked-actions">
+            <a class="button-like button-like--secondary" href="/now">Open what works today</a>
+            <a class="button-like button-like--ghost" href="/progress">Open progress</a>
+        </div>
+    </section>
+}
 
 <section class="product-proof">
     <div class="product-proof__copy">
