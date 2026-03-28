@@ -113,9 +113,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         WorkspaceRestoreProjection restore)
     {
         CampaignReadinessCue? attentionCue = workspace.ReadinessCues.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
-        string restoreSummary = restore.ConflictSummaries.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item))
-            ?? restore.LocalOnlyNotes.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item))
-            ?? "Restore posture is attached to claimed installs and continuity snapshots instead of a local-only guess.";
+        string restorePrefetchSummary = DescribeRestorePrefetchSummary(restore);
+        string restoreSummary = restore.ConflictSummaries.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item)) is { } conflictSummary
+            ? $"{conflictSummary} {restorePrefetchSummary}"
+            : restore.LocalOnlyNotes.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item)) is { } localOnlySummary
+                ? $"{restorePrefetchSummary} {localOnlySummary}"
+                : $"{restorePrefetchSummary} Restore posture is attached to claimed installs and continuity snapshots instead of a local-only guess.";
         string publicationSummary = workspace.RecapShelf.Count == 0
             ? "No recap-safe output is pinned yet, so the workspace still needs its first publication-safe continuity handoff."
             : $"{workspace.RecapShelf.Count} publication-safe output(s) are attached to the same campaign continuity spine.";
@@ -483,6 +486,25 @@ public sealed class CampaignWorkspaceServerPlaneService
                 restore.ClaimedDevices
                     .Take(2)
                     .Select(static item => $"{item.DeviceRole} on {item.Platform}/{item.HeadId} ({item.Channel})"));
+
+    private static string DescribeRestorePrefetchSummary(WorkspaceRestoreProjection restore)
+    {
+        string inventory = DescribeRestorePrefetchInventory(
+            restore.RecentDossiers.Count,
+            restore.RecentCampaigns.Count,
+            restore.RecentRuleEnvironments.Count,
+            restore.RecentArtifacts.Count);
+        return restore.ClaimedDevices.Count == 0
+            ? $"Prefetch inventory: {inventory} are attached to the restore packet, but no claimed-device return lane is linked yet."
+            : $"Prefetch inventory: {inventory} are staged for bounded offline use across {restore.ClaimedDevices.Count} claimed device(s).";
+    }
+
+    private static string DescribeRestorePrefetchInventory(
+        int dossierCount,
+        int campaignCount,
+        int ruleEnvironmentCount,
+        int artifactCount)
+        => $"{dossierCount} dossier(s), {campaignCount} campaign(s), {ruleEnvironmentCount} rule snapshot(s), and {artifactCount} reconnectable artifact(s)";
 
     private static string ResolveDeviceRole(ClaimedInstallationDto installation)
     {
