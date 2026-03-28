@@ -23,9 +23,30 @@ public sealed class SupportCasePresentationService
         string detailHref = $"/account/support/{Uri.EscapeDataString(supportCase.CaseId)}";
         string? affectedInstallSummary = BuildAffectedInstallSummary(supportCase);
         string followUpLaneSummary = BuildFollowUpLaneSummary(supportCase);
-        string releaseProgressSummary = BuildReleaseProgressSummary(supportCase, status, fixedReleaseLabel);
+        string verificationState = NormalizeVerificationState(supportCase.ReporterVerificationState);
+        string releaseProgressSummary = BuildReleaseProgressSummary(supportCase, status, fixedReleaseLabel, verificationState);
+        string verificationSummary = BuildVerificationSummary(supportCase, fixedReleaseLabel, verificationState);
+        bool canVerifyFix = CanVerifyFix(status, verificationState);
         IReadOnlyList<SupportCaseTimelineHighlightViewModel> timelineHighlights = BuildTimelineHighlights(supportCase);
-        var (stageLabel, nextSafeAction, closureSummary, primaryActionLabel, primaryActionHref, reporterActionNeeded) = status switch
+        var (stageLabel, nextSafeAction, closureSummary, primaryActionLabel, primaryActionHref, reporterActionNeeded) = verificationState switch
+        {
+            SupportCaseVerificationStates.ConfirmedFixed => (
+                "Closed and confirmed",
+                "No further action is needed unless the same issue returns on a later update.",
+                string.IsNullOrWhiteSpace(fixedReleaseLabel)
+                    ? "The reporter confirmed that the fix worked on the affected install."
+                    : $"The reporter confirmed that {fixedReleaseLabel} fixed the issue on the affected install.",
+                "Open downloads",
+                "/downloads",
+                false),
+            SupportCaseVerificationStates.StillBroken => (
+                "Needs follow-up",
+                "Add the newest reproduction detail or log on this same tracked case so support can reopen the fix path without losing continuity.",
+                "The reporter said the fix did not hold on the affected install, so the case reopened for follow-up.",
+                "Open tracked case",
+                detailHref,
+                true),
+            _ => status switch
         {
             SupportCaseStatuses.Clustered => (
                 "Merged",
@@ -103,7 +124,7 @@ public sealed class SupportCasePresentationService
                 "Open tracked case",
                 detailHref,
                 false)
-        };
+        }};
 
         return new SupportCasePresentationViewModel(
             Case: supportCase,
@@ -111,6 +132,7 @@ public sealed class SupportCasePresentationService
             StageLabel: stageLabel,
             NextSafeAction: nextSafeAction,
             ClosureSummary: closureSummary,
+            VerificationSummary: verificationSummary,
             DetailHref: detailHref,
             PrimaryActionLabel: primaryActionLabel,
             PrimaryActionHref: primaryActionHref,
@@ -120,7 +142,8 @@ public sealed class SupportCasePresentationService
             FollowUpLaneSummary: followUpLaneSummary,
             ReleaseProgressSummary: releaseProgressSummary,
             TimelineHighlights: timelineHighlights,
-            ReporterActionNeeded: reporterActionNeeded);
+            ReporterActionNeeded: reporterActionNeeded,
+            CanVerifyFix: canVerifyFix);
     }
 
     private static string NormalizeStatus(string? value)
@@ -136,6 +159,22 @@ public sealed class SupportCasePresentationService
             SupportCaseStatuses.AwaitingEvidence => "Needs detail",
             _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '))
         };
+
+    private static string NormalizeVerificationState(string? value)
+    {
+        string? normalized = NormalizeOptional(value, 64);
+        if (normalized is null)
+        {
+            return string.Empty;
+        }
+
+        return normalized.ToLowerInvariant() switch
+        {
+            SupportCaseVerificationStates.ConfirmedFixed => SupportCaseVerificationStates.ConfirmedFixed,
+            SupportCaseVerificationStates.StillBroken => SupportCaseVerificationStates.StillBroken,
+            _ => string.Empty
+        };
+    }
 
     private static string BuildFixedReleaseLabel(string? version, string? channel)
     {
@@ -225,8 +264,22 @@ public sealed class SupportCasePresentationService
         return "Follow-up stays attached to this case id until a clearer response lane exists.";
     }
 
-    private static string BuildReleaseProgressSummary(SupportCaseProjection supportCase, string normalizedStatus, string fixedReleaseLabel)
+    private static string BuildReleaseProgressSummary(
+        SupportCaseProjection supportCase,
+        string normalizedStatus,
+        string fixedReleaseLabel,
+        string verificationState)
     {
+        if (verificationState == SupportCaseVerificationStates.ConfirmedFixed)
+        {
+            return "The reporter confirmed the fix on the affected install, so the visible loop is closed unless the issue returns.";
+        }
+
+        if (verificationState == SupportCaseVerificationStates.StillBroken)
+        {
+            return "The reporter said the fix did not hold on the affected install, so the case reopened for follow-up and fresh evidence.";
+        }
+
         return normalizedStatus switch
         {
             SupportCaseStatuses.UserNotified => string.IsNullOrWhiteSpace(fixedReleaseLabel)
@@ -243,6 +296,32 @@ public sealed class SupportCasePresentationService
             _ => "No reporter-ready release is attached yet, so the visible next step is still triage or fix work."
         };
     }
+
+    private static string BuildVerificationSummary(
+        SupportCaseProjection supportCase,
+        string fixedReleaseLabel,
+        string verificationState)
+    {
+        string verifiedAt = supportCase.ReporterVerifiedAtUtc?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") ?? "an unknown time";
+        return verificationState switch
+        {
+            SupportCaseVerificationStates.ConfirmedFixed => string.IsNullOrWhiteSpace(fixedReleaseLabel)
+                ? $"Reporter confirmed the fix on the affected install at {verifiedAt} UTC."
+                : $"Reporter confirmed {fixedReleaseLabel} on the affected install at {verifiedAt} UTC.",
+            SupportCaseVerificationStates.StillBroken => string.IsNullOrWhiteSpace(supportCase.ReporterVerificationNote)
+                ? $"Reporter said the fix is still broken on the affected install at {verifiedAt} UTC."
+                : $"Reporter said the fix is still broken at {verifiedAt} UTC: {supportCase.ReporterVerificationNote}",
+            _ when CanVerifyFix(NormalizeStatus(supportCase.Status), verificationState)
+                => "After you update or reinstall on the affected device, confirm whether the fix worked here or whether the same issue still reproduces.",
+            _ => "No fix confirmation is requested yet."
+        };
+    }
+
+    private static bool CanVerifyFix(string normalizedStatus, string verificationState)
+        => verificationState != SupportCaseVerificationStates.ConfirmedFixed
+           && (normalizedStatus == SupportCaseStatuses.Fixed
+               || normalizedStatus == SupportCaseStatuses.ReleasedToReporterChannel
+               || normalizedStatus == SupportCaseStatuses.UserNotified);
 
     private static IReadOnlyList<SupportCaseTimelineHighlightViewModel> BuildTimelineHighlights(SupportCaseProjection supportCase)
     {

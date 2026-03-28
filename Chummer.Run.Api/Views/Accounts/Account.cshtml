@@ -359,12 +359,22 @@
                                 <p><strong>Next safe action:</strong> @selectedSupportCaseSummary.NextSafeAction</p>
                                 <p><strong>Closure:</strong> @selectedSupportCaseSummary.ClosureSummary</p>
                                 <p><strong>Release progress:</strong> @selectedSupportCaseSummary.ReleaseProgressSummary</p>
+                                <p><strong>Fix confirmation:</strong> @selectedSupportCaseSummary.VerificationSummary</p>
                             </div>
-                            @if (string.Equals(selectedSupportCaseSummary.PrimaryActionHref, "/downloads", StringComparison.OrdinalIgnoreCase))
-                            {
-                                <div class="stacked-actions">
+                            <div class="stacked-actions">
+                                @if (string.Equals(selectedSupportCaseSummary.PrimaryActionHref, "/downloads", StringComparison.OrdinalIgnoreCase))
+                                {
                                     <a class="button-like button-like--secondary" href="@selectedSupportCaseSummary.PrimaryActionHref">@selectedSupportCaseSummary.PrimaryActionLabel</a>
-                                </div>
+                                }
+                                @if (selectedSupportCaseSummary.CanVerifyFix)
+                                {
+                                    <button class="button-like button-like--primary" type="button" data-support-verification-outcome="confirmed_fixed" data-support-case-id="@selectedSupportCase.CaseId">Fix worked here</button>
+                                    <button class="button-like button-like--ghost" type="button" data-support-verification-outcome="still_broken" data-support-case-id="@selectedSupportCase.CaseId">Still broken</button>
+                                }
+                            </div>
+                            @if (selectedSupportCaseSummary.CanVerifyFix)
+                            {
+                                <p id="supportVerificationStatusNotice" class="muted-copy" hidden></p>
                             }
                         }
                         @if (selectedSupportCase.Attachments is { Count: > 0 })
@@ -1621,6 +1631,50 @@
 
   syncSupportContextPreview();
   supportInstallation?.addEventListener("change", syncSupportContextPreview);
+
+  document.querySelectorAll("[data-support-verification-outcome]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const notice = document.getElementById("supportVerificationStatusNotice");
+      const outcome = button.getAttribute("data-support-verification-outcome");
+      const caseId = button.getAttribute("data-support-case-id");
+      if (!outcome || !caseId) {
+        return;
+      }
+
+      let note = "";
+      if (outcome === "still_broken") {
+        const response = window.prompt("What still looks broken on this install? Optional, but it helps support reopen the right lane.", "");
+        if (response === null) {
+          return;
+        }
+
+        note = response.trim();
+      }
+
+      ui.clearNotice(notice);
+      const siblingButtons = Array.from(document.querySelectorAll(`[data-support-case-id="${caseId}"]`));
+      siblingButtons.forEach((item) => ui.setButtonBusy(item, true, "Saving..."));
+      try {
+        await ui.requestJson(`/api/v1/support/cases/${encodeURIComponent(caseId)}/verify`, {
+          method: "POST",
+          json: {
+            outcome,
+            note: note || null
+          }
+        });
+        ui.setNotice(
+          notice,
+          outcome === "confirmed_fixed"
+            ? "Thanks. The tracked case now shows that the fix worked on this install."
+            : "Thanks. The tracked case reopened for follow-up on this install.");
+        window.location.reload();
+      } catch (error) {
+        ui.setNotice(notice, ui.describeError(error, "Fix verification could not be recorded right now."), true);
+      } finally {
+        siblingButtons.forEach((item) => ui.setButtonBusy(item, false, "Saving..."));
+      }
+    });
+  });
 })();
 </script>
 }

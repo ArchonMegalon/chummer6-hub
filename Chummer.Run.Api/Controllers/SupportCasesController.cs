@@ -218,6 +218,34 @@ public sealed class SupportCasesController : ControllerBase
         }
     }
 
+    [HttpPost("{caseId}/verify")]
+    [ProducesResponseType<SupportCaseProjection>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<SupportCaseProjection>> VerifyReporterFix(
+        [FromRoute] string caseId,
+        [FromBody] SupportCaseVerificationRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("verification payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_supportCases.VerifyForReporter(caseId, user.UserId, subject.SubjectId, request));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or ArgumentException or InvalidOperationException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
     [HttpGet("triage")]
     [IgnoreAntiforgeryToken]
     [ProducesResponseType<SupportCaseListResponse>(StatusCodes.Status200OK)]

@@ -338,6 +338,7 @@ public sealed record SupportCasePresentationViewModel(
     string StageLabel,
     string NextSafeAction,
     string ClosureSummary,
+    string VerificationSummary,
     string DetailHref,
     string PrimaryActionLabel,
     string PrimaryActionHref,
@@ -347,7 +348,8 @@ public sealed record SupportCasePresentationViewModel(
     string FollowUpLaneSummary,
     string ReleaseProgressSummary,
     IReadOnlyList<SupportCaseTimelineHighlightViewModel> TimelineHighlights,
-    bool ReporterActionNeeded);
+    bool ReporterActionNeeded,
+    bool CanVerifyFix);
 
 public sealed record SupportCaseTimelineHighlightViewModel(
     string Label,

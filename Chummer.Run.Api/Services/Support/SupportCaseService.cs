@@ -28,6 +28,12 @@ public sealed class SupportCaseService
         SupportCaseStatuses.UserNotified
     ];
 
+    private static readonly HashSet<string> AllowedVerificationStates =
+    [
+        SupportCaseVerificationStates.ConfirmedFixed,
+        SupportCaseVerificationStates.StillBroken
+    ];
+
     private readonly SupportStore _store;
     private readonly SupportAttachmentStorageService _attachments;
     private readonly ILogger<SupportCaseService> _logger;
@@ -407,6 +413,73 @@ public sealed class SupportCaseService
         }
     }
 
+    public SupportCaseProjection VerifyForReporter(
+        string caseId,
+        string? reporterUserId,
+        string? reporterSubjectId,
+        SupportCaseVerificationRequest request)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(caseId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        string verificationState = NormalizeVerificationState(request.Outcome);
+        string? note = NormalizeOptional(request.Note, 160);
+        string actor = NormalizeOptional(request.Actor, 64) ?? SupportCaseSourceKinds.HubAccount;
+        string? normalizedUserId = NormalizeOptional(reporterUserId, 64);
+        string? normalizedSubjectId = NormalizeOptional(reporterSubjectId, 128);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        lock (_store.Gate)
+        {
+            if (!_store.CasesById.TryGetValue(caseId.Trim(), out SupportCaseProjection? existing))
+            {
+                throw new KeyNotFoundException($"Unknown support case: {caseId}");
+            }
+
+            if (!MatchesIdentity(existing.ReporterUserId, existing.ReporterSubjectId, normalizedUserId, normalizedSubjectId))
+            {
+                throw new KeyNotFoundException($"Unknown support case: {caseId}");
+            }
+
+            string currentStatus = NormalizeStatus(existing.Status);
+            if (currentStatus != SupportCaseStatuses.Fixed
+                && currentStatus != SupportCaseStatuses.ReleasedToReporterChannel
+                && currentStatus != SupportCaseStatuses.UserNotified)
+            {
+                throw new InvalidOperationException("Reporter verification is only available after the fix enters a reporter-facing release or notification state.");
+            }
+
+            string targetStatus = verificationState == SupportCaseVerificationStates.StillBroken
+                ? SupportCaseStatuses.AwaitingEvidence
+                : currentStatus == SupportCaseStatuses.Fixed
+                    ? SupportCaseStatuses.UserNotified
+                    : existing.Status;
+            string summary = verificationState == SupportCaseVerificationStates.ConfirmedFixed
+                ? note ?? "Reporter confirmed that the fix worked on the affected install."
+                : note ?? "Reporter said the issue still reproduces after the fix path reached the affected install.";
+
+            SupportCaseProjection updated = existing with
+            {
+                Status = targetStatus,
+                UpdatedAtUtc = now,
+                ReporterVerificationState = verificationState,
+                ReporterVerificationNote = note,
+                ReporterVerifiedAtUtc = now,
+                Timeline = AppendTimeline(
+                    existing.Timeline,
+                    BuildEvent(
+                        status: targetStatus,
+                        summary: summary,
+                        occurredAtUtc: now,
+                        actor: actor,
+                        metadata: BuildMetadata(("verification_state", verificationState))))
+            };
+            _store.CasesById[updated.CaseId] = updated;
+            _store.PersistLocked();
+            return updated;
+        }
+    }
+
     private static IEnumerable<SupportCaseProjection> ApplyFilters(
         IEnumerable<SupportCaseProjection> items,
         string? status,
@@ -679,6 +752,17 @@ public sealed class SupportCaseService
         if (!AllowedStatuses.Contains(normalized))
         {
             throw new ArgumentException($"Unsupported support case status: {value}", nameof(value));
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeVerificationState(string value)
+    {
+        string normalized = NormalizeRequired(value, nameof(value), 64).ToLowerInvariant();
+        if (!AllowedVerificationStates.Contains(normalized))
+        {
+            throw new ArgumentException($"Unsupported support case verification outcome: {value}", nameof(value));
         }
 
         return normalized;
