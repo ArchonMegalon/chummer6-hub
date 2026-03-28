@@ -60,6 +60,7 @@ internal static class HubRequestObservabilityVerification
         {
             VerificationAssert.NotNull(context.Items[HubRequestObservability.CorrelationItemKey] as string, "Middleware should stamp a correlation id before controller execution.");
             context.Response.StatusCode = StatusCodes.Status202Accepted;
+            await context.Response.StartAsync();
             await context.Response.WriteAsync("ok");
         }, options, NullLogger<HubRequestObservabilityMiddleware>.Instance);
 

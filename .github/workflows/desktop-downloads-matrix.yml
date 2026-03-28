@@ -10,6 +10,7 @@ on:
         type: boolean
   push:
     branches:
+      - main
       - Docker
     paths:
       - '.github/workflows/desktop-downloads-matrix.yml'
@@ -19,11 +20,14 @@ on:
       - 'Chummer.Blazor/**'
       - 'Chummer.Core/**'
       - 'Chummer.Contracts/**'
+      - 'Chummer.Run.Api/**'
       - 'Chummer.Rulesets.Sr5/**'
       - 'Chummer.Desktop.Runtime/**'
       - 'Chummer.Infrastructure/**'
       - 'Chummer.Portal/**'
       - 'Chummer.Presentation/**'
+      - 'docs/ACTIVE_HEAD_RELEASE_ARTIFACTS.md'
+      - 'docs/SELF_HOSTED_DOWNLOADS_RUNBOOK.md'
       - 'global.json'
       - 'scripts/generate-releases-manifest.sh'
       - 'scripts/publish-download-bundle.sh'
@@ -35,6 +39,42 @@ permissions:
   contents: read
 
 jobs:
+  build-api:
+    name: Build API Release Bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore API
+        run: dotnet restore Chummer.Run.Api/Chummer.Run.Api.csproj
+
+      - name: Publish API bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/api dist
+          dotnet publish Chummer.Run.Api/Chummer.Run.Api.csproj \
+            -c Release \
+            --self-contained false \
+            -p:UseAppHost=false \
+            -o out/api
+          tar -C out/api -czf dist/chummer-run-api-portable.tar.gz .
+
+      - name: Upload API artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-api-portable
+          path: dist/chummer-run-api-portable.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
   build-desktop:
     name: Build ${{ matrix.app }} ${{ matrix.rid }}
     runs-on: ${{ matrix.os }}
@@ -156,7 +196,9 @@ jobs:
 
   generate-manifest:
     name: Generate Downloads Manifest
-    needs: build-desktop
+    needs:
+      - build-api
+      - build-desktop
     runs-on: ubuntu-latest
 
     steps:
@@ -218,6 +260,7 @@ jobs:
             echo "## Desktop Download Bundle"
             echo
             echo "Generated manifest artifact: \`desktop-download-bundle\`"
+            echo "Generated API artifact: \`release-api-portable\`"
             echo
             echo "Files:"
             find dist -maxdepth 2 -type f | sort | sed 's|^|- `|' | sed 's|$|`|'
