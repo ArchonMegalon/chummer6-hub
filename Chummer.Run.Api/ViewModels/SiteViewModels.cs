@@ -355,6 +355,26 @@ public sealed record SupportCasePresentationViewModel(
     bool ReporterActionNeeded,
     bool CanVerifyFix);
 
+public sealed record SupportCaseDigestViewModel(
+    string CaseId,
+    string Title,
+    string Summary,
+    string StatusLabel,
+    string StageLabel,
+    string NextSafeAction,
+    string ClosureSummary,
+    string VerificationSummary,
+    string DetailHref,
+    string PrimaryActionLabel,
+    string PrimaryActionHref,
+    string UpdatedLabel,
+    string? FixedReleaseLabel,
+    string? AffectedInstallSummary,
+    string FollowUpLaneSummary,
+    string ReleaseProgressSummary,
+    bool ReporterActionNeeded,
+    bool CanVerifyFix);
+
 public sealed record SupportCaseTimelineHighlightViewModel(
     string Label,
     string Summary,

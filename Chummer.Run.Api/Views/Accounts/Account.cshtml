@@ -798,7 +798,16 @@
                             </div>
                             <div class="settings-summary-row">
                                 <span>Next safe action</span>
-                                <strong>@(selectedWorkspace.NextSafeAction ?? "Open the shared campaign view and confirm the current return lane before you continue.")</strong>
+                                <strong>
+                                    @if (!string.IsNullOrWhiteSpace(selectedWorkspace.NextSafeAction))
+                                    {
+                                        @selectedWorkspace.NextSafeAction
+                                    }
+                                    else
+                                    {
+                                        <text>Open the shared campaign view and confirm the current return lane before you continue.</text>
+                                    }
+                                </strong>
                             </div>
                         </div>
                         <div class="stacked-copy">

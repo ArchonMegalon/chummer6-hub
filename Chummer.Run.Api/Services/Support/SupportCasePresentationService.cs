@@ -6,6 +6,11 @@ namespace Chummer.Run.Api.Services.Support;
 
 public sealed class SupportCasePresentationService
 {
+    public IReadOnlyList<SupportCaseDigestViewModel> BuildDigestList(IReadOnlyList<SupportCaseProjection>? cases)
+        => BuildList(cases)
+            .Select(BuildDigest)
+            .ToArray();
+
     public IReadOnlyList<SupportCasePresentationViewModel> BuildList(IReadOnlyList<SupportCaseProjection>? cases)
         => cases is null
             ? Array.Empty<SupportCasePresentationViewModel>()
@@ -13,6 +18,31 @@ public sealed class SupportCasePresentationService
                 .OrderByDescending(static item => item.Case.UpdatedAtUtc)
                 .ThenBy(static item => item.Case.CaseId, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+
+    public SupportCaseDigestViewModel BuildDigest(SupportCasePresentationViewModel item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        return new SupportCaseDigestViewModel(
+            CaseId: item.Case.CaseId,
+            Title: item.Case.Title,
+            Summary: item.Case.Summary,
+            StatusLabel: item.StatusLabel,
+            StageLabel: item.StageLabel,
+            NextSafeAction: item.NextSafeAction,
+            ClosureSummary: item.ClosureSummary,
+            VerificationSummary: item.VerificationSummary,
+            DetailHref: item.DetailHref,
+            PrimaryActionLabel: item.PrimaryActionLabel,
+            PrimaryActionHref: item.PrimaryActionHref,
+            UpdatedLabel: item.UpdatedLabel,
+            FixedReleaseLabel: item.FixedReleaseLabel,
+            AffectedInstallSummary: item.AffectedInstallSummary,
+            FollowUpLaneSummary: item.FollowUpLaneSummary,
+            ReleaseProgressSummary: item.ReleaseProgressSummary,
+            ReporterActionNeeded: item.ReporterActionNeeded,
+            CanVerifyFix: item.CanVerifyFix);
+    }
 
     public SupportCasePresentationViewModel Build(SupportCaseProjection supportCase)
     {
@@ -34,8 +64,8 @@ public sealed class SupportCasePresentationService
                 "Closed and confirmed",
                 "No further action is needed unless the same issue returns on a later update.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
-                    ? "The reporter confirmed that the fix worked on the affected install."
-                    : $"The reporter confirmed that {fixedReleaseLabel} fixed the issue on the affected install.",
+                    ? "The closure notice already went out, and the reporter confirmed that the fix worked on the affected install."
+                    : $"The closure notice already went out for {fixedReleaseLabel}, and the reporter confirmed that the fix worked on the affected install.",
                 "Open downloads",
                 "/downloads",
                 false),
