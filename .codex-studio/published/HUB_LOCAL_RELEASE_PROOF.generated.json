@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer6-hub.local_release_proof",
   "status": "passed",
-  "base_url": "http://127.0.0.1:8091",
+  "base_url": "https://chummer.run",
   "compose_file": "docker-compose.public-edge.yml",
   "playwright_timeout_seconds": 300,
   "edge_rebuild_skipped": true,
@@ -19,5 +19,5 @@
     "/account/support",
     "/contact"
   ],
-  "generated_at": "2026-03-28T21:09:35Z"
+  "generated_at": "2026-03-28T21:11:26Z"
 }
