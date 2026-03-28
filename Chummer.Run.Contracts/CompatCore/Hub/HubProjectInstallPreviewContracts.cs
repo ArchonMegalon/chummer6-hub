@@ -54,4 +54,7 @@ public sealed record HubProjectInstallPreviewReceipt(
     IReadOnlyList<HubProjectInstallPreviewDiagnostic> Diagnostics,
     string? RuntimeFingerprint = null,
     bool RequiresConfirmation = false,
-    string? DeferredReason = null);
+    string? DeferredReason = null,
+    string? RuntimeCompatibilitySummary = null,
+    string? CampaignReturnSummary = null,
+    string? SupportClosureSummary = null);
