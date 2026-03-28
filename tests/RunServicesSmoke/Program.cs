@@ -1725,6 +1725,7 @@ async Task VerifyPublicLandingProjectionAsync()
         linkedIdentityClient,
         accounts,
         supportCases,
+        supportPresentation,
         new SupportAssistantService(supportCases, canon, campaignSpine, loggerFactory.CreateLogger<SupportAssistantService>()),
         supportAttachments,
         configuration)
@@ -1735,6 +1736,7 @@ async Task VerifyPublicLandingProjectionAsync()
         linkedIdentityClient,
         accounts,
         supportCases,
+        supportPresentation,
         new SupportAssistantService(supportCases, canon, campaignSpine, loggerFactory.CreateLogger<SupportAssistantService>()),
         supportAttachments,
         configuration)
@@ -1941,6 +1943,13 @@ async Task VerifyPublicLandingProjectionAsync()
     var myCasesPayload = (myCasesResult.Result as OkObjectResult)?.Value as SupportCaseListResponse;
     Assert(myCasesPayload is not null && myCasesPayload.TotalCount >= 1, "support case list should return reporter-scoped cases.");
     Assert(myCasesPayload!.Items.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "support case list should include the newly submitted case.");
+    var myPresentedCasesResult = await supportCasesController.GetMyPresentedCases(status: null, kind: null, CancellationToken.None);
+    var myPresentedCasesPayload = (myPresentedCasesResult.Result as OkObjectResult)?.Value as IReadOnlyList<SupportCaseDigestViewModel>;
+    var presentedCase = myPresentedCasesPayload?.FirstOrDefault(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal));
+    Assert(presentedCase is not null, "presented support case list should include the tracked case digest.");
+    Assert(!string.IsNullOrWhiteSpace(presentedCase!.NextSafeAction), "presented support case list should surface the next safe action.");
+    Assert(!string.IsNullOrWhiteSpace(presentedCase.ReleaseProgressSummary), "presented support case list should surface release progress summary.");
+    Assert(!string.IsNullOrWhiteSpace(presentedCase.DetailHref), "presented support case list should keep the tracked detail href.");
     var triageResult = supportAutomationController.ListForTriage(status: null, kind: null, candidateOwnerRepo: null, designImpactOnly: null);
     var triagePayload = (triageResult.Result as OkObjectResult)?.Value as SupportCaseListResponse;
     Assert(triagePayload is not null && triagePayload.Items.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "internal triage view should surface submitted support cases.");

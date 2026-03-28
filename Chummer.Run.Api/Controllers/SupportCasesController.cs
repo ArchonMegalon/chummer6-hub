@@ -1,6 +1,7 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.Support;
+using Chummer.Run.Api.ViewModels;
 using Chummer.Control.Contracts.Support;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Cryptography;
@@ -16,6 +17,7 @@ public sealed class SupportCasesController : ControllerBase
     private readonly HubIdentityClient _identity;
     private readonly AccountService _accounts;
     private readonly SupportCaseService _supportCases;
+    private readonly SupportCasePresentationService _supportPresentation;
     private readonly SupportAssistantService _assistant;
     private readonly SupportAttachmentStorageService _attachments;
     private readonly IConfiguration _configuration;
@@ -24,6 +26,7 @@ public sealed class SupportCasesController : ControllerBase
         HubIdentityClient identity,
         AccountService accounts,
         SupportCaseService supportCases,
+        SupportCasePresentationService supportPresentation,
         SupportAssistantService assistant,
         SupportAttachmentStorageService attachments,
         IConfiguration configuration)
@@ -31,6 +34,7 @@ public sealed class SupportCasesController : ControllerBase
         _identity = identity;
         _accounts = accounts;
         _supportCases = supportCases;
+        _supportPresentation = supportPresentation;
         _assistant = assistant;
         _attachments = attachments;
         _configuration = configuration;
@@ -48,6 +52,26 @@ public sealed class SupportCasesController : ControllerBase
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             return Ok(_supportCases.ListForReporter(user.UserId, subject.SubjectId, status, kind));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/presented")]
+    [ProducesResponseType<IReadOnlyList<SupportCaseDigestViewModel>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<SupportCaseDigestViewModel>>> GetMyPresentedCases(
+        [FromQuery] string? status,
+        [FromQuery] string? kind,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var items = _supportCases.ListForReporter(user.UserId, subject.SubjectId, status, kind).Items;
+            return Ok(_supportPresentation.BuildDigestList(items));
         }
         catch (HubRequestAuthException ex)
         {
