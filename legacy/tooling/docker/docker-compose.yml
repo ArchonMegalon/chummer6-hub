@@ -124,38 +124,21 @@ services:
     image: chummer-portal:local
     build:
       context: ../../..
-      dockerfile: Chummer.Portal/Dockerfile
+      dockerfile: Chummer.Run.Api/Dockerfile
     depends_on:
       - chummer-api
-      - chummer-blazor-portal
-      - chummer-hub-web-portal
-      - chummer-session-web-portal
-      - chummer-coach-web-portal
-      - chummer-avalonia-browser
     profiles: ["portal"]
     environment:
-      CHUMMER_PORTAL_BLAZOR_URL: "${CHUMMER_PORTAL_BLAZOR_URL:-/blazor/}"
-      CHUMMER_PORTAL_BLAZOR_PROXY_URL: "${CHUMMER_PORTAL_BLAZOR_PROXY_URL:-http://chummer-blazor-portal:8080/}"
-      CHUMMER_PORTAL_HUB_URL: "${CHUMMER_PORTAL_HUB_URL:-/hub/}"
-      CHUMMER_PORTAL_HUB_PROXY_URL: "${CHUMMER_PORTAL_HUB_PROXY_URL:-http://chummer-hub-web-portal:8080/}"
-      CHUMMER_PORTAL_SESSION_URL: "${CHUMMER_PORTAL_SESSION_URL:-/session/}"
-      CHUMMER_PORTAL_SESSION_PROXY_URL: "${CHUMMER_PORTAL_SESSION_PROXY_URL:-http://chummer-session-web-portal:8080/}"
-      CHUMMER_PORTAL_COACH_URL: "${CHUMMER_PORTAL_COACH_URL:-/coach/}"
-      CHUMMER_RUN_URL: "${CHUMMER_RUN_URL:-}"
-      CHUMMER_PORTAL_COACH_PROXY_URL: "${CHUMMER_PORTAL_COACH_PROXY_URL:-http://chummer-coach-web-portal:8080/}"
-      CHUMMER_PORTAL_AI_PROXY_URL: "${CHUMMER_PORTAL_AI_PROXY_URL:-}"
-      CHUMMER_PORTAL_AVALONIA_URL: "${CHUMMER_PORTAL_AVALONIA_URL:-/avalonia/}"
-      CHUMMER_PORTAL_AVALONIA_PROXY_URL: "${CHUMMER_PORTAL_AVALONIA_PROXY_URL:-http://chummer-avalonia-browser:8080/}"
-      CHUMMER_PORTAL_API_URL: "${CHUMMER_PORTAL_API_URL:-http://chummer-api:8080/}"
+      ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
+      CHUMMER_PUBLIC_CANON_ROOT: /repo
+      CHUMMER_COMMUNITY_STORE_PATH: /app/state/community-store.json
+      CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
+      CHUMMER_DOWNLOADS_SOURCE_ROOT: /app/downloads
       CHUMMER_API_KEY: "${CHUMMER_API_KEY:-}"
-      CHUMMER_PORTAL_API_KEY: "${CHUMMER_PORTAL_API_KEY:-}"
-      CHUMMER_PORTAL_DOWNLOADS_URL: "${CHUMMER_PORTAL_DOWNLOADS_URL:-/downloads/}"
-      CHUMMER_PORTAL_DOWNLOADS_FALLBACK_URL: "${CHUMMER_PORTAL_DOWNLOADS_FALLBACK_URL:-}"
-      CHUMMER_PORTAL_DOWNLOADS_PROXY_URL: "${CHUMMER_PORTAL_DOWNLOADS_PROXY_URL:-}"
-      CHUMMER_PORTAL_RELEASES_FILE: "${CHUMMER_PORTAL_RELEASES_FILE:-/app/downloads/releases.json}"
-      CHUMMER_PORTAL_RELEASES_DIR: "${CHUMMER_PORTAL_RELEASES_DIR:-/app/downloads}"
     volumes:
+      - chummer-state:/app/state
       - ./Docker/Downloads:/app/downloads:ro
+      - ../../../:/repo:ro
     ports:
       - "${CHUMMER_PORTAL_PORT:-8091}:8080"
   chummer-run-cloudflared:

@@ -189,7 +189,7 @@ Exit state: `Chummer` (WinForms) and `Chummer.Web` are oracle/parity assets only
 
 - [x] `MIG-080` Remove `Chummer.Web` from default product runtime path once parity gates are met.
 Acceptance criteria: compose and README primary flows reference API + Blazor + Avalonia only.
-Progress: default `legacy/tooling/docker/docker-compose.yml` runtime continues to expose only `chummer-api` and `chummer-blazor`, portal flows use `chummer-blazor-portal` + `chummer-avalonia-browser`, and README primary startup paths reference active heads only while legacy heads remain documentation-only.
+Progress: the repo no longer treats dormant local Blazor/Avalonia hosts as required runtime ownership. Public-edge verification now centers on `docker-compose.public-edge.yml` (`chummer-run-identity` + `chummer-portal`), and older compatibility compose entries no longer drive the active repo gates.
 
 - [x] `MIG-081` Replace any remaining legacy-shell-coupled checks with head-agnostic parity tests.
 Acceptance criteria: migration/compliance tests no longer require `Chummer.Web` artifacts to assert parity.
@@ -203,7 +203,7 @@ Progress: README now frames the Docker branch as the current multi-head runtime,
 
 - [ ] `MIG-090` Replace API-key-only production posture with real authn/authz strategy.
 Acceptance criteria: production deployment path supports identity-backed authentication and authorization; API key mode remains documented as minimal/dev fallback.
-Progress note: the API now has both a signed portal-owner propagation seam (`CHUMMER_PORTAL_OWNER_SHARED_KEY`, optional `CHUMMER_PORTAL_OWNER_MAX_AGE_SECONDS`) for authenticated portal-edge identity and a disabled-by-default forwarded owner header seam (`CHUMMER_ALLOW_OWNER_HEADER`, `CHUMMER_OWNER_HEADER_NAME`) for dev/test isolation only; the owner header bridge remains explicitly non-public fallback behavior. `Chummer.Portal` now also registers cookie-auth scaffolding plus a dev login harness (`CHUMMER_PORTAL_DEV_AUTH_ENABLED`, `CHUMMER_PORTAL_REQUIRE_AUTH`) so portal-backed identity can populate `HttpContext.User` before proxying, but real public identity/account management still remains open.
+Progress note: `Chummer.Run.Api` now owns the real public-edge browser auth path: `/login`, `/signup`, email magic-link start/callback, Google bootstrap/merge, signed portal-owner propagation (`CHUMMER_PORTAL_OWNER_SHARED_KEY`, optional `CHUMMER_PORTAL_OWNER_MAX_AGE_SECONDS`), and the disabled-by-default forwarded owner header seam (`CHUMMER_ALLOW_OWNER_HEADER`, `CHUMMER_OWNER_HEADER_NAME`) for dev/test isolation only. The bridge is no longer API-key-only for signed-in browser flows, but durable public identity/account authorization policy still remains open.
 
 - [ ] `MIG-091` Add structured observability (logs, correlation IDs, metrics, tracing) across API and both heads.
 Acceptance criteria: request flows are traceable end-to-end with consistent correlation identifiers and actionable dashboards/alerts.
@@ -219,32 +219,32 @@ Progress: `WorkspaceLifecyclePolicyService` now prunes expired/orphaned restore 
 
 - [x] `MIG-094` Publish first-class release artifacts for API, Blazor, and Avalonia.
 Acceptance criteria: CI produces versioned, reproducible deliverables for all active heads and documents deployment procedures.
-Progress: workflow `Desktop Downloads Matrix` now triggers on `main`, publishes `release-api-portable` alongside the existing `desktop-avalonia-*`, `desktop-blazor-desktop-*`, and `desktop-download-bundle` artifacts, and the deployment guidance is explicit in `docs/ACTIVE_HEAD_RELEASE_ARTIFACTS.md` plus `docs/SELF_HOSTED_DOWNLOADS_RUNBOOK.md`.
+Progress: workflow `Public Edge Release Artifacts` now triggers on `main`, publishes `release-api-portable`, and packages the checked-in public downloads mirror into `desktop-download-bundle` with a freshly generated manifest. Deployment guidance is explicit in `docs/ACTIVE_HEAD_RELEASE_ARTIFACTS.md` plus `docs/SELF_HOSTED_DOWNLOADS_RUNBOOK.md`, and the repo no longer claims to source-build boundary-external desktop heads it does not contain.
 
 - [ ] `MIG-095` Add benchmark guardrails for import/section/save paths.
 Acceptance criteria: `Chummer.Benchmarks` includes migration-critical workloads with performance budgets checked in CI.
 
-### Phase 10: Public portal and tunnel gateway
+### Phase 10: Public edge and tunnel gateway
 
-- [x] `MIG-100` Scaffold `Chummer.Portal` as a public landing surface with stable route entry points.
-Acceptance criteria: portal provides a single public home with deterministic links for `/blazor`, `/api`, `/docs`, and `/downloads`.
-Progress: added `Chummer.Portal` (`net10.0`) plus compose `portal` profile service (`chummer-portal`) exposing a landing page and redirect-based route shims for the target entry paths.
+- [x] `MIG-100` Scaffold the public edge as a stable landing surface with deterministic route entry points.
+Acceptance criteria: the public edge provides a single public home with deterministic links for `/blazor`, `/api`, `/docs`, and `/downloads`.
+Progress: `Chummer.Run.Api` now owns the landing page and public-edge route set directly, and the compose-facing `chummer-portal` service is just that public-edge host under the historical service name.
 
-- [x] `MIG-101` Replace portal redirects with in-process reverse proxy routing for `/blazor/*`, `/api/*`, `/docs/*`, `/downloads/*`.
-Acceptance criteria: one public origin can route subpaths to internal services without exposing per-service public ports.
-Progress: `Chummer.Portal` now proxies `/api/*`, `/openapi/*`, `/docs/*`, `/blazor/*`, `/avalonia/*`, and supports `/downloads/*` in-process proxy mode via `CHUMMER_PORTAL_DOWNLOADS_PROXY_URL`; default mode serves local download files/manifests with fallback redirect. Optional portal API-key forwarding is available through `CHUMMER_PORTAL_API_KEY` (or `CHUMMER_API_KEY` in portal env).
+- [x] `MIG-101` Replace the old portal detour with a single public-edge host for `/blazor/*`, `/api/*`, `/docs/*`, `/downloads/*`, and the legacy entry redirects.
+Acceptance criteria: one public origin can serve the public surfaces without exposing per-service public ports.
+Progress: `Chummer.Run.Api` now owns the public landing routes, `/downloads/*`, `/openapi/*`, `/docs/*`, and the legacy surface redirects (`/hub`, `/blazor`, `/avalonia`, `/session`, `/coach`) directly, so the public edge no longer depends on a separate `Chummer.Portal` project.
 
 - [x] `MIG-102` Move Blazor head to stable `/blazor/` app-base deployment behind the portal.
 Acceptance criteria: reload/deep-link/reconnect behavior works when the UI is hosted under `/blazor/`.
-Progress: added path-base aware Blazor hosting plus dedicated `chummer-blazor-portal` service (`CHUMMER_BLAZOR_PATH_BASE=/blazor`) behind portal `/blazor/*` proxy routing. The current local-docker public-edge proof now validates the customer-facing `/blazor/` entry redirect through the same `docker-compose.public-edge.yml` bridge that serves `/`, `/downloads/`, `/contact`, `/faq`, and the other public routes under one origin.
+Progress: added path-base aware Blazor hosting plus stable `/blazor/` entry semantics under the public edge. The current local-docker proof validates the customer-facing `/blazor/` redirect through the same `docker-compose.public-edge.yml` bridge that serves `/`, `/downloads/`, `/contact`, `/faq`, and the other public routes under one origin.
 
 - [x] `MIG-103` Add OpenAPI + interactive docs surface to `Chummer.Run.Api` and wire through portal `/docs/`.
 Acceptance criteria: generated OpenAPI document and interactive docs are reachable and validated in CI.
-Progress: added built-in ASP.NET OpenAPI generation to `Chummer.Run.Api` with `/openapi/v1.json` and a self-hosted interactive `/docs` UI (local assets, no external CDN dependency); portal proxies `/openapi/*` and `/docs/*`. The current public-edge release proof no longer treats `/docs/` as part of the calm customer-facing bridge contract, so local-docker release validation now focuses on the stable landing, downloads, participation, support, and redirect routes instead of internal docs exposure.
+Progress: added built-in ASP.NET OpenAPI generation to `Chummer.Run.Api` with `/openapi/v1.json` and a self-hosted interactive `/docs` UI (local assets, no external CDN dependency). The current public-edge release proof no longer treats `/docs/` as part of the calm customer-facing bridge contract, so local-docker release validation now focuses on the stable landing, downloads, participation, support, and redirect routes instead of internal docs exposure.
 
 - [x] `MIG-104` Add desktop download manifest + artifacts surface behind portal `/downloads/`.
 Acceptance criteria: platform download matrix is generated from CI artifacts and exposed through a versioned manifest.
-Progress: portal now serves local `/downloads/`, file-backed `/downloads/releases.json` (`CHUMMER_PORTAL_RELEASES_FILE`), and local `/downloads/<artifact>` files (`CHUMMER_PORTAL_RELEASES_DIR`) with fallback release feed. The local-docker edge proof validates `/downloads/`, `/downloads/releases.json`, and the current public bridge redirects (`/hub`, `/blazor`, `/avalonia`, `/session`, `/coach`) instead of the older docs/api-heavy smoke contract; CI workflow `desktop-downloads-matrix.yml` still produces multi-RID Avalonia archives plus a generated `releases.json` in `desktop-download-bundle` artifact.
+Progress: the public edge now serves local `/downloads/`, file-backed `/downloads/releases.json`, and local `/downloads/<artifact>` files from the checked-in portal-download mirror plus mounted self-hosted artifacts. The local-docker edge proof validates `/downloads/`, `/downloads/releases.json`, and the current public bridge redirects (`/hub`, `/blazor`, `/avalonia`, `/session`, `/coach`) instead of the older docs/api-heavy smoke contract; CI workflow `desktop-downloads-matrix.yml` packages the same mirror into `desktop-download-bundle` with a regenerated manifest for deploy verification.
 
 - [x] `MIG-105` Add browser-hosted Avalonia head entry path (`/avalonia/`) behind the same public origin.
 Acceptance criteria: browser head is reachable from portal and clearly separated from native desktop distribution.

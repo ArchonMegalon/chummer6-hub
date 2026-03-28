@@ -25,9 +25,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate docker compose configuration
-        run: docker compose -f legacy/tooling/docker/docker-compose.yml config > /tmp/chummer-compose-config.out
+        env:
+          CHUMMER_RUN_CF_TUNNEL_TOKEN: dummy
+        run: |
+          docker compose -f legacy/tooling/docker/docker-compose.yml config > /tmp/chummer-compose-config.out
+          docker compose -f docker-compose.public-edge.yml config > /tmp/chummer-public-edge-compose-config.out
 
-  portal-format-guardrail:
+  public-edge-format-guardrail:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,11 +42,11 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore portal project
-        run: dotnet restore Chummer.Portal/Chummer.Portal.csproj
+      - name: Restore public-edge host
+        run: dotnet restore Chummer.Run.Api/Chummer.Run.Api.csproj
 
-      - name: Verify portal program formatting
-        run: dotnet format style Chummer.Portal/Chummer.Portal.csproj --verify-no-changes --no-restore --include Chummer.Portal/Program.cs
+      - name: Verify public-edge program formatting
+        run: dotnet format style Chummer.Run.Api/Chummer.Run.Api.csproj --verify-no-changes --no-restore --include Chummer.Run.Api/Program.cs
 
   parity-checklist-sync:
     runs-on: ubuntu-latest
@@ -83,7 +87,7 @@ jobs:
           TEST_NUGET_SOFT_FAIL=0 \
           TEST_DISABLE_BUILD_SERVERS=1 \
           TEST_MAX_CPU=1 \
-          bash scripts/runbook.sh local-tests net10.0 "FullyQualifiedName~MigrationComplianceTests"
+          bash scripts/runbook.sh local-tests net10.0
 
   linux-migration-loop:
     runs-on: ubuntu-latest
@@ -101,11 +105,12 @@ jobs:
         env:
           CHUMMER_API_KEY: migration-smoke-key
           CHUMMER_PORTAL_E2E: "1"
+          CHUMMER_HUB_E2E: "1"
         run: bash scripts/migration-loop.sh 1
 
       - name: Compose cleanup
         if: always()
-        run: docker compose -f legacy/tooling/docker/docker-compose.yml down --remove-orphans --volumes
+        run: docker compose -f docker-compose.public-edge.yml down --remove-orphans --volumes
 
   blazor-component-tests:
     runs-on: ubuntu-latest
@@ -124,7 +129,7 @@ jobs:
       - name: Blazor component suite
         run: bash scripts/test-blazor-components.sh
 
-  blazor-playwright-e2e:
+  public-edge-playwright-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -136,20 +141,26 @@ jobs:
           docker version
           docker compose version
 
-      - name: Start api + blazor stack
+      - name: Start public edge
         env:
           CHUMMER_API_KEY: migration-smoke-key
-        run: docker compose -f legacy/tooling/docker/docker-compose.yml up -d --build --remove-orphans chummer-api chummer-blazor
+        run: docker compose -f docker-compose.public-edge.yml up -d --build --remove-orphans chummer-run-identity chummer-portal
 
-      - name: Playwright UI E2E
+      - name: Portal route E2E
         env:
-          CHUMMER_API_KEY: migration-smoke-key
-          CHUMMER_UI_PLAYWRIGHT: "1"
-        run: bash scripts/e2e-ui.sh
+          CHUMMER_PORTAL_PLAYWRIGHT: "1"
+          CHUMMER_PORTAL_E2E_SKIP_EDGE_REBUILD: "1"
+        run: bash scripts/e2e-portal.sh
+
+      - name: Hub route E2E
+        env:
+          CHUMMER_HUB_PLAYWRIGHT: "1"
+          CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD: "1"
+        run: bash scripts/e2e-hub.sh
 
       - name: Compose cleanup
         if: always()
-        run: docker compose -f legacy/tooling/docker/docker-compose.yml down --remove-orphans --volumes
+        run: docker compose -f docker-compose.public-edge.yml down --remove-orphans --volumes
 
   linux-headless-tests:
     runs-on: ubuntu-latest
