@@ -39,6 +39,7 @@ internal static class ServiceCollectionBoundedContextExtensions
 
     public static IServiceCollection AddHubCampaignSpineContext(this IServiceCollection services)
     {
+        services.AddSingleton<WorkspaceLifecyclePolicyService>();
         services.AddSingleton<CampaignSpineService>();
         services.AddSingleton<CampaignWorkspaceServerPlaneService>();
         return services;

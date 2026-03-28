@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Chummer.Campaign.Contracts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.Boosters;
@@ -9,6 +10,7 @@ namespace Chummer.Run.Api.Services.Community;
 
 public sealed class CampaignSpineService
 {
+    private static readonly JsonSerializerOptions ComparisonJsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly IReadOnlyList<string> DefaultPersonalPreviewCapabilities =
     [
         "campaign_workspace",
@@ -19,10 +21,12 @@ public sealed class CampaignSpineService
     ];
 
     private readonly CommunityStore _store;
+    private readonly WorkspaceLifecyclePolicyService _lifecyclePolicy;
 
-    public CampaignSpineService(CommunityStore store)
+    public CampaignSpineService(CommunityStore store, WorkspaceLifecyclePolicyService lifecyclePolicy)
     {
         _store = store;
+        _lifecyclePolicy = lifecyclePolicy;
     }
 
     public AccountCampaignSummary GetAccountSummary(HubUserDto user, InstallLinkingSummaryDto? installLinking = null)
@@ -31,7 +35,10 @@ public sealed class CampaignSpineService
 
         lock (_store.Gate)
         {
-            var changed = EnsureSeedDataLocked(user, installLinking);
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            WorkspaceLifecycleCleanupResult cleanup = _lifecyclePolicy.ApplyLocked(_store, now);
+            var changed = cleanup.Changed;
+            changed |= EnsureSeedDataLocked(user, installLinking, now);
             if (changed)
             {
                 _store.PersistLocked();
@@ -55,7 +62,7 @@ public sealed class CampaignSpineService
                 .ToArray();
             var restore = _store.RestoreByUserId.TryGetValue(user.UserId, out var existingRestore)
                 ? existingRestore
-                : BuildRestoreProjection(user, dossiers, campaigns, installLinking);
+                : BuildRestoreProjection(user, dossiers, campaigns, installLinking, now);
             var workspaces = campaigns
                 .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore))
                 .OrderByDescending(static workspace => workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.MinValue)
@@ -239,11 +246,11 @@ public sealed class CampaignSpineService
             UpdatedAtUtc: updatedAtUtc);
     }
 
-    private bool EnsureSeedDataLocked(HubUserDto user, InstallLinkingSummaryDto? installLinking)
+    private bool EnsureSeedDataLocked(HubUserDto user, InstallLinkingSummaryDto? installLinking, DateTimeOffset now)
     {
         var changed = false;
-        changed |= EnsurePersonalDossierLocked(user);
-        changed |= EnsureCampaignsLocked(user);
+        changed |= EnsurePersonalDossierLocked(user, now);
+        changed |= EnsureCampaignsLocked(user, now);
 
         var dossiers = _store.DossiersById.Values
             .Where(item => string.Equals(item.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
@@ -253,8 +260,12 @@ public sealed class CampaignSpineService
             .Where(item => item.DossierIds.Any(dossierId => dossiers.Any(dossier => string.Equals(dossier.DossierId, dossierId, StringComparison.OrdinalIgnoreCase))))
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .ToArray();
-        var restore = BuildRestoreProjection(user, dossiers, campaigns, installLinking);
-        if (!_store.RestoreByUserId.TryGetValue(user.UserId, out var existingRestore) || !Equals(existingRestore, restore))
+        _store.RestoreByUserId.TryGetValue(user.UserId, out var existingRestore);
+        var restore = _lifecyclePolicy.FinalizeRestoreProjection(
+            existingRestore,
+            BuildRestoreProjection(user, dossiers, campaigns, installLinking, now),
+            now);
+        if (!ContentEquals(existingRestore, restore))
         {
             _store.RestoreByUserId[user.UserId] = restore;
             changed = true;
@@ -263,14 +274,13 @@ public sealed class CampaignSpineService
         return changed;
     }
 
-    private bool EnsurePersonalDossierLocked(HubUserDto user)
+    private bool EnsurePersonalDossierLocked(HubUserDto user, DateTimeOffset now)
     {
         if (_store.DossiersById.Values.Any(item => string.Equals(item.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase)))
         {
             return false;
         }
 
-        var now = DateTimeOffset.UtcNow;
         var dossierId = AccountService.NewId("dos");
         _store.DossiersById[dossierId] = new RunnerDossierProjection(
             DossierId: dossierId,
@@ -303,7 +313,7 @@ public sealed class CampaignSpineService
         return true;
     }
 
-    private bool EnsureCampaignsLocked(HubUserDto user)
+    private bool EnsureCampaignsLocked(HubUserDto user, DateTimeOffset now)
     {
         var changed = false;
         var memberGroups = _store.GroupsById.Values
@@ -315,7 +325,7 @@ public sealed class CampaignSpineService
 
         if (sponsorCampaigns.Length == 0)
         {
-            changed |= EnsurePersonalPreviewCampaignLocked(user);
+            changed |= EnsurePersonalPreviewCampaignLocked(user, now);
             memberGroups = _store.GroupsById.Values
                 .Where(group => group.Memberships.Any(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)))
                 .ToArray();
@@ -352,7 +362,7 @@ public sealed class CampaignSpineService
                         return null;
                     }
 
-                    var dossier = EnsureMemberDossierLocked(userRecord, sponsorCampaign.CampaignId, crewId, runId, sceneId, sponsorCampaign.Title);
+                    var dossier = EnsureMemberDossierLocked(userRecord, sponsorCampaign.CampaignId, crewId, runId, sceneId, sponsorCampaign.Title, now);
                     return new CrewAssignmentProjection(
                         UserId: member.UserId,
                         DossierId: dossier.DossierId,
@@ -377,9 +387,10 @@ public sealed class CampaignSpineService
                 CampaignId: sponsorCampaign.CampaignId,
                 Members: memberAssignments,
                 CreatedAtUtc: sponsorCampaign.CreatedAtUtc,
-                UpdatedAtUtc: DateTimeOffset.UtcNow);
-            if (!_store.CrewsById.TryGetValue(crewId, out var existingCrew) || !Equals(existingCrew, crew))
+                UpdatedAtUtc: _store.CrewsById.TryGetValue(crewId, out var existingCrew) ? existingCrew.UpdatedAtUtc : now);
+            if (existingCrew is null || !ContentEquals(existingCrew, crew))
             {
+                crew = existingCrew is null ? crew : crew with { UpdatedAtUtc = now };
                 _store.CrewsById[crewId] = crew;
                 changed = true;
             }
@@ -399,7 +410,9 @@ public sealed class CampaignSpineService
                         Status: "open",
                         Pressure: "medium",
                         Summary: "Use the same dossier, rule environment, and recap spine across surfaces.",
-                        UpdatedAtUtc: DateTimeOffset.UtcNow)
+                        UpdatedAtUtc: _store.RunsById.TryGetValue(runId, out var existingRunForObjective)
+                            ? existingRunForObjective.Objectives.FirstOrDefault(item => string.Equals(item.ObjectiveId, objectiveId, StringComparison.OrdinalIgnoreCase))?.UpdatedAtUtc ?? now
+                            : now)
                 ],
                 Scenes:
                 [
@@ -410,13 +423,16 @@ public sealed class CampaignSpineService
                         Revision: "r1",
                         Status: "active",
                         Summary: "Shared entry scene for planning, continuity, and handoff.",
-                        UpdatedAtUtc: DateTimeOffset.UtcNow)
+                        UpdatedAtUtc: existingRunForObjective is not null
+                            ? existingRunForObjective.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, sceneId, StringComparison.OrdinalIgnoreCase))?.UpdatedAtUtc ?? now
+                            : now)
                 ],
                 LatestContinuity: continuity,
                 CreatedAtUtc: sponsorCampaign.CreatedAtUtc,
-                UpdatedAtUtc: DateTimeOffset.UtcNow);
-            if (!_store.RunsById.TryGetValue(runId, out var existingRun) || !Equals(existingRun, run))
+                UpdatedAtUtc: existingRunForObjective?.UpdatedAtUtc ?? now);
+            if (existingRunForObjective is null || !ContentEquals(existingRunForObjective, run))
             {
+                run = existingRunForObjective is null ? run : run with { UpdatedAtUtc = now };
                 _store.RunsById[runId] = run;
                 changed = true;
             }
@@ -435,9 +451,10 @@ public sealed class CampaignSpineService
                 RunIds: new[] { runId },
                 LatestContinuity: continuity,
                 CreatedAtUtc: sponsorCampaign.CreatedAtUtc,
-                UpdatedAtUtc: DateTimeOffset.UtcNow);
-            if (!_store.CampaignSpinesById.TryGetValue(campaign.CampaignId, out var existingCampaign) || !Equals(existingCampaign, campaign))
+                UpdatedAtUtc: _store.CampaignSpinesById.TryGetValue(sponsorCampaign.CampaignId, out var existingCampaign) ? existingCampaign.UpdatedAtUtc : now);
+            if (existingCampaign is null || !ContentEquals(existingCampaign, campaign))
             {
+                campaign = existingCampaign is null ? campaign : campaign with { UpdatedAtUtc = now };
                 _store.CampaignSpinesById[campaign.CampaignId] = campaign;
                 changed = true;
             }
@@ -446,10 +463,9 @@ public sealed class CampaignSpineService
         return changed;
     }
 
-    private bool EnsurePersonalPreviewCampaignLocked(HubUserDto user)
+    private bool EnsurePersonalPreviewCampaignLocked(HubUserDto user, DateTimeOffset now)
     {
         var changed = false;
-        var now = DateTimeOffset.UtcNow;
         var groupId = StableId("group", $"personal-preview:{user.UserId}");
         var campaignId = StableId("campaign", $"personal-preview:{user.UserId}");
         var membership = new GroupMembershipDto(
@@ -515,12 +531,19 @@ public sealed class CampaignSpineService
         string crewId,
         string runId,
         string sceneId,
-        string campaignTitle)
+        string campaignTitle,
+        DateTimeOffset now)
     {
         var existing = _store.DossiersById.Values.FirstOrDefault(item => string.Equals(item.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase));
+        DateTimeOffset continuityCapturedAt = existing is not null
+            && string.Equals(existing.CampaignId, campaignId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(existing.CurrentRunId, runId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(existing.CurrentSceneId, sceneId, StringComparison.OrdinalIgnoreCase)
+            ? existing.LatestContinuity?.CapturedAtUtc ?? now
+            : now;
         var continuity = new ContinuitySnapshotRef(
             SnapshotId: StableId("snapshot", $"{user.UserId}:{campaignId}"),
-            CapturedAtUtc: DateTimeOffset.UtcNow,
+            CapturedAtUtc: continuityCapturedAt,
             Summary: $"Attached to {campaignTitle} with replay-safe continuity.",
             RestoreState: "campaign_bound",
             SessionId: runId,
@@ -558,12 +581,12 @@ public sealed class CampaignSpineService
                         Summary: "GM-facing continuity and recap-safe state for the active campaign return.",
                         ArtifactId: StableId("ops", campaignId))
                 ],
-                CreatedAtUtc: DateTimeOffset.UtcNow,
-                UpdatedAtUtc: DateTimeOffset.UtcNow);
+                CreatedAtUtc: now,
+                UpdatedAtUtc: now);
         }
         else
         {
-            existing = existing with
+            RunnerDossierProjection candidate = existing with
             {
                 CrewId = crewId,
                 CampaignId = campaignId,
@@ -587,8 +610,12 @@ public sealed class CampaignSpineService
                         ArtifactId: StableId("ops", campaignId))
                 ],
                 SnapshotIds = existing.SnapshotIds.Concat(new[] { continuity.SnapshotId }).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
-                UpdatedAtUtc = DateTimeOffset.UtcNow
+                UpdatedAtUtc = existing.UpdatedAtUtc
             };
+
+            existing = ContentEquals(existing, candidate)
+                ? existing
+                : candidate with { UpdatedAtUtc = now };
         }
 
         _store.DossiersById[existing.DossierId] = existing;
@@ -599,7 +626,8 @@ public sealed class CampaignSpineService
         HubUserDto user,
         IReadOnlyList<RunnerDossierProjection> dossiers,
         IReadOnlyList<CampaignProjection> campaigns,
-        InstallLinkingSummaryDto? installLinking)
+        InstallLinkingSummaryDto? installLinking,
+        DateTimeOffset generatedAtUtc)
     {
         var conflictSummaries = new List<string>();
         var claimedInstallations = installLinking?.ClaimedInstallations ?? Array.Empty<ClaimedInstallationDto>();
@@ -675,7 +703,7 @@ public sealed class CampaignSpineService
                 "Secrets, grant tokens, and runtime caches stay install-local and are never mirrored into the roaming restore packet.",
                 "Second-device restore replays dossiers, campaigns, rule environments, artifacts, and entitlements, but it still asks the target device to mint its own local cache and observer continuity token."
             ],
-            GeneratedAtUtc: DateTimeOffset.UtcNow);
+            GeneratedAtUtc: generatedAtUtc);
     }
 
     private static RuleEnvironmentRef DefaultRuleEnvironment(string environmentId, string ownerScope)
@@ -1266,4 +1294,10 @@ public sealed class CampaignSpineService
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(seed));
         return $"{prefix}-{Convert.ToHexString(hash)[..12].ToLowerInvariant()}";
     }
+
+    private static bool ContentEquals<T>(T? left, T? right)
+        => string.Equals(
+            JsonSerializer.Serialize(left, ComparisonJsonOptions),
+            JsonSerializer.Serialize(right, ComparisonJsonOptions),
+            StringComparison.Ordinal);
 }
