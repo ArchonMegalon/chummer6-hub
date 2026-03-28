@@ -4,7 +4,7 @@
     {
         "support" => "Account · Support",
         "access" => "Account · Devices & access",
-        "work" => "Account · Workspaces",
+        "work" => "Account · Work",
         "settings" => "Account · Settings",
         "advanced" => "Account · Advanced",
         _ => "Account"
@@ -13,7 +13,7 @@
     {
         "support" => "Support",
         "access" => "Devices & access",
-        "work" => "Workspaces and continuity",
+        "work" => "Work and continuity",
         "settings" => "Settings",
         "advanced" => "Advanced account details",
         _ => "Account"
@@ -22,9 +22,9 @@
     {
         "support" => "Open, track, and close support without leaving the signed-in shell.",
         "access" => "Keep linked installs, access rights, and claim handoff in one calmer route.",
-        "work" => "Campaign continuity, work-return surfaces, and team posture stay here when you explicitly need them.",
+        "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
         "settings" => "Preferences, participation, and linked channels stay out of the customer core until you ask for them.",
-        "advanced" => "Raw identifiers and technical account detail stay behind an explicit advanced route.",
+        "advanced" => "Account identifiers and technical detail stay behind an explicit advanced route.",
         _ => "Keep sign-in, recovery, devices, support, and account preferences in one calmer product settings surface."
     };
     ViewData["Title"] = pageTitle;
@@ -595,14 +595,14 @@
                     <a class="button-like button-like--ghost" href="/help#install-update">How install linking works</a>
                 </div>
                 <details class="details-drawer">
-                    <summary>Advanced continuity and restore</summary>
+                    <summary>Advanced device recovery</summary>
                     <div class="settings-summary-list">
                         <div class="settings-summary-row">
-                            <span>Claimed restore devices</span>
+                            <span>Recovery devices</span>
                             <strong>@(restoreDeviceCount == 0 ? "None yet" : restoreDeviceCount.ToString())</strong>
                         </div>
                         <div class="settings-summary-row">
-                            <span>Rule environments</span>
+                            <span>Rules snapshots</span>
                             <strong>@(Model.CampaignSpine.Restore.RecentRuleEnvironments.Count == 0 ? "Pending" : Model.CampaignSpine.Restore.RecentRuleEnvironments.Count.ToString())</strong>
                         </div>
                         <div class="settings-summary-row">
@@ -617,7 +617,7 @@
                     @if (Model.CampaignSpine.Restore.ClaimedDevices.Count > 0)
                     {
                         <details class="details-drawer">
-                            <summary>Claimed second-device restore posture</summary>
+                            <summary>Second-device recovery notes</summary>
                             <ul class="muted-copy">
                                 @foreach (var device in Model.CampaignSpine.Restore.ClaimedDevices)
                                 {
@@ -629,7 +629,7 @@
                     @if (Model.CampaignSpine.Restore.RecentRuleEnvironments.Count > 0)
                     {
                         <details class="details-drawer">
-                            <summary>Rule environments</summary>
+                            <summary>Rules snapshots</summary>
                             <ul class="muted-copy">
                                 @foreach (var environment in Model.CampaignSpine.Restore.RecentRuleEnvironments)
                                 {
@@ -678,14 +678,14 @@
             @if (showWorkSection || showSettingsSection)
             {
             <details class="details-drawer" open>
-                <summary>@(showWorkSection ? "Workspaces and teams" : "More settings and policy")</summary>
+                <summary>@(showWorkSection ? "Work and teams" : "More settings and policy")</summary>
 
             @if (showWorkSection && !showCampaignSection && !showTeamsSection)
             {
                 <section class="settings-section" data-account-panel id="workspaces-empty">
                     <div class="settings-section__header">
-                        <h2>Workspaces and teams</h2>
-                        <p>No campaign workspace, team operator role, or return-path load is attached to this account yet. When that changes, this route keeps the work surface separate from the customer core.</p>
+                        <h2>Work and teams</h2>
+                        <p>No campaign return, team role, or shared activity is attached to this account yet. When that changes, this route keeps work separate from the customer core.</p>
                     </div>
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="/home">Return to home</a>
@@ -709,7 +709,7 @@
                         <strong>@dossierCount</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Campaign workspaces</span>
+                        <span>Shared campaign views</span>
                         <strong>@(workspaceCount == 0 ? "Ready to seed" : workspaceCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -747,7 +747,7 @@
                 </div>
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
                 {
-                    <p class="muted-copy">No campaign workspace yet. The first claimed install or campaign handoff will seed the long-lived runner identity and the first shared live run view.</p>
+                    <p class="muted-copy">No shared campaign view yet. The first claimed install or campaign handoff will seed the long-lived runner identity and the first shared live run view.</p>
                 }
                 else
                 {

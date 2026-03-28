@@ -189,7 +189,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/account/work', async () => {
-    await expectVisible(page, 'text=Workspaces and continuity');
+    await expectVisible(page, 'text=Work and continuity');
   });
 
   await gotoAndAssert(page, pageErrors, '/account/settings', async () => {
