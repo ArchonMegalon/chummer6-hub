@@ -47,6 +47,7 @@ public sealed class CommunityStore
     public Dictionary<string, CrewProjection> CrewsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CampaignProjection> CampaignSpinesById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, RunProjection> RunsById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<RosterTransferProjection> RosterTransfers { get; } = new();
     public Dictionary<string, WorkspaceRestoreProjection> RestoreByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void PersistLocked()
@@ -75,6 +76,7 @@ public sealed class CommunityStore
             Crews: CrewsById.Values.OrderBy(static item => item.CrewId, StringComparer.OrdinalIgnoreCase).ToArray(),
             CampaignSpines: CampaignSpinesById.Values.OrderBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase).ToArray(),
             Runs: RunsById.Values.OrderBy(static item => item.RunId, StringComparer.OrdinalIgnoreCase).ToArray(),
+            RosterTransfers: RosterTransfers.OrderByDescending(static item => item.TransferredAtUtc).ToArray(),
             RestoreSummaries: RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase).ToArray());
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
@@ -127,6 +129,7 @@ public sealed class CommunityStore
         CrewsById.Clear();
         CampaignSpinesById.Clear();
         RunsById.Clear();
+        RosterTransfers.Clear();
         RestoreByUserId.Clear();
 
         foreach (var user in snapshot.Users ?? Array.Empty<HubUserDto>())
@@ -199,6 +202,8 @@ public sealed class CommunityStore
         {
             RunsById[run.RunId] = run;
         }
+
+        RosterTransfers.AddRange(snapshot.RosterTransfers ?? Array.Empty<RosterTransferProjection>());
 
         foreach (var restore in snapshot.RestoreSummaries ?? Array.Empty<WorkspaceRestoreProjection>())
         {
@@ -292,6 +297,7 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<CrewProjection>? Crews = null,
     IReadOnlyList<CampaignProjection>? CampaignSpines = null,
     IReadOnlyList<RunProjection>? Runs = null,
+    IReadOnlyList<RosterTransferProjection>? RosterTransfers = null,
     IReadOnlyList<WorkspaceRestoreProjection>? RestoreSummaries = null);
 
 internal sealed record SponsorSessionStateSnapshot(

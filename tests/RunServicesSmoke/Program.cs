@@ -1589,6 +1589,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@supportCase.ReleaseProgressSummary", StringComparison.Ordinal), "home access should surface release-progress truth directly from the shared support presenter.");
     Assert(homeSource.Contains("@supportCase.AffectedInstallSummary", StringComparison.Ordinal), "home access should surface affected-install truth directly from the shared support presenter.");
     Assert(homeSource.Contains("Watchout:", StringComparison.Ordinal), "home work should keep one concrete watchout instead of a long data-dump summary.");
+    Assert(homeSource.Contains("Transfer:", StringComparison.Ordinal), "home work should surface a short roster-transfer cue when campaign ownership or roster placement changes.");
     Assert(!homeSource.Contains("Next safe action:", StringComparison.Ordinal), "home work should not fall back to the older verbose next-safe-action label on the short card.");
     Assert(!homeSource.Contains("Support reuse:", StringComparison.Ordinal), "home work should keep support reuse detail in the deeper work route instead of the short home card.");
     Assert(!homeSource.Contains("story-guide-tail", StringComparison.Ordinal), "home should use quieter release-footnote sections instead of the older full-width CTA band.");
@@ -1605,6 +1606,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!accountSource.Contains("Campaign workspaces", StringComparison.Ordinal), "account work summary should describe shared campaign views in customer-facing language.");
     Assert(accountSource.Contains("\"work\" => \"Work\"", StringComparison.Ordinal), "account should use the calmer work section heading.");
     Assert(accountSource.Contains("Advanced device recovery", StringComparison.Ordinal), "account access should use customer-facing recovery wording for advanced device details.");
+    Assert(accountSource.Contains("Roster transfer audit", StringComparison.Ordinal), "account work should expose explicit roster-transfer audit language on shared campaign views.");
     var downloadDispatchSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
     var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
@@ -1838,7 +1840,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingModel.PrimaryHeroAction.Href.StartsWith("/signup?next=", StringComparison.Ordinal), "guest-gated primary CTA should route to signup through the install handoff.");
     Assert(string.Equals(landingModel.SecondaryHeroAction.Label, "See what works today", StringComparison.Ordinal), "landing page should keep the manifest-backed secondary CTA.");
     Assert(landingModel.TrustPulse is not null, "landing page should surface a compact weekly trust pulse on the front door.");
-    Assert(landingModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Cloud & Publishing", StringComparison.Ordinal)), "landing page should surface the current caution lane from the weekly trust pulse.");
+    Assert(landingModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("current longest pole", StringComparison.OrdinalIgnoreCase)), "landing page should surface the current caution lane from the weekly trust pulse.");
     Assert(landingModel.Workflows.Any(static card => string.Equals(card.Action.Href, "/downloads", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
     Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Create account to get preview", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "landing page chrome should expose the release-aware signup CTA beside sign in");
     Assert(landingModel.Lanes.Any(static card => string.Equals(card.Card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
@@ -2226,7 +2228,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedDownloadsModel?.TrustPulse is not null, "downloads should surface the weekly public trust pulse next to the release shelf.");
     Assert(string.Equals(authenticatedDownloadsModel!.SignedInStatus!.Heading, "Update your linked install", StringComparison.Ordinal), "signed-in downloads should tell the reporter to update the linked install before verification when the fix is on a newer build.");
     Assert(authenticatedDownloadsModel.SignedInStatus.Summary.Contains("preview 0.6.3-smoke", StringComparison.Ordinal), "signed-in downloads should project the exact reporter-ready build in the trust panel.");
-    Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Cloud & Publishing", StringComparison.Ordinal)), "downloads should surface the weekly caution lane from the trust pulse.");
+    Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("current longest pole", StringComparison.OrdinalIgnoreCase)), "downloads should surface the weekly caution lane from the trust pulse.");
     var authenticatedHelpPage = await authenticatedLandingController.HelpPage(CancellationToken.None) as ViewResult;
     var authenticatedHelpModel = authenticatedHelpPage?.Model as TrustPageViewModel;
     Assert(authenticatedHelpModel?.SignedInStatus is not null, "signed-in help should project install-specific trust status.");
@@ -2459,6 +2461,70 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary), "home work route should keep publication trust visible on the shared home projection.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1, "home work route should keep the claimed-device return packet visible on the shared home projection.");
+
+    var transferTargetUser = accounts.EnsureUser("subject.outsider", "Outsider Demo");
+    var transferGroup = groups.CreateGroup(new CreateGroupRequest(
+        SubjectId: "subject.demo",
+        Name: "Thursday Crew Relay",
+        GroupType: "campaign",
+        Visibility: "group",
+        Capabilities: null));
+    var transferCampaign = groups.GetOrCreateCampaign(transferGroup.GroupId, "hub", "Thursday Crew Relay");
+    var sourceOwnerSummary = campaignSpine.GetAccountSummary(linkedUser);
+    var sourceDossier = sourceOwnerSummary.Dossiers.FirstOrDefault();
+    Assert(sourceDossier is not null, "signed-in owners should have a governed dossier before a GM moves roster state.");
+    var rosterTransferResult = await campaignSpineController.TransferMyRoster(
+        new RosterTransferRequest(
+            DossierId: sourceDossier!.DossierId,
+            TargetGroupId: transferGroup.GroupId,
+            TargetCampaignId: transferCampaign.CampaignId,
+            TargetCampaignTitle: transferCampaign.Title,
+            TargetOwnerUserId: transferTargetUser.UserId,
+            Note: "GM handoff for the next run."),
+        CancellationToken.None);
+    var rosterTransferPayload = (rosterTransferResult.Result as OkObjectResult)?.Value as RosterTransferProjection ?? rosterTransferResult.Value;
+    var rosterTransferStatusCode = (rosterTransferResult.Result as ObjectResult)?.StatusCode;
+    var rosterTransferProblemDetail = ((rosterTransferResult.Result as ObjectResult)?.Value as ProblemDetails)?.Detail;
+    Assert(rosterTransferPayload is not null && string.Equals(rosterTransferPayload.DossierId, sourceDossier.DossierId, StringComparison.Ordinal), $"campaign spine transfer api should return the moved dossier receipt. status={rosterTransferStatusCode?.ToString() ?? "<null>"} detail={rosterTransferProblemDetail ?? "<none>"}");
+    Assert(string.Equals(rosterTransferPayload!.CurrentOwnerUserId, transferTargetUser.UserId, StringComparison.Ordinal), "campaign spine transfer api should record the new owner on the transfer receipt.");
+    Assert(rosterTransferPayload.Summary.Contains("ownership transferred", StringComparison.OrdinalIgnoreCase), "transfer summary should make explicit when governed ownership changes.");
+    Assert(groups.GetGroup(transferGroup.GroupId)?.Memberships.Any(item => string.Equals(item.UserId, transferTargetUser.UserId, StringComparison.OrdinalIgnoreCase)) == true, "target owner should be added to the target roster group during transfer.");
+
+    var rosterTargetIdentityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        var body = request.Content is null ? string.Empty : request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        return body.Contains("outsider-token", StringComparison.Ordinal)
+            ? JsonResponse(new IdentityIntrospectionResponse(true, "session-outsider", "subject.outsider", new[] { "player" }, DateTimeOffset.UtcNow.AddHours(1)))
+            : JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized);
+    })), configuration);
+    var outsiderCampaignSpineController = new CampaignSpineController(
+        rosterTargetIdentityClient,
+        accounts,
+        installLinking,
+        campaignSpine,
+        workspaceServerPlane)
+    {
+        ControllerContext = AuthenticatedControllerContext("outsider-token")
+    };
+    var outsiderCampaignSummaryResult = await outsiderCampaignSpineController.GetMyCampaignSummary(CancellationToken.None);
+    var outsiderCampaignSummaryPayload = (outsiderCampaignSummaryResult.Result as OkObjectResult)?.Value as AccountCampaignSummary ?? outsiderCampaignSummaryResult.Value;
+    Assert(outsiderCampaignSummaryPayload is not null && outsiderCampaignSummaryPayload.Dossiers.Any(item => string.Equals(item.DossierId, sourceDossier.DossierId, StringComparison.Ordinal) && string.Equals(item.OwnerUserId, transferTargetUser.UserId, StringComparison.Ordinal)), "new owner should see the transferred dossier on their campaign summary.");
+    var outsiderWorkspace = outsiderCampaignSummaryPayload!.Workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, transferCampaign.CampaignId, StringComparison.OrdinalIgnoreCase));
+    Assert(outsiderWorkspace is not null && outsiderWorkspace.RosterTransfers?.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true, "target workspace should surface the roster-transfer audit receipt.");
+    var outsiderWorkspaceServerPlaneResult = await outsiderCampaignSpineController.GetMyCampaignWorkspaceServerPlane(outsiderWorkspace!.WorkspaceId, CancellationToken.None);
+    var outsiderWorkspaceServerPlanePayload = (outsiderWorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? outsiderWorkspaceServerPlaneResult.Value;
+    Assert(outsiderWorkspaceServerPlanePayload is not null && outsiderWorkspaceServerPlanePayload.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)), "target workspace server plane should preserve the roster-transfer receipt.");
+    Assert(outsiderWorkspaceServerPlanePayload!.ChangePackets.Any(item => string.Equals(item.Kind, "roster_transfer", StringComparison.Ordinal)), "target workspace server plane should project roster transfer as a first-class change packet.");
+
+    var outsiderTransferDenied = await outsiderCampaignSpineController.TransferMyRoster(
+        new RosterTransferRequest(
+            DossierId: sourceDossier.DossierId,
+            TargetGroupId: transferGroup.GroupId,
+            TargetCampaignId: transferCampaign.CampaignId,
+            TargetOwnerUserId: linkedUser.UserId,
+            Note: "Attempted unauthorized return."),
+        CancellationToken.None);
+    Assert((outsiderTransferDenied.Result as ObjectResult)?.StatusCode == StatusCodes.Status403Forbidden, "non-operator target owners should not be allowed to move governed roster state.");
 
     var progressHtml = (await progressController.ProgressPage(CancellationToken.None)).Content ?? string.Empty;
     Assert(progressHtml.Contains("Core Rules Engine", StringComparison.Ordinal), "progress page should render the generated product-part report");
