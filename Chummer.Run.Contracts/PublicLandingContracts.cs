@@ -68,7 +68,18 @@ public sealed record PublicReleaseManifestDto(
     string Source = "manifest",
     string Status = "published",
     string? Message = null,
-    bool HasFallbackSource = false);
+    bool HasFallbackSource = false,
+    string? RolloutState = null,
+    string? RolloutReason = null,
+    string? SupportabilityState = null,
+    string? SupportabilitySummary = null,
+    string? KnownIssueSummary = null,
+    string? FixAvailabilitySummary = null,
+    string? ProofStatus = null,
+    DateTimeOffset? ProofGeneratedAt = null,
+    string? ProofBaseUrl = null,
+    IReadOnlyList<string>? ProofJourneys = null,
+    IReadOnlyList<string>? ProofRoutes = null);
 
 public sealed record PublicFeatureCardDto(
     string Id,

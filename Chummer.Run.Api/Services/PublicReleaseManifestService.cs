@@ -222,7 +222,18 @@ public sealed class PublicReleaseManifestService
             Source: "registry",
             Status: status,
             Message: message,
-            HasFallbackSource: false);
+            HasFallbackSource: false,
+            RolloutState: parsed.RolloutState,
+            RolloutReason: parsed.RolloutReason,
+            SupportabilityState: parsed.SupportabilityState,
+            SupportabilitySummary: parsed.SupportabilitySummary,
+            KnownIssueSummary: parsed.KnownIssueSummary,
+            FixAvailabilitySummary: parsed.FixAvailabilitySummary,
+            ProofStatus: parsed.ReleaseProof?.Status,
+            ProofGeneratedAt: parsed.ReleaseProof?.GeneratedAt,
+            ProofBaseUrl: parsed.ReleaseProof?.BaseUrl,
+            ProofJourneys: parsed.ReleaseProof?.JourneysPassed,
+            ProofRoutes: parsed.ReleaseProof?.ProofRoutes);
     }
 
     private sealed record RegistryReleaseChannelManifest(
@@ -232,7 +243,21 @@ public sealed class PublicReleaseManifestService
         DateTimeOffset? PublishedAt,
         string? Status,
         string? Message,
+        string? RolloutState,
+        string? RolloutReason,
+        string? SupportabilityState,
+        string? SupportabilitySummary,
+        string? KnownIssueSummary,
+        string? FixAvailabilitySummary,
+        RegistryReleaseProof? ReleaseProof,
         IReadOnlyList<RegistryReleaseArtifact>? Artifacts);
+
+    private sealed record RegistryReleaseProof(
+        string? Status,
+        DateTimeOffset? GeneratedAt,
+        string? BaseUrl,
+        IReadOnlyList<string>? JourneysPassed,
+        IReadOnlyList<string>? ProofRoutes);
 
     private sealed record RegistryReleaseArtifact(
         string? ArtifactId,
