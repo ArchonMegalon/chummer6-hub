@@ -23,7 +23,6 @@ public sealed class HubRequestObservabilityMiddleware
     {
         string correlationId = ResolveCorrelationId(context);
         context.Items[HubRequestObservability.CorrelationItemKey] = correlationId;
-        context.Response.Headers[_options.CorrelationHeaderName] = correlationId;
 
         KeyValuePair<string, object?>[] tags =
         [
@@ -36,6 +35,23 @@ public sealed class HubRequestObservabilityMiddleware
         activity?.SetTag("http.method", context.Request.Method);
         activity?.SetTag("url.path", context.Request.Path.Value);
         activity?.SetTag("chummer.correlation_id", correlationId);
+        context.Response.Headers[_options.CorrelationHeaderName] = correlationId;
+        if (activity?.Id is { Length: > 0 } traceParent && !context.Response.Headers.ContainsKey("traceparent"))
+        {
+            context.Response.Headers["traceparent"] = traceParent;
+        }
+
+        context.Response.OnStarting(static state =>
+        {
+            ResponseHeaderRegistration registration = (ResponseHeaderRegistration)state;
+            registration.Context.Response.Headers[registration.HeaderName] = registration.CorrelationId;
+            if (registration.TraceParent is { Length: > 0 } traceParent && !registration.Context.Response.Headers.ContainsKey("traceparent"))
+            {
+                registration.Context.Response.Headers["traceparent"] = traceParent;
+            }
+
+            return Task.CompletedTask;
+        }, new ResponseHeaderRegistration(context, _options.CorrelationHeaderName, correlationId, activity?.Id));
 
         using IDisposable? scope = _logger.BeginScope(new Dictionary<string, object?>
         {
@@ -63,12 +79,6 @@ public sealed class HubRequestObservabilityMiddleware
                 elapsedMs,
                 [.. tags, new KeyValuePair<string, object?>("http.status_code", statusCode)]);
 
-            context.Response.Headers[_options.CorrelationHeaderName] = correlationId;
-            if (activity?.Id is { Length: > 0 } traceParent && !context.Response.Headers.ContainsKey("traceparent"))
-            {
-                context.Response.Headers["traceparent"] = traceParent;
-            }
-
             _logger.LogInformation("Hub request completed in {ElapsedMs} ms with status {StatusCode}.", elapsedMs, context.Response.StatusCode);
         }
     }
@@ -84,4 +94,10 @@ public sealed class HubRequestObservabilityMiddleware
 
         return Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("N");
     }
+
+    private sealed record ResponseHeaderRegistration(
+        HttpContext Context,
+        string HeaderName,
+        string CorrelationId,
+        string? TraceParent);
 }

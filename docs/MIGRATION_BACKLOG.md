@@ -217,8 +217,9 @@ Progress: `Chummer.Run.Api` now centralizes hub guardrail options from `CHUMMER_
 Acceptance criteria: workspace lifecycle policy (retention, cleanup, recovery) is documented and enforced by automated jobs or service policies.
 Progress: `WorkspaceLifecyclePolicyService` now prunes expired/orphaned restore summaries before workspace projection, active users regenerate restore packets from durable dossier/campaign/install truth in the same flow, seeded workspace continuity timestamps stay stable when no content changed, and `docs/HOSTED_WORKSPACE_RETENTION_RUNBOOK.md` plus `WorkspaceLifecycleRetentionVerification` keep the policy executable.
 
-- [ ] `MIG-094` Publish first-class release artifacts for API, Blazor, and Avalonia.
+- [x] `MIG-094` Publish first-class release artifacts for API, Blazor, and Avalonia.
 Acceptance criteria: CI produces versioned, reproducible deliverables for all active heads and documents deployment procedures.
+Progress: workflow `Desktop Downloads Matrix` now triggers on `main`, publishes `release-api-portable` alongside the existing `desktop-avalonia-*`, `desktop-blazor-desktop-*`, and `desktop-download-bundle` artifacts, and the deployment guidance is explicit in `docs/ACTIVE_HEAD_RELEASE_ARTIFACTS.md` plus `docs/SELF_HOSTED_DOWNLOADS_RUNBOOK.md`.
 
 - [ ] `MIG-095` Add benchmark guardrails for import/section/save paths.
 Acceptance criteria: `Chummer.Benchmarks` includes migration-critical workloads with performance budgets checked in CI.

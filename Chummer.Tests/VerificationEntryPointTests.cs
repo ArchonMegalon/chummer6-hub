@@ -81,14 +81,38 @@ public sealed class VerificationEntryPointTests
         string programPath = RepoPaths.FromRoot("Chummer.Run.Api", "Program.cs");
         string verificationProgramPath = RepoPaths.FromRoot("tests", "RunServicesVerification", "Program.cs");
         string backlogPath = RepoPaths.FromRoot("docs", "MIGRATION_BACKLOG.md");
+        string middlewarePath = RepoPaths.FromRoot("Chummer.Run.Api", "HubRequestObservabilityMiddleware.cs");
 
         string program = File.ReadAllText(programPath);
         string verificationProgram = File.ReadAllText(verificationProgramPath);
         string backlog = File.ReadAllText(backlogPath);
+        string middleware = File.ReadAllText(middlewarePath);
 
         Assert.Contains("AddHubRequestObservability", program, StringComparison.Ordinal);
         Assert.Contains("UseHubRequestObservability", program, StringComparison.Ordinal);
         Assert.Contains("HubRequestObservabilityVerification.RunAsync", verificationProgram, StringComparison.Ordinal);
         Assert.Contains("MIG-091", backlog, StringComparison.Ordinal);
+        Assert.Contains("Response.OnStarting", middleware, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReleaseWorkflowPublishesApiAndDesktopHeadArtifacts()
+    {
+        string workflowPath = RepoPaths.FromRoot(".github", "workflows", "desktop-downloads-matrix.yml");
+        string docsPath = RepoPaths.FromRoot("docs", "ACTIVE_HEAD_RELEASE_ARTIFACTS.md");
+
+        string workflow = File.ReadAllText(workflowPath);
+        string docs = File.ReadAllText(docsPath);
+
+        Assert.Contains("- main", workflow, StringComparison.Ordinal);
+        Assert.Contains("name: release-api-portable", workflow, StringComparison.Ordinal);
+        Assert.Contains("name: desktop-${{ matrix.app }}-${{ matrix.rid }}", workflow, StringComparison.Ordinal);
+        Assert.Contains("app: avalonia", workflow, StringComparison.Ordinal);
+        Assert.Contains("app: blazor-desktop", workflow, StringComparison.Ordinal);
+        Assert.Contains("desktop-download-bundle", workflow, StringComparison.Ordinal);
+        Assert.Contains("release-api-portable", docs, StringComparison.Ordinal);
+        Assert.Contains("desktop-avalonia-*", docs, StringComparison.Ordinal);
+        Assert.Contains("desktop-blazor-desktop-*", docs, StringComparison.Ordinal);
+        Assert.Contains("desktop-download-bundle", docs, StringComparison.Ordinal);
     }
 }
