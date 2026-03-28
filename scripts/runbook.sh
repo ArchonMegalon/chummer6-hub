@@ -665,6 +665,18 @@ if [[ "$RUNBOOK_MODE" == "hub-live-audit" ]]; then
   exit "$status"
 fi
 
+if [[ "$RUNBOOK_MODE" == "hub-closeout" ]]; then
+  HUB_CLOSEOUT_LOG_FILE="${HUB_CLOSEOUT_LOG_FILE:-$(resolve_runbook_log_file chummer-hub-closeout)}"
+  set +e
+  bash scripts/ai/hub_closeout.sh 2>&1 | tee "$HUB_CLOSEOUT_LOG_FILE"
+  status=${PIPESTATUS[0]}
+  set -e
+  echo
+  echo "== hub closeout summary =="
+  tail -n 60 "$HUB_CLOSEOUT_LOG_FILE" || true
+  exit "$status"
+fi
+
 if [[ "$RUNBOOK_MODE" == "docker-tests" ]]; then
   TEST_PROJECT="${TEST_PROJECT:-Chummer.Tests/Chummer.Tests.csproj}"
   TEST_FRAMEWORK="${TEST_FRAMEWORK:-${RUNBOOK_ARG_FRAMEWORK:-net10.0}}"
