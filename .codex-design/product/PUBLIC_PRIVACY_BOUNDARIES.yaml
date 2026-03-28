@@ -1,0 +1,54 @@
+product: chummer
+surface: public_privacy_boundaries
+version: 1
+contract_name: chummer.public_privacy_boundaries
+as_of: 2026-03-28
+eyebrow: Privacy boundary
+heading: Support, survey, and assistant data stay on a bounded clock
+summary: Chummer keeps support, install, survey, and provider-backed help surfaces on explicit retention windows and redaction rules instead of stockpiling raw payloads.
+micro_proof:
+  - Public routes show status, fix availability, and provenance, not private notes or provider transcripts.
+  - Signed-in routes show the user-safe slice of support and install truth without leaking unrelated reporter data.
+  - Provider-backed help stays grounded in case IDs, release IDs, and curated receipts.
+domains:
+  - id: support_case_truth
+    label: Support cases
+    owner: chummer6-hub
+    retention_summary: User-visible timelines and closure receipts stay available for 18 months after the last state change; stale raw attachments should be summarized or redacted within 90 days.
+    redaction_summary: Remove secrets, local paths, and unrelated identity data while keeping install, channel, and version truth needed for honest fix notices.
+    public_projection: Public routes may show known issues, release posture, and channel-aware fix availability, not private case notes or raw attachments.
+    signed_in_projection: Signed-in routes may show the reporter-safe timeline, affected install, and next follow-through step.
+  - id: claim_install_linkage
+    label: Install linkage
+    owner: chummer6-hub + chummer6-hub-registry
+    retention_summary: Claim tickets and install-link events stay for 365 days after the last activity; durable install identity and channel posture remain while the relationship is active.
+    redaction_summary: The binary stays canonical and signed; Chummer keeps person, install, device role, and campaign scope explicit instead of flattening them into one sync blob.
+    public_projection: Public trust surfaces may show release and install posture, not personalized binary data.
+    signed_in_projection: Signed-in routes may show claimed-install state, device roles, and restore follow-through for the linked account.
+  - id: survey_follow_up
+    label: Survey follow-up
+    owner: chummer6-hub
+    retention_summary: Post-fix follow-up invites and answer summaries stay for 365 days; raw free-text survey payloads should be summarized or redacted within 180 days unless a governor packet still needs them.
+    redaction_summary: Keep survey truth out of public guide copy until it is synthesized into canon; remove install and account data that is irrelevant to the follow-up question.
+    public_projection: Public routes may summarize learned product changes, not raw survey answers or account-linked responses.
+    signed_in_projection: Signed-in routes may show that follow-up happened and what next action remains, not raw internal synthesis notes.
+  - id: provider_traces
+    label: Provider-backed help
+    owner: executive-assistant + owning surface
+    retention_summary: Raw provider request and response traces stay for 30 days; grounding-pack summaries and lane scorecards stay for 180 days.
+    redaction_summary: Provider prompts and traces should prefer case IDs, release IDs, and rule receipt IDs over raw user text and may not carry unbounded PII.
+    public_projection: Public help may show grounded answers and cited truth, not raw prompts, transcripts, or provider traces.
+    signed_in_projection: Signed-in help may show the curated answer path and case-safe citations, not operator-only provider logs.
+surface_rules:
+  - id: public_surfaces
+    label: Public surfaces
+    summary: Public routes may show support status, known issues, release posture, compatibility, provenance, and channel-aware fix availability.
+    blocked_summary: Public routes may not show private case notes, raw crash envelopes, provider traces, or account-internal survey payloads.
+  - id: signed_in_user_surfaces
+    label: Signed-in user surfaces
+    summary: Signed-in routes may show case timeline, install posture, claimed-device state, and the user-safe slice of support and crash truth.
+    blocked_summary: Signed-in routes may not show unrelated reporter data, operator-only deliberation, or private moderation notes.
+  - id: provider_backed_assistant_surfaces
+    label: Provider-backed help
+    summary: Provider-backed help must stay grounded in curated canonical sources, registry truth, or support-case truth.
+    blocked_summary: Provider-backed help may not become the system of record for support or release state and may not persist raw secrets or undefined retention windows.

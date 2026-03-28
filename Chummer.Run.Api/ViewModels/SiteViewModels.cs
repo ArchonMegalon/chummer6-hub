@@ -239,6 +239,29 @@ public sealed record PublicTrustPulsePanelViewModel(
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel? SecondaryAction = null);
 
+public sealed record PrivacyBoundaryDomainViewModel(
+    string Label,
+    string Owner,
+    string RetentionSummary,
+    string RedactionSummary,
+    string PublicProjection,
+    string SignedInProjection);
+
+public sealed record PrivacyBoundarySurfaceRuleViewModel(
+    string Label,
+    string Summary,
+    string BlockedSummary);
+
+public sealed record PrivacyBoundaryPanelViewModel(
+    string Eyebrow,
+    string Heading,
+    string Summary,
+    IReadOnlyList<string> MicroProof,
+    IReadOnlyList<PrivacyBoundaryDomainViewModel> Domains,
+    IReadOnlyList<PrivacyBoundarySurfaceRuleViewModel> SurfaceRules,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel? SecondaryAction = null);
+
 public sealed record SupportIntakeOptionViewModel(
     string Value,
     string Label,
@@ -293,7 +316,8 @@ public sealed record TrustPageViewModel(
     IReadOnlyList<string>? SummaryPoints = null,
     SupportIntakeViewModel? SupportIntake = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null,
+    PrivacyBoundaryPanelViewModel? PrivacyBoundary = null);
 
 public sealed record FaqEntryViewModel(
     string Question,

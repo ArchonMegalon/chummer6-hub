@@ -184,6 +184,37 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void PublicTrustPagesPublishPrivacyBoundaryArtifact()
+    {
+        string serviceCollectionPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicProgressController.cs");
+        string landingControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string servicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "PublicPrivacyBoundaryService.cs");
+        string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
+        string partialPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PrivacyBoundaryPanel.cshtml");
+        string auditPath = RepoPaths.FromRoot("scripts", "hub-live-audit.py");
+
+        string serviceCollection = File.ReadAllText(serviceCollectionPath);
+        string controller = File.ReadAllText(controllerPath);
+        string landingController = File.ReadAllText(landingControllerPath);
+        string service = File.ReadAllText(servicePath);
+        string viewModel = File.ReadAllText(viewModelPath);
+        string partial = File.ReadAllText(partialPath);
+        string audit = File.ReadAllText(auditPath);
+
+        Assert.Contains("PublicPrivacyBoundaryService", serviceCollection, StringComparison.Ordinal);
+        Assert.Contains("/api/public/privacy-boundaries", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildPanel(\"privacy\")", landingController, StringComparison.Ordinal);
+        Assert.Contains("BuildPanel(\"help\")", landingController, StringComparison.Ordinal);
+        Assert.Contains("BuildPanel(\"contact\")", landingController, StringComparison.Ordinal);
+        Assert.Contains("PUBLIC_PRIVACY_BOUNDARIES.yaml", service, StringComparison.Ordinal);
+        Assert.Contains("PrivacyBoundaryPanelViewModel? PrivacyBoundary", viewModel, StringComparison.Ordinal);
+        Assert.Contains("Retention window:", partial, StringComparison.Ordinal);
+        Assert.Contains("/api/public/privacy-boundaries", audit, StringComparison.Ordinal);
+        Assert.Contains("chummer.public_privacy_boundaries", audit, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ReleaseWorkflowPublishesApiAndDownloadsMirrorArtifacts()
     {
         string workflowPath = RepoPaths.FromRoot(".github", "workflows", "desktop-downloads-matrix.yml");

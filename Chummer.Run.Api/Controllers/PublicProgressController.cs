@@ -13,6 +13,7 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class PublicProgressController : ControllerBase
 {
     private readonly PublicProgressService _progress;
+    private readonly PublicPrivacyBoundaryService _privacyBoundaries;
     private readonly PublicNavigationService _navigation;
     private readonly HubPageChromeService _chrome;
     private readonly AccountService _accounts;
@@ -22,6 +23,7 @@ public sealed class PublicProgressController : ControllerBase
 
     public PublicProgressController(
         PublicProgressService progress,
+        PublicPrivacyBoundaryService privacyBoundaries,
         PublicNavigationService navigation,
         HubPageChromeService chrome,
         AccountService accounts,
@@ -30,6 +32,7 @@ public sealed class PublicProgressController : ControllerBase
         ILogger<PublicProgressController> logger)
     {
         _progress = progress;
+        _privacyBoundaries = privacyBoundaries;
         _navigation = navigation;
         _chrome = chrome;
         _accounts = accounts;
@@ -70,6 +73,12 @@ public sealed class PublicProgressController : ControllerBase
     [Produces("application/json")]
     public ContentResult WeeklyPulse()
         => Content(_progress.LoadWeeklyPulseJson(), "application/json");
+
+    [HttpGet("privacy-boundaries")]
+    [HttpGet("/api/public/privacy-boundaries")]
+    [Produces("application/json")]
+    public ContentResult PrivacyBoundaries()
+        => Content(_privacyBoundaries.LoadArtifactJson(), "application/json");
 
     private string RenderShell(string reportHtml, SiteChromeViewModel chrome, string? antiForgeryToken)
     {

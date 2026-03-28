@@ -159,6 +159,40 @@ internal sealed class PublicTrustContentDocument
     public List<PublicFaqPageDocument>? FaqPages { get; init; }
 }
 
+internal sealed class PublicPrivacyBoundariesDocument
+{
+    public string Product { get; init; } = string.Empty;
+    public string Surface { get; init; } = string.Empty;
+    public int Version { get; init; }
+    public string? ContractName { get; init; }
+    public string? AsOf { get; init; }
+    public string Eyebrow { get; init; } = string.Empty;
+    public string Heading { get; init; } = string.Empty;
+    public string Summary { get; init; } = string.Empty;
+    public List<string>? MicroProof { get; init; }
+    public List<PublicPrivacyBoundaryDomainDocument>? Domains { get; init; }
+    public List<PublicPrivacyBoundarySurfaceRuleDocument>? SurfaceRules { get; init; }
+}
+
+internal sealed class PublicPrivacyBoundaryDomainDocument
+{
+    public string Id { get; init; } = string.Empty;
+    public string Label { get; init; } = string.Empty;
+    public string Owner { get; init; } = string.Empty;
+    public string RetentionSummary { get; init; } = string.Empty;
+    public string RedactionSummary { get; init; } = string.Empty;
+    public string PublicProjection { get; init; } = string.Empty;
+    public string SignedInProjection { get; init; } = string.Empty;
+}
+
+internal sealed class PublicPrivacyBoundarySurfaceRuleDocument
+{
+    public string Id { get; init; } = string.Empty;
+    public string Label { get; init; } = string.Empty;
+    public string Summary { get; init; } = string.Empty;
+    public string BlockedSummary { get; init; } = string.Empty;
+}
+
 internal sealed class PublicTrustPageDocument
 {
     public string Id { get; init; } = string.Empty;

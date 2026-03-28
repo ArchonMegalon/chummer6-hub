@@ -29,6 +29,7 @@ public sealed class PublicLandingController : Controller
     private readonly CampaignSpineService _campaignSpine;
     private readonly HubPageChromeService _chrome;
     private readonly PublicTrustContentService _trustContent;
+    private readonly PublicPrivacyBoundaryService _privacyBoundaries;
     private readonly PublicTrustPulseService _trustPulse;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
@@ -48,6 +49,7 @@ public sealed class PublicLandingController : Controller
         CampaignSpineService campaignSpine,
         HubPageChromeService chrome,
         PublicTrustContentService trustContent,
+        PublicPrivacyBoundaryService privacyBoundaries,
         PublicTrustPulseService trustPulse,
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
@@ -66,6 +68,7 @@ public sealed class PublicLandingController : Controller
         _campaignSpine = campaignSpine;
         _chrome = chrome;
         _trustContent = trustContent;
+        _privacyBoundaries = privacyBoundaries;
         _trustPulse = trustPulse;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
@@ -281,6 +284,7 @@ public sealed class PublicLandingController : Controller
             "~/Views/PublicLanding/TrustPage.cshtml",
             _trustContent.BuildHelpPage(chrome) with
             {
+                PrivacyBoundary = _privacyBoundaries.BuildPanel("help"),
                 TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
                 SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken)
             });
@@ -305,6 +309,7 @@ public sealed class PublicLandingController : Controller
             "~/Views/PublicLanding/TrustPage.cshtml",
             _trustContent.BuildPrivacyPage(chrome) with
             {
+                PrivacyBoundary = _privacyBoundaries.BuildPanel("privacy"),
                 TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience)
             });
     }
@@ -695,6 +700,7 @@ public sealed class PublicLandingController : Controller
         var overrides = ResolveSupportIntakeOverridesFromQuery();
         return _trustContent.BuildContactPage(chrome) with
         {
+            PrivacyBoundary = _privacyBoundaries.BuildPanel("contact"),
             TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SupportIntake = BuildSupportIntakeModel(
                 authenticated: chrome.Authenticated,
