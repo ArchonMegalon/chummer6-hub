@@ -47,4 +47,40 @@ public static class PublicSurfaceStatus
             ResearchTrack => "tag--quiet",
             _ => string.Empty
         };
+
+    public static string AudienceLabel(string? audience)
+    {
+        if (string.IsNullOrWhiteSpace(audience))
+        {
+            return "Anyone evaluating the preview";
+        }
+
+        var rawParts = audience
+            .Split([',', ';', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (rawParts.Length == 0)
+        {
+            return "Anyone evaluating the preview";
+        }
+
+        var labels = rawParts
+            .Select(static part => part.Trim())
+            .Where(static part => !string.IsNullOrWhiteSpace(part))
+            .Select(static part => part.ToLowerInvariant() switch
+            {
+                "public" => "Anyone evaluating the preview",
+                "signed_in" or "signed-in" or "registered" or "account" => "Signed-in preview users",
+                "gm" or "game_master" or "game-master" => "Game masters",
+                "player" => "Players",
+                "creator" => "Creators",
+                "operator" or "community_operator" or "community-operator" => "Operators",
+                _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(part.Replace('_', ' ').Replace('-', ' '))
+            })
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return labels.Length == 0
+            ? "Anyone evaluating the preview"
+            : string.Join(", ", labels);
+    }
 }

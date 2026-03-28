@@ -1587,10 +1587,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Join beta waitlist", StringComparison.Ordinal)), "beta waitlist should keep an explicit signed-in action label in canon.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "horizon_local_co_processor", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open the horizon page", StringComparison.Ordinal)), "local co-processor should route through its roadmap detail page instead of pretending the overview card is an install action.");
     var downloadsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"));
+    var publicLandingControllerSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
     Assert(downloadsSource.Contains("Advanced download options", StringComparison.Ordinal), "downloads should group advanced distribution paths under one calmer disclosure.");
     Assert(!downloadsSource.Contains("What changed and what to expect", StringComparison.Ordinal), "downloads should not carry a second release explainer block under the primary install path.");
     Assert(downloadsSource.Contains("Release notes, known issues, and requirements", StringComparison.Ordinal), "downloads should tuck release education into one calmer drawer on the primary card.");
     Assert(!downloadsSource.Contains("<summary>Package details</summary>", StringComparison.Ordinal), "downloads should keep package details inside the existing release-information drawer instead of adding a second top-card drawer.");
+    Assert(shelfSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Card.Audience)", StringComparison.Ordinal), "artifact shelf cards should humanize audience labels instead of leaking raw canon values.");
+    Assert(!shelfSource.Contains("@card.Card.Audience", StringComparison.Ordinal), "artifact shelf cards should not render raw audience values.");
+    Assert(publicLandingControllerSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Audience)", StringComparison.Ordinal), "detail-page facts should humanize audience labels before projecting them.");
+    Assert(publicLandingControllerSource.Contains("\"Who should use this now\"", StringComparison.Ordinal), "live proof details should use customer-facing audience copy.");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var campaignSpine = new CampaignSpineService(store);

@@ -872,11 +872,12 @@ public sealed class PublicLandingController : Controller
             facts.Add(new(
                 card.Bucket switch
                 {
-                    "coming_next" => "Who this horizon helps",
-                    "featured_artifacts" => "Who this proof is for",
+                    "coming_next" => "Who should follow this",
+                    "featured_artifacts" when liveArtifact => "Who should use this now",
+                    "featured_artifacts" => "Who should track this",
                     _ => "Audience"
                 },
-                card.Audience));
+                PublicSurfaceStatus.AudienceLabel(card.Audience)));
         }
 
         var nextStep = card.DetailPrimaryLabel
@@ -887,9 +888,9 @@ public sealed class PublicLandingController : Controller
             facts.Add(new(
                 card.Bucket switch
                 {
-                    "coming_next" => "Best next step in Chummer",
-                    "featured_artifacts" when liveArtifact => "Use this live proof from",
-                    "featured_artifacts" => "Follow this preview from",
+                    "coming_next" => "Best next route",
+                    "featured_artifacts" when liveArtifact => "Start from",
+                    "featured_artifacts" => "Follow from",
                     _ => "Next step"
                 },
                 nextStep));
