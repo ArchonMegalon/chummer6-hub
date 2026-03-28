@@ -226,7 +226,7 @@ public sealed class AccountsController : Controller
             new SectionLinkViewModel("profile", "Profile", "/account", string.Equals(currentSection, "profile", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("support", "Support", "/account/support", string.Equals(currentSection, "support", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("access", "Devices & access", "/account/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
-            new SectionLinkViewModel("work", "Workspaces", "/account/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase))
+            new SectionLinkViewModel("work", "Work", "/account/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase))
         };
 
     private static IReadOnlyList<SectionLinkViewModel> BuildAccountSecondarySections(string currentSection)
@@ -239,11 +239,11 @@ public sealed class AccountsController : Controller
     private static (string Title, string Description) DescribeAccountSection(string currentSection)
         => currentSection switch
         {
-            "support" => ("Account · Support", "Open, track, and close support without leaving the signed-in product shell."),
+            "support" => ("Account · Support", "Open, track, and close support without leaving the account surface."),
             "access" => ("Account · Devices & access", "Linked installs, access rights, and claim handoff in one calmer route."),
-            "work" => ("Account · Workspaces", "Campaign continuity, teams, and work-return details when you explicitly need them."),
+            "work" => ("Account · Work", "Campaign return, shared work, and deeper follow-through when you explicitly need them."),
             "settings" => ("Account · Settings", "Preferences, linked channels, participation, and help policy outside the customer core."),
-            "advanced" => ("Account · Advanced", "Raw identifiers and technical account detail kept behind an explicit advanced route."),
+            "advanced" => ("Account · Advanced", "Account identifiers and deeper technical detail when you explicitly need them."),
             _ => ("Account", "Profile, sign-in methods, recovery posture, and channel settings.")
         };
 

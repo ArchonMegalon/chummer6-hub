@@ -24,7 +24,7 @@
         "access" => "Keep linked installs, access rights, and claim handoff in one calmer route.",
         "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
         "settings" => "Preferences, participation, and linked channels stay out of the customer core until you ask for them.",
-        "advanced" => "Account identifiers and technical detail stay behind an explicit advanced route.",
+        "advanced" => "Account identifiers and deeper technical detail stay behind the advanced route.",
         _ => "Keep sign-in, recovery, devices, support, and account preferences in one calmer product settings surface."
     };
     ViewData["Title"] = pageTitle;
@@ -702,14 +702,14 @@
             @if (showWorkSection || showSettingsSection)
             {
             <details class="details-drawer" open>
-                <summary>@(showWorkSection ? "Work and teams" : "More settings and policy")</summary>
+                <summary>@(showWorkSection ? "Work" : "More settings and policy")</summary>
 
             @if (showWorkSection && !showCampaignSection && !showTeamsSection)
             {
                 <section class="settings-section" data-account-panel id="workspaces-empty">
                     <div class="settings-section__header">
-                        <h2>Work and teams</h2>
-                        <p>No campaign return, team role, or shared activity is attached to this account yet. When that changes, this route keeps work separate from the customer core.</p>
+                        <h2>Work</h2>
+                        <p>No campaign return, team role, or shared activity is attached to this account yet. When that changes, this route keeps the deeper work surfaces separate from the customer core.</p>
                     </div>
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="/home">Return to home</a>
@@ -725,7 +725,7 @@
             <section id="campaigns" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Campaigns &amp; dossiers</h2>
-                    <p>Campaign workspace, living dossiers, crew context, rules checks, live run state, recap material, and restore signals stay tied together here instead of falling back to one-off build files.</p>
+                    <p>Shared campaign views, living dossiers, rules answers, live runs, recap material, and recovery signals stay tied together here instead of falling back to one-off files.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -733,7 +733,7 @@
                         <strong>@dossierCount</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Campaign workspace</span>
+                        <span>Shared campaign views</span>
                         <strong>@(workspaceCount == 0 ? "Ready to seed" : workspaceCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -781,7 +781,7 @@
                                 <strong>@HumanizeStatus(selectedWorkspace.Visibility, "Private")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Rule environment</span>
+                                <span>Reference context</span>
                                 <strong>@RuleEnvironmentSummary(selectedWorkspace.RuleEnvironment)</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -813,7 +813,7 @@
                         <div class="stacked-copy">
                             @if (selectedWorkspace.LatestContinuity is not null)
                             {
-                                <p><strong>Continuity:</strong> @selectedWorkspace.LatestContinuity.Summary</p>
+                                <p><strong>Current return:</strong> @selectedWorkspace.LatestContinuity.Summary</p>
                             }
                             @if (selectedWorkspace.RecapShelf.Count > 0)
                             {
@@ -947,25 +947,25 @@
                 }
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
                 {
-                    <p class="muted-copy">No shared campaign view yet. The first claimed install or campaign handoff will seed the long-lived runner identity and the first shared live run view.</p>
+                    <p class="muted-copy">No shared campaign view yet. The first claimed install or campaign handoff will seed the long-lived runner identity and the first shared run view.</p>
                 }
                 else
                 {
                     @foreach (var workspace in Model.CampaignSpine.Workspaces)
                     {
                         <details class="details-drawer">
-                            <summary>@workspace.CampaignName · live run view</summary>
+                            <summary>@workspace.CampaignName · shared campaign view</summary>
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
                                     <span>Visibility</span>
                                     <strong>@HumanizeStatus(workspace.Visibility, "Private")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Rule environment</span>
+                                    <span>Reference context</span>
                                     <strong>@RuleEnvironmentSummary(workspace.RuleEnvironment)</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Continuity</span>
+                                    <span>Current return</span>
                                     <strong>@(workspace.LatestContinuity?.Summary ?? workspace.ReturnSummary)</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -1242,7 +1242,7 @@
                                     <strong>@op.CampaignVisibilitySummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Rule environment</span>
+                                    <span>Reference context</span>
                                     <strong>@RuleEnvironmentSummary(op.RuleEnvironment)</strong>
                                 </div>
                                 <div class="settings-summary-row">
