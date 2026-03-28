@@ -42,7 +42,7 @@
                     <h2>@card.Card.Title</h2>
                     <p>@card.Card.Summary</p>
                     <div class="trust-claim__microproof">
-                        <span>@card.Card.Audience</span>
+                        <span>@PublicSurfaceStatus.AudienceLabel(card.Card.Audience)</span>
                         <span>@card.Action.Label</span>
                     </div>
                     @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
@@ -77,7 +77,7 @@
                     <h2>@card.Card.Title</h2>
                     <p>@card.Card.Summary</p>
                     <div class="trust-claim__microproof">
-                        <span>@card.Card.Audience</span>
+                        <span>@PublicSurfaceStatus.AudienceLabel(card.Card.Audience)</span>
                         <span>@card.Action.Label</span>
                     </div>
                     @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
