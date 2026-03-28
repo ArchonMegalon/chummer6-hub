@@ -332,7 +332,7 @@ public sealed class ReleaseSelectionService
     {
         if (authenticated)
         {
-            return "Signed-in download: the canonical artifact plus a claim code you can use to link this copy on first launch.";
+            return "Signed-in download: the same published artifact plus a claim code you can use to link this copy on first launch.";
         }
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
