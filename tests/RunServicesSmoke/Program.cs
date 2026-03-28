@@ -1492,6 +1492,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("scene_dossier_desk", StringComparison.Ordinal), "landing should pair the hero proof teaser with a different lower proof asset.");
     Assert(landingSource.Contains("string.Equals(proofSectionAsset.AssetSlot, heroProofAsset.AssetSlot", StringComparison.Ordinal), "landing should guard against reusing the same proof asset slot in both the hero and lower proof band.");
     Assert(landingSource.Contains("var proofNotes = Model.Workflows.Take(1).ToArray();", StringComparison.Ordinal), "landing should keep the proof band to one tighter workflow note instead of restating the whole product loop.");
+    Assert(landingSource.Contains("<div class=\"release-footnote\">", StringComparison.Ordinal), "landing proof should reduce the workflow follow-through to one quieter note instead of a second full card grid.");
+    Assert(!landingSource.Contains("role-matrix__grid", StringComparison.Ordinal), "landing proof should not reopen a second mini-grid once the hero already carries the main conversion story.");
     Assert(!landingSource.Contains("works-column__header", StringComparison.Ordinal), "landing should collapse the what-works-now strip instead of restating three full column headers.");
     Assert(landingSource.Contains("Preview in progress:", StringComparison.Ordinal), "landing should demote preview-in-progress copy to a quieter shelf note instead of a full third state card.");
     Assert(landingSource.Contains("PublicSurfaceStatus.DisplayLabel", StringComparison.Ordinal), "landing should use the shared public status presenter instead of route-local badge labels.");
@@ -1507,6 +1509,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(nowSource.Contains("Supporting proof around the core loop", StringComparison.Ordinal), "now should keep supporting proof behind a calmer secondary disclosure.");
     Assert(!nowSource.Contains("Integrity stays visible. Use downloads when you are ready to install", StringComparison.Ordinal), "now should not end with a second generic CTA band after the signed-in return callout.");
     Assert(!nowSource.Contains("static string DisplayStatus", StringComparison.Ordinal), "now should use the shared public status presenter instead of a local badge mapper.");
+    Assert(!nowSource.Contains("story-guide-tail", StringComparison.Ordinal), "now should end with a quieter release footnote instead of a landing-style CTA band.");
     var shelfSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml"));
     Assert(shelfSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "artifact shelf should include the unified public status guide.");
     Assert(!shelfSource.Contains("static string DisplayStatus", StringComparison.Ordinal), "artifact shelf should use the shared public status presenter instead of a local badge mapper.");
@@ -1529,17 +1532,20 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Open what works today", StringComparison.Ordinal), "home access should point proof needs to the dedicated now route instead of repeating proof cards inline.");
     Assert(homeSource.Contains("Need product proof before you install or return?", StringComparison.Ordinal), "home access should keep proof follow-through as a calmer note instead of a third equal-weight rail card.");
     Assert(!homeSource.Contains("Need product proof before you act?", StringComparison.Ordinal), "home access should not revive the louder proof rail copy.");
+    Assert(homeSource.Contains("<summary>Release and device state</summary>", StringComparison.Ordinal), "home access should collapse secondary release and device detail under one calmer disclosure.");
     Assert(homeSource.Contains("GM-ready context", StringComparison.Ordinal), "home work should use customer-facing continuity language instead of internal workspace wording.");
     Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
     Assert(homeSource.Contains("Evidence:", StringComparison.Ordinal), "home work should surface the first grounded rule evidence line instead of only a generic provenance label.");
     Assert(homeSource.Contains("Next:", StringComparison.Ordinal), "home work should keep a short next-step cue on the calmer build follow-through card.");
+    Assert(homeSource.Contains("<summary>Build, explain, and next step</summary>", StringComparison.Ordinal), "home work should collapse the secondary build and rules follow-through under one calmer disclosure.");
     Assert(homeSource.Contains("@supportCase.ClosureSummary", StringComparison.Ordinal), "home access should surface support-closure truth directly from the shared support presenter.");
     Assert(homeSource.Contains("@supportCase.ReleaseProgressSummary", StringComparison.Ordinal), "home access should surface release-progress truth directly from the shared support presenter.");
     Assert(homeSource.Contains("@supportCase.AffectedInstallSummary", StringComparison.Ordinal), "home access should surface affected-install truth directly from the shared support presenter.");
     Assert(homeSource.Contains("Watchout:", StringComparison.Ordinal), "home work should keep one concrete watchout instead of a long data-dump summary.");
     Assert(!homeSource.Contains("Next safe action:", StringComparison.Ordinal), "home work should not fall back to the older verbose next-safe-action label on the short card.");
     Assert(!homeSource.Contains("Support reuse:", StringComparison.Ordinal), "home work should keep support reuse detail in the deeper work route instead of the short home card.");
+    Assert(!homeSource.Contains("story-guide-tail", StringComparison.Ordinal), "home should use quieter release-footnote sections instead of the older full-width CTA band.");
     var accountSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"));
     Assert(!accountSource.Contains("Build Lab handoffs", StringComparison.Ordinal), "account copy should avoid internal Build Lab wording on the customer-facing surface.");
     Assert(!accountSource.Contains("Rules Navigator answers", StringComparison.Ordinal), "account copy should avoid internal Rules Navigator wording on the customer-facing surface.");
@@ -1567,7 +1573,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Next safe action:", StringComparison.Ordinal), "account support detail should surface the next honest user action for a tracked case.");
     Assert(accountSource.Contains("More settings", StringComparison.Ordinal), "account should keep non-core sections behind a calmer secondary settings disclosure.");
     Assert(accountSource.Contains("<summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should keep primary sign-in inside a calmer drawer instead of a full stacked section.");
+    Assert(!accountSource.Contains("<details class=\"details-drawer\" open>\n                <summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should not expand the sign-in drawer by default.");
     Assert(accountSource.Contains("<summary>Recovery email</summary>", StringComparison.Ordinal), "account profile should keep recovery email inside a calmer drawer instead of stacking it inline on the main profile route.");
+    Assert(accountSource.Contains("<summary>Need routing help first?</summary>", StringComparison.Ordinal), "account support should keep the grounded assistant behind a calmer disclosure so case filing stays primary.");
     Assert(accountSource.Contains("Advanced account details", StringComparison.Ordinal), "account should hide raw account identifiers behind an advanced disclosure.");
     Assert(accountSource.Contains("var sectionTitle = Model.CurrentSection switch", StringComparison.Ordinal), "account routes should expose route-specific headings instead of one generic account title.");
     var trustSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml"));
@@ -1613,6 +1621,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!downloadsSource.Contains("What changed and what to expect", StringComparison.Ordinal), "downloads should not carry a second release explainer block under the primary install path.");
     Assert(downloadsSource.Contains("Release notes, known issues, and requirements", StringComparison.Ordinal), "downloads should tuck release education into one calmer drawer on the primary card.");
     Assert(!downloadsSource.Contains("<summary>Package details</summary>", StringComparison.Ordinal), "downloads should keep package details inside the existing release-information drawer instead of adding a second top-card drawer.");
+    Assert(downloadsSource.Contains("Open current release", StringComparison.Ordinal), "downloads should route broader release posture back to the dedicated current-release page instead of turning the install card into a second status page.");
     Assert(shelfSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Card.Audience)", StringComparison.Ordinal), "artifact shelf cards should humanize audience labels instead of leaking raw canon values.");
     Assert(!shelfSource.Contains("@card.Card.Audience", StringComparison.Ordinal), "artifact shelf cards should not render raw audience values.");
     Assert(publicLandingControllerSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Audience)", StringComparison.Ordinal), "detail-page facts should humanize audience labels before projecting them.");

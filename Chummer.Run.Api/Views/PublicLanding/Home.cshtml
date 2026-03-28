@@ -172,36 +172,35 @@
                                 </div>
 
                                 <div class="home-stream__column">
-                                    <div class="home-stream__lead">
-                                        <p class="eyebrow">Access</p>
-                                        <h2 class="home-stream__title">Release, proof, and device state</h2>
-                                    </div>
-                                    <div class="app-rail">
-                                        <article class="app-rail__item">
-                                            <span class="tag">Current release</span>
-                                            <div class="app-rail__copy">
-                                                <h3>Use the current preview</h3>
-                                                <p>Review what changed, what is working today, and whether this is the right moment to install or update.</p>
-                                            </div>
-                                            <a class="inline-link" href="/now">Open current release</a>
-                                        </article>
-                                        <article class="app-rail__item">
-                                            <span class="tag">Device state</span>
-                                            <div class="app-rail__copy">
-                                                <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s) active" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install yet")</h3>
-                                                <p>Claim tickets, linked installs, and preview access stay in one place instead of being rediscovered during the next install.</p>
-                                            </div>
-                                            <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
-                                        </article>
-                                    </div>
-                                    <p class="muted-copy">Need product proof before you install or return? <a class="inline-link" href="/now">Open what works today</a>.</p>
+                                    <details class="details-drawer">
+                                        <summary>Release and device state</summary>
+                                        <div class="app-rail">
+                                            <article class="app-rail__item">
+                                                <span class="tag">Current release</span>
+                                                <div class="app-rail__copy">
+                                                    <h3>Use the current preview</h3>
+                                                    <p>Review what changed, what is working today, and whether this is the right moment to install or update.</p>
+                                                </div>
+                                                <a class="inline-link" href="/now">Open current release</a>
+                                            </article>
+                                            <article class="app-rail__item">
+                                                <span class="tag">Device state</span>
+                                                <div class="app-rail__copy">
+                                                    <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s) active" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install yet")</h3>
+                                                    <p>Claim tickets, linked installs, and preview access stay in one place instead of being rediscovered during the next install.</p>
+                                                </div>
+                                                <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
+                                            </article>
+                                        </div>
+                                        <p class="muted-copy">Need product proof before you install or return? <a class="inline-link" href="/now">Open what works today</a>.</p>
+                                    </details>
                                 </div>
                 </div>
             </section>
         }
         else if (showAccessSection)
         {
-            <section class="story-guide-tail">
+            <section class="release-footnote">
                 <p class="eyebrow">Access</p>
                 <h2 class="editorial-title">Finish setup before you worry about devices and follow-up</h2>
                 <p class="editorial-copy">The access surface becomes more useful once the account basics and recovery path are in place.</p>
@@ -273,87 +272,90 @@
                                 </div>
 
                                 <div class="home-stream__column">
-                                    <div class="home-stream__lead">
-                                        <p class="eyebrow">Next</p>
-                                        <h2 class="home-stream__title">Build, explain, and move forward without losing continuity</h2>
-                                        <p class="home-stream__summary">Build paths and grounded rule answers stay next to your return path so you can see what to inspect before reopening a dossier, session, or support thread.</p>
-                                    </div>
-                                    <div class="app-rail">
-                                        @if (buildHandoffs.Length == 0 && rulesAnswers.Length == 0)
-                                        {
-                                            <article class="app-rail__item">
-                                                <span class="tag">Build path</span>
-                                                <div class="app-rail__copy">
-                                                    <h3>Continuity is ready for the first grounded handoff</h3>
-                                                    <p>Your next build comparison and rules answer will land here once the first dossier or campaign return is seeded.</p>
-                                                </div>
-                                                <a class="inline-link" href="/downloads">Start from downloads</a>
-                                            </article>
-                                        }
-                                        else
-                                        {
-                                            @if (buildHandoffs.Length > 0)
+                                    <details class="details-drawer">
+                                        <summary>Build, explain, and next step</summary>
+                                        <div class="home-stream__lead">
+                                            <p class="eyebrow">Next</p>
+                                            <h2 class="home-stream__title">Build, explain, and move forward without losing continuity</h2>
+                                            <p class="home-stream__summary">Build paths and grounded rule answers stay next to your return path so you can see what to inspect before reopening a dossier, session, or support thread.</p>
+                                        </div>
+                                        <div class="app-rail">
+                                            @if (buildHandoffs.Length == 0 && rulesAnswers.Length == 0)
                                             {
-                                                var handoff = buildHandoffs[0];
                                                 <article class="app-rail__item">
                                                     <span class="tag">Build path</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>@handoff.Title</h3>
-                                                        <p>
-                                                            @handoff.Summary
-                                                            @if (!string.IsNullOrWhiteSpace(handoff.NextSafeAction))
-                                                            {
-                                                                <span> Next: @handoff.NextSafeAction.</span>
-                                                            }
-                                                            else if (handoff.ProgressionOutcomes.Count > 0)
-                                                            {
-                                                                <span> Next: @handoff.ProgressionOutcomes[0].</span>
-                                                            }
-                                                            @if (handoff.Watchouts is { Count: > 0 })
-                                                            {
-                                                                <span> Watchout: @handoff.Watchouts[0]</span>
-                                                            }
-                                                        </p>
+                                                        <h3>Continuity is ready for the first grounded handoff</h3>
+                                                        <p>Your next build comparison and rules answer will land here once the first dossier or campaign return is seeded.</p>
                                                     </div>
-                                                    <a class="inline-link" href="/account/work">Open build follow-through</a>
+                                                    <a class="inline-link" href="/downloads">Start from downloads</a>
                                                 </article>
                                             }
-                                            @if (rulesAnswers.Length > 0)
+                                            else
                                             {
-                                                var answer = rulesAnswers[0];
-                                                <article class="app-rail__item">
-                                                    <span class="tag">Grounded rule answer</span>
-                                                    <div class="app-rail__copy">
-                                                        <h3>@answer.Question</h3>
-                                                        <p>
-                                                            @answer.ShortAnswer
-                                                            <span> Provenance: @answer.ProvenanceLabel.</span>
-                                                            @if (answer.EvidenceLines.Count > 0)
-                                                            {
-                                                                <span> Evidence: @answer.EvidenceLines[0]</span>
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                    <a class="inline-link" href="/account/work">Open grounded rule context</a>
-                                                </article>
+                                                @if (buildHandoffs.Length > 0)
+                                                {
+                                                    var handoff = buildHandoffs[0];
+                                                    <article class="app-rail__item">
+                                                        <span class="tag">Build path</span>
+                                                        <div class="app-rail__copy">
+                                                            <h3>@handoff.Title</h3>
+                                                            <p>
+                                                                @handoff.Summary
+                                                                @if (!string.IsNullOrWhiteSpace(handoff.NextSafeAction))
+                                                                {
+                                                                    <span> Next: @handoff.NextSafeAction.</span>
+                                                                }
+                                                                else if (handoff.ProgressionOutcomes.Count > 0)
+                                                                {
+                                                                    <span> Next: @handoff.ProgressionOutcomes[0].</span>
+                                                                }
+                                                                @if (handoff.Watchouts is { Count: > 0 })
+                                                                {
+                                                                    <span> Watchout: @handoff.Watchouts[0]</span>
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <a class="inline-link" href="/account/work">Open build follow-through</a>
+                                                    </article>
+                                                }
+                                                @if (rulesAnswers.Length > 0)
+                                                {
+                                                    var answer = rulesAnswers[0];
+                                                    <article class="app-rail__item">
+                                                        <span class="tag">Grounded rule answer</span>
+                                                        <div class="app-rail__copy">
+                                                            <h3>@answer.Question</h3>
+                                                            <p>
+                                                                @answer.ShortAnswer
+                                                                <span> Provenance: @answer.ProvenanceLabel.</span>
+                                                                @if (answer.EvidenceLines.Count > 0)
+                                                                {
+                                                                    <span> Evidence: @answer.EvidenceLines[0]</span>
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <a class="inline-link" href="/account/work">Open grounded rule context</a>
+                                                    </article>
+                                                }
                                             }
-                                        }
-                                        <article class="app-rail__item">
-                                            <span class="tag">Support</span>
-                                            <div class="app-rail__copy">
-                                                <h3>Need a real answer instead?</h3>
-                                                <p>Use support when release, device, or return-path surfaces stop being enough to move forward confidently.</p>
-                                            </div>
-                                            <a class="inline-link" href="/account/support">Open support</a>
-                                        </article>
-                                    </div>
+                                            <article class="app-rail__item">
+                                                <span class="tag">Support</span>
+                                                <div class="app-rail__copy">
+                                                    <h3>Need a real answer instead?</h3>
+                                                    <p>Use support when release, device, or return-path surfaces stop being enough to move forward confidently.</p>
+                                                </div>
+                                                <a class="inline-link" href="/account/support">Open support</a>
+                                            </article>
+                                        </div>
+                                    </details>
                                 </div>
                 </div>
             </section>
         }
         else if (showWorkSection)
         {
-            <section class="story-guide-tail">
+            <section class="release-footnote">
                 <p class="eyebrow">Work</p>
                 <h2 class="editorial-title">Finish setup before the work surfaces try to carry too much</h2>
                 <p class="editorial-copy">The work route gets useful once Chummer has a stable identity, install path, and return context attached to the account.</p>
@@ -365,7 +367,7 @@
 
         @if (showSetupSection)
         {
-            <section class="story-guide-tail">
+            <section class="release-footnote">
                 <p class="eyebrow">Setup</p>
                 <h2 class="editorial-title">Finish the small setup flow, then come back to access and work</h2>
                 <p class="editorial-copy">Profile, recovery, and update preferences live here so the rest of the account can stay calmer by default.</p>
