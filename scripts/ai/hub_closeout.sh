@@ -8,6 +8,7 @@ cd "$ROOT_DIR"
 HUB_EDGE_COMPOSE_FILE="${HUB_EDGE_COMPOSE_FILE:-docker-compose.public-edge.yml}"
 HUB_LOCAL_BASE_URL="${HUB_LOCAL_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
 HUB_LIVE_BASE_URL="${HUB_LIVE_BASE_URL:-https://chummer.run}"
+HUB_PUBLIC_HOST="${HUB_PUBLIC_HOST:-chummer.run}"
 HUB_CLOSEOUT_BUILD="${HUB_CLOSEOUT_BUILD:-1}"
 HUB_CLOSEOUT_BROWSER="${HUB_CLOSEOUT_BROWSER:-1}"
 HUB_CLOSEOUT_LIVE_AUDIT="${HUB_CLOSEOUT_LIVE_AUDIT:-1}"
@@ -35,7 +36,11 @@ fi
 
 echo
 echo "== local route audit =="
-python3 scripts/hub-live-audit.py --base-url "$HUB_LOCAL_BASE_URL"
+python3 scripts/hub-live-audit.py \
+  --base-url "$HUB_LOCAL_BASE_URL" \
+  --public-host "$HUB_PUBLIC_HOST" \
+  --forwarded-proto https \
+  --verify-http-redirects
 
 if [[ "$HUB_CLOSEOUT_LIVE_AUDIT" == "1" || "$HUB_CLOSEOUT_LIVE_AUDIT" == "true" || "$HUB_CLOSEOUT_LIVE_AUDIT" == "TRUE" ]]; then
   echo

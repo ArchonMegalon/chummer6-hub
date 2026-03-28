@@ -7,8 +7,9 @@ import sys
 import time
 from dataclasses import dataclass
 from html.parser import HTMLParser
+from urllib.error import HTTPError
 from urllib.parse import urljoin
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 BANNED_COPY = re.compile(r"\b(Read the linked detail|Read more|Learn more)\b", re.IGNORECASE)
@@ -38,25 +39,80 @@ class HeaderCounter(HTMLParser):
             self.count += 1
 
 
-def fetch(base_url: str, path: str) -> tuple[int, str, dict[str, str], str]:
+class NoRedirectHandler(HTTPRedirectHandler):
+    def http_error_301(self, req, fp, code, msg, headers):  # pragma: no cover - exercised via operational probes
+        return fp
+
+    def http_error_302(self, req, fp, code, msg, headers):  # pragma: no cover - exercised via operational probes
+        return fp
+
+    def http_error_303(self, req, fp, code, msg, headers):  # pragma: no cover - exercised via operational probes
+        return fp
+
+    def http_error_307(self, req, fp, code, msg, headers):  # pragma: no cover - exercised via operational probes
+        return fp
+
+    def http_error_308(self, req, fp, code, msg, headers):  # pragma: no cover - exercised via operational probes
+        return fp
+
+
+def fetch(
+    base_url: str,
+    path: str,
+    *,
+    public_host: str | None = None,
+    forwarded_proto: str | None = None,
+    follow_redirects: bool = True,
+) -> tuple[int, str, dict[str, str], str]:
     url = urljoin(base_url, path)
-    request = Request(url, headers={"User-Agent": "chummer-hub-live-audit"})
-    with urlopen(request, timeout=20) as response:
-        status = response.status
-        body = response.read().decode("utf-8", errors="replace")
-        headers = {key.lower(): value for key, value in response.headers.items()}
-        final_url = response.geturl()
-    return status, body, headers, final_url
+    headers = {"User-Agent": "chummer-hub-live-audit"}
+    if public_host:
+        headers["Host"] = public_host
+    if forwarded_proto:
+        headers["X-Forwarded-Proto"] = forwarded_proto
+
+    request = Request(url, headers=headers)
+    opener = build_opener() if follow_redirects else build_opener(NoRedirectHandler())
+    try:
+        with opener.open(request, timeout=20) as response:
+            status = response.status
+            body = response.read().decode("utf-8", errors="replace")
+            response_headers = {key.lower(): value for key, value in response.headers.items()}
+            final_url = response.geturl()
+            return status, body, response_headers, final_url
+    except HTTPError as exc:  # pragma: no cover - exercised via operational probes
+        body = exc.read().decode("utf-8", errors="replace")
+        response_headers = {key.lower(): value for key, value in exc.headers.items()}
+        return exc.code, body, response_headers, exc.geturl()
+
+
+def verify_https_redirect(base_url: str, path: str, public_host: str) -> None:
+    status, _, headers, _ = fetch(base_url, path, public_host=public_host, follow_redirects=False)
+    if status not in {301, 302, 307, 308}:
+        raise AssertionError(f"{path} returned {status}, expected an HTTPS redirect")
+
+    location = headers.get("location")
+    expected_location = f"https://{public_host}{path}"
+    if location != expected_location:
+        raise AssertionError(f"{path} redirected to {location!r}, expected {expected_location!r}")
+
+    print(f"ok {path} redirects -> {location}")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Audit the public Chummer Hub surface.")
     parser.add_argument("--base-url", default="https://chummer.run", help="Base URL to audit.")
+    parser.add_argument("--public-host", default=None, help="Optional Host header for reverse-proxied local edge checks.")
+    parser.add_argument("--forwarded-proto", default=None, help="Optional X-Forwarded-Proto header for reverse-proxied local edge checks.")
+    parser.add_argument("--verify-http-redirects", action="store_true", help="Verify that the local HTTP edge redirects to the public HTTPS host.")
     parser.add_argument("--poll-seconds", type=int, default=0, help="Sleep before starting the audit.")
     args = parser.parse_args()
 
     if args.poll_seconds > 0:
         time.sleep(args.poll_seconds)
+
+    if args.verify_http_redirects and not args.public_host:
+        raise AssertionError("--verify-http-redirects requires --public-host")
 
     routes = [
         AuditRoute("/", "Create account to get preview", required_texts=("Final pool 9",), expects_header_count=1),
@@ -85,8 +141,17 @@ def main() -> int:
         AuditRoute("/robots.txt", "Disallow: /"),
     ]
 
+    if args.verify_http_redirects:
+        for redirect_path in ("/", "/downloads", "/contact"):
+            verify_https_redirect(args.base_url, redirect_path, args.public_host)
+
     for route in routes:
-        status, body, headers, final_url = fetch(args.base_url, route.path)
+        status, body, headers, final_url = fetch(
+            args.base_url,
+            route.path,
+            public_host=args.public_host,
+            forwarded_proto=args.forwarded_proto,
+        )
         if status != route.expected_status:
             raise AssertionError(f"{route.path} returned {status}, expected {route.expected_status}")
         if route.expected_text and route.expected_text not in body:
@@ -112,7 +177,12 @@ def main() -> int:
                     raise AssertionError(f"{route.path} rendered {parser_.count} site headers, expected {route.expects_header_count}")
         print(f"ok {route.path} -> {final_url}")
 
-    status, _, _, final_url = fetch(args.base_url, "/status")
+    status, _, _, final_url = fetch(
+        args.base_url,
+        "/status",
+        public_host=args.public_host,
+        forwarded_proto=args.forwarded_proto,
+    )
     if status != 200 or not final_url.rstrip("/").endswith("/now"):
         raise AssertionError("/status did not resolve to /now")
     print(f"ok /status -> {final_url}")
