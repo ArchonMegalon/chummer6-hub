@@ -481,10 +481,19 @@ public sealed class SupportCasePresentationService
         string? platform = NormalizeOptional(supportCase.Platform, 64);
         string? arch = NormalizeOptional(supportCase.Arch, 32);
 
-        return installations
-            .OrderByDescending(item => ScoreInstallationMatch(item, releaseChannel, headId, platform, arch))
-            .ThenByDescending(static item => item.UpdatedAtUtc)
+        var best = installations
+            .Select(item => new
+            {
+                Installation = item,
+                Score = ScoreInstallationMatch(item, releaseChannel, headId, platform, arch)
+            })
+            .OrderByDescending(static item => item.Score)
+            .ThenByDescending(static item => item.Installation.UpdatedAtUtc)
             .FirstOrDefault();
+
+        return best is not null && best.Score > 0
+            ? best.Installation
+            : null;
     }
 
     private static int ScoreInstallationMatch(

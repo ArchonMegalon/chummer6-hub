@@ -126,16 +126,18 @@ public sealed class PublicLandingController : Controller
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var model = new NowPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("What Is Real Now", "Readiness labels and direct evidence for what you can use today.", "/now", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
-            ReleaseExperience: _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated),
+            ReleaseExperience: releaseExperience,
             ProofModules: ResolveCards(_landing.CardsForBucket(surface, "start_here").Take(3).ToArray(), assetCatalog, authenticated: false, "/now"),
             AvailableToday: ResolveCards(nowCards.Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/now"),
             Inspectable: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/now"),
             SignedInPreview: surface.RegisteredOverlays,
-            Manifest: manifest);
+            Manifest: manifest,
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Now.cshtml", model);
     }
 
@@ -160,12 +162,14 @@ public sealed class PublicLandingController : Controller
         var surface = _landing.LoadSurface();
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var model = new DownloadsPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current preview, compare package types, and keep release integrity in view.", "/downloads", cancellationToken),
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             Manifest: manifest,
-            ReleaseExperience: _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated));
+            ReleaseExperience: releaseExperience,
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Downloads.cshtml", model);
     }
 
@@ -261,7 +265,14 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> HelpPage(CancellationToken cancellationToken)
     {
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Help", "How to get help, what participation means, and where to go when something goes wrong.", "/help", cancellationToken);
-        return View("~/Views/PublicLanding/TrustPage.cshtml", _trustContent.BuildHelpPage(chrome));
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        return View(
+            "~/Views/PublicLanding/TrustPage.cshtml",
+            _trustContent.BuildHelpPage(chrome) with
+            {
+                SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken)
+            });
     }
 
     [HttpGet("/faq")]
@@ -634,6 +645,19 @@ public sealed class PublicLandingController : Controller
         }
     }
 
+    private async Task<AuthenticatedHubSubject?> TryGetOptionalPublicSurfaceSubjectAsync(string currentPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await TryGetOptionalSubjectAsync(cancellationToken);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Skipping signed-in public trust projection after identity failure for {Path}.", currentPath);
+            return null;
+        }
+    }
+
     private async Task<TrustPageViewModel> BuildContactPageModelAsync(SiteChromeViewModel chrome, CancellationToken cancellationToken)
     {
         var installDefaults = await ResolveSupportIntakeDefaultsAsync(cancellationToken);
@@ -646,6 +670,115 @@ public sealed class PublicLandingController : Controller
                 installDefaults,
                 overrides)
         };
+    }
+
+    private async Task<SignedInTrustStatusPanelViewModel?> BuildSignedInTrustStatusPanelAsync(
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience,
+        CancellationToken cancellationToken)
+    {
+        var subject = await TryGetOptionalPublicSurfaceSubjectAsync(Request.Path.Value ?? "/", cancellationToken);
+        if (subject is null)
+        {
+            return null;
+        }
+
+        var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        var supportSummaries = _supportPresentation.BuildList(_supportCases.ListForReporter(user.UserId, subject.SubjectId).Items, installLinking);
+        var latestInstallation = installLinking.ClaimedInstallations?
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        var installCount = installLinking.ClaimedInstallations?.Count ?? 0;
+        var followThrough = supportSummaries
+            .Where(static item => item.ReporterActionNeeded || item.NeedsLinkedInstall || item.NeedsInstallUpdate || item.CanVerifyFix)
+            .OrderByDescending(static item => item.Case.UpdatedAtUtc)
+            .FirstOrDefault();
+        var rows = new List<SignedInTrustStatusRowViewModel>
+        {
+            new(
+                "Linked installs",
+                installCount > 0
+                    ? $"{installCount} linked"
+                    : installLinking.PendingClaimTickets.Count > 0
+                        ? $"{installLinking.PendingClaimTickets.Count} claim pending"
+                        : "No linked install yet"),
+            new(
+                "Current linked build",
+                latestInstallation is null
+                    ? "No linked build yet"
+                    : $"{ResolveInstallationDisplayLabel(latestInstallation)} · {latestInstallation.Version} on {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}"),
+            new("Release proof", BuildReleaseProofSummary(manifest)),
+            new(
+                "Support follow-through",
+                followThrough is null
+                    ? "No active fix, relink, or evidence follow-through is waiting on this account."
+                    : $"{followThrough.StageLabel} · {followThrough.NextSafeAction}")
+        };
+
+        if (followThrough?.NeedsLinkedInstall == true)
+        {
+            return new SignedInTrustStatusPanelViewModel(
+                Eyebrow: "Signed-in trust status",
+                Heading: "Relink the affected install",
+                Summary: followThrough.InstallReadinessSummary,
+                Rows: rows,
+                PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
+                SecondaryAction: new TrustPageActionViewModel("Open support timeline", "/account/support", "secondary"));
+        }
+
+        if (followThrough?.NeedsInstallUpdate == true)
+        {
+            return new SignedInTrustStatusPanelViewModel(
+                Eyebrow: "Signed-in trust status",
+                Heading: "Update your linked install",
+                Summary: followThrough.InstallReadinessSummary,
+                Rows: rows,
+                PrimaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "primary"),
+                SecondaryAction: new TrustPageActionViewModel("Open support timeline", "/account/support", "secondary"));
+        }
+
+        if (followThrough?.CanVerifyFix == true)
+        {
+            return new SignedInTrustStatusPanelViewModel(
+                Eyebrow: "Signed-in trust status",
+                Heading: "Your linked install can verify a fix now",
+                Summary: followThrough.VerificationSummary,
+                Rows: rows,
+                PrimaryAction: new TrustPageActionViewModel("Open support timeline", "/account/support", "primary"),
+                SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"));
+        }
+
+        if (followThrough?.ReporterActionNeeded == true)
+        {
+            return new SignedInTrustStatusPanelViewModel(
+                Eyebrow: "Signed-in trust status",
+                Heading: "Support needs one more detail",
+                Summary: followThrough.NextSafeAction,
+                Rows: rows,
+                PrimaryAction: new TrustPageActionViewModel("Open support timeline", "/account/support", "primary"),
+                SecondaryAction: new TrustPageActionViewModel("Open help", "/help", "secondary"));
+        }
+
+        if (latestInstallation is null)
+        {
+            return new SignedInTrustStatusPanelViewModel(
+                Eyebrow: "Signed-in trust status",
+                Heading: "No linked install is attached yet",
+                Summary: "Claim the current preview first so downloads, support closure, and recovery stay attached to this account instead of turning into a fresh unknown device next time.",
+                Rows: rows,
+                PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
+                SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"));
+        }
+
+        string installationLabel = ResolveInstallationDisplayLabel(latestInstallation);
+        return new SignedInTrustStatusPanelViewModel(
+            Eyebrow: "Signed-in trust status",
+            Heading: $"{installationLabel} is attached",
+            Summary: $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery are all using the same claimed install context right now.",
+            Rows: rows,
+            PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"));
     }
 
     private SupportIntakeOverrides ResolveSupportIntakeOverridesFromQuery()
@@ -815,6 +948,47 @@ public sealed class PublicLandingController : Controller
 
         return SupportIntakeDefaults.Empty;
     }
+
+    private static string ResolveInstallationDisplayLabel(ClaimedInstallationDto installation)
+        => installation.HostLabel
+            ?? installation.HeadId
+            ?? installation.ArtifactId
+            ?? installation.InstallationId;
+
+    private static string ResolveChannelLabel(
+        string? channel,
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience)
+    {
+        if (!string.IsNullOrWhiteSpace(channel)
+            && string.Equals(channel, manifest.Channel, StringComparison.OrdinalIgnoreCase))
+        {
+            return releaseExperience.Display.ChannelLabel;
+        }
+
+        return HumanizeToken(channel, "Current preview");
+    }
+
+    private static string BuildReleaseProofSummary(PublicReleaseManifestDto manifest)
+    {
+        string proof = HumanizeToken(manifest.ProofStatus, "Unknown");
+        if (!string.IsNullOrWhiteSpace(manifest.SupportabilitySummary))
+        {
+            return $"{proof} · {manifest.SupportabilitySummary}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.SupportabilityState))
+        {
+            return $"{proof} · {HumanizeToken(manifest.SupportabilityState, "Current preview")}";
+        }
+
+        return proof;
+    }
+
+    private static string HumanizeToken(string? value, string fallback)
+        => string.IsNullOrWhiteSpace(value)
+            ? fallback
+            : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
 
     private sealed record SupportIntakeDefaults(
         string? Platform,

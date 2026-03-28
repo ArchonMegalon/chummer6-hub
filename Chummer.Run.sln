@@ -1,4 +1,3 @@
-﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -17,13 +16,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Run.Identity", "Chu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Run.AI", "Chummer.Run.AI\Chummer.Run.AI.csproj", "{8C50A2B6-CBCB-47CA-8743-585BB1404045}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Tests", "Chummer.Tests\Chummer.Tests.csproj", "{C68507B3-96D7-4DAA-8263-94F66B6E6573}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{BD2C5E98-A0D5-4ECA-B48C-3C1B65D2B19C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -54,5 +52,12 @@ Global
 		{8C50A2B6-CBCB-47CA-8743-585BB1404045}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8C50A2B6-CBCB-47CA-8743-585BB1404045}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8C50A2B6-CBCB-47CA-8743-585BB1404045}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C68507B3-96D7-4DAA-8263-94F66B6E6573}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C68507B3-96D7-4DAA-8263-94F66B6E6573}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C68507B3-96D7-4DAA-8263-94F66B6E6573}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C68507B3-96D7-4DAA-8263-94F66B6E6573}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 EndGlobal

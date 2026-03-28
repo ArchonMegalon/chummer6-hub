@@ -151,7 +151,8 @@ public sealed record NowPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> AvailableToday,
     IReadOnlyList<ResolvedPublicCardViewModel> Inspectable,
     IReadOnlyList<PublicLandingOverlayDto> SignedInPreview,
-    PublicReleaseManifestDto Manifest);
+    PublicReleaseManifestDto Manifest,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record HorizonsPageViewModel(
     SiteChromeViewModel Chrome,
@@ -173,7 +174,8 @@ public sealed record DownloadsPageViewModel(
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
     PublicReleaseManifestDto Manifest,
-    ReleaseExperienceViewModel ReleaseExperience);
+    ReleaseExperienceViewModel ReleaseExperience,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record DownloadDispatchPageViewModel(
     SiteChromeViewModel Chrome,
@@ -207,6 +209,18 @@ public sealed record TrustPageActionViewModel(
     string Label,
     string Href,
     string Tone);
+
+public sealed record SignedInTrustStatusRowViewModel(
+    string Label,
+    string Value);
+
+public sealed record SignedInTrustStatusPanelViewModel(
+    string Eyebrow,
+    string Heading,
+    string Summary,
+    IReadOnlyList<SignedInTrustStatusRowViewModel> Rows,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel? SecondaryAction = null);
 
 public sealed record SupportIntakeOptionViewModel(
     string Value,
@@ -260,7 +274,8 @@ public sealed record TrustPageViewModel(
     string? EffectiveDate = null,
     string? UpdatedDate = null,
     IReadOnlyList<string>? SummaryPoints = null,
-    SupportIntakeViewModel? SupportIntake = null);
+    SupportIntakeViewModel? SupportIntake = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record FaqEntryViewModel(
     string Question,
