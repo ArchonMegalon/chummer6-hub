@@ -1544,6 +1544,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!accountSource.Contains("Rules Navigator answers", StringComparison.Ordinal), "account copy should avoid internal Rules Navigator wording on the customer-facing surface.");
     Assert(accountSource.Contains("Build paths", StringComparison.Ordinal), "account should describe Build Lab follow-through as customer-facing build paths.");
     Assert(accountSource.Contains("Grounded rule answers", StringComparison.Ordinal), "account should describe Rules Navigator follow-through as grounded rule answers.");
+    Assert(!accountSource.Contains("Workspaces and continuity", StringComparison.Ordinal), "account should avoid workspace-heavy section titles on the customer-facing route.");
+    Assert(!accountSource.Contains("Campaign continuity, work-return surfaces, and team posture", StringComparison.Ordinal), "account work copy should avoid internal continuity posture phrasing.");
+    Assert(!accountSource.Contains("Advanced continuity and restore", StringComparison.Ordinal), "account access should avoid internal restore drawer wording.");
+    Assert(!accountSource.Contains("Claimed second-device restore posture", StringComparison.Ordinal), "account access should avoid internal second-device restore jargon.");
+    Assert(!accountSource.Contains("Campaign workspaces", StringComparison.Ordinal), "account work summary should describe shared campaign views in customer-facing language.");
+    Assert(accountSource.Contains("Work and continuity", StringComparison.Ordinal), "account should use the calmer work section heading.");
+    Assert(accountSource.Contains("Advanced device recovery", StringComparison.Ordinal), "account access should use customer-facing recovery wording for advanced device details.");
     Assert(accountSource.Contains("Recent install handoffs", StringComparison.Ordinal), "account access should describe recent downloads as install handoffs instead of raw receipts.");
     Assert(accountSource.Contains("Finish on another device", StringComparison.Ordinal), "account access should describe pending claim codes as the remaining device handoff step.");
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
