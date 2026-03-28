@@ -422,6 +422,11 @@ internal static class HubExtractionReadinessVerification
                      "EnsurePersonalDossierLocked",
                      "BuildRestoreProjection",
                      "BuildWorkspaceProjection",
+                     "GetRestoreProjection",
+                     "GetWorkspace",
+                     "GetBuildLabHandoff",
+                     "GetRulesNavigatorAnswer",
+                     "GetCreatorPublication",
                      "ResolveOperatorRole",
                      "CampaignVisibilitySummary"
                  })
@@ -434,8 +439,15 @@ internal static class HubExtractionReadinessVerification
                  {
                      "Route(\"api/v1/campaign-spine\")",
                      "GetMyCampaignSummary",
+                     "GetMyRestoreProjection",
+                     "GetMyCampaignWorkspace",
+                     "GetMyBuildLabHandoff",
+                     "GetMyRulesNavigatorAnswer",
+                     "GetMyCreatorPublication",
                      "AccountCampaignSummary",
-                     "_campaignSpine.GetAccountSummary"
+                     "_campaignSpine.GetAccountSummary",
+                     "_campaignSpine.GetRestoreProjection",
+                     "_campaignSpine.GetWorkspace"
                  })
         {
             VerificationAssert.True(
