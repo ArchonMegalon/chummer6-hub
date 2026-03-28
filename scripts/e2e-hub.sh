@@ -6,6 +6,7 @@ HUB_PLAYWRIGHT_TIMEOUT_SECONDS="${CHUMMER_HUB_E2E_TIMEOUT_SECONDS:-300}"
 HUB_BASE_URL="${CHUMMER_HUB_PLAYWRIGHT_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
 HUB_SKIP_EDGE_REBUILD="${CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD:-0}"
 HUB_LOCAL_PROOF_PATH="${CHUMMER_HUB_LOCAL_PROOF_PATH:-.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
+HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT="${CHUMMER_HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT:-scripts/cleanup_synthetic_support_cases.py}"
 
 if [[ -n "${CHUMMER_HUB_PLAYWRIGHT:-}" ]]; then
   RUN_HUB_PLAYWRIGHT="$CHUMMER_HUB_PLAYWRIGHT"
@@ -26,6 +27,28 @@ fi
 is_docker_permission_error_text() {
   local source_file="$1"
   grep -Eqi "permission denied while trying to connect to the Docker daemon socket|operation not permitted|got permission denied while trying to connect to the docker daemon socket" "$source_file"
+}
+
+resolve_hub_internal_token() {
+  docker compose -f "$HUB_EDGE_COMPOSE_FILE" ps -q chummer-portal \
+    | head -n 1 \
+    | xargs -r docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' \
+    | grep '^FLEET_INTERNAL_API_TOKEN=' \
+    | head -n 1 \
+    | cut -d= -f2-
+}
+
+cleanup_synthetic_support_cases() {
+  local token
+  token="$(resolve_hub_internal_token || true)"
+  if [[ -z "$token" ]]; then
+    echo "skipping synthetic support-case cleanup: FLEET_INTERNAL_API_TOKEN is unavailable."
+    return 0
+  fi
+
+  python3 "$HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT" \
+    --base-url "$HUB_BASE_URL" \
+    --token "$token"
 }
 
 if [[ "$HUB_SKIP_EDGE_REBUILD" == "1" || "$HUB_SKIP_EDGE_REBUILD" == "true" || "$HUB_SKIP_EDGE_REBUILD" == "TRUE" ]]; then
@@ -71,6 +94,8 @@ if [[ "$RUN_HUB_PLAYWRIGHT" != "1" ]]; then
   exit 0
 fi
 
+cleanup_synthetic_support_cases
+
 playwright_log="$(mktemp)"
 export CHUMMER_RUN_CF_TUNNEL_TOKEN="${CHUMMER_RUN_CF_TUNNEL_TOKEN:-disabled-for-local-hub-e2e}"
 set +e
@@ -92,6 +117,7 @@ if [[ "$playwright_status" -ne 0 ]]; then
 fi
 
 rm -f "$playwright_log"
+cleanup_synthetic_support_cases
 mkdir -p "$(dirname "$HUB_LOCAL_PROOF_PATH")"
 python3 - "$HUB_LOCAL_PROOF_PATH" "$HUB_BASE_URL" "$HUB_EDGE_COMPOSE_FILE" "$HUB_PLAYWRIGHT_TIMEOUT_SECONDS" "$HUB_SKIP_EDGE_REBUILD" <<'PY'
 import datetime as dt
