@@ -1541,10 +1541,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
     Assert(homeSource.Contains("Evidence:", StringComparison.Ordinal), "home work should surface the first grounded rule evidence line instead of only a generic provenance label.");
+    Assert(homeSource.Contains("@handoff.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface build-path return truth directly on the calmer home card.");
+    Assert(homeSource.Contains("@handoff.SupportClosureSummary", StringComparison.Ordinal), "home work should surface build-path support closure truth directly on the calmer home card.");
+    Assert(homeSource.Contains("@answer.SupportReuseHints[0]", StringComparison.Ordinal), "home work should surface grounded support-reuse hints directly from the shared rules projection.");
     Assert(homeSource.Contains("Next:", StringComparison.Ordinal), "home work should keep a short next-step cue on the calmer build follow-through card.");
     Assert(homeSource.Contains("<summary>Build, explain, and next step</summary>", StringComparison.Ordinal), "home work should collapse the secondary build and rules follow-through under one calmer disclosure.");
     Assert(homeSource.Contains("/account/work/build-handoffs/", StringComparison.Ordinal), "home work should deep-link build follow-through into the signed-in work detail route.");
     Assert(homeSource.Contains("/account/work/rules/", StringComparison.Ordinal), "home work should deep-link grounded rule answers into the signed-in work detail route.");
+    Assert(homeSource.Contains("Migration continuity", StringComparison.Ordinal), "home work should surface migration continuity instead of leaving legacy carry-forward buried in the deeper work route.");
+    Assert(homeSource.Contains("Open migration continuity", StringComparison.Ordinal), "home work should keep a direct route back into migration continuity.");
     Assert(homeSource.Contains("Publication follow-through", StringComparison.Ordinal), "home work should surface creator-publication continuity instead of leaving publication trust buried in the deeper account route.");
     Assert(homeSource.Contains("Open publication follow-through", StringComparison.Ordinal), "home work should keep a direct route into publication follow-through.");
     Assert(homeSource.Contains("/account/work/publications/", StringComparison.Ordinal), "home work should deep-link publication follow-through into the signed-in work detail route.");
