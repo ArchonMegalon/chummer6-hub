@@ -2,12 +2,22 @@ using System.Security.Cryptography;
 using System.Text;
 using Chummer.Campaign.Contracts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
+using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
 
 namespace Chummer.Run.Api.Services.Community;
 
 public sealed class CampaignSpineService
 {
+    private static readonly IReadOnlyList<string> DefaultPersonalPreviewCapabilities =
+    [
+        "campaign_workspace",
+        "build_lab",
+        "rules_navigator",
+        "creator_publication",
+        "support_closure"
+    ];
+
     private readonly CommunityStore _store;
 
     public CampaignSpineService(CommunityStore store)
@@ -212,9 +222,22 @@ public sealed class CampaignSpineService
         var memberGroups = _store.GroupsById.Values
             .Where(group => group.Memberships.Any(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)))
             .ToArray();
+        var sponsorCampaigns = _store.CampaignsById.Values
+            .Where(item => memberGroups.Any(group => string.Equals(group.GroupId, item.GroupId, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
 
-        foreach (var sponsorCampaign in _store.CampaignsById.Values
-                     .Where(item => memberGroups.Any(group => string.Equals(group.GroupId, item.GroupId, StringComparison.OrdinalIgnoreCase))))
+        if (sponsorCampaigns.Length == 0)
+        {
+            changed |= EnsurePersonalPreviewCampaignLocked(user);
+            memberGroups = _store.GroupsById.Values
+                .Where(group => group.Memberships.Any(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)))
+                .ToArray();
+            sponsorCampaigns = _store.CampaignsById.Values
+                .Where(item => memberGroups.Any(group => string.Equals(group.GroupId, item.GroupId, StringComparison.OrdinalIgnoreCase)))
+                .ToArray();
+        }
+
+        foreach (var sponsorCampaign in sponsorCampaigns)
         {
             if (!_store.GroupsById.TryGetValue(sponsorCampaign.GroupId, out var group))
             {
@@ -331,6 +354,69 @@ public sealed class CampaignSpineService
                 _store.CampaignSpinesById[campaign.CampaignId] = campaign;
                 changed = true;
             }
+        }
+
+        return changed;
+    }
+
+    private bool EnsurePersonalPreviewCampaignLocked(HubUserDto user)
+    {
+        var changed = false;
+        var now = DateTimeOffset.UtcNow;
+        var groupId = StableId("group", $"personal-preview:{user.UserId}");
+        var campaignId = StableId("campaign", $"personal-preview:{user.UserId}");
+        var membership = new GroupMembershipDto(
+            MembershipId: StableId("membership", $"personal-preview:{user.UserId}"),
+            GroupId: groupId,
+            UserId: user.UserId,
+            Role: "gm",
+            JoinedAtUtc: user.CreatedAtUtc);
+
+        if (!_store.GroupsById.TryGetValue(groupId, out var existingGroup))
+        {
+            _store.GroupsById[groupId] = new GroupDto(
+                GroupId: groupId,
+                GroupType: "campaign",
+                Name: $"{user.DisplayName} preview crew",
+                Visibility: "private",
+                OwnerUserId: user.UserId,
+                Capabilities: DefaultPersonalPreviewCapabilities,
+                Memberships: [membership],
+                CreatedAtUtc: now,
+                UpdatedAtUtc: now);
+            changed = true;
+        }
+        else if (existingGroup.Memberships.All(member => !string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)))
+        {
+            _store.GroupsById[groupId] = existingGroup with
+            {
+                Memberships = existingGroup.Memberships.Concat([membership]).ToArray(),
+                UpdatedAtUtc = now
+            };
+            changed = true;
+        }
+
+        if (_store.UsersById.TryGetValue(user.UserId, out var existingUser)
+            && existingUser.GroupIds.All(group => !string.Equals(group, groupId, StringComparison.OrdinalIgnoreCase)))
+        {
+            _store.UsersById[user.UserId] = existingUser with
+            {
+                GroupIds = existingUser.GroupIds.Concat([groupId]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                UpdatedAtUtc = now
+            };
+            changed = true;
+        }
+
+        if (!_store.CampaignsById.ContainsKey(campaignId))
+        {
+            _store.CampaignsById[campaignId] = new BoostCampaignDto(
+                CampaignId: campaignId,
+                GroupId: groupId,
+                ProjectId: "campaign-os-preview",
+                Title: $"{user.DisplayName} preview campaign",
+                Status: "active",
+                CreatedAtUtc: now);
+            changed = true;
         }
 
         return changed;

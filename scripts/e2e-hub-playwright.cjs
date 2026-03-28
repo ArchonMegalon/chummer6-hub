@@ -35,6 +35,28 @@ async function assertTextCount(page, needle, expected, label) {
   assert.equal(matches.length, expected, `${label} should render "${needle}" ${expected} time(s), got ${matches.length}.`);
 }
 
+async function expectBodyText(page, needle, label) {
+  const text = await page.locator('body').innerText();
+  assert.equal(
+    text.includes(needle),
+    true,
+    `${label} should render "${needle}" in visible body copy.\n\n${text.slice(0, 2400)}`
+  );
+}
+
+async function expandDetailsBySummary(page, summaryText, label) {
+  const summary = page.locator('summary').filter({ hasText: summaryText }).first();
+  if (await summary.count() === 0) {
+    assert.fail(`${label} should render a details summary containing "${summaryText}".`);
+  }
+
+  const details = summary.locator('xpath=ancestor::details[1]');
+  const isOpen = await details.evaluate((element) => element.hasAttribute('open'));
+  if (!isOpen) {
+    await summary.click();
+  }
+}
+
 function assertLoginRedirect(page, expectedNext, label) {
   const current = new URL(page.url());
   assert.equal(current.pathname, '/login', `${label} should redirect to /login.`);
@@ -188,6 +210,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/home/work', async () => {
     await expectVisible(page, 'text=Work and continuity');
+    await expectVisible(page, 'text=Finish setup before the work surfaces try to carry too much');
   });
 
   await gotoAndAssert(page, pageErrors, '/home/setup', async () => {
@@ -206,6 +229,26 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/account/work', async () => {
     await expectVisible(page, 'text=Work and continuity');
+    await expandDetailsBySummary(page, 'Work and teams', '/account/work');
+    await expandDetailsBySummary(page, 'Campaigns & dossiers', '/account/work');
+    await expandDetailsBySummary(page, 'preview campaign', '/account/work');
+    await expectBodyText(page, 'Campaign workspace', '/account/work');
+    await expectBodyText(page, 'Build paths', '/account/work');
+    await expectBodyText(page, 'Grounded rule answers', '/account/work');
+    await expectBodyText(page, 'Creator publication shelf', '/account/work');
+    await expectBodyText(page, 'Rule environment', '/account/work');
+    await expectBodyText(page, 'Active scene', '/account/work');
+    await expectBodyText(page, 'Next safe action', '/account/work');
+    await expandDetailsBySummary(page, 'Recent change packets', '/account/work');
+    await expectBodyText(page, 'Recent change packets', '/account/work');
+    await expectBodyText(page, 'Continuity snapshot', '/account/work');
+    await expandDetailsBySummary(page, 'Build paths', '/account/work');
+    await expectBodyText(page, 'Runtime:', '/account/work');
+    await expectBodyText(page, 'Closure:', '/account/work');
+    await expandDetailsBySummary(page, 'Grounded rule answers', '/account/work');
+    await expectBodyText(page, 'Provenance:', '/account/work');
+    await expandDetailsBySummary(page, 'Creator publication', '/account/work');
+    await expectBodyText(page, 'Discovery:', '/account/work');
   });
 
   await gotoAndAssert(page, pageErrors, '/account/settings', async () => {
