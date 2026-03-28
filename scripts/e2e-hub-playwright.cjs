@@ -209,7 +209,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/home/work', async () => {
-    await expectVisible(page, 'text=Work and continuity');
+    await expectVisible(page, 'text=Work');
     await expectVisible(page, 'text=Finish setup before the work surfaces try to carry too much');
   });
 
@@ -228,7 +228,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/account/work', async () => {
-    await expectVisible(page, 'text=Work and continuity');
+    await expectVisible(page, 'text=Work');
     await expandDetailsBySummary(page, 'Work and teams', '/account/work');
     await expandDetailsBySummary(page, 'Campaigns & dossiers', '/account/work');
     await expandDetailsBySummary(page, 'preview campaign', '/account/work');
@@ -246,7 +246,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectBodyText(page, 'Runtime:', '/account/work');
     await expectBodyText(page, 'Closure:', '/account/work');
     await expandDetailsBySummary(page, 'Grounded rule answers', '/account/work');
-    await expectBodyText(page, 'Provenance:', '/account/work');
+    await expectBodyText(page, 'Source:', '/account/work');
     await expandDetailsBySummary(page, 'Creator publication', '/account/work');
     await expectBodyText(page, 'Discovery:', '/account/work');
   });

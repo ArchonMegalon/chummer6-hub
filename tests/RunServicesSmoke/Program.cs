@@ -1550,15 +1550,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!homeSource.Contains("signed-in cockpit", StringComparison.Ordinal), "home access should avoid cockpit phrasing on the customer-facing route.");
     Assert(!homeSource.Contains("signed-in shell", StringComparison.Ordinal), "home should avoid signed-in shell wording on customer-facing routes.");
     Assert(!homeSource.Contains("Campaign workspace context", StringComparison.Ordinal), "home work should avoid internal campaign-workspace phrasing.");
-    Assert(homeSource.Contains("Rule environments", StringComparison.Ordinal), "home work should keep explicit rule-environment evidence on the signed-in route.");
+    Assert(homeSource.Contains("grounded rule answers", StringComparison.OrdinalIgnoreCase), "home work should keep explicit grounded-rule evidence on the signed-in route.");
     Assert(homeSource.Contains("Open what works today", StringComparison.Ordinal), "home access should point proof needs to the dedicated now route instead of repeating proof cards inline.");
     Assert(homeSource.Contains("Need product proof before you install or return?", StringComparison.Ordinal), "home access should keep proof follow-through as a calmer note instead of a third equal-weight rail card.");
     Assert(!homeSource.Contains("Need product proof before you act?", StringComparison.Ordinal), "home access should not revive the louder proof rail copy.");
     Assert(homeSource.Contains("<summary>Release and device state</summary>", StringComparison.Ordinal), "home access should collapse secondary release and device detail under one calmer disclosure.");
     Assert(homeSource.Contains("Device roles", StringComparison.Ordinal), "home access should keep explicit device-role evidence on the signed-in route.");
-    Assert(homeSource.Contains("GM-ready context", StringComparison.Ordinal), "home work should use customer-facing continuity language instead of internal workspace wording.");
+    Assert(homeSource.Contains("GM-ready cues", StringComparison.Ordinal), "home work should use customer-facing continuity language instead of internal workspace wording.");
     Assert(homeSource.Contains("Shared campaign view", StringComparison.Ordinal), "home work should surface the calmer shared campaign view card instead of hiding workspace return behind the deeper account route.");
-    Assert(homeSource.Contains("Open campaign workspace", StringComparison.Ordinal), "home work should keep an explicit route back into the shared campaign view.");
+    Assert(homeSource.Contains("Open shared campaign view", StringComparison.Ordinal), "home work should keep an explicit route back into the shared campaign view.");
     Assert(homeSource.Contains("/account/work/workspaces/", StringComparison.Ordinal), "home work should deep-link the shared campaign view instead of sending every route back to the generic work shell.");
     Assert(homeSource.Contains("@workspace.ActiveSceneSummary", StringComparison.Ordinal), "home work should surface active-scene change truth directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("@workspace.NextSafeAction", StringComparison.Ordinal), "home work should surface the next safe action directly on the calmer shared campaign card.");
@@ -1572,13 +1572,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("<summary>Build, explain, and next step</summary>", StringComparison.Ordinal), "home work should collapse the secondary build and rules follow-through under one calmer disclosure.");
     Assert(homeSource.Contains("/account/work/build-handoffs/", StringComparison.Ordinal), "home work should deep-link build follow-through into the signed-in work detail route.");
     Assert(homeSource.Contains("/account/work/rules/", StringComparison.Ordinal), "home work should deep-link grounded rule answers into the signed-in work detail route.");
-    Assert(homeSource.Contains("Migration continuity", StringComparison.Ordinal), "home work should surface migration continuity instead of leaving legacy carry-forward buried in the deeper work route.");
-    Assert(homeSource.Contains("Open migration continuity", StringComparison.Ordinal), "home work should keep a direct route back into migration continuity.");
-    Assert(homeSource.Contains("Publication follow-through", StringComparison.Ordinal), "home work should surface creator-publication continuity instead of leaving publication trust buried in the deeper account route.");
-    Assert(homeSource.Contains("Open publication follow-through", StringComparison.Ordinal), "home work should keep a direct route into publication follow-through.");
+    Assert(homeSource.Contains("Migration return", StringComparison.Ordinal), "home work should surface migration return instead of leaving legacy carry-forward buried in the deeper work route.");
+    Assert(homeSource.Contains("Open migration return", StringComparison.Ordinal), "home work should keep a direct route back into migration return.");
+    Assert(homeSource.Contains("Publication status", StringComparison.Ordinal), "home work should surface creator-publication status instead of leaving publication trust buried in the deeper account route.");
+    Assert(homeSource.Contains("Open publication status", StringComparison.Ordinal), "home work should keep a direct route into publication status.");
     Assert(homeSource.Contains("/account/work/publications/", StringComparison.Ordinal), "home work should deep-link publication follow-through into the signed-in work detail route.");
-    Assert(homeSource.Contains("Return packet", StringComparison.Ordinal), "home work should surface the calmer return-packet card for claimed-device continuity.");
-    Assert(homeSource.Contains("Open return packet", StringComparison.Ordinal), "home work should keep a direct route into the return packet when claimed-device continuity already exists.");
+    Assert(homeSource.Contains("Device return", StringComparison.Ordinal), "home work should surface the calmer device-return card for claimed-device continuity.");
+    Assert(homeSource.Contains("Open device return", StringComparison.Ordinal), "home work should keep a direct route into the device-return lane when claimed-device continuity already exists.");
     Assert(homeSource.Contains("@supportCase.ClosureSummary", StringComparison.Ordinal), "home access should surface support-closure truth directly from the shared support presenter.");
     Assert(homeSource.Contains("@supportCase.ReleaseProgressSummary", StringComparison.Ordinal), "home access should surface release-progress truth directly from the shared support presenter.");
     Assert(homeSource.Contains("@supportCase.AffectedInstallSummary", StringComparison.Ordinal), "home access should surface affected-install truth directly from the shared support presenter.");
@@ -1597,7 +1597,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!accountSource.Contains("Claimed second-device restore posture", StringComparison.Ordinal), "account access should avoid internal second-device restore jargon.");
     Assert(!accountSource.Contains("signed-in shell", StringComparison.Ordinal), "account should avoid signed-in shell wording on customer-facing surfaces.");
     Assert(!accountSource.Contains("Campaign workspaces", StringComparison.Ordinal), "account work summary should describe shared campaign views in customer-facing language.");
-    Assert(accountSource.Contains("Work and continuity", StringComparison.Ordinal), "account should use the calmer work section heading.");
+    Assert(accountSource.Contains("\"work\" => \"Work\"", StringComparison.Ordinal), "account should use the calmer work section heading.");
     Assert(accountSource.Contains("Advanced device recovery", StringComparison.Ordinal), "account access should use customer-facing recovery wording for advanced device details.");
     var downloadDispatchSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
     var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
@@ -1619,6 +1619,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("<summary>Recovery email</summary>", StringComparison.Ordinal), "account profile should keep recovery email inside a calmer drawer instead of stacking it inline on the main profile route.");
     Assert(accountSource.Contains("<summary>Need routing help first?</summary>", StringComparison.Ordinal), "account support should keep the grounded assistant behind a calmer disclosure so case filing stays primary.");
     Assert(accountSource.Contains("Advanced account details", StringComparison.Ordinal), "account should hide raw account identifiers behind an advanced disclosure.");
+    Assert(accountSource.Contains("Cross-device recovery", StringComparison.Ordinal), "account access should describe restore state as cross-device recovery.");
+    Assert(accountSource.Contains("What stays on this device", StringComparison.Ordinal), "account access should keep install-local notes in customer-facing wording.");
+    Assert(accountSource.Contains("Recent recaps", StringComparison.Ordinal), "account work should describe recap counts in customer-facing language.");
+    Assert(accountSource.Contains("Open support cases", StringComparison.Ordinal), "account work should describe support counts honestly instead of as blockers.");
     Assert(accountSource.Contains("var sectionTitle = Model.CurrentSection switch", StringComparison.Ordinal), "account routes should expose route-specific headings instead of one generic account title.");
     var trustSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml"));
     Assert(trustSource.Contains("supportReleaseChannel", StringComparison.Ordinal), "contact intake should keep release-channel context visible when install-aware support is available.");
@@ -2116,9 +2120,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var workspaceDigestsPayload = (workspaceDigestsResult.Result as OkObjectResult)?.Value as IReadOnlyList<CampaignWorkspaceDigestProjection> ?? workspaceDigestsResult.Value;
     Assert(workspaceDigestsPayload is not null && workspaceDigestsPayload.Count >= 1, "campaign spine api should expose workspace digests for calmer client follow-through.");
     Assert(workspaceDigestsPayload!.Any(item => string.Equals(item.WorkspaceId, workspaceId, StringComparison.Ordinal)), "campaign spine workspace digests should include the signed-in lead workspace.");
-    Assert(workspaceDigestsPayload[0].ReadinessHighlights.Count >= 1, "campaign spine workspace digests should preserve readiness highlights.");
-    Assert(!string.IsNullOrWhiteSpace(workspaceDigestsPayload[0].SupportClosureSummary), "campaign spine workspace digests should preserve support-closure truth.");
-    Assert(!string.IsNullOrWhiteSpace(workspaceDigestsPayload[0].RuleEnvironmentSummary), "campaign spine workspace digests should preserve rule-environment truth.");
+    var leadWorkspaceDigest = workspaceDigestsPayload![0];
+    Assert(leadWorkspaceDigest.ReadinessHighlights.Count >= 1, "campaign spine workspace digests should preserve readiness highlights.");
+    Assert(!string.IsNullOrWhiteSpace(leadWorkspaceDigest.SupportClosureSummary), "campaign spine workspace digests should preserve support-closure truth.");
+    Assert(!string.IsNullOrWhiteSpace(leadWorkspaceDigest.RuleEnvironmentSummary), "campaign spine workspace digests should preserve rule-environment truth.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
@@ -2594,7 +2599,7 @@ void VerifyRegistryWorkflow()
 void VerifyRegistryControllerHardening()
 {
     var registry = new HubArtifactStore();
-    var controller = new HubRegistryController(registry)
+    var controller = new HubRegistryController(registry, new StubReleaseChannelManifestStore())
     {
         ControllerContext = new ControllerContext
         {
@@ -4092,6 +4097,11 @@ sealed class StubHttpMessageHandler : HttpMessageHandler
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         => Task.FromResult(_handler(request));
+}
+
+sealed class StubReleaseChannelManifestStore : IReleaseChannelManifestStore
+{
+    public Chummer.Hub.Registry.Contracts.ReleaseChannelHeadProjection? LoadCurrent() => null;
 }
 
 sealed class SmokeMarkupGoAdapter : IProviderAdapter
