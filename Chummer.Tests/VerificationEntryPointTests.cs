@@ -74,4 +74,21 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("--forwarded-proto https", e2e, StringComparison.Ordinal);
         Assert.Contains("--verify-http-redirects", e2e, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void HubRequestObservabilityIsWiredIntoProgramAndVerification()
+    {
+        string programPath = RepoPaths.FromRoot("Chummer.Run.Api", "Program.cs");
+        string verificationProgramPath = RepoPaths.FromRoot("tests", "RunServicesVerification", "Program.cs");
+        string backlogPath = RepoPaths.FromRoot("docs", "MIGRATION_BACKLOG.md");
+
+        string program = File.ReadAllText(programPath);
+        string verificationProgram = File.ReadAllText(verificationProgramPath);
+        string backlog = File.ReadAllText(backlogPath);
+
+        Assert.Contains("AddHubRequestObservability", program, StringComparison.Ordinal);
+        Assert.Contains("UseHubRequestObservability", program, StringComparison.Ordinal);
+        Assert.Contains("HubRequestObservabilityVerification.RunAsync", verificationProgram, StringComparison.Ordinal);
+        Assert.Contains("MIG-091", backlog, StringComparison.Ordinal);
+    }
 }
