@@ -203,6 +203,11 @@ public sealed class CampaignSpineService
                 .Take(2)
                 .Select(static packet => $"{packet.Label} — {packet.Summary}")
             ?? []);
+        readinessHighlights.AddRange(
+            workspace.Consequences?
+                .Take(2)
+                .Select(static consequence => $"{consequence.Label} — {consequence.Summary}")
+            ?? []);
         if (!string.IsNullOrWhiteSpace(leadHandoff?.CampaignReturnSummary))
         {
             readinessHighlights.Add($"Build handoff — {leadHandoff.CampaignReturnSummary}");
@@ -353,25 +358,34 @@ public sealed class CampaignSpineService
                 SessionId: runId,
                 SceneId: sceneId,
                 RecapArtifactId: StableId("recap", sponsorCampaign.CampaignId));
-            var memberAssignments = group.Memberships
+            var memberDetails = group.Memberships
                 .Select(member =>
                 {
                     var userRecord = _store.UsersById.GetValueOrDefault(member.UserId);
                     if (userRecord is null)
                     {
-                        return null;
+                        return (Assignment: (CrewAssignmentProjection?)null, Dossier: (RunnerDossierProjection?)null);
                     }
 
                     var dossier = EnsureMemberDossierLocked(userRecord, sponsorCampaign.CampaignId, crewId, runId, sceneId, sponsorCampaign.Title, now);
-                    return new CrewAssignmentProjection(
-                        UserId: member.UserId,
-                        DossierId: dossier.DossierId,
-                        Role: member.Role,
-                        Availability: "active",
-                        AddedAtUtc: member.JoinedAtUtc);
+                    return (
+                        Assignment: new CrewAssignmentProjection(
+                            UserId: member.UserId,
+                            DossierId: dossier.DossierId,
+                            Role: member.Role,
+                            Availability: "active",
+                            AddedAtUtc: member.JoinedAtUtc),
+                        Dossier: dossier);
                 })
-                .Where(static assignment => assignment is not null)
-                .Cast<CrewAssignmentProjection>()
+                .Where(static detail => detail.Assignment is not null && detail.Dossier is not null)
+                .ToArray();
+            var memberAssignments = memberDetails
+                .Select(static detail => detail.Assignment!)
+                .ToArray();
+            var memberDossiers = memberDetails
+                .Select(static detail => detail.Dossier!)
+                .GroupBy(static dossier => dossier.DossierId, StringComparer.OrdinalIgnoreCase)
+                .Select(static group => group.First())
                 .ToArray();
 
             if (memberAssignments.Length == 0)
@@ -451,7 +465,14 @@ public sealed class CampaignSpineService
                 RunIds: new[] { runId },
                 LatestContinuity: continuity,
                 CreatedAtUtc: sponsorCampaign.CreatedAtUtc,
-                UpdatedAtUtc: _store.CampaignSpinesById.TryGetValue(sponsorCampaign.CampaignId, out var existingCampaign) ? existingCampaign.UpdatedAtUtc : now);
+                UpdatedAtUtc: _store.CampaignSpinesById.TryGetValue(sponsorCampaign.CampaignId, out var existingCampaign) ? existingCampaign.UpdatedAtUtc : now,
+                Consequences: BuildCampaignConsequences(
+                    sponsorCampaign,
+                    group,
+                    crew,
+                    memberDossiers,
+                    run,
+                    continuity));
             if (existingCampaign is null || !ContentEquals(existingCampaign, campaign))
             {
                 campaign = existingCampaign is null ? campaign : campaign with { UpdatedAtUtc = now };
@@ -784,6 +805,19 @@ public sealed class CampaignSpineService
                 Summary: "At least one dossier is missing the latest continuity snapshot for safe campaign return."));
         }
 
+        var consequences = campaign.Consequences?
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray()
+            ?? Array.Empty<CampaignConsequenceProjection>();
+        if (consequences.Length > 0)
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:consequences"),
+                Severity: "ready",
+                Title: "Consequence ledger is attached",
+                Summary: $"{consequences.Length} governed faction, heat, contact, and reputation signal(s) stay attached to the shared campaign view with receipt-backed evidence."));
+        }
+
         var recapShelf = workspaceDossiers
             .SelectMany(static item => item.Projections)
             .Where(item => item.Kind.Contains("recap", StringComparison.OrdinalIgnoreCase)
@@ -816,7 +850,8 @@ public sealed class CampaignSpineService
             ReturnSummary: campaign.LatestContinuity?.Summary ?? campaign.Summary,
             ActiveSceneSummary: activeSceneSummary,
             NextSafeAction: nextSafeAction,
-            ChangePackets: changePackets);
+            ChangePackets: changePackets,
+            Consequences: consequences);
     }
 
     private static bool IsOperatorRole(string role)
@@ -1117,6 +1152,158 @@ public sealed class CampaignSpineService
         return packets
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .Take(4)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<CampaignConsequenceProjection> BuildCampaignConsequences(
+        BoostCampaignDto sponsorCampaign,
+        GroupDto group,
+        CrewProjection crew,
+        IReadOnlyList<RunnerDossierProjection> memberDossiers,
+        RunProjection run,
+        ContinuitySnapshotRef continuity)
+    {
+        SceneProjection? activeScene = ResolveActiveScene(run) ?? run.Scenes
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        ObjectiveProjection? leadObjective = run.Objectives
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        PublicationSafeProjection[] outputs = memberDossiers
+            .SelectMany(static item => item.Projections)
+            .Distinct()
+            .ToArray();
+        int artifactCount = outputs.Count(static item => !string.IsNullOrWhiteSpace(item.ArtifactId));
+        DateTimeOffset dossierUpdatedAt = memberDossiers.Count == 0
+            ? continuity.CapturedAtUtc
+            : memberDossiers.Max(static item => item.UpdatedAtUtc);
+        DateTimeOffset outputUpdatedAt = new[]
+        {
+            run.UpdatedAtUtc,
+            continuity.CapturedAtUtc,
+            dossierUpdatedAt
+        }.Max();
+
+        List<CampaignConsequenceProjection> consequences = [];
+
+        if (leadObjective is not null && activeScene is not null)
+        {
+            consequences.Add(new CampaignConsequenceProjection(
+                ConsequenceId: StableId("consequence", $"{sponsorCampaign.CampaignId}:heat"),
+                Kind: "heat",
+                Label: "Heat posture",
+                State: leadObjective.Pressure,
+                Summary: $"{activeScene.Title} keeps operational heat at {leadObjective.Pressure} while {leadObjective.Title} remains {leadObjective.Status}.",
+                EvidenceLines:
+                [
+                    $"{leadObjective.Title} is {leadObjective.Status} with {leadObjective.Pressure} pressure.",
+                    $"{activeScene.Title} is the live scene at revision {activeScene.Revision}.",
+                    continuity.Summary
+                ],
+                Receipts:
+                [
+                    new CampaignConsequenceReceipt(
+                        ReceiptId: leadObjective.ObjectiveId,
+                        SourceKind: "objective",
+                        Summary: leadObjective.Summary),
+                    new CampaignConsequenceReceipt(
+                        ReceiptId: activeScene.SceneId,
+                        SourceKind: "scene",
+                        Summary: activeScene.Summary),
+                    new CampaignConsequenceReceipt(
+                        ReceiptId: continuity.SnapshotId,
+                        SourceKind: "continuity",
+                        Summary: continuity.Summary)
+                ],
+                UpdatedAtUtc: new[] { leadObjective.UpdatedAtUtc, activeScene.UpdatedAtUtc, continuity.CapturedAtUtc }.Max()));
+        }
+
+        consequences.Add(new CampaignConsequenceProjection(
+            ConsequenceId: StableId("consequence", $"{sponsorCampaign.CampaignId}:faction"),
+            Kind: "faction",
+            Label: "Faction standing",
+            State: string.Equals(group.Visibility, "private", StringComparison.OrdinalIgnoreCase) ? "trusted" : "shared",
+            Summary: $"{group.Name} remains the governed sponsor faction for {sponsorCampaign.Title}, and crew membership stays attached to that shared campaign truth.",
+            EvidenceLines:
+            [
+                $"{crew.Name} has {crew.Members.Count} governed crew assignment(s).",
+                $"{group.Name} is operating at {group.Visibility} visibility.",
+                $"{sponsorCampaign.Title} keeps sponsorship and continuity in the same campaign record."
+            ],
+            Receipts:
+            [
+                new CampaignConsequenceReceipt(
+                    ReceiptId: group.GroupId,
+                    SourceKind: "group",
+                    Summary: $"{group.Name} sponsor group"),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: crew.CrewId,
+                    SourceKind: "crew",
+                    Summary: $"{crew.Members.Count} crew assignment(s) stay attached to the campaign"),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: sponsorCampaign.CampaignId,
+                    SourceKind: "campaign",
+                    Summary: sponsorCampaign.Title)
+            ],
+            UpdatedAtUtc: new[] { crew.UpdatedAtUtc, run.UpdatedAtUtc, continuity.CapturedAtUtc }.Max()));
+
+        consequences.Add(new CampaignConsequenceProjection(
+            ConsequenceId: StableId("consequence", $"{sponsorCampaign.CampaignId}:contact"),
+            Kind: "contact",
+            Label: "Contact network",
+            State: memberDossiers.Count >= 2 ? "networked" : "thin",
+            Summary: $"{memberDossiers.Count} dossier-backed runner contact lane(s) remain attached to the same campaign return path instead of drifting into local notes.",
+            EvidenceLines: memberDossiers
+                .Take(3)
+                .Select(static dossier => $"{dossier.DisplayName} remains pinned to the shared campaign continuity spine.")
+                .Concat([continuity.Summary])
+                .ToArray(),
+            Receipts: memberDossiers
+                .Take(3)
+                .Select(static dossier => new CampaignConsequenceReceipt(
+                    ReceiptId: dossier.DossierId,
+                    SourceKind: "dossier",
+                    Summary: $"{dossier.DisplayName} ({dossier.RunnerHandle})"))
+                .Concat(
+                [
+                    new CampaignConsequenceReceipt(
+                        ReceiptId: continuity.SnapshotId,
+                        SourceKind: "continuity",
+                        Summary: continuity.Summary)
+                ])
+                .ToArray(),
+            UpdatedAtUtc: new[] { dossierUpdatedAt, continuity.CapturedAtUtc }.Max()));
+
+        consequences.Add(new CampaignConsequenceProjection(
+            ConsequenceId: StableId("consequence", $"{sponsorCampaign.CampaignId}:reputation"),
+            Kind: "reputation",
+            Label: "Reputation posture",
+            State: artifactCount > 0 ? "tracked" : "pending",
+            Summary: $"{outputs.Length} publication-safe dossier and runboard artifact(s) keep reputation changes reviewable instead of disappearing into recap prose.",
+            EvidenceLines:
+            [
+                $"{artifactCount} artifact-backed projection(s) are already attached to the active dossiers.",
+                $"{memberDossiers.Count} dossier(s) contribute publication-safe outputs to this campaign.",
+                continuity.Summary
+            ],
+            Receipts: outputs
+                .Take(3)
+                .Select(static output => new CampaignConsequenceReceipt(
+                    ReceiptId: output.ArtifactId ?? output.ProjectionId,
+                    SourceKind: output.Kind,
+                    Summary: output.Summary))
+                .Concat(
+                [
+                    new CampaignConsequenceReceipt(
+                        ReceiptId: continuity.SnapshotId,
+                        SourceKind: "continuity",
+                        Summary: continuity.Summary)
+                ])
+                .ToArray(),
+            UpdatedAtUtc: outputUpdatedAt));
+
+        return consequences
+            .OrderByDescending(static item => item.UpdatedAtUtc)
             .ToArray();
     }
 

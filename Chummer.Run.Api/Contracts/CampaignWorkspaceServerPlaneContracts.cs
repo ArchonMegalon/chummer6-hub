@@ -9,6 +9,7 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     RosterReadinessSummary RosterReadiness,
     IReadOnlyList<CampaignReadinessCue> ReadinessCues,
     IReadOnlyList<WorkspaceChangePacketProjection> ChangePackets,
+    IReadOnlyList<CampaignConsequenceProjection> Consequences,
     IReadOnlyList<DossierFreshnessCue> DossierFreshness,
     IReadOnlyList<RuleEnvironmentHealthCue> RuleEnvironmentHealth,
     RunboardSummary? Runboard,
