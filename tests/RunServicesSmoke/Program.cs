@@ -1524,6 +1524,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Evidence:", StringComparison.Ordinal), "home work should surface the first grounded rule evidence line instead of only a generic provenance label.");
     Assert(homeSource.Contains("Next:", StringComparison.Ordinal), "home work should keep a short next-step cue on the calmer build follow-through card.");
     Assert(homeSource.Contains("@supportCase.ClosureSummary", StringComparison.Ordinal), "home access should surface support-closure truth directly from the shared support presenter.");
+    Assert(homeSource.Contains("@supportCase.ReleaseProgressSummary", StringComparison.Ordinal), "home access should surface release-progress truth directly from the shared support presenter.");
+    Assert(homeSource.Contains("@supportCase.AffectedInstallSummary", StringComparison.Ordinal), "home access should surface affected-install truth directly from the shared support presenter.");
     Assert(homeSource.Contains("Watchout:", StringComparison.Ordinal), "home work should keep one concrete watchout instead of a long data-dump summary.");
     Assert(!homeSource.Contains("Next safe action:", StringComparison.Ordinal), "home work should not fall back to the older verbose next-safe-action label on the short card.");
     Assert(!homeSource.Contains("Support reuse:", StringComparison.Ordinal), "home work should keep support reuse detail in the deeper work route instead of the short home card.");
@@ -1536,6 +1538,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Finish on another device", StringComparison.Ordinal), "account access should describe pending claim codes as the remaining device handoff step.");
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
     Assert(accountSource.Contains("Closure:", StringComparison.Ordinal), "account build-path details should surface support-closure truth instead of leaving the new rail data unused.");
+    Assert(accountSource.Contains("Follow-up lane", StringComparison.Ordinal), "account support detail should surface the follow-up lane instead of assuming the user remembers it.");
+    Assert(accountSource.Contains("Release progress:", StringComparison.Ordinal), "account support detail should surface reporter-lane release progress instead of only the closure summary.");
+    Assert(accountSource.Contains("Affected install", StringComparison.Ordinal), "account support detail should surface the install linked to the tracked case.");
     Assert(accountSource.Contains("Next safe action:", StringComparison.Ordinal), "account support detail should surface the next honest user action for a tracked case.");
     Assert(accountSource.Contains("More settings", StringComparison.Ordinal), "account should keep non-core sections behind a calmer secondary settings disclosure.");
     Assert(accountSource.Contains("<summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should keep primary sign-in inside a calmer drawer instead of a full stacked section.");
@@ -1553,6 +1558,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(supportSubmittedSource.Contains("Watch Account > Support", StringComparison.Ordinal), "support confirmation should explain the signed-in follow-up lane instead of stopping at a generic receipt.");
     Assert(supportSubmittedSource.Contains("Watch your reply email", StringComparison.Ordinal), "support confirmation should explain the guest follow-up lane instead of assuming an account-only workflow.");
     Assert(supportSubmittedSource.Contains("Next safe action", StringComparison.Ordinal), "support confirmation should keep the tracked case next-step visible when the reporter is signed in.");
+    Assert(supportSubmittedSource.Contains("Follow-up lane", StringComparison.Ordinal), "support confirmation should surface the concrete follow-up lane when tracked case truth is available.");
+    Assert(supportSubmittedSource.Contains("Affected install", StringComparison.Ordinal), "support confirmation should surface the linked install when the report came from one.");
     Assert(supportSubmittedSource.Contains("Download</a>", StringComparison.Ordinal), "support confirmation should keep saved attachment downloads visible on the first confirmation screen.");
     var faqSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Faq.cshtml"));
     Assert(faqSource.Contains("FaqActionFor", StringComparison.Ordinal), "faq should attach direct next-step routing under answers instead of stopping at a text-only sheet.");
@@ -1946,6 +1953,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(accountSupportDetailModel!.SelectedSupportCaseSummary!.StatusLabel, "Notified", StringComparison.Ordinal), "account support detail should humanize notified support closure for the signed-in reporter.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.FixedReleaseLabel?.Contains("preview", StringComparison.OrdinalIgnoreCase) == true, "account support detail should tie closure truth to the released reporter channel.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.ClosureSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase), "account support detail should explain that the reporter-facing closure already went out.");
+    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.FollowUpLaneSummary.Contains("Account > Support", StringComparison.Ordinal), "account support detail should keep the signed-in follow-up lane explicit.");
+    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.ReleaseProgressSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase), "account support detail should project the user-facing release progress summary.");
+    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.AffectedInstallSummary?.Contains("install-smoke-001", StringComparison.Ordinal) == true, "account support detail should keep the affected install attached to the tracked case.");
+    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.TimelineHighlights.Count >= 1, "account support detail should project timeline highlights through the shared presenter.");
     var accountAccessPage = await accountController.AccountPage(section: "access", caseId: null, CancellationToken.None) as ViewResult;
     var accountAccessModel = accountAccessPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountAccessModel?.CurrentSection, "access", StringComparison.Ordinal), "account access route should render the devices-and-access section.");
@@ -1977,6 +1988,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(contactSubmittedModel is not null && string.Equals(contactSubmittedModel.CaseId, supportCase.CaseId, StringComparison.Ordinal), "contact submitted route should render a stable support confirmation page.");
     Assert(contactSubmittedModel!.Attachments.Count == 1, "contact submitted route should surface saved support attachments for signed-in reporters.");
     Assert(contactSubmittedModel.TrackedCaseSummary is not null && contactSubmittedModel.TrackedCaseSummary.NextSafeAction.Contains("Update", StringComparison.OrdinalIgnoreCase), "contact confirmation should keep the next safe support action visible for signed-in reporters.");
+    Assert(contactSubmittedModel.TrackedCaseSummary!.FollowUpLaneSummary.Contains("Account > Support", StringComparison.Ordinal), "contact confirmation should surface the signed-in follow-up lane.");
+    Assert(contactSubmittedModel.TrackedCaseSummary.AffectedInstallSummary?.Contains("install-smoke-001", StringComparison.Ordinal) == true, "contact confirmation should keep the affected install attached to the tracked case.");
     Assert(authenticatedHomeModel.CampaignSpine.RulesNavigator.Count >= 1, "signed-in home should surface grounded rules navigator answers.");
     Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Count >= 1, "signed-in home should surface creator publication posture.");
     Assert(authenticatedHomeModel.CampaignSpine.MigrationReceipts.Count >= 1, "signed-in home should surface migration receipt truth.");

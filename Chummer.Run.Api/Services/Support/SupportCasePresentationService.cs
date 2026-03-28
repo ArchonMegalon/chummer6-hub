@@ -21,6 +21,10 @@ public sealed class SupportCasePresentationService
         string status = NormalizeStatus(supportCase.Status);
         string fixedReleaseLabel = BuildFixedReleaseLabel(supportCase.FixedVersion, supportCase.FixedChannel);
         string detailHref = $"/account/support/{Uri.EscapeDataString(supportCase.CaseId)}";
+        string? affectedInstallSummary = BuildAffectedInstallSummary(supportCase);
+        string followUpLaneSummary = BuildFollowUpLaneSummary(supportCase);
+        string releaseProgressSummary = BuildReleaseProgressSummary(supportCase, status, fixedReleaseLabel);
+        IReadOnlyList<SupportCaseTimelineHighlightViewModel> timelineHighlights = BuildTimelineHighlights(supportCase);
         var (stageLabel, nextSafeAction, closureSummary, primaryActionLabel, primaryActionHref, reporterActionNeeded) = status switch
         {
             SupportCaseStatuses.Clustered => (
@@ -112,6 +116,10 @@ public sealed class SupportCasePresentationService
             PrimaryActionHref: primaryActionHref,
             UpdatedLabel: $"{supportCase.UpdatedAtUtc.ToUniversalTime():yyyy-MM-dd HH:mm} UTC",
             FixedReleaseLabel: string.IsNullOrWhiteSpace(fixedReleaseLabel) ? null : fixedReleaseLabel,
+            AffectedInstallSummary: affectedInstallSummary,
+            FollowUpLaneSummary: followUpLaneSummary,
+            ReleaseProgressSummary: releaseProgressSummary,
+            TimelineHighlights: timelineHighlights,
             ReporterActionNeeded: reporterActionNeeded);
     }
 
@@ -160,5 +168,133 @@ public sealed class SupportCasePresentationService
 
         string trimmed = value.Trim();
         return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+    }
+
+    private static string? BuildAffectedInstallSummary(SupportCaseProjection supportCase)
+    {
+        string? installationId = NormalizeOptional(supportCase.InstallationId, 64);
+        string? releaseChannel = NormalizeOptional(supportCase.ReleaseChannel, 64);
+        string? applicationVersion = NormalizeOptional(supportCase.ApplicationVersion, 64);
+        string? headId = NormalizeOptional(supportCase.HeadId, 64);
+        string? platform = NormalizeOptional(supportCase.Platform, 64);
+        string? arch = NormalizeOptional(supportCase.Arch, 32);
+        var descriptors = new List<string>();
+        if (!string.IsNullOrWhiteSpace(headId))
+        {
+            descriptors.Add(headId);
+        }
+
+        string? platformSummary = JoinNonEmpty(platform, arch, separator: " ");
+        if (!string.IsNullOrWhiteSpace(platformSummary))
+        {
+            descriptors.Add(platformSummary);
+        }
+
+        string? releaseSummary = JoinNonEmpty(releaseChannel, applicationVersion, separator: " ");
+        if (!string.IsNullOrWhiteSpace(releaseSummary))
+        {
+            descriptors.Add(releaseSummary);
+        }
+
+        if (descriptors.Count == 0 && string.IsNullOrWhiteSpace(installationId))
+        {
+            return null;
+        }
+
+        string target = descriptors.Count == 0
+            ? "the linked install"
+            : $"the linked {string.Join(" · ", descriptors)} install";
+
+        return string.IsNullOrWhiteSpace(installationId)
+            ? $"This case stays attached to {target}."
+            : $"This case stays attached to {target} ({installationId}).";
+    }
+
+    private static string BuildFollowUpLaneSummary(SupportCaseProjection supportCase)
+    {
+        if (!string.IsNullOrWhiteSpace(supportCase.ReporterUserId) || !string.IsNullOrWhiteSpace(supportCase.ReporterSubjectId))
+        {
+            return "Follow-up stays inside Account > Support for this signed-in report.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(supportCase.ReporterEmail))
+        {
+            return "Follow-up stays on the reply email attached to this case.";
+        }
+
+        return "Follow-up stays attached to this case id until a clearer response lane exists.";
+    }
+
+    private static string BuildReleaseProgressSummary(SupportCaseProjection supportCase, string normalizedStatus, string fixedReleaseLabel)
+    {
+        return normalizedStatus switch
+        {
+            SupportCaseStatuses.UserNotified => string.IsNullOrWhiteSpace(fixedReleaseLabel)
+                ? "The fix already reached the reporter lane and the closure notice went out."
+                : $"The fix reached {fixedReleaseLabel}, and the closure notice already went out.",
+            SupportCaseStatuses.ReleasedToReporterChannel => string.IsNullOrWhiteSpace(fixedReleaseLabel)
+                ? "The fix reached the reporter-ready release lane. Update or reinstall on the affected device to pick it up."
+                : $"The fix reached {fixedReleaseLabel}. Update or reinstall on the affected device to pick it up.",
+            SupportCaseStatuses.Fixed => string.IsNullOrWhiteSpace(fixedReleaseLabel)
+                ? "The fix exists, but the release handoff is still moving."
+                : $"The fix is already mapped to {fixedReleaseLabel}, but the closure notice has not gone out yet.",
+            _ when supportCase.UserNotifiedAtUtc.HasValue => "The closure notice already went out; reopen support only if the same issue still reproduces.",
+            _ when supportCase.ReleasedToReporterChannelAtUtc.HasValue => "A reporter-ready fix exists, but the final user-facing closure step is still catching up.",
+            _ => "No reporter-ready release is attached yet, so the visible next step is still triage or fix work."
+        };
+    }
+
+    private static IReadOnlyList<SupportCaseTimelineHighlightViewModel> BuildTimelineHighlights(SupportCaseProjection supportCase)
+    {
+        var highlights = new List<SupportCaseTimelineHighlightViewModel>();
+        if (supportCase.Timeline is { Count: > 0 })
+        {
+            highlights.AddRange(
+                supportCase.Timeline
+                    .OrderByDescending(static item => item.OccurredAtUtc)
+                    .Take(6)
+                    .Select(item => new SupportCaseTimelineHighlightViewModel(
+                        Label: HumanizeStatus(NormalizeStatus(item.Status)),
+                        Summary: item.Summary,
+                        OccurredLabel: $"{item.OccurredAtUtc.ToUniversalTime():yyyy-MM-dd HH:mm} UTC")));
+        }
+
+        if (supportCase.UserNotifiedAtUtc.HasValue
+            && !highlights.Any(static item => item.Summary.Contains("closure notice", StringComparison.OrdinalIgnoreCase)))
+        {
+            highlights.Add(new SupportCaseTimelineHighlightViewModel(
+                Label: "Notified",
+                Summary: "Chummer sent the closure notice to the reporter lane.",
+                OccurredLabel: $"{supportCase.UserNotifiedAtUtc.Value.ToUniversalTime():yyyy-MM-dd HH:mm} UTC"));
+        }
+
+        if (supportCase.ReleasedToReporterChannelAtUtc.HasValue
+            && !highlights.Any(static item => item.Label.Equals("Released", StringComparison.OrdinalIgnoreCase)))
+        {
+            highlights.Add(new SupportCaseTimelineHighlightViewModel(
+                Label: "Released",
+                Summary: "The fix reached the reporter-ready release lane.",
+                OccurredLabel: $"{supportCase.ReleasedToReporterChannelAtUtc.Value.ToUniversalTime():yyyy-MM-dd HH:mm} UTC"));
+        }
+
+        return highlights
+            .OrderByDescending(static item => item.OccurredLabel, StringComparer.Ordinal)
+            .Take(6)
+            .ToArray();
+    }
+
+    private static string? JoinNonEmpty(string? left, string? right, string separator)
+    {
+        if (string.IsNullOrWhiteSpace(left))
+        {
+            return string.IsNullOrWhiteSpace(right) ? null : right;
+        }
+
+        if (string.IsNullOrWhiteSpace(right))
+        {
+            return left;
+        }
+
+        return $"{left}{separator}{right}";
     }
 }
