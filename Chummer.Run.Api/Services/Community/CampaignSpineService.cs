@@ -961,14 +961,24 @@ public sealed class CampaignSpineService
             .ToArray();
 
         var claimedDevices = claimedInstallations
-            .Select(static installation => new ClaimedDeviceRestoreProjection(
-                InstallationId: installation.InstallationId,
-                DeviceRole: ResolveDeviceRole(installation),
-                Platform: installation.Platform ?? "unknown",
-                HeadId: installation.HeadId ?? "desktop",
-                Channel: installation.Channel,
-                HostLabel: installation.HostLabel,
-                RestoreSummary: $"{installation.Platform ?? "unknown"} · {installation.HeadId ?? "desktop"} · {installation.Version}"))
+            .Select(installation =>
+            {
+                string deviceRole = ResolveDeviceRole(installation);
+                return new ClaimedDeviceRestoreProjection(
+                    InstallationId: installation.InstallationId,
+                    DeviceRole: deviceRole,
+                    Platform: installation.Platform ?? "unknown",
+                    HeadId: installation.HeadId ?? "desktop",
+                    Channel: installation.Channel,
+                    HostLabel: installation.HostLabel,
+                    RestoreSummary: BuildClaimedDeviceRestoreSummary(
+                        installation,
+                        deviceRole,
+                        dossiers.Count,
+                        campaigns.Count,
+                        ruleEnvironments.Length,
+                        recentArtifacts.Length));
+            })
             .Take(4)
             .ToArray();
 
@@ -989,6 +999,29 @@ public sealed class CampaignSpineService
             ],
             GeneratedAtUtc: generatedAtUtc);
     }
+
+    private static string BuildClaimedDeviceRestoreSummary(
+        ClaimedInstallationDto installation,
+        string deviceRole,
+        int dossierCount,
+        int campaignCount,
+        int ruleEnvironmentCount,
+        int artifactCount)
+    {
+        string baseSummary = $"{installation.Platform ?? "unknown"} · {installation.HeadId ?? "desktop"} · {installation.Version}";
+        string inventory = DescribeRestorePrefetchInventory(dossierCount, campaignCount, ruleEnvironmentCount, artifactCount);
+        string laneSummary = string.Equals(deviceRole, "travel_cache", StringComparison.OrdinalIgnoreCase)
+            ? "Travel-safe cache keeps"
+            : "Claimed-device return keeps";
+        return $"{baseSummary}. {laneSummary} {inventory} ready for bounded offline use.";
+    }
+
+    private static string DescribeRestorePrefetchInventory(
+        int dossierCount,
+        int campaignCount,
+        int ruleEnvironmentCount,
+        int artifactCount)
+        => $"{dossierCount} dossier(s), {campaignCount} campaign(s), {ruleEnvironmentCount} rule snapshot(s), and {artifactCount} reconnectable artifact(s)";
 
     private static RuleEnvironmentRef DefaultRuleEnvironment(string environmentId, string ownerScope)
         => new(
