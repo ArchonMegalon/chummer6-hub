@@ -5,6 +5,7 @@ HUB_EDGE_COMPOSE_FILE="${HUB_EDGE_COMPOSE_FILE:-docker-compose.public-edge.yml}"
 HUB_PLAYWRIGHT_TIMEOUT_SECONDS="${CHUMMER_HUB_E2E_TIMEOUT_SECONDS:-300}"
 HUB_BASE_URL="${CHUMMER_HUB_PLAYWRIGHT_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
 HUB_SKIP_EDGE_REBUILD="${CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD:-0}"
+HUB_LOCAL_PROOF_PATH="${CHUMMER_HUB_LOCAL_PROOF_PATH:-.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
 
 if [[ -n "${CHUMMER_HUB_PLAYWRIGHT:-}" ]]; then
   RUN_HUB_PLAYWRIGHT="$CHUMMER_HUB_PLAYWRIGHT"
@@ -91,4 +92,24 @@ if [[ "$playwright_status" -ne 0 ]]; then
 fi
 
 rm -f "$playwright_log"
+mkdir -p "$(dirname "$HUB_LOCAL_PROOF_PATH")"
+python3 - "$HUB_LOCAL_PROOF_PATH" "$HUB_BASE_URL" "$HUB_EDGE_COMPOSE_FILE" "$HUB_PLAYWRIGHT_TIMEOUT_SECONDS" "$HUB_SKIP_EDGE_REBUILD" <<'PY'
+import datetime as dt
+import json
+import sys
+
+out_path, base_url, compose_file, timeout_seconds, skip_rebuild = sys.argv[1:]
+payload = {
+    "contract_name": "chummer6-hub.local_release_proof",
+    "generated_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+    "status": "passed",
+    "base_url": base_url,
+    "compose_file": compose_file,
+    "playwright_timeout_seconds": int(timeout_seconds),
+    "edge_rebuild_skipped": skip_rebuild.lower() in {"1", "true"},
+}
+with open(out_path, "w", encoding="utf-8") as handle:
+    json.dump(payload, handle, indent=2)
+    handle.write("\n")
+PY
 echo "hub e2e completed"
