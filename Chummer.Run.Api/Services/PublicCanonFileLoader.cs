@@ -62,4 +62,16 @@ public sealed class PublicCanonFileLoader
             throw new InvalidOperationException($"canon file '{relativePath}' is invalid: {ex.Message}", ex);
         }
     }
+
+    public string LoadRequiredText(string relativePath)
+    {
+        var repoRoot = ResolveRepoRoot(relativePath);
+        var path = Path.Combine(repoRoot, relativePath);
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException($"required canon file not found: {path}");
+        }
+
+        return File.ReadAllText(path);
+    }
 }

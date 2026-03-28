@@ -212,7 +212,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("BuildPanel(\"help\")", landingController, StringComparison.Ordinal);
         Assert.Contains("BuildPanel(\"contact\")", landingController, StringComparison.Ordinal);
         Assert.Contains("BuildPanel(\"account\")", accountController, StringComparison.Ordinal);
-        Assert.Contains("PUBLIC_PRIVACY_BOUNDARIES.yaml", service, StringComparison.Ordinal);
+        Assert.Contains("PRIVACY_AND_RETENTION_BOUNDARIES.md", service, StringComparison.Ordinal);
+        Assert.Contains("PUBLIC_TRUST_CONTENT.yaml", service, StringComparison.Ordinal);
         Assert.Contains("PrivacyBoundaryPanelViewModel? PrivacyBoundary", viewModel, StringComparison.Ordinal);
         Assert.Contains("Retention window:", partial, StringComparison.Ordinal);
         Assert.Contains("Model.PrivacyBoundary", accountView, StringComparison.Ordinal);

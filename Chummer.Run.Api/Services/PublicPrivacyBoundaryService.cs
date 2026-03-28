@@ -5,13 +5,47 @@ namespace Chummer.Run.Api.Services;
 
 public sealed class PublicPrivacyBoundaryService
 {
-    private const string PrivacyBoundariesRelativePath = ".codex-design/product/PUBLIC_PRIVACY_BOUNDARIES.yaml";
+    private const string PrivacyBoundariesRelativePath = ".codex-design/product/PRIVACY_AND_RETENTION_BOUNDARIES.md";
+    private const string TrustContentRelativePath = ".codex-design/product/PUBLIC_TRUST_CONTENT.yaml";
     private const string DefaultContractName = "chummer.public_privacy_boundaries";
-    private const string SourceDocument = "products/chummer/PUBLIC_PRIVACY_BOUNDARIES.yaml";
+    private const string SourceDocument = "products/chummer/PRIVACY_AND_RETENTION_BOUNDARIES.md + products/chummer/PUBLIC_TRUST_CONTENT.yaml";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
     };
+    private static readonly BoundaryDomainSpec[] BoundaryDomains =
+    [
+        new(
+            MarkdownHeading: "Support-case truth",
+            Id: "support_case_truth",
+            Label: "Support cases",
+            PublicProjection: "Public routes may show known issues, fix availability, and bounded support status.",
+            SignedInProjection: "Signed-in routes may show the reporter-safe case timeline and closure state."),
+        new(
+            MarkdownHeading: "Claim and install linkage",
+            Id: "claim_install_linkage",
+            Label: "Install linkage",
+            PublicProjection: "Public routes may show release posture, install help, and channel-aware fix visibility.",
+            SignedInProjection: "Signed-in routes may show claimed-install state, access posture, and linked-device context."),
+        new(
+            MarkdownHeading: "Survey and follow-up results",
+            Id: "survey_follow_up",
+            Label: "Survey follow-up",
+            PublicProjection: "Public routes may summarize learned product changes after canon absorbs the signal.",
+            SignedInProjection: "Signed-in routes may show that follow-up happened without replaying raw survey text."),
+        new(
+            MarkdownHeading: "Provider traces and assistant grounding packs",
+            Id: "provider_traces",
+            Label: "Provider-backed help",
+            PublicProjection: "Public help may show grounded answers and cited truth, not raw provider transcripts.",
+            SignedInProjection: "Signed-in help may show the curated answer path without turning help into the system of record.")
+    ];
+    private static readonly BoundarySurfaceRuleSpec[] BoundarySurfaceRules =
+    [
+        new("Public surfaces", "public_surfaces", "Public surfaces"),
+        new("Signed-in user surfaces", "signed_in_user_surfaces", "Signed-in user surfaces"),
+        new("Provider-backed assistant surfaces", "provider_backed_assistant_surfaces", "Provider-backed help")
+    ];
 
     private readonly PublicCanonFileLoader _canon;
     private readonly PublicRouteCatalogService _routes;
@@ -103,12 +137,255 @@ public sealed class PublicPrivacyBoundaryService
     }
 
     private PublicPrivacyBoundariesDocument LoadDocument()
-        => _canon.LoadRequiredYaml<PublicPrivacyBoundariesDocument>(PrivacyBoundariesRelativePath);
+    {
+        var trust = _canon.LoadRequiredYaml<PublicTrustContentDocument>(TrustContentRelativePath);
+        var privacyPage = (trust.TrustPages ?? new List<PublicTrustPageDocument>())
+            .FirstOrDefault(static page => string.Equals(page.Id, "privacy", StringComparison.Ordinal))
+            ?? throw new InvalidOperationException("public trust content is missing the privacy trust page.");
+
+        var markdown = _canon.LoadRequiredText(PrivacyBoundariesRelativePath);
+        var retentionDomains = ParseRetentionDomains(markdown);
+        var surfaceRules = ParseSurfaceRules(markdown);
+
+        return new PublicPrivacyBoundariesDocument
+        {
+            Product = "chummer",
+            Surface = "public_privacy_boundaries",
+            Version = 1,
+            ContractName = DefaultContractName,
+            AsOf = privacyPage.UpdatedDate ?? privacyPage.EffectiveDate ?? string.Empty,
+            Eyebrow = "Privacy boundary",
+            Heading = "Support, install, survey, and provider-backed help stay on a bounded clock",
+            Summary = "Chummer keeps support, install, survey, and provider-backed help surfaces on explicit retention windows and redaction rules instead of stockpiling raw payloads.",
+            MicroProof = privacyPage.SummaryPoints ?? new List<string>(),
+            Domains = BoundaryDomains
+                .Select(spec => BuildDomain(spec, retentionDomains))
+                .ToList(),
+            SurfaceRules = BoundarySurfaceRules
+                .Select(spec => BuildSurfaceRule(spec, surfaceRules))
+                .ToList()
+        };
+    }
+
+    private static PublicPrivacyBoundaryDomainDocument BuildDomain(
+        BoundaryDomainSpec spec,
+        IReadOnlyDictionary<string, RetentionDomainSection> sections)
+    {
+        if (!sections.TryGetValue(spec.MarkdownHeading, out var section))
+        {
+            throw new InvalidOperationException($"privacy canon is missing retention domain '{spec.MarkdownHeading}'.");
+        }
+
+        return new PublicPrivacyBoundaryDomainDocument
+        {
+            Id = spec.Id,
+            Label = spec.Label,
+            Owner = section.Owner,
+            RetentionSummary = JoinBulletSummary(section.RetentionBullets),
+            RedactionSummary = JoinBulletSummary(section.RedactionBullets),
+            PublicProjection = spec.PublicProjection,
+            SignedInProjection = spec.SignedInProjection
+        };
+    }
+
+    private static PublicPrivacyBoundarySurfaceRuleDocument BuildSurfaceRule(
+        BoundarySurfaceRuleSpec spec,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> sections)
+    {
+        if (!sections.TryGetValue(spec.MarkdownHeading, out var bullets))
+        {
+            throw new InvalidOperationException($"privacy canon is missing surface rule '{spec.MarkdownHeading}'.");
+        }
+
+        return new PublicPrivacyBoundarySurfaceRuleDocument
+        {
+            Id = spec.Id,
+            Label = spec.Label,
+            Summary = bullets.Count > 0 ? bullets[0] : throw new InvalidOperationException($"surface rule '{spec.MarkdownHeading}' is missing its summary bullet."),
+            BlockedSummary = bullets.Count > 1 ? bullets[1] : throw new InvalidOperationException($"surface rule '{spec.MarkdownHeading}' is missing its blocked-summary bullet.")
+        };
+    }
+
+    private static IReadOnlyDictionary<string, RetentionDomainSection> ParseRetentionDomains(string markdown)
+    {
+        var sections = new Dictionary<string, RetentionDomainSection>(StringComparer.Ordinal);
+        string? currentTop = null;
+        string? currentHeading = null;
+        string? currentList = null;
+        string? owner = null;
+        List<string> retention = [];
+        List<string> redaction = [];
+
+        foreach (var rawLine in markdown.Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (line.StartsWith("## ", StringComparison.Ordinal))
+            {
+                CommitRetentionSection();
+                currentTop = line[3..].Trim();
+                currentHeading = null;
+                currentList = null;
+                continue;
+            }
+
+            if (!string.Equals(currentTop, "Retention domains", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (line.StartsWith("### ", StringComparison.Ordinal))
+            {
+                CommitRetentionSection();
+                currentHeading = line[4..].Trim();
+                currentList = null;
+                owner = null;
+                retention = [];
+                redaction = [];
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(currentHeading))
+            {
+                continue;
+            }
+
+            if (line.StartsWith("Owner:", StringComparison.Ordinal))
+            {
+                owner = line["Owner:".Length..].Trim();
+                continue;
+            }
+
+            if (string.Equals(line, "Retention posture:", StringComparison.Ordinal))
+            {
+                currentList = "retention";
+                continue;
+            }
+
+            if (string.Equals(line, "Redaction baseline:", StringComparison.Ordinal))
+            {
+                currentList = "redaction";
+                continue;
+            }
+
+            if (line.StartsWith("* ", StringComparison.Ordinal))
+            {
+                if (string.Equals(currentList, "retention", StringComparison.Ordinal))
+                {
+                    retention.Add(line[2..].Trim());
+                }
+                else if (string.Equals(currentList, "redaction", StringComparison.Ordinal))
+                {
+                    redaction.Add(line[2..].Trim());
+                }
+            }
+        }
+
+        CommitRetentionSection();
+        return sections;
+
+        void CommitRetentionSection()
+        {
+            if (string.IsNullOrWhiteSpace(currentHeading))
+            {
+                return;
+            }
+
+            sections[currentHeading] = new RetentionDomainSection(
+                string.IsNullOrWhiteSpace(owner)
+                    ? throw new InvalidOperationException($"retention domain '{currentHeading}' is missing an owner.")
+                    : owner,
+                retention.ToArray(),
+                redaction.ToArray());
+        }
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> ParseSurfaceRules(string markdown)
+    {
+        var sections = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        string? currentTop = null;
+        string? currentHeading = null;
+        List<string> bullets = [];
+
+        foreach (var rawLine in markdown.Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (line.StartsWith("## ", StringComparison.Ordinal))
+            {
+                CommitSurfaceRule();
+                currentTop = line[3..].Trim();
+                currentHeading = null;
+                continue;
+            }
+
+            if (!string.Equals(currentTop, "Surface redaction rules", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (line.StartsWith("### ", StringComparison.Ordinal))
+            {
+                CommitSurfaceRule();
+                currentHeading = line[4..].Trim();
+                bullets = [];
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(currentHeading))
+            {
+                continue;
+            }
+
+            if (line.StartsWith("* ", StringComparison.Ordinal))
+            {
+                bullets.Add(line[2..].Trim());
+            }
+        }
+
+        CommitSurfaceRule();
+        return sections;
+
+        void CommitSurfaceRule()
+        {
+            if (string.IsNullOrWhiteSpace(currentHeading))
+            {
+                return;
+            }
+
+            sections[currentHeading] = bullets.ToArray();
+        }
+    }
+
+    private static string JoinBulletSummary(IReadOnlyList<string> bullets)
+    {
+        if (bullets.Count == 0)
+        {
+            throw new InvalidOperationException("privacy canon is missing required bullet content.");
+        }
+
+        return string.Join(" ", bullets);
+    }
 
     private static string RequireText(string? value, string description)
         => string.IsNullOrWhiteSpace(value)
             ? throw new InvalidOperationException($"{description} is missing required text.")
             : value;
+
+    private sealed record BoundaryDomainSpec(
+        string MarkdownHeading,
+        string Id,
+        string Label,
+        string PublicProjection,
+        string SignedInProjection);
+
+    private sealed record BoundarySurfaceRuleSpec(
+        string MarkdownHeading,
+        string Id,
+        string Label);
+
+    private sealed record RetentionDomainSection(
+        string Owner,
+        IReadOnlyList<string> RetentionBullets,
+        IReadOnlyList<string> RedactionBullets);
 
     private sealed record PublicPrivacyBoundaryArtifact(
         string ContractName,
