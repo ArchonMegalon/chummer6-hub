@@ -1,0 +1,41 @@
+{
+  "contract_name": "chummer6-hub.campaign_os_local_proof",
+  "generated_at": "2026-03-28T13:56:20Z",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "journeys_passed": [
+    "build_explain_publish",
+    "campaign_session_recover_recap",
+    "report_cluster_release_notify"
+  ],
+  "required_markers": {
+    "build_explain_publish": [
+      "accountModel.CampaignSpine.BuildLabHandoffs.Count >= 1",
+      "accountModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction",
+      "accountModel.CampaignSpine.BuildLabHandoffs[0].RuntimeCompatibilitySummary",
+      "accountModel.CampaignSpine.BuildLabHandoffs[0].SupportClosureSummary",
+      "campaignSpineController.GetMyBuildLabHandoff",
+      "campaignSpineController.GetMyRulesNavigatorAnswer",
+      "campaignSpineController.GetMyCreatorPublication",
+      "workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary"
+    ],
+    "campaign_session_recover_recap": [
+      "accountModel.CampaignSpine.Workspaces.Count >= 1",
+      "accountModel.CampaignSpine.Workspaces[0].ReadinessCues.Count >= 1",
+      "accountModel.CampaignSpine.Workspaces[0].RecapShelf.Count >= 1",
+      "campaignSpineController.GetMyCampaignWorkspace",
+      "campaignSpineController.GetMyRun",
+      "workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary",
+      "workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1"
+    ],
+    "report_cluster_release_notify": [
+      "accountModel!.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(item.ClosureSummary))",
+      "supportCasesController.VerifyReporterFix",
+      "SelectedSupportCaseSummary.CanVerifyFix",
+      "TrackedCaseSummary.NextSafeAction.Contains(\"Update\"",
+      "TrackedCaseSummary!.FollowUpLaneSummary.Contains(\"Account > Support\"",
+      "authenticatedHomeModel.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && item.ClosureSummary.Contains(\"closure notice\""
+    ]
+  }
+}

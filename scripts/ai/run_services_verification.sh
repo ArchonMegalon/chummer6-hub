@@ -265,3 +265,5 @@ dotnet "$OUT_DLL"
 if [[ "${CHUMMER_HUB_PLAYWRIGHT:-0}" == "1" ]]; then
   bash scripts/e2e-hub.sh
 fi
+
+python3 scripts/materialize_campaign_os_local_proof.py >/dev/null
