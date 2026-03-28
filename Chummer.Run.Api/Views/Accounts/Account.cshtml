@@ -121,6 +121,22 @@
 
         return $"{installation.Version} on {installation.Channel}";
     }
+
+    static string PlatformSummary(string? platform, string? arch)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(platform))
+        {
+            parts.Add(platform.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(arch))
+        {
+            parts.Add(arch.Trim());
+        }
+
+        return parts.Count == 0 ? "Current device" : string.Join(" · ", parts);
+    }
 }
 
 <section class="account-stage">
@@ -476,11 +492,11 @@
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
-                        <span>Recent download receipts</span>
+                        <span>Recent install handoffs</span>
                         <strong>@Model.InstallLinking.RecentReceipts.Count</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Pending claim tickets</span>
+                        <span>Waiting to finish on another device</span>
                         <strong>@Model.InstallLinking.PendingClaimTickets.Count</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -507,7 +523,7 @@
                         {
                             <div class="settings-summary-row">
                                 <span>@receipt.ArtifactLabel</span>
-                                <strong>@receipt.Version on @receipt.IssuedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                                <strong>@receipt.Version on @receipt.Channel · @receipt.IssuedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
                             </div>
                         }
                     </div>
@@ -521,7 +537,7 @@
                             {
                                 <div class="settings-summary-row">
                                     <span>@(installation.HostLabel ?? installation.HeadId ?? installation.ArtifactId)</span>
-                                    <strong>@installation.Version on @installation.Channel (@HumanizeStatus(installation.Status, "Active"))</strong>
+                                    <strong>@installation.Version on @installation.Channel · @PlatformSummary(installation.Platform, installation.Arch) · @HumanizeStatus(installation.Status, "Active")</strong>
                                 </div>
                             }
                         </div>
@@ -536,7 +552,7 @@
                             {
                                 <div class="settings-summary-row">
                                     <span>@InstallationLabelFor(Model.InstallLinking.ClaimedInstallations, grant.InstallationId)</span>
-                                    <strong>@InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, grant.InstallationId) · @HumanizeStatus(grant.Status, "Active") until @grant.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                                    <strong>Preview access on @InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, grant.InstallationId) until @grant.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
                                 </div>
                             }
                         </div>
@@ -545,8 +561,8 @@
                 @if (pendingClaims > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Technical handoff details and claim codes</summary>
-                        <p class="muted-copy">Use these codes only when you are linking an already-downloaded copy back to this account on first launch.</p>
+                        <summary>Finish on another device</summary>
+                        <p class="muted-copy">Use these codes only on the device that is opening the already-downloaded build for the first time.</p>
                         <div class="settings-summary-list">
                             @foreach (var ticket in Model.InstallLinking.PendingClaimTickets)
                             {
@@ -554,7 +570,7 @@
                                     <span>@ticket.ArtifactLabel</span>
                                     <strong>
                                         <code class="mono-receipt" id="claim-code-@ticket.ClaimCode">@ticket.ClaimCode</code>
-                                        until @ticket.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC
+                                        · use before @ticket.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC
                                         <button class="button-like button-like--ghost" type="button" data-copy-source="claim-code-@ticket.ClaimCode">Copy</button>
                                     </strong>
                                 </div>
