@@ -86,7 +86,6 @@ Read:
 * Who decides whether reality means "fix code", "fix docs", "freeze", or "replan"? -> `PRODUCT_GOVERNOR_AND_AUTOPILOT_LOOP.md`
 * What closes the loop from support reality back into canon and release posture? -> `PRODUCT_CONTROL_AND_GOVERNOR_LOOP.md` and `SUPPORT_AND_SIGNAL_OODA_LOOP.md`
 * What are the default privacy and retention rules? -> `PRIVACY_AND_RETENTION_BOUNDARIES.md`
-* What do public help, privacy, and support pages expose from that boundary? -> `PUBLIC_PRIVACY_BOUNDARIES.yaml` and `PRIVACY_AND_RETENTION_BOUNDARIES.md`
 * What do users actually do? -> `USER_JOURNEYS.md` and `journeys/`
 * What does success feel like from the user side? -> `EXPERIENCE_SUCCESS_METRICS.md`
 * What do these words mean? -> `GLOSSARY.md`
