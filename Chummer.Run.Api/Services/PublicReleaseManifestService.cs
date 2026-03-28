@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Chummer.Run.Contracts.PublicSurface;
 
 namespace Chummer.Run.Api.Services;
@@ -6,8 +7,11 @@ namespace Chummer.Run.Api.Services;
 public sealed class PublicReleaseManifestService
 {
     private const string DefaultRoot = "/downloads-source";
+    private const string DefaultLocalProofRelativePath = ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json";
     private const string RegistryCurrentUrlKey = "CHUMMER_RELEASE_REGISTRY_CURRENT_URL";
     private const string RegistryBaseUrlKey = "CHUMMER_HUB_REGISTRY_BASE_URL";
+    private const string PublicCanonRootKey = "CHUMMER_PUBLIC_CANON_ROOT";
+    private const string LocalProofFileKey = "CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE";
     private readonly IConfiguration _configuration;
     private readonly HttpClient? _httpClient;
 
@@ -31,20 +35,20 @@ public sealed class PublicReleaseManifestService
             var runtimeManifest = TryLoadRegistryReleaseManifestFromUrl(registryManifestUrl);
             if (runtimeManifest is not null)
             {
-                return runtimeManifest;
+                return ApplyLocalReleaseProofFallback(runtimeManifest);
             }
         }
 
         var registryManifestPath = ResolveRegistryManifestPath(root);
         if (File.Exists(registryManifestPath))
         {
-            return LoadRegistryReleaseManifest(registryManifestPath);
+            return ApplyLocalReleaseProofFallback(LoadRegistryReleaseManifest(registryManifestPath));
         }
 
         var manifestPath = Path.Combine(root, "releases.json");
         if (!File.Exists(manifestPath))
         {
-            return new PublicReleaseManifestDto(
+            return ApplyLocalReleaseProofFallback(new PublicReleaseManifestDto(
                 Version: "unpublished",
                 Channel: "preview",
                 PublishedAt: DateTimeOffset.UtcNow,
@@ -52,10 +56,10 @@ public sealed class PublicReleaseManifestService
                 Source: "fallback",
                 Status: "unpublished",
                 Message: "No published desktop builds are available yet.",
-                HasFallbackSource: false);
+                HasFallbackSource: false));
         }
 
-        return LoadReleaseManifest(manifestPath);
+        return ApplyLocalReleaseProofFallback(LoadReleaseManifest(manifestPath));
     }
 
     public string? ResolveDownloadFilePath(string? path)
@@ -138,10 +142,68 @@ public sealed class PublicReleaseManifestService
             ? configured
             : DefaultRoot;
 
+    private PublicReleaseManifestDto ApplyLocalReleaseProofFallback(PublicReleaseManifestDto manifest)
+    {
+        var proofPath = ResolveLocalReleaseProofPath();
+        if (string.IsNullOrWhiteSpace(proofPath) || !File.Exists(proofPath))
+        {
+            return manifest;
+        }
+
+        try
+        {
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            var parsed = JsonSerializer.Deserialize<LocalReleaseProof>(File.ReadAllText(proofPath), options);
+            if (parsed is null || !string.Equals(parsed.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal))
+            {
+                return manifest;
+            }
+
+            var proofJourneys = manifest.ProofJourneys is { Count: > 0 } ? manifest.ProofJourneys : parsed.JourneysPassed;
+            var proofRoutes = manifest.ProofRoutes is { Count: > 0 } ? manifest.ProofRoutes : parsed.ProofRoutes;
+            return manifest with
+            {
+                ProofStatus = string.IsNullOrWhiteSpace(manifest.ProofStatus) ? parsed.Status : manifest.ProofStatus,
+                ProofGeneratedAt = manifest.ProofGeneratedAt ?? parsed.GeneratedAt,
+                ProofBaseUrl = string.IsNullOrWhiteSpace(manifest.ProofBaseUrl) ? parsed.BaseUrl : manifest.ProofBaseUrl,
+                ProofJourneys = proofJourneys,
+                ProofRoutes = proofRoutes
+            };
+        }
+        catch
+        {
+            return manifest;
+        }
+    }
+
     private string ResolveRegistryManifestPath(string downloadsRoot)
         => _configuration["CHUMMER_RELEASE_REGISTRY_MANIFEST_FILE"]?.Trim() is { Length: > 0 } configured
             ? configured
             : Path.Combine(downloadsRoot, "RELEASE_CHANNEL.generated.json");
+
+    private string? ResolveLocalReleaseProofPath()
+    {
+        if (_configuration[LocalProofFileKey]?.Trim() is { Length: > 0 } configuredProofPath)
+        {
+            return configuredProofPath;
+        }
+
+        var candidates = new[]
+        {
+            _configuration[PublicCanonRootKey]?.Trim() is { Length: > 0 } canonRoot
+                ? Path.Combine(canonRoot, DefaultLocalProofRelativePath.Replace('/', Path.DirectorySeparatorChar))
+                : null,
+            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), DefaultLocalProofRelativePath.Replace('/', Path.DirectorySeparatorChar))),
+            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", DefaultLocalProofRelativePath.Replace('/', Path.DirectorySeparatorChar))),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, DefaultLocalProofRelativePath.Replace('/', Path.DirectorySeparatorChar))),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", DefaultLocalProofRelativePath.Replace('/', Path.DirectorySeparatorChar)))
+        };
+
+        return candidates.FirstOrDefault(candidate => !string.IsNullOrWhiteSpace(candidate) && File.Exists(candidate));
+    }
 
     private string? ResolveRegistryManifestUrl()
     {
@@ -321,4 +383,12 @@ public sealed class PublicReleaseManifestService
         string? Sha256,
         long? SizeBytes,
         string? InstallAccessClass);
+
+    private sealed record LocalReleaseProof(
+        [property: JsonPropertyName("contract_name")] string? ContractName,
+        [property: JsonPropertyName("status")] string? Status,
+        [property: JsonPropertyName("base_url")] string? BaseUrl,
+        [property: JsonPropertyName("generated_at")] DateTimeOffset? GeneratedAt,
+        [property: JsonPropertyName("journeys_passed")] IReadOnlyList<string>? JourneysPassed,
+        [property: JsonPropertyName("proof_routes")] IReadOnlyList<string>? ProofRoutes);
 }
