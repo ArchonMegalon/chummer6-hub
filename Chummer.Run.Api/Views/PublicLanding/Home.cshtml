@@ -24,6 +24,7 @@
     var workspaces = Model.CampaignSpine.Workspaces.Take(2).ToArray();
     var buildHandoffs = Model.CampaignSpine.BuildLabHandoffs.Take(2).ToArray();
     var rulesAnswers = Model.CampaignSpine.RulesNavigator.Take(2).ToArray();
+    var migrationReceipts = Model.CampaignSpine.MigrationReceipts.Take(1).ToArray();
     var creatorPublications = Model.CampaignSpine.CreatorPublications.Take(1).ToArray();
     var restoreDevices = Model.CampaignSpine.Restore.ClaimedDevices.Take(1).ToArray();
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
@@ -335,6 +336,14 @@
                                                                 {
                                                                     <span> Next: @handoff.ProgressionOutcomes[0].</span>
                                                                 }
+                                                                @if (!string.IsNullOrWhiteSpace(handoff.CampaignReturnSummary))
+                                                                {
+                                                                    <span> Return: @handoff.CampaignReturnSummary.</span>
+                                                                }
+                                                                @if (!string.IsNullOrWhiteSpace(handoff.SupportClosureSummary))
+                                                                {
+                                                                    <span> Support: @handoff.SupportClosureSummary.</span>
+                                                                }
                                                                 @if (handoff.Watchouts is { Count: > 0 })
                                                                 {
                                                                     <span> Watchout: @handoff.Watchouts[0]</span>
@@ -358,6 +367,10 @@
                                                                 {
                                                                     <span> Evidence: @answer.EvidenceLines[0]</span>
                                                                 }
+                                                                @if (answer.SupportReuseHints.Count > 0)
+                                                                {
+                                                                    <span> Reuse: @answer.SupportReuseHints[0]</span>
+                                                                }
                                                             </p>
                                                         </div>
                                                         <a class="inline-link" href="@($"/account/work/rules/{Uri.EscapeDataString(answer.EntryId)}")">Open grounded rule context</a>
@@ -372,6 +385,28 @@
                                                 </div>
                                                 <a class="inline-link" href="/account/support">Open support</a>
                                             </article>
+                                            @if (migrationReceipts.Length > 0)
+                                            {
+                                                var migration = migrationReceipts[0];
+                                                var leadField = migration.Fields.FirstOrDefault();
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Migration continuity</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@migration.Summary</h3>
+                                                        <p>
+                                                            @if (leadField is null)
+                                                            {
+                                                                <span>Legacy import stayed attached to the same campaign continuity lane.</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span>@leadField.Label: @leadField.Summary</span>
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account/work">Open migration continuity</a>
+                                                </article>
+                                            }
                                             @if (creatorPublications.Length > 0)
                                             {
                                                 var publication = creatorPublications[0];
