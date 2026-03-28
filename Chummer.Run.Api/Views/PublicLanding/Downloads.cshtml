@@ -15,14 +15,14 @@
         <p class="page-copy">
             @(platformShelfNotice
                 ? "This device platform is not on the current public shelf. Read the current platform note before treating the preview as installable on this machine."
-                : "Start with the recommended installer for this device. Release notes, known issues, and advanced packages stay underneath so the first decision stays simple.")
+                : "Start with the recommended installer for this device. Release details and advanced packages stay underneath so the first decision stays simple.")
         </p>
         <p class="release-stage__note">
             @(platformShelfNotice
                 ? release.PlatformShelfNoticeSummary
                 : guestGateRequired
                 ? release.GuestGateSummary
-                : "Start with the recommended installer for this platform. Everything else stays collapsed underneath unless you know you need it.")
+                : "Use the recommended installer first. Everything else stays collapsed underneath unless you know you need it.")
         </p>
         @if (platformShelfNotice)
         {
@@ -53,7 +53,7 @@ else
             <div class="recommended-download__copy">
                 <span class="tag">@(guestGateRequired ? release.GuestGateHeading : "Recommended")</span>
                 <h2>@release.Recommended.Title</h2>
-                <p>@release.Recommended.SupportLine</p>
+                <p>Use the recommended installer first. Release detail, alternate packages, and manual paths stay collapsed underneath.</p>
                 <p class="muted-copy">@release.Display.ChannelLabel · @release.Display.BuildLabel · @release.Display.PublishedLabel</p>
                 <div class="recommended-download__meta">
                     <span>@release.Recommended.PlatformLabel</span>
@@ -96,6 +96,10 @@ else
                                 <strong>@Model.Manifest.SupportabilitySummary</strong>
                             </div>
                         }
+                        <div class="settings-summary-row">
+                            <span>Install path</span>
+                            <strong>@release.Recommended.SupportLine</strong>
+                        </div>
                         @if (!string.IsNullOrWhiteSpace(Model.Manifest.FixAvailabilitySummary))
                         {
                             <div class="settings-summary-row">
