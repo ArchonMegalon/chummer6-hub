@@ -1,4 +1,5 @@
 using Chummer.Campaign.Contracts;
+using Chummer.Run.Api.Contracts;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
@@ -15,17 +16,20 @@ public sealed class CampaignSpineController : ControllerBase
     private readonly AccountService _accounts;
     private readonly InstallLinkingService _installLinking;
     private readonly CampaignSpineService _campaignSpine;
+    private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
 
     public CampaignSpineController(
         HubIdentityClient identity,
         AccountService accounts,
         InstallLinkingService installLinking,
-        CampaignSpineService campaignSpine)
+        CampaignSpineService campaignSpine,
+        CampaignWorkspaceServerPlaneService workspaceServerPlane)
     {
         _identity = identity;
         _accounts = accounts;
         _installLinking = installLinking;
         _campaignSpine = campaignSpine;
+        _workspaceServerPlane = workspaceServerPlane;
     }
 
     [HttpGet("me")]
@@ -91,6 +95,25 @@ public sealed class CampaignSpineController : ControllerBase
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             return Ok(_campaignSpine.GetWorkspaceDigests(user, installLinking));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/workspaces/{workspaceId}/server-plane")]
+    [ProducesResponseType<CampaignWorkspaceServerPlaneProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CampaignWorkspaceServerPlaneProjection>> GetMyCampaignWorkspaceServerPlane([FromRoute] string workspaceId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var serverPlane = _workspaceServerPlane.GetWorkspaceServerPlane(user, workspaceId, installLinking);
+            return serverPlane is null ? NotFound() : Ok(serverPlane);
         }
         catch (HubRequestAuthException ex)
         {

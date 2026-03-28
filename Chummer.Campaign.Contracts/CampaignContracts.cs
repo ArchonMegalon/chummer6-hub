@@ -199,6 +199,73 @@ public sealed record CampaignWorkspaceDigestProjection(
     IReadOnlyList<string> Watchouts,
     DateTimeOffset UpdatedAtUtc);
 
+public sealed record WorkspaceSummary(
+    string WorkspaceId,
+    string CampaignId,
+    string CampaignName,
+    string Visibility,
+    string ReturnSummary,
+    string DeviceRoleSummary,
+    string SupportClosureSummary,
+    string? ActiveSceneSummary,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record CampaignWorkspaceSummary(
+    string WorkspaceId,
+    string CampaignId,
+    string CampaignName,
+    string RuleEnvironmentSummary,
+    string SessionReadinessSummary,
+    string RestoreSummary,
+    string PublicationSummary,
+    string NextSafeAction,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record RosterReadinessSummary(
+    string Summary,
+    int ReadyDossierCount,
+    int NeedsAttentionCount,
+    int CrewCount,
+    int RunCount,
+    IReadOnlyList<string> Highlights);
+
+public sealed record DossierFreshnessCue(
+    string DossierId,
+    string RunnerHandle,
+    string Status,
+    string Severity,
+    string Summary);
+
+public sealed record RuleEnvironmentHealthCue(
+    string EnvironmentId,
+    string Severity,
+    string Title,
+    string Summary);
+
+public sealed record RunboardSummary(
+    string RunId,
+    string Title,
+    string Status,
+    string? ActiveSceneId,
+    string? ActiveSceneSummary,
+    string ObjectiveSummary,
+    IReadOnlyList<string> Blockers,
+    string ReturnSummary);
+
+public sealed record ContinuityConflictCue(
+    string CueId,
+    string Severity,
+    string Summary,
+    string ResolutionAction);
+
+public sealed record RecapShelfEntry(
+    string EntryId,
+    string Kind,
+    string Label,
+    string Summary,
+    string? ArtifactId,
+    DateTimeOffset UpdatedAtUtc);
+
 public sealed record RestoreArtifactProjection(
     string ArtifactId,
     string Label,

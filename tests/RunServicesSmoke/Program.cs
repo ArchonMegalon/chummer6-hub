@@ -27,6 +27,7 @@ using Chummer.Play.Contracts.Spider;
 using Chummer.Run.Contracts.AI.Newspaper;
 using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Api.Contracts;
 using Chummer.Run.Contracts.Entitlements;
 using Chummer.Run.Contracts.Identity;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
@@ -1793,7 +1794,8 @@ async Task VerifyPublicLandingProjectionAsync()
         linkedIdentityClient,
         accounts,
         installLinking,
-        campaignSpine)
+        campaignSpine,
+        new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation))
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2129,6 +2131,16 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(leadWorkspaceDigest.ReadinessHighlights.Count >= 1, "campaign spine workspace digests should preserve readiness highlights.");
     Assert(!string.IsNullOrWhiteSpace(leadWorkspaceDigest.SupportClosureSummary), "campaign spine workspace digests should preserve support-closure truth.");
     Assert(!string.IsNullOrWhiteSpace(leadWorkspaceDigest.RuleEnvironmentSummary), "campaign spine workspace digests should preserve rule-environment truth.");
+    var workspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
+    var workspaceServerPlanePayload = (workspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? workspaceServerPlaneResult.Value;
+    Assert(workspaceServerPlanePayload is not null && string.Equals(workspaceServerPlanePayload.Workspace.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine server plane api should expose the same stable workspace id.");
+    Assert(workspaceServerPlanePayload!.RosterReadiness.Highlights.Count >= 1, "campaign spine server plane api should expose roster readiness highlights.");
+    Assert(workspaceServerPlanePayload.DossierFreshness.Count >= 1, "campaign spine server plane api should expose dossier freshness cues.");
+    Assert(workspaceServerPlanePayload.RuleEnvironmentHealth.Count >= 1, "campaign spine server plane api should expose rule-environment health cues.");
+    Assert(workspaceServerPlanePayload.ChangePackets.Count >= 1, "campaign spine server plane api should preserve workspace change packets.");
+    Assert(workspaceServerPlanePayload.SupportClosures.Count >= 1, "campaign spine server plane api should expose install-aware support closure cues.");
+    Assert(workspaceServerPlanePayload.DecisionNotices.Count >= 1, "campaign spine server plane api should expose bounded follow-through notices.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.NextSafeAction.Summary), "campaign spine server plane api should expose one bounded next safe action.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
@@ -2144,6 +2156,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicationPayload is not null && string.Equals(publicationPayload.PublicationId, publicationId, StringComparison.Ordinal), "campaign spine api should expose creator-publication posture from the same campaign truth.");
     var missingWorkspaceResult = await campaignSpineController.GetMyCampaignWorkspace("workspace-missing", CancellationToken.None);
     Assert(missingWorkspaceResult.Result is NotFoundResult, "campaign spine workspace api should return 404 when the signed-in workspace does not exist.");
+    var missingWorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane("workspace-missing", CancellationToken.None);
+    Assert(missingWorkspaceServerPlaneResult.Result is NotFoundResult, "campaign spine server plane api should return 404 when the signed-in workspace does not exist.");
     var accountSupportPage = await accountController.AccountPage(section: "support", caseId: null, CancellationToken.None) as ViewResult;
     var accountSupportModel = accountSupportPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountSupportModel?.CurrentSection, "support", StringComparison.Ordinal), "account support route should render the support section.");
