@@ -517,7 +517,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var supportAttachments = new SupportAttachmentStorageService(configuration);
     var installLinking = new InstallLinkingService(installLinkingStore);
     var supportCases = new SupportCaseService(supportStore, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
-    var campaignSpine = new CampaignSpineService(store);
+    var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration));
     var accounts = new AccountService(store);
     var groups = new GroupService(store, accounts);
     var rewards = new RewardService(store);
@@ -1697,7 +1697,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!roadmapDetailSource.Contains("Audience impact", StringComparison.Ordinal), "roadmap detail should not repeat audience copy once the fact rail already states who should follow it.");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
-    var campaignSpine = new CampaignSpineService(store);
+    var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration));
     var accounts = new AccountService(store);
     var identityLinks = new IdentityLinkService(store, accounts);
     var experience = new UserExperienceService(store, accounts);

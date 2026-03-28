@@ -4,6 +4,8 @@ Purpose: keep the hosted share of `F1` explicit and runnable.
 
 This runbook is the operator-facing proof path for session-ledger restore, registry/runtime-bundle restore, and replay-safe counter continuity in the hosted runtime after contract and owner-repo extraction.
 
+For hub-owned workspace continuity retention and cleanup, use `HOSTED_WORKSPACE_RETENTION_RUNBOOK.md`.
+
 ## Scope
 
 This drill covers:
