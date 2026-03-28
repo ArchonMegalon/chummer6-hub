@@ -185,6 +185,20 @@ public sealed record CampaignWorkspaceProjection(
     string? NextSafeAction = null,
     IReadOnlyList<WorkspaceChangePacketProjection>? ChangePackets = null);
 
+public sealed record CampaignWorkspaceDigestProjection(
+    string WorkspaceId,
+    string CampaignId,
+    string CampaignName,
+    string ReturnSummary,
+    string RuleEnvironmentSummary,
+    string DeviceRoleSummary,
+    string SupportClosureSummary,
+    string? ActiveSceneSummary,
+    string NextSafeAction,
+    IReadOnlyList<string> ReadinessHighlights,
+    IReadOnlyList<string> Watchouts,
+    DateTimeOffset UpdatedAtUtc);
+
 public sealed record RestoreArtifactProjection(
     string ArtifactId,
     string Label,

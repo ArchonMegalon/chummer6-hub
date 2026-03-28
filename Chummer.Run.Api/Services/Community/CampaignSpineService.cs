@@ -116,6 +116,17 @@ public sealed class CampaignSpineService
             .FirstOrDefault(item => string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase));
     }
 
+    public IReadOnlyList<CampaignWorkspaceDigestProjection> GetWorkspaceDigests(HubUserDto user, InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
+        return summary.Workspaces
+            .Select(workspace => BuildWorkspaceDigest(summary, workspace))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+    }
+
     public RunProjection? GetRun(HubUserDto user, string runId, InstallLinkingSummaryDto? installLinking = null)
     {
         ArgumentNullException.ThrowIfNull(user);
@@ -150,6 +161,82 @@ public sealed class CampaignSpineService
 
         return GetAccountSummary(user, installLinking).CreatorPublications
             .FirstOrDefault(item => string.Equals(item.PublicationId, publicationId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static CampaignWorkspaceDigestProjection BuildWorkspaceDigest(
+        AccountCampaignSummary summary,
+        CampaignWorkspaceProjection workspace)
+    {
+        BuildLabHandoffProjection? leadHandoff = summary.BuildLabHandoffs
+            .Where(handoff => string.Equals(handoff.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static handoff => handoff.UpdatedAtUtc)
+            .FirstOrDefault();
+        RulesNavigatorAnswerProjection? leadRulesAnswer = summary.RulesNavigator.FirstOrDefault();
+
+        string ruleEnvironmentSummary = $"{workspace.RuleEnvironment.OwnerScope} · {workspace.RuleEnvironment.ApprovalState} · {workspace.RuleEnvironment.CompatibilityFingerprint}";
+        string deviceRoleSummary = summary.Restore.ClaimedDevices.Count == 0
+            ? "No claimed device role is attached yet."
+            : string.Join(
+                "; ",
+                summary.Restore.ClaimedDevices
+                    .Take(2)
+                    .Select(static item => $"{item.DeviceRole} on {item.Platform}/{item.HeadId} ({item.Channel})"));
+        string supportClosureSummary = !string.IsNullOrWhiteSpace(leadHandoff?.SupportClosureSummary)
+            ? leadHandoff.SupportClosureSummary!
+            : leadRulesAnswer?.SupportReuseHints.FirstOrDefault(static hint => !string.IsNullOrWhiteSpace(hint))
+              ?? "Support closure stays aligned with the claimed install, current channel, and the workspace you reopen here.";
+
+        List<string> readinessHighlights = [];
+        readinessHighlights.AddRange(
+            workspace.ReadinessCues
+                .Take(3)
+                .Select(static cue => $"{cue.Title} — {cue.Summary}"));
+        readinessHighlights.AddRange(
+            workspace.ChangePackets?
+                .Take(2)
+                .Select(static packet => $"{packet.Label} — {packet.Summary}")
+            ?? []);
+        if (!string.IsNullOrWhiteSpace(leadHandoff?.CampaignReturnSummary))
+        {
+            readinessHighlights.Add($"Build handoff — {leadHandoff.CampaignReturnSummary}");
+        }
+
+        List<string> watchouts = [];
+        watchouts.AddRange(
+            workspace.ReadinessCues
+                .Where(static cue => NeedsAttention(cue.Severity))
+                .Select(static cue => $"{cue.Title}: {cue.Summary}"));
+        watchouts.AddRange(summary.Restore.ConflictSummaries);
+        watchouts.AddRange(summary.Restore.LocalOnlyNotes);
+        if (leadHandoff?.Watchouts is not null)
+        {
+            watchouts.AddRange(leadHandoff.Watchouts);
+        }
+
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                workspace.LatestContinuity?.CapturedAtUtc,
+                leadHandoff?.UpdatedAtUtc,
+                summary.Restore.GeneratedAtUtc
+            }
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(summary.Restore.GeneratedAtUtc)
+            .Max();
+
+        return new CampaignWorkspaceDigestProjection(
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            CampaignName: workspace.CampaignName,
+            ReturnSummary: workspace.ReturnSummary,
+            RuleEnvironmentSummary: ruleEnvironmentSummary,
+            DeviceRoleSummary: deviceRoleSummary,
+            SupportClosureSummary: supportClosureSummary,
+            ActiveSceneSummary: workspace.ActiveSceneSummary,
+            NextSafeAction: workspace.NextSafeAction ?? "Reopen the current campaign workspace before creating another local-only fork.",
+            ReadinessHighlights: FinalizeLines(readinessHighlights),
+            Watchouts: FinalizeLines(watchouts),
+            UpdatedAtUtc: updatedAtUtc);
     }
 
     private bool EnsureSeedDataLocked(HubUserDto user, InstallLinkingSummaryDto? installLinking)
@@ -710,6 +797,13 @@ public sealed class CampaignSpineService
             || string.Equals(role, "manager", StringComparison.OrdinalIgnoreCase)
             || string.Equals(role, "gm", StringComparison.OrdinalIgnoreCase);
 
+    private static bool NeedsAttention(string? severity)
+        => !string.IsNullOrWhiteSpace(severity)
+           && !severity.Equals("healthy", StringComparison.OrdinalIgnoreCase)
+           && !severity.Equals("info", StringComparison.OrdinalIgnoreCase)
+           && !severity.Equals("ok", StringComparison.OrdinalIgnoreCase)
+           && !severity.Equals("ready", StringComparison.OrdinalIgnoreCase);
+
     private static string ResolveOperatorRole(GroupDto group, string userId)
         => group.Memberships
                .Where(member => string.Equals(member.UserId, userId, StringComparison.OrdinalIgnoreCase))
@@ -735,6 +829,14 @@ public sealed class CampaignSpineService
             ? visibilities[0]
             : string.Join(" + ", visibilities);
     }
+
+    private static IReadOnlyList<string> FinalizeLines(IEnumerable<string> lines)
+        => lines
+            .Where(static line => !string.IsNullOrWhiteSpace(line))
+            .Select(static line => line.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToArray();
 
     private static int OperatorRolePriority(string? role)
         => role?.Trim().ToLowerInvariant() switch

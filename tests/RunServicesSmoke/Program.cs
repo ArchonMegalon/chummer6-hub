@@ -2061,6 +2061,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(workspacePayload?.ActiveSceneSummary), "campaign spine workspace api should expose an active-scene summary.");
     Assert(!string.IsNullOrWhiteSpace(workspacePayload?.NextSafeAction), "campaign spine workspace api should expose a next safe action.");
     Assert(workspacePayload?.ChangePackets?.Count >= 1, "campaign spine workspace api should expose recent change packets.");
+    var workspaceDigestsResult = await campaignSpineController.GetMyCampaignWorkspaceDigests(CancellationToken.None);
+    var workspaceDigestsPayload = (workspaceDigestsResult.Result as OkObjectResult)?.Value as IReadOnlyList<CampaignWorkspaceDigestProjection> ?? workspaceDigestsResult.Value;
+    Assert(workspaceDigestsPayload is not null && workspaceDigestsPayload.Count >= 1, "campaign spine api should expose workspace digests for calmer client follow-through.");
+    Assert(workspaceDigestsPayload!.Any(item => string.Equals(item.WorkspaceId, workspaceId, StringComparison.Ordinal)), "campaign spine workspace digests should include the signed-in lead workspace.");
+    Assert(workspaceDigestsPayload[0].ReadinessHighlights.Count >= 1, "campaign spine workspace digests should preserve readiness highlights.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceDigestsPayload[0].SupportClosureSummary), "campaign spine workspace digests should preserve support-closure truth.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceDigestsPayload[0].RuleEnvironmentSummary), "campaign spine workspace digests should preserve rule-environment truth.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
