@@ -15,9 +15,10 @@ public sealed class PublicPrivacyBoundaryServiceTests
 
         var panel = fixture.CreateService().BuildPanel("privacy");
 
-        Assert.Equal("Support, survey, and assistant data stay on a bounded clock", panel.Heading);
+        Assert.Equal("Support, install, survey, and provider-backed help stay on a bounded clock", panel.Heading);
         Assert.Equal("/help", panel.PrimaryAction.Href);
         Assert.Contains(panel.Domains, static item => string.Equals(item.Label, "Provider-backed help", StringComparison.Ordinal) && item.RetentionSummary.Contains("30 days", StringComparison.Ordinal));
+        Assert.Contains(panel.Domains, static item => string.Equals(item.Label, "Install linkage", StringComparison.Ordinal) && item.RetentionSummary.Contains("365 days", StringComparison.Ordinal));
         Assert.Contains(panel.SurfaceRules, static item => string.Equals(item.Label, "Public surfaces", StringComparison.Ordinal));
     }
 
@@ -67,60 +68,96 @@ public sealed class PublicPrivacyBoundaryServiceTests
             string productRoot = Path.Combine(_canonRoot, ".codex-design", "product");
             Directory.CreateDirectory(productRoot);
             File.WriteAllText(
-                Path.Combine(productRoot, "PUBLIC_PRIVACY_BOUNDARIES.yaml"),
+                Path.Combine(productRoot, "PRIVACY_AND_RETENTION_BOUNDARIES.md"),
+                """
+# Privacy and retention boundaries
+
+## Retention domains
+
+### Support-case truth
+
+Owner: `chummer6-hub`
+
+Retention posture:
+
+* case timeline and user-visible status events: retain for 18 months after the last state change
+
+Redaction baseline:
+
+* remove secrets, local paths, and unrelated identity data from user-visible case history
+
+### Claim and install linkage
+
+Owner: `chummer6-hub` plus `chummer6-hub-registry`
+
+Retention posture:
+
+* claim tickets and install-link events: retain for 365 days after last install activity
+
+Redaction baseline:
+
+* keep person, install, device-role, and campaign scopes explicit instead of flattening them into a single sync blob
+
+### Survey and follow-up results
+
+Owner: `chummer6-hub`
+
+Retention posture:
+
+* post-fix follow-up invites and answer summaries: retain for 365 days
+* raw free-text survey payloads: summarize or redact within 180 days unless still tied to an open product-governor packet
+
+Redaction baseline:
+
+* keep survey truth out of public guide copy until synthesized into canon
+
+### Provider traces and assistant grounding packs
+
+Owner: `executive-assistant` plus the owning product surface
+
+Retention posture:
+
+* raw provider request/response traces: retain for 30 days unless a narrower provider contract says less
+* lane-level scorecards, challenger briefs, and grounding-pack summaries: retain for 180 days
+
+Redaction baseline:
+
+* grounding packs should prefer case IDs, release IDs, and rule receipt IDs over raw user text where possible
+
+## Surface redaction rules
+
+### Public surfaces
+
+* may expose support status, known issues, release posture, compatibility, provenance, and channel-aware fix availability
+* may not expose private case notes, raw crash envelopes, provider traces, or account-internal survey payloads
+
+### Signed-in user surfaces
+
+* may expose case timeline, install posture, claimed-device state, and the user-safe slice of crash/support data
+* may not expose unrelated reporter data, operator-only packet deliberation, or private moderation notes
+
+### Provider-backed assistant surfaces
+
+* must ground answers in curated canonical sources, registry truth, or support-case truth
+* must not become the system of record for support or release state
+""");
+            File.WriteAllText(
+                Path.Combine(productRoot, "PUBLIC_TRUST_CONTENT.yaml"),
                 """
 product: chummer
-surface: public_privacy_boundaries
+surface: chummer.run
 version: 1
-contract_name: chummer.public_privacy_boundaries
-as_of: 2026-03-28
-eyebrow: Privacy boundary
-heading: Support, survey, and assistant data stay on a bounded clock
-summary: Chummer keeps support, install, survey, and provider-backed help surfaces on explicit retention windows and redaction rules instead of stockpiling raw payloads.
-micro_proof:
-  - Public routes show status and provenance, not private notes or provider transcripts.
-domains:
-  - id: support_case_truth
-    label: Support cases
-    owner: chummer6-hub
-    retention_summary: 18 months plus 90 day attachment cleanup.
-    redaction_summary: Remove secrets and unrelated identity data.
-    public_projection: Public routes may show known issues and fix availability.
-    signed_in_projection: Signed-in routes may show the reporter-safe timeline.
-  - id: claim_install_linkage
-    label: Install linkage
-    owner: chummer6-hub + chummer6-hub-registry
-    retention_summary: 365 days after the last activity.
-    redaction_summary: Keep install scope explicit.
-    public_projection: Public routes may show release and install posture.
-    signed_in_projection: Signed-in routes may show claimed-install state.
-  - id: survey_follow_up
-    label: Survey follow-up
-    owner: chummer6-hub
-    retention_summary: 365 days with 180 day raw text cleanup.
-    redaction_summary: Keep survey truth out of public guide copy until synthesized.
-    public_projection: Public routes may summarize learned product changes.
-    signed_in_projection: Signed-in routes may show that follow-up happened.
-  - id: provider_traces
-    label: Provider-backed help
-    owner: executive-assistant + owning surface
-    retention_summary: 30 days for raw traces and 180 days for grounded summaries.
-    redaction_summary: Prefer case IDs and release IDs over raw user text.
-    public_projection: Public help may show grounded answers and cited truth.
-    signed_in_projection: Signed-in help may show the curated answer path.
-surface_rules:
-  - id: public_surfaces
-    label: Public surfaces
-    summary: Public routes may show support status and provenance.
-    blocked_summary: No private case notes or provider traces.
-  - id: signed_in_user_surfaces
-    label: Signed-in user surfaces
-    summary: Signed-in routes may show case timeline and install posture.
-    blocked_summary: No unrelated reporter data or operator-only deliberation.
-  - id: provider_backed_assistant_surfaces
-    label: Provider-backed help
-    summary: Provider-backed help must stay grounded in curated truth.
-    blocked_summary: It may not become the system of record for support or release state.
+trust_pages:
+  - id: privacy
+    eyebrow: "Privacy"
+    heading: "What Chummer stores, and what it does not"
+    intro: "This is the practical hosted-product posture right now."
+    effective_date: "2026-03-25"
+    updated_date: "2026-03-28"
+    summary_points:
+      - "The installer stays the same for everyone"
+      - "Hub stores account and support state"
+      - "Provider secrets stay out of Hub"
 """);
 
             File.WriteAllText(
