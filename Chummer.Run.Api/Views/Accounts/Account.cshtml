@@ -13,7 +13,7 @@
     {
         "support" => "Support",
         "access" => "Devices & access",
-        "work" => "Work and continuity",
+        "work" => "Work",
         "settings" => "Settings",
         "advanced" => "Advanced account details",
         _ => "Account"
@@ -544,7 +544,7 @@
                         <strong>@activeAccessRights</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Roaming restore packet</span>
+                        <span>Cross-device recovery</span>
                         <strong>@(restoreArtifactCount == 0 && restoreEntitlementCount == 0 ? "Ready to seed" : $"{restoreArtifactCount} artifacts · {restoreEntitlementCount} entitlements")</strong>
                     </div>
                 </div>
@@ -687,7 +687,7 @@
                         </details>
                     }
                     <details class="details-drawer">
-                        <summary>Install-local guardrails</summary>
+                        <summary>What stays on this device</summary>
                         <ul class="muted-copy">
                             @foreach (var note in Model.CampaignSpine.Restore.LocalOnlyNotes)
                             {
@@ -741,7 +741,7 @@
                         <strong>@(runCount == 0 ? "Quiet" : runCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Recap shelf items</span>
+                        <span>Recent recaps</span>
                         <strong>@(recapProjectionCount == 0 ? "None yet" : recapProjectionCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -749,7 +749,7 @@
                         <strong>@(restoreConflicts == 0 ? "None" : restoreConflicts.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Support blockers</span>
+                        <span>Open support cases</span>
                         <strong>@(openSupportCases == 0 ? "None" : openSupportCases.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -817,7 +817,7 @@
                             }
                             @if (selectedWorkspace.RecapShelf.Count > 0)
                             {
-                                <p><strong>Recap shelf:</strong> @selectedWorkspace.RecapShelf[0].Summary</p>
+                                <p><strong>Recent recap:</strong> @selectedWorkspace.RecapShelf[0].Summary</p>
                             }
                             @if (selectedWorkspace.ChangePackets is { Count: > 0 })
                             {
@@ -926,7 +926,7 @@
                 else if (selectedCreatorPublication is not null)
                 {
                     <article class="app-action-card app-action-card--primary" id="publication-@selectedCreatorPublication.PublicationId">
-                        <span class="tag">Publication follow-through</span>
+                        <span class="tag">Publication status</span>
                         <h3>@selectedCreatorPublication.Title</h3>
                         <p>@selectedCreatorPublication.Summary</p>
                         <div class="settings-summary-list">
@@ -981,7 +981,7 @@
                                     <strong>@(workspace.NextSafeAction ?? "Open the shared campaign view and confirm the current return lane before you continue.")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Recap shelf</span>
+                                    <span>Recent recap</span>
                                     <strong>@(workspace.RecapShelf.Count == 0 ? "Pending" : $"{workspace.RecapShelf.Count} ready")</strong>
                                 </div>
                             </div>
@@ -1085,7 +1085,7 @@
                 @if (Model.CampaignSpine.Restore.ConflictSummaries.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Restore and continuity notes</summary>
+                        <summary>Recovery notes</summary>
                         <ul class="muted-copy">
                             @foreach (var note in Model.CampaignSpine.Restore.ConflictSummaries)
                             {
@@ -1151,7 +1151,7 @@
                                 <li>
                                     <strong><a class="inline-link" href="@RulesDetailHref(answer.EntryId)">@answer.Question</a></strong>: @answer.ShortAnswer
                                     <span> Before: @answer.BeforeSummary. After: @answer.AfterSummary.</span>
-                                    <span> Provenance: @answer.ProvenanceLabel.</span>
+                                    <span> Source: @answer.ProvenanceLabel.</span>
                                     @if (answer.EvidenceLines.Count > 0)
                                     {
                                         <span> Evidence: @answer.EvidenceLines[0].</span>
@@ -1189,7 +1189,7 @@
                             {
                                 <li>
                                     <strong><a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">@publication.Title</a></strong>: @publication.Summary
-                                    <span> Provenance: @publication.ProvenanceSummary. Discovery: @publication.DiscoverySummary.</span>
+                                    <span> Source: @publication.ProvenanceSummary. Discovery: @publication.DiscoverySummary.</span>
                                 </li>
                             }
                         </ul>

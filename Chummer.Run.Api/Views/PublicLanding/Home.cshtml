@@ -45,14 +45,14 @@
     var heading = Model.CurrentSection switch
     {
         "access" => "Access and return",
-        "work" => "Work and continuity",
+        "work" => "Work",
         "setup" => "Finish setup",
         _ => $"Welcome back, {Model.User.DisplayName}"
     };
     var summary = Model.CurrentSection switch
     {
         "access" => "Keep install return, release posture, and support follow-up in one calmer route instead of searching the whole account surface.",
-        "work" => "Pick up dossiers, campaign continuity, and the next useful route without turning Home into a full workspace.",
+        "work" => "Pick up dossiers, active runs, and the next useful route without turning Home into a full workspace.",
         "setup" => "Finish the short setup flow first, then come back to access and work with a steadier account.",
         _ => "Pick up where you left off: finish the basics, install the current preview, and keep track of what is opening next."
     };
@@ -222,8 +222,8 @@
                                     <div class="home-stream__lead">
                                         <p class="eyebrow">Work</p>
                                         <h2 class="home-stream__title">Pick up where you actually left off</h2>
-                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible with GM-ready context and clear next routes without turning Home into a full workspace.</p>
-                                        <p class="muted-copy">Shared campaign view, Rule environments, and GM readiness cues stay visible here before you drop into the deeper account work surface.</p>
+                                        <p class="home-stream__summary">Dossiers, runs, and shared return context stay visible with GM-ready cues and clear next routes without turning Home into a full workspace.</p>
+                                        <p class="muted-copy">Shared campaign view, grounded rule answers, and GM-ready cues stay visible here before you open the deeper account work route.</p>
                                     </div>
                                     <div class="app-rail">
                                         @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0 && workspaces.Length == 0)
@@ -256,7 +256,7 @@
                                                     <span class="tag">Campaign</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@campaign.Name</h3>
-                                                        <p>@(campaign.LatestContinuity?.Summary ?? "Campaign continuity is live.")</p>
+                                                        <p>@(campaign.LatestContinuity?.Summary ?? "Campaign return is live.")</p>
                                                     </div>
                                                     <a class="inline-link" href="/account/work">Open campaign return</a>
                                                 </article>
@@ -298,11 +298,11 @@
                                                             }
                                                             else if (workspace.RecapShelf.Count > 0)
                                                             {
-                                                                <span> Recap shelf: @workspace.RecapShelf[0].Summary</span>
+                                                                <span> Recent recap: @workspace.RecapShelf[0].Summary</span>
                                                             }
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}")">Open campaign workspace</a>
+                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}")">Open shared campaign view</a>
                                                 </article>
                                             }
                                         }
@@ -314,7 +314,7 @@
                                         <summary>Build, explain, and next step</summary>
                                         <div class="home-stream__lead">
                                             <p class="eyebrow">Next</p>
-                                            <h2 class="home-stream__title">Build, explain, and move forward without losing continuity</h2>
+                                            <h2 class="home-stream__title">Build, explain, and move forward without losing your place</h2>
                                             <p class="home-stream__summary">Build paths and grounded rule answers stay next to your return path so you can see what to inspect before reopening a dossier, session, or support thread.</p>
                                         </div>
                                         <div class="app-rail">
@@ -374,14 +374,14 @@
                                                             <h3>@answer.Question</h3>
                                                             <p>
                                                                 @answer.ShortAnswer
-                                                                <span> Provenance: @answer.ProvenanceLabel.</span>
+                                                                <span> Source: @answer.ProvenanceLabel.</span>
                                                                 @if (answer.EvidenceLines.Count > 0)
                                                                 {
                                                                     <span> Evidence: @answer.EvidenceLines[0]</span>
                                                                 }
                                                                 @if (answer.SupportReuseHints.Count > 0)
                                                                 {
-                                                                    <span> Reuse: @answer.SupportReuseHints[0]</span>
+                                                                    <span> Support note: @answer.SupportReuseHints[0]</span>
                                                                 }
                                                             </p>
                                                         </div>
@@ -402,13 +402,13 @@
                                                 var migration = migrationReceipts[0];
                                                 var leadField = migration.Fields.FirstOrDefault();
                                                 <article class="app-rail__item">
-                                                    <span class="tag">Migration continuity</span>
+                                                    <span class="tag">Migration return</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@migration.Summary</h3>
                                                         <p>
                                                             @if (leadField is null)
                                                             {
-                                                                <span>Legacy import stayed attached to the same campaign continuity lane.</span>
+                                                                <span>Legacy import stayed attached to the same account return path.</span>
                                                             }
                                                             else
                                                             {
@@ -416,31 +416,31 @@
                                                             }
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="/account/work">Open migration continuity</a>
+                                                    <a class="inline-link" href="/account/work">Open migration return</a>
                                                 </article>
                                             }
                                             @if (creatorPublications.Length > 0)
                                             {
                                                 var publication = creatorPublications[0];
                                                 <article class="app-rail__item">
-                                                    <span class="tag">Publication follow-through</span>
+                                                    <span class="tag">Publication status</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@publication.Title</h3>
                                                         <p>@publication.Summary <span>Trust: @publication.ProvenanceSummary.</span></p>
                                                     </div>
-                                                    <a class="inline-link" href="@($"/account/work/publications/{Uri.EscapeDataString(publication.PublicationId)}")">Open publication follow-through</a>
+                                                    <a class="inline-link" href="@($"/account/work/publications/{Uri.EscapeDataString(publication.PublicationId)}")">Open publication status</a>
                                                 </article>
                                             }
                                             @if (restoreDevices.Length > 0)
                                             {
                                                 var device = restoreDevices[0];
                                                 <article class="app-rail__item">
-                                                    <span class="tag">Return packet</span>
+                                                    <span class="tag">Device return</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@device.HostLabel</h3>
                                                         <p>@device.RestoreSummary <span>Role: @device.DeviceRole on @device.Platform.</span></p>
                                                     </div>
-                                                    <a class="inline-link" href="/account/access">Open return packet</a>
+                                                    <a class="inline-link" href="/account/access">Open device return</a>
                                                 </article>
                                             }
                                         </div>
