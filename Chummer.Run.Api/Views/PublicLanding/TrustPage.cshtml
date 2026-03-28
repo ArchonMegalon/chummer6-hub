@@ -167,21 +167,21 @@ else
                     <select id="supportKind" name="kind" required>
                         @foreach (var option in Model.SupportIntake.Options)
                         {
-                            <option value="@option.Value">@option.Label</option>
+                            <option value="@option.Value" selected="@(string.Equals(Model.SupportIntake.DefaultKind, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
                         }
                     </select>
                 </div>
                 <div class="field">
                     <label for="supportTitle">Short title</label>
-                    <input id="supportTitle" name="title" maxlength="160" placeholder="Installer linked, but first launch did not explain the next step" required />
+                    <input id="supportTitle" name="title" maxlength="160" placeholder="Installer linked, but first launch did not explain the next step" value="@Model.SupportIntake.DefaultTitle" required />
                 </div>
                 <div class="field">
                     <label for="supportSummary">One-line summary</label>
-                    <input id="supportSummary" name="summary" maxlength="280" placeholder="The Linux preview installed successfully, but the post-install guidance was unclear." required />
+                    <input id="supportSummary" name="summary" maxlength="280" placeholder="The Linux preview installed successfully, but the post-install guidance was unclear." value="@Model.SupportIntake.DefaultSummary" required />
                 </div>
                 <div class="field">
                     <label for="supportDetail">What happened</label>
-                    <textarea id="supportDetail" name="detail" rows="6" placeholder="Tell Chummer what you expected, what actually happened, and the fastest way to reproduce it." required></textarea>
+                    <textarea id="supportDetail" name="detail" rows="6" placeholder="Tell Chummer what you expected, what actually happened, and the fastest way to reproduce it." required>@Model.SupportIntake.DefaultDetail</textarea>
                 </div>
                 @if (!Model.SupportIntake.Authenticated)
                 {
