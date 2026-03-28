@@ -208,8 +208,9 @@ Progress note: the API now has both a signed portal-owner propagation seam (`CHU
 - [ ] `MIG-091` Add structured observability (logs, correlation IDs, metrics, tracing) across API and both heads.
 Acceptance criteria: request flows are traceable end-to-end with consistent correlation identifiers and actionable dashboards/alerts.
 
-- [ ] `MIG-092` Add API runtime guardrails for request/operation limits.
+- [x] `MIG-092` Add API runtime guardrails for request/operation limits.
 Acceptance criteria: explicit request size limits, rate limiting, and timeout/cancellation policies are configured and test-covered.
+Progress: `Chummer.Run.Api` now centralizes hub guardrail options from `CHUMMER_API_*` env/config, applies per-route request body ceilings (compact JSON vs. support multipart), enforces per-client sliding-window rate limits, and wraps controller execution in timeout/cancellation budgets with executable verification in `HubApiRuntimeGuardrailVerification`.
 
 - [ ] `MIG-093` Define workspace retention/cleanup and operational runbook.
 Acceptance criteria: workspace lifecycle policy (retention, cleanup, recovery) is documented and enforced by automated jobs or service policies.

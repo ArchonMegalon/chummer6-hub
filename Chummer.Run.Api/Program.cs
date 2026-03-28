@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddHubApiRuntimeGuardrails();
 
 // Add services to the container.
 
@@ -76,6 +77,7 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
+app.UseHubApiRuntimeGuardrails();
 app.UseAuthorization();
 
 app.MapControllers();
