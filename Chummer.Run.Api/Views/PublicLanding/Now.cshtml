@@ -53,6 +53,11 @@
     </div>
 </section>
 
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+
 @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
 
 <section class="evidence-wall">

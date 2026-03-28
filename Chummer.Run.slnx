@@ -5,4 +5,5 @@
   <Project Path="Chummer.Run.Api/Chummer.Run.Api.csproj" />
   <Project Path="Chummer.Run.Contracts/Chummer.Run.Contracts.csproj" />
   <Project Path="Chummer.Run.Identity/Chummer.Run.Identity.csproj" />
+  <Project Path="Chummer.Tests/Chummer.Tests.csproj" />
 </Solution>

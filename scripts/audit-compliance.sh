@@ -2,6 +2,6 @@
 set -euo pipefail
 
 echo "[audit] running hosted boundary verification"
-COMPOSE_FILE=legacy/tooling/docker/docker-compose.yml docker compose --profile test run --build --rm chummer-tests
+bash scripts/ai/verify.sh
 
 echo "[audit] compliance checks passed"

@@ -263,6 +263,27 @@ public sealed class SupportCasesController : ControllerBase
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            SupportCaseProjection? trackedCase = _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
+            if (trackedCase is null)
+            {
+                return NotFound();
+            }
+
+            if (AllowsReporterVerification(trackedCase.Status))
+            {
+                var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+                var presented = _supportPresentation.Build(trackedCase, installLinking);
+                if (!presented.CanVerifyFix)
+                {
+                    string detail = !string.IsNullOrWhiteSpace(presented.VerificationSummary)
+                        ? presented.VerificationSummary
+                        : !string.IsNullOrWhiteSpace(presented.InstallReadinessSummary)
+                            ? presented.InstallReadinessSummary
+                            : presented.NextSafeAction;
+                    return Problem(statusCode: StatusCodes.Status409Conflict, detail: detail);
+                }
+            }
+
             return Ok(_supportCases.VerifyForReporter(caseId, user.UserId, subject.SubjectId, request));
         }
         catch (HubRequestAuthException ex)
@@ -375,6 +396,11 @@ public sealed class SupportCasesController : ControllerBase
         byte[] rightBytes = Encoding.UTF8.GetBytes(right);
         return CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
     }
+
+    private static bool AllowsReporterVerification(string? status)
+        => string.Equals(status, SupportCaseStatuses.Fixed, StringComparison.OrdinalIgnoreCase)
+           || string.Equals(status, SupportCaseStatuses.ReleasedToReporterChannel, StringComparison.OrdinalIgnoreCase)
+           || string.Equals(status, SupportCaseStatuses.UserNotified, StringComparison.OrdinalIgnoreCase);
 
     private static async Task<IReadOnlyList<SupportAttachmentUpload>> ReadUploadsAsync(
         IReadOnlyList<IFormFile>? files,

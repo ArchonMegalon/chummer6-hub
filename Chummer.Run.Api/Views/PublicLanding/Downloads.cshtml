@@ -33,6 +33,11 @@
     </div>
 </section>
 
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+
 @if (Model.Manifest.Downloads.Count == 0 || release.Recommended is null)
 {
     <section class="release-shelf">

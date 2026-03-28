@@ -2183,6 +2183,19 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.ReleaseProgressSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase), "account support detail should project the user-facing release progress summary.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.AffectedInstallSummary?.Contains("install-smoke-001", StringComparison.Ordinal) == true, "account support detail should keep the affected install attached to the tracked case.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.TimelineHighlights.Count >= 1, "account support detail should project timeline highlights through the shared presenter.");
+    var authenticatedDownloadsPage = await authenticatedLandingController.DownloadsPage(CancellationToken.None) as ViewResult;
+    var authenticatedDownloadsModel = authenticatedDownloadsPage?.Model as DownloadsPageViewModel;
+    Assert(authenticatedDownloadsModel?.SignedInStatus is not null, "signed-in downloads should project install-specific trust status.");
+    Assert(string.Equals(authenticatedDownloadsModel!.SignedInStatus!.Heading, "Update your linked install", StringComparison.Ordinal), "signed-in downloads should tell the reporter to update the linked install before verification when the fix is on a newer build.");
+    Assert(authenticatedDownloadsModel.SignedInStatus.Summary.Contains("preview 0.6.3-smoke", StringComparison.Ordinal), "signed-in downloads should project the exact reporter-ready build in the trust panel.");
+    var authenticatedHelpPage = await authenticatedLandingController.HelpPage(CancellationToken.None) as ViewResult;
+    var authenticatedHelpModel = authenticatedHelpPage?.Model as TrustPageViewModel;
+    Assert(authenticatedHelpModel?.SignedInStatus is not null, "signed-in help should project install-specific trust status.");
+    Assert(authenticatedHelpModel!.SignedInStatus!.Summary.Contains("preview 0.6.3-smoke", StringComparison.Ordinal), "signed-in help should carry the same install-specific follow-through summary.");
+    var authenticatedNowPage = await authenticatedLandingController.NowPage(CancellationToken.None) as ViewResult;
+    var authenticatedNowModel = authenticatedNowPage?.Model as NowPageViewModel;
+    Assert(authenticatedNowModel?.SignedInStatus is not null, "signed-in current-release page should project install-specific trust status.");
+    Assert(authenticatedNowModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Support follow-through", StringComparison.Ordinal) && row.Value.Contains("Closed with notice", StringComparison.Ordinal)), "signed-in current-release page should surface the current support follow-through stage.");
     var fixedReadyRefreshResult = installLinkingController.RefreshGrant(new RefreshInstallationGrantRequestDto(
         InstallationId: redeemPayload.Installation.InstallationId,
         AccessToken: currentGrantAccessToken,
@@ -2201,6 +2214,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(readyToVerifyAccountDetailModel?.SelectedSupportCaseSummary?.CanVerifyFix == true, "account support detail should reopen the verification controls once the linked install reaches the fixed build.");
     Assert(readyToVerifyAccountDetailModel?.SelectedSupportCaseSummary?.FixReadyOnLinkedInstall == true, "account support detail should mark the linked install as ready to verify.");
     Assert(readyToVerifyAccountDetailModel?.SelectedSupportCaseSummary?.VerificationSummary.Contains("fix worked here", StringComparison.OrdinalIgnoreCase) == true, "account support detail should return the reporter verification loop once the linked install is current.");
+    var readyToVerifyDownloadsPage = await authenticatedLandingController.DownloadsPage(CancellationToken.None) as ViewResult;
+    var readyToVerifyDownloadsModel = readyToVerifyDownloadsPage?.Model as DownloadsPageViewModel;
+    Assert(string.Equals(readyToVerifyDownloadsModel?.SignedInStatus?.Heading, "Your linked install can verify a fix now", StringComparison.Ordinal), "signed-in downloads should switch from update-needed to verification-ready once the linked install matches the fix build.");
     var verifiedFixedResult = await supportCasesController.VerifyReporterFix(
         supportCase.CaseId,
         new SupportCaseVerificationRequest(
@@ -2268,6 +2284,53 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(reopenedAccountDetailModel?.SelectedSupportCaseSummary?.StageLabel, "Needs follow-up", StringComparison.Ordinal), "still-broken verification should project a follow-up stage on the account support detail.");
     Assert(reopenedAccountDetailModel?.SelectedSupportCaseSummary?.VerificationSummary.Contains("still broken", StringComparison.OrdinalIgnoreCase) == true, "still-broken verification should project the reporter note on the account support detail.");
     Assert(reopenedAccountDetailModel?.SelectedSupportCaseSummary?.CanVerifyFix == false, "reopened follow-up cases should not keep the same verification call-to-action until another fix reaches the reporter.");
+    SupportCaseProjection orphanedInstallCase = supportCases.Submit(
+        linkedUser.UserId,
+        "subject.demo",
+        new SupportCaseSubmitRequest(
+            Kind: SupportCaseKinds.BugReport,
+            Title: "Old beta install is no longer linked",
+            Summary: "The affected install was replaced before the fix reached the reporter lane.",
+            Detail: "The original beta install was retired, so this account no longer has the affected device linked.",
+            InstallationId: "install-missing-404",
+            ApplicationVersion: "0.5.0-smoke",
+            ReleaseChannel: "beta",
+            HeadId: "web",
+            Platform: "windows",
+            Arch: "arm64",
+            Source: SupportCaseSourceKinds.HubAccount));
+    var orphanedInstallReleasedResult = supportAutomationController.Transition(
+        orphanedInstallCase.CaseId,
+        new SupportCaseTransitionRequest(
+            TargetStatus: SupportCaseStatuses.ReleasedToReporterChannel,
+            Note: "Fix is ready on preview 0.6.5-smoke.",
+            FixedVersion: "0.6.5-smoke",
+            FixedChannel: "preview",
+            Actor: "fleet"));
+    var orphanedInstallReleasedPayload = (orphanedInstallReleasedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
+    Assert(orphanedInstallReleasedPayload is not null && string.Equals(orphanedInstallReleasedPayload.Status, SupportCaseStatuses.ReleasedToReporterChannel, StringComparison.Ordinal), "orphaned-install support case should enter the reporter release state for relink testing.");
+    var orphanedInstallNotifiedResult = supportAutomationController.NotifyReporter(
+        orphanedInstallCase.CaseId,
+        new SupportCaseNotificationRequest(
+            Note: "Closure notice sent after the preview 0.6.5-smoke release reached the reporter lane.",
+            Channel: "account",
+            Actor: "fleet"));
+    var orphanedInstallNotifiedPayload = (orphanedInstallNotifiedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
+    Assert(orphanedInstallNotifiedPayload is not null && string.Equals(orphanedInstallNotifiedPayload.Status, SupportCaseStatuses.UserNotified, StringComparison.Ordinal), "orphaned-install support case should enter the reporter notification state for relink testing.");
+    var orphanedAccountDetailPage = await accountController.AccountPage(section: "support", caseId: orphanedInstallCase.CaseId, CancellationToken.None) as ViewResult;
+    var orphanedAccountDetailModel = orphanedAccountDetailPage?.Model as AccountPageViewModel;
+    Assert(orphanedAccountDetailModel?.SelectedSupportCaseSummary?.NeedsLinkedInstall == true, "support detail should require relinking when no current install matches the affected device context.");
+    Assert(orphanedAccountDetailModel?.SelectedSupportCaseSummary?.CanVerifyFix == false, "support detail should not reopen fix verification when the affected install is no longer linked.");
+    Assert(orphanedAccountDetailModel?.SelectedSupportCaseSummary?.InstallReadinessSummary.Contains("not currently linked here", StringComparison.OrdinalIgnoreCase) == true, "support detail should explain that the affected install must be relinked instead of silently choosing another device.");
+    var orphanedVerifyResult = await supportCasesController.VerifyReporterFix(
+        orphanedInstallCase.CaseId,
+        new SupportCaseVerificationRequest(
+            Outcome: SupportCaseVerificationStates.ConfirmedFixed,
+            Note: "Tried to verify from the wrong device."),
+        CancellationToken.None);
+    var orphanedVerifyProblem = orphanedVerifyResult.Result as ObjectResult;
+    Assert(orphanedVerifyProblem?.StatusCode == StatusCodes.Status409Conflict, "support verification api should reject fix confirmation when the affected install is no longer linked.");
+    Assert((orphanedVerifyProblem?.Value as ProblemDetails)?.Detail?.Contains("not currently linked here", StringComparison.OrdinalIgnoreCase) == true, "support verification api should explain that the affected install must be relinked before verification.");
     var accountAccessPage = await accountController.AccountPage(section: "access", caseId: null, CancellationToken.None) as ViewResult;
     var accountAccessModel = accountAccessPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountAccessModel?.CurrentSection, "access", StringComparison.Ordinal), "account access route should render the devices-and-access section.");
@@ -2422,6 +2485,18 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLandingModel = unavailableLandingView?.Model as LandingPageViewModel;
     Assert(unavailableLandingModel?.Chrome.Authenticated == true, "public landing chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
     Assert(unavailableLandingModel!.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Sign out", StringComparison.Ordinal)), "authenticated public landing chrome should keep the signed-in actions during identity outages.");
+    var unavailableNowView = await unavailableLandingController.NowPage(CancellationToken.None) as ViewResult;
+    var unavailableNowModel = unavailableNowView?.Model as NowPageViewModel;
+    Assert(unavailableNowModel?.Chrome.Authenticated == true, "current-release chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
+    Assert(unavailableNowModel?.SignedInStatus is null, "current-release projection should suppress install-specific trust status when identity is temporarily unavailable.");
+    var unavailableDownloadsView = await unavailableLandingController.DownloadsPage(CancellationToken.None) as ViewResult;
+    var unavailableDownloadsModel = unavailableDownloadsView?.Model as DownloadsPageViewModel;
+    Assert(unavailableDownloadsModel?.Chrome.Authenticated == true, "downloads chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
+    Assert(unavailableDownloadsModel?.SignedInStatus is null, "downloads projection should suppress install-specific trust status when identity is temporarily unavailable.");
+    var unavailableHelpView = await unavailableLandingController.HelpPage(CancellationToken.None) as ViewResult;
+    var unavailableHelpModel = unavailableHelpView?.Model as TrustPageViewModel;
+    Assert(unavailableHelpModel?.Chrome.Authenticated == true, "help chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
+    Assert(unavailableHelpModel?.SignedInStatus is null, "help projection should suppress install-specific trust status when identity is temporarily unavailable.");
     var unavailableHomeResult = await unavailableLandingController.HomePage(null, CancellationToken.None);
     var unavailableHomeModel = (unavailableHomeResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableHomeModel?.Heading, "Home is unavailable right now", StringComparison.Ordinal), "home page should show an unavailable message when identity is down instead of redirecting to login.");
