@@ -3210,6 +3210,21 @@ async Task VerifyGmOpsBoardWorkflowAsync()
         RuntimeFingerprint: "ops-smoke"));
     var revealCreated = (revealCreate.Result as CreatedAtActionResult)?.Value as GmPrepAssetRecord;
     Assert(revealCreated is not null, "ops-board should create player reveal assets");
+    var reusableNoteCreate = controller.CreatePrepAsset(new GmPrepAssetCreateRequest(
+        CampaignId: "campaign_smoke",
+        SessionId: null,
+        SceneId: null,
+        Title: "Reusable threat ladder",
+        Kind: GmPrepAssetKind.Note,
+        Audience: GmPrepAssetAudience.GameMaster,
+        Summary: "Campaign-level reusable prep",
+        Body: "Escalate to response teams if the smoke route collapses.",
+        Tags: ["library", "reusable"],
+        SourceEventIds: Array.Empty<string>(),
+        CreatedBy: "gm.smoke",
+        RuntimeFingerprint: "ops-fingerprint"));
+    var reusableNote = (reusableNoteCreate.Result as CreatedAtActionResult)?.Value as GmPrepAssetRecord;
+    Assert(reusableNote is not null, "ops-board should create reusable campaign prep assets");
 
     var projection = controller.GetProjection("session_ops_smoke", "scene_smoke", "scene_smoke:r2").Result as OkObjectResult;
     var projectionPayload = projection?.Value as OpsBoardProjection;
@@ -3252,9 +3267,15 @@ async Task VerifyGmOpsBoardWorkflowAsync()
     Assert(deliveredRevealPayload?.Outcome == "delivered", "approved player reveal assets should deliver through the outbox");
     Assert(deliveredRevealPayload?.Message?.Card?.CardKind == "player-screen", "player-screen reveals should preserve their delivery card kind");
 
-    var list = controller.ListPrepAssets(campaignId: "campaign_smoke", sessionId: "session_ops_smoke", sceneId: "scene_smoke", kind: null).Result as OkObjectResult;
+    var list = controller.ListPrepAssets(
+        campaignId: "campaign_smoke",
+        sessionId: "session_ops_smoke",
+        sceneId: "scene_smoke",
+        kind: null,
+        includeReusableCampaignAssets: true).Result as OkObjectResult;
     var listPayload = list?.Value as GmPrepAssetListResponse;
-    Assert(listPayload?.TotalCount == 2, "ops-board list endpoint should filter scene prep assets");
+    Assert(listPayload?.TotalCount == 3, "ops-board list endpoint should optionally include reusable campaign prep assets");
+    Assert(listPayload?.Items.Any(item => item.AssetId == reusableNote!.AssetId) == true, "ops-board list endpoint should surface reusable campaign prep assets when requested");
 }
 
 void VerifyInteropWorkflow()
@@ -3289,6 +3310,21 @@ void VerifyInteropWorkflow()
         CreatedBy: "gm.interop.smoke",
         RuntimeFingerprint: "interop-smoke"));
     Assert(prepCreate.AssetId.StartsWith("prep_", StringComparison.Ordinal), "interop smoke should seed prep assets for export.");
+    var reusablePrep = ops.CreatePrepAsset(new GmPrepAssetCreateRequest(
+        CampaignId: "campaign_interop_smoke",
+        SessionId: null,
+        SceneId: null,
+        Title: "Reusable extraction ladder",
+        Kind: GmPrepAssetKind.Note,
+        Audience: GmPrepAssetAudience.GameMaster,
+        Summary: "Campaign reusable prep",
+        Body: "Escalate extraction plans if round-trip validation finds missing assets.",
+        Tags: ["interop", "library"],
+        ChecklistItems: Array.Empty<GmPrepChecklistItem>(),
+        SourceEventIds: Array.Empty<string>(),
+        CreatedBy: "gm.interop.smoke",
+        RuntimeFingerprint: "interop-smoke"));
+    Assert(reusablePrep.AssetId.StartsWith("prep_", StringComparison.Ordinal), "interop smoke should seed reusable campaign prep assets.");
 
     var exportResult = controller.Export(new InteropExportRequest(
         CampaignId: "campaign_interop_smoke",
@@ -3296,6 +3332,7 @@ void VerifyInteropWorkflow()
         RequestedBy: "gm.interop.smoke")).Result as OkObjectResult;
     var exported = exportResult?.Value as InteropExportPackage;
     Assert(exported is not null, "interop export endpoint should return an export package");
+    Assert(exported!.Assets.Any(item => item.AssetKind == InteropAssetKind.Prep && item.DisplayName == "Reusable extraction ladder"), "interop export endpoint should include reusable campaign prep assets");
     Assert(exported!.ContractFamily == "interop_export_v1", "interop export should use the canonical family");
     Assert(exported.Manifest.CharacterCount >= 1, "interop export should include character assets");
     Assert(exported.Manifest.NpcCount >= 1, "interop export should include npc assets");
@@ -3465,6 +3502,17 @@ async Task VerifySessionWorkflowAsync()
             new GmPrepChecklistItem("sync-1", "Export snapshot", true)
         ],
         CreatedBy: "gm.demo"));
+    var reusablePrep = ops.CreatePrepAsset(new GmPrepAssetCreateRequest(
+        CampaignId: "campaign_demo",
+        SessionId: null,
+        SceneId: null,
+        Title: "Reusable chase ladder",
+        Kind: GmPrepAssetKind.Note,
+        Audience: GmPrepAssetAudience.GameMaster,
+        Summary: "Campaign reusable prep",
+        Body: "Escalate the chase with drones, patrols, and sealed checkpoints.",
+        Tags: ["offline", "library"],
+        CreatedBy: "gm.demo"));
 
     var snapshot = offlineSync.CreateSnapshot(new OfflineSyncSnapshotRequest(
         CampaignId: "campaign_demo",
@@ -3474,6 +3522,7 @@ async Task VerifySessionWorkflowAsync()
         DeviceId: "tablet-smoke"));
     Assert(snapshot.ContractFamily == "offline_sync_snapshot_v1", "offline sync snapshot should use canonical family");
     Assert(snapshot.PrepAssets.Any(item => item.AssetId == prep.AssetId), "offline sync snapshot should include prep assets for collaboration surfaces");
+    Assert(snapshot.PrepAssets.Any(item => item.AssetId == reusablePrep.AssetId), "offline sync snapshot should include reusable campaign prep assets");
 
     var reconcile = await offlineSync.ReconcileAsync(new OfflineSyncReconcileRequest(
         Snapshot: snapshot,

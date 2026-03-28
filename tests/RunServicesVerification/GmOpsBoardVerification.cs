@@ -67,13 +67,44 @@ internal static class GmOpsBoardVerification
             SourceEventIds: ["evt_ops_02"],
             CreatedBy: "gm.ops",
             RuntimeFingerprint: "ops-fingerprint"));
+        var libraryNote = ops.CreatePrepAsset(new GmPrepAssetCreateRequest(
+            CampaignId: "campaign_ops",
+            SessionId: null,
+            SceneId: null,
+            Title: "Reusable threat ladder",
+            Kind: GmPrepAssetKind.Note,
+            Audience: GmPrepAssetAudience.GameMaster,
+            Summary: "Campaign-level fallback escalation beats",
+            Body: "Use the Renraku escalation ladder when heat spikes above the current scene plan.",
+            Tags: ["library", "reusable"],
+            SourceEventIds: Array.Empty<string>(),
+            CreatedBy: "gm.ops",
+            RuntimeFingerprint: "ops-fingerprint"));
 
         var projection = ops.GetProjection("session_ops", "scene_downtown", "scene_downtown:r3");
+        var sceneOnlyAssets = ops.ListPrepAssets(campaignId: "campaign_ops", sessionId: "session_ops", sceneId: "scene_downtown");
+        var sceneWithLibrary = ops.ListPrepAssets(
+            campaignId: "campaign_ops",
+            sessionId: "session_ops",
+            sceneId: "scene_downtown",
+            includeReusableCampaignAssets: true);
+        var exportedAssets = ops.ExportPortableAssets(
+            "campaign_ops",
+            "session_ops",
+            "scene_downtown",
+            includeReusableCampaignAssets: true);
         VerificationAssert.Equal(2, projection.LedgerVersion, "Ops board should project ledger version from the canonical session ledger.");
         VerificationAssert.True(projection.UnresolvedItems.Count >= 2, "Ops board should surface unresolved or heat-bearing items from ledger evidence.");
         VerificationAssert.Equal(2, projection.ChecklistSummary.TotalItems, "Ops board should summarize checklist counts.");
         VerificationAssert.Equal(1, projection.ChecklistSummary.CompletedItems, "Ops board should summarize completed checklist items.");
         VerificationAssert.True(projection.RevealSurfaces.Any(item => item.AssetId == reveal.AssetId), "Ops board should surface reveal assets for player delivery.");
+        VerificationAssert.Equal(2, sceneOnlyAssets.TotalCount, "Scene-scoped prep lists should stay focused on direct scene assets by default.");
+        VerificationAssert.True(
+            sceneWithLibrary.Items.Any(item => item.AssetId == libraryNote.AssetId),
+            "Prep lists should optionally include reusable campaign assets that stay compatible with the requested session.");
+        VerificationAssert.True(
+            exportedAssets.Any(item => item.AssetId == libraryNote.AssetId),
+            "Portable prep export should include reusable campaign assets for GM library continuity.");
 
         var updatedChecklist = ops.UpdateChecklist(
             checklist.AssetId,

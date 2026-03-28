@@ -36,7 +36,8 @@ public sealed class OfflineSyncService : IOfflineSyncService
                 request.CampaignId.Trim(),
                 request.SessionId.Trim(),
                 request.SceneId.Trim(),
-                request.PrepAssetIds)
+                request.PrepAssetIds,
+                includeReusableCampaignAssets: true)
             .Select(ToPortableAsset)
             .OrderBy(static item => item.AssetId, StringComparer.Ordinal)
             .ToArray();

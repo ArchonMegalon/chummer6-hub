@@ -33,6 +33,19 @@ internal static class InteropExportVerification
             SourceEventIds: Array.Empty<string>(),
             CreatedBy: "gm.interop",
             RuntimeFingerprint: "interop:fp"));
+        ops.CreatePrepAsset(new GmPrepAssetCreateRequest(
+            CampaignId: "campaign_interop",
+            SessionId: null,
+            SceneId: null,
+            Title: "Reusable extraction ladder",
+            Kind: GmPrepAssetKind.Note,
+            Audience: GmPrepAssetAudience.GameMaster,
+            Summary: "Campaign-level fallback extraction beats",
+            Body: "Escalate from street pickup to rooftop evac to burn notice.",
+            Tags: ["library", "interop"],
+            SourceEventIds: Array.Empty<string>(),
+            CreatedBy: "gm.interop",
+            RuntimeFingerprint: "interop:fp"));
 
         var package = interop.Export(new InteropExportRequest(
             CampaignId: "campaign_interop",
@@ -46,6 +59,11 @@ internal static class InteropExportVerification
         VerificationAssert.True(package.Manifest.SessionCount >= 1, "Interop export should include session assets.");
         VerificationAssert.True(package.Manifest.EncounterCount >= 1, "Interop export should include encounter assets.");
         VerificationAssert.True(package.Manifest.PrepCount >= 1, "Interop export should include prep assets.");
+        VerificationAssert.True(
+            package.Assets.Any(item =>
+                item.AssetKind == InteropAssetKind.Prep
+                && string.Equals(item.DisplayName, "Reusable extraction ladder", StringComparison.Ordinal)),
+            "Interop export should include reusable campaign prep assets alongside session-scoped prep.");
 
         var import = interop.Import(new InteropImportRequest(package, ImportedBy: "gm.interop"));
         VerificationAssert.Equal(package.Manifest.TotalCount, import.ImportedCount, "Interop import should accept untampered payloads.");
