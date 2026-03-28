@@ -104,7 +104,7 @@ milestones:
       - chummer6-hub-registry
       - chummer6-ui
       - chummer6-mobile
-    status: not_started
+    status: in_progress
     exit_criteria:
       - Claimed devices can prefetch dossier, campaign, rule-environment, and artifact truth for bounded offline use.
       - Travel and safehouse mode keep install-local caches local while making offline readiness visible and deliberate.
