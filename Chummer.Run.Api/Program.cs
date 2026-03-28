@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddHubApiRuntimeGuardrails();
+builder.AddHubRequestObservability();
 
 // Add services to the container.
 
@@ -77,6 +78,7 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
+app.UseHubRequestObservability();
 app.UseHubApiRuntimeGuardrails();
 app.UseAuthorization();
 

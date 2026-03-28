@@ -207,6 +207,7 @@ Progress note: the API now has both a signed portal-owner propagation seam (`CHU
 
 - [ ] `MIG-091` Add structured observability (logs, correlation IDs, metrics, tracing) across API and both heads.
 Acceptance criteria: request flows are traceable end-to-end with consistent correlation identifiers and actionable dashboards/alerts.
+Progress: `Chummer.Run.Api` now starts a hub-owned observability lane with request correlation headers, W3C traceparent emission, structured request scopes, and request counters/duration histograms in `HubRequestObservabilityMiddleware`, with executable proof in `HubRequestObservabilityVerification`; broader cross-head dashboards/alerts still remain open.
 
 - [x] `MIG-092` Add API runtime guardrails for request/operation limits.
 Acceptance criteria: explicit request size limits, rate limiting, and timeout/cancellation policies are configured and test-covered.
