@@ -55,6 +55,21 @@
                 <p>@Model.TrackedCaseSummary.ClosureSummary</p>
             </div>
         </article>
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>Follow-up lane</h3>
+                <p>@Model.TrackedCaseSummary.FollowUpLaneSummary</p>
+            </div>
+        </article>
+        @if (!string.IsNullOrWhiteSpace(Model.TrackedCaseSummary.AffectedInstallSummary))
+        {
+            <article class="compact-rail__item">
+                <div class="compact-rail__copy">
+                    <h3>Affected install</h3>
+                    <p>@Model.TrackedCaseSummary.AffectedInstallSummary</p>
+                </div>
+            </article>
+        }
     </section>
 }
 

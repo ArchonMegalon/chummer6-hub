@@ -343,7 +343,16 @@ public sealed record SupportCasePresentationViewModel(
     string PrimaryActionHref,
     string UpdatedLabel,
     string? FixedReleaseLabel,
+    string? AffectedInstallSummary,
+    string FollowUpLaneSummary,
+    string ReleaseProgressSummary,
+    IReadOnlyList<SupportCaseTimelineHighlightViewModel> TimelineHighlights,
     bool ReporterActionNeeded);
+
+public sealed record SupportCaseTimelineHighlightViewModel(
+    string Label,
+    string Summary,
+    string OccurredLabel);
 
 public sealed record AccountPageViewModel(
     SiteChromeViewModel Chrome,

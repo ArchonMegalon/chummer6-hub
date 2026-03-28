@@ -136,6 +136,11 @@
                                                     <div class="app-rail__copy">
                                                         <h3>@supportCase.Case.Title</h3>
                                                         <p>@supportCase.ClosureSummary <span>Next: @supportCase.NextSafeAction</span></p>
+                                                        <p class="muted-copy">@supportCase.ReleaseProgressSummary</p>
+                                                        @if (!string.IsNullOrWhiteSpace(supportCase.AffectedInstallSummary))
+                                                        {
+                                                            <p class="muted-copy">@supportCase.AffectedInstallSummary</p>
+                                                        }
                                                     </div>
                                                     <a class="inline-link" href="@supportCase.PrimaryActionHref">@supportCase.PrimaryActionLabel</a>
                                                 </article>

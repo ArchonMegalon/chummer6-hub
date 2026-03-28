@@ -326,6 +326,17 @@
                                     <strong>@selectedSupportCaseSummary.FixedReleaseLabel</strong>
                                 </div>
                             }
+                            @if (!string.IsNullOrWhiteSpace(selectedSupportCaseSummary?.AffectedInstallSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Affected install</span>
+                                    <strong>@selectedSupportCaseSummary.AffectedInstallSummary</strong>
+                                </div>
+                            }
+                            <div class="settings-summary-row">
+                                <span>Follow-up lane</span>
+                                <strong>@(selectedSupportCaseSummary?.FollowUpLaneSummary ?? "Follow-up stays attached to this case id.")</strong>
+                            </div>
                             <div class="settings-summary-row">
                                 <span>Updated</span>
                                 <strong>@(selectedSupportCaseSummary?.UpdatedLabel ?? selectedSupportCase.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") + " UTC")</strong>
@@ -336,6 +347,7 @@
                             <div class="stacked-copy">
                                 <p><strong>Next safe action:</strong> @selectedSupportCaseSummary.NextSafeAction</p>
                                 <p><strong>Closure:</strong> @selectedSupportCaseSummary.ClosureSummary</p>
+                                <p><strong>Release progress:</strong> @selectedSupportCaseSummary.ReleaseProgressSummary</p>
                             </div>
                             @if (string.Equals(selectedSupportCaseSummary.PrimaryActionHref, "/downloads", StringComparison.OrdinalIgnoreCase))
                             {
@@ -365,15 +377,15 @@
                                 </div>
                             </details>
                         }
-                        @if (selectedSupportCase.Timeline is { Count: > 0 })
+                        @if (selectedSupportCaseSummary?.TimelineHighlights is { Count: > 0 })
                         {
                             <details class="details-drawer" open>
                                 <summary>Case timeline</summary>
                                 <div class="settings-summary-list">
-                                    @foreach (var eventItem in selectedSupportCase.Timeline.OrderByDescending(item => item.OccurredAtUtc).Take(6))
+                                    @foreach (var eventItem in selectedSupportCaseSummary.TimelineHighlights)
                                     {
                                         <div class="settings-summary-row">
-                                            <span>@eventItem.OccurredAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</span>
+                                            <span>@eventItem.OccurredLabel · @eventItem.Label</span>
                                             <strong>@eventItem.Summary</strong>
                                         </div>
                                     }
