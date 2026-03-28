@@ -368,7 +368,12 @@ public sealed record AccountPageViewModel(
     IReadOnlyList<SupportCasePresentationViewModel> SupportCaseSummaries,
     SupportCaseProjection? SelectedSupportCase,
     SupportCasePresentationViewModel? SelectedSupportCaseSummary,
-    AccountCampaignSummary CampaignSpine);
+    AccountCampaignSummary CampaignSpine,
+    CampaignWorkspaceProjection? SelectedWorkspace = null,
+    RunProjection? SelectedRun = null,
+    BuildLabHandoffProjection? SelectedBuildLabHandoff = null,
+    RulesNavigatorAnswerProjection? SelectedRulesNavigatorAnswer = null,
+    CreatorPublicationProjection? SelectedCreatorPublication = null);
 
 public sealed record AuthPageViewModel(
     SiteChromeViewModel Chrome,
