@@ -1,4 +1,5 @@
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Contracts;
 using Chummer.Campaign.Contracts;
 using Chummer.Control.Contracts.Support;
 using Chummer.Run.Contracts.Community;
@@ -396,6 +397,7 @@ public sealed record AccountPageViewModel(
     SupportCasePresentationViewModel? SelectedSupportCaseSummary,
     AccountCampaignSummary CampaignSpine,
     CampaignWorkspaceProjection? SelectedWorkspace = null,
+    CampaignWorkspaceServerPlaneProjection? SelectedWorkspaceServerPlane = null,
     RunProjection? SelectedRun = null,
     BuildLabHandoffProjection? SelectedBuildLabHandoff = null,
     RulesNavigatorAnswerProjection? SelectedRulesNavigatorAnswer = null,

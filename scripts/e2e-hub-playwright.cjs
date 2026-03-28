@@ -251,6 +251,18 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectBodyText(page, 'Discovery:', '/account/work');
   });
 
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.locator('a[href*="/account/work/workspaces/"]').first().click()
+  ]);
+  assert(/\/account\/work\/workspaces\//.test(page.url()), 'Workspace detail route should open from the account work rail.');
+  await expectBodyText(page, 'Server-plane follow-through', '/account/work/workspaces detail');
+  await expectBodyText(page, 'Roster readiness and dossier freshness', '/account/work/workspaces detail');
+  await expectBodyText(page, 'Rule and continuity health', '/account/work/workspaces detail');
+  await expectBodyText(page, 'Support follow-through', '/account/work/workspaces detail');
+  await assertNoBannedCopy(page, '/account/work/workspaces detail');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail');
+
   await gotoAndAssert(page, pageErrors, '/account/settings', async () => {
     await expectVisible(page, 'text=More settings');
   });

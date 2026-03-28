@@ -426,10 +426,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         HashSet<string> heads = installations
             .Select(static item => item.HeadId)
             .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Select(static item => item!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         HashSet<string> platforms = installations
             .Select(static item => item.Platform)
             .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Select(static item => item!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         SupportCaseProjection[] matched = supportCases
