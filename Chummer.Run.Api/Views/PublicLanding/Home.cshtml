@@ -289,6 +289,10 @@
                                                             {
                                                                 <span> Next: @workspace.NextSafeAction</span>
                                                             }
+                                                            @if (workspace.Consequences is { Count: > 0 })
+                                                            {
+                                                                <span> Consequence: @workspace.Consequences[0].Label is @workspace.Consequences[0].State.</span>
+                                                            }
                                                             else if (workspace.ReadinessCues.Count > 0)
                                                             {
                                                                 <span> Readiness: @workspace.ReadinessCues[0].Summary</span>

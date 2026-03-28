@@ -73,6 +73,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             RosterReadiness: BuildRosterReadinessSummary(workspace),
             ReadinessCues: workspace.ReadinessCues,
             ChangePackets: workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>(),
+            Consequences: workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>(),
             DossierFreshness: BuildDossierFreshness(workspace),
             RuleEnvironmentHealth: BuildRuleEnvironmentHealth(workspace, accountSummary.Restore),
             Runboard: BuildRunboardSummary(workspace, leadRun),
@@ -116,6 +117,10 @@ public sealed class CampaignWorkspaceServerPlaneService
         string publicationSummary = workspace.RecapShelf.Count == 0
             ? "No recap-safe output is pinned yet, so the workspace still needs its first publication-safe continuity handoff."
             : $"{workspace.RecapShelf.Count} publication-safe output(s) are attached to the same campaign continuity spine.";
+        if (workspace.Consequences is { Count: > 0 })
+        {
+            publicationSummary = $"{publicationSummary} {workspace.Consequences.Count} governed consequence signal(s) stay attached to the same workspace.";
+        }
 
         return new CampaignWorkspaceSummary(
             WorkspaceId: workspace.WorkspaceId,
@@ -145,6 +150,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<string> highlights = workspace.ReadinessCues
             .Take(4)
             .Select(static cue => $"{cue.Title} — {cue.Summary}")
+            .Concat(
+                workspace.Consequences?
+                    .Take(2)
+                    .Select(static consequence => $"{consequence.Label} — {consequence.Summary}")
+                ?? Array.Empty<string>())
+            .Take(4)
             .ToArray();
 
         return new RosterReadinessSummary(

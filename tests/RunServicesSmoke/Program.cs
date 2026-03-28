@@ -1567,6 +1567,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("/account/work/workspaces/", StringComparison.Ordinal), "home work should deep-link the shared campaign view instead of sending every route back to the generic work shell.");
     Assert(homeSource.Contains("@workspace.ActiveSceneSummary", StringComparison.Ordinal), "home work should surface active-scene change truth directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("@workspace.NextSafeAction", StringComparison.Ordinal), "home work should surface the next safe action directly on the calmer shared campaign card.");
+    Assert(homeSource.Contains("Consequence:", StringComparison.Ordinal), "home work should surface one short consequence cue directly on the shared campaign card.");
     Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
     Assert(homeSource.Contains("Evidence:", StringComparison.Ordinal), "home work should surface the first grounded rule evidence line instead of only a generic provenance label.");
@@ -1613,6 +1614,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
     Assert(accountSource.Contains("Closure:", StringComparison.Ordinal), "account build-path details should surface support-closure truth instead of leaving the new rail data unused.");
     Assert(accountSource.Contains("Recent change packets", StringComparison.Ordinal), "account work should surface recent change packets for the shared campaign view.");
+    Assert(accountSource.Contains("Consequence ledger", StringComparison.Ordinal), "account work should surface the governed consequence ledger for the shared campaign view.");
+    Assert(accountSource.Contains("Lead consequence", StringComparison.Ordinal), "account work should summarize the leading consequence directly on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspace.NextSafeAction", StringComparison.Ordinal), "account work should surface the workspace next safe action directly on the selected campaign card.");
     Assert(accountSource.Contains("Follow-up lane", StringComparison.Ordinal), "account support detail should surface the follow-up lane instead of assuming the user remembers it.");
     Assert(accountSource.Contains("Release progress:", StringComparison.Ordinal), "account support detail should surface reporter-lane release progress instead of only the closure summary.");
@@ -2109,9 +2112,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CoreSections.Any(static section => string.Equals(section.Href, "/account/access", StringComparison.Ordinal)), "account should expose the devices-and-access section link.");
     Assert(accountModel!.CampaignSpine.Dossiers.Count >= 1, "account page should surface the living dossier summary.");
     Assert(accountModel.CampaignSpine.Runs.Count >= 1, "account page should surface the current runboard summary.");
+    Assert(accountModel.CampaignSpine.Campaigns[0].Consequences?.Count >= 4, "campaign projections should persist governed faction, heat, contact, and reputation consequences as durable campaign truth.");
+    Assert(accountModel.CampaignSpine.Campaigns[0].Consequences!.Any(item => string.Equals(item.Kind, "heat", StringComparison.Ordinal) && item.Receipts.Count >= 2), "campaign consequences should keep grounded heat receipts attached to the durable campaign record.");
     Assert(accountModel.CampaignSpine.Workspaces.Count >= 1, "account page should surface a first-class campaign workspace.");
     Assert(accountModel.CampaignSpine.Workspaces[0].ReadinessCues.Count >= 1, "campaign workspace should surface readiness cues.");
     Assert(accountModel.CampaignSpine.Workspaces[0].RecapShelf.Count >= 1, "campaign workspace should surface recap or publication-safe continuity outputs.");
+    Assert(accountModel.CampaignSpine.Workspaces[0].Consequences?.Count >= 4, "campaign workspace should surface the governed consequence ledger directly on the shared campaign view.");
+    Assert(accountModel.CampaignSpine.Workspaces[0].Consequences!.Any(item => string.Equals(item.Kind, "contact", StringComparison.Ordinal) && item.EvidenceLines.Count >= 1), "campaign workspace should keep receipt-backed contact evidence attached to the shared consequence ledger.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "campaign workspace should surface an explicit active-scene summary.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.Workspaces[0].NextSafeAction), "campaign workspace should surface an explicit next safe action.");
     Assert(accountModel.CampaignSpine.Workspaces[0].ChangePackets?.Count >= 1, "campaign workspace should surface recent change packets.");
@@ -2136,6 +2143,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var freshPreviewUser = accounts.EnsureUser("subject.preview", "Preview Bootstrap", "preview-bootstrap@example.invalid");
     var freshPreviewSummary = campaignSpine.GetAccountSummary(freshPreviewUser);
     Assert(freshPreviewSummary.Workspaces.Count >= 1, "freshly created accounts should receive a seeded preview campaign workspace instead of an empty work shell.");
+    Assert(freshPreviewSummary.Workspaces[0].Consequences?.Count >= 4, "freshly created accounts should receive a seeded governed consequence ledger with the preview campaign workspace.");
     Assert(freshPreviewSummary.BuildLabHandoffs.Count >= 1, "freshly created accounts should receive a seeded build-path handoff.");
     Assert(freshPreviewSummary.RulesNavigator.Count >= 1, "freshly created accounts should receive a seeded grounded rule answer.");
     Assert(freshPreviewSummary.CreatorPublications.Count >= 1, "freshly created accounts should receive a seeded publication follow-through.");
@@ -2152,6 +2160,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var workspacePayload = (workspaceResult.Result as OkObjectResult)?.Value as CampaignWorkspaceProjection ?? workspaceResult.Value;
     Assert(workspacePayload is not null && string.Equals(workspacePayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine api should expose a stable workspace summary.");
     Assert(workspacePayload?.ReadinessCues.Count >= 1, "campaign spine workspace api should keep readiness cues attached to the workspace summary.");
+    Assert(workspacePayload?.Consequences?.Count >= 4, "campaign spine workspace api should expose the governed consequence ledger.");
+    Assert(workspacePayload!.Consequences!.Any(item => string.Equals(item.Kind, "reputation", StringComparison.Ordinal) && item.Receipts.Count >= 1), "campaign spine workspace api should keep grounded reputation receipts attached.");
     Assert(!string.IsNullOrWhiteSpace(workspacePayload?.ActiveSceneSummary), "campaign spine workspace api should expose an active-scene summary.");
     Assert(!string.IsNullOrWhiteSpace(workspacePayload?.NextSafeAction), "campaign spine workspace api should expose a next safe action.");
     Assert(workspacePayload?.ChangePackets?.Count >= 1, "campaign spine workspace api should expose recent change packets.");
@@ -2170,6 +2180,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.DossierFreshness.Count >= 1, "campaign spine server plane api should expose dossier freshness cues.");
     Assert(workspaceServerPlanePayload.RuleEnvironmentHealth.Count >= 1, "campaign spine server plane api should expose rule-environment health cues.");
     Assert(workspaceServerPlanePayload.ChangePackets.Count >= 1, "campaign spine server plane api should preserve workspace change packets.");
+    Assert(workspaceServerPlanePayload.Consequences.Count >= 4, "campaign spine server plane api should preserve the governed consequence ledger.");
+    Assert(workspaceServerPlanePayload.Consequences.Any(item => string.Equals(item.Kind, "faction", StringComparison.Ordinal) && item.Receipts.Count >= 1), "campaign spine server plane api should keep grounded faction receipts visible.");
     Assert(workspaceServerPlanePayload.SupportClosures.Count >= 1, "campaign spine server plane api should expose install-aware support closure cues.");
     Assert(workspaceServerPlanePayload.DecisionNotices.Count >= 1, "campaign spine server plane api should expose bounded follow-through notices.");
     Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.NextSafeAction.Summary), "campaign spine server plane api should expose one bounded next safe action.");
@@ -2399,6 +2411,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.Dossiers.Count >= 1, "signed-in home should surface living dossier continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.Runs.Count >= 1, "signed-in home should surface runboard continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Count >= 1, "signed-in home should keep the first-class campaign workspace attached to the signed-in shell.");
+    Assert(authenticatedHomeModel.CampaignSpine.Workspaces[0].Consequences?.Count >= 4, "signed-in home should keep governed faction, heat, contact, and reputation consequences attached to the shared campaign view.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "signed-in home should keep the active-scene summary attached to the shared campaign view.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].NextSafeAction), "signed-in home should keep the workspace next safe action attached to the shared campaign view.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");

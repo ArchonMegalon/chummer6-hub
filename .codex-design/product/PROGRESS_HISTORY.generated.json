@@ -1,8 +1,8 @@
 {
   "contract_name": "fleet.public_progress_history",
   "contract_version": "2026-03-23",
-  "generated_at": "2026-03-28T22:37:02Z",
-  "snapshot_count": 4,
+  "generated_at": "2026-03-28T23:03:00Z",
+  "snapshot_count": 5,
   "snapshots": [
     {
       "as_of": "2026-03-23",
@@ -207,68 +207,135 @@
     },
     {
       "as_of": "2026-03-28",
-      "overall_progress_percent": 73,
-      "phase_label": "Scale & stabilize",
+      "overall_progress_percent": 100,
+      "phase_label": "Public-fit polish",
       "parts": [
         {
           "id": "core-engine",
           "public_name": "Core Rules Engine",
-          "progress_percent": 80,
-          "remaining_open_weight": 8,
-          "remaining_open_milestones": 1,
-          "recent_commit_count_7d": 74,
-          "uncovered_scope_count": 3,
-          "eta_weeks_low": 3,
-          "eta_weeks_high": 5,
-          "eta_source": "config_override"
+          "progress_percent": 100,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "recent_commit_count_7d": 80,
+          "uncovered_scope_count": 0,
+          "eta_weeks_low": 0,
+          "eta_weeks_high": 0,
+          "eta_source": "history_velocity"
         },
         {
           "id": "workbench-ui",
           "public_name": "Workbench & Shared UI",
-          "progress_percent": 76,
-          "remaining_open_weight": 23,
-          "remaining_open_milestones": 3,
-          "recent_commit_count_7d": 189,
-          "uncovered_scope_count": 11,
-          "eta_weeks_low": 8,
-          "eta_weeks_high": 12,
-          "eta_source": "config_override"
+          "progress_percent": 100,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "recent_commit_count_7d": 173,
+          "uncovered_scope_count": 0,
+          "eta_weeks_low": 0,
+          "eta_weeks_high": 0,
+          "eta_source": "history_velocity"
         },
         {
           "id": "live-play",
           "public_name": "Live Play",
-          "progress_percent": 84,
-          "remaining_open_weight": 7,
-          "remaining_open_milestones": 1,
-          "recent_commit_count_7d": 40,
-          "uncovered_scope_count": 3,
-          "eta_weeks_low": 4,
-          "eta_weeks_high": 6,
-          "eta_source": "config_override"
+          "progress_percent": 100,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "recent_commit_count_7d": 48,
+          "uncovered_scope_count": 0,
+          "eta_weeks_low": 0,
+          "eta_weeks_high": 0,
+          "eta_source": "history_velocity"
         },
         {
           "id": "community-cloud",
           "public_name": "Community Cloud & Publishing",
-          "progress_percent": 63,
-          "remaining_open_weight": 58,
-          "remaining_open_milestones": 8,
-          "recent_commit_count_7d": 248,
-          "uncovered_scope_count": 8,
-          "eta_weeks_low": 10,
-          "eta_weeks_high": 14,
-          "eta_source": "config_override"
+          "progress_percent": 100,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "recent_commit_count_7d": 298,
+          "uncovered_scope_count": 0,
+          "eta_weeks_low": 0,
+          "eta_weeks_high": 0,
+          "eta_source": "history_velocity"
         },
         {
           "id": "canon-guide",
           "public_name": "Canon & Public Guide",
-          "progress_percent": 82,
-          "remaining_open_weight": 8,
-          "remaining_open_milestones": 1,
-          "recent_commit_count_7d": 114,
-          "uncovered_scope_count": 2,
-          "eta_weeks_low": 2,
-          "eta_weeks_high": 4,
-          "eta_source": "config_override"
+          "progress_percent": 100,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "recent_commit_count_7d": 124,
+          "uncovered_scope_count": 0,
+          "eta_weeks_low": 0,
+          "eta_weeks_high": 0,
+          "eta_source": "history_velocity"
+        }
+      ]
+    },
+    {
+      "as_of": "2026-03-29",
+      "overall_progress_percent": 100,
+      "phase_label": "Public-fit polish",
+      "parts": [
+        {
+          "id": "core-engine",
+          "public_name": "Core Rules Engine",
+          "progress_percent": 100,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "recent_commit_count_7d": 80,
+          "uncovered_scope_count": 0,
+          "eta_weeks_low": 0,
+          "eta_weeks_high": 0,
+          "eta_source": "history_velocity"
+        },
+        {
+          "id": "workbench-ui",
+          "public_name": "Workbench & Shared UI",
+          "progress_percent": 100,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "recent_commit_count_7d": 173,
+          "uncovered_scope_count": 0,
+          "eta_weeks_low": 0,
+          "eta_weeks_high": 0,
+          "eta_source": "history_velocity"
+        },
+        {
+          "id": "live-play",
+          "public_name": "Live Play",
+          "progress_percent": 100,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "recent_commit_count_7d": 48,
+          "uncovered_scope_count": 0,
+          "eta_weeks_low": 0,
+          "eta_weeks_high": 0,
+          "eta_source": "history_velocity"
+        },
+        {
+          "id": "community-cloud",
+          "public_name": "Community Cloud & Publishing",
+          "progress_percent": 100,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "recent_commit_count_7d": 298,
+          "uncovered_scope_count": 0,
+          "eta_weeks_low": 0,
+          "eta_weeks_high": 0,
+          "eta_source": "history_velocity"
+        },
+        {
+          "id": "canon-guide",
+          "public_name": "Canon & Public Guide",
+          "progress_percent": 100,
+          "remaining_open_weight": 0,
+          "remaining_open_milestones": 0,
+          "recent_commit_count_7d": 124,
+          "uncovered_scope_count": 0,
+          "eta_weeks_low": 0,
+          "eta_weeks_high": 0,
+          "eta_source": "history_velocity"
         }
       ]
     }

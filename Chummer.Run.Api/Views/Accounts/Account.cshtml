@@ -847,6 +847,10 @@
                             {
                                 <p><strong>Recent change:</strong> @selectedWorkspace.ChangePackets[0].Label — @selectedWorkspace.ChangePackets[0].Summary</p>
                             }
+                            @if (selectedWorkspace.Consequences is { Count: > 0 })
+                            {
+                                <p><strong>Lead consequence:</strong> @selectedWorkspace.Consequences[0].Label — @selectedWorkspace.Consequences[0].Summary</p>
+                            }
                         </div>
                         @if (selectedWorkspaceServerPlane is not null)
                         {
@@ -1113,6 +1117,10 @@
                                     <span>Recent recap</span>
                                     <strong>@(workspace.RecapShelf.Count == 0 ? "Pending" : $"{workspace.RecapShelf.Count} ready")</strong>
                                 </div>
+                                <div class="settings-summary-row">
+                                    <span>Consequence ledger</span>
+                                    <strong>@(workspace.Consequences is { Count: > 0 } ? $"{workspace.Consequences.Count} tracked" : "Pending")</strong>
+                                </div>
                             </div>
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open shared campaign view</a>
@@ -1204,6 +1212,29 @@
                                         @foreach (var packet in workspace.ChangePackets)
                                         {
                                             <li><strong>@packet.Label</strong>: @packet.Summary</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+
+                            @if (workspace.Consequences is { Count: > 0 })
+                            {
+                                <details class="details-drawer">
+                                    <summary>Consequence ledger</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var consequence in workspace.Consequences)
+                                        {
+                                            <li>
+                                                <strong>@consequence.Label</strong>: @HumanizeStatus(consequence.State, "Tracked"). @consequence.Summary
+                                                @if (consequence.EvidenceLines.Count > 0)
+                                                {
+                                                    <span> Evidence: @consequence.EvidenceLines[0]</span>
+                                                }
+                                                @if (consequence.Receipts.Count > 0)
+                                                {
+                                                    <span> Receipt: @consequence.Receipts[0].SourceKind @consequence.Receipts[0].ReceiptId</span>
+                                                }
+                                            </li>
                                         }
                                     </ul>
                                 </details>

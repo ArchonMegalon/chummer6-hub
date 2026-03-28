@@ -47,6 +47,21 @@ public sealed record PublicationSafeProjection(
     string Summary,
     string? ArtifactId = null);
 
+public sealed record CampaignConsequenceReceipt(
+    string ReceiptId,
+    string SourceKind,
+    string Summary);
+
+public sealed record CampaignConsequenceProjection(
+    string ConsequenceId,
+    string Kind,
+    string Label,
+    string State,
+    string Summary,
+    IReadOnlyList<string> EvidenceLines,
+    IReadOnlyList<CampaignConsequenceReceipt> Receipts,
+    DateTimeOffset UpdatedAtUtc);
+
 public sealed record RunnerDossierProjection(
     string DossierId,
     string RunnerHandle,
@@ -126,7 +141,8 @@ public sealed record CampaignProjection(
     IReadOnlyList<string> RunIds,
     ContinuitySnapshotRef? LatestContinuity,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    IReadOnlyList<CampaignConsequenceProjection>? Consequences = null);
 
 public sealed record WorkspaceRestoreProjection(
     string RestoreId,
@@ -183,7 +199,8 @@ public sealed record CampaignWorkspaceProjection(
     string ReturnSummary,
     string? ActiveSceneSummary = null,
     string? NextSafeAction = null,
-    IReadOnlyList<WorkspaceChangePacketProjection>? ChangePackets = null);
+    IReadOnlyList<WorkspaceChangePacketProjection>? ChangePackets = null,
+    IReadOnlyList<CampaignConsequenceProjection>? Consequences = null);
 
 public sealed record CampaignWorkspaceDigestProjection(
     string WorkspaceId,
