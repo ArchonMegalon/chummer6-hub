@@ -1535,11 +1535,17 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!homeSource.Contains("Need product proof before you act?", StringComparison.Ordinal), "home access should not revive the louder proof rail copy.");
     Assert(homeSource.Contains("<summary>Release and device state</summary>", StringComparison.Ordinal), "home access should collapse secondary release and device detail under one calmer disclosure.");
     Assert(homeSource.Contains("GM-ready context", StringComparison.Ordinal), "home work should use customer-facing continuity language instead of internal workspace wording.");
+    Assert(homeSource.Contains("Shared campaign view", StringComparison.Ordinal), "home work should surface the calmer shared campaign view card instead of hiding workspace return behind the deeper account route.");
+    Assert(homeSource.Contains("Open campaign workspace", StringComparison.Ordinal), "home work should keep an explicit route back into the shared campaign view.");
     Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
     Assert(homeSource.Contains("Evidence:", StringComparison.Ordinal), "home work should surface the first grounded rule evidence line instead of only a generic provenance label.");
     Assert(homeSource.Contains("Next:", StringComparison.Ordinal), "home work should keep a short next-step cue on the calmer build follow-through card.");
     Assert(homeSource.Contains("<summary>Build, explain, and next step</summary>", StringComparison.Ordinal), "home work should collapse the secondary build and rules follow-through under one calmer disclosure.");
+    Assert(homeSource.Contains("Publication follow-through", StringComparison.Ordinal), "home work should surface creator-publication continuity instead of leaving publication trust buried in the deeper account route.");
+    Assert(homeSource.Contains("Open publication follow-through", StringComparison.Ordinal), "home work should keep a direct route into publication follow-through.");
+    Assert(homeSource.Contains("Return packet", StringComparison.Ordinal), "home work should surface the calmer return-packet card for claimed-device continuity.");
+    Assert(homeSource.Contains("Open return packet", StringComparison.Ordinal), "home work should keep a direct route into the return packet when claimed-device continuity already exists.");
     Assert(homeSource.Contains("@supportCase.ClosureSummary", StringComparison.Ordinal), "home access should surface support-closure truth directly from the shared support presenter.");
     Assert(homeSource.Contains("@supportCase.ReleaseProgressSummary", StringComparison.Ordinal), "home access should surface release-progress truth directly from the shared support presenter.");
     Assert(homeSource.Contains("@supportCase.AffectedInstallSummary", StringComparison.Ordinal), "home access should surface affected-install truth directly from the shared support presenter.");
@@ -2095,6 +2101,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var workHomeModel = workHomePage?.Model as HomePageViewModel;
     Assert(string.Equals(workHomeModel?.CurrentSection, "work", StringComparison.Ordinal), "home work route should render the work section.");
     Assert(string.Equals(workHomeModel?.Chrome.Title, "Home · Work", StringComparison.Ordinal), "home work route should project its own chrome title.");
+    Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");
+    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary), "home work route should keep publication trust visible on the shared home projection.");
+    Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1, "home work route should keep the claimed-device return packet visible on the shared home projection.");
 
     var progressHtml = (await progressController.ProgressPage(CancellationToken.None)).Content ?? string.Empty;
     Assert(progressHtml.Contains("Core Rules Engine", StringComparison.Ordinal), "progress page should render the generated product-part report");

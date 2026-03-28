@@ -21,8 +21,11 @@
     var dossiers = Model.CampaignSpine.Dossiers.Take(3).ToArray();
     var campaigns = Model.CampaignSpine.Campaigns.Take(3).ToArray();
     var runs = Model.CampaignSpine.Runs.Take(3).ToArray();
+    var workspaces = Model.CampaignSpine.Workspaces.Take(2).ToArray();
     var buildHandoffs = Model.CampaignSpine.BuildLabHandoffs.Take(2).ToArray();
     var rulesAnswers = Model.CampaignSpine.RulesNavigator.Take(2).ToArray();
+    var creatorPublications = Model.CampaignSpine.CreatorPublications.Take(1).ToArray();
+    var restoreDevices = Model.CampaignSpine.Restore.ClaimedDevices.Take(1).ToArray();
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
     var releasedOrNotifiedCases = Model.SupportCaseSummaries
         .Where(item =>
@@ -221,7 +224,7 @@
                                         <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible with GM-ready context and clear next routes without turning Home into a full workspace.</p>
                                     </div>
                                     <div class="app-rail">
-                                        @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0)
+                                        @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0 && workspaces.Length == 0)
                                         {
                                                 <article class="app-rail__item">
                                                     <span class="tag">Ready</span>
@@ -265,6 +268,27 @@
                                                         <p>@run.Objectives.Count objectives · @(run.ActiveSceneId is null ? "No active scene" : "Scene live") · @(run.LatestContinuity?.Summary ?? run.Summary)</p>
                                                     </div>
                                                     <a class="inline-link" href="/account/work">Open run context</a>
+                                                </article>
+                                            }
+                                            @foreach (var workspace in workspaces)
+                                            {
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Shared campaign view</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@workspace.CampaignName</h3>
+                                                        <p>
+                                                            @workspace.ReturnSummary
+                                                            @if (workspace.ReadinessCues.Count > 0)
+                                                            {
+                                                                <span> Readiness: @workspace.ReadinessCues[0].Summary</span>
+                                                            }
+                                                            else if (workspace.RecapShelf.Count > 0)
+                                                            {
+                                                                <span> Recap shelf: @workspace.RecapShelf[0].Summary</span>
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account/work">Open campaign workspace</a>
                                                 </article>
                                             }
                                         }
@@ -347,6 +371,30 @@
                                                 </div>
                                                 <a class="inline-link" href="/account/support">Open support</a>
                                             </article>
+                                            @if (creatorPublications.Length > 0)
+                                            {
+                                                var publication = creatorPublications[0];
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Publication follow-through</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@publication.Title</h3>
+                                                        <p>@publication.Summary <span>Trust: @publication.ProvenanceSummary.</span></p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account/work">Open publication follow-through</a>
+                                                </article>
+                                            }
+                                            @if (restoreDevices.Length > 0)
+                                            {
+                                                var device = restoreDevices[0];
+                                                <article class="app-rail__item">
+                                                    <span class="tag">Return packet</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@device.HostLabel</h3>
+                                                        <p>@device.RestoreSummary <span>Role: @device.DeviceRole on @device.Platform.</span></p>
+                                                    </div>
+                                                    <a class="inline-link" href="/account/access">Open return packet</a>
+                                                </article>
+                                            }
                                         </div>
                                     </details>
                                 </div>
