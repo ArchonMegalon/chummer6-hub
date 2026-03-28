@@ -107,6 +107,18 @@ payload = {
     "compose_file": compose_file,
     "playwright_timeout_seconds": int(timeout_seconds),
     "edge_rebuild_skipped": skip_rebuild.lower() in {"1", "true"},
+    "journeys_passed": [
+        "install_claim_restore_continue",
+        "report_cluster_release_notify",
+    ],
+    "proof_routes": [
+        "/downloads/install/avalonia-linux-x64-installer",
+        "/home/access",
+        "/home/work",
+        "/account/work",
+        "/account/support",
+        "/contact",
+    ],
 }
 with open(out_path, "w", encoding="utf-8") as handle:
     json.dump(payload, handle, indent=2)
