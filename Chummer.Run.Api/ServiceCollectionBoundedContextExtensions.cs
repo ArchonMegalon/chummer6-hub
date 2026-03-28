@@ -17,6 +17,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<PublicNavigationService>();
         services.AddSingleton<HubPageChromeService>();
         services.AddSingleton<PublicProgressService>();
+        services.AddSingleton<CampaignOsLocalProofService>();
         services.AddSingleton<PublicReleaseManifestService>();
         services.AddSingleton<ReleaseSelectionService>();
         return services;

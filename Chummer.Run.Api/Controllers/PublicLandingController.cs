@@ -18,6 +18,7 @@ public sealed class PublicLandingController : Controller
 {
     private readonly PublicLandingService _landing;
     private readonly PublicReleaseManifestService _releases;
+    private readonly CampaignOsLocalProofService _campaignOsProof;
     private readonly ReleaseSelectionService _releaseSelection;
     private readonly PublicActionResolver _actions;
     private readonly AccountService _accounts;
@@ -35,6 +36,7 @@ public sealed class PublicLandingController : Controller
     public PublicLandingController(
         PublicLandingService landing,
         PublicReleaseManifestService releases,
+        CampaignOsLocalProofService campaignOsProof,
         ReleaseSelectionService releaseSelection,
         PublicActionResolver actions,
         AccountService accounts,
@@ -51,6 +53,7 @@ public sealed class PublicLandingController : Controller
     {
         _landing = landing;
         _releases = releases;
+        _campaignOsProof = campaignOsProof;
         _releaseSelection = releaseSelection;
         _actions = actions;
         _accounts = accounts;
@@ -137,6 +140,7 @@ public sealed class PublicLandingController : Controller
             Inspectable: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/now"),
             SignedInPreview: surface.RegisteredOverlays,
             Manifest: manifest,
+            CampaignOsProof: _campaignOsProof.LoadProof(),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Now.cshtml", model);
     }

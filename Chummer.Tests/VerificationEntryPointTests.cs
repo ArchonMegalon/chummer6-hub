@@ -124,6 +124,26 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void NowPageSurfacesCampaignOsLocalProof()
+    {
+        string serviceCollectionPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml");
+
+        string serviceCollection = File.ReadAllText(serviceCollectionPath);
+        string controller = File.ReadAllText(controllerPath);
+        string viewModel = File.ReadAllText(viewModelPath);
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("CampaignOsLocalProofService", serviceCollection, StringComparison.Ordinal);
+        Assert.Contains("CampaignOsProof: _campaignOsProof.LoadProof()", controller, StringComparison.Ordinal);
+        Assert.Contains("CampaignOsLocalProofSnapshot? CampaignOsProof", viewModel, StringComparison.Ordinal);
+        Assert.Contains("Campaign OS local proof", view, StringComparison.Ordinal);
+        Assert.Contains("Source-backed local smoke contract", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ReleaseWorkflowPublishesApiAndDownloadsMirrorArtifacts()
     {
         string workflowPath = RepoPaths.FromRoot(".github", "workflows", "desktop-downloads-matrix.yml");
