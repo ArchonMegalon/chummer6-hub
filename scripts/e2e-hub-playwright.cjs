@@ -229,14 +229,14 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/account/work', async () => {
     await expectVisible(page, 'text=Work');
-    await expandDetailsBySummary(page, 'Work and teams', '/account/work');
+    await expandDetailsBySummary(page, 'Work', '/account/work');
     await expandDetailsBySummary(page, 'Campaigns & dossiers', '/account/work');
     await expandDetailsBySummary(page, 'preview campaign', '/account/work');
-    await expectBodyText(page, 'Campaign workspace', '/account/work');
+    await expectBodyText(page, 'Shared campaign views', '/account/work');
     await expectBodyText(page, 'Build paths', '/account/work');
     await expectBodyText(page, 'Grounded rule answers', '/account/work');
     await expectBodyText(page, 'Creator publication shelf', '/account/work');
-    await expectBodyText(page, 'Rule environment', '/account/work');
+    await expectBodyText(page, 'Reference context', '/account/work');
     await expectBodyText(page, 'Active scene', '/account/work');
     await expectBodyText(page, 'Next safe action', '/account/work');
     await expandDetailsBySummary(page, 'Recent change packets', '/account/work');

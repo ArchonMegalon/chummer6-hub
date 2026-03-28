@@ -56,7 +56,7 @@ rg -n 'public sealed class AccountService|public sealed class GroupService|publi
   Chummer.Run.Api/Services/Community/*.cs >/dev/null
 rg -n 'public sealed class CampaignSpineService|RunnerDossierProjection|CampaignProjection|RunProjection|CampaignWorkspaceProjection|CampaignReadinessCue|WorkspaceRestoreProjection|AccountCampaignSummary' \
   Chummer.Run.Api/Services/Community/CampaignSpineService.cs >/dev/null
-rg -n 'OperatorRole|CampaignVisibilitySummary|ApprovalState|Workspaces|Campaign workspace|GM readiness|Permissions' \
+rg -n 'OperatorRole|CampaignVisibilitySummary|ApprovalState|Workspaces|Shared campaign view|GM-ready|Permissions' \
   Chummer.Campaign.Contracts/CampaignContracts.cs \
   Chummer.Run.Api/Views/Accounts/Account.cshtml >/dev/null
 rg -n 'public sealed class IdentityLinkService|Google|Facebook|Telegram|EA' \

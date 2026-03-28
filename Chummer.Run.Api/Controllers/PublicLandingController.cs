@@ -343,7 +343,7 @@ public sealed class PublicLandingController : Controller
             Heading: "Support case received",
             Intro: trackedCase is null
                 ? "Chummer accepted the report. Keep the case id nearby if you need to mention it later."
-                : "Chummer accepted the report and linked it to the signed-in product shell so the next routed update stays visible.",
+                : "Chummer accepted the report and linked it to the signed-in account path so the next routed update stays visible.",
             CaseId: caseId,
             StatusLabel: trackedCase?.Status ?? SupportCaseStatuses.New,
             ResponseExpectation: authenticated
@@ -604,7 +604,7 @@ public sealed class PublicLandingController : Controller
         => currentSection switch
         {
             "access" => ("Home · Access", "Install return, support closure, and access state without the rest of the dashboard."),
-            "work" => ("Home · Work", "Continuity, current work, and the next useful product path without the full overview shell."),
+            "work" => ("Home · Work", "Current work, return context, and the next useful route without the rest of Home."),
             "setup" => ("Home · Setup", "Finish the short account setup flow, then come back to access and work."),
             _ => ("Home", "Pick the next action and keep track of what is opening next.")
         };
