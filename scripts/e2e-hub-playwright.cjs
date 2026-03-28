@@ -228,6 +228,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   assert(/\/account\/support\/support_case_/i.test(page.url()), 'Support form should redirect to a tracked case route.');
   await expectVisible(page, 'text=Tracked case');
+  await expectVisible(page, 'text=Next safe action');
+  await expectVisible(page, 'text=Closure');
   await expectVisible(page, 'text=Saved attachments');
   await expectVisible(page, 'text=playwright-support.log');
   await assertNoPageErrors(page, pageErrors, 'Tracked support case');

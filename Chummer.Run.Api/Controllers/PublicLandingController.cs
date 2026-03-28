@@ -29,6 +29,7 @@ public sealed class PublicLandingController : Controller
     private readonly HubPageChromeService _chrome;
     private readonly PublicTrustContentService _trustContent;
     private readonly SupportCaseService _supportCases;
+    private readonly SupportCasePresentationService _supportPresentation;
     private readonly ILogger<PublicLandingController> _logger;
 
     public PublicLandingController(
@@ -45,6 +46,7 @@ public sealed class PublicLandingController : Controller
         HubPageChromeService chrome,
         PublicTrustContentService trustContent,
         SupportCaseService supportCases,
+        SupportCasePresentationService supportPresentation,
         ILogger<PublicLandingController> logger)
     {
         _landing = landing;
@@ -60,6 +62,7 @@ public sealed class PublicLandingController : Controller
         _chrome = chrome;
         _trustContent = trustContent;
         _supportCases = supportCases;
+        _supportPresentation = supportPresentation;
         _logger = logger;
     }
 
@@ -348,7 +351,8 @@ public sealed class PublicLandingController : Controller
                 : "Guest reports should include a reply email. Clear preview reports usually get an answer within two working days.",
             Highlights: highlights,
             Actions: actions,
-            Attachments: trackedCase?.Attachments ?? Array.Empty<SupportCaseAttachmentProjection>()));
+            Attachments: trackedCase?.Attachments ?? Array.Empty<SupportCaseAttachmentProjection>(),
+            TrackedCaseSummary: trackedCase is null ? null : _supportPresentation.Build(trackedCase)));
     }
 
     [HttpPost("/contact")]
@@ -430,6 +434,7 @@ public sealed class PublicLandingController : Controller
             var experience = _experience.GetOrCreate(subject.SubjectId);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
+            var supportCaseSummaries = _supportPresentation.BuildList(supportCases);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
             var model = new HomePageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
@@ -442,6 +447,7 @@ public sealed class PublicLandingController : Controller
                 Experience: experience,
                 InstallLinking: installLinking,
                 SupportCases: supportCases,
+                SupportCaseSummaries: supportCaseSummaries,
                 CampaignSpine: campaignSpine,
                 PrimaryAction: BuildHomePrimaryAction(experience, installLinking),
                 NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath),

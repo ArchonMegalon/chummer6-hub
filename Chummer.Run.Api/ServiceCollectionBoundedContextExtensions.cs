@@ -48,6 +48,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<SupportStore>();
         services.AddSingleton<SupportAttachmentStorageService>();
         services.AddSingleton<SupportCaseService>();
+        services.AddSingleton<SupportCasePresentationService>();
         services.AddSingleton<SupportAssistantService>();
         services.AddSingleton<CrashSupportService>();
         return services;

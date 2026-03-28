@@ -40,6 +40,24 @@
     </div>
 </section>
 
+@if (Model.TrackedCaseSummary is not null)
+{
+    <section class="compact-rail">
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>Next safe action</h3>
+                <p>@Model.TrackedCaseSummary.NextSafeAction</p>
+            </div>
+        </article>
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>Closure</h3>
+                <p>@Model.TrackedCaseSummary.ClosureSummary</p>
+            </div>
+        </article>
+    </section>
+}
+
 <section class="compact-rail">
     <article class="compact-rail__item">
         <div class="compact-rail__copy">

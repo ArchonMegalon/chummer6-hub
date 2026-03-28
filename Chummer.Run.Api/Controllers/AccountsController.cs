@@ -19,6 +19,7 @@ public sealed class AccountsController : Controller
     private readonly UserExperienceService _experience;
     private readonly InstallLinkingService _installLinking;
     private readonly SupportCaseService _supportCases;
+    private readonly SupportCasePresentationService _supportPresentation;
     private readonly CampaignSpineService _campaignSpine;
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
@@ -31,6 +32,7 @@ public sealed class AccountsController : Controller
         UserExperienceService experience,
         InstallLinkingService installLinking,
         SupportCaseService supportCases,
+        SupportCasePresentationService supportPresentation,
         CampaignSpineService campaignSpine,
         HubPageChromeService chrome,
         HubGoogleAuthService google,
@@ -42,6 +44,7 @@ public sealed class AccountsController : Controller
         _experience = experience;
         _installLinking = installLinking;
         _supportCases = supportCases;
+        _supportPresentation = supportPresentation;
         _campaignSpine = campaignSpine;
         _chrome = chrome;
         _google = google;
@@ -68,9 +71,11 @@ public sealed class AccountsController : Controller
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
+            var supportCaseSummaries = _supportPresentation.BuildList(supportCases);
             var selectedSupportCase = string.IsNullOrWhiteSpace(caseId)
                 ? null
                 : _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
+            var selectedSupportCaseSummary = selectedSupportCase is null ? null : _supportPresentation.Build(selectedSupportCase);
             var model = new AccountPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
                 CurrentSection: selectedSection,
@@ -82,7 +87,9 @@ public sealed class AccountsController : Controller
                 GoogleAvailable: _google.IsConfigured(),
                 InstallLinking: installLinking,
                 SupportCases: supportCases,
+                SupportCaseSummaries: supportCaseSummaries,
                 SelectedSupportCase: selectedSupportCase,
+                SelectedSupportCaseSummary: selectedSupportCaseSummary,
                 CampaignSpine: _campaignSpine.GetAccountSummary(user, installLinking));
             return View("~/Views/Accounts/Account.cshtml", model);
         }

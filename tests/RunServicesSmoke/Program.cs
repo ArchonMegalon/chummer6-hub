@@ -557,7 +557,8 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         Timezone: "UTC",
         CountryCode: "AT"));
     var experience = new UserExperienceService(store, accounts);
-    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, campaignSpine, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var supportPresentation = new SupportCasePresentationService();
+    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1522,6 +1523,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
     Assert(homeSource.Contains("Evidence:", StringComparison.Ordinal), "home work should surface the first grounded rule evidence line instead of only a generic provenance label.");
     Assert(homeSource.Contains("Next:", StringComparison.Ordinal), "home work should keep a short next-step cue on the calmer build follow-through card.");
+    Assert(homeSource.Contains("@supportCase.ClosureSummary", StringComparison.Ordinal), "home access should surface support-closure truth directly from the shared support presenter.");
     Assert(homeSource.Contains("Watchout:", StringComparison.Ordinal), "home work should keep one concrete watchout instead of a long data-dump summary.");
     Assert(!homeSource.Contains("Next safe action:", StringComparison.Ordinal), "home work should not fall back to the older verbose next-safe-action label on the short card.");
     Assert(!homeSource.Contains("Support reuse:", StringComparison.Ordinal), "home work should keep support reuse detail in the deeper work route instead of the short home card.");
@@ -1532,6 +1534,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Grounded rule answers", StringComparison.Ordinal), "account should describe Rules Navigator follow-through as grounded rule answers.");
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
     Assert(accountSource.Contains("Closure:", StringComparison.Ordinal), "account build-path details should surface support-closure truth instead of leaving the new rail data unused.");
+    Assert(accountSource.Contains("Next safe action:", StringComparison.Ordinal), "account support detail should surface the next honest user action for a tracked case.");
     Assert(accountSource.Contains("More settings", StringComparison.Ordinal), "account should keep non-core sections behind a calmer secondary settings disclosure.");
     Assert(accountSource.Contains("<summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should keep primary sign-in inside a calmer drawer instead of a full stacked section.");
     Assert(accountSource.Contains("<summary>Recovery email</summary>", StringComparison.Ordinal), "account profile should keep recovery email inside a calmer drawer instead of stacking it inline on the main profile route.");
@@ -1547,6 +1550,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
     Assert(supportSubmittedSource.Contains("Watch Account > Support", StringComparison.Ordinal), "support confirmation should explain the signed-in follow-up lane instead of stopping at a generic receipt.");
     Assert(supportSubmittedSource.Contains("Watch your reply email", StringComparison.Ordinal), "support confirmation should explain the guest follow-up lane instead of assuming an account-only workflow.");
+    Assert(supportSubmittedSource.Contains("Next safe action", StringComparison.Ordinal), "support confirmation should keep the tracked case next-step visible when the reporter is signed in.");
     Assert(supportSubmittedSource.Contains("Download</a>", StringComparison.Ordinal), "support confirmation should keep saved attachment downloads visible on the first confirmation screen.");
     var faqSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Faq.cshtml"));
     Assert(faqSource.Contains("FaqActionFor", StringComparison.Ordinal), "faq should attach direct next-step routing under answers instead of stopping at a text-only sheet.");
@@ -1606,14 +1610,15 @@ async Task VerifyPublicLandingProjectionAsync()
     var emailLinks = new HubEmailLinkVerificationService(
         DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(tempRoot, "email-links"))));
     var google = CreateGoogleService(configuration, authService, identityLinks, accounts, loggerFactory, tempRoot);
-    var controller = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
+    var supportPresentation = new SupportCasePresentationService();
+    var controller = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1660,6 +1665,7 @@ async Task VerifyPublicLandingProjectionAsync()
         experience,
         installLinking,
         supportCases,
+        supportPresentation,
         campaignSpine,
         chrome,
         google,
@@ -1904,6 +1910,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var accountPage = await accountController.AccountPage(section: null, caseId: null, CancellationToken.None) as ViewResult;
     var accountModel = accountPage?.Model as AccountPageViewModel;
     Assert(accountModel is not null && accountModel.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "account page should surface support-case history beside installs and access.");
+    Assert(accountModel!.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(item.ClosureSummary)), "account page should project support lifecycle and closure summaries instead of only raw case rows.");
     Assert(string.Equals(accountModel!.CurrentSection, "profile", StringComparison.Ordinal), "default account route should land on the profile section.");
     Assert(accountModel.CoreSections.Any(static section => string.Equals(section.Href, "/account/access", StringComparison.Ordinal)), "account should expose the devices-and-access section link.");
     Assert(accountModel!.CampaignSpine.Dossiers.Count >= 1, "account page should surface the living dossier summary.");
@@ -1933,6 +1940,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var accountSupportDetailPage = await accountController.AccountPage(section: "support", caseId: supportCase.CaseId, CancellationToken.None) as ViewResult;
     var accountSupportDetailModel = accountSupportDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountSupportDetailModel?.SelectedSupportCase?.CaseId, supportCase.CaseId, StringComparison.Ordinal), "account support detail route should load the selected tracked case.");
+    Assert(accountSupportDetailModel?.SelectedSupportCaseSummary is not null, "account support detail route should project a support lifecycle summary for the tracked case.");
+    Assert(string.Equals(accountSupportDetailModel!.SelectedSupportCaseSummary!.StatusLabel, "Notified", StringComparison.Ordinal), "account support detail should humanize notified support closure for the signed-in reporter.");
+    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.FixedReleaseLabel?.Contains("preview", StringComparison.OrdinalIgnoreCase) == true, "account support detail should tie closure truth to the released reporter channel.");
+    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.ClosureSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase), "account support detail should explain that the reporter-facing closure already went out.");
     var accountAccessPage = await accountController.AccountPage(section: "access", caseId: null, CancellationToken.None) as ViewResult;
     var accountAccessModel = accountAccessPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountAccessModel?.CurrentSection, "access", StringComparison.Ordinal), "account access route should render the devices-and-access section.");
@@ -1944,6 +1955,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(authenticatedHomeModel!.CurrentSection, "overview", StringComparison.Ordinal), "default home route should land on the overview section.");
     Assert(authenticatedHomeModel.Sections.Any(static section => string.Equals(section.Href, "/home/access", StringComparison.Ordinal)), "home should expose the dedicated access section link.");
     Assert(authenticatedHomeModel!.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "signed-in home should surface tracked support context.");
+    Assert(authenticatedHomeModel.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && item.ClosureSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase)), "signed-in home access should surface release closure truth from the shared support presenter.");
     Assert(authenticatedHomeModel.CampaignSpine.Dossiers.Count >= 1, "signed-in home should surface living dossier continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.Runs.Count >= 1, "signed-in home should surface runboard continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Count >= 1, "signed-in home should keep the first-class campaign workspace attached to the signed-in shell.");
@@ -1962,6 +1974,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var contactSubmittedModel = contactSubmittedPage?.Model as SupportSubmittedPageViewModel;
     Assert(contactSubmittedModel is not null && string.Equals(contactSubmittedModel.CaseId, supportCase.CaseId, StringComparison.Ordinal), "contact submitted route should render a stable support confirmation page.");
     Assert(contactSubmittedModel!.Attachments.Count == 1, "contact submitted route should surface saved support attachments for signed-in reporters.");
+    Assert(contactSubmittedModel.TrackedCaseSummary is not null && contactSubmittedModel.TrackedCaseSummary.NextSafeAction.Contains("Update", StringComparison.OrdinalIgnoreCase), "contact confirmation should keep the next safe support action visible for signed-in reporters.");
     Assert(authenticatedHomeModel.CampaignSpine.RulesNavigator.Count >= 1, "signed-in home should surface grounded rules navigator answers.");
     Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Count >= 1, "signed-in home should surface creator publication posture.");
     Assert(authenticatedHomeModel.CampaignSpine.MigrationReceipts.Count >= 1, "signed-in home should surface migration receipt truth.");
@@ -2039,7 +2052,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2061,7 +2074,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
     Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
-    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, campaignSpine, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, chrome, google, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

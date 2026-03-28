@@ -24,11 +24,12 @@
     var buildHandoffs = Model.CampaignSpine.BuildLabHandoffs.Take(2).ToArray();
     var rulesAnswers = Model.CampaignSpine.RulesNavigator.Take(2).ToArray();
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
-    var releasedOrNotifiedCases = Model.SupportCases
+    var releasedOrNotifiedCases = Model.SupportCaseSummaries
         .Where(item =>
-            string.Equals(item.Status, "released_to_reporter_channel", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(item.Status, "user_notified", StringComparison.OrdinalIgnoreCase))
-        .OrderByDescending(item => item.UpdatedAtUtc)
+            string.Equals(item.Case.Status, "released_to_reporter_channel", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.Case.Status, "user_notified", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.Case.Status, "fixed", StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(item => item.Case.UpdatedAtUtc)
         .Take(2)
         .ToArray();
     var recentReceipts = Model.InstallLinking.RecentReceipts.Take(2).ToArray();
@@ -131,12 +132,12 @@
                                             @foreach (var supportCase in releasedOrNotifiedCases)
                                             {
                                                 <article class="app-rail__item">
-                                                    <span class="tag">Support</span>
+                                                    <span class="tag">@supportCase.StageLabel</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>@supportCase.Title</h3>
-                                                        <p>@(supportCase.FixedVersion is null ? supportCase.Summary : $"Fixed in {supportCase.FixedVersion}: {supportCase.Summary}")</p>
+                                                        <h3>@supportCase.Case.Title</h3>
+                                                        <p>@supportCase.ClosureSummary <span>Next: @supportCase.NextSafeAction</span></p>
                                                     </div>
-                                                    <a class="inline-link" href="/account/support">Open support</a>
+                                                    <a class="inline-link" href="@supportCase.PrimaryActionHref">@supportCase.PrimaryActionLabel</a>
                                                 </article>
                                             }
                                             @foreach (var receipt in recentReceipts)
