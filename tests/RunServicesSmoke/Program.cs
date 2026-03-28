@@ -2056,10 +2056,66 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(accountSupportDetailModel!.SelectedSupportCaseSummary!.StatusLabel, "Notified", StringComparison.Ordinal), "account support detail should humanize notified support closure for the signed-in reporter.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.FixedReleaseLabel?.Contains("preview", StringComparison.OrdinalIgnoreCase) == true, "account support detail should tie closure truth to the released reporter channel.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.ClosureSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase), "account support detail should explain that the reporter-facing closure already went out.");
+    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.CanVerifyFix, "account support detail should let the reporter confirm whether the fix worked on the affected install.");
+    Assert(accountSupportDetailModel.SelectedSupportCaseSummary.VerificationSummary.Contains("fix worked here", StringComparison.OrdinalIgnoreCase) || accountSupportDetailModel.SelectedSupportCaseSummary.VerificationSummary.Contains("still reproduces", StringComparison.OrdinalIgnoreCase), "account support detail should explain the available verification loop before confirmation.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.FollowUpLaneSummary.Contains("Account > Support", StringComparison.Ordinal), "account support detail should keep the signed-in follow-up lane explicit.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.ReleaseProgressSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase), "account support detail should project the user-facing release progress summary.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.AffectedInstallSummary?.Contains("install-smoke-001", StringComparison.Ordinal) == true, "account support detail should keep the affected install attached to the tracked case.");
     Assert(accountSupportDetailModel.SelectedSupportCaseSummary.TimelineHighlights.Count >= 1, "account support detail should project timeline highlights through the shared presenter.");
+    var verifiedFixedResult = await supportCasesController.VerifyReporterFix(
+        supportCase.CaseId,
+        new SupportCaseVerificationRequest(
+            Outcome: SupportCaseVerificationStates.ConfirmedFixed,
+            Note: "Preview 0.6.3-smoke fixed it here."),
+        CancellationToken.None);
+    var verifiedFixedPayload = (verifiedFixedResult.Result as OkObjectResult)?.Value as SupportCaseProjection ?? verifiedFixedResult.Value;
+    Assert(verifiedFixedPayload is not null && string.Equals(verifiedFixedPayload.ReporterVerificationState, SupportCaseVerificationStates.ConfirmedFixed, StringComparison.Ordinal), "reporter verification should record a confirmed-fixed outcome.");
+    Assert(verifiedFixedPayload!.ReporterVerifiedAtUtc is not null, "reporter verification should stamp the verification time.");
+    var verifiedFixedAccountDetailPage = await accountController.AccountPage(section: "support", caseId: supportCase.CaseId, CancellationToken.None) as ViewResult;
+    var verifiedFixedAccountDetailModel = verifiedFixedAccountDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(verifiedFixedAccountDetailModel?.SelectedSupportCaseSummary?.StageLabel, "Closed and confirmed", StringComparison.Ordinal), "confirmed fixes should project a closed-and-confirmed support stage.");
+    Assert(verifiedFixedAccountDetailModel?.SelectedSupportCaseSummary?.VerificationSummary.Contains("0.6.3-smoke", StringComparison.Ordinal) == true, "confirmed fixes should project the reporter-visible fixed release in the verification summary.");
+    Assert(verifiedFixedAccountDetailModel?.SelectedSupportCaseSummary?.CanVerifyFix == false, "confirmed fixes should retire the reporter verification call-to-action.");
+
+    SupportCaseProjection reopenCase = supportCases.Submit(
+        linkedUser.UserId,
+        "subject.demo",
+        new SupportCaseSubmitRequest(
+            Kind: SupportCaseKinds.BugReport,
+            Title: "Campaign recap still loses roster context",
+            Summary: "The recap lane still drops the active roster after the update.",
+            Detail: "Returning from the update still loses the selected roster on the campaign recap screen.",
+            InstallationId: "install-smoke-001",
+            ApplicationVersion: "0.6.2-smoke",
+            ReleaseChannel: "preview",
+            HeadId: "avalonia",
+            Platform: "linux",
+            Arch: "x64",
+            Source: SupportCaseSourceKinds.HubAccount));
+    var reopenReleasedResult = supportAutomationController.Transition(
+        reopenCase.CaseId,
+        new SupportCaseTransitionRequest(
+            TargetStatus: SupportCaseStatuses.ReleasedToReporterChannel,
+            Note: "Fix is live on preview 0.6.4-smoke.",
+            FixedVersion: "0.6.4-smoke",
+            FixedChannel: "preview",
+            Actor: "fleet"));
+    var reopenReleasedPayload = (reopenReleasedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
+    Assert(reopenReleasedPayload is not null && string.Equals(reopenReleasedPayload.Status, SupportCaseStatuses.ReleasedToReporterChannel, StringComparison.Ordinal), "secondary support case should enter reporter-facing release state before reopen verification.");
+    var stillBrokenResult = await supportCasesController.VerifyReporterFix(
+        reopenCase.CaseId,
+        new SupportCaseVerificationRequest(
+            Outcome: SupportCaseVerificationStates.StillBroken,
+            Note: "The recap still drops the roster after the update."),
+        CancellationToken.None);
+    var stillBrokenPayload = (stillBrokenResult.Result as OkObjectResult)?.Value as SupportCaseProjection ?? stillBrokenResult.Value;
+    Assert(stillBrokenPayload is not null && string.Equals(stillBrokenPayload.Status, SupportCaseStatuses.AwaitingEvidence, StringComparison.Ordinal), "still-broken verification should reopen the case into awaiting_evidence.");
+    Assert(string.Equals(stillBrokenPayload!.ReporterVerificationState, SupportCaseVerificationStates.StillBroken, StringComparison.Ordinal), "still-broken verification should record the reporter outcome.");
+    var reopenedAccountDetailPage = await accountController.AccountPage(section: "support", caseId: reopenCase.CaseId, CancellationToken.None) as ViewResult;
+    var reopenedAccountDetailModel = reopenedAccountDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(reopenedAccountDetailModel?.SelectedSupportCaseSummary?.StageLabel, "Needs follow-up", StringComparison.Ordinal), "still-broken verification should project a follow-up stage on the account support detail.");
+    Assert(reopenedAccountDetailModel?.SelectedSupportCaseSummary?.VerificationSummary.Contains("still broken", StringComparison.OrdinalIgnoreCase) == true, "still-broken verification should project the reporter note on the account support detail.");
+    Assert(reopenedAccountDetailModel?.SelectedSupportCaseSummary?.CanVerifyFix == false, "reopened follow-up cases should not keep the same verification call-to-action until another fix reaches the reporter.");
     var accountAccessPage = await accountController.AccountPage(section: "access", caseId: null, CancellationToken.None) as ViewResult;
     var accountAccessModel = accountAccessPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountAccessModel?.CurrentSection, "access", StringComparison.Ordinal), "account access route should render the devices-and-access section.");

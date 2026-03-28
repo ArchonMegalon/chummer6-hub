@@ -33,6 +33,12 @@ public static class SupportCaseSourceKinds
     public const string FleetAutomation = "fleet_automation";
 }
 
+public static class SupportCaseVerificationStates
+{
+    public const string ConfirmedFixed = "confirmed_fixed";
+    public const string StillBroken = "still_broken";
+}
+
 public sealed record SupportCaseTimelineEvent(
     string EventId,
     string Status,
@@ -75,6 +81,9 @@ public sealed record SupportCaseProjection(
     string? FixedChannel = null,
     DateTimeOffset? ReleasedToReporterChannelAtUtc = null,
     DateTimeOffset? UserNotifiedAtUtc = null,
+    string? ReporterVerificationState = null,
+    string? ReporterVerificationNote = null,
+    DateTimeOffset? ReporterVerifiedAtUtc = null,
     IReadOnlyList<string>? RelatedIds = null,
     IReadOnlyList<SupportCaseTimelineEvent>? Timeline = null,
     IReadOnlyList<SupportCaseAttachmentProjection>? Attachments = null);
@@ -104,6 +113,11 @@ public sealed record SupportCaseNotificationRequest(
     [property: Required(AllowEmptyStrings = false), StringLength(160)] string Note,
     [property: StringLength(64)] string? Actor = null,
     [property: StringLength(64)] string? Channel = null);
+
+public sealed record SupportCaseVerificationRequest(
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string Outcome,
+    [property: StringLength(160)] string? Note = null,
+    [property: StringLength(64)] string? Actor = null);
 
 public sealed record SupportCaseListResponse(
     IReadOnlyList<SupportCaseProjection> Items,
