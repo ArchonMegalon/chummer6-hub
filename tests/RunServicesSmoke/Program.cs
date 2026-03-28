@@ -1861,9 +1861,20 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(participateModel.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Join beta waitlist", StringComparison.Ordinal)), "participate page should render an explicit beta-waitlist label.");
     var privacyPage = trustContent.BuildPrivacyPage(chrome.BuildPublicChrome("Privacy", "What Chummer stores, and what it does not.", "/privacy"));
     Assert(privacyPage.Actions.Any(static action => string.Equals(action.Label, "Create account", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "privacy page should adapt account-only actions into signup-first actions for guests.");
+    var publicPrivacyView = await controller.PrivacyPage(CancellationToken.None) as ViewResult;
+    var publicPrivacyModel = publicPrivacyView?.Model as TrustPageViewModel;
+    Assert(publicPrivacyModel?.TrustPulse is not null, "privacy page should surface the weekly public trust pulse.");
+    var publicTermsView = await controller.TermsPage(CancellationToken.None) as ViewResult;
+    var publicTermsModel = publicTermsView?.Model as TrustPageViewModel;
+    Assert(publicTermsModel?.TrustPulse is not null, "terms page should surface the weekly public trust pulse.");
+    var publicContactView = await controller.ContactPage(CancellationToken.None) as ViewResult;
+    var publicContactModel = publicContactView?.Model as TrustPageViewModel;
+    Assert(publicContactModel?.TrustPulse is not null, "guest contact page should surface the weekly public trust pulse.");
+    Assert(publicContactModel?.SupportIntake is not null, "guest contact page should keep the first-party support intake available.");
 
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
+    Assert(downloadsModel?.TrustPulse is not null, "guest downloads should surface the weekly public trust pulse.");
     Assert(downloadsModel is not null && downloadsModel.Manifest.Downloads.Any(static item => string.Equals(item.Id, "smoke-poc-linux-x64", StringComparison.Ordinal)), "downloads page should render artifacts from the live release manifest");
     Assert(downloadsModel!.Manifest.Downloads.All(static item => !string.Equals(item.Id, "smoke-poc-osx-arm64-installer", StringComparison.Ordinal)), "downloads page should filter withheld macOS artifacts from the public manifest.");
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
@@ -2382,6 +2393,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var authenticatedContactPage = await authenticatedLandingController.ContactPage(CancellationToken.None) as ViewResult;
     var authenticatedContactModel = authenticatedContactPage?.Model as TrustPageViewModel;
     Assert(authenticatedContactModel?.SupportIntake is not null, "authenticated contact page should project the first-party support intake.");
+    Assert(authenticatedContactModel?.TrustPulse is not null, "authenticated contact page should surface the weekly public trust pulse.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedContactModel!.SupportIntake!.DefaultInstallationId), "authenticated contact page should prefill install-aware support context when a linked install exists.");
     Assert(authenticatedContactModel.SupportIntake.ContextHint?.Contains("linked install", StringComparison.OrdinalIgnoreCase) == true, "authenticated contact page should explain where the prefilled install context came from.");
     Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultReleaseChannel, "preview", StringComparison.Ordinal), "authenticated contact page should prefill the install release channel.");
@@ -2391,6 +2403,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var queryPrefilledContactPage = await authenticatedLandingController.ContactPage(CancellationToken.None) as ViewResult;
     var queryPrefilledContactModel = queryPrefilledContactPage?.Model as TrustPageViewModel;
     Assert(queryPrefilledContactModel?.SupportIntake is not null, "query-prefilled contact page should keep the first-party support intake intact.");
+    Assert(queryPrefilledContactModel?.TrustPulse is not null, "query-prefilled contact page should keep the weekly public trust pulse intact.");
     Assert(string.Equals(queryPrefilledContactModel!.SupportIntake!.DefaultKind, SupportCaseKinds.InstallHelp, StringComparison.Ordinal), "query-prefilled contact page should preserve the requested support case type.");
     Assert(string.Equals(queryPrefilledContactModel.SupportIntake.DefaultTitle, "Mobile follow-through needs grounded runtime", StringComparison.Ordinal), "query-prefilled contact page should preserve the requested support title.");
     Assert(string.Equals(queryPrefilledContactModel.SupportIntake.DefaultSummary, "Scene resume needs support review", StringComparison.Ordinal), "query-prefilled contact page should preserve the requested support summary.");

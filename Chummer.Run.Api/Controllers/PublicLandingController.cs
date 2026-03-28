@@ -298,7 +298,14 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> PrivacyPage(CancellationToken cancellationToken)
     {
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Privacy", "What the account keeps, what stays out of it, and how recognition and privacy stay separate.", "/privacy", cancellationToken);
-        return View("~/Views/PublicLanding/TrustPage.cshtml", _trustContent.BuildPrivacyPage(chrome));
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        return View(
+            "~/Views/PublicLanding/TrustPage.cshtml",
+            _trustContent.BuildPrivacyPage(chrome) with
+            {
+                TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience)
+            });
     }
 
     [HttpGet("/terms")]
@@ -306,7 +313,14 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> TermsPage(CancellationToken cancellationToken)
     {
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Terms", "Preview-use expectations, support posture, and the boundaries of the current hosted promise.", "/terms", cancellationToken);
-        return View("~/Views/PublicLanding/TrustPage.cshtml", _trustContent.BuildTermsPage(chrome));
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        return View(
+            "~/Views/PublicLanding/TrustPage.cshtml",
+            _trustContent.BuildTermsPage(chrome) with
+            {
+                TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience)
+            });
     }
 
     [HttpGet("/contact")]
@@ -314,7 +328,9 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> ContactPage(CancellationToken cancellationToken)
     {
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Where to send bugs, account questions, and public product feedback right now.", "/contact", cancellationToken);
-        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildContactPageModelAsync(chrome, cancellationToken));
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildContactPageModelAsync(chrome, manifest, releaseExperience, cancellationToken));
     }
 
     [HttpGet("/contact/submitted/{caseId}")]
@@ -668,12 +684,17 @@ public sealed class PublicLandingController : Controller
         }
     }
 
-    private async Task<TrustPageViewModel> BuildContactPageModelAsync(SiteChromeViewModel chrome, CancellationToken cancellationToken)
+    private async Task<TrustPageViewModel> BuildContactPageModelAsync(
+        SiteChromeViewModel chrome,
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience,
+        CancellationToken cancellationToken)
     {
         var installDefaults = await ResolveSupportIntakeDefaultsAsync(cancellationToken);
         var overrides = ResolveSupportIntakeOverridesFromQuery();
         return _trustContent.BuildContactPage(chrome) with
         {
+            TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SupportIntake = BuildSupportIntakeModel(
                 authenticated: chrome.Authenticated,
                 submissionNotice: null,
