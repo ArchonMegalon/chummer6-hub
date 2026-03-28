@@ -314,7 +314,7 @@ public sealed class PublicLandingController : Controller
         var highlights = new List<string>
         {
             $"Case id {caseId}",
-            authenticated ? "Tracked inside the signed-in shell" : "Guest follow-up stays on the reply email you provided"
+            authenticated ? "Tracked on your account support page" : "Guest follow-up stays on the reply email you provided"
         };
         if (trackedCase?.Attachments is { Count: > 0 })
         {
@@ -530,7 +530,7 @@ public sealed class PublicLandingController : Controller
             return new HomePrimaryActionViewModel(
                 "Setup",
                 "Finish setup",
-                "Complete the short setup flow so Chummer can recover your account, route updates, and keep the signed-in shell calm.",
+                "Complete the short setup flow so Chummer can recover your account, route updates, and keep your account surface calm.",
                 "Complete setup",
                 "/home/setup",
                 "primary");
