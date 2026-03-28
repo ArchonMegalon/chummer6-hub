@@ -91,6 +91,22 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
     await expectVisible(page, 'text=Open a first-party support case');
   });
+  await gotoAndAssert(
+    page,
+    pageErrors,
+    '/contact?kind=install_help&title=Mobile%20follow-through%20needs%20grounded%20runtime&summary=Scene%20resume%20needs%20support%20review&detail=Session%3A%20session-redmond&sessionId=session-redmond&sceneId=scene-redmond&runtime=sr6.preview.v1&bundle=bundle-redmond',
+    async () => {
+      await expectVisible(page, 'text=Open a first-party support case');
+      assert.equal(await page.locator('#supportKind').inputValue(), 'install_help', 'Prefilled contact route should preserve the support kind.');
+      assert.equal(await page.locator('#supportTitle').inputValue(), 'Mobile follow-through needs grounded runtime', 'Prefilled contact route should preserve the support title.');
+      assert.equal(await page.locator('#supportSummary').inputValue(), 'Scene resume needs support review', 'Prefilled contact route should preserve the support summary.');
+      assert.equal(await page.locator('#supportDetail').inputValue(), 'Session: session-redmond', 'Prefilled contact route should preserve the support detail.');
+      await page.getByText('Optional environment details').click();
+      await expectVisible(page, 'text=Follow-through opened with session session-redmond · scene scene-redmond · runtime sr6.preview.v1 · bundle bundle-redmond.');
+    });
+  await gotoAndAssert(page, pageErrors, '/contact', async () => {
+    await expectVisible(page, 'text=Open a first-party support case');
+  });
   await page.selectOption('#supportKind', 'bug_report');
   await page.fill('#supportTitle', 'Guest support intake smoke');
   await page.fill('#supportSummary', 'Guest support submission should land on the first-party confirmation page.');
