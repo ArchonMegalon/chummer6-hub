@@ -64,6 +64,11 @@
     var showAdvancedSection = string.Equals(Model.CurrentSection, "advanced", StringComparison.OrdinalIgnoreCase);
     var selectedSupportCase = Model.SelectedSupportCase;
     var selectedSupportCaseSummary = Model.SelectedSupportCaseSummary;
+    var selectedWorkspace = Model.SelectedWorkspace;
+    var selectedRun = Model.SelectedRun;
+    var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
+    var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
+    var selectedCreatorPublication = Model.SelectedCreatorPublication;
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -137,6 +142,12 @@
 
         return parts.Count == 0 ? "Current device" : string.Join(" · ", parts);
     }
+
+    static string WorkspaceDetailHref(string workspaceId) => $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}";
+    static string RunDetailHref(string runId) => $"/account/work/runs/{Uri.EscapeDataString(runId)}";
+    static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
+    static string RulesDetailHref(string entryId) => $"/account/work/rules/{Uri.EscapeDataString(entryId)}";
+    static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
 }
 
 <section class="account-stage">
@@ -748,6 +759,161 @@
                         <strong>@(creatorPublicationCount == 0 ? "Pending" : creatorPublicationCount.ToString())</strong>
                     </div>
                 </div>
+                @if (selectedWorkspace is not null)
+                {
+                    <article class="app-action-card app-action-card--primary" id="workspace-@selectedWorkspace.WorkspaceId">
+                        <span class="tag">Shared campaign view</span>
+                        <h3>@selectedWorkspace.CampaignName</h3>
+                        <p>@selectedWorkspace.ReturnSummary</p>
+                        <div class="settings-summary-list">
+                            <div class="settings-summary-row">
+                                <span>Visibility</span>
+                                <strong>@HumanizeStatus(selectedWorkspace.Visibility, "Private")</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Rule environment</span>
+                                <strong>@RuleEnvironmentSummary(selectedWorkspace.RuleEnvironment)</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Live runs</span>
+                                <strong>@(selectedWorkspace.Runs.Count == 0 ? "No active run" : $"{selectedWorkspace.Runs.Count} tracked")</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Readiness cues</span>
+                                <strong>@(selectedWorkspace.ReadinessCues.Count == 0 ? "No blockers" : selectedWorkspace.ReadinessCues[0].Summary)</strong>
+                            </div>
+                        </div>
+                        <div class="stacked-copy">
+                            @if (selectedWorkspace.LatestContinuity is not null)
+                            {
+                                <p><strong>Continuity:</strong> @selectedWorkspace.LatestContinuity.Summary</p>
+                            }
+                            @if (selectedWorkspace.RecapShelf.Count > 0)
+                            {
+                                <p><strong>Recap shelf:</strong> @selectedWorkspace.RecapShelf[0].Summary</p>
+                            }
+                        </div>
+                    </article>
+                }
+                else if (selectedRun is not null)
+                {
+                    <article class="app-action-card app-action-card--primary" id="run-@selectedRun.RunId">
+                        <span class="tag">Run context</span>
+                        <h3>@selectedRun.Title</h3>
+                        <p>@selectedRun.Summary</p>
+                        <div class="settings-summary-list">
+                            <div class="settings-summary-row">
+                                <span>Status</span>
+                                <strong>@HumanizeStatus(selectedRun.Status, "Active")</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Active scene</span>
+                                <strong>@(selectedRun.ActiveSceneId ?? "No active scene")</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Objectives</span>
+                                <strong>@selectedRun.Objectives.Count</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Scenes</span>
+                                <strong>@selectedRun.Scenes.Count</strong>
+                            </div>
+                        </div>
+                        @if (selectedRun.LatestContinuity is not null)
+                        {
+                            <p><strong>Continuity:</strong> @selectedRun.LatestContinuity.Summary</p>
+                        }
+                    </article>
+                }
+                else if (selectedBuildLabHandoff is not null)
+                {
+                    <article class="app-action-card app-action-card--primary" id="build-handoff-@selectedBuildLabHandoff.HandoffId">
+                        <span class="tag">Build follow-through</span>
+                        <h3>@selectedBuildLabHandoff.Title</h3>
+                        <p>@selectedBuildLabHandoff.Summary</p>
+                        <div class="settings-summary-list">
+                            <div class="settings-summary-row">
+                                <span>Variant</span>
+                                <strong>@selectedBuildLabHandoff.VariantLabel</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Progression</span>
+                                <strong>@selectedBuildLabHandoff.ProgressionLabel</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Next safe action</span>
+                                <strong>@(selectedBuildLabHandoff.NextSafeAction ?? "Review the grounded progression outcomes before you return to play.")</strong>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.RuntimeCompatibilitySummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Runtime</span>
+                                    <strong>@selectedBuildLabHandoff.RuntimeCompatibilitySummary</strong>
+                                </div>
+                            }
+                        </div>
+                        @if (selectedBuildLabHandoff.TradeoffLines.Count > 0)
+                        {
+                            <p><strong>Tradeoffs:</strong> @string.Join(" ", selectedBuildLabHandoff.TradeoffLines)</p>
+                        }
+                        @if (selectedBuildLabHandoff.Outputs.Count > 0)
+                        {
+                            <p><strong>Outputs:</strong> @string.Join(", ", selectedBuildLabHandoff.Outputs.Select(item => item.Label))</p>
+                        }
+                        @if (selectedBuildLabHandoff.Watchouts is { Count: > 0 })
+                        {
+                            <p><strong>Watchouts:</strong> @string.Join(" ", selectedBuildLabHandoff.Watchouts)</p>
+                        }
+                    </article>
+                }
+                else if (selectedRulesNavigatorAnswer is not null)
+                {
+                    <article class="app-action-card app-action-card--primary" id="rules-answer-@selectedRulesNavigatorAnswer.EntryId">
+                        <span class="tag">Grounded rule answer</span>
+                        <h3>@selectedRulesNavigatorAnswer.Question</h3>
+                        <p>@selectedRulesNavigatorAnswer.ShortAnswer</p>
+                        <div class="settings-summary-list">
+                            <div class="settings-summary-row">
+                                <span>Before</span>
+                                <strong>@selectedRulesNavigatorAnswer.BeforeSummary</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>After</span>
+                                <strong>@selectedRulesNavigatorAnswer.AfterSummary</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Provenance</span>
+                                <strong>@selectedRulesNavigatorAnswer.ProvenanceLabel</strong>
+                            </div>
+                        </div>
+                        @if (selectedRulesNavigatorAnswer.EvidenceLines.Count > 0)
+                        {
+                            <p><strong>Evidence:</strong> @string.Join(" ", selectedRulesNavigatorAnswer.EvidenceLines.Take(3))</p>
+                        }
+                    </article>
+                }
+                else if (selectedCreatorPublication is not null)
+                {
+                    <article class="app-action-card app-action-card--primary" id="publication-@selectedCreatorPublication.PublicationId">
+                        <span class="tag">Publication follow-through</span>
+                        <h3>@selectedCreatorPublication.Title</h3>
+                        <p>@selectedCreatorPublication.Summary</p>
+                        <div class="settings-summary-list">
+                            <div class="settings-summary-row">
+                                <span>Trust</span>
+                                <strong>@selectedCreatorPublication.ProvenanceSummary</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Discovery</span>
+                                <strong>@selectedCreatorPublication.DiscoverySummary</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Status</span>
+                                <strong>@HumanizeStatus(selectedCreatorPublication.PublicationStatus, "Published")</strong>
+                            </div>
+                        </div>
+                    </article>
+                }
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
                 {
                     <p class="muted-copy">No shared campaign view yet. The first claimed install or campaign handoff will seed the long-lived runner identity and the first shared live run view.</p>
@@ -779,6 +945,13 @@
                                     <span>Recap shelf</span>
                                     <strong>@(workspace.RecapShelf.Count == 0 ? "Pending" : $"{workspace.RecapShelf.Count} ready")</strong>
                                 </div>
+                            </div>
+                            <div class="stacked-actions">
+                                <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open shared campaign view</a>
+                                @if (workspace.Runs.Count > 0)
+                                {
+                                    <a class="button-like button-like--secondary" href="@RunDetailHref(workspace.Runs[0].RunId)">Open run context</a>
+                                }
                             </div>
 
                             <div class="settings-summary-list">
@@ -877,7 +1050,7 @@
                             @foreach (var handoff in Model.CampaignSpine.BuildLabHandoffs)
                             {
                                 <li>
-                                    <strong>@handoff.Title</strong>: @handoff.Summary
+                                    <strong><a class="inline-link" href="@BuildHandoffDetailHref(handoff.HandoffId)">@handoff.Title</a></strong>: @handoff.Summary
                                     <span> Variant: @handoff.VariantLabel. Progression: @handoff.ProgressionLabel.</span>
                                     @if (handoff.TradeoffLines.Count > 0)
                                     {
@@ -924,7 +1097,7 @@
                             @foreach (var answer in Model.CampaignSpine.RulesNavigator)
                             {
                                 <li>
-                                    <strong>@answer.Question</strong>: @answer.ShortAnswer
+                                    <strong><a class="inline-link" href="@RulesDetailHref(answer.EntryId)">@answer.Question</a></strong>: @answer.ShortAnswer
                                     <span> Before: @answer.BeforeSummary. After: @answer.AfterSummary.</span>
                                     <span> Provenance: @answer.ProvenanceLabel.</span>
                                     @if (answer.EvidenceLines.Count > 0)
@@ -963,7 +1136,7 @@
                             @foreach (var publication in Model.CampaignSpine.CreatorPublications)
                             {
                                 <li>
-                                    <strong>@publication.Title</strong>: @publication.Summary
+                                    <strong><a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">@publication.Title</a></strong>: @publication.Summary
                                     <span> Provenance: @publication.ProvenanceSummary. Discovery: @publication.DiscoverySummary.</span>
                                 </li>
                             }

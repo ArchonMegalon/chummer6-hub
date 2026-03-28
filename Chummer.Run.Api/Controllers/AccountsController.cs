@@ -54,15 +54,28 @@ public sealed class AccountsController : Controller
     [HttpGet("/account")]
     [HttpGet("/account/{section}")]
     [HttpGet("/account/support/{caseId}")]
+    [HttpGet("/account/work/workspaces/{workspaceId}")]
+    [HttpGet("/account/work/runs/{runId}")]
+    [HttpGet("/account/work/build-handoffs/{handoffId}")]
+    [HttpGet("/account/work/rules/{entryId}")]
+    [HttpGet("/account/work/publications/{publicationId}")]
     [Produces("text/html")]
-    public async Task<IActionResult> AccountPage([FromRoute] string? section, [FromRoute] string? caseId, CancellationToken cancellationToken)
+    public async Task<IActionResult> AccountPage(
+        [FromRoute] string? section,
+        [FromRoute] string? caseId,
+        CancellationToken cancellationToken,
+        [FromRoute] string? workspaceId = null,
+        [FromRoute] string? runId = null,
+        [FromRoute] string? handoffId = null,
+        [FromRoute] string? entryId = null,
+        [FromRoute] string? publicationId = null)
     {
-        var selectedSection = string.IsNullOrWhiteSpace(caseId) ? NormalizeAccountSection(section) : "support";
-        var currentPath = !string.IsNullOrWhiteSpace(caseId)
-            ? $"/account/support/{caseId}"
-            : selectedSection == "profile"
-                ? "/account"
-                : $"/account/{selectedSection}";
+        var selectedSection = !string.IsNullOrWhiteSpace(caseId)
+            ? "support"
+            : HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId)
+                ? "work"
+                : NormalizeAccountSection(section);
+        var currentPath = BuildAccountCurrentPath(selectedSection, caseId, workspaceId, runId, handoffId, entryId, publicationId);
         var (chromeTitle, chromeDescription) = DescribeAccountSection(selectedSection);
 
         try
@@ -76,6 +89,12 @@ public sealed class AccountsController : Controller
                 ? null
                 : _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
             var selectedSupportCaseSummary = selectedSupportCase is null ? null : _supportPresentation.Build(selectedSupportCase);
+            var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
+            var selectedWorkspace = FindById(campaignSpine.Workspaces, workspaceId, static item => item.WorkspaceId);
+            var selectedRun = FindById(campaignSpine.Runs, runId, static item => item.RunId);
+            var selectedBuildLabHandoff = FindById(campaignSpine.BuildLabHandoffs, handoffId, static item => item.HandoffId);
+            var selectedRulesNavigatorAnswer = FindById(campaignSpine.RulesNavigator, entryId, static item => item.EntryId);
+            var selectedCreatorPublication = FindById(campaignSpine.CreatorPublications, publicationId, static item => item.PublicationId);
             var model = new AccountPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
                 CurrentSection: selectedSection,
@@ -90,7 +109,12 @@ public sealed class AccountsController : Controller
                 SupportCaseSummaries: supportCaseSummaries,
                 SelectedSupportCase: selectedSupportCase,
                 SelectedSupportCaseSummary: selectedSupportCaseSummary,
-                CampaignSpine: _campaignSpine.GetAccountSummary(user, installLinking));
+                CampaignSpine: campaignSpine,
+                SelectedWorkspace: selectedWorkspace,
+                SelectedRun: selectedRun,
+                SelectedBuildLabHandoff: selectedBuildLabHandoff,
+                SelectedRulesNavigatorAnswer: selectedRulesNavigatorAnswer,
+                SelectedCreatorPublication: selectedCreatorPublication);
             return View("~/Views/Accounts/Account.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -110,6 +134,76 @@ public sealed class AccountsController : Controller
                 SecondaryLabel: "Return home",
                 SecondaryHref: "/home"));
         }
+    }
+
+    private static bool HasWorkSelection(
+        string? workspaceId,
+        string? runId,
+        string? handoffId,
+        string? entryId,
+        string? publicationId)
+        => !string.IsNullOrWhiteSpace(workspaceId)
+            || !string.IsNullOrWhiteSpace(runId)
+            || !string.IsNullOrWhiteSpace(handoffId)
+            || !string.IsNullOrWhiteSpace(entryId)
+            || !string.IsNullOrWhiteSpace(publicationId);
+
+    private static string BuildAccountCurrentPath(
+        string selectedSection,
+        string? caseId,
+        string? workspaceId,
+        string? runId,
+        string? handoffId,
+        string? entryId,
+        string? publicationId)
+    {
+        if (!string.IsNullOrWhiteSpace(caseId))
+        {
+            return $"/account/support/{Uri.EscapeDataString(caseId)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(workspaceId))
+        {
+            return $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(runId))
+        {
+            return $"/account/work/runs/{Uri.EscapeDataString(runId)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(handoffId))
+        {
+            return $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(entryId))
+        {
+            return $"/account/work/rules/{Uri.EscapeDataString(entryId)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(publicationId))
+        {
+            return $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
+        }
+
+        return selectedSection == "profile"
+            ? "/account"
+            : $"/account/{selectedSection}";
+    }
+
+    private static TItem? FindById<TItem>(
+        IReadOnlyList<TItem> items,
+        string? id,
+        Func<TItem, string> keySelector)
+        where TItem : class
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return null;
+        }
+
+        return items.FirstOrDefault(item => string.Equals(keySelector(item), id, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string NormalizeAccountSection(string? section)

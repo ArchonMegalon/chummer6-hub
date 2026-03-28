@@ -288,7 +288,7 @@
                                                             }
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="/account/work">Open campaign workspace</a>
+                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}")">Open campaign workspace</a>
                                                 </article>
                                             }
                                         }
@@ -340,7 +340,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="/account/work">Open build follow-through</a>
+                                                        <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(handoff.HandoffId)}")">Open build follow-through</a>
                                                     </article>
                                                 }
                                                 @if (rulesAnswers.Length > 0)
@@ -359,7 +359,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="/account/work">Open grounded rule context</a>
+                                                        <a class="inline-link" href="@($"/account/work/rules/{Uri.EscapeDataString(answer.EntryId)}")">Open grounded rule context</a>
                                                     </article>
                                                 }
                                             }
@@ -380,7 +380,7 @@
                                                         <h3>@publication.Title</h3>
                                                         <p>@publication.Summary <span>Trust: @publication.ProvenanceSummary.</span></p>
                                                     </div>
-                                                    <a class="inline-link" href="/account/work">Open publication follow-through</a>
+                                                    <a class="inline-link" href="@($"/account/work/publications/{Uri.EscapeDataString(publication.PublicationId)}")">Open publication follow-through</a>
                                                 </article>
                                             }
                                             @if (restoreDevices.Length > 0)
