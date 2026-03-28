@@ -243,7 +243,7 @@ public sealed class AccountsController : Controller
             "access" => ("Account · Devices & access", "Linked installs, access rights, and claim handoff in one calmer route."),
             "work" => ("Account · Work", "Campaign return, shared work, and deeper follow-through when you explicitly need them."),
             "settings" => ("Account · Settings", "Preferences, linked channels, participation, and help policy outside the customer core."),
-            "advanced" => ("Account · Advanced", "Account identifiers and deeper technical detail when you explicitly need them."),
+            "advanced" => ("Account · Advanced", "Account identifiers and deeper account details when you explicitly need them."),
             _ => ("Account", "Profile, sign-in methods, recovery posture, and channel settings.")
         };
 
