@@ -1529,11 +1529,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!homeSource.Contains("signed-in cockpit", StringComparison.Ordinal), "home access should avoid cockpit phrasing on the customer-facing route.");
     Assert(!homeSource.Contains("signed-in shell", StringComparison.Ordinal), "home should avoid signed-in shell wording on customer-facing routes.");
     Assert(!homeSource.Contains("Campaign workspace context", StringComparison.Ordinal), "home work should avoid internal campaign-workspace phrasing.");
-    Assert(!homeSource.Contains("Rule environments", StringComparison.Ordinal), "home work should avoid internal rule-environment phrasing.");
+    Assert(homeSource.Contains("Rule environments", StringComparison.Ordinal), "home work should keep explicit rule-environment evidence on the signed-in route.");
     Assert(homeSource.Contains("Open what works today", StringComparison.Ordinal), "home access should point proof needs to the dedicated now route instead of repeating proof cards inline.");
     Assert(homeSource.Contains("Need product proof before you install or return?", StringComparison.Ordinal), "home access should keep proof follow-through as a calmer note instead of a third equal-weight rail card.");
     Assert(!homeSource.Contains("Need product proof before you act?", StringComparison.Ordinal), "home access should not revive the louder proof rail copy.");
     Assert(homeSource.Contains("<summary>Release and device state</summary>", StringComparison.Ordinal), "home access should collapse secondary release and device detail under one calmer disclosure.");
+    Assert(homeSource.Contains("Device roles", StringComparison.Ordinal), "home access should keep explicit device-role evidence on the signed-in route.");
     Assert(homeSource.Contains("GM-ready context", StringComparison.Ordinal), "home work should use customer-facing continuity language instead of internal workspace wording.");
     Assert(homeSource.Contains("Shared campaign view", StringComparison.Ordinal), "home work should surface the calmer shared campaign view card instead of hiding workspace return behind the deeper account route.");
     Assert(homeSource.Contains("Open campaign workspace", StringComparison.Ordinal), "home work should keep an explicit route back into the shared campaign view.");
