@@ -5,6 +5,7 @@ public sealed class PublicProgressService
     private const string ReportJsonRelativePath = ".codex-design/product/PROGRESS_REPORT.generated.json";
     private const string ReportHtmlRelativePath = ".codex-design/product/PROGRESS_REPORT.generated.html";
     private const string PosterSvgRelativePath = ".codex-design/product/PROGRESS_REPORT_POSTER.svg";
+    private const string WeeklyPulseJsonRelativePath = ".codex-design/product/WEEKLY_PRODUCT_PULSE.generated.json";
     private readonly IConfiguration _configuration;
     private readonly ILogger<PublicProgressService> _logger;
 
@@ -19,6 +20,8 @@ public sealed class PublicProgressService
     public string LoadReportHtml() => File.ReadAllText(ResolveRequiredPath(ReportHtmlRelativePath));
 
     public string LoadPosterSvg() => File.ReadAllText(ResolveRequiredPath(PosterSvgRelativePath));
+
+    public string LoadWeeklyPulseJson() => File.ReadAllText(ResolveRequiredPath(WeeklyPulseJsonRelativePath));
 
     private string ResolveRequiredPath(string relativePath)
     {

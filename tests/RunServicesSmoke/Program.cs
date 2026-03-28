@@ -2210,7 +2210,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHelpModel?.SignedInStatus is not null, "signed-in help should project install-specific trust status.");
     Assert(authenticatedHelpModel?.TrustPulse is not null, "help should surface the weekly public trust pulse.");
     Assert(authenticatedHelpModel!.SignedInStatus!.Summary.Contains("preview 0.6.3-smoke", StringComparison.Ordinal), "signed-in help should carry the same install-specific follow-through summary.");
-    Assert(authenticatedHelpModel.TrustPulse!.MicroProof.Any(static item => item.Contains("2026-04", StringComparison.Ordinal)), "help should surface the active nine-month checkpoint in the weekly trust pulse.");
+    Assert(authenticatedHelpModel.TrustPulse!.MicroProof.Any(static item => item.Contains("campaign OS indispensable", StringComparison.OrdinalIgnoreCase)), "help should surface the current next-checkpoint question in the weekly trust pulse.");
     var authenticatedNowPage = await authenticatedLandingController.NowPage(CancellationToken.None) as ViewResult;
     var authenticatedNowModel = authenticatedNowPage?.Model as NowPageViewModel;
     Assert(authenticatedNowModel?.SignedInStatus is not null, "signed-in current-release page should project install-specific trust status.");
@@ -2452,6 +2452,16 @@ async Task VerifyPublicLandingProjectionAsync()
 
     var progressPoster = progressController.ProgressPoster().Content ?? string.Empty;
     Assert(progressPoster.Contains("<svg", StringComparison.OrdinalIgnoreCase), "progress poster endpoint should serve SVG content");
+
+    var weeklyPulseJson = progressController.WeeklyPulse().Content ?? string.Empty;
+    using (var weeklyPulseDocument = JsonDocument.Parse(weeklyPulseJson))
+    {
+        Assert(string.Equals(weeklyPulseDocument.RootElement.GetProperty("contract_name").GetString(), "chummer.weekly_product_pulse", StringComparison.Ordinal), "weekly pulse endpoint should serve the mirrored weekly pulse artifact.");
+        Assert(string.Equals(weeklyPulseDocument.RootElement.GetProperty("active_wave").GetString(), "Next 20 Big Wins After Post-Audit Closeout", StringComparison.Ordinal), "weekly pulse endpoint should expose the current active wave from the mirrored design pulse.");
+        Assert(weeklyPulseDocument.RootElement.TryGetProperty("next_checkpoint_question", out JsonElement checkpointQuestion)
+            && !string.IsNullOrWhiteSpace(checkpointQuestion.GetString()), "weekly pulse endpoint should keep the next checkpoint question visible for the current wave.");
+        Assert(!weeklyPulseDocument.RootElement.TryGetProperty("active_nine_month_checkpoint", out _), "weekly pulse endpoint should mirror the current pulse artifact without the retired nine-month checkpoint block.");
+    }
 
     var artifactsView = await controller.ArtifactsPage(CancellationToken.None) as ViewResult;
     var artifactsModel = artifactsView?.Model as ShelfPageViewModel;

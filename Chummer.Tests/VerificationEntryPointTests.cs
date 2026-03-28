@@ -167,6 +167,23 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void PublicProgressControllerPublishesWeeklyPulseArtifact()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicProgressController.cs");
+        string servicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "PublicProgressService.cs");
+        string auditPath = RepoPaths.FromRoot("scripts", "hub-live-audit.py");
+
+        string controller = File.ReadAllText(controllerPath);
+        string service = File.ReadAllText(servicePath);
+        string audit = File.ReadAllText(auditPath);
+
+        Assert.Contains("/api/public/weekly-pulse", controller, StringComparison.Ordinal);
+        Assert.Contains("LoadWeeklyPulseJson", service, StringComparison.Ordinal);
+        Assert.Contains("/api/public/weekly-pulse", audit, StringComparison.Ordinal);
+        Assert.Contains("chummer.weekly_product_pulse", audit, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ReleaseWorkflowPublishesApiAndDownloadsMirrorArtifacts()
     {
         string workflowPath = RepoPaths.FromRoot(".github", "workflows", "desktop-downloads-matrix.yml");

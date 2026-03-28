@@ -187,6 +187,16 @@ def main() -> int:
         raise AssertionError("/status did not resolve to /now")
     print(f"ok /status -> {final_url}")
 
+    status, body, _, final_url = fetch(
+        args.base_url,
+        "/api/public/weekly-pulse",
+        public_host=args.public_host,
+        forwarded_proto=args.forwarded_proto,
+    )
+    if status != 200 or '"contract_name": "chummer.weekly_product_pulse"' not in body:
+        raise AssertionError("/api/public/weekly-pulse did not serve the mirrored weekly pulse artifact")
+    print(f"ok /api/public/weekly-pulse -> {final_url}")
+
     return 0
 
 

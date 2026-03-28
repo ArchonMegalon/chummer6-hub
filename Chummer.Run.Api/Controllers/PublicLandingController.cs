@@ -726,6 +726,11 @@ public sealed class PublicLandingController : Controller
                 : $"{pulse.ActiveCheckpointId} · {pulse.ActiveCheckpointTitle}");
         }
 
+        if (!string.IsNullOrWhiteSpace(pulse.NextCheckpointQuestion))
+        {
+            microProof.Add($"Next question: {pulse.NextCheckpointQuestion}");
+        }
+
         if (pulse.OverallProgressPercent is int overallProgressPercent && !string.IsNullOrWhiteSpace(pulse.PhaseLabel))
         {
             microProof.Add($"{overallProgressPercent}% · {pulse.PhaseLabel}");

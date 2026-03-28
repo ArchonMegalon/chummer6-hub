@@ -67,8 +67,6 @@ Read:
 12. `METRICS_AND_SLOS.yaml`
 13. `NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_GUIDE.md`
 14. `CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md`
-15. `NINE_MONTH_EXECUTION_PLAN.md`
-16. `NINE_MONTH_EXECUTION_REGISTRY.yaml`
 
 ## Fast path by question
 
@@ -76,7 +74,6 @@ Read:
 * What is real today? -> `PUBLIC_FEATURE_REGISTRY.yaml` and `RELEASE_EVIDENCE_PACK.md`
 * What just closed and what is next? -> `POST_AUDIT_NEXT_20_BIG_WINS_CLOSEOUT.md` and `NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_GUIDE.md`
 * What still makes the campaign OS feel unproven or uneven? -> `CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md`
-* What is the next nine-month operating overlay? -> `NINE_MONTH_EXECUTION_PLAN.md` and `NINE_MONTH_EXECUTION_REGISTRY.yaml`
 * Which journeys must every release wave keep passable? -> `GOLDEN_JOURNEY_RELEASE_GATES.yaml`
 * What is the product middle between build, play, and publication? -> `CAMPAIGN_SPINE_AND_CREW_MODEL.md` and `CHARACTER_LIFECYCLE_AND_LIVING_DOSSIER.md`
 * How do claimed devices follow me without turning into mystery sync? -> `ROAMING_WORKSPACE_AND_ENTITLEMENT_SYNC.md`

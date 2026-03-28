@@ -18,10 +18,11 @@ public sealed class PublicTrustPulseServiceTests
 
         Assert.NotNull(snapshot);
         Assert.Equal("2026-03-28", snapshot!.AsOf);
-        Assert.Equal("Golden journey operating proof", snapshot.ActiveCheckpointTitle);
+        Assert.Null(snapshot.ActiveCheckpointTitle);
         Assert.Equal("ready", snapshot.JourneyGateState);
         Assert.Equal("Cloud & Publishing", snapshot.LongestPoleLabel);
         Assert.Equal(73, snapshot.OverallProgressPercent);
+        Assert.Equal("What is the smallest cross-repo slice that makes the campaign OS indispensable and turns trust, adoption, and publication depth into a real launch advantage?", snapshot.NextCheckpointQuestion);
     }
 
     [Fact]
@@ -72,12 +73,6 @@ public sealed class PublicTrustPulseServiceTests
                     ["summary"] = "Journey proof is ready and the longest pole remains Cloud & Publishing.",
                     ["active_wave"] = "Next 20 Big Wins After Post-Audit Closeout",
                     ["active_wave_status"] = "in_progress",
-                    ["active_nine_month_checkpoint"] = new Dictionary<string, object?>
-                    {
-                        ["id"] = "2026-04",
-                        ["title"] = "Golden journey operating proof",
-                        ["status"] = "next"
-                    },
                     ["journey_gate_health"] = new Dictionary<string, object?>
                     {
                         ["state"] = "ready",
@@ -85,7 +80,7 @@ public sealed class PublicTrustPulseServiceTests
                         ["blocked_count"] = 0,
                         ["warning_count"] = 0
                     },
-                    ["next_checkpoint_question"] = "What is the thinnest April 2026 cross-repo slice that turns golden journey proof into release-control evidence?",
+                    ["next_checkpoint_question"] = "What is the smallest cross-repo slice that makes the campaign OS indispensable and turns trust, adoption, and publication depth into a real launch advantage?",
                     ["snapshot"] = new Dictionary<string, object?>
                     {
                         ["release_health"] = new Dictionary<string, object?>
