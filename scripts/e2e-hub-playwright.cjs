@@ -236,6 +236,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await expectVisible(page, 'text=Next safe action');
   await expectVisible(page, 'text=Closure');
   await expectVisible(page, 'text=Saved attachments');
+  const savedAttachmentsSummary = page.locator('summary').filter({ hasText: 'Saved attachments' });
+  if (await savedAttachmentsSummary.count()) {
+    await savedAttachmentsSummary.first().click();
+  }
   await expectVisible(page, 'text=playwright-support.log');
   await assertNoPageErrors(page, pageErrors, 'Tracked support case');
 

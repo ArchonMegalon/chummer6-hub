@@ -215,7 +215,7 @@
                 </form>
             </section>
 
-            <details class="details-drawer" open>
+            <details class="details-drawer">
                 <summary>Primary sign-in</summary>
                 <section id="sign-in" class="settings-section" data-account-panel>
                     <div class="settings-section__header">
@@ -358,7 +358,7 @@
                         }
                         @if (selectedSupportCase.Attachments is { Count: > 0 })
                         {
-                            <details class="details-drawer" open>
+                            <details class="details-drawer">
                                 <summary>Saved attachments</summary>
                                 <div class="settings-summary-list">
                                     @foreach (var attachment in selectedSupportCase.Attachments)
@@ -379,7 +379,7 @@
                         }
                         @if (selectedSupportCaseSummary?.TimelineHighlights is { Count: > 0 })
                         {
-                            <details class="details-drawer" open>
+                            <details class="details-drawer">
                                 <summary>Case timeline</summary>
                                 <div class="settings-summary-list">
                                     @foreach (var eventItem in selectedSupportCaseSummary.TimelineHighlights)
@@ -404,27 +404,30 @@
                         <strong>@Model.SupportCases.Count</strong>
                     </div>
                 </div>
-                <form id="supportAssistantForm" class="settings-form">
-                    <div class="field">
-                        <label for="supportAssistantQuery">Ask the grounded support assistant</label>
-                        <textarea id="supportAssistantQuery" rows="4" placeholder="What changed, what still hurts, or what do you need help understanding?"></textarea>
-                    </div>
-                    <div class="field">
-                        <label for="supportAssistantInstallation">Related install</label>
-                        <select id="supportAssistantInstallation">
-                            <option value="">Any install or no install yet</option>
-                            @foreach (var installation in Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>())
-                            {
-                                <option value="@installation.InstallationId">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
-                            }
-                        </select>
-                    </div>
-                    <button class="button-like button-like--secondary" type="submit">Check guidance</button>
-                    <p id="supportAssistantStatusNotice" class="muted-copy" hidden></p>
-                    <div id="supportAssistantAnswer" class="stacked-copy" hidden></div>
-                    <div id="supportAssistantActions" class="stacked-actions" hidden></div>
-                    <div id="supportAssistantCitations" class="settings-summary-list" hidden></div>
-                </form>
+                <details class="details-drawer">
+                    <summary>Need routing help first?</summary>
+                    <form id="supportAssistantForm" class="settings-form">
+                        <div class="field">
+                            <label for="supportAssistantQuery">Ask the grounded support assistant</label>
+                            <textarea id="supportAssistantQuery" rows="4" placeholder="What changed, what still hurts, or what do you need help understanding?"></textarea>
+                        </div>
+                        <div class="field">
+                            <label for="supportAssistantInstallation">Related install</label>
+                            <select id="supportAssistantInstallation">
+                                <option value="">Any install or no install yet</option>
+                                @foreach (var installation in Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>())
+                                {
+                                    <option value="@installation.InstallationId">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
+                                }
+                            </select>
+                        </div>
+                        <button class="button-like button-like--secondary" type="submit">Check guidance</button>
+                        <p id="supportAssistantStatusNotice" class="muted-copy" hidden></p>
+                        <div id="supportAssistantAnswer" class="stacked-copy" hidden></div>
+                        <div id="supportAssistantActions" class="stacked-actions" hidden></div>
+                        <div id="supportAssistantCitations" class="settings-summary-list" hidden></div>
+                    </form>
+                </details>
                 <form id="supportCaseForm" class="settings-form">
                     <div class="field">
                         <label for="supportCaseKind">Case type</label>

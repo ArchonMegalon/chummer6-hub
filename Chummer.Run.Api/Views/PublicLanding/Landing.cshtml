@@ -99,17 +99,14 @@
                 }
             </div>
         }
-        <div class="role-matrix__grid">
-            @foreach (var workflow in proofNotes)
-            {
-                <article class="role-matrix__cell">
-                    <span class="tag">@workflow.Card.Title</span>
-                    <h3>@workflow.Card.Summary</h3>
-                    <p>@(workflow.Card.ProofNote ?? workflow.Card.Payoff ?? workflow.Card.Summary)</p>
-                    <a class="inline-link" href="@workflow.Action.Href">@workflow.Action.Label</a>
-                </article>
-            }
-        </div>
+        @if (proofNotes.Length > 0)
+        {
+            var workflow = proofNotes[0];
+            <div class="release-footnote">
+                <p><strong>@workflow.Card.Title:</strong> @(workflow.Card.ProofNote ?? workflow.Card.Payoff ?? workflow.Card.Summary)</p>
+                <p><a class="inline-link" href="@workflow.Action.Href">@workflow.Action.Label</a></p>
+            </div>
+        }
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.Surface.ProductProofPrimaryHref">@Model.Surface.ProductProofPrimaryLabel</a>
         </div>
