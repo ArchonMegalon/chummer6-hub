@@ -1434,6 +1434,10 @@
                             <strong>@HumanizeStatus(Model.Links.RecoveryPosture, "Single method")</strong>
                         </div>
                     </div>
+                    @if (Model.PrivacyBoundary is not null)
+                    {
+                        @await Html.PartialAsync("~/Views/Shared/_PrivacyBoundaryPanel.cshtml", Model.PrivacyBoundary)
+                    }
                 </section>
             </details>
             }

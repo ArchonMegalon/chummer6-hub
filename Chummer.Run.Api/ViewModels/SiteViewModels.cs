@@ -466,7 +466,8 @@ public sealed record AccountPageViewModel(
     RunProjection? SelectedRun = null,
     BuildLabHandoffProjection? SelectedBuildLabHandoff = null,
     RulesNavigatorAnswerProjection? SelectedRulesNavigatorAnswer = null,
-    CreatorPublicationProjection? SelectedCreatorPublication = null);
+    CreatorPublicationProjection? SelectedCreatorPublication = null,
+    PrivacyBoundaryPanelViewModel? PrivacyBoundary = null);
 
 public sealed record AuthPageViewModel(
     SiteChromeViewModel Chrome,

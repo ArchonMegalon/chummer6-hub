@@ -24,6 +24,7 @@ public sealed class AccountsController : Controller
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
+    private readonly PublicPrivacyBoundaryService _privacyBoundaries;
     private readonly ILogger<AccountsController> _logger;
 
     public AccountsController(
@@ -38,6 +39,7 @@ public sealed class AccountsController : Controller
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
         HubPageChromeService chrome,
         HubGoogleAuthService google,
+        PublicPrivacyBoundaryService privacyBoundaries,
         ILogger<AccountsController> logger)
     {
         _accounts = accounts;
@@ -51,6 +53,7 @@ public sealed class AccountsController : Controller
         _workspaceServerPlane = workspaceServerPlane;
         _chrome = chrome;
         _google = google;
+        _privacyBoundaries = privacyBoundaries;
         _logger = logger;
     }
 
@@ -121,7 +124,8 @@ public sealed class AccountsController : Controller
                 SelectedRun: selectedRun,
                 SelectedBuildLabHandoff: selectedBuildLabHandoff,
                 SelectedRulesNavigatorAnswer: selectedRulesNavigatorAnswer,
-                SelectedCreatorPublication: selectedCreatorPublication);
+                SelectedCreatorPublication: selectedCreatorPublication,
+                PrivacyBoundary: _privacyBoundaries.BuildPanel("account"));
             return View("~/Views/Accounts/Account.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
