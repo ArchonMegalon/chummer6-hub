@@ -542,6 +542,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
             IssuedAtUtc: DateTimeOffset.UtcNow,
             ExpiresAtUtc: DateTimeOffset.UtcNow.AddHours(1))))), configuration);
     var google = CreateGoogleService(configuration, browserAuth, identityLinks, accounts, loggerFactory, tempRoot);
+    var privacyBoundaries = new PublicPrivacyBoundaryService(new PublicCanonFileLoader(configuration), new PublicRouteCatalogService(new PublicCanonFileLoader(configuration)));
     var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(request =>
     {
         var body = request.Content is null ? string.Empty : request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
@@ -560,7 +561,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var experience = new UserExperienceService(store, accounts);
     var supportPresentation = new SupportCasePresentationService();
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
-    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, privacyBoundaries, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1618,6 +1619,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Affected install", StringComparison.Ordinal), "account support detail should surface the install linked to the tracked case.");
     Assert(accountSource.Contains("Next safe action:", StringComparison.Ordinal), "account support detail should surface the next honest user action for a tracked case.");
     Assert(accountSource.Contains("More settings", StringComparison.Ordinal), "account should keep non-core sections behind a calmer secondary settings disclosure.");
+    Assert(accountSource.Contains("Model.PrivacyBoundary", StringComparison.Ordinal), "account privacy should render the shared privacy-boundary panel on the signed-in surface.");
     Assert(accountSource.Contains("<summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should keep primary sign-in inside a calmer drawer instead of a full stacked section.");
     Assert(!accountSource.Contains("<details class=\"details-drawer\" open>\n                <summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should not expand the sign-in drawer by default.");
     Assert(accountSource.Contains("<summary>Recovery email</summary>", StringComparison.Ordinal), "account profile should keep recovery email inside a calmer drawer instead of stacking it inline on the main profile route.");
@@ -1795,6 +1797,7 @@ async Task VerifyPublicLandingProjectionAsync()
         workspaceServerPlane,
         chrome,
         google,
+        privacyBoundaries,
         loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -2101,6 +2104,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var accountModel = accountPage?.Model as AccountPageViewModel;
     Assert(accountModel is not null && accountModel.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "account page should surface support-case history beside installs and access.");
     Assert(accountModel!.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(item.ClosureSummary)), "account page should project support lifecycle and closure summaries instead of only raw case rows.");
+    Assert(accountModel.PrivacyBoundary is not null, "account page should surface the signed-in privacy boundary next to visibility and recovery posture.");
     Assert(string.Equals(accountModel!.CurrentSection, "profile", StringComparison.Ordinal), "default account route should land on the profile section.");
     Assert(accountModel.CoreSections.Any(static section => string.Equals(section.Href, "/account/access", StringComparison.Ordinal)), "account should expose the devices-and-access section link.");
     Assert(accountModel!.CampaignSpine.Dossiers.Count >= 1, "account page should surface the living dossier summary.");
@@ -2562,7 +2566,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
     Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
-    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, loggerFactory.CreateLogger<AccountsController>())
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, privacyBoundaries, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
