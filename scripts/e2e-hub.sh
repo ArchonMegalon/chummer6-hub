@@ -4,6 +4,7 @@ set -euo pipefail
 HUB_EDGE_COMPOSE_FILE="${HUB_EDGE_COMPOSE_FILE:-docker-compose.public-edge.yml}"
 HUB_PLAYWRIGHT_TIMEOUT_SECONDS="${CHUMMER_HUB_E2E_TIMEOUT_SECONDS:-300}"
 HUB_BASE_URL="${CHUMMER_HUB_PLAYWRIGHT_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
+HUB_PUBLIC_HOST="${CHUMMER_HUB_PUBLIC_HOST:-chummer.run}"
 HUB_SKIP_EDGE_REBUILD="${CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD:-0}"
 HUB_LOCAL_PROOF_PATH="${CHUMMER_HUB_LOCAL_PROOF_PATH:-.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
 HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT="${CHUMMER_HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT:-scripts/cleanup_synthetic_support_cases.py}"
@@ -89,35 +90,42 @@ else
   rm -f "$compose_up_log"
 fi
 
-if [[ "$RUN_HUB_PLAYWRIGHT" != "1" ]]; then
-  echo "skipping hub playwright e2e (set CHUMMER_HUB_PLAYWRIGHT=1 to enable)"
-  exit 0
+hub_live_audit_args=(--base-url "$HUB_BASE_URL")
+if [[ "$HUB_BASE_URL" == http://* ]]; then
+  hub_live_audit_args+=(--public-host "$HUB_PUBLIC_HOST" --forwarded-proto https --verify-http-redirects)
 fi
 
-cleanup_synthetic_support_cases
+python3 scripts/hub-live-audit.py "${hub_live_audit_args[@]}"
 
-playwright_log="$(mktemp)"
-export CHUMMER_RUN_CF_TUNNEL_TOKEN="${CHUMMER_RUN_CF_TUNNEL_TOKEN:-disabled-for-local-hub-e2e}"
-set +e
-timeout "${HUB_PLAYWRIGHT_TIMEOUT_SECONDS}"s docker compose -f legacy/tooling/docker/docker-compose.yml --profile test run --build --rm \
-  -e CHUMMER_HUB_PLAYWRIGHT_BASE_URL="$HUB_BASE_URL" \
-  chummer-playwright-hub 2>&1 | tee "$playwright_log"
-playwright_status=${PIPESTATUS[0]}
-set -e
-if [[ "$playwright_status" -ne 0 ]]; then
-  if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$playwright_log"; then
-    echo "skipping hub playwright e2e: docker daemon permission denied in this environment."
+if [[ "$RUN_HUB_PLAYWRIGHT" == "1" ]]; then
+  cleanup_synthetic_support_cases
+
+  playwright_log="$(mktemp)"
+  export CHUMMER_RUN_CF_TUNNEL_TOKEN="${CHUMMER_RUN_CF_TUNNEL_TOKEN:-disabled-for-local-hub-e2e}"
+  set +e
+  timeout "${HUB_PLAYWRIGHT_TIMEOUT_SECONDS}"s docker compose -f legacy/tooling/docker/docker-compose.yml --profile test run --build --rm \
+    -e CHUMMER_HUB_PLAYWRIGHT_BASE_URL="$HUB_BASE_URL" \
+    chummer-playwright-hub 2>&1 | tee "$playwright_log"
+  playwright_status=${PIPESTATUS[0]}
+  set -e
+  if [[ "$playwright_status" -ne 0 ]]; then
+    if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$playwright_log"; then
+      echo "skipping hub playwright e2e: docker daemon permission denied in this environment."
+      rm -f "$playwright_log"
+      exit 0
+    fi
+
     rm -f "$playwright_log"
-    exit 0
+    echo "hub playwright e2e failed or timed out after ${HUB_PLAYWRIGHT_TIMEOUT_SECONDS}s" >&2
+    exit "$playwright_status"
   fi
 
   rm -f "$playwright_log"
-  echo "hub playwright e2e failed or timed out after ${HUB_PLAYWRIGHT_TIMEOUT_SECONDS}s" >&2
-  exit "$playwright_status"
+  cleanup_synthetic_support_cases
+else
+  echo "skipping hub playwright e2e (set CHUMMER_HUB_PLAYWRIGHT=1 to enable)"
 fi
 
-rm -f "$playwright_log"
-cleanup_synthetic_support_cases
 mkdir -p "$(dirname "$HUB_LOCAL_PROOF_PATH")"
 python3 scripts/materialize_hub_local_release_proof.py \
   "$HUB_LOCAL_PROOF_PATH" \

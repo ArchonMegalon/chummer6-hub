@@ -45,4 +45,33 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("ASPNETCORE_HTTPS_PORT", compose, StringComparison.Ordinal);
         Assert.Contains("${ASPNETCORE_HTTPS_PORT:-443}", compose, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void HubLiveAuditSupportsReverseProxiedLocalEdgeMode()
+    {
+        string auditPath = RepoPaths.FromRoot("scripts", "hub-live-audit.py");
+        string audit = File.ReadAllText(auditPath);
+
+        Assert.Contains("--public-host", audit, StringComparison.Ordinal);
+        Assert.Contains("--forwarded-proto", audit, StringComparison.Ordinal);
+        Assert.Contains("--verify-http-redirects", audit, StringComparison.Ordinal);
+        Assert.Contains("X-Forwarded-Proto", audit, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HubCloseoutAndE2EUseReverseProxiedLocalEdgeAudit()
+    {
+        string closeoutPath = RepoPaths.FromRoot("scripts", "ai", "hub_closeout.sh");
+        string e2ePath = RepoPaths.FromRoot("scripts", "e2e-hub.sh");
+        string closeout = File.ReadAllText(closeoutPath);
+        string e2e = File.ReadAllText(e2ePath);
+
+        Assert.Contains("HUB_PUBLIC_HOST", closeout, StringComparison.Ordinal);
+        Assert.Contains("--forwarded-proto https", closeout, StringComparison.Ordinal);
+        Assert.Contains("--verify-http-redirects", closeout, StringComparison.Ordinal);
+        Assert.Contains("hub-live-audit.py", e2e, StringComparison.Ordinal);
+        Assert.Contains("HUB_PUBLIC_HOST", e2e, StringComparison.Ordinal);
+        Assert.Contains("--forwarded-proto https", e2e, StringComparison.Ordinal);
+        Assert.Contains("--verify-http-redirects", e2e, StringComparison.Ordinal);
+    }
 }
