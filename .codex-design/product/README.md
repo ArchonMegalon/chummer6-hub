@@ -70,40 +70,41 @@ Use `PRODUCT_HEALTH_SCORECARD.yaml` when the question is "how does whole-product
 42. `PUBLIC_MEDIA_AND_GUIDE_ASSET_POLICY.md`
 43. `METRICS_AND_SLOS.yaml`
 44. `PUBLIC_TRUST_CONTENT.yaml`
-45. `journeys/README.md`
-46. `OWNERSHIP_MATRIX.md`
-47. `PROGRAM_MILESTONES.yaml`
-48. `CONTRACT_SETS.yaml`
-49. `GROUP_BLOCKERS.md`
-50. `projects/*.md` for repo-specific scope
-51. `CAMPAIGN_SPINE_AND_CREW_MODEL.md`
-52. `CHARACTER_LIFECYCLE_AND_LIVING_DOSSIER.md`
-53. `ROAMING_WORKSPACE_AND_ENTITLEMENT_SYNC.md`
-54. `CAMPAIGN_WORKSPACE_AND_DEVICE_ROLES.md`
-55. `PRODUCT_CONTROL_AND_GOVERNOR_LOOP.md`
-56. `SUPPORT_AND_SIGNAL_OODA_LOOP.md`
-57. `USER_JOURNEYS.md`
-58. `EXPERIENCE_SUCCESS_METRICS.md`
-59. `PUBLIC_NAVIGATION.yaml`
-60. `PUBLIC_PROGRESS_PARTS.yaml`
-61. `PUBLIC_CAMPAIGN_IMAGE_MANIFEST.yaml`
-62. `PUBLIC_RELEASE_EXPERIENCE.yaml`
-63. `BUILD_LAB_PRODUCT_MODEL.md`
-64. `ACCOUNT_AWARE_FRONT_DOOR_CLOSEOUT.md`
-65. `NEXT_WAVE_ACCOUNT_AWARE_FRONT_DOOR.md`
-66. `NEXT_15_BIG_WINS_EXECUTION_PLAN.md`
-67. `NEXT_20_BIG_WINS_EXECUTION_PLAN.md`
-68. `NEXT_20_BIG_WINS_REGISTRY.yaml`
-69. `POST_AUDIT_NEXT_20_BIG_WINS_GUIDE.md`
-70. `POST_AUDIT_NEXT_20_BIG_WINS_REGISTRY.yaml`
-71. `POST_AUDIT_NEXT_20_BIG_WINS_CLOSEOUT.md`
-72. `NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_GUIDE.md`
-73. `NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_REGISTRY.yaml`
-74. `INTEROP_AND_PORTABILITY_MODEL.md`
-75. `PROVIDER_AND_ROUTE_STEWARDSHIP.md`
-76. `CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md`
-77. `GOLDEN_JOURNEY_RELEASE_GATES.yaml`
-78. `PRIVACY_AND_RETENTION_BOUNDARIES.md`
+45. `PUBLIC_PRIVACY_BOUNDARIES.yaml`
+46. `journeys/README.md`
+47. `OWNERSHIP_MATRIX.md`
+48. `PROGRAM_MILESTONES.yaml`
+49. `CONTRACT_SETS.yaml`
+50. `GROUP_BLOCKERS.md`
+51. `projects/*.md` for repo-specific scope
+52. `CAMPAIGN_SPINE_AND_CREW_MODEL.md`
+53. `CHARACTER_LIFECYCLE_AND_LIVING_DOSSIER.md`
+54. `ROAMING_WORKSPACE_AND_ENTITLEMENT_SYNC.md`
+55. `CAMPAIGN_WORKSPACE_AND_DEVICE_ROLES.md`
+56. `PRODUCT_CONTROL_AND_GOVERNOR_LOOP.md`
+57. `SUPPORT_AND_SIGNAL_OODA_LOOP.md`
+58. `USER_JOURNEYS.md`
+59. `EXPERIENCE_SUCCESS_METRICS.md`
+60. `PUBLIC_NAVIGATION.yaml`
+61. `PUBLIC_PROGRESS_PARTS.yaml`
+62. `PUBLIC_CAMPAIGN_IMAGE_MANIFEST.yaml`
+63. `PUBLIC_RELEASE_EXPERIENCE.yaml`
+64. `BUILD_LAB_PRODUCT_MODEL.md`
+65. `ACCOUNT_AWARE_FRONT_DOOR_CLOSEOUT.md`
+66. `NEXT_WAVE_ACCOUNT_AWARE_FRONT_DOOR.md`
+67. `NEXT_15_BIG_WINS_EXECUTION_PLAN.md`
+68. `NEXT_20_BIG_WINS_EXECUTION_PLAN.md`
+69. `NEXT_20_BIG_WINS_REGISTRY.yaml`
+70. `POST_AUDIT_NEXT_20_BIG_WINS_GUIDE.md`
+71. `POST_AUDIT_NEXT_20_BIG_WINS_REGISTRY.yaml`
+72. `POST_AUDIT_NEXT_20_BIG_WINS_CLOSEOUT.md`
+73. `NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_GUIDE.md`
+74. `NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_REGISTRY.yaml`
+75. `INTEROP_AND_PORTABILITY_MODEL.md`
+76. `PROVIDER_AND_ROUTE_STEWARDSHIP.md`
+77. `CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md`
+78. `GOLDEN_JOURNEY_RELEASE_GATES.yaml`
+79. `PRIVACY_AND_RETENTION_BOUNDARIES.md`
 
 `HORIZON_REGISTRY.yaml` is the machine-readable source for horizon existence, order, public-guide eligibility, and eventual build path.
 The current horizon set covers knowledge fabric, spatial/runsite artifacts, creator press, replay/forensics, and bounded table coaching in addition to the earlier continuity and simulation lanes.
@@ -139,6 +140,7 @@ The current horizon set covers knowledge fabric, spatial/runsite artifacts, crea
 `PUBLIC_GUIDE_PAGE_REGISTRY.yaml`, `PUBLIC_PART_REGISTRY.yaml`, `PUBLIC_FAQ_REGISTRY.yaml`, and `PUBLIC_HELP_COPY.md` are the machine-readable and public-safe source of truth for downstream guide generation outside the landing surface, including the generated download/build shelf.
 `METRICS_AND_SLOS.yaml` is the release-scorecard canon for measurable user-trust, continuity, publication, and install/update gates.
 `PRIVACY_AND_RETENTION_BOUNDARIES.md` defines the default retention clocks, redaction posture, and ownership split for support, crash, claim/install, survey, provider-trace, and publication telemetry surfaces.
+`PUBLIC_PRIVACY_BOUNDARIES.yaml` is the machine-readable public projection for that privacy boundary, so help, privacy, support, and audit surfaces can expose the same redacted retention contract without ad hoc copy drift.
 `PUBLIC_TRUST_CONTENT.yaml` is the canonical trust-content manifest for help, contact, and support statements surfaced at `/help`, `/contact`, and `/downloads`.
 `journeys/*.md` defines the top end-to-end user flows and failure-mode recoveries that multiple repos must preserve.
 `BUILD_LAB_PRODUCT_MODEL.md` defines Build Lab as a flagship Build plus Explain surface rather than leaving it as a downstream milestone label without a canonical product promise.

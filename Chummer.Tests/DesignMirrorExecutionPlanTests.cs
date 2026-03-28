@@ -15,8 +15,10 @@ public sealed class DesignMirrorExecutionPlanTests
 
         Assert.Contains("NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_GUIDE.md", readme, StringComparison.Ordinal);
         Assert.Contains("CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md", readme, StringComparison.Ordinal);
+        Assert.Contains("PUBLIC_PRIVACY_BOUNDARIES.yaml", readme, StringComparison.Ordinal);
         Assert.Contains("NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_GUIDE.md", startHere, StringComparison.Ordinal);
         Assert.Contains("CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md", startHere, StringComparison.Ordinal);
+        Assert.Contains("PUBLIC_PRIVACY_BOUNDARIES.yaml", startHere, StringComparison.Ordinal);
         Assert.DoesNotContain("NINE_MONTH_EXECUTION_PLAN.md", readme, StringComparison.Ordinal);
         Assert.DoesNotContain("NINE_MONTH_EXECUTION_REGISTRY.yaml", readme, StringComparison.Ordinal);
         Assert.DoesNotContain("NINE_MONTH_EXECUTION_PLAN.md", startHere, StringComparison.Ordinal);

@@ -14,6 +14,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<PublicActionResolver>();
         services.AddSingleton<PublicLandingService>();
         services.AddSingleton<PublicTrustContentService>();
+        services.AddSingleton<PublicPrivacyBoundaryService>();
         services.AddSingleton<PublicNavigationService>();
         services.AddSingleton<HubPageChromeService>();
         services.AddSingleton<PublicProgressService>();

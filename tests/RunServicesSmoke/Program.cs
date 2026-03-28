@@ -1635,6 +1635,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(trustSource.Contains("What changed in this version", StringComparison.Ordinal), "privacy and terms should render a policy-delta block instead of leaving summary points buried in the generic hero chrome.");
     Assert(trustSource.Contains("HelpFallbackActionFor", StringComparison.Ordinal), "help should expose a deliberate fallback action per lane instead of only one outbound link.");
     Assert(trustSource.Contains("Fallback:", StringComparison.Ordinal), "help cards should render a visible fallback route under the primary next step.");
+    Assert(trustSource.Contains("_PrivacyBoundaryPanel.cshtml", StringComparison.Ordinal), "help, privacy, and contact routes should render the shared privacy-boundary panel instead of ad hoc trust copy.");
     Assert(supportSubmittedSource.Contains("Watch Account > Support", StringComparison.Ordinal), "support confirmation should explain the signed-in follow-up lane instead of stopping at a generic receipt.");
     Assert(supportSubmittedSource.Contains("Watch your reply email", StringComparison.Ordinal), "support confirmation should explain the guest follow-up lane instead of assuming an account-only workflow.");
     Assert(supportSubmittedSource.Contains("Next safe action", StringComparison.Ordinal), "support confirmation should keep the tracked case next-step visible when the reporter is signed in.");
@@ -1728,15 +1729,16 @@ async Task VerifyPublicLandingProjectionAsync()
     var google = CreateGoogleService(configuration, authService, identityLinks, accounts, loggerFactory, tempRoot);
     var campaignOsProof = new CampaignOsLocalProofService(configuration);
     var trustPulse = new PublicTrustPulseService(configuration, loggerFactory.CreateLogger<PublicTrustPulseService>());
+    var privacyBoundaries = new PublicPrivacyBoundaryService(canon, routes);
     var supportPresentation = new SupportCasePresentationService();
-    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1808,6 +1810,7 @@ async Task VerifyPublicLandingProjectionAsync()
     };
     var progressController = new PublicProgressController(
         progress,
+        privacyBoundaries,
         navigation,
         chrome,
         accounts,
@@ -1866,12 +1869,15 @@ async Task VerifyPublicLandingProjectionAsync()
     var publicPrivacyView = await controller.PrivacyPage(CancellationToken.None) as ViewResult;
     var publicPrivacyModel = publicPrivacyView?.Model as TrustPageViewModel;
     Assert(publicPrivacyModel?.TrustPulse is not null, "privacy page should surface the weekly public trust pulse.");
+    Assert(publicPrivacyModel?.PrivacyBoundary is not null, "privacy page should surface the public privacy-boundary projection.");
+    Assert(publicPrivacyModel!.PrivacyBoundary!.Domains.Count >= 4, "privacy page should keep the support, install, survey, and provider domains visible.");
     var publicTermsView = await controller.TermsPage(CancellationToken.None) as ViewResult;
     var publicTermsModel = publicTermsView?.Model as TrustPageViewModel;
     Assert(publicTermsModel?.TrustPulse is not null, "terms page should surface the weekly public trust pulse.");
     var publicContactView = await controller.ContactPage(CancellationToken.None) as ViewResult;
     var publicContactModel = publicContactView?.Model as TrustPageViewModel;
     Assert(publicContactModel?.TrustPulse is not null, "guest contact page should surface the weekly public trust pulse.");
+    Assert(publicContactModel?.PrivacyBoundary is not null, "guest contact page should surface the same privacy-boundary panel before support intake.");
     Assert(publicContactModel?.SupportIntake is not null, "guest contact page should keep the first-party support intake available.");
 
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
@@ -2209,8 +2215,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var authenticatedHelpModel = authenticatedHelpPage?.Model as TrustPageViewModel;
     Assert(authenticatedHelpModel?.SignedInStatus is not null, "signed-in help should project install-specific trust status.");
     Assert(authenticatedHelpModel?.TrustPulse is not null, "help should surface the weekly public trust pulse.");
+    Assert(authenticatedHelpModel?.PrivacyBoundary is not null, "help should surface the privacy-boundary projection next to the grounded help lanes.");
     Assert(authenticatedHelpModel!.SignedInStatus!.Summary.Contains("preview 0.6.3-smoke", StringComparison.Ordinal), "signed-in help should carry the same install-specific follow-through summary.");
     Assert(authenticatedHelpModel.TrustPulse!.MicroProof.Any(static item => item.Contains("campaign OS indispensable", StringComparison.OrdinalIgnoreCase)), "help should surface the current next-checkpoint question in the weekly trust pulse.");
+    Assert(authenticatedHelpModel.PrivacyBoundary!.SurfaceRules.Any(static rule => string.Equals(rule.Label, "Provider-backed help", StringComparison.Ordinal)), "help should keep the provider-backed help boundary explicit.");
     var authenticatedNowPage = await authenticatedLandingController.NowPage(CancellationToken.None) as ViewResult;
     var authenticatedNowModel = authenticatedNowPage?.Model as NowPageViewModel;
     Assert(authenticatedNowModel?.SignedInStatus is not null, "signed-in current-release page should project install-specific trust status.");
@@ -2463,6 +2471,14 @@ async Task VerifyPublicLandingProjectionAsync()
         Assert(!weeklyPulseDocument.RootElement.TryGetProperty("active_nine_month_checkpoint", out _), "weekly pulse endpoint should mirror the current pulse artifact without the retired nine-month checkpoint block.");
     }
 
+    var privacyBoundaryJson = progressController.PrivacyBoundaries().Content ?? string.Empty;
+    using (var privacyBoundaryDocument = JsonDocument.Parse(privacyBoundaryJson))
+    {
+        Assert(string.Equals(privacyBoundaryDocument.RootElement.GetProperty("contractName").GetString(), "chummer.public_privacy_boundaries", StringComparison.Ordinal), "privacy-boundary endpoint should serve the mirrored privacy-boundary artifact.");
+        Assert(privacyBoundaryDocument.RootElement.GetProperty("domains").GetArrayLength() >= 4, "privacy-boundary endpoint should keep all public trust domains visible.");
+        Assert(privacyBoundaryDocument.RootElement.GetProperty("surfaceRules").EnumerateArray().Any(item => string.Equals(item.GetProperty("label").GetString(), "Provider-backed help", StringComparison.Ordinal)), "privacy-boundary endpoint should keep the provider-backed help rule explicit.");
+    }
+
     var artifactsView = await controller.ArtifactsPage(CancellationToken.None) as ViewResult;
     var artifactsModel = artifactsView?.Model as ShelfPageViewModel;
     Assert(
@@ -2509,7 +2525,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

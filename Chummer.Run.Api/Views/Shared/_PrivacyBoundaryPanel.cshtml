@@ -1,0 +1,57 @@
+@model PrivacyBoundaryPanelViewModel
+
+<section class="release-shelf" aria-label="Privacy boundaries">
+    <article class="app-action-card">
+        <span class="tag">@Model.Eyebrow</span>
+        <h2>@Model.Heading</h2>
+        <p>@Model.Summary</p>
+        @if (Model.MicroProof.Count > 0)
+        {
+            <div class="trust-claim__microproof">
+                @foreach (var item in Model.MicroProof)
+                {
+                    <span>@item</span>
+                }
+            </div>
+        }
+        <div class="stacked-actions">
+            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+            @if (Model.SecondaryAction is not null)
+            {
+                <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+            }
+        </div>
+    </article>
+
+    <div class="workflow-grid">
+        @foreach (var domain in Model.Domains)
+        {
+            <article class="workflow-card">
+                <div class="workflow-card__copy">
+                    <span class="tag">@domain.Owner</span>
+                    <h3>@domain.Label</h3>
+                    <p><strong>Retention window:</strong> @domain.RetentionSummary</p>
+                    <p><strong>Redaction:</strong> @domain.RedactionSummary</p>
+                    <p><strong>Public route:</strong> @domain.PublicProjection</p>
+                    <p><strong>Signed-in route:</strong> @domain.SignedInProjection</p>
+                </div>
+            </article>
+        }
+    </div>
+
+    @if (Model.SurfaceRules.Count > 0)
+    {
+        <div class="compact-rail">
+            @foreach (var rule in Model.SurfaceRules)
+            {
+                <article class="compact-rail__item">
+                    <div class="compact-rail__copy">
+                        <h3>@rule.Label</h3>
+                        <p>@rule.Summary</p>
+                        <p class="muted-copy"><strong>Never:</strong> @rule.BlockedSummary</p>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
