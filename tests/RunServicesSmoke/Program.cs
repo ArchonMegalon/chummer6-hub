@@ -1499,7 +1499,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var releases = new PublicReleaseManifestService(configuration);
     var releaseSelection = new ReleaseSelectionService(canon);
     var chrome = new HubPageChromeService(landing, navigation, releases, releaseSelection);
-    var progress = new PublicProgressService(configuration, loggerFactory.CreateLogger<PublicProgressService>());
+    var weeklyPulseArtifact = new WeeklyProductPulseArtifactService(configuration, loggerFactory.CreateLogger<WeeklyProductPulseArtifactService>());
+    var progress = new PublicProgressService(configuration, weeklyPulseArtifact, loggerFactory.CreateLogger<PublicProgressService>());
     var trustContent = new PublicTrustContentService(canon, routes);
     var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
@@ -1886,7 +1887,7 @@ async Task VerifyPublicLandingProjectionAsync()
         DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(tempRoot, "email-links"))));
     var google = CreateGoogleService(configuration, authService, identityLinks, accounts, loggerFactory, tempRoot);
     var campaignOsProof = new CampaignOsLocalProofService(configuration);
-    var trustPulse = new PublicTrustPulseService(configuration, loggerFactory.CreateLogger<PublicTrustPulseService>());
+    var trustPulse = new PublicTrustPulseService(weeklyPulseArtifact, configuration, loggerFactory.CreateLogger<PublicTrustPulseService>());
     var privacyBoundaries = new PublicPrivacyBoundaryService(canon, routes);
     var supportPresentation = new SupportCasePresentationService();
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
@@ -1993,6 +1994,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingModel.TrustPulse is not null, "landing page should surface a compact weekly trust pulse on the front door.");
     Assert(landingModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "landing page should surface who can get the recommended shelf now.");
     Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("weekly snapshots", StringComparison.OrdinalIgnoreCase)), "landing page should surface measured adoption health on the trust pulse.");
+    Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Closure health", StringComparison.Ordinal) && row.Value.Contains("waiting closure", StringComparison.OrdinalIgnoreCase)), "landing page should surface closure-health follow-through on the trust pulse.");
     Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Progress trend", StringComparison.Ordinal) && row.Value.Contains("Trend sparkline", StringComparison.OrdinalIgnoreCase)), "landing page should surface progress trend sparkline on the trust pulse.");
     Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && row.Value.Contains("route-canary validation", StringComparison.OrdinalIgnoreCase)), "landing page should surface launch-readiness posture on the trust pulse.");
     Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Provider-route stewardship", StringComparison.Ordinal) && row.Value.Contains("Pilot defaults are governed", StringComparison.Ordinal)), "landing page should surface provider-route stewardship on the trust pulse.");
@@ -2595,6 +2597,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedNowModel?.TrustPulse is not null, "current-release should surface the weekly public trust pulse.");
     Assert(authenticatedNowModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Support follow-through", StringComparison.Ordinal) && row.Value.Contains("Closed with notice", StringComparison.Ordinal)), "signed-in current-release page should surface the current support follow-through stage.");
     Assert(authenticatedNowModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Recommended now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "current-release should explain who can get the recommended build now.");
+    Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Closure health", StringComparison.Ordinal) && row.Value.Contains("waiting closure", StringComparison.OrdinalIgnoreCase)), "current-release should surface closure-health follow-through in the weekly trust pulse.");
     Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Progress trend", StringComparison.Ordinal) && row.Value.Contains("Trend window", StringComparison.OrdinalIgnoreCase)), "current-release should surface trend window movement in the weekly trust pulse.");
     Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && row.Value.Contains("route-canary validation", StringComparison.OrdinalIgnoreCase)), "current-release should surface launch-readiness posture on the weekly trust pulse.");
     Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Provider-route stewardship", StringComparison.Ordinal) && row.Value.Contains("Pilot defaults are governed", StringComparison.Ordinal)), "current-release should surface provider-route stewardship on the weekly trust pulse.");
