@@ -89,6 +89,14 @@ internal static class GmOpsBoardVerification
             AdditionalTags: ["opposition", "packet"],
             CreatedBy: "gm.ops",
             RuntimeFingerprint: "ops-fingerprint"));
+        var governedNpcPackPrep = ops.CreatePrepAssetFromProject(new GmPrepAssetCatalogImportRequest(
+            CampaignId: "campaign_ops",
+            SessionId: "session_ops",
+            SceneId: "scene_downtown",
+            Project: BuildGovernedNpcPackProject(),
+            AdditionalTags: ["opposition", "roster"],
+            CreatedBy: "gm.ops",
+            RuntimeFingerprint: "ops-fingerprint"));
 
         var projection = ops.GetProjection("session_ops", "scene_downtown", "scene_downtown:r3");
         var sceneOnlyAssets = ops.ListPrepAssets(campaignId: "campaign_ops", sessionId: "session_ops", sceneId: "scene_downtown");
@@ -108,11 +116,16 @@ internal static class GmOpsBoardVerification
             sessionId: "session_ops",
             sceneId: "scene_downtown",
             queryText: "spoofed badges");
-        var governedPacketSearch = ops.ListPrepAssets(
+        var governedEncounterSearch = ops.ListPrepAssets(
             campaignId: "campaign_ops",
             sessionId: "session_ops",
             sceneId: "scene_downtown",
-            queryText: "red-samurai checkpoint");
+            queryText: "checkpoint scanner");
+        var governedRosterSearch = ops.ListPrepAssets(
+            campaignId: "campaign_ops",
+            sessionId: "session_ops",
+            sceneId: "scene_downtown",
+            queryText: "security roster");
         var exportedAssets = ops.ExportPortableAssets(
             "campaign_ops",
             "session_ops",
@@ -123,7 +136,7 @@ internal static class GmOpsBoardVerification
         VerificationAssert.Equal(2, projection.ChecklistSummary.TotalItems, "Ops board should summarize checklist counts.");
         VerificationAssert.Equal(1, projection.ChecklistSummary.CompletedItems, "Ops board should summarize completed checklist items.");
         VerificationAssert.True(projection.RevealSurfaces.Any(item => item.AssetId == reveal.AssetId), "Ops board should surface reveal assets for player delivery.");
-        VerificationAssert.Equal(3, sceneOnlyAssets.TotalCount, "Scene-scoped prep lists should stay focused on direct scene assets by default, including governed packet bindings.");
+        VerificationAssert.Equal(4, sceneOnlyAssets.TotalCount, "Scene-scoped prep lists should stay focused on direct scene assets by default, including governed packet bindings.");
         VerificationAssert.NotNull(governedEncounterPrep.GovernedProject, "Governed packet prep should carry structured governed-project provenance.");
         VerificationAssert.Equal("renraku-checkpoint", governedEncounterPrep.GovernedProject!.ProjectId, "Governed packet prep should preserve the source project id.");
         VerificationAssert.True(
@@ -132,6 +145,14 @@ internal static class GmOpsBoardVerification
         VerificationAssert.True(
             governedEncounterPrep.Body.Contains("red-samurai", StringComparison.OrdinalIgnoreCase),
             "Governed packet prep should preserve grounded dependency truth from the imported encounter packet.");
+        VerificationAssert.NotNull(governedNpcPackPrep.GovernedProject, "Governed NPC pack prep should carry structured governed-project provenance.");
+        VerificationAssert.Equal("renraku-security", governedNpcPackPrep.GovernedProject!.ProjectId, "Governed NPC pack prep should preserve the source project id.");
+        VerificationAssert.True(
+            governedNpcPackPrep.Tags.Contains(HubCatalogItemKinds.NpcPack, StringComparer.OrdinalIgnoreCase),
+            "Governed NPC pack prep should retain the source npc-pack kind as a searchable tag.");
+        VerificationAssert.True(
+            governedNpcPackPrep.Body.Contains("renraku-spider", StringComparison.OrdinalIgnoreCase),
+            "Governed NPC pack prep should preserve grounded dependency truth from the imported NPC pack.");
         VerificationAssert.True(
             sceneWithLibrary.Items.Any(item => item.AssetId == libraryNote.AssetId),
             "Prep lists should optionally include reusable campaign assets that stay compatible with the requested session.");
@@ -143,16 +164,23 @@ internal static class GmOpsBoardVerification
         VerificationAssert.True(
             checklistSearch.Items.Any(item => item.AssetId == checklist.AssetId),
             "Prep list search should return the checklist asset when the label matches the query.");
-        VerificationAssert.Equal(1, governedPacketSearch.TotalCount, "Prep lists should support governed packet search by title and dependency content.");
+        VerificationAssert.Equal(1, governedEncounterSearch.TotalCount, "Prep lists should support governed encounter packet search by title and dependency content.");
         VerificationAssert.True(
-            governedPacketSearch.Items.Any(item => item.AssetId == governedEncounterPrep.AssetId),
+            governedEncounterSearch.Items.Any(item => item.AssetId == governedEncounterPrep.AssetId),
             "Prep list search should return the governed encounter packet binding.");
+        VerificationAssert.Equal(1, governedRosterSearch.TotalCount, "Prep lists should support governed NPC pack search by title and dependency content.");
+        VerificationAssert.True(
+            governedRosterSearch.Items.Any(item => item.AssetId == governedNpcPackPrep.AssetId),
+            "Prep list search should return the governed NPC pack binding.");
         VerificationAssert.True(
             exportedAssets.Any(item => item.AssetId == libraryNote.AssetId),
             "Portable prep export should include reusable campaign assets for GM library continuity.");
         VerificationAssert.True(
             exportedAssets.Any(item => item.AssetId == governedEncounterPrep.AssetId),
             "Portable prep export should include governed packet bindings alongside scene prep.");
+        VerificationAssert.True(
+            exportedAssets.Any(item => item.AssetId == governedNpcPackPrep.AssetId),
+            "Portable prep export should include governed NPC pack bindings alongside scene prep.");
 
         var updatedChecklist = ops.UpdateChecklist(
             checklist.AssetId,
@@ -224,5 +252,40 @@ internal static class GmOpsBoardVerification
             [
                 new HubProjectAction("clone-encounter-pack", "Clone to Library", HubProjectActionKinds.CloneToLibrary),
                 new HubProjectAction("open-encounter-pack", "Open Registry Entry", HubProjectActionKinds.OpenRegistry)
+            ]);
+
+    private static HubProjectDetailProjection BuildGovernedNpcPackProject() =>
+        new(
+            Summary: new HubCatalogItem(
+                ItemId: "renraku-security",
+                Kind: HubCatalogItemKinds.NpcPack,
+                Title: "Renraku security roster",
+                Description: "Curated security roster with red samurai pressure and matrix support.",
+                RulesetId: "sr5",
+                Visibility: "public",
+                TrustTier: "verified",
+                LinkTarget: "/hub/npc-packs/renraku-security",
+                Version: "1.0.0"),
+            OwnerId: "hub:default",
+            CatalogKind: "npc-vault",
+            PublicationStatus: "published",
+            ReviewState: "approved",
+            RuntimeFingerprint: "npcvault:renraku-security:v1",
+            OwnerReview: null,
+            AggregateReview: null,
+            Facts:
+            [
+                new HubProjectDetailFact("threat", "Threat", "High"),
+                new HubProjectDetailFact("roster", "Roster posture", "Checkpoint-ready security team with matrix support")
+            ],
+            Dependencies:
+            [
+                new HubProjectDependency(HubProjectDependencyKinds.IncludesNpcEntry, HubCatalogItemKinds.NpcEntry, "red-samurai", "1.0.0"),
+                new HubProjectDependency(HubProjectDependencyKinds.IncludesNpcEntry, HubCatalogItemKinds.NpcEntry, "renraku-spider", "1.0.0")
+            ],
+            Actions:
+            [
+                new HubProjectAction("clone-npc-pack", "Clone to Library", HubProjectActionKinds.CloneToLibrary),
+                new HubProjectAction("open-npc-pack", "Open Registry Entry", HubProjectActionKinds.OpenRegistry)
             ]);
 }
