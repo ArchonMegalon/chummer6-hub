@@ -1607,8 +1607,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("/account/work#community-op-board-", StringComparison.Ordinal), "home work should deep-link the operator card into the exact season-board drawer instead of sending every organizer flow back to the generic operator shell.");
     Assert(homeSource.Contains("Open season board", StringComparison.Ordinal), "home work should keep a direct route back to the governed season board.");
     Assert(homeSource.Contains("Invites:", StringComparison.Ordinal), "home work should keep invite and sponsorship posture attached to the lead operator card.");
+    Assert(homeSource.Contains("Sponsors:", StringComparison.Ordinal), "home work should keep a bounded sponsor-session pulse attached to the lead operator card.");
+    Assert(homeSource.Contains("@leadCommunitySponsorSession.UserDisplayName", StringComparison.Ordinal), "home work should surface the lead sponsor-session participant directly from the shared operator projection.");
     Assert(homeSource.Contains("/account/work#community-op-invites-", StringComparison.Ordinal), "home work should deep-link the operator card into the invite and sponsorship rail.");
     Assert(homeSource.Contains("Open invite rail", StringComparison.Ordinal), "home work should give operators a direct route to the invite and sponsorship rail.");
+    Assert(homeSource.Contains("/account/work#community-op-sponsor-sessions-", StringComparison.Ordinal), "home work should deep-link the operator card into the sponsor-session rail.");
+    Assert(homeSource.Contains("Open sponsor rail", StringComparison.Ordinal), "home work should give operators a direct route to the sponsor-session rail.");
     Assert(homeSource.Contains("Guide: current preview, downloads, and closure posture stay on the same operator rail.", StringComparison.Ordinal), "home work should keep bounded organizer guidance attached to the lead operator card.");
     Assert(homeSource.Contains("/account/work#community-op-guidance-", StringComparison.Ordinal), "home work should deep-link the operator card into the organizer guidance rail.");
     Assert(homeSource.Contains("Open member guidance", StringComparison.Ordinal), "home work should give operators a direct route to the member-guidance rail.");
@@ -1706,11 +1710,14 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@entry.LatestEventSummary", StringComparison.Ordinal), "account season board should surface the latest governed event summary for each campaign lane.");
     Assert(accountSource.Contains("Open shared campaign view", StringComparison.Ordinal), "account season board should give operators a direct route from the board into the governed campaign lane.");
     Assert(accountSource.Contains("Invite / sponsorship", StringComparison.Ordinal), "account teams and permissions should keep invite and sponsorship posture visible on the same operator surface.");
+    Assert(accountSource.Contains("Sponsor session rail", StringComparison.Ordinal), "account teams and permissions should keep sponsor-session posture visible on the operator summary rail.");
     Assert(accountSource.Contains("Invite &amp; sponsorship rail", StringComparison.Ordinal), "account teams and permissions should give operators a dedicated invite and sponsorship rail.");
     Assert(accountSource.Contains("Issue governed join code", StringComparison.Ordinal), "account invite rail should expose a governed join-code issuance flow.");
     Assert(accountSource.Contains("Issue governed boost code", StringComparison.Ordinal), "account invite rail should expose a governed boost-code issuance flow.");
     Assert(accountSource.Contains("Recent join codes", StringComparison.Ordinal), "account invite rail should surface recent governed join codes.");
     Assert(accountSource.Contains("Recent boost codes", StringComparison.Ordinal), "account invite rail should surface recent governed boost codes.");
+    Assert(accountSource.Contains("Recent sponsor sessions", StringComparison.Ordinal), "account invite rail should surface recent governed sponsor sessions.");
+    Assert(accountSource.Contains("id=\"community-op-sponsor-sessions-@op.GroupId\"", StringComparison.Ordinal), "account invite rail should give the sponsor-session drawer a stable deep-link target.");
     Assert(accountSource.Contains("If a member reports a stale join code", StringComparison.Ordinal), "account invite rail should explain stale-code recovery on the same operator surface.");
     Assert(accountSource.Contains("Launch &amp; closure", StringComparison.Ordinal), "account teams and permissions should keep organizer release and closure posture visible on the same operator surface.");
     Assert(accountSource.Contains("Member guidance rail", StringComparison.Ordinal), "account teams and permissions should provide a bounded member-guidance rail for organizer workflows.");
@@ -2072,10 +2079,29 @@ async Task VerifyPublicLandingProjectionAsync()
         CampaignId: seededCampaign.CampaignId,
         ProjectId: "hub",
         Label: "smoke_operator"));
+    var operatorSponsorSessions = new BoostSessionService(
+        store,
+        accounts,
+        groups,
+        new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { detail = "operator sponsor session should not hit Fleet" }, HttpStatusCode.InternalServerError))), configuration),
+        new RewardService(store));
+    var operatorSponsorSession = operatorSponsorSessions.Create(new CreateSponsorSessionRequest(
+        SubjectId: "subject.demo",
+        ProjectId: "hub",
+        GroupId: operatorGroup.GroupId,
+        SubjectLabel: "Runner Demo",
+        CampaignId: seededCampaign.CampaignId,
+        Visibility: "group",
+        RequestedLaneType: "participant_burst",
+        RequestedLaneRole: "coding",
+        AuthorizationTier: "plus",
+        TierSource: "operator_verified"));
+    operatorSponsorSession = operatorSponsorSessions.RecordConsent(operatorSponsorSession.SponsorSessionId);
     Assert(string.Equals(seededCampaign.GroupId, operatorGroup.GroupId, StringComparison.Ordinal), "smoke campaign should attach to the seeded operator group.");
     Assert(string.Equals(seededSeasonCampaign.GroupId, operatorGroup.GroupId, StringComparison.Ordinal), "secondary smoke season campaign should stay on the same seeded operator group.");
     Assert(!string.IsNullOrWhiteSpace(operatorJoinCode.Code), "operator join-code issuance should produce a durable code.");
     Assert(!string.IsNullOrWhiteSpace(operatorBoostCode.Code), "operator boost-code issuance should produce a durable code.");
+    Assert(string.Equals(operatorSponsorSession.Status, "consented", StringComparison.OrdinalIgnoreCase), "operator sponsor-session seeding should leave a real governed sponsor session attached to the operator group.");
     var installSummary = installLinking.GetSummary(linkedUser.UserId, "subject.demo");
     Assert(installSummary.RecentReceipts.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal)), "signed-in downloads should mint a durable download receipt.");
     Assert(installSummary.PendingClaimTickets.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal) && string.Equals(item.Status, InstallClaimTicketStates.Pending, StringComparison.Ordinal)), "signed-in downloads should mint a pending install claim ticket.");
@@ -2271,6 +2297,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.InviteCampaigns.Count >= 2), "account page should keep multi-campaign invite choices on the operator rail.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentJoinCodes.Any(code => string.Equals(code.Code, operatorJoinCode.Code, StringComparison.Ordinal))), "account page should keep recent governed join codes attached to the operator rail.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentBoostCodes.Any(code => string.Equals(code.Code, operatorBoostCode.Code, StringComparison.Ordinal))), "account page should keep recent governed boost codes attached to the operator rail.");
+    Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentSponsorSessions.Any(session => string.Equals(session.SponsorSessionId, operatorSponsorSession.SponsorSessionId, StringComparison.Ordinal))), "account page should keep recent governed sponsor sessions attached to the operator rail.");
+    Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentSponsorSessions.Any(session => session.StatusSummary.Contains("Consent recorded", StringComparison.OrdinalIgnoreCase))), "account page should keep sponsor-session status truth attached to the operator rail.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.SeasonBoardEntries.Count >= 2), "account page should keep a multi-campaign season board attached to the operator rail.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.SeasonBoardEntries.All(entry => !string.IsNullOrWhiteSpace(entry.NextSafeAction))), "account season board should keep next-safe-action truth attached to each campaign lane.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.ActiveCampaignCount >= 2), "account page should surface a multi-campaign operator group on the same governed backbone.");
@@ -2434,6 +2462,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var rulesResult = await campaignSpineController.GetMyRulesNavigatorAnswer(rulesEntryId, CancellationToken.None);
     var rulesPayload = (rulesResult.Result as OkObjectResult)?.Value as RulesNavigatorAnswerProjection ?? rulesResult.Value;
     Assert(rulesPayload is not null && rulesPayload.EvidenceLines.Count >= 1, "campaign spine api should expose grounded rule-environment evidence.");
+    Assert(rulesPayload?.Diffs?.Count >= 2, "campaign spine api should expose grounded before-and-after rule-environment diffs.");
+    Assert(rulesPayload?.Diffs?[0].AfterSummary.Contains(rulesPayload.ProvenanceLabel.Split(" · ").Last(), StringComparison.Ordinal) == true, "campaign spine api should keep the active compatibility fingerprint visible in the first rules diff.");
     var publicationResult = await campaignSpineController.GetMyCreatorPublication(publicationId, CancellationToken.None);
     var publicationPayload = (publicationResult.Result as OkObjectResult)?.Value as CreatorPublicationProjection ?? publicationResult.Value;
     Assert(publicationPayload is not null && string.Equals(publicationPayload.PublicationId, publicationId, StringComparison.Ordinal), "campaign spine api should expose creator-publication posture from the same campaign truth.");
@@ -2699,6 +2729,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentEventSummaries.Count >= 1, "signed-in home should keep a bounded recent-event receipt attached to the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentJoinCodes.Any(code => string.Equals(code.Code, operatorJoinCode.Code, StringComparison.Ordinal)), "signed-in home should keep recent governed join codes attached to the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentBoostCodes.Any(code => string.Equals(code.Code, operatorBoostCode.Code, StringComparison.Ordinal)), "signed-in home should keep recent governed boost codes attached to the lead operator group.");
+    Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentSponsorSessions.Any(session => string.Equals(session.SponsorSessionId, operatorSponsorSession.SponsorSessionId, StringComparison.Ordinal)), "signed-in home should keep recent governed sponsor sessions attached to the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].SeasonBoardEntries.Count >= 2, "signed-in home should keep the multi-campaign season board attached to the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "signed-in home should receive customer-facing build-path titles directly from the campaign spine service.");

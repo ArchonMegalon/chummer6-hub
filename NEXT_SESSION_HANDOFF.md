@@ -16,6 +16,7 @@ Updated: 2026-03-29
   - governed downtime brief packets on the shared workspace and server plane
   - richer operator operations pulse and campaign-return pulse on the shared account/control backbone
   - explicit season/event operator rail on the shared account/control backbone
+  - explicit sponsor-session operator rail on the shared account/control backbone
   - multi-campaign preview season bootstrap on one operator group
   - signed-in home/work aftermath recap visibility on the calmer home cockpit
   - signed-in home/work downtime brief visibility on the calmer home cockpit
@@ -49,8 +50,11 @@ Updated: 2026-03-29
 - Extended the signed-in `/home/work` operator card so it now carries bounded organizer guidance copy plus a direct route to the member-guidance rail on `/account/work`
 - Extended the signed-in live audit so both `/account/work` and `/home/work` have to surface the new organizer guidance rail on the rebuilt edge
 - Added a first-class `Invite & sponsorship rail` to `Teams & permissions` so operators can issue governed join codes and boost codes without leaving the shared account/control backbone
+- Added a first-class `Recent sponsor sessions` rail to `Teams & permissions`, backed by governed sponsor-session projections so operators can see who is attached, which campaign lane they are on, and the current sponsorship status without leaving the same operator surface
 - Added explicit stale-code recovery copy and problem-detail recovery guidance so missing or expired join/boost codes now point users back to a fresh governed code and the same member-guidance rail instead of leaking repo vocabulary
 - Backfilled the default preview operator group with governed invite and sponsorship capabilities so the signed-in organizer rail is materially usable on the rebuilt local edge, not just on manually created campaign groups
+- Extended the signed-in `/home/work` operator card so it now carries one bounded sponsor-session pulse and deep-links directly into the sponsor-session rail on `/account/work`
+- Extended the signed-in live audit so it now creates and consents a real governed sponsor session, re-reads the shared campaign spine, and proves the sponsor-session rail on both `/account/work` and `/home/work`
 - Extended the signed-in live audit so it now issues real join and boost codes, verifies the stale-code recovery responses, and proves the new invite rail on both `/account/work` and `/home/work`
 - Reordered community operator projections so the signed-in `/home/work` operator card prefers the freshest and richest governed operator lane instead of falling back to alphabetical group order
 - Added a dedicated `Consequence watch` card on `/home/work` so the lead governed campaign consequence and one evidence cue stay visible on the signed-in home cockpit instead of only appearing inside the shared summary prose

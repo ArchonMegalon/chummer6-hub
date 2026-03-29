@@ -462,6 +462,79 @@ def verify_signed_in_work_audit(
     if not boost_code.get("code"):
         raise AssertionError("boost-code issuance did not expose the issued code")
 
+    sponsor_session_body = json.dumps(
+        {
+            "subjectId": subject_id,
+            "projectId": "hub",
+            "groupId": group_id,
+            "subjectLabel": "Live Audit Operator",
+            "campaignId": invite_campaigns[0]["campaignId"] if invite_campaigns else None,
+            "visibility": "group",
+            "requestedLaneType": "participant_burst",
+            "requestedLaneRole": "coding",
+            "authorizationTier": "plus",
+            "tierSource": "operator_verified",
+        }
+    ).encode("utf-8")
+    sponsor_session_path = "/api/v1/boost-sessions"
+    status, body, _, _ = fetch(
+        base_url,
+        sponsor_session_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=sponsor_session_body,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"{sponsor_session_path} returned {status}: {body[:400]}")
+    sponsor_session = json.loads(body)
+    sponsor_session_id = sponsor_session.get("sponsorSessionId")
+    if not sponsor_session_id:
+        raise AssertionError("sponsor-session creation did not expose a sponsor session id")
+
+    consent_path = f"/api/v1/boost-sessions/{sponsor_session_id}/consent"
+    status, body, _, _ = fetch(
+        base_url,
+        consent_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=b"",
+        request_headers={
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"{consent_path} returned {status}: {body[:400]}")
+    sponsor_session = json.loads(body)
+    if sponsor_session.get("status") != "consented":
+        raise AssertionError("sponsor-session consent did not move the governed session into the consented state")
+
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/campaign-spine/me",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/campaign-spine/me returned {status}, expected 200 after sponsor-session creation")
+    refreshed_summary = json.loads(body)
+    refreshed_operations = refreshed_summary.get("communityOperations") or []
+    refreshed_operation = next((item for item in refreshed_operations if item.get("groupId") == group_id), None)
+    if refreshed_operation is None:
+        raise AssertionError("signed-in campaign summary lost the lead community operation after sponsor-session creation")
+    refreshed_sponsor_sessions = refreshed_operation.get("recentSponsorSessions") or []
+    refreshed_sponsor_session = next((item for item in refreshed_sponsor_sessions if item.get("sponsorSessionId") == sponsor_session_id), None)
+    if refreshed_sponsor_session is None:
+        raise AssertionError("signed-in campaign summary did not surface the new sponsor session on the operator rail")
+
     missing_boost_body = json.dumps(
         {
             "subjectId": subject_id,
@@ -680,8 +753,11 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Issue governed boost code", "/account/work")
     require_snippet(body, "Recent join codes", "/account/work")
     require_snippet(body, "Recent boost codes", "/account/work")
+    require_snippet(body, "Recent sponsor sessions", "/account/work")
     require_snippet(body, join_code["code"], "/account/work")
     require_snippet(body, boost_code["code"], "/account/work")
+    require_snippet(body, refreshed_sponsor_session["userDisplayName"], "/account/work")
+    require_snippet(body, refreshed_sponsor_session["campaignName"], "/account/work")
     require_snippet(body, "Member guidance rail", "/account/work")
     require_snippet(body, "Open shared campaign view", "/account/work")
     require_snippet(body, "Open current release", "/account/work")
@@ -713,13 +789,16 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Latest event:", "/home/work")
     require_snippet(body, "Board:", "/home/work")
     require_snippet(body, "Invites:", "/home/work")
+    require_snippet(body, "Sponsors:", "/home/work")
     require_snippet(body, "Guide: current preview, downloads, and closure posture stay on the same operator rail.", "/home/work")
     require_snippet(body, "Open season board", "/home/work")
     require_snippet(body, "Open invite rail", "/home/work")
+    require_snippet(body, "Open sponsor rail", "/home/work")
     require_snippet(body, "Open member guidance", "/home/work")
     require_snippet(body, "Consequence watch", "/home/work")
     require_snippet(body, prep_launch["packetTitle"], "/home/work")
     require_snippet(body, travel_prefetch["deviceRole"], "/home/work")
+    require_snippet(body, refreshed_sponsor_session["campaignName"], "/home/work")
     status, body, _, _ = fetch(
         base_url,
         workspace_path,
@@ -740,7 +819,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Downtime brief", workspace_path)
     print(
         "ok signed-in /account/work -> "
-        f"{final_url} workspace={workspace_id} install={claimed_installation_id} join_code={join_code['code']} boost_code={boost_code['code']} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} downtime={downtime_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
+        f"{final_url} workspace={workspace_id} install={claimed_installation_id} join_code={join_code['code']} boost_code={boost_code['code']} sponsor_session={sponsor_session_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} downtime={downtime_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
     )
 
 

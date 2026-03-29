@@ -31,12 +31,16 @@
     var leadCommunityTransfer = leadCommunityOperation?.RecentRosterTransfers?.FirstOrDefault();
     var leadCommunityEvent = leadCommunityOperation?.RecentEventSummaries.FirstOrDefault();
     var leadCommunityBoard = leadCommunityOperation?.SeasonBoardEntries.FirstOrDefault();
+    var leadCommunitySponsorSession = leadCommunityOperation?.RecentSponsorSessions.FirstOrDefault();
     var leadCommunityBoardHref = leadCommunityOperation is null
         ? "/account/work#community-ops"
         : $"/account/work#community-op-board-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadCommunityInviteHref = leadCommunityOperation is null
         ? "/account/work#community-ops"
         : $"/account/work#community-op-invites-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
+    var leadCommunitySponsorHref = leadCommunityOperation is null
+        ? "/account/work#community-ops"
+        : $"/account/work#community-op-sponsor-sessions-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadCommunityGuidanceHref = leadCommunityOperation is null
         ? "/account/work#community-ops"
         : $"/account/work#community-op-guidance-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
@@ -571,6 +575,10 @@
                                                                     <span> Board: @leadCommunityBoard.CampaignName via @leadCommunityBoard.RunTitle. Next: @leadCommunityBoard.NextSafeAction</span>
                                                                 }
                                                                 <span> Invites: @(leadCommunityOperation.RecentJoinCodes.Count == 0 && leadCommunityOperation.RecentBoostCodes.Count == 0 ? "issue member and sponsor entry from one governed rail." : $"{leadCommunityOperation.RecentJoinCodes.Count} join code(s) and {leadCommunityOperation.RecentBoostCodes.Count} sponsor code(s) stay on the same rail.")</span>
+                                                                @if (leadCommunitySponsorSession is not null)
+                                                                {
+                                                                    <span> Sponsors: @leadCommunitySponsorSession.UserDisplayName on @leadCommunitySponsorSession.CampaignName. @leadCommunitySponsorSession.StatusSummary.</span>
+                                                                }
                                                                 <span> Guide: current preview, downloads, and closure posture stay on the same operator rail.</span>
                                                                 @if (leadCommunityTransfer is not null)
                                                                 {
@@ -585,6 +593,7 @@
                                                         <div class="stacked-actions">
                                                             <a class="inline-link" href="@leadCommunityBoardHref">Open season board</a>
                                                             <a class="inline-link" href="@leadCommunityInviteHref">Open invite rail</a>
+                                                            <a class="inline-link" href="@leadCommunitySponsorHref">Open sponsor rail</a>
                                                             <a class="inline-link" href="@leadCommunityGuidanceHref">Open member guidance</a>
                                                         </div>
                                                     </article>
@@ -672,6 +681,10 @@
                                                                 @if (answer.EvidenceLines.Count > 0)
                                                                 {
                                                                     <span> Evidence: @answer.EvidenceLines[0]</span>
+                                                                }
+                                                                @if (answer.Diffs is { Count: > 0 })
+                                                                {
+                                                                    <span> Change: @answer.Diffs[0].Label -> @answer.Diffs[0].AfterSummary</span>
                                                                 }
                                                                 @if (answer.SupportReuseHints.Count > 0)
                                                                 {

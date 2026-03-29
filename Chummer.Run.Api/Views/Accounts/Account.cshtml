@@ -1518,6 +1518,19 @@
                         {
                             <p><strong>Evidence:</strong> @string.Join(" ", selectedRulesNavigatorAnswer.EvidenceLines.Take(3))</p>
                         }
+                        @if (selectedRulesNavigatorAnswer.Diffs is { Count: > 0 })
+                        {
+                            <div class="settings-summary-list">
+                                @foreach (var diff in selectedRulesNavigatorAnswer.Diffs.Take(2))
+                                {
+                                    <div class="settings-summary-row">
+                                        <span>@diff.Label</span>
+                                        <strong>@diff.AfterSummary</strong>
+                                    </div>
+                                    <p class="muted-copy">Before: @diff.BeforeSummary Why: @diff.ReasonSummary</p>
+                                }
+                            </div>
+                        }
                     </article>
                 }
                 else if (selectedCreatorPublication is not null)
@@ -2062,6 +2075,10 @@
                                     <strong>@inviteSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
+                                    <span>Sponsor session rail</span>
+                                    <strong>@(op.RecentSponsorSessions.Count == 0 ? "Quiet" : $"{op.RecentSponsorSessions.Count} recent")</strong>
+                                </div>
+                                <div class="settings-summary-row">
                                     <span>Operator watchouts</span>
                                     <strong>@(op.Watchouts.Count == 0 ? "Quiet" : op.Watchouts[0])</strong>
                                 </div>
@@ -2134,6 +2151,10 @@
                                     <div class="settings-summary-row">
                                         <span>Active sponsor sessions</span>
                                         <strong>@(op.ActiveSponsorSessionCount == 0 ? "Quiet" : op.ActiveSponsorSessionCount.ToString())</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Recent sponsor sessions</span>
+                                        <strong>@(op.RecentSponsorSessions.Count == 0 ? "Quiet" : $"{op.RecentSponsorSessions.Count} recent")</strong>
                                     </div>
                                 </div>
                                 <p class="muted-copy">Community invites, sponsorship entry, and stale-code recovery stay on the same governed operator rail instead of getting pushed into chat folklore.</p>
@@ -2224,6 +2245,29 @@
                                                 <li>
                                                     <strong>@boostCode.Code</strong>: @boostCode.CampaignName · @HumanizeStatus(boostCode.Status, "Active")
                                                     <span> @boostCode.StatusSummary</span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </details>
+                                <details id="community-op-sponsor-sessions-@op.GroupId" class="details-drawer">
+                                    <summary>Recent sponsor sessions</summary>
+                                    @if (op.RecentSponsorSessions.Count == 0)
+                                    {
+                                        <p class="muted-copy">No governed sponsor session is attached to this operator rail yet.</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="muted-copy">
+                                            @foreach (var sponsorSession in op.RecentSponsorSessions)
+                                            {
+                                                <li>
+                                                    <strong>@sponsorSession.UserDisplayName</strong>: @sponsorSession.CampaignName · @HumanizeStatus(sponsorSession.Status, "Tracked")
+                                                    <span> @sponsorSession.StatusSummary</span>
+                                                    @if (!string.IsNullOrWhiteSpace(sponsorSession.LatestEventSummary))
+                                                    {
+                                                        <span> Latest: @sponsorSession.LatestEventSummary</span>
+                                                    }
                                                 </li>
                                             }
                                         </ul>
