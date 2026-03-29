@@ -45,6 +45,7 @@ Updated: 2026-03-29
 - Retired the first-session proof automatically once governed prep launch, travel prefetch, or recap follow-through lands, so the starter lane does not linger after the campaign moves into durable continuity
 - Extended `PublicTrustPulseService` and signed-in/public trust-pulse rows so landing, downloads, help, and current-release surfaces now carry `Launch readiness` plus `Provider-route stewardship` straight from the weekly pulse
 - Added unit and smoke assertions that lock those launch/provider pulse rows into the public and signed-in surfaces instead of leaving them as unguarded controller copy
+- Refreshed the local mirrored weekly pulse artifact with launch/provider fields and made stack smoke tolerate alternate compose entry files, missing `haproxy.cfg`, and healthy `307` redirect posture on the public edge
 - Added a `Start first playable session` action on `/account/work` empty-state copy so signed-in work follows the same starter-lane onboarding route as `/home/work`
 - Reused `/api/v1/campaign-spine/me/workspaces/starter` from the account route and added starter-lane feedback/redirect handling instead of inventing a second onboarding API
 - Added a dedicated `Aftermath recap` card on `/home/work` with bounded summary, evidence, return-shelf context, and a deep link back to the shared workspace return lane
