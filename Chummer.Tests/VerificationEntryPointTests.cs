@@ -164,6 +164,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("PublicTrustPulsePanelViewModel? TrustPulse", viewModel, StringComparison.Ordinal);
         Assert.Contains("Weekly trust pulse", partial, StringComparison.Ordinal);
         Assert.Contains("Current caution", controller, StringComparison.Ordinal);
+        Assert.Contains("Progress trend", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildTrustPulseProgressTrendSummary", controller, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -786,6 +786,7 @@ public sealed class PublicLandingController : Controller
             new("Launch readiness", BuildTrustPulseLaunchReadinessSummary(pulse)),
             new("Provider-route stewardship", BuildProviderRouteStewardshipSummary(pulse)),
             new("Adoption health", BuildTrustPulseAdoptionSummary(pulse)),
+            new("Progress trend", BuildTrustPulseProgressTrendSummary(pulse)),
             new("Journey pulse", BuildJourneyPulseSummary(pulse)),
             new("Current caution", BuildTrustPulseCautionSummary(pulse))
         };
@@ -1280,6 +1281,26 @@ public sealed class PublicLandingController : Controller
         return segments.Count == 0
             ? "Measured adoption evidence is still accumulating."
             : string.Join(" ", segments);
+    }
+
+    private static string BuildTrustPulseProgressTrendSummary(PublicTrustPulseSnapshot pulse)
+    {
+        if (pulse.ProgressTrendDirection is null
+            || pulse.ProgressTrendFromAsOf is null
+            || pulse.ProgressTrendToAsOf is null
+            || pulse.ProgressTrendDeltaPercent is null)
+        {
+            return pulse.ProgressHistorySnapshotCount is not null && pulse.ProgressHistorySnapshotCount > 1
+                ? $"Trend needs two distinct snapshots to calculate movement. {pulse.ProgressHistorySnapshotCount} snapshot(s) are available."
+                : "Progress trend is awaiting measured history; two weekly points are required.";
+        }
+
+        return pulse.ProgressTrendDirection switch
+        {
+            "up" => $"Upward momentum: +{pulse.ProgressTrendDeltaPercent.Value}% from {pulse.ProgressTrendFromAsOf} to {pulse.ProgressTrendToAsOf}.",
+            "down" => $"Regression detected: -{pulse.ProgressTrendDeltaPercent.Value}% from {pulse.ProgressTrendFromAsOf} to {pulse.ProgressTrendToAsOf}.",
+            _ => $"Flat trend: {pulse.ProgressTrendFromAsOf} -> {pulse.ProgressTrendToAsOf} at {pulse.ProgressTrendDeltaPercent.Value}%."
+        };
     }
 
     private static string HumanizeToken(string? value, string fallback)
