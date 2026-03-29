@@ -606,6 +606,10 @@
                                                                     {
                                                                         <span> Memory: @leadCommunityBoard.CampaignMemorySummary</span>
                                                                     }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadCommunityBoard.CampaignMemoryReturnSummary))
+                                                                    {
+                                                                        <span> Return: @leadCommunityBoard.CampaignMemoryReturnSummary</span>
+                                                                    }
                                                                 }
                                                                 <span> League: @leadCommunityOperation.LeagueOperationsSummary</span>
                                                                 <span> Invites: @(leadCommunityOperation.RecentJoinCodes.Count == 0 && leadCommunityOperation.RecentBoostCodes.Count == 0 ? "issue member and sponsor entry from one governed rail." : $"{leadCommunityOperation.RecentJoinCodes.Count} join code(s) and {leadCommunityOperation.RecentBoostCodes.Count} sponsor code(s) stay on the same rail.")</span>
