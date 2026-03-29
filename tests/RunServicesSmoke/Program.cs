@@ -3683,12 +3683,57 @@ async Task VerifyGmOpsBoardWorkflowAsync()
     Assert(governedPacketReference.ProjectId == "renraku-checkpoint", "governed prep bindings should preserve the source project id");
     Assert(governedPacket.Tags.Contains(HubCatalogItemKinds.EncounterPack, StringComparer.OrdinalIgnoreCase), "governed prep bindings should keep the source packet kind as a tag");
     Assert(governedPacket.Body.Contains("red-samurai", StringComparison.OrdinalIgnoreCase), "governed prep bindings should preserve dependency truth from the imported encounter packet");
+    var governedNpcPackCreate = controller.CreatePrepAssetFromProject(new GmPrepAssetCatalogImportRequest(
+        CampaignId: "campaign_smoke",
+        SessionId: "session_ops_smoke",
+        SceneId: "scene_smoke",
+        Project: new HubProjectDetailProjection(
+            Summary: new HubCatalogItem(
+                ItemId: "renraku-security",
+                Kind: HubCatalogItemKinds.NpcPack,
+                Title: "Renraku security roster",
+                Description: "Curated security roster with red samurai pressure and matrix support.",
+                RulesetId: "sr5",
+                Visibility: "public",
+                TrustTier: "verified",
+                LinkTarget: "/hub/npc-packs/renraku-security",
+                Version: "1.0.0"),
+            OwnerId: "hub:default",
+            CatalogKind: "npc-vault",
+            PublicationStatus: "published",
+            ReviewState: "approved",
+            RuntimeFingerprint: "npcvault:renraku-security:v1",
+            OwnerReview: null,
+            AggregateReview: null,
+            Facts:
+            [
+                new HubProjectDetailFact("threat", "Threat", "High"),
+                new HubProjectDetailFact("roster", "Roster posture", "Checkpoint-ready security team with matrix support")
+            ],
+            Dependencies:
+            [
+                new HubProjectDependency(HubProjectDependencyKinds.IncludesNpcEntry, HubCatalogItemKinds.NpcEntry, "red-samurai", "1.0.0"),
+                new HubProjectDependency(HubProjectDependencyKinds.IncludesNpcEntry, HubCatalogItemKinds.NpcEntry, "renraku-spider", "1.0.0")
+            ],
+            Actions:
+            [
+                new HubProjectAction("clone-npc-pack", "Clone to Library", HubProjectActionKinds.CloneToLibrary),
+                new HubProjectAction("open-npc-pack", "Open Registry Entry", HubProjectActionKinds.OpenRegistry)
+            ]),
+        AdditionalTags: ["opposition", "roster"],
+        CreatedBy: "gm.smoke",
+        RuntimeFingerprint: "ops-smoke")).Result as CreatedAtActionResult;
+    var governedNpcPack = NotNull(governedNpcPackCreate?.Value as GmPrepAssetRecord, "ops-board should bind governed NPC packs into campaign prep assets");
+    var governedNpcPackReference = NotNull(governedNpcPack.GovernedProject, "governed NPC pack bindings should carry structured governed-project provenance");
+    Assert(governedNpcPackReference.ProjectId == "renraku-security", "governed NPC pack bindings should preserve the source project id");
+    Assert(governedNpcPack.Tags.Contains(HubCatalogItemKinds.NpcPack, StringComparer.OrdinalIgnoreCase), "governed NPC pack bindings should keep the source packet kind as a tag");
+    Assert(governedNpcPack.Body.Contains("renraku-spider", StringComparison.OrdinalIgnoreCase), "governed NPC pack bindings should preserve dependency truth from the imported NPC pack");
 
     var projection = controller.GetProjection("session_ops_smoke", "scene_smoke", "scene_smoke:r2").Result as OkObjectResult;
     var projectionPayload = projection?.Value as OpsBoardProjection;
     Assert(projectionPayload?.RecentEvents.Count == 2, "ops-board projection should include recent session events");
     Assert(projectionPayload?.UnresolvedItems.Count == 2, "ops-board projection should surface unresolved and heat items");
-    Assert(projectionPayload?.PrepAssets.Count == 3, "ops-board projection should include prep assets for the scene, including governed packet bindings");
+    Assert(projectionPayload?.PrepAssets.Count == 4, "ops-board projection should include prep assets for the scene, including governed packet bindings");
 
     var checklistUpdate = controller.UpdateChecklist(
         checklistCreated!.AssetId,
@@ -3732,7 +3777,7 @@ async Task VerifyGmOpsBoardWorkflowAsync()
         kind: null,
         includeReusableCampaignAssets: true).Result as OkObjectResult;
     var listPayload = list?.Value as GmPrepAssetListResponse;
-    Assert(listPayload?.TotalCount == 4, "ops-board list endpoint should optionally include reusable campaign prep assets alongside governed packet bindings");
+    Assert(listPayload?.TotalCount == 5, "ops-board list endpoint should optionally include reusable campaign prep assets alongside governed packet bindings");
     Assert(listPayload?.Items.Any(item => item.AssetId == reusableNote!.AssetId) == true, "ops-board list endpoint should surface reusable campaign prep assets when requested");
 
     var libraryQuery = controller.ListPrepAssets(
@@ -3757,16 +3802,26 @@ async Task VerifyGmOpsBoardWorkflowAsync()
     Assert(checklistQueryPayload?.TotalCount == 1, "ops-board list endpoint should support checklist label search");
     Assert(checklistQueryPayload?.Items[0].AssetId == checklistCreated!.AssetId, "ops-board search should find scene prep by checklist label text");
 
-    var governedPacketQuery = controller.ListPrepAssets(
+    var governedEncounterQuery = controller.ListPrepAssets(
         campaignId: "campaign_smoke",
         sessionId: "session_ops_smoke",
         sceneId: "scene_smoke",
         kind: null,
         includeReusableCampaignAssets: true,
-        queryText: "red-samurai checkpoint").Result as OkObjectResult;
-    var governedPacketQueryPayload = governedPacketQuery?.Value as GmPrepAssetListResponse;
-    Assert(governedPacketQueryPayload?.TotalCount == 1, "ops-board list endpoint should support governed packet search by title and dependency content");
-    Assert(governedPacketQueryPayload?.Items[0].AssetId == governedPacket.AssetId, "ops-board search should find the governed packet binding");
+        queryText: "checkpoint scanner").Result as OkObjectResult;
+    var governedEncounterQueryPayload = governedEncounterQuery?.Value as GmPrepAssetListResponse;
+    Assert(governedEncounterQueryPayload?.TotalCount == 1, "ops-board list endpoint should support governed encounter packet search by title and dependency content");
+    Assert(governedEncounterQueryPayload?.Items[0].AssetId == governedPacket.AssetId, "ops-board search should find the governed encounter packet binding");
+    var governedRosterQuery = controller.ListPrepAssets(
+        campaignId: "campaign_smoke",
+        sessionId: "session_ops_smoke",
+        sceneId: "scene_smoke",
+        kind: null,
+        includeReusableCampaignAssets: true,
+        queryText: "security roster").Result as OkObjectResult;
+    var governedRosterQueryPayload = governedRosterQuery?.Value as GmPrepAssetListResponse;
+    Assert(governedRosterQueryPayload?.TotalCount == 1, "ops-board list endpoint should support governed NPC pack search by title and dependency content");
+    Assert(governedRosterQueryPayload?.Items[0].AssetId == governedNpcPack.AssetId, "ops-board search should find the governed NPC pack binding");
 }
 
 void VerifyInteropWorkflow()
