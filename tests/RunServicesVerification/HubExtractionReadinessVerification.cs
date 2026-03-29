@@ -692,6 +692,7 @@ internal static class HubExtractionReadinessVerification
                      "HubRegistryController.AddReview",
                      "PublicationsController.Review",
                      "PublicationsController.Moderate",
+                     "GmOpsBoardController.CreatePrepAssetFromProject",
                      "GmOpsBoardController.GetProjection",
                      "GmOpsBoardController.UpdateChecklist",
                      "GmOpsBoardController.Reveal",
@@ -711,6 +712,7 @@ internal static class HubExtractionReadinessVerification
         var gmOpsControllerText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Controllers", "GmOpsBoardController.cs"));
         foreach (var requiredToken in new[]
                  {
+                     "CreatePrepAssetFromProject",
                      "GetProjection",
                      "UpdateChecklist",
                      "Reveal"
@@ -724,6 +726,7 @@ internal static class HubExtractionReadinessVerification
         var gmOpsServiceText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.AI", "Services", "Ops", "GmOpsBoardService.cs"));
         foreach (var requiredToken in new[]
                  {
+                     "CreatePrepAssetFromProject",
                      "GetProjection",
                      "UpdateChecklist",
                      "Reveal",

@@ -1,3 +1,4 @@
+using Chummer.Contracts.Hub;
 using Chummer.Run.AI.Services.Ops;
 using Chummer.Run.AI.Services.Session;
 using Chummer.Run.AI.Services.Spider;
@@ -80,6 +81,14 @@ internal static class GmOpsBoardVerification
             SourceEventIds: Array.Empty<string>(),
             CreatedBy: "gm.ops",
             RuntimeFingerprint: "ops-fingerprint"));
+        var governedEncounterPrep = ops.CreatePrepAssetFromProject(new GmPrepAssetCatalogImportRequest(
+            CampaignId: "campaign_ops",
+            SessionId: "session_ops",
+            SceneId: "scene_downtown",
+            Project: BuildGovernedEncounterProject(),
+            AdditionalTags: ["opposition", "packet"],
+            CreatedBy: "gm.ops",
+            RuntimeFingerprint: "ops-fingerprint"));
 
         var projection = ops.GetProjection("session_ops", "scene_downtown", "scene_downtown:r3");
         var sceneOnlyAssets = ops.ListPrepAssets(campaignId: "campaign_ops", sessionId: "session_ops", sceneId: "scene_downtown");
@@ -99,6 +108,11 @@ internal static class GmOpsBoardVerification
             sessionId: "session_ops",
             sceneId: "scene_downtown",
             queryText: "spoofed badges");
+        var governedPacketSearch = ops.ListPrepAssets(
+            campaignId: "campaign_ops",
+            sessionId: "session_ops",
+            sceneId: "scene_downtown",
+            queryText: "red-samurai checkpoint");
         var exportedAssets = ops.ExportPortableAssets(
             "campaign_ops",
             "session_ops",
@@ -109,7 +123,13 @@ internal static class GmOpsBoardVerification
         VerificationAssert.Equal(2, projection.ChecklistSummary.TotalItems, "Ops board should summarize checklist counts.");
         VerificationAssert.Equal(1, projection.ChecklistSummary.CompletedItems, "Ops board should summarize completed checklist items.");
         VerificationAssert.True(projection.RevealSurfaces.Any(item => item.AssetId == reveal.AssetId), "Ops board should surface reveal assets for player delivery.");
-        VerificationAssert.Equal(2, sceneOnlyAssets.TotalCount, "Scene-scoped prep lists should stay focused on direct scene assets by default.");
+        VerificationAssert.Equal(3, sceneOnlyAssets.TotalCount, "Scene-scoped prep lists should stay focused on direct scene assets by default, including governed packet bindings.");
+        VerificationAssert.True(
+            governedEncounterPrep.Tags.Contains(HubCatalogItemKinds.EncounterPack, StringComparer.OrdinalIgnoreCase),
+            "Governed packet prep should retain the source encounter-pack kind as a searchable tag.");
+        VerificationAssert.True(
+            governedEncounterPrep.Body.Contains("red-samurai", StringComparison.OrdinalIgnoreCase),
+            "Governed packet prep should preserve grounded dependency truth from the imported encounter packet.");
         VerificationAssert.True(
             sceneWithLibrary.Items.Any(item => item.AssetId == libraryNote.AssetId),
             "Prep lists should optionally include reusable campaign assets that stay compatible with the requested session.");
@@ -121,9 +141,16 @@ internal static class GmOpsBoardVerification
         VerificationAssert.True(
             checklistSearch.Items.Any(item => item.AssetId == checklist.AssetId),
             "Prep list search should return the checklist asset when the label matches the query.");
+        VerificationAssert.Equal(1, governedPacketSearch.TotalCount, "Prep lists should support governed packet search by title and dependency content.");
+        VerificationAssert.True(
+            governedPacketSearch.Items.Any(item => item.AssetId == governedEncounterPrep.AssetId),
+            "Prep list search should return the governed encounter packet binding.");
         VerificationAssert.True(
             exportedAssets.Any(item => item.AssetId == libraryNote.AssetId),
             "Portable prep export should include reusable campaign assets for GM library continuity.");
+        VerificationAssert.True(
+            exportedAssets.Any(item => item.AssetId == governedEncounterPrep.AssetId),
+            "Portable prep export should include governed packet bindings alongside scene prep.");
 
         var updatedChecklist = ops.UpdateChecklist(
             checklist.AssetId,
@@ -161,4 +188,39 @@ internal static class GmOpsBoardVerification
             string.Equals("player-screen", deliveredReveal.Channel, StringComparison.Ordinal),
             "Reveal delivery should default to the player-screen channel.");
     }
+
+    private static HubProjectDetailProjection BuildGovernedEncounterProject() =>
+        new(
+            Summary: new HubCatalogItem(
+                ItemId: "renraku-checkpoint",
+                Kind: HubCatalogItemKinds.EncounterPack,
+                Title: "Renraku checkpoint",
+                Description: "Checkpoint packet with red samurai pressure and matrix overwatch.",
+                RulesetId: "sr5",
+                Visibility: "public",
+                TrustTier: "verified",
+                LinkTarget: "/hub/encounters/renraku-checkpoint",
+                Version: "1.0.0"),
+            OwnerId: "hub:default",
+            CatalogKind: "npc-vault",
+            PublicationStatus: "published",
+            ReviewState: "approved",
+            RuntimeFingerprint: "npcvault:renraku-checkpoint:v1",
+            OwnerReview: null,
+            AggregateReview: null,
+            Facts:
+            [
+                new HubProjectDetailFact("threat", "Threat", "High"),
+                new HubProjectDetailFact("scene", "Scene posture", "Checkpoint 12 lockdown with scanner coverage")
+            ],
+            Dependencies:
+            [
+                new HubProjectDependency(HubProjectDependencyKinds.IncludesNpcEntry, HubCatalogItemKinds.NpcEntry, "red-samurai", "1.0.0", "lead"),
+                new HubProjectDependency(HubProjectDependencyKinds.IncludesNpcEntry, HubCatalogItemKinds.NpcEntry, "renraku-spider", "1.0.0", "matrix-support")
+            ],
+            Actions:
+            [
+                new HubProjectAction("clone-encounter-pack", "Clone to Library", HubProjectActionKinds.CloneToLibrary),
+                new HubProjectAction("open-encounter-pack", "Open Registry Entry", HubProjectActionKinds.OpenRegistry)
+            ]);
 }

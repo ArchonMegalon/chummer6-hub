@@ -1,3 +1,4 @@
+using Chummer.Contracts.Hub;
 using Chummer.Run.AI.Services.Session;
 using Chummer.Run.AI.Services.Spider;
 using Chummer.Run.Contracts.Ops;
@@ -9,6 +10,7 @@ public interface IGmOpsBoardService
 {
     OpsBoardProjection GetProjection(string sessionId, string sceneId, string? sceneRevision = null);
     GmPrepAssetRecord CreatePrepAsset(GmPrepAssetCreateRequest request);
+    GmPrepAssetRecord CreatePrepAssetFromProject(GmPrepAssetCatalogImportRequest request);
     GmPrepAssetRecord? GetPrepAsset(string assetId);
     GmPrepAssetListResponse ListPrepAssets(
         string? campaignId = null,
@@ -179,6 +181,34 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
 
         _assets[state.AssetId] = state;
         return ToRecord(state);
+    }
+
+    public GmPrepAssetRecord CreatePrepAssetFromProject(GmPrepAssetCatalogImportRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(request.Project);
+
+        string projectKind = HubCatalogItemKinds.NormalizeRequired(request.Project.Summary.Kind, nameof(request.Project));
+        if (!SupportsGovernedPacketBinding(projectKind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(request.Project), $"Unsupported governed prep packet kind '{request.Project.Summary.Kind}'.");
+        }
+
+        return CreatePrepAsset(new GmPrepAssetCreateRequest(
+            CampaignId: request.CampaignId,
+            SessionId: request.SessionId,
+            SceneId: request.SceneId,
+            Title: BuildGovernedPacketTitle(request.Project),
+            Kind: GmPrepAssetKind.Note,
+            Audience: request.Audience,
+            Summary: BuildGovernedPacketSummary(request.Project),
+            Body: BuildGovernedPacketBody(request.Project),
+            Tags: BuildGovernedPacketTags(request.Project, request.AdditionalTags),
+            ChecklistItems: Array.Empty<GmPrepChecklistItem>(),
+            SourceEventIds: Array.Empty<string>(),
+            Reusable: request.Reusable,
+            CreatedBy: request.CreatedBy,
+            RuntimeFingerprint: request.RuntimeFingerprint));
     }
 
     public GmPrepAssetRecord? GetPrepAsset(string assetId)
@@ -528,6 +558,79 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 .Select(static item => item.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+
+    private static bool SupportsGovernedPacketBinding(string projectKind) =>
+        string.Equals(projectKind, HubCatalogItemKinds.NpcEntry, StringComparison.Ordinal)
+        || string.Equals(projectKind, HubCatalogItemKinds.NpcPack, StringComparison.Ordinal)
+        || string.Equals(projectKind, HubCatalogItemKinds.EncounterPack, StringComparison.Ordinal);
+
+    private static string BuildGovernedPacketTitle(HubProjectDetailProjection project) =>
+        $"Governed prep: {project.Summary.Title}";
+
+    private static string BuildGovernedPacketSummary(HubProjectDetailProjection project) =>
+        $"{ResolveCatalogKindLabel(project.Summary.Kind)} packet from {project.Summary.RulesetId} with grounded catalog facts, dependencies, and actions.";
+
+    private static string BuildGovernedPacketBody(HubProjectDetailProjection project)
+    {
+        List<string> lines =
+        [
+            $"Catalog packet: {ResolveCatalogKindLabel(project.Summary.Kind)}",
+            $"Project id: {project.Summary.ItemId}",
+            $"Ruleset: {project.Summary.RulesetId}",
+            $"Trust tier: {project.Summary.TrustTier}",
+            $"Catalog link: {project.Summary.LinkTarget}",
+            $"Description: {project.Summary.Description}"
+        ];
+
+        if (!string.IsNullOrWhiteSpace(project.RuntimeFingerprint))
+        {
+            lines.Add($"Runtime fingerprint: {project.RuntimeFingerprint}");
+        }
+
+        if (project.Facts.Count > 0)
+        {
+            lines.Add("Facts:");
+            lines.AddRange(project.Facts.Select(static fact => $"- {fact.Label}: {fact.Value}"));
+        }
+
+        if (project.Dependencies.Count > 0)
+        {
+            lines.Add("Dependencies:");
+            lines.AddRange(project.Dependencies.Select(static dependency =>
+            {
+                string notes = string.IsNullOrWhiteSpace(dependency.Notes) ? string.Empty : $" ({dependency.Notes})";
+                return $"- {dependency.Kind} {dependency.ItemKind}:{dependency.ItemId}@{dependency.Version}{notes}";
+            }));
+        }
+
+        if (project.Actions.Count > 0)
+        {
+            lines.Add("Actions:");
+            lines.AddRange(project.Actions.Select(static action => $"- {action.Label} ({action.Kind})"));
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string[] BuildGovernedPacketTags(HubProjectDetailProjection project, IReadOnlyList<string>? additionalTags) =>
+        NormalizeList(
+        [
+            "governed-packet",
+            "campaign-bindable",
+            project.Summary.Kind,
+            project.Summary.RulesetId,
+            project.Summary.TrustTier,
+            ..(additionalTags ?? Array.Empty<string>())
+        ]);
+
+    private static string ResolveCatalogKindLabel(string kind) =>
+        kind switch
+        {
+            HubCatalogItemKinds.NpcEntry => "NPC entry",
+            HubCatalogItemKinds.NpcPack => "NPC pack",
+            HubCatalogItemKinds.EncounterPack => "Encounter pack",
+            _ => "Catalog packet"
+        };
 
     private static T ParseEnum<T>(string raw, T fallback)
         where T : struct, Enum
