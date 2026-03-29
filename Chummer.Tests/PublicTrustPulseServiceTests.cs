@@ -13,6 +13,7 @@ public sealed class PublicTrustPulseServiceTests
     {
         using var fixture = new PublicTrustPulseFixture();
         fixture.WritePulse("chummer.weekly_product_pulse");
+        fixture.WriteProgressHistory();
 
         var snapshot = fixture.CreateService().LoadSnapshot();
 
@@ -39,6 +40,23 @@ public sealed class PublicTrustPulseServiceTests
         var snapshot = fixture.CreateService().LoadSnapshot();
 
         Assert.Null(snapshot);
+    }
+
+    [Fact]
+    public void LoadSnapshotComputesProgressTrendFromHistory()
+    {
+        using var fixture = new PublicTrustPulseFixture();
+        fixture.WritePulse("chummer.weekly_product_pulse");
+        fixture.WriteProgressHistoryWithTwoPoints();
+
+        var snapshot = fixture.CreateService().LoadSnapshot();
+
+        Assert.NotNull(snapshot);
+        Assert.Equal(2, snapshot!.ProgressHistorySnapshotCount);
+        Assert.Equal("up", snapshot.ProgressTrendDirection);
+        Assert.Equal(22, snapshot.ProgressTrendDeltaPercent);
+        Assert.Equal("2026-03-22", snapshot.ProgressTrendFromAsOf);
+        Assert.Equal("2026-03-29", snapshot.ProgressTrendToAsOf);
     }
 
     private sealed class PublicTrustPulseFixture : IDisposable
@@ -107,6 +125,73 @@ public sealed class PublicTrustPulseServiceTests
                             ["canary_status"] = "Canary green on all active lanes",
                             ["review_due"] = "2026-06-01",
                             ["next_decision"] = "Promote once support fallout remains stable."
+                        }
+                    }
+                }));
+        }
+
+        public void WriteProgressHistory()
+        {
+            var historyDir = Path.Combine(_canonRoot, ".codex-design", "product");
+            Directory.CreateDirectory(historyDir);
+            File.WriteAllText(
+                Path.Combine(historyDir, "PROGRESS_HISTORY.generated.json"),
+                JsonSerializer.Serialize(new Dictionary<string, object?>
+                {
+                    ["contract_name"] = "fleet.public_progress_history",
+                    ["snapshot_count"] = 5,
+                    ["snapshots"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["as_of"] = "2026-03-23",
+                            ["overall_progress_percent"] = 73
+                        },
+                        new Dictionary<string, object?>
+                        {
+                            ["as_of"] = "2026-03-25",
+                            ["overall_progress_percent"] = 73
+                        },
+                        new Dictionary<string, object?>
+                        {
+                            ["as_of"] = "2026-03-27",
+                            ["overall_progress_percent"] = 73
+                        },
+                        new Dictionary<string, object?>
+                        {
+                            ["as_of"] = "2026-03-28",
+                            ["overall_progress_percent"] = 100
+                        },
+                        new Dictionary<string, object?>
+                        {
+                            ["as_of"] = "2026-03-29",
+                            ["overall_progress_percent"] = 100
+                    }
+                    }
+                }));
+        }
+
+        public void WriteProgressHistoryWithTwoPoints()
+        {
+            var historyDir = Path.Combine(_canonRoot, ".codex-design", "product");
+            Directory.CreateDirectory(historyDir);
+            File.WriteAllText(
+                Path.Combine(historyDir, "PROGRESS_HISTORY.generated.json"),
+                JsonSerializer.Serialize(new Dictionary<string, object?>
+                {
+                    ["contract_name"] = "fleet.public_progress_history",
+                    ["snapshot_count"] = 2,
+                    ["snapshots"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["as_of"] = "2026-03-22",
+                            ["overall_progress_percent"] = 69
+                        },
+                        new Dictionary<string, object?>
+                        {
+                            ["as_of"] = "2026-03-29",
+                            ["overall_progress_percent"] = 91
                         }
                     }
                 }));

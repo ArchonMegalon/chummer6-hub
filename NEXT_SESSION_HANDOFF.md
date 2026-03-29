@@ -2,6 +2,19 @@
 
 Updated: 2026-03-29T21:20:00+02:00
 
+## Current state (2026-03-29T21:33:00+02:00)
+
+- Implemented trust-pulse trend surfacing from `PROGRESS_HISTORY.generated.json` into public trust rows.
+- Added a new `Progress trend` row on `/now`, `/downloads`, and `/help` trust pulse panel through `PublicLandingController`.
+- Extended `PublicTrustPulseService` and snapshot model with trend direction/delta and history source metadata.
+- Added service tests for history loading and trend calculation, plus verification test coverage for the new `Progress trend` row.
+- Hardened `scripts/hub-live-audit.py` fetch path with bounded 429 retry/backoff and expanded trust-row required snippets to include `Progress trend`.
+- Re-ran full verification sequence: build/tests, `run_smoke.sh`, live audit, non-playwright e2e, and Playwright e2e (all passing after local rate-limit retries).
+
+Remaining immediate gap
+- Long-form trend chart/sparkline visuals are still absent from trust panels; currently shows summary delta only.
+- Follow-up could include multi-point trend bullets in panel micro-proof if desired.
+
 ## Current state
 
 - Local docker public edge is the active proof lane for `chummer.run`

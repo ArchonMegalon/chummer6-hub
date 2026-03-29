@@ -73,29 +73,53 @@ def fetch(
     method: str = "GET",
     body: bytes | None = None,
     request_headers: dict[str, str] | None = None,
+    max_retries: int = 6,
+    retry_delay_seconds: float = 1.0,
 ) -> tuple[int, str, dict[str, str], str]:
-    url = urljoin(base_url, path)
-    headers = {"User-Agent": "chummer-hub-live-audit"}
-    if public_host:
-        headers["Host"] = public_host
-    if forwarded_proto:
-        headers["X-Forwarded-Proto"] = forwarded_proto
-    if request_headers:
-        headers.update(request_headers)
+    if max_retries < 0:
+        raise ValueError("max_retries cannot be negative")
+    if retry_delay_seconds < 0:
+        raise ValueError("retry_delay_seconds cannot be negative")
 
-    request = Request(url, headers=headers, data=body, method=method)
-    opener = build_opener() if follow_redirects else build_opener(NoRedirectHandler())
-    try:
-        with opener.open(request, timeout=20) as response:
-            status = response.status
-            body = response.read().decode("utf-8", errors="replace")
-            response_headers = {key.lower(): value for key, value in response.headers.items()}
-            final_url = response.geturl()
-            return status, body, response_headers, final_url
-    except HTTPError as exc:  # pragma: no cover - exercised via operational probes
-        body = exc.read().decode("utf-8", errors="replace")
-        response_headers = {key.lower(): value for key, value in exc.headers.items()}
-        return exc.code, body, response_headers, exc.geturl()
+    attempt = 0
+    while True:
+        url = urljoin(base_url, path)
+        headers = {"User-Agent": "chummer-hub-live-audit"}
+        if public_host:
+            headers["Host"] = public_host
+        if forwarded_proto:
+            headers["X-Forwarded-Proto"] = forwarded_proto
+        if request_headers:
+            headers.update(request_headers)
+
+        request = Request(url, headers=headers, data=body, method=method)
+        opener = build_opener() if follow_redirects else build_opener(NoRedirectHandler())
+        try:
+            with opener.open(request, timeout=20) as response:
+                status = response.status
+                body_text = response.read().decode("utf-8", errors="replace")
+                response_headers = {key.lower(): value for key, value in response.headers.items()}
+                final_url = response.geturl()
+        except HTTPError as exc:  # pragma: no cover - exercised via operational probes
+            status = exc.code
+            body_text = exc.read().decode("utf-8", errors="replace")
+            response_headers = {key.lower(): value for key, value in exc.headers.items()}
+            final_url = exc.geturl()
+
+        if status != 429 or attempt >= max_retries:
+            return status, body_text, response_headers, final_url
+
+        attempt += 1
+        retry_after = response_headers.get("retry-after")
+        if retry_after:
+            try:
+                delay_seconds = float(retry_after)
+            except ValueError:
+                delay_seconds = retry_delay_seconds * (2 ** (attempt - 1))
+        else:
+            delay_seconds = retry_delay_seconds * (2 ** (attempt - 1))
+        print(f"rate-limited on {path}; retrying in {delay_seconds:.1f}s ({attempt}/{max_retries})")
+        time.sleep(delay_seconds)
 
 
 def load_json_object(body: str, path: str) -> dict[str, object]:
@@ -1156,12 +1180,12 @@ def main() -> int:
         AuditRoute(
             "/now",
             "Current preview, visible proof, and known posture",
-            required_texts=("What you can verify now", "Build, explain, and run with visible evidence", "Who can get it now", "Adoption health", "Status guide"),
+            required_texts=("What you can verify now", "Build, explain, and run with visible evidence", "Who can get it now", "Progress trend", "Adoption health", "Status guide"),
             expects_header_count=1),
         AuditRoute(
             "/downloads",
             "Install the current preview",
-            required_texts=("Create account to get preview", "Already have an account? Sign in", "Advanced download options", "Release notes, known issues, and requirements", "Who can get it now", "Adoption health"),
+            required_texts=("Create account to get preview", "Already have an account? Sign in", "Advanced download options", "Release notes, known issues, and requirements", "Who can get it now", "Progress trend", "Adoption health"),
             forbidden_texts=("Package details",),
             expects_header_count=1),
         AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Status guide"), forbidden_texts=("Research tracks",), expects_header_count=1),
@@ -1169,7 +1193,7 @@ def main() -> int:
         AuditRoute("/artifacts/current-preview-build", "Current preview build", required_texts=("Anyone evaluating the preview",), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", required_texts=("Anyone evaluating the preview",), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute("/participate", "Choose how to participate", expects_header_count=1),
-        AuditRoute("/help", "Get help without guessing", required_texts=("Fallback:", "Support, survey, and assistant data stay on a bounded clock", "Who can get it now", "Adoption health"), expects_header_count=1),
+        AuditRoute("/help", "Get help without guessing", required_texts=("Fallback:", "Support, survey, and assistant data stay on a bounded clock", "Who can get it now", "Progress trend", "Adoption health"), expects_header_count=1),
         AuditRoute("/faq", "Plain answers before you spend more time", expects_header_count=1),
         AuditRoute("/contact", "Open the right support case", expects_header_count=1),
         AuditRoute("/privacy", "What Chummer stores, and what it does not", required_texts=("Support, survey, and assistant data stay on a bounded clock",), expects_header_count=1),
