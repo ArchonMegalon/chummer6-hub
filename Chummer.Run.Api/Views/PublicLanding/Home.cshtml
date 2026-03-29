@@ -29,6 +29,7 @@
     var restoreDevices = Model.CampaignSpine.Restore.ClaimedDevices.Take(1).ToArray();
     var leadCommunityOperation = Model.CampaignSpine.CommunityOperations.FirstOrDefault();
     var leadCommunityTransfer = leadCommunityOperation?.RecentRosterTransfers?.FirstOrDefault();
+    var leadCommunityEvent = leadCommunityOperation?.RecentEventSummaries.FirstOrDefault();
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
     var leadNextSessionCarryForward = leadWorkspaceServerPlane?.NextSessionCarryForward;
@@ -549,7 +550,12 @@
                                                                 <span> Roster: @leadCommunityOperation.MemberCount members · @leadCommunityOperation.ActiveCampaignCount campaigns.</span>
                                                                 <span> Pulse: @leadCommunityOperation.OperationsSummary</span>
                                                                 <span> Return: @leadCommunityOperation.CampaignReturnSummary</span>
+                                                                <span> Season / event pulse: @leadCommunityOperation.SeasonEventSummary</span>
                                                                 <span> Rules: @RuleEnvironmentSummary(leadCommunityOperation.RuleEnvironment).</span>
+                                                                @if (!string.IsNullOrWhiteSpace(leadCommunityEvent))
+                                                                {
+                                                                    <span> Latest event: @leadCommunityEvent</span>
+                                                                }
                                                                 @if (leadCommunityTransfer is not null)
                                                                 {
                                                                     <span> Latest move: @leadCommunityTransfer.RunnerHandle.</span>

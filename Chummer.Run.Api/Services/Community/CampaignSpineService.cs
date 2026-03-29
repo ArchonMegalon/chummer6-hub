@@ -107,10 +107,12 @@ public sealed class CampaignSpineService
                         ActiveSponsorSessionCount: _store.SponsorSessionsById.Values.Count(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "stopped", StringComparison.OrdinalIgnoreCase)),
                         OperationsSummary: ResolveGroupOperationsSummary(group, groupCampaigns, groupWorkspaces),
                         CampaignReturnSummary: ResolveGroupCampaignReturnSummary(group, groupWorkspaces),
+                        SeasonEventSummary: ResolveGroupSeasonEventSummary(group, groupCampaigns, groupWorkspaces),
                         RecentReturnSummaries: groupWorkspaces
                             .Select(static workspace => $"{workspace.CampaignName}: {workspace.ReturnSummary}")
                             .Take(3)
                             .ToArray(),
+                        RecentEventSummaries: BuildGroupRecentEventSummaries(groupWorkspaces),
                         Watchouts: BuildGroupOperatorWatchouts(groupWorkspaces),
                         RecentRosterTransfers: transfers
                             .Where(item =>
@@ -1599,6 +1601,76 @@ public sealed class CampaignSpineService
         return groupWorkspaces.Count == 1
             ? $"{leadWorkspace.CampaignName}: {leadWorkspace.ReturnSummary}"
             : $"{groupWorkspaces.Count} shared campaign returns are live; latest is {leadWorkspace.CampaignName}: {leadWorkspace.ReturnSummary}";
+    }
+
+    private static string ResolveGroupSeasonEventSummary(
+        GroupDto group,
+        IReadOnlyList<CampaignProjection> groupCampaigns,
+        IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
+    {
+        if (groupWorkspaces.Count == 0)
+        {
+            return $"No governed season or event rail is attached to {group.Name} yet.";
+        }
+
+        int liveRunCount = groupWorkspaces.Sum(workspace => workspace.Runs.Count(run =>
+            !string.Equals(run.Status, RunStatuses.Closed, StringComparison.OrdinalIgnoreCase)));
+        int carryForwardCount = groupWorkspaces.Count(workspace => workspace.NextSessionCarryForward is not null);
+        int recapPackageCount = groupWorkspaces.Sum(workspace => workspace.AftermathPackages?.Count ?? 0);
+        string railLabel = groupCampaigns.Count > 1 ? "season rail" : "event rail";
+        string liveRunSummary = liveRunCount == 0
+            ? "no live or planned run is active yet"
+            : $"{liveRunCount} live or planned run(s) are already attached";
+        string carryForwardSummary = carryForwardCount == 0
+            ? "next-session carry-forward is still pending"
+            : $"{carryForwardCount} carry-forward lane(s) are already attached";
+        string recapSummary = recapPackageCount == 0
+            ? "recap packaging is still pending"
+            : $"{recapPackageCount} recap package(s) are already reviewable";
+        return $"{groupWorkspaces.Count} campaign return(s) keep the governed {railLabel} on the same account/control backbone; {liveRunSummary}, {carryForwardSummary}, and {recapSummary}.";
+    }
+
+    private static IReadOnlyList<string> BuildGroupRecentEventSummaries(IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
+    {
+        List<(DateTimeOffset UpdatedAtUtc, string Summary)> lines = [];
+        foreach (var workspace in groupWorkspaces)
+        {
+            var leadRun = workspace.Runs
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .FirstOrDefault();
+            if (leadRun is not null)
+            {
+                lines.Add((leadRun.UpdatedAtUtc, $"{workspace.CampaignName}: Run {leadRun.Title} · {(string.IsNullOrWhiteSpace(workspace.ActiveSceneSummary) ? leadRun.Summary : workspace.ActiveSceneSummary)}"));
+            }
+
+            if (workspace.NextSessionCarryForward is not null)
+            {
+                lines.Add((workspace.NextSessionCarryForward.UpdatedAtUtc, $"{workspace.CampaignName}: {workspace.NextSessionCarryForward.Label} · {workspace.NextSessionCarryForward.Summary}"));
+            }
+
+            var leadAftermathPackage = workspace.AftermathPackages?
+                .OrderByDescending(static item => item.GeneratedAtUtc)
+                .FirstOrDefault();
+            if (leadAftermathPackage is not null)
+            {
+                lines.Add((leadAftermathPackage.GeneratedAtUtc, $"{workspace.CampaignName}: {leadAftermathPackage.Title} · {leadAftermathPackage.Summary}"));
+            }
+
+            var leadChangePacket = workspace.ChangePackets?
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .FirstOrDefault();
+            if (leadChangePacket is not null)
+            {
+                lines.Add((leadChangePacket.UpdatedAtUtc, $"{workspace.CampaignName}: {leadChangePacket.Label} · {leadChangePacket.Summary}"));
+            }
+        }
+
+        return lines
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .Select(static item => item.Summary)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
     }
 
     private static IReadOnlyList<string> BuildGroupOperatorWatchouts(IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)

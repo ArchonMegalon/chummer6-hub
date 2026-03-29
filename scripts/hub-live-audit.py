@@ -559,6 +559,8 @@ def verify_signed_in_work_audit(
     require_snippet(body, transfer["runnerHandle"], "/account/work")
     require_snippet(body, "Prep launch audit", "/account/work")
     require_snippet(body, "Operations pulse", "/account/work")
+    require_snippet(body, "Season / event pulse", "/account/work")
+    require_snippet(body, "Season &amp; event rail", "/account/work")
     status, body, _, _ = fetch(
         base_url,
         "/home/work",
@@ -580,6 +582,8 @@ def verify_signed_in_work_audit(
     require_snippet(body, transfer["runnerHandle"], "/home/work")
     require_snippet(body, "Open governed roster moves", "/home/work")
     require_snippet(body, "Operator posture", "/home/work")
+    require_snippet(body, "Season / event pulse", "/home/work")
+    require_snippet(body, "Latest event:", "/home/work")
     require_snippet(body, "Open teams and permissions", "/home/work")
     require_snippet(body, "Consequence watch", "/home/work")
     require_snippet(body, prep_launch["packetTitle"], "/home/work")

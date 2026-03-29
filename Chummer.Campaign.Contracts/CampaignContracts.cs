@@ -299,7 +299,9 @@ public sealed record CommunityOperatorProjection(
     int ActiveSponsorSessionCount,
     string OperationsSummary,
     string CampaignReturnSummary,
+    string SeasonEventSummary,
     IReadOnlyList<string> RecentReturnSummaries,
+    IReadOnlyList<string> RecentEventSummaries,
     IReadOnlyList<string> Watchouts,
     IReadOnlyList<RosterTransferProjection>? RecentRosterTransfers = null);
 
