@@ -5,6 +5,7 @@ namespace Chummer.Run.Api.Services;
 
 public sealed class PublicTrustPulseService
 {
+    private const int MaxProgressTrendSamples = 8;
     private const string DefaultPulseRelativePath = ".codex-design/product/WEEKLY_PRODUCT_PULSE.generated.json";
     private const string DefaultProgressHistoryRelativePath = ".codex-design/product/PROGRESS_HISTORY.generated.json";
     private const string DefaultProgressReportRelativePath = ".codex-design/product/PROGRESS_REPORT.generated.json";
@@ -51,6 +52,7 @@ public sealed class PublicTrustPulseService
                 static payload => string.Equals(payload.ContractName, "fleet.public_progress_history", StringComparison.Ordinal),
                 "public progress history");
             var progressTrend = ComputeProgressTrend(progressHistory);
+            var progressTrendSamples = ExtractProgressTrendSamples(progressHistory);
             var localReleaseProof = LoadOptionalArtifact<LocalReleaseProofPayload>(
                 ResolveLocalReleaseProofPath(),
                 options,
@@ -79,6 +81,7 @@ public sealed class PublicTrustPulseService
                 ProgressTrendDeltaPercent: progressTrend?.DeltaPercent,
                 ProgressTrendFromAsOf: progressTrend?.FromAsOf,
                 ProgressTrendToAsOf: progressTrend?.ToAsOf,
+                ProgressTrendSamples: progressTrendSamples.Count > 0 ? progressTrendSamples : null,
                 LongestPoleLabel: payload.SupportingSignals?.LongestPole,
                 LaunchReadiness: payload.SupportingSignals?.LaunchReadiness,
                 ProviderRouteDefault: payload.SupportingSignals?.ProviderRouteStewardship?.DefaultStatus,
@@ -136,17 +139,7 @@ public sealed class PublicTrustPulseService
             return null;
         }
 
-        var points = payload.Snapshots
-            .Where(static snapshot =>
-                !string.IsNullOrWhiteSpace(snapshot.AsOf)
-                && snapshot.OverallProgressPercent.HasValue)
-            .Select(static snapshot => new
-            {
-                AsOf = snapshot.AsOf!,
-                Progress = snapshot.OverallProgressPercent!.Value
-            })
-            .OrderBy(static item => item.AsOf)
-            .ToList();
+        var points = ExtractProgressTrendSamples(payload);
 
         if (points.Count < 2)
         {
@@ -155,12 +148,35 @@ public sealed class PublicTrustPulseService
 
         var previous = points[^2];
         var latest = points[^1];
-        var delta = latest.Progress - previous.Progress;
+        var delta = latest.OverallProgressPercent - previous.OverallProgressPercent;
         return new ProgressTrendInfo(
             Direction: delta > 0 ? "up" : delta < 0 ? "down" : "flat",
             DeltaPercent: Math.Abs(delta),
             FromAsOf: previous.AsOf,
             ToAsOf: latest.AsOf);
+    }
+
+    private static List<ProgressHistoryTrendPoint> ExtractProgressTrendSamples(ProgressHistoryPayload? payload)
+    {
+        if (payload?.Snapshots is null)
+        {
+            return new List<ProgressHistoryTrendPoint>(0);
+        }
+
+        var points = payload.Snapshots
+            .Where(static snapshot =>
+                !string.IsNullOrWhiteSpace(snapshot.AsOf)
+                && snapshot.OverallProgressPercent.HasValue)
+            .Select(static snapshot => new ProgressHistoryTrendPoint(snapshot.AsOf!, snapshot.OverallProgressPercent!.Value))
+            .OrderBy(static item => item.AsOf)
+            .ToList();
+
+        if (points.Count <= MaxProgressTrendSamples)
+        {
+            return points;
+        }
+
+        return points.Skip(points.Count - MaxProgressTrendSamples).ToList();
     }
 
     private string? ResolveExistingPath(string configKey, string defaultRelativePath)
@@ -274,6 +290,7 @@ public sealed record PublicTrustPulseSnapshot(
     int? ProgressTrendDeltaPercent,
     string? ProgressTrendFromAsOf,
     string? ProgressTrendToAsOf,
+    IReadOnlyList<ProgressHistoryTrendPoint>? ProgressTrendSamples,
     string? LongestPoleLabel,
     string? NextCheckpointQuestion,
     string? LocalReleaseProofStatus,
@@ -284,3 +301,5 @@ public sealed record PublicTrustPulseSnapshot(
     string? ProviderRouteNextDecision,
     int? ProvenJourneyCount,
     int? ProvenRouteCount);
+
+public sealed record ProgressHistoryTrendPoint(string AsOf, int OverallProgressPercent);
