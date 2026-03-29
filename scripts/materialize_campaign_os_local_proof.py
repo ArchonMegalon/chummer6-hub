@@ -51,6 +51,8 @@ REQUIRED_MARKERS = {
         'campaignSpineController.GetMyCampaignWorkspacePrepLibrary',
         'prepLibraryPayload.TotalCount >= 1',
         'accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3',
+        'authenticatedHomeModel.LeadWorkspaceServerPlane is not null',
+        'workHomeModel?.LeadWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3',
         'workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary',
         'homeSource.Contains("@workspace.ActiveSceneSummary"',
         'homeSource.Contains("@workspace.NextSafeAction"',

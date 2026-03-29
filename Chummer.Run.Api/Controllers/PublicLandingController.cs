@@ -27,6 +27,7 @@ public sealed class PublicLandingController : Controller
     private readonly UserExperienceService _experience;
     private readonly InstallLinkingService _installLinking;
     private readonly CampaignSpineService _campaignSpine;
+    private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
     private readonly HubPageChromeService _chrome;
     private readonly PublicTrustContentService _trustContent;
     private readonly PublicPrivacyBoundaryService _privacyBoundaries;
@@ -47,6 +48,7 @@ public sealed class PublicLandingController : Controller
         UserExperienceService experience,
         InstallLinkingService installLinking,
         CampaignSpineService campaignSpine,
+        CampaignWorkspaceServerPlaneService workspaceServerPlane,
         HubPageChromeService chrome,
         PublicTrustContentService trustContent,
         PublicPrivacyBoundaryService privacyBoundaries,
@@ -66,6 +68,7 @@ public sealed class PublicLandingController : Controller
         _experience = experience;
         _installLinking = installLinking;
         _campaignSpine = campaignSpine;
+        _workspaceServerPlane = workspaceServerPlane;
         _chrome = chrome;
         _trustContent = trustContent;
         _privacyBoundaries = privacyBoundaries;
@@ -491,6 +494,9 @@ public sealed class PublicLandingController : Controller
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
             var supportCaseSummaries = _supportPresentation.BuildList(supportCases, installLinking);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
+            var leadWorkspaceServerPlane = campaignSpine.Workspaces.Count == 0
+                ? null
+                : _workspaceServerPlane.GetWorkspaceServerPlane(user, campaignSpine.Workspaces[0].WorkspaceId, installLinking);
             var model = new HomePageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
                 CurrentSection: selectedSection,
@@ -504,6 +510,7 @@ public sealed class PublicLandingController : Controller
                 SupportCases: supportCases,
                 SupportCaseSummaries: supportCaseSummaries,
                 CampaignSpine: campaignSpine,
+                LeadWorkspaceServerPlane: leadWorkspaceServerPlane,
                 PrimaryAction: BuildHomePrimaryAction(experience, installLinking),
                 NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath),
                 HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath));

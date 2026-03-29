@@ -1740,14 +1740,15 @@ async Task VerifyPublicLandingProjectionAsync()
     var trustPulse = new PublicTrustPulseService(configuration, loggerFactory.CreateLogger<PublicTrustPulseService>());
     var privacyBoundaries = new PublicPrivacyBoundaryService(canon, routes);
     var supportPresentation = new SupportCasePresentationService();
-    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
+    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1791,7 +1792,6 @@ async Task VerifyPublicLandingProjectionAsync()
     {
         ControllerContext = AuthenticatedControllerContext("smoke-token")
     };
-    var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
     var accountController = new AccountsController(
         accounts,
         linkedIdentityClient,
@@ -2437,6 +2437,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces[0].Consequences?.Count >= 4, "signed-in home should keep governed faction, heat, contact, and reputation consequences attached to the shared campaign view.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "signed-in home should keep the active-scene summary attached to the shared campaign view.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].NextSafeAction), "signed-in home should keep the workspace next safe action attached to the shared campaign view.");
+    Assert(authenticatedHomeModel.LeadWorkspaceServerPlane is not null, "signed-in home should receive the bounded lead workspace server plane.");
+    Assert(authenticatedHomeModel.LeadWorkspaceServerPlane!.PrepLibrary.Packets.Count >= 3, "signed-in home should surface the governed GM prep library on the home cockpit.");
+    Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount >= 1, "signed-in home should surface safehouse/travel readiness on the home cockpit.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "signed-in home should receive customer-facing build-path titles directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "signed-in home should receive the next safe build action directly from the campaign spine service.");
@@ -2479,6 +2482,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var workHomeModel = workHomePage?.Model as HomePageViewModel;
     Assert(string.Equals(workHomeModel?.CurrentSection, "work", StringComparison.Ordinal), "home work route should render the work section.");
     Assert(string.Equals(workHomeModel?.Chrome.Title, "Home · Work", StringComparison.Ordinal), "home work route should project its own chrome title.");
+    Assert(workHomeModel?.LeadWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "home work route should keep the governed prep library visible.");
+    Assert(workHomeModel?.LeadWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "home work route should keep bounded prep-carrying travel inventory visible.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary), "home work route should keep publication trust visible on the shared home projection.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1, "home work route should keep the claimed-device return packet visible on the shared home projection.");
@@ -2630,7 +2635,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
