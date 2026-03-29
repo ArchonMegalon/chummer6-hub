@@ -357,6 +357,7 @@ public sealed record CommunitySeasonBoardEntryProjection(
     string CampaignName,
     string RunTitle,
     string LatestEventSummary,
+    string? ConsequenceSummary,
     string? CampaignMemorySummary,
     string? CampaignMemoryReturnSummary,
     string NextSafeAction,

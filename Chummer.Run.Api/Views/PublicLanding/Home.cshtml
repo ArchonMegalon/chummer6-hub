@@ -602,6 +602,10 @@
                                                                 @if (leadCommunityBoard is not null)
                                                                 {
                                                                     <span> Board: @leadCommunityBoard.CampaignName via @leadCommunityBoard.RunTitle. Next: @leadCommunityBoard.NextSafeAction</span>
+                                                                    @if (!string.IsNullOrWhiteSpace(leadCommunityBoard.ConsequenceSummary))
+                                                                    {
+                                                                        <span> Consequence: @leadCommunityBoard.ConsequenceSummary</span>
+                                                                    }
                                                                     @if (!string.IsNullOrWhiteSpace(leadCommunityBoard.CampaignMemorySummary))
                                                                     {
                                                                         <span> Memory: @leadCommunityBoard.CampaignMemorySummary</span>

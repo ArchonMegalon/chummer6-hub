@@ -1608,6 +1608,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Latest event:", StringComparison.Ordinal), "home work should keep one bounded event receipt on the lead operator card.");
     Assert(homeSource.Contains("Board:", StringComparison.Ordinal), "home work should surface one bounded season-board entry on the lead operator card.");
     Assert(homeSource.Contains("@leadCommunityBoard.CampaignName", StringComparison.Ordinal), "home work should surface the lead season-board campaign directly from the shared operator projection.");
+    Assert(homeSource.Contains("@leadCommunityBoard.ConsequenceSummary", StringComparison.Ordinal), "home work should surface the lead season-board consequence summary directly from the shared operator projection.");
     Assert(homeSource.Contains("@leadCommunityBoard.CampaignMemorySummary", StringComparison.Ordinal), "home work should surface the lead season-board campaign-memory summary directly from the shared operator projection.");
     Assert(homeSource.Contains("@leadCommunityBoard.CampaignMemoryReturnSummary", StringComparison.Ordinal), "home work should surface the lead season-board campaign-memory return cue directly from the shared operator projection.");
     Assert(homeSource.Contains("League:", StringComparison.Ordinal), "home work should surface a bounded league-and-season operations summary on the lead operator card.");
@@ -1724,6 +1725,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("op.SeasonBoardEntries.Count == 0", StringComparison.Ordinal), "account teams and permissions should surface the season-board campaign count directly from the shared projection.");
     Assert(accountSource.Contains("id=\"community-op-board-@op.GroupId\"", StringComparison.Ordinal), "account teams and permissions should give the season board a stable deep-link target.");
     Assert(accountSource.Contains("@entry.LatestEventSummary", StringComparison.Ordinal), "account season board should surface the latest governed event summary for each campaign lane.");
+    Assert(accountSource.Contains("@entry.ConsequenceSummary", StringComparison.Ordinal), "account season board should surface the shared consequence summary for each campaign lane.");
     Assert(accountSource.Contains("@entry.CampaignMemorySummary", StringComparison.Ordinal), "account season board should surface the shared campaign-memory summary for each campaign lane.");
     Assert(accountSource.Contains("@entry.CampaignMemoryReturnSummary", StringComparison.Ordinal), "account season board should surface the shared campaign-memory return cue for each campaign lane.");
     Assert(accountSource.Contains("Open shared campaign view", StringComparison.Ordinal), "account season board should give operators a direct route from the board into the governed campaign lane.");
@@ -2322,6 +2324,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentSponsorSessions.Any(session => string.Equals(session.SponsorSessionId, operatorSponsorSession.SponsorSessionId, StringComparison.Ordinal))), "account page should keep recent governed sponsor sessions attached to the operator rail.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentSponsorSessions.Any(session => session.StatusSummary.Contains("Consent recorded", StringComparison.OrdinalIgnoreCase))), "account page should keep sponsor-session status truth attached to the operator rail.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.SeasonBoardEntries.Count >= 2), "account page should keep a multi-campaign season board attached to the operator rail.");
+    Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.SeasonBoardEntries.Any(entry => !string.IsNullOrWhiteSpace(entry.ConsequenceSummary))), "account season board should keep consequence summary truth attached to at least one campaign lane.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.SeasonBoardEntries.All(entry => !string.IsNullOrWhiteSpace(entry.NextSafeAction))), "account season board should keep next-safe-action truth attached to each campaign lane.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.SeasonBoardEntries.All(entry => !string.IsNullOrWhiteSpace(entry.CampaignMemorySummary))), "account season board should keep campaign-memory summary truth attached to each campaign lane.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.ActiveCampaignCount >= 2), "account page should surface a multi-campaign operator group on the same governed backbone.");
@@ -2345,6 +2348,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(freshPreviewSummary.CommunityOperations[0].ActiveCampaignCount >= 2, "freshly created accounts should receive a seeded multi-campaign operator group instead of a single-campaign placeholder.");
     Assert(freshPreviewSummary.CommunityOperations[0].SeasonEventSummary.Contains("season rail", StringComparison.OrdinalIgnoreCase), "freshly created accounts should receive a season-rail summary when one operator group carries multiple governed campaigns.");
     Assert(freshPreviewSummary.CommunityOperations[0].SeasonBoardEntries.Count >= 2, "freshly created accounts should receive a seeded season board with more than one governed campaign lane.");
+    Assert(freshPreviewSummary.CommunityOperations[0].SeasonBoardEntries.Any(entry => !string.IsNullOrWhiteSpace(entry.ConsequenceSummary)), "freshly created accounts should receive a consequence summary on at least one seeded season-board lane.");
     Assert(freshPreviewSummary.CommunityOperations[0].SeasonBoardEntries.All(entry => !string.IsNullOrWhiteSpace(entry.CampaignMemorySummary)), "freshly created accounts should receive campaign-memory summaries on seeded season-board lanes.");
     var restoreResult = await campaignSpineController.GetMyRestoreProjection(CancellationToken.None);
     var restorePayload = (restoreResult.Result as OkObjectResult)?.Value as WorkspaceRestoreProjection ?? restoreResult.Value;
@@ -2782,6 +2786,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentBoostCodes.Any(code => string.Equals(code.Code, operatorBoostCode.Code, StringComparison.Ordinal)), "signed-in home should keep recent governed boost codes attached to the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentSponsorSessions.Any(session => string.Equals(session.SponsorSessionId, operatorSponsorSession.SponsorSessionId, StringComparison.Ordinal)), "signed-in home should keep recent governed sponsor sessions attached to the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].SeasonBoardEntries.Count >= 2, "signed-in home should keep the multi-campaign season board attached to the lead operator group.");
+    Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].SeasonBoardEntries.Any(entry => !string.IsNullOrWhiteSpace(entry.ConsequenceSummary)), "signed-in home should keep a season-board consequence summary attached to at least one lead operator lane.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].SeasonBoardEntries.All(entry => !string.IsNullOrWhiteSpace(entry.CampaignMemorySummary)), "signed-in home should keep campaign-memory summaries attached to the lead season-board lanes.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "signed-in home should receive customer-facing build-path titles directly from the campaign spine service.");
