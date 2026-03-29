@@ -464,6 +464,8 @@ public sealed record AccountPageViewModel(
     AccountCampaignSummary CampaignSpine,
     CampaignWorkspaceProjection? SelectedWorkspace = null,
     CampaignWorkspaceServerPlaneProjection? SelectedWorkspaceServerPlane = null,
+    CampaignPrepLibrarySearchResponse? SelectedWorkspacePrepLibrarySearch = null,
+    string? SelectedWorkspacePrepLibraryQuery = null,
     RunProjection? SelectedRun = null,
     BuildLabHandoffProjection? SelectedBuildLabHandoff = null,
     RulesNavigatorAnswerProjection? SelectedRulesNavigatorAnswer = null,

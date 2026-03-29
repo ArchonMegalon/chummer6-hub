@@ -67,6 +67,8 @@
     var selectedSupportInstallationId = selectedSupportCase?.InstallationId;
     var selectedWorkspace = Model.SelectedWorkspace;
     var selectedWorkspaceServerPlane = Model.SelectedWorkspaceServerPlane;
+    var selectedWorkspacePrepLibrarySearch = Model.SelectedWorkspacePrepLibrarySearch;
+    var selectedWorkspacePrepLibraryQuery = Model.SelectedWorkspacePrepLibraryQuery;
     var selectedRun = Model.SelectedRun;
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
@@ -1034,6 +1036,36 @@
                                 <p><strong>Binding posture:</strong> @selectedWorkspaceServerPlane.PrepLibrary.BindingSummary</p>
                                 <p><strong>Safehouse / travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
                                 <p><strong>Prefetch inventory:</strong> @selectedWorkspaceServerPlane.TravelMode.PrefetchInventorySummary</p>
+                                <form class="stacked-copy" method="get" action="@WorkspaceDetailHref(selectedWorkspace!.WorkspaceId)">
+                                    <div class="field">
+                                        <label for="prepQuery">Search governed prep packets</label>
+                                        <input id="prepQuery" name="prepQuery" type="search" value="@selectedWorkspacePrepLibraryQuery" placeholder="opposition, scene, safehouse, dossier..." />
+                                    </div>
+                                    <div class="stacked-actions">
+                                        <button class="button-like button-like--secondary" type="submit">Search prep library</button>
+                                        @if (!string.IsNullOrWhiteSpace(selectedWorkspacePrepLibraryQuery))
+                                        {
+                                            <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(selectedWorkspace.WorkspaceId)">Clear search</a>
+                                        }
+                                    </div>
+                                </form>
+                                @if (!string.IsNullOrWhiteSpace(selectedWorkspacePrepLibraryQuery))
+                                {
+                                    <p><strong>Search results:</strong> @(selectedWorkspacePrepLibrarySearch?.TotalCount ?? 0) match(es) for "@selectedWorkspacePrepLibraryQuery".</p>
+                                    @if (selectedWorkspacePrepLibrarySearch?.Items.Count > 0)
+                                    {
+                                        <ul class="muted-copy">
+                                            @foreach (var packet in selectedWorkspacePrepLibrarySearch.Items)
+                                            {
+                                                <li><strong>@packet.Title:</strong> @packet.Summary <span>@packet.BindingSummary</span></li>
+                                            }
+                                        </ul>
+                                    }
+                                    else
+                                    {
+                                        <p class="muted-copy">No governed prep packet matched that search yet. Try campaign, scene, opposition, dossier, or safehouse terms.</p>
+                                    }
+                                }
                                 @if (selectedWorkspaceServerPlane.PrepLibrary.Packets.Count > 0)
                                 {
                                     <ul class="muted-copy">

@@ -38,6 +38,7 @@
       "prepLibraryPayload.TotalCount >= 1",
       "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.Label",
       "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3",
+      "searchableWorkspaceDetailModel?.SelectedWorkspacePrepLibrarySearch?.TotalCount >= 1",
       "authenticatedHomeModel.LeadWorkspaceServerPlane is not null",
       "authenticatedHomeModel.LeadWorkspaceServerPlane!.WorkspaceState.Status",
       "workHomeModel?.LeadWorkspaceServerPlane?.WorkspaceState.Label",
@@ -57,5 +58,5 @@
       "authenticatedHomeModel.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && item.ClosureSummary.Contains(\"closure notice\""
     ]
   },
-  "generated_at": "2026-03-29T08:31:44Z"
+  "generated_at": "2026-03-29T08:37:14Z"
 }

@@ -1626,6 +1626,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Lead consequence", StringComparison.Ordinal), "account work should summarize the leading consequence directly on the selected campaign card.");
     Assert(!accountSource.Contains("Server-plane follow-through", StringComparison.Ordinal), "account work should avoid internal server-plane wording on the customer-facing route.");
     Assert(accountSource.Contains("What changed for me", StringComparison.Ordinal), "account work should keep the explicit what-changed-for-me packet on the selected campaign card.");
+    Assert(accountSource.Contains("Search governed prep packets", StringComparison.Ordinal), "account work should expose a real governed prep-library search flow on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Label", StringComparison.Ordinal), "account work should surface the bounded workspace state directly from the server plane.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Summary", StringComparison.Ordinal), "account work should explain why the bounded workspace state is active on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspace.NextSafeAction", StringComparison.Ordinal), "account work should surface the workspace next safe action directly on the selected campaign card.");
@@ -2424,6 +2425,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "account workspace detail route should surface the governed GM prep library.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.TravelReadyDeviceCount >= 1, "account workspace detail route should surface safehouse/travel readiness.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "account workspace detail route should explain that prep packets are carried in the prefetch inventory.");
+    var searchableWorkspaceDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, workspaceId: workspaceId, prepQuery: "opposition") as ViewResult;
+    var searchableWorkspaceDetailModel = searchableWorkspaceDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(searchableWorkspaceDetailModel?.SelectedWorkspacePrepLibrarySearch?.QueryText, "opposition", StringComparison.Ordinal), "account workspace detail search should keep the normalized governed prep-library query.");
+    Assert(searchableWorkspaceDetailModel?.SelectedWorkspacePrepLibrarySearch?.TotalCount >= 1, "account workspace detail search should return matching governed prep packets.");
+    Assert(searchableWorkspaceDetailModel?.SelectedWorkspacePrepLibrarySearch?.Items.Any(item => item.Title.Contains("opposition", StringComparison.OrdinalIgnoreCase) || item.SearchTerms.Any(term => term.Contains("opposition", StringComparison.OrdinalIgnoreCase))) == true, "account workspace detail search should surface the governed opposition packet.");
     var accountRunDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, runId: runId) as ViewResult;
     var accountRunDetailModel = accountRunDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountRunDetailModel?.SelectedRun?.RunId, runId, StringComparison.Ordinal), "account run detail route should load the selected live run context.");

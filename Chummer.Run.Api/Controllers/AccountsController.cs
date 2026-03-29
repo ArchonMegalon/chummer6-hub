@@ -74,7 +74,8 @@ public sealed class AccountsController : Controller
         [FromRoute] string? runId = null,
         [FromRoute] string? handoffId = null,
         [FromRoute] string? entryId = null,
-        [FromRoute] string? publicationId = null)
+        [FromRoute] string? publicationId = null,
+        [FromQuery] string? prepQuery = null)
     {
         var selectedSection = !string.IsNullOrWhiteSpace(caseId)
             ? "support"
@@ -100,6 +101,9 @@ public sealed class AccountsController : Controller
             var selectedWorkspaceServerPlane = selectedWorkspace is null
                 ? null
                 : _workspaceServerPlane.GetWorkspaceServerPlane(user, selectedWorkspace.WorkspaceId, installLinking);
+            var selectedWorkspacePrepLibrarySearch = selectedWorkspace is null || string.IsNullOrWhiteSpace(prepQuery)
+                ? null
+                : _workspaceServerPlane.GetWorkspacePrepLibrary(user, selectedWorkspace.WorkspaceId, installLinking, prepQuery);
             var selectedRun = FindById(campaignSpine.Runs, runId, static item => item.RunId);
             var selectedBuildLabHandoff = FindById(campaignSpine.BuildLabHandoffs, handoffId, static item => item.HandoffId);
             var selectedRulesNavigatorAnswer = FindById(campaignSpine.RulesNavigator, entryId, static item => item.EntryId);
@@ -121,6 +125,8 @@ public sealed class AccountsController : Controller
                 CampaignSpine: campaignSpine,
                 SelectedWorkspace: selectedWorkspace,
                 SelectedWorkspaceServerPlane: selectedWorkspaceServerPlane,
+                SelectedWorkspacePrepLibrarySearch: selectedWorkspacePrepLibrarySearch,
+                SelectedWorkspacePrepLibraryQuery: prepQuery,
                 SelectedRun: selectedRun,
                 SelectedBuildLabHandoff: selectedBuildLabHandoff,
                 SelectedRulesNavigatorAnswer: selectedRulesNavigatorAnswer,

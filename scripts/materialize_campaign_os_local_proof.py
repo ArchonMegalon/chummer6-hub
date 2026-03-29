@@ -53,6 +53,7 @@ REQUIRED_MARKERS = {
         'prepLibraryPayload.TotalCount >= 1',
         'accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.Label',
         'accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3',
+        'searchableWorkspaceDetailModel?.SelectedWorkspacePrepLibrarySearch?.TotalCount >= 1',
         'authenticatedHomeModel.LeadWorkspaceServerPlane is not null',
         'authenticatedHomeModel.LeadWorkspaceServerPlane!.WorkspaceState.Status',
         'workHomeModel?.LeadWorkspaceServerPlane?.WorkspaceState.Label',
