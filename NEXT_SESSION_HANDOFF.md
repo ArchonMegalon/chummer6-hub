@@ -11,16 +11,17 @@ Updated: 2026-03-29
   - governed prep-library search
   - governed prep launch receipts on the shared workspace
   - governed travel-prefetch receipts on the shared workspace
-  - safehouse / travel mode visibility and staged offline inventory
+  - governed aftermath recap packages on the shared workspace
+  - safehouse / travel mode visibility, staged offline inventory, and recap follow-through
 
 ## What just landed
 
-- Persisted governed travel-prefetch receipts in Hub campaign truth
-- Added `/api/v1/campaign-spine/me/workspaces/{workspaceId}/travel-prefetches`
-- Added the signed-in `Stage travel prefetch` action on `/account/work/workspaces/{workspaceId}`
-- Added travel-prefetch receipts to workspace detail, work rails, and bounded change-packet projections
-- Added an empty-state prompt so the travel-prefetch lane stays visible before a device is claimed
-- Taught `scripts/hub-live-audit.py` to mint a real signed-in download handoff, redeem the install claim, and then verify prep launch, travel prefetch, and roster transfer on the live edge
+- Persisted governed aftermath recap packages in Hub campaign truth
+- Added `/api/v1/campaign-spine/me/workspaces/{workspaceId}/aftermath-recap-packages`
+- Added the signed-in `Generate aftermath recap package` action on `/account/work/workspaces/{workspaceId}`
+- Added aftermath recap packages to workspace detail, work rails, recap shelf projections, creator-publication inputs, and bounded change-packet projections
+- Kept the travel-prefetch lane visible before a device is claimed and kept the new aftermath lane tied to the same shared return rail
+- Taught `scripts/hub-live-audit.py` to verify prep launch, travel prefetch, aftermath recap packaging, and roster transfer on the live edge after minting a real install claim
 - Refreshed local proof artifacts and smoke coverage for the new lane
 
 ## Verify first
@@ -38,7 +39,7 @@ CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh
 ## Next highest-impact gaps
 
 1. Deepen organizer/operator depth on the same account/control backbone without inventing a parallel admin model.
-2. Push more of the campaign workspace v3 follow-through into durable receipts and shared projections instead of isolated cards, especially recap/publication and consequence carry-forward.
+2. Push more of the campaign workspace v3 follow-through into durable receipts and shared projections instead of isolated cards, especially downtime/next-session carry-forward and consequence follow-through.
 3. Keep moving toward the cross-repo journey-proof gap: install -> claim -> restore -> continue and join campaign -> run -> recover -> recap still need stronger whole-product acceptance evidence outside this repo.
 
 ## Guardrails

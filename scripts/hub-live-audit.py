@@ -340,6 +340,7 @@ def verify_signed_in_work_audit(
         "Transfer governed roster state",
         "Launch governed prep packet",
         "Stage travel prefetch",
+        "Generate aftermath recap package",
         "GM prep library and travel mode",
     ):
         require_snippet(body, snippet, workspace_path)
@@ -451,6 +452,34 @@ def verify_signed_in_work_audit(
     if not travel_prefetch.get("receiptId"):
         raise AssertionError("travel prefetch response did not expose a receipt id")
 
+    aftermath_body = json.dumps(
+        {
+            "runId": target_run.get("runId"),
+            "packageKind": "session_recap",
+            "note": "Signed-in live audit pinning aftermath recap truth to the shared return lane.",
+        }
+    ).encode("utf-8")
+    aftermath_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/aftermath-recap-packages"
+    status, body, _, _ = fetch(
+        base_url,
+        aftermath_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=aftermath_body,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"{aftermath_path} returned {status}: {body[:400]}")
+
+    aftermath_package = json.loads(body)
+    if not aftermath_package.get("packageId"):
+        raise AssertionError("aftermath recap response did not expose a package id")
+
     payload = json.dumps(
         {
             "dossierId": dossier_options[0]["dossierId"],
@@ -502,9 +531,11 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_path)
     require_snippet(body, "Recent travel prefetch receipts", workspace_path)
     require_snippet(body, travel_prefetch["deviceRole"], workspace_path)
+    require_snippet(body, "Recent aftermath recap packages", workspace_path)
+    require_snippet(body, aftermath_package["title"], workspace_path)
     print(
         "ok signed-in /account/work -> "
-        f"{final_url} workspace={workspace_id} install={claimed_installation_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
+        f"{final_url} workspace={workspace_id} install={claimed_installation_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
     )
 
 

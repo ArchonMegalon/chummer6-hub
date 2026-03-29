@@ -169,6 +169,26 @@ public sealed record TravelPrefetchReceiptProjection(
     string InitiatedByUserId,
     DateTimeOffset StagedAtUtc);
 
+public sealed record AftermathRecapPackageRequest(
+    [StringLength(128)] string? RunId,
+    [Required(AllowEmptyStrings = false), StringLength(64)] string PackageKind,
+    [StringLength(128)] string? Title = null,
+    [StringLength(256)] string? Note = null);
+
+public sealed record AftermathRecapPackageProjection(
+    string PackageId,
+    string WorkspaceId,
+    string CampaignId,
+    string? RunId,
+    string? RunTitle,
+    string PackageKind,
+    string Title,
+    string Summary,
+    string ArtifactId,
+    IReadOnlyList<string> EvidenceLines,
+    string InitiatedByUserId,
+    DateTimeOffset GeneratedAtUtc);
+
 public sealed record RunnerDossierProjection(
     string DossierId,
     string RunnerHandle,
@@ -311,7 +331,8 @@ public sealed record CampaignWorkspaceProjection(
     IReadOnlyList<CampaignConsequenceProjection>? Consequences = null,
     IReadOnlyList<RosterTransferProjection>? RosterTransfers = null,
     IReadOnlyList<GovernedPrepLaunchProjection>? PrepLaunches = null,
-    IReadOnlyList<TravelPrefetchReceiptProjection>? TravelPrefetches = null);
+    IReadOnlyList<TravelPrefetchReceiptProjection>? TravelPrefetches = null,
+    IReadOnlyList<AftermathRecapPackageProjection>? AftermathPackages = null);
 
 public sealed record CampaignWorkspaceDigestProjection(
     string WorkspaceId,

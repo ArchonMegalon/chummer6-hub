@@ -106,6 +106,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             PrepLaunches: context.Workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>(),
             TravelMode: travelMode,
             TravelPrefetches: context.Workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>(),
+            AftermathPackages: context.Workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>(),
             NextSafeAction: nextSafeAction,
             GeneratedAtUtc: context.GeneratedAtUtc);
     }
@@ -206,6 +207,36 @@ public sealed class CampaignWorkspaceServerPlaneService
             request.Note);
     }
 
+    public AftermathRecapPackageProjection? GenerateAftermathRecapPackage(
+        HubUserDto user,
+        string workspaceId,
+        AftermathRecapPackageRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(request);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        if (context is null)
+        {
+            return null;
+        }
+
+        RunProjection? targetRun = ResolvePrepLaunchRun(context.Workspace, context.LeadRun, request.RunId);
+        string packageKind = NormalizeAftermathPackageKind(request.PackageKind);
+        string title = BuildAftermathPackageTitle(context.Workspace, targetRun, packageKind, request.Title);
+        string summary = BuildAftermathPackageSummary(context.Workspace, targetRun, packageKind);
+        IReadOnlyList<string> evidenceLines = BuildAftermathPackageEvidenceLines(context.Workspace, context.Restore, targetRun, packageKind, request.Note);
+        return _campaignSpine.RecordAftermathRecapPackage(
+            user,
+            context.Workspace,
+            targetRun,
+            packageKind,
+            title,
+            summary,
+            evidenceLines);
+    }
+
     private WorkspaceContext? ResolveWorkspaceContext(
         HubUserDto user,
         string workspaceId,
@@ -242,6 +273,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 workspace.RosterTransfers?.FirstOrDefault()?.TransferredAtUtc,
                 workspace.PrepLaunches?.FirstOrDefault()?.LaunchedAtUtc,
                 workspace.TravelPrefetches?.FirstOrDefault()?.StagedAtUtc,
+                workspace.AftermathPackages?.FirstOrDefault()?.GeneratedAtUtc,
                 leadRun?.UpdatedAtUtc
             }
             .Concat(relevantCases.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
@@ -590,7 +622,11 @@ public sealed class CampaignWorkspaceServerPlaneService
     }
 
     private static IReadOnlyList<RecapShelfEntry> BuildRecapShelf(CampaignWorkspaceProjection workspace)
-        => workspace.RecapShelf
+    {
+        Dictionary<string, DateTimeOffset> aftermathTimes = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
+            .ToDictionary(static item => item.PackageId, static item => item.GeneratedAtUtc, StringComparer.OrdinalIgnoreCase);
+        DateTimeOffset defaultUpdatedAtUtc = workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow;
+        return workspace.RecapShelf
             .Take(6)
             .Select(item => new RecapShelfEntry(
                 EntryId: item.ProjectionId,
@@ -598,8 +634,11 @@ public sealed class CampaignWorkspaceServerPlaneService
                 Label: item.Label,
                 Summary: item.Summary,
                 ArtifactId: item.ArtifactId,
-                UpdatedAtUtc: workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow))
+                UpdatedAtUtc: aftermathTimes.TryGetValue(item.ProjectionId, out DateTimeOffset updatedAtUtc)
+                    ? updatedAtUtc
+                    : defaultUpdatedAtUtc))
             .ToArray();
+    }
 
     private static IReadOnlyList<SupportClosureCue> BuildSupportClosures(IReadOnlyList<SupportCaseDigestViewModel> digests)
         => digests
@@ -1148,6 +1187,83 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return lines;
+    }
+
+    private static string NormalizeAftermathPackageKind(string? packageKind)
+        => NormalizeOptional(packageKind)?.ToLowerInvariant() switch
+        {
+            "session_recap" => "session_recap",
+            "after_action_report" => "after_action_report",
+            "downtime_brief" => "downtime_brief",
+            null => throw new InvalidOperationException("aftermath package kind is required."),
+            _ => throw new InvalidOperationException($"Unsupported aftermath package kind: {packageKind}")
+        };
+
+    private static string BuildAftermathPackageTitle(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? run,
+        string packageKind,
+        string? requestedTitle)
+    {
+        string? normalizedTitle = NormalizeOptional(requestedTitle);
+        if (normalizedTitle is not null)
+        {
+            return normalizedTitle;
+        }
+
+        string runTitle = run?.Title ?? workspace.CampaignName;
+        return packageKind switch
+        {
+            "after_action_report" => $"{runTitle} after-action report",
+            "downtime_brief" => $"{workspace.CampaignName} downtime brief",
+            _ => $"{runTitle} session recap"
+        };
+    }
+
+    private static string BuildAftermathPackageSummary(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? run,
+        string packageKind)
+    {
+        int openObjectiveCount = run?.Objectives.Count(item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase)) ?? 0;
+        int consequenceCount = workspace.Consequences?.Count ?? 0;
+        string subject = run?.Title ?? workspace.CampaignName;
+        return packageKind switch
+        {
+            "after_action_report" => $"Generated an after-action report for {subject} with {openObjectiveCount} open objective(s) and {consequenceCount} consequence signal(s) carried into the shared return lane.",
+            "downtime_brief" => $"Generated a downtime brief for {workspace.CampaignName} so the next session return keeps aftermath, carry-forward obligations, and publication-safe continuity in one packet.",
+            _ => $"Generated a session recap package for {subject} with {openObjectiveCount} open objective(s) and {consequenceCount} consequence signal(s) pinned for safe return and creator follow-through."
+        };
+    }
+
+    private static IReadOnlyList<string> BuildAftermathPackageEvidenceLines(
+        CampaignWorkspaceProjection workspace,
+        WorkspaceRestoreProjection restore,
+        RunProjection? run,
+        string packageKind,
+        string? note)
+    {
+        SceneProjection? activeScene = run is null
+            ? null
+            : run.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, run.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
+              ?? run.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
+        int openObjectiveCount = run?.Objectives.Count(item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase)) ?? 0;
+        return new[]
+        {
+            $"Package kind: {packageKind}.",
+            $"Campaign: {workspace.CampaignName}.",
+            run is null ? "Run scope: campaign-wide aftermath." : $"Run scope: {run.Title} ({run.Status}).",
+            activeScene is null ? "Active scene: no pinned scene." : $"Active scene: {activeScene.Title} ({activeScene.Revision}).",
+            $"Open objectives: {openObjectiveCount}.",
+            $"Continuity: {workspace.LatestContinuity?.Summary ?? workspace.ReturnSummary}.",
+            $"Governed prep launches: {workspace.PrepLaunches?.Count ?? 0}.",
+            $"Travel prefetch receipts: {workspace.TravelPrefetches?.Count ?? 0}.",
+            $"Restore artifacts in scope: {restore.RecentArtifacts.Count}.",
+            string.IsNullOrWhiteSpace(note) ? string.Empty : $"Operator note: {note.Trim()}."
+        }
+        .Where(static item => !string.IsNullOrWhiteSpace(item))
+        .Take(8)
+        .ToArray();
     }
 
     private static bool IsTravelReadyDevice(ClaimedDeviceRestoreProjection device)

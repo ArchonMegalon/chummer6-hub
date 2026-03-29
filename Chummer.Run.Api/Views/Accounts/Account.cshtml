@@ -72,6 +72,7 @@
     var selectedWorkspacePrepLibraryQuery = Model.SelectedWorkspacePrepLibraryQuery;
     var selectedWorkspacePrepLaunches = selectedWorkspaceServerPlane?.PrepLaunches ?? Array.Empty<Chummer.Campaign.Contracts.GovernedPrepLaunchProjection>();
     var selectedWorkspaceTravelPrefetches = selectedWorkspaceServerPlane?.TravelPrefetches ?? Array.Empty<Chummer.Campaign.Contracts.TravelPrefetchReceiptProjection>();
+    var selectedWorkspaceAftermathPackages = selectedWorkspaceServerPlane?.AftermathPackages ?? Array.Empty<Chummer.Campaign.Contracts.AftermathRecapPackageProjection>();
     var selectedRun = Model.SelectedRun;
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
@@ -853,6 +854,10 @@
                             {
                                 <p><strong>Recent recap:</strong> @selectedWorkspace.RecapShelf[0].Summary</p>
                             }
+                            @if (selectedWorkspaceAftermathPackages.Count > 0)
+                            {
+                                <p><strong>Lead aftermath package:</strong> @selectedWorkspaceAftermathPackages[0].Summary</p>
+                            }
                             @if (selectedWorkspace.ChangePackets is { Count: > 0 })
                             {
                                 <p><strong>Recent change:</strong> @selectedWorkspace.ChangePackets[0].Label — @selectedWorkspace.ChangePackets[0].Summary</p>
@@ -898,6 +903,10 @@
                                     <div class="settings-summary-row">
                                         <span>Transfer audit</span>
                                         <strong>@(selectedWorkspaceServerPlane.RosterTransfers.Count == 0 ? "No recent moves" : $"{selectedWorkspaceServerPlane.RosterTransfers.Count} receipts")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Aftermath packages</span>
+                                        <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No governed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} receipts")</strong>
                                     </div>
                                 </div>
                                 @if (selectedWorkspaceServerPlane.WorkspaceState.EvidenceLines.Count > 0)
@@ -1100,6 +1109,10 @@
                                     <span>Travel prefetch receipts</span>
                                     <strong>@(selectedWorkspaceTravelPrefetches.Count == 0 ? "No staged receipts yet" : $"{selectedWorkspaceTravelPrefetches.Count} staged")</strong>
                                 </div>
+                                <div class="settings-summary-row">
+                                    <span>Aftermath recap packages</span>
+                                    <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No governed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} packaged")</strong>
+                                </div>
                             </div>
                             <p><strong>GM prep library:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
                             <p><strong>Binding posture:</strong> @selectedWorkspaceServerPlane.PrepLibrary.BindingSummary</p>
@@ -1246,14 +1259,82 @@
                                         }
                                     </ul>
                                 }
-                                @if (selectedWorkspaceServerPlane.TravelMode.Boundaries.Count > 0)
-                                {
+                            @if (selectedWorkspaceServerPlane.TravelMode.Boundaries.Count > 0)
+                            {
                                     <ul class="muted-copy">
                                         @foreach (var boundary in selectedWorkspaceServerPlane.TravelMode.Boundaries)
                                         {
                                             <li>@boundary</li>
                                         }
                                     </ul>
+                                }
+                            </details>
+
+                            <details class="details-drawer">
+                                <summary>Aftermath and recap</summary>
+                                <div class="settings-summary-list">
+                                    <div class="settings-summary-row">
+                                        <span>Publication-safe outputs</span>
+                                        <strong>@selectedWorkspaceServerPlane.RecapShelf.Count</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Aftermath recap packages</span>
+                                        <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No governed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} receipts")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Publication posture</span>
+                                        <strong>@selectedWorkspaceServerPlane.CampaignSummary.PublicationSummary</strong>
+                                    </div>
+                                </div>
+                                <p><strong>Return lane:</strong> @selectedWorkspace.ReturnSummary</p>
+                                @if (selectedWorkspace!.Runs.Count > 0)
+                                {
+                                    <form id="aftermathPackageForm" class="settings-form">
+                                        <div class="field">
+                                            <label for="aftermathPackageRun">Run scope</label>
+                                            <select id="aftermathPackageRun">
+                                                @foreach (var run in selectedWorkspace.Runs)
+                                                {
+                                                    <option value="@run.RunId">@run.Title</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="field">
+                                            <label for="aftermathPackageKind">Package kind</label>
+                                            <select id="aftermathPackageKind" required>
+                                                <option value="session_recap">Session recap</option>
+                                                <option value="after_action_report">After-action report</option>
+                                                <option value="downtime_brief">Downtime brief</option>
+                                            </select>
+                                        </div>
+                                        <div class="field">
+                                            <label for="aftermathPackageTitle">Package title</label>
+                                            <input id="aftermathPackageTitle" maxlength="128" placeholder="Generated from run and package kind by default" />
+                                        </div>
+                                        <div class="field">
+                                            <label for="aftermathPackageNote">Operator note</label>
+                                            <textarea id="aftermathPackageNote" rows="3" placeholder="What aftermath or next-session follow-through should stay grounded in this package?"></textarea>
+                                        </div>
+                                        <div id="aftermathPackagePreview" class="settings-summary-list" hidden></div>
+                                        <button class="button-like button-like--secondary" type="submit">Generate aftermath recap package</button>
+                                        <p id="aftermathPackageStatusNotice" class="muted-copy" hidden></p>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <p class="muted-copy">Generate aftermath recap package becomes available once the workspace has a tracked run to pin into the return lane.</p>
+                                }
+                                @if (selectedWorkspaceAftermathPackages.Count > 0)
+                                {
+                                    <details class="details-drawer" id="aftermath-packages">
+                                        <summary>Recent aftermath recap packages</summary>
+                                        <ul class="muted-copy">
+                                            @foreach (var package in selectedWorkspaceAftermathPackages)
+                                            {
+                                                <li><strong>@package.Title:</strong> @package.Summary</li>
+                                            }
+                                        </ul>
+                                    </details>
                                 }
                             </details>
                         }
@@ -1433,6 +1514,10 @@
                                     <span>Travel prefetch audit</span>
                                     <strong>@(workspace.TravelPrefetches is { Count: > 0 } ? $"{workspace.TravelPrefetches.Count} receipts" : "No recent prefetches")</strong>
                                 </div>
+                                <div class="settings-summary-row">
+                                    <span>Aftermath recap audit</span>
+                                    <strong>@(workspace.AftermathPackages is { Count: > 0 } ? $"{workspace.AftermathPackages.Count} receipts" : "No recap packages")</strong>
+                                </div>
                             </div>
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open shared campaign view</a>
@@ -1494,6 +1579,19 @@
                                         @foreach (var receipt in workspace.TravelPrefetches)
                                         {
                                             <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+
+                            @if (workspace.AftermathPackages is { Count: > 0 })
+                            {
+                                <details class="details-drawer">
+                                    <summary>Aftermath recap audit</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var package in workspace.AftermathPackages)
+                                        {
+                                            <li><strong>@package.Title:</strong> @package.Summary</li>
                                         }
                                     </ul>
                                 </details>
@@ -1928,6 +2026,7 @@
   const rosterTransferPlan = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceRosterTransferPlan));
   const prepLaunchPackets = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceServerPlane?.PrepLibrary.Packets ?? Array.Empty<Chummer.Run.Api.Contracts.GovernedPrepPacketSummary>()));
   const prepLaunchRuns = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspace?.Runs ?? Array.Empty<Chummer.Campaign.Contracts.RunProjection>()));
+  const aftermathPackageRuns = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspace?.Runs ?? Array.Empty<Chummer.Campaign.Contracts.RunProjection>()));
   const travelModeDevices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceServerPlane?.TravelMode.Devices ?? Array.Empty<Chummer.Run.Api.Contracts.TravelModeDeviceReadinessCue>()));
   const travelPrefetchInventorySummary = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary));
   const selectedWorkspaceId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspace?.WorkspaceId));
@@ -2083,6 +2182,65 @@
 
   syncTravelPrefetchPreview();
   document.getElementById("travelPrefetchInstallation")?.addEventListener("change", syncTravelPrefetchPreview);
+
+  const defaultAftermathTitle = () => {
+    const runSelect = document.getElementById("aftermathPackageRun");
+    const kindSelect = document.getElementById("aftermathPackageKind");
+    const run = Array.isArray(aftermathPackageRuns)
+      ? aftermathPackageRuns.find((item) => item && item.RunId === runSelect?.value) || aftermathPackageRuns[0]
+      : null;
+    const scopeLabel = run?.Title || "Campaign";
+    switch (kindSelect?.value) {
+      case "after_action_report":
+        return `${scopeLabel} after-action report`;
+      case "downtime_brief":
+        return `${scopeLabel} downtime brief`;
+      default:
+        return `${scopeLabel} session recap`;
+    }
+  };
+
+  const syncAftermathPackagePreview = () => {
+    const runSelect = document.getElementById("aftermathPackageRun");
+    const kindSelect = document.getElementById("aftermathPackageKind");
+    const titleInput = document.getElementById("aftermathPackageTitle");
+    const preview = document.getElementById("aftermathPackagePreview");
+    if (!kindSelect || !titleInput || !preview) {
+      return;
+    }
+
+    const run = Array.isArray(aftermathPackageRuns)
+      ? aftermathPackageRuns.find((item) => item && item.RunId === runSelect?.value) || aftermathPackageRuns[0]
+      : null;
+    if (!titleInput.value.trim()) {
+      titleInput.value = defaultAftermathTitle();
+    }
+
+    const rows = [
+      ["Run scope", run ? `${run.Title} · ${ui.humanizeStatus(run.Status, "Active")}` : "Campaign-wide aftermath"],
+      ["Package kind", ui.humanizeStatus(kindSelect.value.replaceAll("_", " "), "Session recap")],
+      ["Package title", titleInput.value.trim() || defaultAftermathTitle()],
+      ["Return posture", run?.Summary || "Pins the next-session return lane to a governed recap package."]
+    ];
+
+    preview.hidden = false;
+    preview.innerHTML = rows.map(([label, value]) => `
+      <div class="settings-summary-row">
+        <span>${label}</span>
+        <strong>${value}</strong>
+      </div>`).join("");
+  };
+
+  syncAftermathPackagePreview();
+  document.getElementById("aftermathPackageRun")?.addEventListener("change", syncAftermathPackagePreview);
+  document.getElementById("aftermathPackageKind")?.addEventListener("change", () => {
+    const titleInput = document.getElementById("aftermathPackageTitle");
+    if (titleInput && !titleInput.value.trim()) {
+      titleInput.value = defaultAftermathTitle();
+    }
+    syncAftermathPackagePreview();
+  });
+  document.getElementById("aftermathPackageTitle")?.addEventListener("input", syncAftermathPackagePreview);
 
   bindSubmit("profileForm", async (event) => {
     event.preventDefault();
@@ -2284,6 +2442,38 @@
       ui.setNotice(notice, ui.describeError(error, "Travel prefetch could not be staged right now."), true);
     } finally {
       ui.setButtonBusy(button, false, "Staging...");
+    }
+  });
+
+  bindSubmit("aftermathPackageForm", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("aftermathPackageStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    const runSelect = document.getElementById("aftermathPackageRun");
+    const kindSelect = document.getElementById("aftermathPackageKind");
+    const titleInput = document.getElementById("aftermathPackageTitle");
+    const noteInput = document.getElementById("aftermathPackageNote");
+    if (!kindSelect || !selectedWorkspaceId) {
+      return;
+    }
+
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Packaging...");
+    try {
+      await ui.requestJson(`/api/v1/campaign-spine/me/workspaces/${encodeURIComponent(selectedWorkspaceId)}/aftermath-recap-packages`, {
+        method: "POST",
+        json: {
+          runId: runSelect?.value || null,
+          packageKind: kindSelect.value,
+          title: titleInput?.value.trim() || null,
+          note: noteInput?.value.trim() || null
+        }
+      });
+      window.location.href = `${workspaceDetailHref(selectedWorkspaceId)}#aftermath-packages`;
+    } catch (error) {
+      ui.setNotice(notice, ui.describeError(error, "Aftermath recap package could not be generated right now."), true);
+    } finally {
+      ui.setButtonBusy(button, false, "Packaging...");
     }
   });
 

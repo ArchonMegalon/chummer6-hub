@@ -50,6 +50,7 @@ public sealed class CommunityStore
     public List<RosterTransferProjection> RosterTransfers { get; } = new();
     public List<GovernedPrepLaunchProjection> PrepLaunches { get; } = new();
     public List<TravelPrefetchReceiptProjection> TravelPrefetchReceipts { get; } = new();
+    public List<AftermathRecapPackageProjection> AftermathPackages { get; } = new();
     public Dictionary<string, WorkspaceRestoreProjection> RestoreByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void PersistLocked()
@@ -81,6 +82,7 @@ public sealed class CommunityStore
             RosterTransfers: RosterTransfers.OrderByDescending(static item => item.TransferredAtUtc).ToArray(),
             PrepLaunches: PrepLaunches.OrderByDescending(static item => item.LaunchedAtUtc).ToArray(),
             TravelPrefetchReceipts: TravelPrefetchReceipts.OrderByDescending(static item => item.StagedAtUtc).ToArray(),
+            AftermathPackages: AftermathPackages.OrderByDescending(static item => item.GeneratedAtUtc).ToArray(),
             RestoreSummaries: RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase).ToArray());
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
@@ -136,6 +138,7 @@ public sealed class CommunityStore
         RosterTransfers.Clear();
         PrepLaunches.Clear();
         TravelPrefetchReceipts.Clear();
+        AftermathPackages.Clear();
         RestoreByUserId.Clear();
 
         foreach (var user in snapshot.Users ?? Array.Empty<HubUserDto>())
@@ -212,6 +215,7 @@ public sealed class CommunityStore
         RosterTransfers.AddRange(snapshot.RosterTransfers ?? Array.Empty<RosterTransferProjection>());
         PrepLaunches.AddRange(snapshot.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>());
         TravelPrefetchReceipts.AddRange(snapshot.TravelPrefetchReceipts ?? Array.Empty<TravelPrefetchReceiptProjection>());
+        AftermathPackages.AddRange(snapshot.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>());
 
         foreach (var restore in snapshot.RestoreSummaries ?? Array.Empty<WorkspaceRestoreProjection>())
         {
@@ -308,6 +312,7 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<RosterTransferProjection>? RosterTransfers = null,
     IReadOnlyList<GovernedPrepLaunchProjection>? PrepLaunches = null,
     IReadOnlyList<TravelPrefetchReceiptProjection>? TravelPrefetchReceipts = null,
+    IReadOnlyList<AftermathRecapPackageProjection>? AftermathPackages = null,
     IReadOnlyList<WorkspaceRestoreProjection>? RestoreSummaries = null);
 
 internal sealed record SponsorSessionStateSnapshot(
