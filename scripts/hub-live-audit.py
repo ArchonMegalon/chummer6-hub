@@ -135,6 +135,10 @@ def extract_claim_code(body: str, path: str) -> str:
     return extract_first_match(body, r'id="claimCodeValue"[^>]*>([^<]+)<', path, "install claim code")
 
 
+def extract_subject_id(body: str, path: str) -> str:
+    return extract_first_match(body, r'const subjectId = "([^"]+)"', path, "signed-in subject id")
+
+
 def extract_cookie(headers: dict[str, str], *, path: str) -> str:
     cookie = headers.get("set-cookie")
     if not cookie:
@@ -372,6 +376,115 @@ def verify_signed_in_work_audit(
     require_snippet(search_body, "opposition", search_path)
 
     workspace_token = extract_antiforgery_token(body, workspace_path)
+    subject_id = extract_subject_id(body, workspace_path)
+    community_operations = summary.get("communityOperations") or []
+    if not community_operations:
+        raise AssertionError("/api/v1/campaign-spine/me did not expose any governed community operation")
+    lead_operation = community_operations[0]
+    group_id = lead_operation.get("groupId")
+    if not group_id:
+        raise AssertionError("lead community operation did not expose a group id")
+    invite_campaigns = lead_operation.get("inviteCampaigns") or []
+    join_code_body = json.dumps(
+        {
+            "subjectId": subject_id,
+            "role": "member",
+            "ttl": "7.00:00:00",
+        }
+    ).encode("utf-8")
+    join_code_path = f"/api/v1/groups/{group_id}/join-codes"
+    status, body, _, _ = fetch(
+        base_url,
+        join_code_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=join_code_body,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"{join_code_path} returned {status}: {body[:400]}")
+    join_code = json.loads(body)
+    if not join_code.get("code"):
+        raise AssertionError("join-code issuance did not expose the issued code")
+
+    missing_join_body = json.dumps(
+        {
+            "subjectId": subject_id,
+            "code": f"JOIN-MISSING-{time.time_ns()}",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/groups/join",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=missing_join_body,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 404:
+        raise AssertionError(f"/api/v1/groups/join missing-code check returned {status}: {body[:400]}")
+    require_snippet(body, "fresh join code", "/api/v1/groups/join")
+
+    boost_code_body = json.dumps(
+        {
+            "subjectId": subject_id,
+            "groupId": group_id,
+            "campaignId": invite_campaigns[0]["campaignId"] if invite_campaigns else None,
+            "label": "live_operator_audit",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/boost-codes",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=boost_code_body,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/boost-codes returned {status}: {body[:400]}")
+    boost_code = json.loads(body)
+    if not boost_code.get("code"):
+        raise AssertionError("boost-code issuance did not expose the issued code")
+
+    missing_boost_body = json.dumps(
+        {
+            "subjectId": subject_id,
+            "code": f"BOOST-MISSING-{time.time_ns()}",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/boost-codes/redeem",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=missing_boost_body,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 404:
+        raise AssertionError(f"/api/v1/boost-codes/redeem missing-code check returned {status}: {body[:400]}")
+    require_snippet(body, "fresh sponsorship code", "/api/v1/boost-codes/redeem")
+
     plan_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/roster-transfer-plan"
     status, body, _, _ = fetch(
         base_url,
@@ -562,6 +675,13 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Season / event pulse", "/account/work")
     require_snippet(body, "Season &amp; event rail", "/account/work")
     require_snippet(body, "Season board", "/account/work")
+    require_snippet(body, "Invite &amp; sponsorship rail", "/account/work")
+    require_snippet(body, "Issue governed join code", "/account/work")
+    require_snippet(body, "Issue governed boost code", "/account/work")
+    require_snippet(body, "Recent join codes", "/account/work")
+    require_snippet(body, "Recent boost codes", "/account/work")
+    require_snippet(body, join_code["code"], "/account/work")
+    require_snippet(body, boost_code["code"], "/account/work")
     require_snippet(body, "Member guidance rail", "/account/work")
     require_snippet(body, "Open shared campaign view", "/account/work")
     require_snippet(body, "Open current release", "/account/work")
@@ -592,8 +712,10 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Season / event pulse", "/home/work")
     require_snippet(body, "Latest event:", "/home/work")
     require_snippet(body, "Board:", "/home/work")
+    require_snippet(body, "Invites:", "/home/work")
     require_snippet(body, "Guide: current preview, downloads, and closure posture stay on the same operator rail.", "/home/work")
     require_snippet(body, "Open season board", "/home/work")
+    require_snippet(body, "Open invite rail", "/home/work")
     require_snippet(body, "Open member guidance", "/home/work")
     require_snippet(body, "Consequence watch", "/home/work")
     require_snippet(body, prep_launch["packetTitle"], "/home/work")
@@ -618,7 +740,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Downtime brief", workspace_path)
     print(
         "ok signed-in /account/work -> "
-        f"{final_url} workspace={workspace_id} install={claimed_installation_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} downtime={downtime_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
+        f"{final_url} workspace={workspace_id} install={claimed_installation_id} join_code={join_code['code']} boost_code={boost_code['code']} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} downtime={downtime_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
     )
 
 
