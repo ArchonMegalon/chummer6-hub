@@ -30,6 +30,8 @@ Updated: 2026-03-29
   - signed-in home/work operator-posture visibility on the calmer home cockpit
   - route-readiness gating so `/home/access` and `/home/work` unlock once real device/return truth exists even if onboarding was not explicitly marked complete yet
   - safehouse / travel mode visibility, staged offline inventory, and recap follow-through
+  - signed-in and public trust pulse now exposes install-aware `Who can get it now` and `Adoption health`
+  - campaign memory projection now appears on signed-in home/work and workspace detail where available
 
 ## What just landed
 
@@ -49,6 +51,8 @@ Updated: 2026-03-29
 - Extended the signed-in `/home/work` operator card so it now also carries a bounded league-and-season operations summary and a direct route into the new league rail on `/account/work`
 - Extended the signed-in live audit so `/account/work` now has to render the season-board entries and their direct shared-workspace routes on the rebuilt edge
 - Extended the signed-in live audit so `/account/work` and `/home/work` also have to render the new league-and-season operations rail after the signed-in transfer flow resolves
+- Extended public trust pulses on `/now`, `/downloads`, and `/help` so both anonymous and signed-in paths expose install-aware `Who can get it now` and `Adoption health` evidence from proof artifacts
+- Exposed campaign memory in signed-in `/home/work`, `/account/work/workspaces/{workspaceId}`, and `/account/work` home surfaces so recall and transition state remains visible across campaign memory boundaries
 - Tightened the grounded support assistant so reporter-facing fix questions now escalate from “read the timeline” to an explicit `Verify fix now` action once the linked install is already on the reporter-ready build
 - Extended smoke coverage so verification-ready assistant answers must explicitly point back to the tracked case detail and tell the reporter to use the live verification buttons
 - Extended `scripts/hub-live-audit.py` so the rebuilt local `chummer.run` edge now submits a real signed-in support case, moves it through internal release and reporter notification, refreshes the claimed install onto the fix build, asks the assistant before and after the update, and proves the `Verify fix now` action plus reporter confirmation on `/account/support/{caseId}`
@@ -102,6 +106,7 @@ CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hu
 1. Keep deepening organizer/operator depth on the same account/control backbone without inventing a parallel admin model, especially beyond the new season/event rail into broader community, league, and multi-event operations.
 2. Push more of the campaign workspace v3 follow-through into durable receipts and shared projections instead of isolated cards, especially shared consequence/recap synthesis and broader long-lived campaign memory beyond the new next-session and downtime packets.
 3. Keep moving toward the cross-repo journey-proof gap: install -> claim -> restore -> continue and join campaign -> run -> recover -> recap still need stronger whole-product acceptance evidence outside this repo.
+4. Start the next design slice toward guided onboarding and first playable-session completion with measurable evidence across Hub and operator surfaces.
 
 ## Guardrails
 
