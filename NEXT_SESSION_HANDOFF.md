@@ -17,6 +17,7 @@ Updated: 2026-03-29
   - richer operator operations pulse and campaign-return pulse on the shared account/control backbone
   - explicit season/event operator rail on the shared account/control backbone
   - explicit sponsor-session operator rail on the shared account/control backbone
+  - explicit league/season operations rail on the shared account/control backbone
   - multi-campaign preview season bootstrap on one operator group
   - signed-in home/work aftermath recap visibility on the calmer home cockpit
   - signed-in home/work downtime brief visibility on the calmer home cockpit
@@ -41,8 +42,11 @@ Updated: 2026-03-29
 - Fixed the campaign spine so one operator group can safely carry more than one governed campaign by resolving crew ids per campaign, keeping campaign-bound dossiers scoped by owner plus campaign instead of collapsing back to one member dossier, and narrowing roster-transfer overwrite checks to the selected target campaign
 - Seeded a second governed `preview season` campaign on the default personal operator group and extended smoke coverage so organizer summaries now prove a real multi-campaign season rail instead of a single-campaign placeholder
 - Added a first-class multi-campaign `Season board` to `Teams & permissions`, backed by governed workspace projections so each campaign lane shows its lead run, latest event receipt, next safe action, watchout, and direct shared-workspace route
+- Added a first-class `League / season operations` rail to `Teams & permissions`, backed by governed league summaries and bounded audit lines so multi-campaign organizer work stops living across disconnected drawers
 - Extended the signed-in `/home/work` operator card so it now shows one lead `Season board` lane and deep-links directly into the exact board drawer on `/account/work`
+- Extended the signed-in `/home/work` operator card so it now also carries a bounded league-and-season operations summary and a direct route into the new league rail on `/account/work`
 - Extended the signed-in live audit so `/account/work` now has to render the season-board entries and their direct shared-workspace routes on the rebuilt edge
+- Extended the signed-in live audit so `/account/work` and `/home/work` also have to render the new league-and-season operations rail after the signed-in transfer flow resolves
 - Fixed bounded receipt retention for governed prep launches, travel-prefetch receipts, and aftermath recap packages so the newest receipts survive once the local proof store crosses its 64-item cap
 - Biased signed-in home lead-workspace ordering toward the richer live lane when two workspaces share the same latest transfer timestamp, so `/home/work` keeps the active prep/aftermath lane instead of drifting to a thinner transfer-only lane
 - Extended smoke coverage with an aftermath-retention overflow regression so the newest generated recap package must remain visible on `/home/work` after the cap is exceeded

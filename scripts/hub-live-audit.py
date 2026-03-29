@@ -731,6 +731,21 @@ def verify_signed_in_work_audit(
         raise AssertionError(f"/api/v1/campaign-spine/me/roster-transfers returned {status}: {body[:400]}")
 
     transfer = json.loads(body)
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/campaign-spine/me",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/campaign-spine/me returned {status}, expected 200 after roster transfer")
+    post_transfer_summary = json.loads(body)
+    post_transfer_operations = post_transfer_summary.get("communityOperations") or []
+    post_transfer_operation = next((item for item in post_transfer_operations if item.get("groupId") == group_id), None)
+    if post_transfer_operation is None:
+        raise AssertionError("signed-in campaign summary lost the operator rail after the roster transfer")
+
     status, body, _, final_url = fetch(
         base_url,
         "/account/work",
@@ -745,6 +760,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, transfer["runnerHandle"], "/account/work")
     require_snippet(body, "Prep launch audit", "/account/work")
     require_snippet(body, "Operations pulse", "/account/work")
+    require_snippet(body, "League / season operations", "/account/work")
     require_snippet(body, "Season / event pulse", "/account/work")
     require_snippet(body, "Season &amp; event rail", "/account/work")
     require_snippet(body, "Season board", "/account/work")
@@ -756,6 +772,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Recent sponsor sessions", "/account/work")
     require_snippet(body, join_code["code"], "/account/work")
     require_snippet(body, boost_code["code"], "/account/work")
+    require_snippet(body, post_transfer_operation["leagueOperationsSummary"], "/account/work")
     require_snippet(body, refreshed_sponsor_session["userDisplayName"], "/account/work")
     require_snippet(body, refreshed_sponsor_session["campaignName"], "/account/work")
     require_snippet(body, "Member guidance rail", "/account/work")
@@ -788,9 +805,11 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Season / event pulse", "/home/work")
     require_snippet(body, "Latest event:", "/home/work")
     require_snippet(body, "Board:", "/home/work")
+    require_snippet(body, "League:", "/home/work")
     require_snippet(body, "Invites:", "/home/work")
     require_snippet(body, "Sponsors:", "/home/work")
     require_snippet(body, "Guide: current preview, downloads, and closure posture stay on the same operator rail.", "/home/work")
+    require_snippet(body, "Open league rail", "/home/work")
     require_snippet(body, "Open season board", "/home/work")
     require_snippet(body, "Open invite rail", "/home/work")
     require_snippet(body, "Open sponsor rail", "/home/work")
@@ -798,6 +817,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Consequence watch", "/home/work")
     require_snippet(body, prep_launch["packetTitle"], "/home/work")
     require_snippet(body, travel_prefetch["deviceRole"], "/home/work")
+    require_snippet(body, post_transfer_operation["leagueOperationsSummary"], "/home/work")
     require_snippet(body, refreshed_sponsor_session["campaignName"], "/home/work")
     status, body, _, _ = fetch(
         base_url,
