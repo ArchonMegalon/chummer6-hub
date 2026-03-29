@@ -29,6 +29,8 @@
       "accountModel.CampaignSpine.Workspaces[0].RecapShelf.Count >= 1",
       "accountModel.CampaignSpine.Workspaces[0].ActiveSceneSummary",
       "accountModel.CampaignSpine.Workspaces[0].NextSafeAction",
+      "workspacePayload.FirstPlayableSession is not null",
+      "workspaceServerPlanePayload.FirstPlayableSession is not null",
       "accountModel.CampaignSpine.Workspaces[0].ChangePackets?.Count >= 1",
       "campaignSpineController.GetMyCampaignWorkspace",
       "campaignSpineController.GetMyRun",
@@ -72,8 +74,11 @@
       "workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, \"travel_prefetch\", StringComparison.Ordinal)) == true",
       "workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, \"aftermath_recap\", StringComparison.Ordinal)) == true",
       "workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary",
+      "starterWorkspacePayload!.FirstPlayableSession is not null",
       "operatorWorkModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true",
       "homeSource.Contains(\"What changed for me\"",
+      "homeSource.Contains(\"@workspace.FirstPlayableSession.CampaignStartSummary\"",
+      "accountSource.Contains(\"selected-first-playable-session\"",
       "homeSource.Contains(\"@workspace.ActiveSceneSummary\"",
       "homeSource.Contains(\"@workspace.NextSafeAction\"",
       "workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1"
@@ -87,5 +92,5 @@
       "authenticatedHomeModel.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && item.ClosureSummary.Contains(\"closure notice\""
     ]
   },
-  "generated_at": "2026-03-29T18:40:35Z"
+  "generated_at": "2026-03-29T19:01:53Z"
 }
