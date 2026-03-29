@@ -1609,6 +1609,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Board:", StringComparison.Ordinal), "home work should surface one bounded season-board entry on the lead operator card.");
     Assert(homeSource.Contains("@leadCommunityBoard.CampaignName", StringComparison.Ordinal), "home work should surface the lead season-board campaign directly from the shared operator projection.");
     Assert(homeSource.Contains("@leadCommunityBoard.CampaignMemorySummary", StringComparison.Ordinal), "home work should surface the lead season-board campaign-memory summary directly from the shared operator projection.");
+    Assert(homeSource.Contains("@leadCommunityBoard.CampaignMemoryReturnSummary", StringComparison.Ordinal), "home work should surface the lead season-board campaign-memory return cue directly from the shared operator projection.");
     Assert(homeSource.Contains("League:", StringComparison.Ordinal), "home work should surface a bounded league-and-season operations summary on the lead operator card.");
     Assert(homeSource.Contains("@leadCommunityOperation.LeagueOperationsSummary", StringComparison.Ordinal), "home work should surface the shared league-operations summary directly from the operator projection.");
     Assert(homeSource.Contains("/account/work#community-op-league-", StringComparison.Ordinal), "home work should deep-link the operator card into the league-and-season operations rail.");
