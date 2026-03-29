@@ -302,8 +302,19 @@ public sealed record CommunityOperatorProjection(
     string SeasonEventSummary,
     IReadOnlyList<string> RecentReturnSummaries,
     IReadOnlyList<string> RecentEventSummaries,
+    IReadOnlyList<CommunitySeasonBoardEntryProjection> SeasonBoardEntries,
     IReadOnlyList<string> Watchouts,
     IReadOnlyList<RosterTransferProjection>? RecentRosterTransfers = null);
+
+public sealed record CommunitySeasonBoardEntryProjection(
+    string CampaignId,
+    string WorkspaceId,
+    string CampaignName,
+    string RunTitle,
+    string LatestEventSummary,
+    string NextSafeAction,
+    string? WatchoutSummary,
+    DateTimeOffset UpdatedAtUtc);
 
 public sealed record CampaignReadinessCue(
     string CueId,
