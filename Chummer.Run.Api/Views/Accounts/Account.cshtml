@@ -1523,10 +1523,28 @@
                                     <strong>@selectedBuildLabHandoff.RuntimeCompatibilitySummary</strong>
                                 </div>
                             }
+                            @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.CampaignReturnSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Return</span>
+                                    <strong>@selectedBuildLabHandoff.CampaignReturnSummary</strong>
+                                </div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.SupportClosureSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Support</span>
+                                    <strong>@selectedBuildLabHandoff.SupportClosureSummary</strong>
+                                </div>
+                            }
                         </div>
                         @if (selectedBuildLabHandoff.TradeoffLines.Count > 0)
                         {
                             <p><strong>Tradeoffs:</strong> @string.Join(" ", selectedBuildLabHandoff.TradeoffLines)</p>
+                        }
+                        @if (selectedBuildLabHandoff.ProgressionOutcomes.Count > 0)
+                        {
+                            <p><strong>Outcome:</strong> @string.Join(" ", selectedBuildLabHandoff.ProgressionOutcomes.Take(2))</p>
                         }
                         @if (selectedBuildLabHandoff.Outputs.Count > 0)
                         {

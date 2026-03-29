@@ -1694,6 +1694,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Finish on another device", StringComparison.Ordinal), "account access should describe pending claim codes as the remaining device handoff step.");
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
     Assert(accountSource.Contains("Closure:", StringComparison.Ordinal), "account build-path details should surface support-closure truth instead of leaving the new rail data unused.");
+    Assert(accountSource.Contains("@selectedBuildLabHandoff.CampaignReturnSummary", StringComparison.Ordinal), "account build-path detail should surface build-handoff return truth directly from the shared projection.");
+    Assert(accountSource.Contains("@selectedBuildLabHandoff.SupportClosureSummary", StringComparison.Ordinal), "account build-path detail should surface build-handoff support closure directly from the shared projection.");
+    Assert(accountSource.Contains("selectedBuildLabHandoff.ProgressionOutcomes", StringComparison.Ordinal), "account build-path detail should render progression outcomes directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.NextSafeAction", StringComparison.Ordinal), "account publication detail should surface the next creator-publication step directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.CampaignReturnSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication return truth directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.SupportClosureSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication support closure directly from the shared projection.");
@@ -2744,6 +2747,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var accountBuildHandoffDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, handoffId: handoffId) as ViewResult;
     var accountBuildHandoffDetailModel = accountBuildHandoffDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountBuildHandoffDetailModel?.SelectedBuildLabHandoff?.HandoffId, handoffId, StringComparison.Ordinal), "account build detail route should load the selected build follow-through.");
+    Assert(!string.IsNullOrWhiteSpace(accountBuildHandoffDetailModel?.SelectedBuildLabHandoff?.CampaignReturnSummary), "account build detail route should keep build-handoff return truth visible.");
+    Assert(!string.IsNullOrWhiteSpace(accountBuildHandoffDetailModel?.SelectedBuildLabHandoff?.SupportClosureSummary), "account build detail route should keep build-handoff support closure visible.");
+    Assert(accountBuildHandoffDetailModel?.SelectedBuildLabHandoff?.ProgressionOutcomes.Count >= 1, "account build detail route should keep build-handoff progression outcomes visible.");
     var accountRulesDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, entryId: rulesEntryId) as ViewResult;
     var accountRulesDetailModel = accountRulesDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountRulesDetailModel?.SelectedRulesNavigatorAnswer?.EntryId, rulesEntryId, StringComparison.Ordinal), "account rules detail route should load the selected grounded rule answer.");
