@@ -2724,6 +2724,24 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1, "home work route should keep the claimed-device return packet visible on the shared home projection.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Any(item => item.RestoreSummary.Contains("bounded offline use", StringComparison.Ordinal)), "home work route should surface bounded offline prefetch on the claimed-device return card.");
 
+    AftermathRecapPackageProjection? retainedAftermathPayload = null;
+    for (var index = 0; index < 70; index++)
+    {
+        var retainedAftermathResult = await campaignSpineController.GenerateMyCampaignWorkspaceAftermathRecapPackage(
+            workspaceId,
+            new AftermathRecapPackageRequest(
+                RunId: runId,
+                PackageKind: "session_recap",
+                Title: $"Retention session recap {index}",
+                Note: $"Retention overflow audit {index}"),
+            CancellationToken.None);
+        retainedAftermathPayload = (retainedAftermathResult.Result as OkObjectResult)?.Value as AftermathRecapPackageProjection ?? retainedAftermathResult.Value;
+    }
+    Assert(retainedAftermathPayload is not null, "campaign spine aftermath generation should keep returning packages after the retention cap is exceeded.");
+    var retainedWorkHomePage = await authenticatedLandingController.HomePage("work", CancellationToken.None) as ViewResult;
+    var retainedWorkHomeModel = retainedWorkHomePage?.Model as HomePageViewModel;
+    Assert(retainedWorkHomeModel?.LeadWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, retainedAftermathPayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the newest aftermath recap package visible after the retention cap is exceeded.");
+
     var transferTargetUser = accounts.EnsureUser("subject.outsider", "Outsider Demo");
     var transferGroup = groups.CreateGroup(new CreateGroupRequest(
         SubjectId: "subject.demo",

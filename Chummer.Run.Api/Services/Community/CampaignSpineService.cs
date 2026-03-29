@@ -223,7 +223,7 @@ public sealed class CampaignSpineService
             _store.PrepLaunches.Add(launch);
             if (_store.PrepLaunches.Count > 64)
             {
-                _store.PrepLaunches.RemoveRange(64, _store.PrepLaunches.Count - 64);
+                _store.PrepLaunches.RemoveRange(0, _store.PrepLaunches.Count - 64);
             }
 
             _store.PersistLocked();
@@ -273,7 +273,7 @@ public sealed class CampaignSpineService
             _store.TravelPrefetchReceipts.Add(receipt);
             if (_store.TravelPrefetchReceipts.Count > 64)
             {
-                _store.TravelPrefetchReceipts.RemoveRange(64, _store.TravelPrefetchReceipts.Count - 64);
+                _store.TravelPrefetchReceipts.RemoveRange(0, _store.TravelPrefetchReceipts.Count - 64);
             }
 
             _store.PersistLocked();
@@ -320,7 +320,7 @@ public sealed class CampaignSpineService
             _store.AftermathPackages.Add(package);
             if (_store.AftermathPackages.Count > 64)
             {
-                _store.AftermathPackages.RemoveRange(64, _store.AftermathPackages.Count - 64);
+                _store.AftermathPackages.RemoveRange(0, _store.AftermathPackages.Count - 64);
             }
 
             _store.PersistLocked();
