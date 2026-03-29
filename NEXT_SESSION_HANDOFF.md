@@ -33,9 +33,12 @@ Updated: 2026-03-29
   - signed-in and public trust pulse now exposes install-aware `Who can get it now` and `Adoption health`
   - campaign memory projection now appears on signed-in home/work and workspace detail where available
   - home starter lane now nudges linked users without existing campaign work into `/home/work` as a first-playable-session onboarding step
+  - `/account/work` empty state now offers the same `Start first playable session` starter action instead of a dead-end generic message
 
 ## What just landed
 
+- Added a `Start first playable session` action on `/account/work` empty-state copy so signed-in work follows the same starter-lane onboarding route as `/home/work`
+- Reused `/api/v1/campaign-spine/me/workspaces/starter` from the account route and added starter-lane feedback/redirect handling instead of inventing a second onboarding API
 - Added a dedicated `Aftermath recap` card on `/home/work` with bounded summary, evidence, return-shelf context, and a deep link back to the shared workspace return lane
 - Added a dedicated `Downtime brief` card on `/home/work` and matching `/account/work/workspaces/{workspaceId}` detail so downtime obligations and next-session follow-through stop hiding inside the generic aftermath list
 - Added a first-class `Next-session carry-forward` projection to the shared workspace and server plane, then surfaced it on both `/account/work/workspaces/{workspaceId}` and `/home/work` with return-lane truth, next-step truth, and bounded evidence
