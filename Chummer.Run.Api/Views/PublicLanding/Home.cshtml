@@ -558,7 +558,22 @@
                                                     <span class="tag">Publication status</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@publication.Title</h3>
-                                                        <p>@publication.Summary <span>Trust: @publication.ProvenanceSummary.</span></p>
+                                                        <p>
+                                                            @publication.Summary
+                                                            <span>Trust: @publication.ProvenanceSummary.</span>
+                                                            @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
+                                                            {
+                                                                <span> Next: @publication.NextSafeAction.</span>
+                                                            }
+                                                            @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
+                                                            {
+                                                                <span> Return: @publication.CampaignReturnSummary.</span>
+                                                            }
+                                                            @if (!string.IsNullOrWhiteSpace(publication.SupportClosureSummary))
+                                                            {
+                                                                <span> Support: @publication.SupportClosureSummary.</span>
+                                                            }
+                                                        </p>
                                                     </div>
                                                     <a class="inline-link" href="@($"/account/work/publications/{Uri.EscapeDataString(publication.PublicationId)}")">Open publication status</a>
                                                 </article>

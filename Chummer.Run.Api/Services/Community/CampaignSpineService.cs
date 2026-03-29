@@ -112,7 +112,7 @@ public sealed class CampaignSpineService
             var buildLabHandoffs = BuildBuildLabHandoffs(dossiers, workspaces, restore);
             var rulesNavigator = BuildRulesNavigatorEntries(workspaces, operations);
             var migrationReceipts = BuildMigrationReceipts(dossiers, campaigns);
-            var creatorPublications = BuildCreatorPublications(workspaces, dossiers);
+            var creatorPublications = BuildCreatorPublications(workspaces, dossiers, buildLabHandoffs);
 
             return new AccountCampaignSummary(
                 dossiers,
@@ -2172,13 +2172,29 @@ public sealed class CampaignSpineService
 
     private static IReadOnlyList<CreatorPublicationProjection> BuildCreatorPublications(
         IReadOnlyList<CampaignWorkspaceProjection> workspaces,
-        IReadOnlyList<RunnerDossierProjection> dossiers)
+        IReadOnlyList<RunnerDossierProjection> dossiers,
+        IReadOnlyList<BuildLabHandoffProjection> buildLabHandoffs)
     {
         return workspaces
             .Select(workspace =>
             {
                 var dossier = dossiers.FirstOrDefault(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase));
                 var artifact = workspace.RecapShelf.FirstOrDefault()?.ArtifactId ?? StableId("artifact", workspace.WorkspaceId);
+                var leadHandoff = buildLabHandoffs
+                    .Where(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(static item => item.UpdatedAtUtc)
+                    .FirstOrDefault();
+                var nextSafeAction = !string.IsNullOrWhiteSpace(leadHandoff?.NextSafeAction)
+                    ? leadHandoff.NextSafeAction
+                    : workspace.NextSafeAction
+                        ?? "Review the grounded creator packet, then return through the shared campaign view before you publish or export it further.";
+                var campaignReturnSummary = !string.IsNullOrWhiteSpace(leadHandoff?.CampaignReturnSummary)
+                    ? leadHandoff.CampaignReturnSummary
+                    : workspace.ReturnSummary;
+                var supportClosureSummary = !string.IsNullOrWhiteSpace(leadHandoff?.SupportClosureSummary)
+                    ? leadHandoff.SupportClosureSummary
+                    : DescribeCreatorPublicationSupportClosure(workspace);
+                var watchouts = BuildCreatorPublicationWatchouts(workspace, leadHandoff);
                 return new CreatorPublicationProjection(
                     PublicationId: StableId("publication", workspace.WorkspaceId),
                     Title: $"{workspace.CampaignName} creator packet",
@@ -2191,9 +2207,49 @@ public sealed class CampaignSpineService
                     DiscoverySummary: $"{workspace.Visibility} visibility with grounded provenance and one truthful next action.",
                     Visibility: workspace.Visibility,
                     PublicationStatus: "preview_ready",
-                    UpdatedAtUtc: workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow);
+                    UpdatedAtUtc: workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow,
+                    NextSafeAction: nextSafeAction,
+                    CampaignReturnSummary: campaignReturnSummary,
+                    SupportClosureSummary: supportClosureSummary,
+                    Watchouts: watchouts);
             })
             .Take(3)
+            .ToArray();
+    }
+
+    private static string DescribeCreatorPublicationSupportClosure(CampaignWorkspaceProjection workspace)
+    {
+        if (workspace.ReadinessCues.Any(item => string.Equals(item.Severity, "warning", StringComparison.OrdinalIgnoreCase)))
+        {
+            return $"{workspace.RuleEnvironment.CompatibilityFingerprint} is grounded, but workspace readiness still needs review before this creator packet becomes the support-safe answer.";
+        }
+
+        return $"{workspace.RuleEnvironment.CompatibilityFingerprint} stays pinned across the creator packet, shared return lane, and support follow-through.";
+    }
+
+    private static IReadOnlyList<string> BuildCreatorPublicationWatchouts(
+        CampaignWorkspaceProjection workspace,
+        BuildLabHandoffProjection? leadHandoff)
+    {
+        List<string> watchouts = [];
+
+        if (leadHandoff is null)
+        {
+            watchouts.Add("No build handoff is attached yet, so creator publication still relies on workspace return truth alone.");
+        }
+
+        if (workspace.RecapShelf.Count == 0)
+        {
+            watchouts.Add("No recap-safe output is attached yet, so creator publication still depends on the live workspace summary.");
+        }
+
+        watchouts.AddRange(workspace.ReadinessCues
+            .Where(item => string.Equals(item.Severity, "warning", StringComparison.OrdinalIgnoreCase))
+            .Select(item => item.Summary));
+
+        return watchouts
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
 
