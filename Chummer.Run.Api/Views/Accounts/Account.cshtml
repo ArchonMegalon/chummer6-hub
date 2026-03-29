@@ -74,6 +74,10 @@
     var selectedWorkspacePrepLaunches = selectedWorkspaceServerPlane?.PrepLaunches ?? Array.Empty<Chummer.Campaign.Contracts.GovernedPrepLaunchProjection>();
     var selectedWorkspaceTravelPrefetches = selectedWorkspaceServerPlane?.TravelPrefetches ?? Array.Empty<Chummer.Campaign.Contracts.TravelPrefetchReceiptProjection>();
     var selectedWorkspaceAftermathPackages = selectedWorkspaceServerPlane?.AftermathPackages ?? Array.Empty<Chummer.Campaign.Contracts.AftermathRecapPackageProjection>();
+    var selectedWorkspaceLeadAftermathPackage = selectedWorkspaceAftermathPackages
+        .FirstOrDefault(item => !string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
+    var selectedWorkspaceDowntimePackage = selectedWorkspaceAftermathPackages
+        .FirstOrDefault(item => string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
     var selectedRun = Model.SelectedRun;
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
@@ -855,9 +859,13 @@
                             {
                                 <p><strong>Recent recap:</strong> @selectedWorkspace.RecapShelf[0].Summary</p>
                             }
-                            @if (selectedWorkspaceAftermathPackages.Count > 0)
+                            @if (selectedWorkspaceLeadAftermathPackage is not null)
                             {
-                                <p><strong>Lead aftermath package:</strong> @selectedWorkspaceAftermathPackages[0].Summary</p>
+                                <p><strong>Lead aftermath package:</strong> @selectedWorkspaceLeadAftermathPackage.Summary</p>
+                            }
+                            @if (selectedWorkspaceDowntimePackage is not null)
+                            {
+                                <p><strong>Downtime brief:</strong> @selectedWorkspaceDowntimePackage.Summary</p>
                             }
                             @if (selectedWorkspaceNextSessionCarryForward is not null)
                             {
@@ -916,6 +924,10 @@
                                     <div class="settings-summary-row">
                                         <span>Aftermath packages</span>
                                         <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No governed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} receipts")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Downtime brief</span>
+                                        <strong>@(selectedWorkspaceDowntimePackage is null ? "Pending" : selectedWorkspaceDowntimePackage.Summary)</strong>
                                     </div>
                                 </div>
                                 @if (selectedWorkspaceServerPlane.WorkspaceState.EvidenceLines.Count > 0)
@@ -978,6 +990,35 @@
                                     {
                                         <ul class="muted-copy">
                                             @foreach (var evidence in selectedWorkspaceNextSessionCarryForward.EvidenceLines)
+                                            {
+                                                <li>@evidence</li>
+                                            }
+                                        </ul>
+                                    }
+                                </details>
+                            }
+
+                            @if (selectedWorkspaceDowntimePackage is not null)
+                            {
+                                <details id="selected-downtime-brief" class="details-drawer">
+                                    <summary>Downtime brief</summary>
+                                    <div class="settings-summary-list">
+                                        <div class="settings-summary-row">
+                                            <span>Downtime summary</span>
+                                            <strong>@selectedWorkspaceDowntimePackage.Summary</strong>
+                                        </div>
+                                        @if (selectedWorkspaceNextSessionCarryForward is not null)
+                                        {
+                                            <div class="settings-summary-row">
+                                                <span>Next-session return</span>
+                                                <strong>@selectedWorkspaceNextSessionCarryForward.Summary</strong>
+                                            </div>
+                                        }
+                                    </div>
+                                    @if (selectedWorkspaceDowntimePackage.EvidenceLines.Count > 0)
+                                    {
+                                        <ul class="muted-copy">
+                                            @foreach (var evidence in selectedWorkspaceDowntimePackage.EvidenceLines)
                                             {
                                                 <li>@evidence</li>
                                             }
@@ -1590,6 +1631,10 @@
                                     <span>Aftermath recap audit</span>
                                     <strong>@(workspace.AftermathPackages is { Count: > 0 } ? $"{workspace.AftermathPackages.Count} receipts" : "No recap packages")</strong>
                                 </div>
+                                <div class="settings-summary-row">
+                                    <span>Downtime brief</span>
+                                    <strong>@(workspace.AftermathPackages?.Any(item => string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase)) == true ? "Ready" : "Pending")</strong>
+                                </div>
                             </div>
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open shared campaign view</a>
@@ -1664,6 +1709,21 @@
                                         @foreach (var package in workspace.AftermathPackages)
                                         {
                                             <li><strong>@package.Title:</strong> @package.Summary</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+
+                            @if (workspace.AftermathPackages?.Any(item => string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase)) == true)
+                            {
+                                var downtimeBrief = workspace.AftermathPackages.First(item => string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
+                                <details class="details-drawer">
+                                    <summary>Downtime brief</summary>
+                                    <ul class="muted-copy">
+                                        <li><strong>@downtimeBrief.Title:</strong> @downtimeBrief.Summary</li>
+                                        @if (downtimeBrief.EvidenceLines.Count > 0)
+                                        {
+                                            <li><strong>Evidence:</strong> @downtimeBrief.EvidenceLines[0]</li>
                                         }
                                     </ul>
                                 </details>

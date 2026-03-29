@@ -493,6 +493,33 @@ def verify_signed_in_work_audit(
     if not aftermath_package.get("packageId"):
         raise AssertionError("aftermath recap response did not expose a package id")
 
+    downtime_body = json.dumps(
+        {
+            "runId": target_run.get("runId"),
+            "packageKind": "downtime_brief",
+            "note": "Signed-in live audit pinning downtime follow-through to the shared return lane.",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        aftermath_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=downtime_body,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"{aftermath_path} downtime brief returned {status}: {body[:400]}")
+
+    downtime_package = json.loads(body)
+    if not downtime_package.get("packageId"):
+        raise AssertionError("downtime brief response did not expose a package id")
+
     payload = json.dumps(
         {
             "dossierId": dossier_options[0]["dossierId"],
@@ -545,6 +572,9 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Aftermath recap", "/home/work")
     require_snippet(body, aftermath_package["title"], "/home/work")
     require_snippet(body, "Open aftermath and return", "/home/work")
+    require_snippet(body, "Downtime brief", "/home/work")
+    require_snippet(body, downtime_package["title"], "/home/work")
+    require_snippet(body, "Open downtime brief", "/home/work")
     require_snippet(body, "Roster move", "/home/work")
     require_snippet(body, transfer["runnerHandle"], "/home/work")
     require_snippet(body, "Open governed roster moves", "/home/work")
@@ -569,9 +599,11 @@ def verify_signed_in_work_audit(
     require_snippet(body, travel_prefetch["deviceRole"], workspace_path)
     require_snippet(body, "Recent aftermath recap packages", workspace_path)
     require_snippet(body, aftermath_package["title"], workspace_path)
+    require_snippet(body, downtime_package["title"], workspace_path)
+    require_snippet(body, "Downtime brief", workspace_path)
     print(
         "ok signed-in /account/work -> "
-        f"{final_url} workspace={workspace_id} install={claimed_installation_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
+        f"{final_url} workspace={workspace_id} install={claimed_installation_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} downtime={downtime_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
     )
 
 

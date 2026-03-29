@@ -1586,6 +1586,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@leadAftermathPackage.Summary", StringComparison.Ordinal), "home work should surface the latest aftermath package summary directly from the bounded server plane.");
     Assert(homeSource.Contains("@leadAftermathEvidence", StringComparison.Ordinal), "home work should surface one bounded aftermath evidence line on the signed-in home route.");
     Assert(homeSource.Contains("Open aftermath and return", StringComparison.Ordinal), "home work should keep a direct route into the aftermath return lane.");
+    Assert(homeSource.Contains("Downtime brief", StringComparison.Ordinal), "home work should surface a dedicated downtime brief card instead of leaving downtime follow-through buried inside the generic aftermath list.");
+    Assert(homeSource.Contains("@leadDowntimePackage.Title", StringComparison.Ordinal), "home work should surface the latest downtime brief title directly from the bounded server plane.");
+    Assert(homeSource.Contains("@leadDowntimeEvidence", StringComparison.Ordinal), "home work should surface one bounded downtime evidence line on the signed-in home route.");
+    Assert(homeSource.Contains("Open downtime brief", StringComparison.Ordinal), "home work should keep a direct route into the downtime brief detail.");
     Assert(homeSource.Contains("Roster move", StringComparison.Ordinal), "home work should surface a dedicated roster-move card instead of collapsing operator actions into one-line campaign summaries.");
     Assert(homeSource.Contains("@leadRosterTransfer.RunnerHandle", StringComparison.Ordinal), "home work should surface the moved runner handle directly from the governed transfer receipt.");
     Assert(homeSource.Contains("Open governed roster moves", StringComparison.Ordinal), "home work should keep a direct route back to the governed roster-move operator rail.");
@@ -1671,6 +1675,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Next-session carry-forward", StringComparison.Ordinal), "account work should surface the shared next-session carry-forward projection on both the selected card and the workspace detail drawer.");
     Assert(accountSource.Contains("@selectedWorkspaceNextSessionCarryForward.Summary", StringComparison.Ordinal), "account work should surface the selected workspace carry-forward summary directly from the shared server-plane projection.");
     Assert(accountSource.Contains("@workspace.NextSessionCarryForward.Summary", StringComparison.Ordinal), "account work should surface next-session carry-forward directly on the shared workspace list.");
+    Assert(accountSource.Contains("Downtime brief", StringComparison.Ordinal), "account work should surface downtime follow-through on both the selected workspace detail and the shared workspace list.");
+    Assert(accountSource.Contains("@selectedWorkspaceDowntimePackage.Summary", StringComparison.Ordinal), "account work should surface the selected downtime brief summary directly from the shared server-plane projection.");
     Assert(accountSource.Contains("Search governed prep packets", StringComparison.Ordinal), "account work should expose a real governed prep-library search flow on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Label", StringComparison.Ordinal), "account work should surface the bounded workspace state directly from the server plane.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Summary", StringComparison.Ordinal), "account work should explain why the bounded workspace state is active on the selected campaign card.");
@@ -2316,6 +2322,18 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(aftermathPackagePayload is not null && string.Equals(aftermathPackagePayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine aftermath recap api should record a governed recap package against the selected workspace.");
     Assert(aftermathPackagePayload!.Summary.Contains("session recap package", StringComparison.OrdinalIgnoreCase), "campaign spine aftermath recap api should describe the governed recap package it generated.");
     Assert(aftermathPackagePayload.EvidenceLines.Any(item => item.Contains("Continuity:", StringComparison.OrdinalIgnoreCase)), "campaign spine aftermath recap api should carry bounded continuity evidence lines.");
+    var downtimeBriefResult = await campaignSpineController.GenerateMyCampaignWorkspaceAftermathRecapPackage(
+        workspaceId,
+        new AftermathRecapPackageRequest(
+            RunId: runId,
+            PackageKind: "downtime_brief",
+            Title: null,
+            Note: "Keep downtime obligations and next-session readiness grounded on the same shared return lane."),
+        CancellationToken.None);
+    var downtimeBriefPayload = (downtimeBriefResult.Result as OkObjectResult)?.Value as AftermathRecapPackageProjection ?? downtimeBriefResult.Value;
+    Assert(downtimeBriefPayload is not null && string.Equals(downtimeBriefPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine downtime brief api should record a governed downtime packet against the selected workspace.");
+    Assert(downtimeBriefPayload!.Summary.Contains("downtime brief", StringComparison.OrdinalIgnoreCase), "campaign spine downtime brief api should describe the governed downtime packet it generated.");
+    Assert(downtimeBriefPayload.EvidenceLines.Any(item => item.Contains("Continuity:", StringComparison.OrdinalIgnoreCase)), "campaign spine downtime brief api should carry bounded continuity evidence lines.");
     var refreshedWorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
     var refreshedWorkspaceServerPlanePayload = (refreshedWorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? refreshedWorkspaceServerPlaneResult.Value;
     Assert(refreshedWorkspaceServerPlanePayload?.PrepLaunches.Any(item => string.Equals(item.LaunchId, prepLaunchPayload.LaunchId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project governed prep-launch receipts after launch.");
@@ -2324,6 +2342,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "travel_prefetch", StringComparison.Ordinal)) == true, "campaign spine server plane api should add staged travel-prefetch receipts into the bounded what-changed packet rail.");
     Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project aftermath recap packages after generation.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "aftermath_recap", StringComparison.Ordinal)) == true, "campaign spine server plane api should add aftermath recap packages into the bounded what-changed packet rail.");
+    Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, downtimeBriefPayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project downtime brief packets after generation.");
     Assert(refreshedWorkspaceServerPlanePayload?.NextSessionCarryForward is not null, "campaign spine server plane api should refresh the next-session carry-forward packet after the governed actions land.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the next-session carry-forward packet on the bounded what-changed rail.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
@@ -2546,6 +2565,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.TravelReadyDeviceCount >= 1, "account workspace detail route should surface safehouse/travel readiness.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelPrefetches.Any(item => string.Equals(item.ReceiptId, travelPrefetchPayload!.ReceiptId, StringComparison.Ordinal)) == true, "account workspace detail route should surface staged travel-prefetch receipts.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "account workspace detail route should surface aftermath recap packages.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, downtimeBriefPayload!.PackageId, StringComparison.Ordinal)) == true, "account workspace detail route should surface downtime brief packages.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "account workspace detail route should explain that prep packets are carried in the prefetch inventory.");
     var searchableWorkspaceDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, workspaceId: workspaceId, prepQuery: "opposition") as ViewResult;
     var searchableWorkspaceDetailModel = searchableWorkspaceDetailPage?.Model as AccountPageViewModel;
