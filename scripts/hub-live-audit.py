@@ -322,6 +322,19 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Cross-device recovery", "/account/access")
     require_snippet(body, "What stays on this device", "/account/access")
 
+    status, body, _, _ = fetch(
+        base_url,
+        "/home/access",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/home/access returned {status}, expected 200")
+    require_snippet(body, "What changed for you", "/home/access")
+    require_snippet(body, "Release and device state", "/home/access")
+    require_snippet(body, "Open Devices &amp; access", "/home/access")
+
     workspace_id = workspaces[0]["workspaceId"]
     workspace_path = f"/account/work/workspaces/{workspace_id}"
     status, body, _, _ = fetch(

@@ -21,7 +21,7 @@ Updated: 2026-03-29
 - Added a dedicated `Aftermath recap` card on `/home/work` with bounded summary, evidence, return-shelf context, and a deep link back to the shared workspace return lane
 - Extended the shared campaign summary on signed-in home to call out aftermath-package count alongside GM prep and travel readiness
 - Replaced the blunt onboarding-only gate on `/home/access` and `/home/work` with route-readiness checks based on actual device, support, install, and campaign-return truth
-- Taught `scripts/hub-live-audit.py` to verify the new `/home/work` aftermath lane after it drives prep launch, travel prefetch, aftermath recap packaging, and roster transfer on the live edge
+- Taught `scripts/hub-live-audit.py` to verify both `/home/access` and the new `/home/work` aftermath lane after it drives prep launch, travel prefetch, aftermath recap packaging, and roster transfer on the live edge
 - Extended smoke coverage so source assertions lock the new home card and route-readiness gate in place
 - Verified the rebuilt local `chummer.run` edge with both host-level live audit and Playwright e2e against the already-running docker edge
 
