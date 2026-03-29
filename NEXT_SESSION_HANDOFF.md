@@ -42,6 +42,9 @@ Updated: 2026-03-29
 - Added a first-class multi-campaign `Season board` to `Teams & permissions`, backed by governed workspace projections so each campaign lane shows its lead run, latest event receipt, next safe action, watchout, and direct shared-workspace route
 - Extended the signed-in `/home/work` operator card so it now shows one lead `Season board` lane and deep-links directly into the exact board drawer on `/account/work`
 - Extended the signed-in live audit so `/account/work` now has to render the season-board entries and their direct shared-workspace routes on the rebuilt edge
+- Fixed bounded receipt retention for governed prep launches, travel-prefetch receipts, and aftermath recap packages so the newest receipts survive once the local proof store crosses its 64-item cap
+- Biased signed-in home lead-workspace ordering toward the richer live lane when two workspaces share the same latest transfer timestamp, so `/home/work` keeps the active prep/aftermath lane instead of drifting to a thinner transfer-only lane
+- Extended smoke coverage with an aftermath-retention overflow regression so the newest generated recap package must remain visible on `/home/work` after the cap is exceeded
 - Added a dedicated `Consequence watch` card on `/home/work` so the lead governed campaign consequence and one evidence cue stay visible on the signed-in home cockpit instead of only appearing inside the shared summary prose
 - Added a dedicated `Roster move` card on `/home/work` so the latest governed transfer stays visible on the signed-in home cockpit and points back to the same operator rail
 - Extended the `/home/work` GM prep card so it now carries the latest governed prep-launch packet title and the latest staged travel-prefetch device receipt instead of only generic posture text
