@@ -1,11 +1,11 @@
 # Next Session Handoff
 
-Updated: 2026-03-29
+Updated: 2026-03-29T21:20:00+02:00
 
 ## Current state
 
 - Local docker public edge is the active proof lane for `chummer.run`
-- Public and signed-in live audits are green on the rebuilt edge
+- Public and signed-in live audits are green on a clean `docker compose -f docker-compose.public-edge.yml up -d --build` cycle
 - Wave 1 campaign workspace work now includes:
   - governed roster transfer operator flow
   - governed prep-library search
@@ -36,7 +36,8 @@ Updated: 2026-03-29
   - home starter lane now nudges linked users without existing campaign work into `/home/work` as a first-playable-session onboarding step
   - `/account/work` empty state now offers the same `Start first playable session` starter action instead of a dead-end generic message
   - shared workspace, workspace digest, and workspace server-plane projections now carry a bounded `First playable session` proof while the campaign is still in its kickoff state
-  - signed-in `/home/work` and `/account/work/workspaces/{workspaceId}` now surface first-session campaign-start proof, bounded evidence, and a direct route back into the same shared workspace detail
+- signed-in `/home/work` and `/account/work/workspaces/{workspaceId}` now surface first-session campaign-start proof, bounded evidence, and a direct route back into the same shared workspace detail
+- /auth/email/start now reliably returns a preview callback link on local edge, allowing signed-in workflow assertions to execute full callback/restore verification.
 
 ## What just landed
 
@@ -98,6 +99,7 @@ Updated: 2026-03-29
 - Extended `scripts/hub-live-audit.py` again so the live signed-in journey now generates and verifies both a session recap package and a downtime brief package on the rebuilt edge
 - Extended `scripts/hub-live-audit.py` again so `/account/work` has to show the richer organizer `Operations pulse` on the rebuilt edge
 - Extended `scripts/hub-live-audit.py` again so both `/account/work` and `/home/work` have to show the new organizer season/event rail on the rebuilt edge
+- Added a local proof fix for intermittent portal<->identity network regressions by validating service attachment during compose verification and validating email-start flow through fallback local identity path.
 - Added starter-lane onboarding to signed-in public home and campaign spine:
   - `/home/work` now unlocks with `effectiveWorkSurfaceReady` for seedable starter install states.
   - `/api/v1/campaign-spine/me/workspaces/starter` now provides the starter workspace payload used by the onboarding button.
@@ -125,7 +127,7 @@ CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hu
 ## Recent verification outcome
 
 - Host-level smoke, compliance, and non-Playwright e2e checks pass on current docker edge.
-- Signed-in Playwright/live-audit checks still hit local rate limit (429) on support/case flow intermittently; retry after backoff for a full signed-in proof run.
+- Signed-in Playwright/live-audit checks pass end-to-end on current docker edge for the account/work journey (including email callback flow, signed workspace, support flow, and operator rails).
 
 ## Next highest-impact gaps
 
@@ -134,6 +136,16 @@ CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hu
 3. Keep moving toward the cross-repo journey-proof gap: install -> claim -> restore -> continue and join campaign -> run -> recover -> recap still need stronger whole-product acceptance evidence outside this repo.
 4. Continue the guided onboarding slice past first-session proof into broader first-session closure and first return, especially once the kickoff lane needs stronger support, recap, and community/operator follow-through without reopening a parallel onboarding model.
 5. Keep pushing milestone-20 pulse depth behind the new surface rows: real trend history, measured closure/adoption deltas, and provider-route canary automation still need to flow from evidence generation into the weekly pulse without hand-tended prose.
+
+## Latest session snapshot
+
+- Ran `docker compose -f docker-compose.public-edge.yml down && docker compose -f docker-compose.public-edge.yml up -d --build` and re-validated:
+  - `python3 scripts/hub-live-audit.py --verify-http-redirects`
+  - `python3 scripts/hub-live-audit.py --verify-signed-in-work`
+  - `bash scripts/run_smoke.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+- Observed both containers correctly attached to `chummer5a_default` and `codex-fleet-net`; `/auth/email/start` now returns `/auth/email/callback` in the rendered preview and callback workflow completes.
+- No source-code functionality changes were required in this session; the remaining work is remaining design-maturity and wave completion evidence.
 
 ## Guardrails
 
