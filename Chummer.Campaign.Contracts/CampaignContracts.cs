@@ -302,9 +302,37 @@ public sealed record CommunityOperatorProjection(
     string SeasonEventSummary,
     IReadOnlyList<string> RecentReturnSummaries,
     IReadOnlyList<string> RecentEventSummaries,
+    IReadOnlyList<CommunityInviteCampaignProjection> InviteCampaigns,
+    IReadOnlyList<CommunityJoinCodeProjection> RecentJoinCodes,
+    IReadOnlyList<CommunityBoostCodeProjection> RecentBoostCodes,
     IReadOnlyList<CommunitySeasonBoardEntryProjection> SeasonBoardEntries,
     IReadOnlyList<string> Watchouts,
     IReadOnlyList<RosterTransferProjection>? RecentRosterTransfers = null);
+
+public sealed record CommunityInviteCampaignProjection(
+    string CampaignId,
+    string CampaignName,
+    string Status);
+
+public sealed record CommunityJoinCodeProjection(
+    string JoinCodeId,
+    string Code,
+    string Role,
+    string Status,
+    string StatusSummary,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? ExpiresAtUtc,
+    int Uses);
+
+public sealed record CommunityBoostCodeProjection(
+    string BoostCodeId,
+    string Code,
+    string CampaignId,
+    string CampaignName,
+    string Status,
+    string StatusSummary,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? RedeemedAtUtc);
 
 public sealed record CommunitySeasonBoardEntryProjection(
     string CampaignId,
