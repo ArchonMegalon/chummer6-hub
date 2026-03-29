@@ -390,6 +390,7 @@ public sealed record HomePageViewModel(
     IReadOnlyList<SupportCaseProjection> SupportCases,
     IReadOnlyList<SupportCasePresentationViewModel> SupportCaseSummaries,
     AccountCampaignSummary CampaignSpine,
+    CampaignWorkspaceServerPlaneProjection? LeadWorkspaceServerPlane,
     HomePrimaryActionViewModel PrimaryAction,
     IReadOnlyList<ResolvedPublicCardViewModel> NowRail,
     IReadOnlyList<ResolvedPublicCardViewModel> HorizonRail);

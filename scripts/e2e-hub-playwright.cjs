@@ -233,6 +233,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/home/work', async () => {
     await expectVisible(page, 'text=Work');
     await expectVisible(page, 'text=Finish setup before the work surfaces try to carry too much');
+    await expectBodyText(page, 'Safehouse / travel mode', '/home/work');
+    await expectBodyText(page, 'GM prep', '/home/work');
   });
 
   await gotoAndAssert(page, pageErrors, '/home/setup', async () => {

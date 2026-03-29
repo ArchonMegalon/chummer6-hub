@@ -27,6 +27,7 @@
     var migrationReceipts = Model.CampaignSpine.MigrationReceipts.Take(1).ToArray();
     var creatorPublications = Model.CampaignSpine.CreatorPublications.Take(1).ToArray();
     var restoreDevices = Model.CampaignSpine.Restore.ClaimedDevices.Take(1).ToArray();
+    var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
     var releasedOrNotifiedCases = Model.SupportCaseSummaries
         .Where(item =>
@@ -309,6 +310,11 @@
                                                             {
                                                                 <span> Recent recap: @workspace.RecapShelf[0].Summary</span>
                                                             }
+                                                            @if (leadWorkspaceServerPlane is not null
+                                                                && string.Equals(leadWorkspaceServerPlane.Workspace.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
+                                                            {
+                                                                <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "claim lane pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
+                                                            }
                                                         </p>
                                                     </div>
                                                     <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}")">Open shared campaign view</a>
@@ -395,6 +401,21 @@
                                                             </p>
                                                         </div>
                                                         <a class="inline-link" href="@($"/account/work/rules/{Uri.EscapeDataString(answer.EntryId)}")">Open grounded rule context</a>
+                                                    </article>
+                                                }
+                                                @if (leadWorkspaceServerPlane is not null)
+                                                {
+                                                    <article class="app-rail__item">
+                                                        <span class="tag">GM prep</span>
+                                                        <div class="app-rail__copy">
+                                                            <h3>@leadWorkspaceServerPlane.PrepLibrary.Summary</h3>
+                                                            <p>
+                                                                @leadWorkspaceServerPlane.TravelMode.Summary
+                                                                <span> Search: @leadWorkspaceServerPlane.PrepLibrary.SearchSummary</span>
+                                                                <span> Safehouse / travel mode: @leadWorkspaceServerPlane.TravelMode.PrefetchInventorySummary.</span>
+                                                            </p>
+                                                        </div>
+                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open prep and travel</a>
                                                     </article>
                                                 }
                                             }
