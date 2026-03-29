@@ -233,6 +233,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/home/work', async () => {
     await expectVisible(page, 'text=Work');
     await expectVisible(page, 'text=Finish setup before the work surfaces try to carry too much');
+    await expectBodyText(page, 'What changed for me', '/home/work');
     await expectBodyText(page, 'Safehouse / travel mode', '/home/work');
     await expectBodyText(page, 'GM prep', '/home/work');
   });
@@ -280,7 +281,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     page.locator('a[href*="/account/work/workspaces/"]').first().click()
   ]);
   assert(/\/account\/work\/workspaces\//.test(page.url()), 'Workspace detail route should open from the account work rail.');
-  await expectBodyText(page, 'Server-plane follow-through', '/account/work/workspaces detail');
+  await expectBodyText(page, 'What changed for me', '/account/work/workspaces detail');
   await expectBodyText(page, 'Roster readiness and dossier freshness', '/account/work/workspaces detail');
   await expectBodyText(page, 'Rule and continuity health', '/account/work/workspaces detail');
   await expectBodyText(page, 'GM prep library and travel mode', '/account/work/workspaces detail');

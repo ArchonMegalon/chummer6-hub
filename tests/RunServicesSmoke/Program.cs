@@ -1568,6 +1568,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("/account/work/workspaces/", StringComparison.Ordinal), "home work should deep-link the shared campaign view instead of sending every route back to the generic work shell.");
     Assert(homeSource.Contains("@workspace.ActiveSceneSummary", StringComparison.Ordinal), "home work should surface active-scene change truth directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("@workspace.NextSafeAction", StringComparison.Ordinal), "home work should surface the next safe action directly on the calmer shared campaign card.");
+    Assert(homeSource.Contains("What changed for me", StringComparison.Ordinal), "home work should keep the explicit what-changed-for-me packet on the signed-in route.");
+    Assert(homeSource.Contains("leadWorkspaceState?.Label", StringComparison.Ordinal), "home work should surface the bounded workspace state directly from the server plane.");
+    Assert(homeSource.Contains("@leadWorkspaceServerPlane.ChangePackets[0].Summary", StringComparison.Ordinal), "home work should surface the first server-plane change packet directly on the what-changed card.");
+    Assert(homeSource.Contains("@leadWorkspaceServerPlane.NextSafeAction.Summary", StringComparison.Ordinal), "home work should surface the bounded next safe action directly on the what-changed card.");
     Assert(homeSource.Contains("Consequence:", StringComparison.Ordinal), "home work should surface one short consequence cue directly on the shared campaign card.");
     Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
@@ -1620,6 +1624,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Recent change packets", StringComparison.Ordinal), "account work should surface recent change packets for the shared campaign view.");
     Assert(accountSource.Contains("Consequence ledger", StringComparison.Ordinal), "account work should surface the governed consequence ledger for the shared campaign view.");
     Assert(accountSource.Contains("Lead consequence", StringComparison.Ordinal), "account work should summarize the leading consequence directly on the selected campaign card.");
+    Assert(!accountSource.Contains("Server-plane follow-through", StringComparison.Ordinal), "account work should avoid internal server-plane wording on the customer-facing route.");
+    Assert(accountSource.Contains("What changed for me", StringComparison.Ordinal), "account work should keep the explicit what-changed-for-me packet on the selected campaign card.");
+    Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Label", StringComparison.Ordinal), "account work should surface the bounded workspace state directly from the server plane.");
+    Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Summary", StringComparison.Ordinal), "account work should explain why the bounded workspace state is active on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspace.NextSafeAction", StringComparison.Ordinal), "account work should surface the workspace next safe action directly on the selected campaign card.");
     Assert(accountSource.Contains("Follow-up lane", StringComparison.Ordinal), "account support detail should surface the follow-up lane instead of assuming the user remembers it.");
     Assert(accountSource.Contains("Release progress:", StringComparison.Ordinal), "account support detail should surface reporter-lane release progress instead of only the closure summary.");
@@ -2191,6 +2199,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.DecisionNotices.Count >= 1, "campaign spine server plane api should expose bounded follow-through notices.");
     Assert(workspaceServerPlanePayload.CampaignSummary.RestoreSummary.Contains("Prefetch inventory:", StringComparison.Ordinal), "campaign spine server plane api should make restore prefetch inventory explicit.");
     Assert(workspaceServerPlanePayload.CampaignSummary.RestoreSummary.Contains("bounded offline use", StringComparison.Ordinal), "campaign spine server plane api should keep restore posture tied to bounded offline use.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.WorkspaceState.Status), "campaign spine server plane api should expose one bounded visible workspace state.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.WorkspaceState.Label), "campaign spine server plane api should expose a customer-facing workspace-state label.");
+    Assert(workspaceServerPlanePayload.WorkspaceState.EvidenceLines.Count >= 1, "campaign spine server plane api should attach evidence lines to the bounded workspace state.");
     Assert(workspaceServerPlanePayload.PrepLibrary.Packets.Count >= 3, "campaign spine server plane api should expose a governed GM prep library compiled from workspace truth.");
     Assert(workspaceServerPlanePayload.PrepLibrary.ReusablePacketCount >= 1, "campaign spine server plane api should expose reusable prep packets for campaign rebinding.");
     Assert(workspaceServerPlanePayload.PrepLibrary.SearchSummary.Contains("Search", StringComparison.Ordinal), "campaign spine server plane api should expose explicit prep-library search posture.");
@@ -2408,6 +2419,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.SupportClosures.Count >= 1, "account workspace detail route should expose support-closure cues from the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.DecisionNotices.Count >= 1, "account workspace detail route should expose bounded decision notices from the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RuleEnvironmentHealth.Count >= 1, "account workspace detail route should expose rule-environment health cues from the workspace server plane.");
+    Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.Label), "account workspace detail route should expose one bounded workspace-state label.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.EvidenceLines.Count >= 1, "account workspace detail route should expose evidence for the bounded workspace state.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "account workspace detail route should surface the governed GM prep library.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.TravelReadyDeviceCount >= 1, "account workspace detail route should surface safehouse/travel readiness.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "account workspace detail route should explain that prep packets are carried in the prefetch inventory.");
@@ -2438,6 +2451,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "signed-in home should keep the active-scene summary attached to the shared campaign view.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].NextSafeAction), "signed-in home should keep the workspace next safe action attached to the shared campaign view.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane is not null, "signed-in home should receive the bounded lead workspace server plane.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.LeadWorkspaceServerPlane!.WorkspaceState.Status), "signed-in home should surface one bounded workspace state on the what-changed card.");
+    Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.WorkspaceState.EvidenceLines.Count >= 1, "signed-in home should surface workspace-state evidence on the what-changed card.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane!.PrepLibrary.Packets.Count >= 3, "signed-in home should surface the governed GM prep library on the home cockpit.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount >= 1, "signed-in home should surface safehouse/travel readiness on the home cockpit.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
@@ -2482,6 +2497,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var workHomeModel = workHomePage?.Model as HomePageViewModel;
     Assert(string.Equals(workHomeModel?.CurrentSection, "work", StringComparison.Ordinal), "home work route should render the work section.");
     Assert(string.Equals(workHomeModel?.Chrome.Title, "Home · Work", StringComparison.Ordinal), "home work route should project its own chrome title.");
+    Assert(!string.IsNullOrWhiteSpace(workHomeModel?.LeadWorkspaceServerPlane?.WorkspaceState.Label), "home work route should keep the bounded workspace state visible.");
+    Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Count >= 1, "home work route should keep the what-changed packet tied to a real change packet.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "home work route should keep the governed prep library visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "home work route should keep bounded prep-carrying travel inventory visible.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");

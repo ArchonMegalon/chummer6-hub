@@ -28,6 +28,7 @@
     var creatorPublications = Model.CampaignSpine.CreatorPublications.Take(1).ToArray();
     var restoreDevices = Model.CampaignSpine.Restore.ClaimedDevices.Take(1).ToArray();
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
+    var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
     var releasedOrNotifiedCases = Model.SupportCaseSummaries
         .Where(item =>
@@ -313,6 +314,11 @@
                                                             @if (leadWorkspaceServerPlane is not null
                                                                 && string.Equals(leadWorkspaceServerPlane.Workspace.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
                                                             {
+                                                                <span> State: @(leadWorkspaceState?.Label).</span>
+                                                                @if (leadWorkspaceServerPlane.ChangePackets.Count > 0)
+                                                                {
+                                                                    <span> Change: @leadWorkspaceServerPlane.ChangePackets[0].Summary</span>
+                                                                }
                                                                 <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "claim lane pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
                                                             }
                                                         </p>
@@ -346,6 +352,28 @@
                                             }
                                             else
                                             {
+                                                @if (leadWorkspaceServerPlane is not null)
+                                                {
+                                                    <article class="app-rail__item">
+                                                        <span class="tag">What changed</span>
+                                                        <div class="app-rail__copy">
+                                                            <h3>What changed for me</h3>
+                                                            <p>
+                                                                @(leadWorkspaceState?.Label): @(leadWorkspaceState?.Summary)
+                                                                @if (leadWorkspaceServerPlane.ChangePackets.Count > 0)
+                                                                {
+                                                                    <span> Change: @leadWorkspaceServerPlane.ChangePackets[0].Summary</span>
+                                                                }
+                                                                <span> Next: @leadWorkspaceServerPlane.NextSafeAction.Summary</span>
+                                                                @if (leadWorkspaceServerPlane.DecisionNotices.Count > 0)
+                                                                {
+                                                                    <span> Notice: @leadWorkspaceServerPlane.DecisionNotices[0].Summary</span>
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open shared campaign view</a>
+                                                    </article>
+                                                }
                                                 @if (buildHandoffs.Length > 0)
                                                 {
                                                     var handoff = buildHandoffs[0];
