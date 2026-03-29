@@ -37,9 +37,12 @@
       "workspaceServerPlanePayload.WorkspaceState.Status",
       "workspaceServerPlanePayload.PrepLibrary.Packets.Count >= 3",
       "workspaceServerPlanePayload.TravelMode.TravelReadyDeviceCount >= 1",
+      "campaignSpineController.GetMyCampaignWorkspaceRosterTransferPlan",
+      "rosterTransferPlanPayload.TargetGroups.Count >= 1",
       "campaignSpineController.GetMyCampaignWorkspacePrepLibrary",
       "prepLibraryPayload.TotalCount >= 1",
       "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.Label",
+      "accountWorkspaceDetailModel?.SelectedWorkspaceRosterTransferPlan?.TargetGroups.Count >= 1",
       "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3",
       "searchableWorkspaceDetailModel?.SelectedWorkspacePrepLibrarySearch?.TotalCount >= 1",
       "authenticatedHomeModel.LeadWorkspaceServerPlane is not null",
@@ -47,6 +50,7 @@
       "workHomeModel?.LeadWorkspaceServerPlane?.WorkspaceState.Label",
       "workHomeModel?.LeadWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3",
       "workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary",
+      "operatorWorkModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true",
       "homeSource.Contains(\"What changed for me\"",
       "homeSource.Contains(\"@workspace.ActiveSceneSummary\"",
       "homeSource.Contains(\"@workspace.NextSafeAction\"",
@@ -61,5 +65,5 @@
       "authenticatedHomeModel.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && item.ClosureSummary.Contains(\"closure notice\""
     ]
   },
-  "generated_at": "2026-03-29T08:54:52Z"
+  "generated_at": "2026-03-29T09:05:09Z"
 }

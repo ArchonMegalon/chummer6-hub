@@ -143,6 +143,27 @@ public sealed class CampaignSpineController : ControllerBase
         }
     }
 
+    [HttpGet("me/workspaces/{workspaceId}/roster-transfer-plan")]
+    [ProducesResponseType<RosterTransferPlannerProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<RosterTransferPlannerProjection>> GetMyCampaignWorkspaceRosterTransferPlan(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var rosterTransferPlan = _campaignSpine.GetRosterTransferPlan(user, workspaceId, installLinking);
+            return rosterTransferPlan is null ? NotFound() : Ok(rosterTransferPlan);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpPost("me/roster-transfers")]
     [ProducesResponseType<RosterTransferProjection>(StatusCodes.Status200OK)]
     public async Task<ActionResult<RosterTransferProjection>> TransferMyRoster([FromBody] RosterTransferRequest? request, CancellationToken cancellationToken)

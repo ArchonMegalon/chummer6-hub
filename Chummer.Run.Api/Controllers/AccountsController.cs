@@ -101,6 +101,9 @@ public sealed class AccountsController : Controller
             var selectedWorkspaceServerPlane = selectedWorkspace is null
                 ? null
                 : _workspaceServerPlane.GetWorkspaceServerPlane(user, selectedWorkspace.WorkspaceId, installLinking);
+            var selectedWorkspaceRosterTransferPlan = selectedWorkspace is null
+                ? null
+                : _campaignSpine.GetRosterTransferPlan(user, selectedWorkspace.WorkspaceId, installLinking);
             var selectedWorkspacePrepLibrarySearch = selectedWorkspace is null || string.IsNullOrWhiteSpace(prepQuery)
                 ? null
                 : _workspaceServerPlane.GetWorkspacePrepLibrary(user, selectedWorkspace.WorkspaceId, installLinking, prepQuery);
@@ -125,6 +128,7 @@ public sealed class AccountsController : Controller
                 CampaignSpine: campaignSpine,
                 SelectedWorkspace: selectedWorkspace,
                 SelectedWorkspaceServerPlane: selectedWorkspaceServerPlane,
+                SelectedWorkspaceRosterTransferPlan: selectedWorkspaceRosterTransferPlan,
                 SelectedWorkspacePrepLibrarySearch: selectedWorkspacePrepLibrarySearch,
                 SelectedWorkspacePrepLibraryQuery: prepQuery,
                 SelectedRun: selectedRun,

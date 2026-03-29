@@ -91,7 +91,13 @@ public sealed class CampaignSpineService
                         Capabilities: group.Capabilities,
                         MemberCount: group.Memberships.Count,
                         ActiveCampaignCount: groupCampaigns.Count(item => string.Equals(item.Status, CampaignStatuses.Active, StringComparison.OrdinalIgnoreCase)),
-                        ActiveSponsorSessionCount: _store.SponsorSessionsById.Values.Count(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "stopped", StringComparison.OrdinalIgnoreCase)));
+                        ActiveSponsorSessionCount: _store.SponsorSessionsById.Values.Count(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "stopped", StringComparison.OrdinalIgnoreCase)),
+                        RecentRosterTransfers: transfers
+                            .Where(item =>
+                                string.Equals(item.SourceGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(item.TargetGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                            .Take(5)
+                            .ToArray());
                 })
                 .ToArray();
             var buildLabHandoffs = BuildBuildLabHandoffs(dossiers, workspaces, restore);
@@ -171,6 +177,87 @@ public sealed class CampaignSpineService
 
         return GetAccountSummary(user, installLinking).CreatorPublications
             .FirstOrDefault(item => string.Equals(item.PublicationId, publicationId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public RosterTransferPlannerProjection? GetRosterTransferPlan(HubUserDto user, string workspaceId, InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
+
+        AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
+        CampaignWorkspaceProjection? workspace = summary.Workspaces
+            .FirstOrDefault(item => string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase));
+        if (workspace is null)
+        {
+            return null;
+        }
+
+        IReadOnlyList<RunnerDossierProjection> workspaceDossiers = summary.Dossiers
+            .Where(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.RunnerHandle, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        lock (_store.Gate)
+        {
+            var sourceCampaign = _store.CampaignSpinesById.GetValueOrDefault(workspace.CampaignId);
+            var sourceGroup = sourceCampaign is null
+                ? null
+                : _store.GroupsById.GetValueOrDefault(sourceCampaign.GroupId);
+            if (sourceCampaign is null || sourceGroup is null)
+            {
+                return null;
+            }
+
+            var dossierOptions = workspaceDossiers
+                .Select(dossier =>
+                {
+                    var currentOwner = _store.UsersById.GetValueOrDefault(dossier.OwnerUserId);
+                    return new RosterTransferCandidateProjection(
+                        DossierId: dossier.DossierId,
+                        RunnerHandle: dossier.RunnerHandle,
+                        DisplayName: dossier.DisplayName,
+                        CurrentOwnerUserId: dossier.OwnerUserId,
+                        CurrentOwnerDisplayName: currentOwner?.DisplayName ?? dossier.OwnerUserId,
+                        CurrentCampaignId: sourceCampaign.CampaignId,
+                        CurrentCampaignName: sourceCampaign.Name);
+                })
+                .ToArray();
+
+            var targetGroups = _store.GroupsById.Values
+                .Where(group => CanManageRosterGroup(group, user.UserId))
+                .OrderBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new RosterTransferTargetGroupProjection(
+                    GroupId: group.GroupId,
+                    GroupName: group.Name,
+                    GroupType: group.GroupType,
+                    OperatorRole: ResolveOperatorRole(group, user.UserId),
+                    SuggestedCampaignTitle: ResolveSuggestedTransferCampaignTitleLocked(group),
+                    OwnerOptions: group.Memberships
+                        .OrderByDescending(member => OperatorRolePriority(member.Role))
+                        .ThenBy(member => _store.UsersById.GetValueOrDefault(member.UserId)?.DisplayName ?? member.UserId, StringComparer.OrdinalIgnoreCase)
+                        .Select(member =>
+                        {
+                            var memberUser = _store.UsersById.GetValueOrDefault(member.UserId);
+                            return new RosterTransferOwnerOptionProjection(
+                                UserId: member.UserId,
+                                DisplayName: memberUser?.DisplayName ?? member.UserId,
+                                Role: member.Role);
+                        })
+                        .DistinctBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase)
+                        .ToArray()))
+                .ToArray();
+
+            return new RosterTransferPlannerProjection(
+                WorkspaceId: workspace.WorkspaceId,
+                SourceGroupId: sourceGroup.GroupId,
+                SourceGroupName: sourceGroup.Name,
+                SourceCampaignId: sourceCampaign.CampaignId,
+                SourceCampaignName: sourceCampaign.Name,
+                Summary: "Move a governed dossier between rosters, campaigns, and owners without losing the same dossier id, continuity return, or explicit audit receipt.",
+                DossierOptions: dossierOptions,
+                TargetGroups: targetGroups);
+        }
     }
 
     public RosterTransferProjection TransferRoster(HubUserDto requester, RosterTransferRequest request)
@@ -454,6 +541,17 @@ public sealed class CampaignSpineService
                 string.Equals(member.UserId, userId, StringComparison.OrdinalIgnoreCase)
                 && IsOperatorRole(member.Role));
 
+    private string ResolveSuggestedTransferCampaignTitleLocked(GroupDto targetGroup)
+    {
+        var activeCampaign = _store.CampaignsById.Values
+            .Where(item => string.Equals(item.GroupId, targetGroup.GroupId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.Status, "active", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(static item => item.CreatedAtUtc)
+            .ThenBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+        return activeCampaign?.Title ?? $"{targetGroup.Name} transfer campaign";
+    }
+
     private BoostCampaignDto ResolveOrCreateTransferCampaignLocked(
         GroupDto targetGroup,
         string? targetCampaignId,
@@ -489,7 +587,7 @@ public sealed class CampaignSpineService
             GroupId: targetGroup.GroupId,
             ProjectId: "campaign-roster-transfer",
             Title: string.IsNullOrWhiteSpace(targetCampaignTitle)
-                ? $"{targetGroup.Name} transfer campaign"
+                ? ResolveSuggestedTransferCampaignTitleLocked(targetGroup)
                 : targetCampaignTitle.Trim(),
             Status: "active",
             CreatedAtUtc: now);
