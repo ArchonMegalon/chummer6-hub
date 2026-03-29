@@ -2211,6 +2211,7 @@ public sealed class CampaignSpineService
                     NextSafeAction: nextSafeAction,
                     CampaignReturnSummary: campaignReturnSummary,
                     SupportClosureSummary: supportClosureSummary,
+                    BuildHandoffId: leadHandoff?.HandoffId,
                     Watchouts: watchouts);
             })
             .Take(3)

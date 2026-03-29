@@ -501,6 +501,7 @@ public sealed record CreatorPublicationProjection(
     string? NextSafeAction = null,
     string? CampaignReturnSummary = null,
     string? SupportClosureSummary = null,
+    string? BuildHandoffId = null,
     IReadOnlyList<string>? Watchouts = null);
 
 public sealed record AccountCampaignSummary(
