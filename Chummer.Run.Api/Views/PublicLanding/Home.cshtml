@@ -29,6 +29,8 @@
     var restoreDevices = Model.CampaignSpine.Restore.ClaimedDevices.Take(1).ToArray();
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
+    var leadRosterTransfer = leadWorkspaceServerPlane?.RosterTransfers.FirstOrDefault();
+    var leadRosterAuditLine = leadRosterTransfer?.AuditLines.FirstOrDefault();
     var leadAftermathPackage = leadWorkspaceServerPlane?.AftermathPackages.FirstOrDefault();
     var leadAftermathShelfEntry = leadWorkspaceServerPlane?.RecapShelf
         .FirstOrDefault(item => string.Equals(item.EntryId, leadAftermathPackage?.PackageId, StringComparison.OrdinalIgnoreCase))
@@ -402,6 +404,25 @@
                                                             </p>
                                                         </div>
                                                         <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#aftermath-packages")">Open aftermath and return</a>
+                                                    </article>
+                                                }
+
+                                                @if (leadRosterTransfer is not null)
+                                                {
+                                                    <article class="app-rail__item">
+                                                        <span class="tag">Roster move</span>
+                                                        <div class="app-rail__copy">
+                                                            <h3>@leadRosterTransfer.RunnerHandle</h3>
+                                                            <p>
+                                                                @leadRosterTransfer.Summary
+                                                                <span> Target: @leadRosterTransfer.TargetCampaignName via @leadRosterTransfer.TargetGroupName.</span>
+                                                                @if (!string.IsNullOrWhiteSpace(leadRosterAuditLine))
+                                                                {
+                                                                    <span> Audit: @leadRosterAuditLine</span>
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <a class="inline-link" href="/account/work#community-ops">Open governed roster moves</a>
                                                     </article>
                                                 }
 
