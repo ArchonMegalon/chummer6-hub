@@ -367,6 +367,15 @@ public sealed record CampaignReadinessCue(
     string Title,
     string Summary);
 
+public sealed record CampaignMemoryProjection(
+    string MemoryId,
+    string Label,
+    string Summary,
+    string ReturnSummary,
+    string NextSafeAction,
+    IReadOnlyList<string> EvidenceLines,
+    DateTimeOffset UpdatedAtUtc);
+
 public sealed record WorkspaceChangePacketProjection(
     string PacketId,
     string Kind,
@@ -404,7 +413,8 @@ public sealed record CampaignWorkspaceProjection(
     IReadOnlyList<GovernedPrepLaunchProjection>? PrepLaunches = null,
     IReadOnlyList<TravelPrefetchReceiptProjection>? TravelPrefetches = null,
     IReadOnlyList<AftermathRecapPackageProjection>? AftermathPackages = null,
-    NextSessionCarryForwardProjection? NextSessionCarryForward = null);
+    NextSessionCarryForwardProjection? NextSessionCarryForward = null,
+    CampaignMemoryProjection? CampaignMemory = null);
 
 public sealed record CampaignWorkspaceDigestProjection(
     string WorkspaceId,
@@ -418,7 +428,8 @@ public sealed record CampaignWorkspaceDigestProjection(
     string NextSafeAction,
     IReadOnlyList<string> ReadinessHighlights,
     IReadOnlyList<string> Watchouts,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    CampaignMemoryProjection? CampaignMemory = null);
 
 public sealed record WorkspaceSummary(
     string WorkspaceId,

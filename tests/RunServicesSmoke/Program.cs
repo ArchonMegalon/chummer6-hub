@@ -1581,6 +1581,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Next-session carry-forward", StringComparison.Ordinal), "home work should surface a dedicated next-session carry-forward card backed by the shared workspace projection.");
     Assert(homeSource.Contains("@leadNextSessionCarryForward.Summary", StringComparison.Ordinal), "home work should surface the next-session carry-forward summary directly from the server plane.");
     Assert(homeSource.Contains("@leadNextSessionCarryForward.ReturnSummary", StringComparison.Ordinal), "home work should keep return-lane truth attached to the calmer next-session card.");
+    Assert(homeSource.Contains("Campaign memory", StringComparison.Ordinal), "home work should surface a dedicated campaign-memory card instead of leaving long-lived follow-through spread across unrelated cards.");
+    Assert(homeSource.Contains("@leadCampaignMemory.Summary", StringComparison.Ordinal), "home work should surface the shared campaign-memory summary directly from the server plane.");
+    Assert(homeSource.Contains("@workspace.CampaignMemory.Summary", StringComparison.Ordinal), "home work should surface campaign memory directly on the calmer shared campaign card when it exists.");
+    Assert(homeSource.Contains("Open campaign memory", StringComparison.Ordinal), "home work should keep a direct route into the bounded campaign-memory detail.");
     Assert(homeSource.Contains("@leadWorkspaceServerPlane.ChangePackets[0].Summary", StringComparison.Ordinal), "home work should surface the first server-plane change packet directly on the what-changed card.");
     Assert(homeSource.Contains("@leadWorkspaceServerPlane.NextSafeAction.Summary", StringComparison.Ordinal), "home work should surface the bounded next safe action directly on the what-changed card.");
     Assert(homeSource.Contains("Aftermath recap", StringComparison.Ordinal), "home work should surface a dedicated aftermath recap card instead of burying recap follow-through inside generic change text.");
@@ -1698,6 +1702,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("What changed for me", StringComparison.Ordinal), "account work should keep the explicit what-changed-for-me packet on the selected campaign card.");
     Assert(accountSource.Contains("Next-session carry-forward", StringComparison.Ordinal), "account work should surface the shared next-session carry-forward projection on both the selected card and the workspace detail drawer.");
     Assert(accountSource.Contains("@selectedWorkspaceNextSessionCarryForward.Summary", StringComparison.Ordinal), "account work should surface the selected workspace carry-forward summary directly from the shared server-plane projection.");
+    Assert(accountSource.Contains("Campaign memory", StringComparison.Ordinal), "account work should surface a first-class campaign-memory drawer on both selected and listed shared campaign views.");
+    Assert(accountSource.Contains("@selectedWorkspaceCampaignMemory.Summary", StringComparison.Ordinal), "account work should surface the selected workspace campaign-memory summary directly from the shared projection.");
+    Assert(accountSource.Contains("@workspace.CampaignMemory.Summary", StringComparison.Ordinal), "account work should surface campaign memory directly on the shared workspace list.");
     Assert(accountSource.Contains("@workspace.NextSessionCarryForward.Summary", StringComparison.Ordinal), "account work should surface next-session carry-forward directly on the shared workspace list.");
     Assert(accountSource.Contains("Downtime brief", StringComparison.Ordinal), "account work should surface downtime follow-through on both the selected workspace detail and the shared workspace list.");
     Assert(accountSource.Contains("@selectedWorkspaceDowntimePackage.Summary", StringComparison.Ordinal), "account work should surface the selected downtime brief summary directly from the shared server-plane projection.");
@@ -1957,6 +1964,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingModel.PrimaryHeroAction.Href.StartsWith("/signup?next=", StringComparison.Ordinal), "guest-gated primary CTA should route to signup through the install handoff.");
     Assert(string.Equals(landingModel.SecondaryHeroAction.Label, "See what works today", StringComparison.Ordinal), "landing page should keep the manifest-backed secondary CTA.");
     Assert(landingModel.TrustPulse is not null, "landing page should surface a compact weekly trust pulse on the front door.");
+    Assert(landingModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "landing page should surface who can get the recommended shelf now.");
+    Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("weekly snapshots", StringComparison.OrdinalIgnoreCase)), "landing page should surface measured adoption health on the trust pulse.");
     Assert(landingModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("current longest pole", StringComparison.OrdinalIgnoreCase)), "landing page should surface the current caution lane from the weekly trust pulse.");
     Assert(landingModel.Workflows.Any(static card => string.Equals(card.Action.Href, "/downloads", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
     Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Create account to get preview", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "landing page chrome should expose the release-aware signup CTA beside sign in");
@@ -2351,6 +2360,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspacePayload!.Consequences!.Any(item => string.Equals(item.Kind, "reputation", StringComparison.Ordinal) && item.Receipts.Count >= 1), "campaign spine workspace api should keep grounded reputation receipts attached.");
     Assert(workspacePayload.NextSessionCarryForward is not null, "campaign spine workspace api should expose a first-class next-session carry-forward projection.");
     Assert(workspacePayload.NextSessionCarryForward!.EvidenceLines.Count >= 1, "campaign spine workspace api should attach bounded next-session evidence lines.");
+    Assert(workspacePayload.CampaignMemory is not null, "campaign spine workspace api should expose a first-class campaign-memory projection.");
+    Assert(workspacePayload.CampaignMemory!.EvidenceLines.Count >= 1, "campaign spine workspace api should attach bounded campaign-memory evidence lines.");
     Assert(!string.IsNullOrWhiteSpace(workspacePayload?.ActiveSceneSummary), "campaign spine workspace api should expose an active-scene summary.");
     Assert(!string.IsNullOrWhiteSpace(workspacePayload?.NextSafeAction), "campaign spine workspace api should expose a next safe action.");
     Assert(workspacePayload?.ChangePackets?.Count >= 1, "campaign spine workspace api should expose recent change packets.");
@@ -2362,6 +2373,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(leadWorkspaceDigest.ReadinessHighlights.Count >= 1, "campaign spine workspace digests should preserve readiness highlights.");
     Assert(!string.IsNullOrWhiteSpace(leadWorkspaceDigest.SupportClosureSummary), "campaign spine workspace digests should preserve support-closure truth.");
     Assert(!string.IsNullOrWhiteSpace(leadWorkspaceDigest.RuleEnvironmentSummary), "campaign spine workspace digests should preserve rule-environment truth.");
+    Assert(leadWorkspaceDigest.CampaignMemory is not null, "campaign spine workspace digests should preserve the calmer campaign-memory summary.");
+    Assert(leadWorkspaceDigest.CampaignMemory!.EvidenceLines.Count >= 1, "campaign spine workspace digests should preserve bounded campaign-memory evidence.");
     var workspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
     var workspaceServerPlanePayload = (workspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? workspaceServerPlaneResult.Value;
     Assert(workspaceServerPlanePayload is not null && string.Equals(workspaceServerPlanePayload.Workspace.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine server plane api should expose the same stable workspace id.");
@@ -2373,6 +2386,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.Consequences.Any(item => string.Equals(item.Kind, "faction", StringComparison.Ordinal) && item.Receipts.Count >= 1), "campaign spine server plane api should keep grounded faction receipts visible.");
     Assert(workspaceServerPlanePayload.NextSessionCarryForward is not null, "campaign spine server plane api should expose the bounded next-session carry-forward projection.");
     Assert(workspaceServerPlanePayload.NextSessionCarryForward!.EvidenceLines.Count >= 1, "campaign spine server plane api should attach bounded next-session evidence lines.");
+    Assert(workspaceServerPlanePayload.CampaignMemory is not null, "campaign spine server plane api should expose the bounded campaign-memory projection.");
+    Assert(workspaceServerPlanePayload.CampaignMemory!.EvidenceLines.Count >= 1, "campaign spine server plane api should attach bounded campaign-memory evidence.");
     Assert(workspaceServerPlanePayload.SupportClosures.Count >= 1, "campaign spine server plane api should expose install-aware support closure cues.");
     Assert(workspaceServerPlanePayload.DecisionNotices.Count >= 1, "campaign spine server plane api should expose bounded follow-through notices.");
     Assert(workspaceServerPlanePayload.CampaignSummary.RestoreSummary.Contains("Prefetch inventory:", StringComparison.Ordinal), "campaign spine server plane api should make restore prefetch inventory explicit.");
@@ -2460,6 +2475,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, downtimeBriefPayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project downtime brief packets after generation.");
     Assert(refreshedWorkspaceServerPlanePayload?.NextSessionCarryForward is not null, "campaign spine server plane api should refresh the next-session carry-forward packet after the governed actions land.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the next-session carry-forward packet on the bounded what-changed rail.");
+    Assert(refreshedWorkspaceServerPlanePayload?.CampaignMemory is not null, "campaign spine server plane api should refresh campaign memory after governed follow-through lands.");
+    Assert(refreshedWorkspaceServerPlanePayload?.CampaignMemory?.Summary.Contains("governed memory lane", StringComparison.OrdinalIgnoreCase) == true, "campaign spine server plane api should keep the long-lived campaign-memory summary explicit after governed follow-through lands.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
@@ -2508,6 +2525,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedDownloadsModel?.TrustPulse is not null, "downloads should surface the weekly public trust pulse next to the release shelf.");
     Assert(string.Equals(authenticatedDownloadsModel!.SignedInStatus!.Heading, "Update your linked install", StringComparison.Ordinal), "signed-in downloads should tell the reporter to update the linked install before verification when the fix is on a newer build.");
     Assert(authenticatedDownloadsModel.SignedInStatus.Summary.Contains("preview 0.6.3-smoke", StringComparison.Ordinal), "signed-in downloads should project the exact reporter-ready build in the trust panel.");
+    Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "downloads should explain the current access posture beside the release shelf.");
+    Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof passed", StringComparison.Ordinal)), "downloads should surface current adoption evidence beside the release shelf.");
     Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("current longest pole", StringComparison.OrdinalIgnoreCase)), "downloads should surface the weekly caution lane from the trust pulse.");
     var authenticatedHelpPage = await authenticatedLandingController.HelpPage(CancellationToken.None) as ViewResult;
     var authenticatedHelpModel = authenticatedHelpPage?.Model as TrustPageViewModel;
@@ -2679,6 +2698,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane is not null, "account workspace detail route should project the bounded workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspace?.NextSessionCarryForward is not null, "account workspace detail route should keep the shared next-session carry-forward projection attached to the selected workspace.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.NextSessionCarryForward is not null, "account workspace detail route should project the next-session carry-forward packet through the workspace server plane.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspace?.CampaignMemory is not null, "account workspace detail route should keep the shared campaign-memory projection attached to the selected workspace.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.CampaignMemory is not null, "account workspace detail route should project the bounded campaign-memory packet through the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.SupportClosures.Count >= 1, "account workspace detail route should expose support-closure cues from the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.DecisionNotices.Count >= 1, "account workspace detail route should expose bounded decision notices from the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RuleEnvironmentHealth.Count >= 1, "account workspace detail route should expose rule-environment health cues from the workspace server plane.");
@@ -2731,6 +2752,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.Runs.Count >= 1, "signed-in home should surface runboard continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Count >= 1, "signed-in home should keep the first-class campaign workspace attached to the signed-in shell.");
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces[0].Consequences?.Count >= 4, "signed-in home should keep governed faction, heat, contact, and reputation consequences attached to the shared campaign view.");
+    Assert(authenticatedHomeModel.CampaignSpine.Workspaces[0].CampaignMemory is not null, "signed-in home should keep the shared campaign-memory projection attached to the shared campaign view.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "signed-in home should keep the active-scene summary attached to the shared campaign view.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].NextSafeAction), "signed-in home should keep the workspace next safe action attached to the shared campaign view.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane is not null, "signed-in home should receive the bounded lead workspace server plane.");
@@ -2741,6 +2763,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount >= 1, "signed-in home should surface safehouse/travel readiness on the home cockpit.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.TravelPrefetches.Any(item => string.Equals(item.ReceiptId, travelPrefetchPayload!.ReceiptId, StringComparison.Ordinal)) == true, "signed-in home should surface the latest staged travel-prefetch receipt on the same workspace spine.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "signed-in home should surface the latest aftermath recap package on the same workspace spine.");
+    Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.CampaignMemory is not null, "signed-in home should surface the bounded campaign-memory projection on the same workspace spine.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.Consequences.Count >= 1, "signed-in home should keep governed consequence follow-through visible on the same workspace spine.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations.Count >= 1, "signed-in home should surface organizer/operator posture on the same account backbone.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].CampaignVisibilitySummary), "signed-in home should keep campaign visibility posture visible for the lead operator group.");
@@ -2808,6 +2831,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "home work route should keep bounded prep-carrying travel inventory visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep aftermath recap packages visible on the lead workspace spine.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.Consequences.Count >= 1, "home work route should keep governed consequence follow-through visible on the lead workspace spine.");
+    Assert(workHomeModel?.LeadWorkspaceServerPlane?.CampaignMemory is not null, "home work route should keep the bounded campaign-memory projection visible on the lead workspace spine.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the aftermath package attached to the bounded return shelf.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary), "home work route should keep publication trust visible on the shared home projection.");
@@ -3002,6 +3026,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(unavailableNowModel?.Chrome.Authenticated == true, "current-release chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
     Assert(unavailableNowModel?.SignedInStatus is null, "current-release projection should suppress install-specific trust status when identity is temporarily unavailable.");
     Assert(unavailableNowModel?.TrustPulse is not null, "current-release should keep the public trust pulse even when identity lookups are temporarily unavailable.");
+    Assert(unavailableNowModel!.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal)), "current-release should keep adoption health visible even when signed-in install lookups are temporarily unavailable.");
     var unavailableDownloadsView = await unavailableLandingController.DownloadsPage(CancellationToken.None) as ViewResult;
     var unavailableDownloadsModel = unavailableDownloadsView?.Model as DownloadsPageViewModel;
     Assert(unavailableDownloadsModel?.Chrome.Authenticated == true, "downloads chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");

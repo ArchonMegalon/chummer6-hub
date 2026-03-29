@@ -66,6 +66,8 @@
         ?? leadWorkspaceServerPlane?.RecapShelf.FirstOrDefault();
     var leadAftermathEvidence = leadAftermathPackage?.EvidenceLines.FirstOrDefault();
     var leadDowntimeEvidence = leadDowntimePackage?.EvidenceLines.FirstOrDefault();
+    var leadCampaignMemory = leadWorkspaceServerPlane?.CampaignMemory;
+    var leadCampaignMemoryEvidence = leadCampaignMemory?.EvidenceLines.FirstOrDefault();
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
     var releasedOrNotifiedCases = Model.SupportCaseSummaries
         .Where(item =>
@@ -373,6 +375,10 @@
                                                             {
                                                                 <span> Carry-forward: @workspace.NextSessionCarryForward.Summary</span>
                                                             }
+                                                            else if (workspace.CampaignMemory is not null)
+                                                            {
+                                                                <span> Memory: @workspace.CampaignMemory.Summary</span>
+                                                            }
                                                             else if (workspace.Consequences is { Count: > 0 })
                                                             {
                                                                 <span> Consequence: @workspace.Consequences[0].Label is @workspace.Consequences[0].State.</span>
@@ -516,6 +522,26 @@
                                                             </p>
                                                         </div>
                                                         <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-downtime-brief")">Open downtime brief</a>
+                                                    </article>
+                                                }
+
+                                                @if (leadCampaignMemory is not null)
+                                                {
+                                                    <article class="app-rail__item">
+                                                        <span class="tag">Campaign memory</span>
+                                                        <div class="app-rail__copy">
+                                                            <h3>@leadCampaignMemory.Label</h3>
+                                                            <p>
+                                                                @leadCampaignMemory.Summary
+                                                                <span> Return: @leadCampaignMemory.ReturnSummary</span>
+                                                                <span> Next: @leadCampaignMemory.NextSafeAction</span>
+                                                                @if (!string.IsNullOrWhiteSpace(leadCampaignMemoryEvidence))
+                                                                {
+                                                                    <span> Evidence: @leadCampaignMemoryEvidence</span>
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-campaign-memory")">Open campaign memory</a>
                                                     </article>
                                                 }
 

@@ -81,6 +81,8 @@
         .FirstOrDefault(item => !string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
     var selectedWorkspaceDowntimePackage = selectedWorkspaceAftermathPackages
         .FirstOrDefault(item => string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
+    var selectedWorkspaceCampaignMemory = selectedWorkspaceServerPlane?.CampaignMemory ?? selectedWorkspace?.CampaignMemory;
+    var selectedWorkspaceCampaignMemoryEvidence = selectedWorkspaceCampaignMemory?.EvidenceLines.FirstOrDefault();
     var selectedRun = Model.SelectedRun;
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
@@ -874,6 +876,10 @@
                             {
                                 <p><strong>Next-session carry-forward:</strong> @selectedWorkspaceNextSessionCarryForward.Summary</p>
                             }
+                            @if (selectedWorkspaceCampaignMemory is not null)
+                            {
+                                <p><strong>Campaign memory:</strong> @selectedWorkspaceCampaignMemory.Summary</p>
+                            }
                             @if (selectedWorkspace.ChangePackets is { Count: > 0 })
                             {
                                 <p><strong>Recent change:</strong> @selectedWorkspace.ChangePackets[0].Label — @selectedWorkspace.ChangePackets[0].Summary</p>
@@ -915,6 +921,10 @@
                                     <div class="settings-summary-row">
                                         <span>Next-session carry-forward</span>
                                         <strong>@(selectedWorkspaceNextSessionCarryForward is null ? "Pending" : $"{selectedWorkspaceNextSessionCarryForward.Label} · {selectedWorkspaceNextSessionCarryForward.Summary}")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Campaign memory</span>
+                                        <strong>@(selectedWorkspaceCampaignMemory is null ? "Pending" : selectedWorkspaceCampaignMemory.Summary)</strong>
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Recent change</span>
@@ -970,6 +980,40 @@
                                     </ul>
                                 }
                             </details>
+
+                            @if (selectedWorkspaceCampaignMemory is not null)
+                            {
+                                <details id="selected-campaign-memory" class="details-drawer" open>
+                                    <summary>Campaign memory</summary>
+                                    <div class="settings-summary-list">
+                                        <div class="settings-summary-row">
+                                            <span>Memory summary</span>
+                                            <strong>@selectedWorkspaceCampaignMemory.Summary</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Return lane</span>
+                                            <strong>@selectedWorkspaceCampaignMemory.ReturnSummary</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Next step</span>
+                                            <strong>@selectedWorkspaceCampaignMemory.NextSafeAction</strong>
+                                        </div>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(selectedWorkspaceCampaignMemoryEvidence))
+                                    {
+                                        <p><strong>Lead evidence:</strong> @selectedWorkspaceCampaignMemoryEvidence</p>
+                                    }
+                                    @if (selectedWorkspaceCampaignMemory.EvidenceLines.Count > 0)
+                                    {
+                                        <ul class="muted-copy">
+                                            @foreach (var evidence in selectedWorkspaceCampaignMemory.EvidenceLines)
+                                            {
+                                                <li>@evidence</li>
+                                            }
+                                        </ul>
+                                    }
+                                </details>
+                            }
 
                             @if (selectedWorkspaceNextSessionCarryForward is not null)
                             {
@@ -1624,6 +1668,10 @@
                                     <strong>@(workspace.NextSessionCarryForward is null ? "Pending" : workspace.NextSessionCarryForward.Summary)</strong>
                                 </div>
                                 <div class="settings-summary-row">
+                                    <span>Campaign memory</span>
+                                    <strong>@(workspace.CampaignMemory is null ? "Pending" : workspace.CampaignMemory.Summary)</strong>
+                                </div>
+                                <div class="settings-summary-row">
                                     <span>Recent recap</span>
                                     <strong>@(workspace.RecapShelf.Count == 0 ? "Pending" : $"{workspace.RecapShelf.Count} ready")</strong>
                                 </div>
@@ -1756,6 +1804,22 @@
                                         @if (workspace.NextSessionCarryForward.EvidenceLines.Count > 0)
                                         {
                                             <li><strong>Evidence:</strong> @workspace.NextSessionCarryForward.EvidenceLines[0]</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+
+                            @if (workspace.CampaignMemory is not null)
+                            {
+                                <details class="details-drawer">
+                                    <summary>Campaign memory</summary>
+                                    <ul class="muted-copy">
+                                        <li><strong>Summary:</strong> @workspace.CampaignMemory.Summary</li>
+                                        <li><strong>Return:</strong> @workspace.CampaignMemory.ReturnSummary</li>
+                                        <li><strong>Next:</strong> @workspace.CampaignMemory.NextSafeAction</li>
+                                        @if (workspace.CampaignMemory.EvidenceLines.Count > 0)
+                                        {
+                                            <li><strong>Evidence:</strong> @workspace.CampaignMemory.EvidenceLines[0]</li>
                                         }
                                     </ul>
                                 </details>

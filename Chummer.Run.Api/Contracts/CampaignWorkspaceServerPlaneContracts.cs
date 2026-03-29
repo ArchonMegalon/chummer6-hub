@@ -25,6 +25,7 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     TravelModeReadinessSummary TravelMode,
     IReadOnlyList<TravelPrefetchReceiptProjection> TravelPrefetches,
     IReadOnlyList<AftermathRecapPackageProjection> AftermathPackages,
+    CampaignMemoryProjection? CampaignMemory,
     NextSessionCarryForwardProjection? NextSessionCarryForward,
     NextSafeActionCue NextSafeAction,
     DateTimeOffset GeneratedAtUtc);
