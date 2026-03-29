@@ -108,6 +108,16 @@ public sealed class CampaignSpineService
                         .ThenByDescending(static workspace => workspace.RosterTransfers?.Count ?? 0)
                         .ThenBy(static workspace => workspace.CampaignName, StringComparer.OrdinalIgnoreCase)
                         .ToArray();
+                    var recentJoinCodes = BuildGroupRecentJoinCodes(_store.JoinCodesByValue.Values, group.GroupId, now);
+                    var recentBoostCodes = BuildGroupRecentBoostCodes(_store.BoostCodesByValue.Values, groupCampaigns, group.GroupId);
+                    var recentSponsorSessions = BuildGroupRecentSponsorSessions(_store.SponsorSessionsById.Values, _store.UsersById, groupCampaigns, group.GroupId);
+                    var seasonBoardEntries = BuildGroupSeasonBoardEntries(groupWorkspaces);
+                    var recentRosterTransfers = transfers
+                        .Where(item =>
+                            string.Equals(item.SourceGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(item.TargetGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                        .Take(5)
+                        .ToArray();
                     return new CommunityOperatorProjection(
                         GroupId: group.GroupId,
                         GroupName: group.Name,
@@ -122,6 +132,7 @@ public sealed class CampaignSpineService
                         ActiveCampaignCount: groupCampaigns.Count(item => string.Equals(item.Status, CampaignStatuses.Active, StringComparison.OrdinalIgnoreCase)),
                         ActiveSponsorSessionCount: _store.SponsorSessionsById.Values.Count(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "stopped", StringComparison.OrdinalIgnoreCase)),
                         OperationsSummary: ResolveGroupOperationsSummary(group, groupCampaigns, groupWorkspaces),
+                        LeagueOperationsSummary: ResolveGroupLeagueOperationsSummary(group, groupCampaigns, groupWorkspaces, recentSponsorSessions, recentJoinCodes, recentBoostCodes, recentRosterTransfers),
                         CampaignReturnSummary: ResolveGroupCampaignReturnSummary(group, groupWorkspaces),
                         SeasonEventSummary: ResolveGroupSeasonEventSummary(group, groupCampaigns, groupWorkspaces),
                         RecentReturnSummaries: groupWorkspaces
@@ -130,17 +141,13 @@ public sealed class CampaignSpineService
                             .ToArray(),
                         RecentEventSummaries: BuildGroupRecentEventSummaries(groupWorkspaces),
                         InviteCampaigns: BuildGroupInviteCampaigns(groupCampaigns),
-                        RecentJoinCodes: BuildGroupRecentJoinCodes(_store.JoinCodesByValue.Values, group.GroupId, now),
-                        RecentBoostCodes: BuildGroupRecentBoostCodes(_store.BoostCodesByValue.Values, groupCampaigns, group.GroupId),
-                        RecentSponsorSessions: BuildGroupRecentSponsorSessions(_store.SponsorSessionsById.Values, _store.UsersById, groupCampaigns, group.GroupId),
-                        SeasonBoardEntries: BuildGroupSeasonBoardEntries(groupWorkspaces),
+                        RecentJoinCodes: recentJoinCodes,
+                        RecentBoostCodes: recentBoostCodes,
+                        RecentSponsorSessions: recentSponsorSessions,
+                        RecentLeagueAuditLines: BuildGroupRecentLeagueAuditLines(recentSponsorSessions, recentJoinCodes, recentBoostCodes, seasonBoardEntries, recentRosterTransfers),
+                        SeasonBoardEntries: seasonBoardEntries,
                         Watchouts: BuildGroupOperatorWatchouts(groupWorkspaces),
-                        RecentRosterTransfers: transfers
-                            .Where(item =>
-                                string.Equals(item.SourceGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
-                                || string.Equals(item.TargetGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
-                            .Take(5)
-                            .ToArray());
+                        RecentRosterTransfers: recentRosterTransfers);
                 })
                 .OrderByDescending(static operation => ResolveCommunityOperatorFreshnessUtc(operation))
                 .ThenByDescending(static operation => ResolveCommunityOperatorActivityBreadth(operation))
@@ -1636,6 +1643,33 @@ public sealed class CampaignSpineService
         return $"{groupCampaigns.Count} governed campaign(s), {crewCount} crew(s), and {dossierCount} dossier(s) stay on one operator surface.";
     }
 
+    private static string ResolveGroupLeagueOperationsSummary(
+        GroupDto group,
+        IReadOnlyList<CampaignProjection> groupCampaigns,
+        IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces,
+        IReadOnlyList<CommunitySponsorSessionProjection> recentSponsorSessions,
+        IReadOnlyList<CommunityJoinCodeProjection> recentJoinCodes,
+        IReadOnlyList<CommunityBoostCodeProjection> recentBoostCodes,
+        IReadOnlyList<RosterTransferProjection> recentRosterTransfers)
+    {
+        if (groupCampaigns.Count == 0 || groupWorkspaces.Count == 0)
+        {
+            return $"{group.Name} does not have a governed league or season lane yet.";
+        }
+
+        string laneLabel = groupCampaigns.Count > 1 ? "league / season lane" : "event lane";
+        string sponsorSummary = recentSponsorSessions.Count == 0
+            ? "sponsor seats are quiet"
+            : $"{recentSponsorSessions.Count} sponsor seat(s) are actively tracked";
+        string inviteSummary = recentJoinCodes.Count == 0 && recentBoostCodes.Count == 0
+            ? "invite issuance is quiet"
+            : $"{recentJoinCodes.Count} join code(s) and {recentBoostCodes.Count} sponsor code(s) are still governed here";
+        string transferSummary = recentRosterTransfers.Count == 0
+            ? "no fresh roster handoff is pending"
+            : $"{recentRosterTransfers.Count} roster move(s) remain auditable";
+        return $"{groupCampaigns.Count} governed campaign lane(s) keep the {laneLabel} on the same account/control backbone; {sponsorSummary}, {inviteSummary}, and {transferSummary}.";
+    }
+
     private static string ResolveGroupCampaignReturnSummary(
         GroupDto group,
         IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
@@ -1718,6 +1752,47 @@ public sealed class CampaignSpineService
             .Select(static item => item.Summary)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<string> BuildGroupRecentLeagueAuditLines(
+        IReadOnlyList<CommunitySponsorSessionProjection> recentSponsorSessions,
+        IReadOnlyList<CommunityJoinCodeProjection> recentJoinCodes,
+        IReadOnlyList<CommunityBoostCodeProjection> recentBoostCodes,
+        IReadOnlyList<CommunitySeasonBoardEntryProjection> seasonBoardEntries,
+        IReadOnlyList<RosterTransferProjection> recentRosterTransfers)
+    {
+        List<(DateTimeOffset UpdatedAtUtc, string Summary)> lines = [];
+        foreach (var entry in seasonBoardEntries)
+        {
+            lines.Add((entry.UpdatedAtUtc, $"{entry.CampaignName}: {entry.RunTitle} · {entry.LatestEventSummary} Next: {entry.NextSafeAction}"));
+        }
+
+        foreach (var sponsorSession in recentSponsorSessions)
+        {
+            lines.Add((sponsorSession.UpdatedAtUtc, $"{sponsorSession.UserDisplayName}: {sponsorSession.CampaignName} · {sponsorSession.StatusSummary}"));
+        }
+
+        foreach (var joinCode in recentJoinCodes)
+        {
+            lines.Add((joinCode.CreatedAtUtc, $"{joinCode.Code}: member entry · {joinCode.StatusSummary}"));
+        }
+
+        foreach (var boostCode in recentBoostCodes)
+        {
+            lines.Add(((boostCode.RedeemedAtUtc ?? boostCode.CreatedAtUtc), $"{boostCode.Code}: sponsorship entry · {boostCode.StatusSummary}"));
+        }
+
+        foreach (var transfer in recentRosterTransfers)
+        {
+            lines.Add((transfer.TransferredAtUtc, $"{transfer.RunnerHandle}: {transfer.Summary}"));
+        }
+
+        return lines
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .Select(static item => item.Summary)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(6)
             .ToArray();
     }
 

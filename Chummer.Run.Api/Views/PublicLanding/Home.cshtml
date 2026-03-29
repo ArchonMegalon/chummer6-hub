@@ -35,6 +35,9 @@
     var leadCommunityBoardHref = leadCommunityOperation is null
         ? "/account/work#community-ops"
         : $"/account/work#community-op-board-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
+    var leadCommunityLeagueHref = leadCommunityOperation is null
+        ? "/account/work#community-ops"
+        : $"/account/work#community-op-league-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadCommunityInviteHref = leadCommunityOperation is null
         ? "/account/work#community-ops"
         : $"/account/work#community-op-invites-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
@@ -574,6 +577,7 @@
                                                                 {
                                                                     <span> Board: @leadCommunityBoard.CampaignName via @leadCommunityBoard.RunTitle. Next: @leadCommunityBoard.NextSafeAction</span>
                                                                 }
+                                                                <span> League: @leadCommunityOperation.LeagueOperationsSummary</span>
                                                                 <span> Invites: @(leadCommunityOperation.RecentJoinCodes.Count == 0 && leadCommunityOperation.RecentBoostCodes.Count == 0 ? "issue member and sponsor entry from one governed rail." : $"{leadCommunityOperation.RecentJoinCodes.Count} join code(s) and {leadCommunityOperation.RecentBoostCodes.Count} sponsor code(s) stay on the same rail.")</span>
                                                                 @if (leadCommunitySponsorSession is not null)
                                                                 {
@@ -591,6 +595,7 @@
                                                             </p>
                                                         </div>
                                                         <div class="stacked-actions">
+                                                            <a class="inline-link" href="@leadCommunityLeagueHref">Open league rail</a>
                                                             <a class="inline-link" href="@leadCommunityBoardHref">Open season board</a>
                                                             <a class="inline-link" href="@leadCommunityInviteHref">Open invite rail</a>
                                                             <a class="inline-link" href="@leadCommunitySponsorHref">Open sponsor rail</a>
