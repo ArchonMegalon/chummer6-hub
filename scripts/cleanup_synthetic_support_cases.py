@@ -16,14 +16,17 @@ TERMINAL_STATUSES = {"deferred", "rejected", "user_notified"}
 SYNTHETIC_TITLES = {
     "Guest support intake smoke",
     "Playwright support case",
+    "Live audit support verification case",
 }
 SYNTHETIC_SUMMARIES = {
     "Guest support submission should land on the first-party confirmation page.",
     "Tracked support submission with attachment",
+    "Signed-in live audit is verifying the assistant-led fix verification lane.",
 }
 SYNTHETIC_DETAIL_PREFIXES = (
     "Browser harness is validating the public support intake route",
     "Browser harness is validating tracked support submission",
+    "Signed-in live audit is verifying the assistant-led fix verification lane on the rebuilt local edge.",
 )
 
 
@@ -124,9 +127,6 @@ def main(argv: List[str] | None = None) -> int:
         status = _normalize_text(item.get("status")).lower()
         if status in TERMINAL_STATUSES:
             already_terminal.append(case_id)
-            continue
-        if status == "released_to_reporter_channel":
-            skipped.append(case_id)
             continue
         transition_url = f"{base_url}/api/v1/support/cases/{urllib.parse.quote(case_id, safe='')}/transition"
         _request_json(
