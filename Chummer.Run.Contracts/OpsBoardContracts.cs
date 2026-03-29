@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Chummer.Contracts.Hub;
 using Chummer.Play.Contracts.Spider;
 
 namespace Chummer.Run.Contracts.Ops;
@@ -90,6 +91,17 @@ public sealed record GmPrepAssetCreateRequest(
     IReadOnlyList<GmPrepChecklistItem>? ChecklistItems = null,
     IReadOnlyList<string>? SourceEventIds = null,
     bool Reusable = true,
+    string? CreatedBy = null,
+    string? RuntimeFingerprint = null);
+
+public sealed record GmPrepAssetCatalogImportRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string CampaignId,
+    [StringLength(128)] string? SessionId,
+    [StringLength(128)] string? SceneId,
+    [Required] HubProjectDetailProjection Project,
+    GmPrepAssetAudience Audience = GmPrepAssetAudience.GameMaster,
+    bool Reusable = true,
+    IReadOnlyList<string>? AdditionalTags = null,
     string? CreatedBy = null,
     string? RuntimeFingerprint = null);
 

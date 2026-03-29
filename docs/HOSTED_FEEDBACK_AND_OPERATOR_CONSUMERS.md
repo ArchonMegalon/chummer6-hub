@@ -6,10 +6,11 @@ Purpose: keep feedback loops and operator boards bounded as advisory, receipt-be
 
 - artifact and publisher/player feedback enters through registry-owned review surfaces: `HubRegistryController.AddReview`, `PublicationsController.Review`, `PublicationsController.Moderate`
 - hosted approval-aware delivery feedback enters through `SpiderController.QueueManual`, `SpiderController.ExecuteAction`, and `DeliveryOutboxService.RecordAction`
-- GM prep and reveal feedback enters through `GmOpsBoardController.UpdateChecklist`, `GmOpsBoardController.Reveal`, and `GmOpsBoardService.GetProjection`
+- GM prep import, checklist feedback, and reveal feedback enters through `GmOpsBoardController.CreatePrepAssetFromProject`, `GmOpsBoardController.UpdateChecklist`, `GmOpsBoardController.Reveal`, and `GmOpsBoardService.GetProjection`
 
 ## Operator consumer surfaces
 
+- governed packet-to-prep binding: `GmOpsBoardController.CreatePrepAssetFromProject`
 - session/operator board projection: `GmOpsBoardController.GetProjection`
 - hosted pipeline projection: `PipelineObservabilityController.GetProjection`
 - registry/operator read models stay in the owner repo: `HubRegistryController.ListProjections`, `HubRegistryController.GetPipelineProjection`, `PublicationsController.List`
@@ -23,7 +24,7 @@ Purpose: keep feedback loops and operator boards bounded as advisory, receipt-be
 
 ## Verification path
 
-- `tests/RunServicesVerification/GmOpsBoardVerification.cs` proves ops-board projection and approval-aware reveal behavior
+- `tests/RunServicesVerification/GmOpsBoardVerification.cs` proves ops-board projection, governed packet binding, search, and approval-aware reveal behavior
 - `tests/RunServicesVerification/PublicationVerification.cs` proves publication review/moderation receipts
 - `tests/RunServicesVerification/PipelineProjectionVerification.cs` proves operator pipeline projections
 - `tests/RunServicesVerification/HubExtractionReadinessVerification.cs` asserts the consumer-rule seams and sibling registry ownership references

@@ -1,3 +1,4 @@
+using Chummer.Contracts.Hub;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
@@ -3225,12 +3226,55 @@ async Task VerifyGmOpsBoardWorkflowAsync()
         RuntimeFingerprint: "ops-fingerprint"));
     var reusableNote = (reusableNoteCreate.Result as CreatedAtActionResult)?.Value as GmPrepAssetRecord;
     Assert(reusableNote is not null, "ops-board should create reusable campaign prep assets");
+    var governedPacketCreate = controller.CreatePrepAssetFromProject(new GmPrepAssetCatalogImportRequest(
+        CampaignId: "campaign_smoke",
+        SessionId: "session_ops_smoke",
+        SceneId: "scene_smoke",
+        Project: new HubProjectDetailProjection(
+            Summary: new HubCatalogItem(
+                ItemId: "renraku-checkpoint",
+                Kind: HubCatalogItemKinds.EncounterPack,
+                Title: "Renraku checkpoint",
+                Description: "Checkpoint packet with scanner pressure and red samurai presence.",
+                RulesetId: "sr5",
+                Visibility: "public",
+                TrustTier: "verified",
+                LinkTarget: "/hub/encounters/renraku-checkpoint",
+                Version: "1.0.0"),
+            OwnerId: "hub:default",
+            CatalogKind: "npc-vault",
+            PublicationStatus: "published",
+            ReviewState: "approved",
+            RuntimeFingerprint: "npcvault:renraku-checkpoint:v1",
+            OwnerReview: null,
+            AggregateReview: null,
+            Facts:
+            [
+                new HubProjectDetailFact("threat", "Threat", "High"),
+                new HubProjectDetailFact("scene", "Scene posture", "Checkpoint 12 lockdown with scanner coverage")
+            ],
+            Dependencies:
+            [
+                new HubProjectDependency(HubProjectDependencyKinds.IncludesNpcEntry, HubCatalogItemKinds.NpcEntry, "red-samurai", "1.0.0", "lead"),
+                new HubProjectDependency(HubProjectDependencyKinds.IncludesNpcEntry, HubCatalogItemKinds.NpcEntry, "renraku-spider", "1.0.0", "matrix-support")
+            ],
+            Actions:
+            [
+                new HubProjectAction("clone-encounter-pack", "Clone to Library", HubProjectActionKinds.CloneToLibrary),
+                new HubProjectAction("open-encounter-pack", "Open Registry Entry", HubProjectActionKinds.OpenRegistry)
+            ]),
+        AdditionalTags: ["opposition", "packet"],
+        CreatedBy: "gm.smoke",
+        RuntimeFingerprint: "ops-smoke")).Result as CreatedAtActionResult;
+    var governedPacket = NotNull(governedPacketCreate?.Value as GmPrepAssetRecord, "ops-board should bind governed encounter packets into campaign prep assets");
+    Assert(governedPacket.Tags.Contains(HubCatalogItemKinds.EncounterPack, StringComparer.OrdinalIgnoreCase), "governed prep bindings should keep the source packet kind as a tag");
+    Assert(governedPacket.Body.Contains("red-samurai", StringComparison.OrdinalIgnoreCase), "governed prep bindings should preserve dependency truth from the imported encounter packet");
 
     var projection = controller.GetProjection("session_ops_smoke", "scene_smoke", "scene_smoke:r2").Result as OkObjectResult;
     var projectionPayload = projection?.Value as OpsBoardProjection;
     Assert(projectionPayload?.RecentEvents.Count == 2, "ops-board projection should include recent session events");
     Assert(projectionPayload?.UnresolvedItems.Count == 2, "ops-board projection should surface unresolved and heat items");
-    Assert(projectionPayload?.PrepAssets.Count == 2, "ops-board projection should include prep assets for the scene");
+    Assert(projectionPayload?.PrepAssets.Count == 3, "ops-board projection should include prep assets for the scene, including governed packet bindings");
 
     var checklistUpdate = controller.UpdateChecklist(
         checklistCreated!.AssetId,
@@ -3274,7 +3318,7 @@ async Task VerifyGmOpsBoardWorkflowAsync()
         kind: null,
         includeReusableCampaignAssets: true).Result as OkObjectResult;
     var listPayload = list?.Value as GmPrepAssetListResponse;
-    Assert(listPayload?.TotalCount == 3, "ops-board list endpoint should optionally include reusable campaign prep assets");
+    Assert(listPayload?.TotalCount == 4, "ops-board list endpoint should optionally include reusable campaign prep assets alongside governed packet bindings");
     Assert(listPayload?.Items.Any(item => item.AssetId == reusableNote!.AssetId) == true, "ops-board list endpoint should surface reusable campaign prep assets when requested");
 
     var libraryQuery = controller.ListPrepAssets(
@@ -3298,6 +3342,17 @@ async Task VerifyGmOpsBoardWorkflowAsync()
     var checklistQueryPayload = checklistQuery?.Value as GmPrepAssetListResponse;
     Assert(checklistQueryPayload?.TotalCount == 1, "ops-board list endpoint should support checklist label search");
     Assert(checklistQueryPayload?.Items[0].AssetId == checklistCreated!.AssetId, "ops-board search should find scene prep by checklist label text");
+
+    var governedPacketQuery = controller.ListPrepAssets(
+        campaignId: "campaign_smoke",
+        sessionId: "session_ops_smoke",
+        sceneId: "scene_smoke",
+        kind: null,
+        includeReusableCampaignAssets: true,
+        queryText: "red-samurai checkpoint").Result as OkObjectResult;
+    var governedPacketQueryPayload = governedPacketQuery?.Value as GmPrepAssetListResponse;
+    Assert(governedPacketQueryPayload?.TotalCount == 1, "ops-board list endpoint should support governed packet search by title and dependency content");
+    Assert(governedPacketQueryPayload?.Items[0].AssetId == governedPacket.AssetId, "ops-board search should find the governed packet binding");
 }
 
 void VerifyInteropWorkflow()

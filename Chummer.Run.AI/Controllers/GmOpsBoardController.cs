@@ -1,3 +1,4 @@
+using Chummer.Contracts.Hub;
 using Chummer.Run.AI.Services.Ops;
 using Chummer.Run.Contracts.Ops;
 using Microsoft.AspNetCore.Mvc;
@@ -44,6 +45,23 @@ public sealed class GmOpsBoardController : ControllerBase
         }
 
         var created = _opsBoard.CreatePrepAsset(request);
+        return CreatedAtAction(nameof(GetPrepAsset), new { assetId = created.AssetId }, created);
+    }
+
+    [HttpPost("prep-assets/from-project")]
+    [ProducesResponseType<GmPrepAssetRecord>(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult<GmPrepAssetRecord> CreatePrepAssetFromProject([FromBody] GmPrepAssetCatalogImportRequest? request)
+    {
+        if (request is null
+            || string.IsNullOrWhiteSpace(request.CampaignId)
+            || request.Project is null
+            || !SupportsProjectPrepSeed(request.Project.Summary.Kind))
+        {
+            return BadRequest("campaignId and a governed npc-entry, npc-pack, or encounter-pack project are required.");
+        }
+
+        var created = _opsBoard.CreatePrepAssetFromProject(request);
         return CreatedAtAction(nameof(GetPrepAsset), new { assetId = created.AssetId }, created);
     }
 
@@ -117,4 +135,9 @@ public sealed class GmOpsBoardController : ControllerBase
         var result = _opsBoard.Reveal(assetId, request);
         return result.Outcome == "missing" ? NotFound(result) : Ok(result);
     }
+
+    private static bool SupportsProjectPrepSeed(string? projectKind) =>
+        string.Equals(projectKind, HubCatalogItemKinds.NpcEntry, StringComparison.Ordinal)
+        || string.Equals(projectKind, HubCatalogItemKinds.NpcPack, StringComparison.Ordinal)
+        || string.Equals(projectKind, HubCatalogItemKinds.EncounterPack, StringComparison.Ordinal);
 }

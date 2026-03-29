@@ -27,7 +27,7 @@ rg -n 'coach.system|PromptRegistry|LoreService|PersonaMemoryService|SessionMemor
   docs/ASSISTANT_PLANE_AUTHORITY.md >/dev/null
 rg -n 'Chummer\.Play\.Contracts\.Docs\.RuntimeDocQuery|RuntimeDocResult|PromptTemplates|PreviewPrompt|SearchLore|QueryPersonaMemory|DraftFromSession|compatibility-only|second system of record' \
   docs/HOSTED_DOCS_HELP_CONSUMERS.md >/dev/null
-rg -n 'HubRegistryController\.AddReview|PublicationsController\.Review|PublicationsController\.Moderate|GmOpsBoardController\.GetProjection|GmOpsBoardController\.UpdateChecklist|GmOpsBoardController\.Reveal|SpiderController\.QueueManual|SpiderController\.ExecuteAction|DeliveryOutboxService\.RecordAction|PipelineObservabilityController\.GetProjection|advisory input with receipts|hidden write-owning side systems' \
+rg -n 'HubRegistryController\.AddReview|PublicationsController\.Review|PublicationsController\.Moderate|GmOpsBoardController\.CreatePrepAssetFromProject|GmOpsBoardController\.GetProjection|GmOpsBoardController\.UpdateChecklist|GmOpsBoardController\.Reveal|SpiderController\.QueueManual|SpiderController\.ExecuteAction|DeliveryOutboxService\.RecordAction|PipelineObservabilityController\.GetProjection|advisory input with receipts|hidden write-owning side systems' \
   docs/HOSTED_FEEDBACK_AND_OPERATOR_CONSUMERS.md >/dev/null
 rg -n 'AccountsController|GroupsController|BoostCodesController|BoostSessionsController|LedgerController|LeaderboardsController|EntitlementsController|BoosterReceiptsController|fact ledger|reward journal|entitlement journal|Fleet executes sponsored participant lanes' \
   docs/HUB_COMMUNITY_LEDGER_PLANE.md >/dev/null
@@ -84,7 +84,7 @@ rg -n 'public sealed class BrowserActGatewayAdapter|public sealed class MarkupGo
 rg -n 'public sealed class PromptRegistry' Chummer.Run.AI/Services/Gateway/PromptRegistry.cs >/dev/null
 rg -n 'public sealed class GmOpsBoardService' Chummer.Run.AI/Services/Ops/GmOpsBoardService.cs >/dev/null
 rg -n 'public sealed class DirectorPolicyEngine' Chummer.Run.AI/Services/Spider/DirectorPolicyEngine.cs >/dev/null
-rg -n 'GetProjection|UpdateChecklist|Reveal' Chummer.Run.AI/Controllers/GmOpsBoardController.cs Chummer.Run.AI/Services/Ops/GmOpsBoardService.cs >/dev/null
+rg -n 'CreatePrepAssetFromProject|GetProjection|UpdateChecklist|Reveal' Chummer.Run.AI/Controllers/GmOpsBoardController.cs Chummer.Run.AI/Services/Ops/GmOpsBoardService.cs >/dev/null
 rg -n 'QueueManual|ExecuteAction|GetOutbox' Chummer.Run.AI/Controllers/SpiderController.cs >/dev/null
 rg -n 'RecordAction|ApprovalState|ProjectionFingerprint' Chummer.Run.AI/Services/Spider/DeliveryOutboxService.cs >/dev/null
 rg -n 'public sealed class SpiderController' Chummer.Run.AI/Controllers/SpiderController.cs >/dev/null
