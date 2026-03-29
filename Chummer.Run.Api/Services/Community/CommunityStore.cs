@@ -48,6 +48,7 @@ public sealed class CommunityStore
     public Dictionary<string, CampaignProjection> CampaignSpinesById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, RunProjection> RunsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public List<RosterTransferProjection> RosterTransfers { get; } = new();
+    public List<GovernedPrepLaunchProjection> PrepLaunches { get; } = new();
     public Dictionary<string, WorkspaceRestoreProjection> RestoreByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void PersistLocked()
@@ -77,6 +78,7 @@ public sealed class CommunityStore
             CampaignSpines: CampaignSpinesById.Values.OrderBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase).ToArray(),
             Runs: RunsById.Values.OrderBy(static item => item.RunId, StringComparer.OrdinalIgnoreCase).ToArray(),
             RosterTransfers: RosterTransfers.OrderByDescending(static item => item.TransferredAtUtc).ToArray(),
+            PrepLaunches: PrepLaunches.OrderByDescending(static item => item.LaunchedAtUtc).ToArray(),
             RestoreSummaries: RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase).ToArray());
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
@@ -130,6 +132,7 @@ public sealed class CommunityStore
         CampaignSpinesById.Clear();
         RunsById.Clear();
         RosterTransfers.Clear();
+        PrepLaunches.Clear();
         RestoreByUserId.Clear();
 
         foreach (var user in snapshot.Users ?? Array.Empty<HubUserDto>())
@@ -204,6 +207,7 @@ public sealed class CommunityStore
         }
 
         RosterTransfers.AddRange(snapshot.RosterTransfers ?? Array.Empty<RosterTransferProjection>());
+        PrepLaunches.AddRange(snapshot.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>());
 
         foreach (var restore in snapshot.RestoreSummaries ?? Array.Empty<WorkspaceRestoreProjection>())
         {
@@ -298,6 +302,7 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<CampaignProjection>? CampaignSpines = null,
     IReadOnlyList<RunProjection>? Runs = null,
     IReadOnlyList<RosterTransferProjection>? RosterTransfers = null,
+    IReadOnlyList<GovernedPrepLaunchProjection>? PrepLaunches = null,
     IReadOnlyList<WorkspaceRestoreProjection>? RestoreSummaries = null);
 
 internal sealed record SponsorSessionStateSnapshot(

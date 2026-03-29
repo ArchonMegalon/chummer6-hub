@@ -231,6 +231,7 @@ def verify_signed_in_work_audit(
         "What changed for me",
         "Move governed roster state",
         "Transfer governed roster state",
+        "Launch governed prep packet",
         "GM prep library and travel mode",
     ):
         require_snippet(body, snippet, workspace_path)
@@ -267,6 +268,53 @@ def verify_signed_in_work_audit(
         raise AssertionError(f"{plan_path} did not expose dossier options")
     if not target_groups:
         raise AssertionError(f"{plan_path} did not expose target groups")
+
+    prep_library_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=opposition"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_path} returned {status}, expected 200")
+
+    prep_library = json.loads(body)
+    prep_items = prep_library.get("items") or []
+    if not prep_items:
+        raise AssertionError("prep-library search did not expose any governed packet to launch")
+
+    runs = workspaces[0].get("runs") or []
+    target_run = runs[0] if runs else {}
+    prep_launch_body = json.dumps(
+        {
+            "packetId": prep_items[0]["packetId"],
+            "targetRunId": target_run.get("runId"),
+            "targetSceneId": target_run.get("activeSceneId"),
+            "note": "Signed-in live audit binding governed opposition truth.",
+        }
+    ).encode("utf-8")
+    launch_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library/launches"
+    status, body, _, _ = fetch(
+        base_url,
+        launch_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=prep_launch_body,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"{launch_path} returned {status}: {body[:400]}")
+
+    prep_launch = json.loads(body)
+    if not prep_launch.get("launchId"):
+        raise AssertionError("prep launch response did not expose a launch id")
 
     payload = json.dumps(
         {
@@ -305,9 +353,21 @@ def verify_signed_in_work_audit(
 
     require_snippet(body, "Recent governed roster moves", "/account/work")
     require_snippet(body, transfer["runnerHandle"], "/account/work")
+    require_snippet(body, "GM prep launch", "/account/work")
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_path} returned {status}, expected 200 after prep launch")
+    require_snippet(body, "Recent governed prep launches", workspace_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_path)
     print(
         "ok signed-in /account/work -> "
-        f"{final_url} workspace={workspace_id} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
+        f"{final_url} workspace={workspace_id} prep_launch={prep_launch['launchId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
     )
 
 

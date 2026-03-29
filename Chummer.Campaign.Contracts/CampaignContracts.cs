@@ -128,6 +128,28 @@ public sealed record RosterTransferPlannerProjection(
     IReadOnlyList<RosterTransferCandidateProjection> DossierOptions,
     IReadOnlyList<RosterTransferTargetGroupProjection> TargetGroups);
 
+public sealed record GovernedPrepLaunchRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string PacketId,
+    [StringLength(128)] string? TargetRunId = null,
+    [StringLength(128)] string? TargetSceneId = null,
+    [StringLength(256)] string? Note = null);
+
+public sealed record GovernedPrepLaunchProjection(
+    string LaunchId,
+    string WorkspaceId,
+    string CampaignId,
+    string PacketId,
+    string PacketKind,
+    string PacketTitle,
+    string? TargetRunId,
+    string? TargetRunTitle,
+    string? TargetSceneId,
+    string? TargetSceneTitle,
+    string InitiatedByUserId,
+    string Summary,
+    IReadOnlyList<string> AuditLines,
+    DateTimeOffset LaunchedAtUtc);
+
 public sealed record RunnerDossierProjection(
     string DossierId,
     string RunnerHandle,
@@ -268,7 +290,8 @@ public sealed record CampaignWorkspaceProjection(
     string? NextSafeAction = null,
     IReadOnlyList<WorkspaceChangePacketProjection>? ChangePackets = null,
     IReadOnlyList<CampaignConsequenceProjection>? Consequences = null,
-    IReadOnlyList<RosterTransferProjection>? RosterTransfers = null);
+    IReadOnlyList<RosterTransferProjection>? RosterTransfers = null,
+    IReadOnlyList<GovernedPrepLaunchProjection>? PrepLaunches = null);
 
 public sealed record CampaignWorkspaceDigestProjection(
     string WorkspaceId,

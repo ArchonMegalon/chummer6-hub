@@ -70,6 +70,7 @@
     var selectedWorkspaceRosterTransferPlan = Model.SelectedWorkspaceRosterTransferPlan;
     var selectedWorkspacePrepLibrarySearch = Model.SelectedWorkspacePrepLibrarySearch;
     var selectedWorkspacePrepLibraryQuery = Model.SelectedWorkspacePrepLibraryQuery;
+    var selectedWorkspacePrepLaunches = selectedWorkspaceServerPlane?.PrepLaunches ?? Array.Empty<Chummer.Campaign.Contracts.GovernedPrepLaunchProjection>();
     var selectedRun = Model.SelectedRun;
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
@@ -1082,23 +1083,64 @@
                                         <span>Reusable packets</span>
                                         <strong>@selectedWorkspaceServerPlane.PrepLibrary.ReusablePacketCount</strong>
                                     </div>
-                                    <div class="settings-summary-row">
-                                        <span>Search posture</span>
-                                        <strong>@selectedWorkspaceServerPlane.PrepLibrary.SearchSummary</strong>
-                                    </div>
-                                    <div class="settings-summary-row">
-                                        <span>Travel-safe devices</span>
-                                        <strong>@(selectedWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready")</strong>
-                                    </div>
+                                <div class="settings-summary-row">
+                                    <span>Search posture</span>
+                                    <strong>@selectedWorkspaceServerPlane.PrepLibrary.SearchSummary</strong>
                                 </div>
-                                <p><strong>GM prep library:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
-                                <p><strong>Binding posture:</strong> @selectedWorkspaceServerPlane.PrepLibrary.BindingSummary</p>
-                                <p><strong>Safehouse / travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
-                                <p><strong>Prefetch inventory:</strong> @selectedWorkspaceServerPlane.TravelMode.PrefetchInventorySummary</p>
-                                <form class="stacked-copy" method="get" action="@WorkspaceDetailHref(selectedWorkspace!.WorkspaceId)">
+                                <div class="settings-summary-row">
+                                    <span>Recent launches</span>
+                                    <strong>@(selectedWorkspacePrepLaunches.Count == 0 ? "No governed binds yet" : $"{selectedWorkspacePrepLaunches.Count} receipts")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Travel-safe devices</span>
+                                    <strong>@(selectedWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready")</strong>
+                                </div>
+                            </div>
+                            <p><strong>GM prep library:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
+                            <p><strong>Binding posture:</strong> @selectedWorkspaceServerPlane.PrepLibrary.BindingSummary</p>
+                            <p><strong>Safehouse / travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
+                            <p><strong>Prefetch inventory:</strong> @selectedWorkspaceServerPlane.TravelMode.PrefetchInventorySummary</p>
+                            @if (selectedWorkspaceServerPlane.PrepLibrary.Packets.Count > 0)
+                            {
+                                <form id="prepLaunchForm" class="settings-form">
                                     <div class="field">
-                                        <label for="prepQuery">Search governed prep packets</label>
-                                        <input id="prepQuery" name="prepQuery" type="search" value="@selectedWorkspacePrepLibraryQuery" placeholder="opposition, scene, safehouse, dossier..." />
+                                        <label for="prepLaunchPacket">Governed packet</label>
+                                        <select id="prepLaunchPacket" required>
+                                            @foreach (var packet in selectedWorkspaceServerPlane.PrepLibrary.Packets)
+                                            {
+                                                <option value="@packet.PacketId">@packet.Title</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    @if (selectedWorkspace!.Runs.Count > 0)
+                                    {
+                                        <div class="field">
+                                            <label for="prepLaunchRun">Target run</label>
+                                            <select id="prepLaunchRun">
+                                                @foreach (var run in selectedWorkspace.Runs)
+                                                {
+                                                    <option value="@run.RunId">@run.Title</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="field">
+                                            <label for="prepLaunchScene">Target scene</label>
+                                            <select id="prepLaunchScene"></select>
+                                        </div>
+                                    }
+                                    <div class="field">
+                                        <label for="prepLaunchNote">Operator note</label>
+                                        <textarea id="prepLaunchNote" rows="3" placeholder="Why are you launching this governed prep packet now?"></textarea>
+                                    </div>
+                                    <div id="prepLaunchTargetPreview" class="settings-summary-list" hidden></div>
+                                    <button class="button-like button-like--secondary" type="submit">Launch governed prep packet</button>
+                                    <p id="prepLaunchStatusNotice" class="muted-copy" hidden></p>
+                                </form>
+                            }
+                            <form class="stacked-copy" method="get" action="@WorkspaceDetailHref(selectedWorkspace!.WorkspaceId)">
+                                <div class="field">
+                                    <label for="prepQuery">Search governed prep packets</label>
+                                    <input id="prepQuery" name="prepQuery" type="search" value="@selectedWorkspacePrepLibraryQuery" placeholder="opposition, scene, safehouse, dossier..." />
                                     </div>
                                     <div class="stacked-actions">
                                         <button class="button-like button-like--secondary" type="submit">Search prep library</button>
@@ -1125,17 +1167,29 @@
                                         <p class="muted-copy">No governed prep packet matched that search yet. Try campaign, scene, opposition, dossier, or safehouse terms.</p>
                                     }
                                 }
-                                @if (selectedWorkspaceServerPlane.PrepLibrary.Packets.Count > 0)
-                                {
+                            @if (selectedWorkspaceServerPlane.PrepLibrary.Packets.Count > 0)
+                            {
+                                <ul class="muted-copy">
+                                    @foreach (var packet in selectedWorkspaceServerPlane.PrepLibrary.Packets)
+                                    {
+                                        <li><strong>@packet.Title:</strong> @packet.Summary <span>@packet.BindingSummary</span></li>
+                                    }
+                                </ul>
+                            }
+                            @if (selectedWorkspacePrepLaunches.Count > 0)
+                            {
+                                <details class="details-drawer" id="prep-launches">
+                                    <summary>Recent governed prep launches</summary>
                                     <ul class="muted-copy">
-                                        @foreach (var packet in selectedWorkspaceServerPlane.PrepLibrary.Packets)
+                                        @foreach (var launch in selectedWorkspacePrepLaunches)
                                         {
-                                            <li><strong>@packet.Title:</strong> @packet.Summary <span>@packet.BindingSummary</span></li>
+                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary</li>
                                         }
                                     </ul>
-                                }
-                                @if (selectedWorkspaceServerPlane.TravelMode.Devices.Count > 0)
-                                {
+                                </details>
+                            }
+                            @if (selectedWorkspaceServerPlane.TravelMode.Devices.Count > 0)
+                            {
                                     <ul class="muted-copy">
                                         @foreach (var device in selectedWorkspaceServerPlane.TravelMode.Devices)
                                         {
@@ -1322,6 +1376,10 @@
                                     <span>Roster transfer audit</span>
                                     <strong>@(workspace.RosterTransfers is { Count: > 0 } ? $"{workspace.RosterTransfers.Count} receipts" : "No recent moves")</strong>
                                 </div>
+                                <div class="settings-summary-row">
+                                    <span>Prep launch audit</span>
+                                    <strong>@(workspace.PrepLaunches is { Count: > 0 } ? $"{workspace.PrepLaunches.Count} receipts" : "No recent launches")</strong>
+                                </div>
                             </div>
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open shared campaign view</a>
@@ -1357,6 +1415,19 @@
                                         @foreach (var transfer in workspace.RosterTransfers)
                                         {
                                             <li><strong>@transfer.RunnerHandle:</strong> @transfer.Summary</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+
+                            @if (workspace.PrepLaunches is { Count: > 0 })
+                            {
+                                <details class="details-drawer">
+                                    <summary>Governed prep launch audit</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var launch in workspace.PrepLaunches)
+                                        {
+                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary</li>
                                         }
                                     </ul>
                                 </details>
@@ -1789,6 +1860,10 @@
   const ui = window.ChummerUi;
   const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
   const rosterTransferPlan = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceRosterTransferPlan));
+  const prepLaunchPackets = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceServerPlane?.PrepLibrary.Packets ?? Array.Empty<Chummer.Run.Api.Contracts.GovernedPrepPacketSummary>()));
+  const prepLaunchRuns = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspace?.Runs ?? Array.Empty<Chummer.Campaign.Contracts.RunProjection>()));
+  const selectedWorkspaceId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspace?.WorkspaceId));
+  const workspaceDetailHref = (workspaceId) => `/account/work/workspaces/${encodeURIComponent(workspaceId)}`;
   const revealHashTarget = () => {
     const hash = window.location.hash;
     if (!hash) return;
@@ -1856,6 +1931,62 @@
   syncRosterTransferInputs();
   document.getElementById("rosterTransferDossier")?.addEventListener("change", syncRosterTransferInputs);
   document.getElementById("rosterTransferGroup")?.addEventListener("change", syncRosterTransferInputs);
+
+  const syncPrepLaunchTargets = () => {
+    const runSelect = document.getElementById("prepLaunchRun");
+    const sceneSelect = document.getElementById("prepLaunchScene");
+    const packetSelect = document.getElementById("prepLaunchPacket");
+    const preview = document.getElementById("prepLaunchTargetPreview");
+    if (!packetSelect || !preview) {
+      return;
+    }
+
+    const packet = Array.isArray(prepLaunchPackets)
+      ? prepLaunchPackets.find((item) => item && item.PacketId === packetSelect.value)
+      : null;
+    const run = runSelect && Array.isArray(prepLaunchRuns)
+      ? prepLaunchRuns.find((item) => item && item.RunId === runSelect.value) || prepLaunchRuns[0]
+      : null;
+    const scenes = Array.isArray(run?.Scenes) ? run.Scenes : [];
+
+    if (sceneSelect) {
+      const previousSceneId = sceneSelect.value;
+      sceneSelect.innerHTML = "";
+      for (const scene of scenes) {
+        const option = document.createElement("option");
+        option.value = scene.SceneId;
+        option.textContent = scene.Title;
+        sceneSelect.appendChild(option);
+      }
+
+      const preferredScene = scenes.find((item) => item.SceneId === (run?.ActiveSceneId || previousSceneId)) || scenes[0];
+      if (preferredScene) {
+        sceneSelect.value = preferredScene.SceneId;
+      }
+    }
+
+    const scene = sceneSelect && scenes.length > 0
+      ? scenes.find((item) => item.SceneId === sceneSelect.value) || scenes[0]
+      : null;
+    const rows = [
+      ["Packet", packet?.Title || "Select a governed packet"],
+      ["Binding posture", packet?.BindingSummary || "Packet stays governed and reusable."],
+      ["Target", run ? `${run.Title}${scene ? ` / ${scene.Title}` : ""}` : "Campaign-wide launch"],
+      ["Search terms", Array.isArray(packet?.SearchTerms) && packet.SearchTerms.length > 0 ? packet.SearchTerms.slice(0, 4).join(", ") : "Governed packet metadata"]
+    ];
+
+    preview.hidden = false;
+    preview.innerHTML = rows.map(([label, value]) => `
+      <div class="settings-summary-row">
+        <span>${label}</span>
+        <strong>${value}</strong>
+      </div>`).join("");
+  };
+
+  syncPrepLaunchTargets();
+  document.getElementById("prepLaunchRun")?.addEventListener("change", syncPrepLaunchTargets);
+  document.getElementById("prepLaunchPacket")?.addEventListener("change", syncPrepLaunchTargets);
+  document.getElementById("prepLaunchScene")?.addEventListener("change", syncPrepLaunchTargets);
 
   bindSubmit("profileForm", async (event) => {
     event.preventDefault();
@@ -1997,6 +2128,38 @@
       ui.setNotice(notice, ui.describeError(error, "Roster transfer could not be recorded right now."), true);
     } finally {
       ui.setButtonBusy(button, false, "Moving...");
+    }
+  });
+
+  bindSubmit("prepLaunchForm", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("prepLaunchStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    const packetSelect = document.getElementById("prepLaunchPacket");
+    const runSelect = document.getElementById("prepLaunchRun");
+    const sceneSelect = document.getElementById("prepLaunchScene");
+    const noteInput = document.getElementById("prepLaunchNote");
+    if (!packetSelect || !selectedWorkspaceId) {
+      return;
+    }
+
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Launching...");
+    try {
+      await ui.requestJson(`/api/v1/campaign-spine/me/workspaces/${encodeURIComponent(selectedWorkspaceId)}/prep-library/launches`, {
+        method: "POST",
+        json: {
+          packetId: packetSelect.value,
+          targetRunId: runSelect?.value || null,
+          targetSceneId: sceneSelect?.value || null,
+          note: noteInput?.value.trim() || null
+        }
+      });
+      window.location.href = `${workspaceDetailHref(selectedWorkspaceId)}#prep-launches`;
+    } catch (error) {
+      ui.setNotice(notice, ui.describeError(error, "Governed prep launch could not be recorded right now."), true);
+    } finally {
+      ui.setButtonBusy(button, false, "Launching...");
     }
   });
 
