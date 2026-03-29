@@ -1777,13 +1777,16 @@ public sealed class CampaignSpineService
         List<(DateTimeOffset UpdatedAtUtc, string Summary)> lines = [];
         foreach (var entry in seasonBoardEntries)
         {
+            string recapSummary = string.IsNullOrWhiteSpace(entry.RecapSummary)
+                ? string.Empty
+                : $" Recap: {entry.RecapSummary}";
             string memorySummary = string.IsNullOrWhiteSpace(entry.CampaignMemorySummary)
                 ? string.Empty
                 : $" Memory: {entry.CampaignMemorySummary}";
             string consequenceSummary = string.IsNullOrWhiteSpace(entry.ConsequenceSummary)
                 ? string.Empty
                 : $" Consequence: {entry.ConsequenceSummary}";
-            lines.Add((entry.UpdatedAtUtc, $"{entry.CampaignName}: {entry.RunTitle} · {entry.LatestEventSummary} Next: {entry.NextSafeAction}{consequenceSummary}{memorySummary}"));
+            lines.Add((entry.UpdatedAtUtc, $"{entry.CampaignName}: {entry.RunTitle} · {entry.LatestEventSummary} Next: {entry.NextSafeAction}{recapSummary}{consequenceSummary}{memorySummary}"));
         }
 
         foreach (var sponsorSession in recentSponsorSessions)
@@ -2042,6 +2045,7 @@ public sealed class CampaignSpineService
                 var leadAftermathPackage = workspace.AftermathPackages?
                     .OrderByDescending(static item => item.GeneratedAtUtc)
                     .FirstOrDefault();
+                var leadRecapShelfEntry = workspace.RecapShelf?.FirstOrDefault();
                 var leadConsequence = workspace.Consequences?
                     .OrderByDescending(static item => item.UpdatedAtUtc)
                     .FirstOrDefault();
@@ -2078,6 +2082,11 @@ public sealed class CampaignSpineService
                     CampaignName: workspace.CampaignName,
                     RunTitle: leadRun?.Title ?? "No live run yet",
                     LatestEventSummary: latestEventSummary,
+                    RecapSummary: leadAftermathPackage is not null
+                        ? $"{leadAftermathPackage.Title} — {leadAftermathPackage.Summary}"
+                        : leadRecapShelfEntry is null
+                            ? null
+                            : $"{leadRecapShelfEntry.Label} — {leadRecapShelfEntry.Summary}",
                     ConsequenceSummary: leadConsequence is null ? null : $"{leadConsequence.Label} — {leadConsequence.Summary}",
                     CampaignMemorySummary: workspace.CampaignMemory?.Summary,
                     CampaignMemoryReturnSummary: workspace.CampaignMemory?.ReturnSummary,
