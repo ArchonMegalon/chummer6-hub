@@ -312,6 +312,15 @@ public sealed record WorkspaceChangePacketProjection(
     string Summary,
     DateTimeOffset UpdatedAtUtc);
 
+public sealed record NextSessionCarryForwardProjection(
+    string CarryForwardId,
+    string Label,
+    string Summary,
+    string ReturnSummary,
+    string NextSafeAction,
+    IReadOnlyList<string> EvidenceLines,
+    DateTimeOffset UpdatedAtUtc);
+
 public sealed record CampaignWorkspaceProjection(
     string WorkspaceId,
     string CampaignId,
@@ -332,7 +341,8 @@ public sealed record CampaignWorkspaceProjection(
     IReadOnlyList<RosterTransferProjection>? RosterTransfers = null,
     IReadOnlyList<GovernedPrepLaunchProjection>? PrepLaunches = null,
     IReadOnlyList<TravelPrefetchReceiptProjection>? TravelPrefetches = null,
-    IReadOnlyList<AftermathRecapPackageProjection>? AftermathPackages = null);
+    IReadOnlyList<AftermathRecapPackageProjection>? AftermathPackages = null,
+    NextSessionCarryForwardProjection? NextSessionCarryForward = null);
 
 public sealed record CampaignWorkspaceDigestProjection(
     string WorkspaceId,

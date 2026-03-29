@@ -1576,6 +1576,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@workspace.NextSafeAction", StringComparison.Ordinal), "home work should surface the next safe action directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("What changed for me", StringComparison.Ordinal), "home work should keep the explicit what-changed-for-me packet on the signed-in route.");
     Assert(homeSource.Contains("leadWorkspaceState?.Label", StringComparison.Ordinal), "home work should surface the bounded workspace state directly from the server plane.");
+    Assert(homeSource.Contains("Next-session carry-forward", StringComparison.Ordinal), "home work should surface a dedicated next-session carry-forward card backed by the shared workspace projection.");
+    Assert(homeSource.Contains("@leadNextSessionCarryForward.Summary", StringComparison.Ordinal), "home work should surface the next-session carry-forward summary directly from the server plane.");
+    Assert(homeSource.Contains("@leadNextSessionCarryForward.ReturnSummary", StringComparison.Ordinal), "home work should keep return-lane truth attached to the calmer next-session card.");
     Assert(homeSource.Contains("@leadWorkspaceServerPlane.ChangePackets[0].Summary", StringComparison.Ordinal), "home work should surface the first server-plane change packet directly on the what-changed card.");
     Assert(homeSource.Contains("@leadWorkspaceServerPlane.NextSafeAction.Summary", StringComparison.Ordinal), "home work should surface the bounded next safe action directly on the what-changed card.");
     Assert(homeSource.Contains("Aftermath recap", StringComparison.Ordinal), "home work should surface a dedicated aftermath recap card instead of burying recap follow-through inside generic change text.");
@@ -1665,6 +1668,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Lead consequence", StringComparison.Ordinal), "account work should summarize the leading consequence directly on the selected campaign card.");
     Assert(!accountSource.Contains("Server-plane follow-through", StringComparison.Ordinal), "account work should avoid internal server-plane wording on the customer-facing route.");
     Assert(accountSource.Contains("What changed for me", StringComparison.Ordinal), "account work should keep the explicit what-changed-for-me packet on the selected campaign card.");
+    Assert(accountSource.Contains("Next-session carry-forward", StringComparison.Ordinal), "account work should surface the shared next-session carry-forward projection on both the selected card and the workspace detail drawer.");
+    Assert(accountSource.Contains("@selectedWorkspaceNextSessionCarryForward.Summary", StringComparison.Ordinal), "account work should surface the selected workspace carry-forward summary directly from the shared server-plane projection.");
+    Assert(accountSource.Contains("@workspace.NextSessionCarryForward.Summary", StringComparison.Ordinal), "account work should surface next-session carry-forward directly on the shared workspace list.");
     Assert(accountSource.Contains("Search governed prep packets", StringComparison.Ordinal), "account work should expose a real governed prep-library search flow on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Label", StringComparison.Ordinal), "account work should surface the bounded workspace state directly from the server plane.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Summary", StringComparison.Ordinal), "account work should explain why the bounded workspace state is active on the selected campaign card.");
@@ -2222,6 +2228,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspacePayload?.ReadinessCues.Count >= 1, "campaign spine workspace api should keep readiness cues attached to the workspace summary.");
     Assert(workspacePayload?.Consequences?.Count >= 4, "campaign spine workspace api should expose the governed consequence ledger.");
     Assert(workspacePayload!.Consequences!.Any(item => string.Equals(item.Kind, "reputation", StringComparison.Ordinal) && item.Receipts.Count >= 1), "campaign spine workspace api should keep grounded reputation receipts attached.");
+    Assert(workspacePayload.NextSessionCarryForward is not null, "campaign spine workspace api should expose a first-class next-session carry-forward projection.");
+    Assert(workspacePayload.NextSessionCarryForward!.EvidenceLines.Count >= 1, "campaign spine workspace api should attach bounded next-session evidence lines.");
     Assert(!string.IsNullOrWhiteSpace(workspacePayload?.ActiveSceneSummary), "campaign spine workspace api should expose an active-scene summary.");
     Assert(!string.IsNullOrWhiteSpace(workspacePayload?.NextSafeAction), "campaign spine workspace api should expose a next safe action.");
     Assert(workspacePayload?.ChangePackets?.Count >= 1, "campaign spine workspace api should expose recent change packets.");
@@ -2242,6 +2250,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.ChangePackets.Count >= 1, "campaign spine server plane api should preserve workspace change packets.");
     Assert(workspaceServerPlanePayload.Consequences.Count >= 4, "campaign spine server plane api should preserve the governed consequence ledger.");
     Assert(workspaceServerPlanePayload.Consequences.Any(item => string.Equals(item.Kind, "faction", StringComparison.Ordinal) && item.Receipts.Count >= 1), "campaign spine server plane api should keep grounded faction receipts visible.");
+    Assert(workspaceServerPlanePayload.NextSessionCarryForward is not null, "campaign spine server plane api should expose the bounded next-session carry-forward projection.");
+    Assert(workspaceServerPlanePayload.NextSessionCarryForward!.EvidenceLines.Count >= 1, "campaign spine server plane api should attach bounded next-session evidence lines.");
     Assert(workspaceServerPlanePayload.SupportClosures.Count >= 1, "campaign spine server plane api should expose install-aware support closure cues.");
     Assert(workspaceServerPlanePayload.DecisionNotices.Count >= 1, "campaign spine server plane api should expose bounded follow-through notices.");
     Assert(workspaceServerPlanePayload.CampaignSummary.RestoreSummary.Contains("Prefetch inventory:", StringComparison.Ordinal), "campaign spine server plane api should make restore prefetch inventory explicit.");
@@ -2314,6 +2324,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "travel_prefetch", StringComparison.Ordinal)) == true, "campaign spine server plane api should add staged travel-prefetch receipts into the bounded what-changed packet rail.");
     Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project aftermath recap packages after generation.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "aftermath_recap", StringComparison.Ordinal)) == true, "campaign spine server plane api should add aftermath recap packages into the bounded what-changed packet rail.");
+    Assert(refreshedWorkspaceServerPlanePayload?.NextSessionCarryForward is not null, "campaign spine server plane api should refresh the next-session carry-forward packet after the governed actions land.");
+    Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the next-session carry-forward packet on the bounded what-changed rail.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
@@ -2519,6 +2531,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(accountWorkspaceDetailModel?.CurrentSection, "work", StringComparison.Ordinal), "account workspace detail route should land inside the work section.");
     Assert(string.Equals(accountWorkspaceDetailModel?.SelectedWorkspace?.WorkspaceId, workspaceId, StringComparison.Ordinal), "account workspace detail route should load the selected shared campaign view.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane is not null, "account workspace detail route should project the bounded workspace server plane.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspace?.NextSessionCarryForward is not null, "account workspace detail route should keep the shared next-session carry-forward projection attached to the selected workspace.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.NextSessionCarryForward is not null, "account workspace detail route should project the next-session carry-forward packet through the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.SupportClosures.Count >= 1, "account workspace detail route should expose support-closure cues from the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.DecisionNotices.Count >= 1, "account workspace detail route should expose bounded decision notices from the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RuleEnvironmentHealth.Count >= 1, "account workspace detail route should expose rule-environment health cues from the workspace server plane.");
@@ -2541,6 +2555,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "prep_launch", StringComparison.Ordinal)) == true, "account workspace detail search should keep prep-launch receipts on the what-changed rail.");
     Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "travel_prefetch", StringComparison.Ordinal)) == true, "account workspace detail search should keep travel-prefetch receipts on the what-changed rail.");
     Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "aftermath_recap", StringComparison.Ordinal)) == true, "account workspace detail search should keep aftermath recap packages on the what-changed rail.");
+    Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)) == true, "account workspace detail search should keep the next-session carry-forward packet on the what-changed rail.");
     var accountRunDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, runId: runId) as ViewResult;
     var accountRunDetailModel = accountRunDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountRunDetailModel?.SelectedRun?.RunId, runId, StringComparison.Ordinal), "account run detail route should load the selected live run context.");

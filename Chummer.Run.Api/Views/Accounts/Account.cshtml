@@ -70,6 +70,7 @@
     var selectedWorkspaceRosterTransferPlan = Model.SelectedWorkspaceRosterTransferPlan;
     var selectedWorkspacePrepLibrarySearch = Model.SelectedWorkspacePrepLibrarySearch;
     var selectedWorkspacePrepLibraryQuery = Model.SelectedWorkspacePrepLibraryQuery;
+    var selectedWorkspaceNextSessionCarryForward = selectedWorkspaceServerPlane?.NextSessionCarryForward;
     var selectedWorkspacePrepLaunches = selectedWorkspaceServerPlane?.PrepLaunches ?? Array.Empty<Chummer.Campaign.Contracts.GovernedPrepLaunchProjection>();
     var selectedWorkspaceTravelPrefetches = selectedWorkspaceServerPlane?.TravelPrefetches ?? Array.Empty<Chummer.Campaign.Contracts.TravelPrefetchReceiptProjection>();
     var selectedWorkspaceAftermathPackages = selectedWorkspaceServerPlane?.AftermathPackages ?? Array.Empty<Chummer.Campaign.Contracts.AftermathRecapPackageProjection>();
@@ -858,6 +859,10 @@
                             {
                                 <p><strong>Lead aftermath package:</strong> @selectedWorkspaceAftermathPackages[0].Summary</p>
                             }
+                            @if (selectedWorkspaceNextSessionCarryForward is not null)
+                            {
+                                <p><strong>Next-session carry-forward:</strong> @selectedWorkspaceNextSessionCarryForward.Summary</p>
+                            }
                             @if (selectedWorkspace.ChangePackets is { Count: > 0 })
                             {
                                 <p><strong>Recent change:</strong> @selectedWorkspace.ChangePackets[0].Label — @selectedWorkspace.ChangePackets[0].Summary</p>
@@ -895,6 +900,10 @@
                                     <div class="settings-summary-row">
                                         <span>Next safe action</span>
                                         <strong>@selectedWorkspaceServerPlane.NextSafeAction.Label · @selectedWorkspaceServerPlane.NextSafeAction.Summary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Next-session carry-forward</span>
+                                        <strong>@(selectedWorkspaceNextSessionCarryForward is null ? "Pending" : $"{selectedWorkspaceNextSessionCarryForward.Label} · {selectedWorkspaceNextSessionCarryForward.Summary}")</strong>
                                     </div>
                                     <div class="settings-summary-row">
                                         <span>Recent change</span>
@@ -946,6 +955,36 @@
                                     </ul>
                                 }
                             </details>
+
+                            @if (selectedWorkspaceNextSessionCarryForward is not null)
+                            {
+                                <details id="selected-next-session-carry-forward" class="details-drawer" open>
+                                    <summary>Next-session carry-forward</summary>
+                                    <div class="settings-summary-list">
+                                        <div class="settings-summary-row">
+                                            <span>Carry-forward summary</span>
+                                            <strong>@selectedWorkspaceNextSessionCarryForward.Summary</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Return lane</span>
+                                            <strong>@selectedWorkspaceNextSessionCarryForward.ReturnSummary</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Next step</span>
+                                            <strong>@selectedWorkspaceNextSessionCarryForward.NextSafeAction</strong>
+                                        </div>
+                                    </div>
+                                    @if (selectedWorkspaceNextSessionCarryForward.EvidenceLines.Count > 0)
+                                    {
+                                        <ul class="muted-copy">
+                                            @foreach (var evidence in selectedWorkspaceNextSessionCarryForward.EvidenceLines)
+                                            {
+                                                <li>@evidence</li>
+                                            }
+                                        </ul>
+                                    }
+                                </details>
+                            }
 
                             <details class="details-drawer">
                                 <summary>Roster readiness and dossier freshness</summary>
@@ -1524,6 +1563,10 @@
                                     <strong>@(workspace.NextSafeAction ?? "Open the shared campaign view and confirm the current return lane before you continue.")</strong>
                                 </div>
                                 <div class="settings-summary-row">
+                                    <span>Next-session carry-forward</span>
+                                    <strong>@(workspace.NextSessionCarryForward is null ? "Pending" : workspace.NextSessionCarryForward.Summary)</strong>
+                                </div>
+                                <div class="settings-summary-row">
                                     <span>Recent recap</span>
                                     <strong>@(workspace.RecapShelf.Count == 0 ? "Pending" : $"{workspace.RecapShelf.Count} ready")</strong>
                                 </div>
@@ -1621,6 +1664,22 @@
                                         @foreach (var package in workspace.AftermathPackages)
                                         {
                                             <li><strong>@package.Title:</strong> @package.Summary</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+
+                            @if (workspace.NextSessionCarryForward is not null)
+                            {
+                                <details class="details-drawer">
+                                    <summary>Next-session carry-forward</summary>
+                                    <ul class="muted-copy">
+                                        <li><strong>Summary:</strong> @workspace.NextSessionCarryForward.Summary</li>
+                                        <li><strong>Return:</strong> @workspace.NextSessionCarryForward.ReturnSummary</li>
+                                        <li><strong>Next:</strong> @workspace.NextSessionCarryForward.NextSafeAction</li>
+                                        @if (workspace.NextSessionCarryForward.EvidenceLines.Count > 0)
+                                        {
+                                            <li><strong>Evidence:</strong> @workspace.NextSessionCarryForward.EvidenceLines[0]</li>
                                         }
                                     </ul>
                                 </details>

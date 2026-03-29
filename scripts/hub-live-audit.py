@@ -530,7 +530,7 @@ def verify_signed_in_work_audit(
 
     require_snippet(body, "Recent governed roster moves", "/account/work")
     require_snippet(body, transfer["runnerHandle"], "/account/work")
-    require_snippet(body, "GM prep launch", "/account/work")
+    require_snippet(body, "Prep launch audit", "/account/work")
     status, body, _, _ = fetch(
         base_url,
         "/home/work",
@@ -540,6 +540,8 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"/home/work returned {status}, expected 200")
+    require_snippet(body, "Next-session carry-forward", "/home/work")
+    require_snippet(body, "Open next-session return", "/home/work")
     require_snippet(body, "Aftermath recap", "/home/work")
     require_snippet(body, aftermath_package["title"], "/home/work")
     require_snippet(body, "Open aftermath and return", "/home/work")
@@ -560,6 +562,7 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"{workspace_path} returned {status}, expected 200 after prep launch")
+    require_snippet(body, "Next-session carry-forward", workspace_path)
     require_snippet(body, "Recent governed prep launches", workspace_path)
     require_snippet(body, prep_launch["packetTitle"], workspace_path)
     require_snippet(body, "Recent travel prefetch receipts", workspace_path)

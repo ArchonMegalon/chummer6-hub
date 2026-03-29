@@ -12,7 +12,9 @@ Updated: 2026-03-29
   - governed prep launch receipts on the shared workspace
   - governed travel-prefetch receipts on the shared workspace
   - governed aftermath recap packages on the shared workspace
+  - governed next-session carry-forward packets on the shared workspace and server plane
   - signed-in home/work aftermath recap visibility on the calmer home cockpit
+  - signed-in home/work next-session carry-forward visibility on the calmer home cockpit
   - signed-in home/work governed consequence follow-through visibility on the calmer home cockpit
   - signed-in home/work governed roster-move visibility on the calmer home cockpit
   - signed-in home/work latest prep-launch and travel-prefetch receipt visibility on the calmer home cockpit
@@ -23,6 +25,7 @@ Updated: 2026-03-29
 ## What just landed
 
 - Added a dedicated `Aftermath recap` card on `/home/work` with bounded summary, evidence, return-shelf context, and a deep link back to the shared workspace return lane
+- Added a first-class `Next-session carry-forward` projection to the shared workspace and server plane, then surfaced it on both `/account/work/workspaces/{workspaceId}` and `/home/work` with return-lane truth, next-step truth, and bounded evidence
 - Added a dedicated `Consequence watch` card on `/home/work` so the lead governed campaign consequence and one evidence cue stay visible on the signed-in home cockpit instead of only appearing inside the shared summary prose
 - Added a dedicated `Roster move` card on `/home/work` so the latest governed transfer stays visible on the signed-in home cockpit and points back to the same operator rail
 - Extended the `/home/work` GM prep card so it now carries the latest governed prep-launch packet title and the latest staged travel-prefetch device receipt instead of only generic posture text
@@ -33,6 +36,7 @@ Updated: 2026-03-29
 - Extended `scripts/hub-live-audit.py` again so `/home/work` also has to show the latest governed roster move after the signed-in transfer action lands
 - Extended `scripts/hub-live-audit.py` again so `/home/work` also has to show the operator-posture card and its route back to `Teams & permissions`
 - Extended `scripts/hub-live-audit.py` again so `/home/work` also has to show the dedicated consequence card after the signed-in workspace journey resolves
+- Extended `scripts/hub-live-audit.py` again so both `/home/work` and `/account/work/workspaces/{workspaceId}` have to show the next-session carry-forward surface on the live edge
 - Extended smoke coverage so source assertions lock the new home card and route-readiness gate in place
 - Verified the rebuilt local `chummer.run` edge with both host-level live audit and Playwright e2e against the already-running docker edge
 
@@ -52,7 +56,7 @@ CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hu
 ## Next highest-impact gaps
 
 1. Deepen organizer/operator depth on the same account/control backbone without inventing a parallel admin model.
-2. Push more of the campaign workspace v3 follow-through into durable receipts and shared projections instead of isolated cards, especially downtime/next-session carry-forward and consequence follow-through.
+2. Push more of the campaign workspace v3 follow-through into durable receipts and shared projections instead of isolated cards, especially downtime carry-forward and shared consequence/recap synthesis beyond the new next-session packet.
 3. Keep moving toward the cross-repo journey-proof gap: install -> claim -> restore -> continue and join campaign -> run -> recover -> recap still need stronger whole-product acceptance evidence outside this repo.
 
 ## Guardrails

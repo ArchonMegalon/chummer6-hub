@@ -31,6 +31,8 @@
     var leadCommunityTransfer = leadCommunityOperation?.RecentRosterTransfers?.FirstOrDefault();
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
+    var leadNextSessionCarryForward = leadWorkspaceServerPlane?.NextSessionCarryForward;
+    var leadNextSessionEvidence = leadNextSessionCarryForward?.EvidenceLines.FirstOrDefault();
     var leadConsequence = leadWorkspaceServerPlane?.Consequences.FirstOrDefault();
     var leadConsequenceEvidence = leadConsequence?.EvidenceLines.FirstOrDefault();
     var leadRosterTransfer = leadWorkspaceServerPlane?.RosterTransfers.FirstOrDefault();
@@ -345,7 +347,11 @@
                                                             {
                                                                 <span> Next: @workspace.NextSafeAction</span>
                                                             }
-                                                            @if (workspace.Consequences is { Count: > 0 })
+                                                            @if (workspace.NextSessionCarryForward is not null)
+                                                            {
+                                                                <span> Carry-forward: @workspace.NextSessionCarryForward.Summary</span>
+                                                            }
+                                                            else if (workspace.Consequences is { Count: > 0 })
                                                             {
                                                                 <span> Consequence: @workspace.Consequences[0].Label is @workspace.Consequences[0].State.</span>
                                                             }
@@ -372,6 +378,10 @@
                                                                 @if (leadWorkspaceServerPlane.ChangePackets.Count > 0)
                                                                 {
                                                                     <span> Change: @leadWorkspaceServerPlane.ChangePackets[0].Summary</span>
+                                                                }
+                                                                @if (leadNextSessionCarryForward is not null)
+                                                                {
+                                                                    <span> Carry-forward: @leadNextSessionCarryForward.Summary</span>
                                                                 }
                                                                 <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "claim lane pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
                                                                 @if (leadWorkspaceServerPlane.AftermathPackages.Count > 0)
@@ -405,6 +415,10 @@
                                                         <h3>What changed for me</h3>
                                                         <p>
                                                             @(leadWorkspaceState?.Label): @(leadWorkspaceState?.Summary)
+                                                            @if (leadNextSessionCarryForward is not null)
+                                                            {
+                                                                <span> Carry-forward: @leadNextSessionCarryForward.Summary</span>
+                                                            }
                                                             @if (leadWorkspaceServerPlane.ChangePackets.Count > 0)
                                                             {
                                                                 <span> Change: @leadWorkspaceServerPlane.ChangePackets[0].Summary</span>
@@ -418,6 +432,26 @@
                                                     </div>
                                                     <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open shared campaign view</a>
                                                 </article>
+
+                                                @if (leadNextSessionCarryForward is not null)
+                                                {
+                                                    <article class="app-rail__item">
+                                                        <span class="tag">Next-session carry-forward</span>
+                                                        <div class="app-rail__copy">
+                                                            <h3>Next-session carry-forward</h3>
+                                                            <p>
+                                                                @leadNextSessionCarryForward.Summary
+                                                                <span> Return: @leadNextSessionCarryForward.ReturnSummary</span>
+                                                                <span> Next: @leadNextSessionCarryForward.NextSafeAction</span>
+                                                                @if (!string.IsNullOrWhiteSpace(leadNextSessionEvidence))
+                                                                {
+                                                                    <span> Evidence: @leadNextSessionEvidence</span>
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-next-session-carry-forward")">Open next-session return</a>
+                                                    </article>
+                                                }
 
                                                 @if (leadAftermathPackage is not null)
                                                 {
