@@ -1579,6 +1579,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@leadAftermathPackage.Summary", StringComparison.Ordinal), "home work should surface the latest aftermath package summary directly from the bounded server plane.");
     Assert(homeSource.Contains("@leadAftermathEvidence", StringComparison.Ordinal), "home work should surface one bounded aftermath evidence line on the signed-in home route.");
     Assert(homeSource.Contains("Open aftermath and return", StringComparison.Ordinal), "home work should keep a direct route into the aftermath return lane.");
+    Assert(homeSource.Contains("Roster move", StringComparison.Ordinal), "home work should surface a dedicated roster-move card instead of collapsing operator actions into one-line campaign summaries.");
+    Assert(homeSource.Contains("@leadRosterTransfer.RunnerHandle", StringComparison.Ordinal), "home work should surface the moved runner handle directly from the governed transfer receipt.");
+    Assert(homeSource.Contains("Open governed roster moves", StringComparison.Ordinal), "home work should keep a direct route back to the governed roster-move operator rail.");
     Assert(homeSource.Contains("Consequence:", StringComparison.Ordinal), "home work should surface one short consequence cue directly on the shared campaign card.");
     Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
@@ -2657,6 +2660,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var operatorWorkPage = await accountController.AccountPage(section: "work", caseId: null, CancellationToken.None) as ViewResult;
     var operatorWorkModel = operatorWorkPage?.Model as AccountPageViewModel;
     Assert(operatorWorkModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true, "account work should keep recent governed roster moves visible on the operator rail after a transfer.");
+    var postTransferWorkHomePage = await authenticatedLandingController.HomePage("work", CancellationToken.None) as ViewResult;
+    var postTransferWorkHomeModel = postTransferWorkHomePage?.Model as HomePageViewModel;
+    Assert(postTransferWorkHomeModel?.LeadWorkspaceServerPlane?.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true, "home work should keep the governed roster-transfer receipt visible on the lead workspace spine after a transfer.");
 
     var outsiderTransferDenied = await outsiderCampaignSpineController.TransferMyRoster(
         new RosterTransferRequest(
