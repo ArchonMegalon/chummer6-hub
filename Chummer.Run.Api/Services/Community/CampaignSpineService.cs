@@ -88,6 +88,10 @@ public sealed class CampaignSpineService
                         .Where(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
                         .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
                         .ToArray();
+                    var groupWorkspaces = workspaces
+                        .Where(workspace => groupCampaigns.Any(campaign => string.Equals(campaign.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase)))
+                        .OrderByDescending(static workspace => workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.MinValue)
+                        .ToArray();
                     return new CommunityOperatorProjection(
                         GroupId: group.GroupId,
                         GroupName: group.Name,
@@ -101,6 +105,13 @@ public sealed class CampaignSpineService
                         MemberCount: group.Memberships.Count,
                         ActiveCampaignCount: groupCampaigns.Count(item => string.Equals(item.Status, CampaignStatuses.Active, StringComparison.OrdinalIgnoreCase)),
                         ActiveSponsorSessionCount: _store.SponsorSessionsById.Values.Count(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "stopped", StringComparison.OrdinalIgnoreCase)),
+                        OperationsSummary: ResolveGroupOperationsSummary(group, groupCampaigns, groupWorkspaces),
+                        CampaignReturnSummary: ResolveGroupCampaignReturnSummary(group, groupWorkspaces),
+                        RecentReturnSummaries: groupWorkspaces
+                            .Select(static workspace => $"{workspace.CampaignName}: {workspace.ReturnSummary}")
+                            .Take(3)
+                            .ToArray(),
+                        Watchouts: BuildGroupOperatorWatchouts(groupWorkspaces),
                         RecentRosterTransfers: transfers
                             .Where(item =>
                                 string.Equals(item.SourceGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
@@ -1559,6 +1570,45 @@ public sealed class CampaignSpineService
             ? visibilities[0]
             : string.Join(" + ", visibilities);
     }
+
+    private static string ResolveGroupOperationsSummary(
+        GroupDto group,
+        IReadOnlyList<CampaignProjection> groupCampaigns,
+        IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
+    {
+        if (groupWorkspaces.Count == 0)
+        {
+            return $"{group.Name} has operator permissions but no shared campaign return surface yet.";
+        }
+
+        int crewCount = groupWorkspaces.Sum(static workspace => workspace.Crews.Count);
+        int dossierCount = groupWorkspaces.Sum(static workspace => workspace.Dossiers.Count);
+        return $"{groupCampaigns.Count} governed campaign(s), {crewCount} crew(s), and {dossierCount} dossier(s) stay on one operator surface.";
+    }
+
+    private static string ResolveGroupCampaignReturnSummary(
+        GroupDto group,
+        IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
+    {
+        if (groupWorkspaces.Count == 0)
+        {
+            return $"No shared campaign return is attached to {group.Name} yet.";
+        }
+
+        CampaignWorkspaceProjection leadWorkspace = groupWorkspaces[0];
+        return groupWorkspaces.Count == 1
+            ? $"{leadWorkspace.CampaignName}: {leadWorkspace.ReturnSummary}"
+            : $"{groupWorkspaces.Count} shared campaign returns are live; latest is {leadWorkspace.CampaignName}: {leadWorkspace.ReturnSummary}";
+    }
+
+    private static IReadOnlyList<string> BuildGroupOperatorWatchouts(IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
+        => groupWorkspaces
+            .SelectMany(workspace => workspace.ReadinessCues
+                .Where(static cue => NeedsAttention(cue.Severity))
+                .Select(cue => $"{workspace.CampaignName}: {cue.Title} — {cue.Summary}"))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
 
     private static IReadOnlyList<string> FinalizeLines(IEnumerable<string> lines)
         => lines
