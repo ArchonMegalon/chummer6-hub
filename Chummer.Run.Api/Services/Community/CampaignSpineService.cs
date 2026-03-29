@@ -72,8 +72,11 @@ public sealed class CampaignSpineService
             var travelPrefetchReceipts = _store.TravelPrefetchReceipts
                 .OrderByDescending(static item => item.StagedAtUtc)
                 .ToArray();
+            var aftermathPackages = _store.AftermathPackages
+                .OrderByDescending(static item => item.GeneratedAtUtc)
+                .ToArray();
             var workspaces = campaigns
-                .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore, transfers, prepLaunches, travelPrefetchReceipts))
+                .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore, transfers, prepLaunches, travelPrefetchReceipts, aftermathPackages))
                 .OrderByDescending(static workspace => workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.MinValue)
                 .ToArray();
             var operations = _store.GroupsById.Values
@@ -249,6 +252,53 @@ public sealed class CampaignSpineService
 
             _store.PersistLocked();
             return receipt;
+        }
+    }
+
+    public AftermathRecapPackageProjection RecordAftermathRecapPackage(
+        HubUserDto user,
+        CampaignWorkspaceProjection workspace,
+        RunProjection? run,
+        string packageKind,
+        string title,
+        string summary,
+        IReadOnlyList<string> evidenceLines)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(workspace);
+
+        string normalizedPackageKind = AccountService.NormalizeOptional(packageKind)
+            ?? throw new ArgumentException("packageKind is required.", nameof(packageKind));
+        string normalizedTitle = AccountService.NormalizeOptional(title)
+            ?? throw new ArgumentException("title is required.", nameof(title));
+        string normalizedSummary = AccountService.NormalizeOptional(summary)
+            ?? normalizedTitle;
+
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            var package = new AftermathRecapPackageProjection(
+                PackageId: StableId("aftermath", $"{workspace.WorkspaceId}:{run?.RunId ?? "campaign"}:{normalizedPackageKind}:{now.ToUnixTimeMilliseconds()}"),
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignId: workspace.CampaignId,
+                RunId: run?.RunId,
+                RunTitle: run?.Title,
+                PackageKind: normalizedPackageKind,
+                Title: normalizedTitle,
+                Summary: normalizedSummary,
+                ArtifactId: StableId("artifact", $"{workspace.WorkspaceId}:{normalizedPackageKind}:{now.ToUnixTimeMilliseconds()}"),
+                EvidenceLines: FinalizeLines(evidenceLines),
+                InitiatedByUserId: user.UserId,
+                GeneratedAtUtc: now);
+
+            _store.AftermathPackages.Add(package);
+            if (_store.AftermathPackages.Count > 64)
+            {
+                _store.AftermathPackages.RemoveRange(64, _store.AftermathPackages.Count - 64);
+            }
+
+            _store.PersistLocked();
+            return package;
         }
     }
 
@@ -1293,7 +1343,8 @@ public sealed class CampaignSpineService
         WorkspaceRestoreProjection restore,
         IReadOnlyList<RosterTransferProjection> transfers,
         IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
-        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts)
+        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
     {
         var workspaceCrews = crews
             .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
@@ -1321,6 +1372,11 @@ public sealed class CampaignSpineService
             .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(static item => item.StagedAtUtc)
+            .ToArray();
+        var workspaceAftermathPackages = aftermathPackages
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.GeneratedAtUtc)
             .ToArray();
 
         var readinessCues = new List<CampaignReadinessCue>();
@@ -1408,12 +1464,22 @@ public sealed class CampaignSpineService
                 Title: "Travel prefetch is staged",
                 Summary: $"{workspaceTravelPrefetches.Length} recent travel-prefetch receipt(s) keep the exact offline inventory deliberate and reviewable per claimed device."));
         }
+        if (workspaceAftermathPackages.Length > 0)
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:aftermath"),
+                Severity: "ready",
+                Title: "Aftermath recap package is attached",
+                Summary: $"{workspaceAftermathPackages.Length} governed recap package(s) keep run aftermath and next-session return reviewable instead of falling back to prose alone."));
+        }
 
-        var recapShelf = workspaceDossiers
+        var recapShelf = workspaceAftermathPackages
+            .Select(BuildAftermathRecapShelfProjection)
+            .Concat(workspaceDossiers
             .SelectMany(static item => item.Projections)
             .Where(item => item.Kind.Contains("recap", StringComparison.OrdinalIgnoreCase)
                 || item.Kind.Contains("runboard", StringComparison.OrdinalIgnoreCase)
-                || item.Kind.Contains("dossier", StringComparison.OrdinalIgnoreCase))
+                || item.Kind.Contains("dossier", StringComparison.OrdinalIgnoreCase)))
             .Distinct()
             .ToArray();
         var leadRun = workspaceRuns.FirstOrDefault();
@@ -1424,7 +1490,7 @@ public sealed class CampaignSpineService
                 && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase));
         var activeSceneSummary = DescribeActiveSceneSummary(leadRun, activeScene, leadObjective);
         var nextSafeAction = ResolveWorkspaceNextSafeAction(campaign, restore, recapShelf, readinessCues, leadRun, activeScene, leadObjective);
-        var changePackets = BuildWorkspaceChangePackets(campaign, recapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches);
+        var changePackets = BuildWorkspaceChangePackets(campaign, recapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages);
 
         return new CampaignWorkspaceProjection(
             WorkspaceId: workspaceId,
@@ -1445,7 +1511,8 @@ public sealed class CampaignSpineService
             Consequences: consequences,
             RosterTransfers: rosterTransfers,
             PrepLaunches: workspacePrepLaunches,
-            TravelPrefetches: workspaceTravelPrefetches);
+            TravelPrefetches: workspaceTravelPrefetches,
+            AftermathPackages: workspaceAftermathPackages);
     }
 
     private static bool IsOperatorRole(string role)
@@ -1714,7 +1781,8 @@ public sealed class CampaignSpineService
         ObjectiveProjection? leadObjective,
         IReadOnlyList<RosterTransferProjection> rosterTransfers,
         IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
-        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts)
+        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
     {
         List<WorkspaceChangePacketProjection> packets = [];
         if (campaign.LatestContinuity is not null)
@@ -1780,8 +1848,19 @@ public sealed class CampaignSpineService
                 UpdatedAtUtc: travelPrefetch.StagedAtUtc));
         }
 
+        AftermathRecapPackageProjection? aftermathPackage = aftermathPackages.FirstOrDefault();
+        if (aftermathPackage is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:aftermath:{aftermathPackage.PackageId}"),
+                Kind: "aftermath_recap",
+                Label: "Aftermath recap package",
+                Summary: aftermathPackage.Summary,
+                UpdatedAtUtc: aftermathPackage.GeneratedAtUtc));
+        }
+
         PublicationSafeProjection? recap = recapShelf.FirstOrDefault();
-        if (recap is not null)
+        if (recap is not null && aftermathPackage is null)
         {
             packets.Add(new WorkspaceChangePacketProjection(
                 PacketId: StableId("packet", $"{campaign.CampaignId}:recap:{recap.ProjectionId}"),
@@ -1796,6 +1875,14 @@ public sealed class CampaignSpineService
             .Take(4)
             .ToArray();
     }
+
+    private static PublicationSafeProjection BuildAftermathRecapShelfProjection(AftermathRecapPackageProjection package)
+        => new(
+            ProjectionId: package.PackageId,
+            Kind: package.PackageKind,
+            Label: package.Title,
+            Summary: package.Summary,
+            ArtifactId: package.ArtifactId);
 
     private static string DescribePrepLaunchSummary(
         CampaignWorkspaceProjection workspace,

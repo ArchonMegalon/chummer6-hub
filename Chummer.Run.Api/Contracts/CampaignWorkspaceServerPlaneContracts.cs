@@ -24,6 +24,7 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     IReadOnlyList<GovernedPrepLaunchProjection> PrepLaunches,
     TravelModeReadinessSummary TravelMode,
     IReadOnlyList<TravelPrefetchReceiptProjection> TravelPrefetches,
+    IReadOnlyList<AftermathRecapPackageProjection> AftermathPackages,
     NextSafeActionCue NextSafeAction,
     DateTimeOffset GeneratedAtUtc);
 
