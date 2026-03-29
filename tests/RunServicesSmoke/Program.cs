@@ -3276,6 +3276,28 @@ async Task VerifyGmOpsBoardWorkflowAsync()
     var listPayload = list?.Value as GmPrepAssetListResponse;
     Assert(listPayload?.TotalCount == 3, "ops-board list endpoint should optionally include reusable campaign prep assets");
     Assert(listPayload?.Items.Any(item => item.AssetId == reusableNote!.AssetId) == true, "ops-board list endpoint should surface reusable campaign prep assets when requested");
+
+    var libraryQuery = controller.ListPrepAssets(
+        campaignId: "campaign_smoke",
+        sessionId: "session_ops_smoke",
+        sceneId: "scene_smoke",
+        kind: null,
+        includeReusableCampaignAssets: true,
+        queryText: "reusable threat").Result as OkObjectResult;
+    var libraryQueryPayload = libraryQuery?.Value as GmPrepAssetListResponse;
+    Assert(libraryQueryPayload?.TotalCount == 1, "ops-board list endpoint should support reusable prep library search");
+    Assert(libraryQueryPayload?.Items[0].AssetId == reusableNote!.AssetId, "ops-board search should return the reusable prep asset that matches title and tag terms");
+
+    var checklistQuery = controller.ListPrepAssets(
+        campaignId: "campaign_smoke",
+        sessionId: "session_ops_smoke",
+        sceneId: "scene_smoke",
+        kind: null,
+        includeReusableCampaignAssets: false,
+        queryText: "escape vehicle").Result as OkObjectResult;
+    var checklistQueryPayload = checklistQuery?.Value as GmPrepAssetListResponse;
+    Assert(checklistQueryPayload?.TotalCount == 1, "ops-board list endpoint should support checklist label search");
+    Assert(checklistQueryPayload?.Items[0].AssetId == checklistCreated!.AssetId, "ops-board search should find scene prep by checklist label text");
 }
 
 void VerifyInteropWorkflow()

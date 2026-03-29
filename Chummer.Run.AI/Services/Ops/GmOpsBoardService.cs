@@ -15,7 +15,8 @@ public interface IGmOpsBoardService
         string? sessionId = null,
         string? sceneId = null,
         GmPrepAssetKind? kind = null,
-        bool includeReusableCampaignAssets = false);
+        bool includeReusableCampaignAssets = false,
+        string? queryText = null);
     GmPrepAssetRecord? UpdateChecklist(string assetId, GmPrepChecklistUpdateRequest request);
     GmPrepAssetRevealResult Reveal(string assetId, GmPrepAssetRevealRequest request);
     IReadOnlyList<GmPrepAssetRecord> ExportPortableAssets(
@@ -190,11 +191,13 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         string? sessionId = null,
         string? sceneId = null,
         GmPrepAssetKind? kind = null,
-        bool includeReusableCampaignAssets = false)
+        bool includeReusableCampaignAssets = false,
+        string? queryText = null)
     {
         var normalizedCampaignId = NormalizeOptional(campaignId);
         var normalizedSessionId = NormalizeOptional(sessionId);
         var normalizedSceneId = NormalizeOptional(sceneId);
+        var normalizedQueryText = NormalizeOptional(queryText);
         var items = _assets.Values
             .Where(item => kind is null || item.Kind == kind)
             .Where(item => MatchesPrepAssetContext(
@@ -203,6 +206,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 normalizedSessionId,
                 normalizedSceneId,
                 includeReusableCampaignAssets))
+            .Where(item => MatchesQueryText(item, normalizedQueryText))
             .OrderByDescending(item => item.UpdatedAtUtc)
             .ThenBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
             .Select(ToSummary)
@@ -364,6 +368,42 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             || string.Equals(item.SceneId, sceneId, StringComparison.OrdinalIgnoreCase);
         return reusableSessionMatch && reusableSceneMatch;
     }
+
+    private static bool MatchesQueryText(PrepAssetState item, string? queryText)
+    {
+        if (queryText is null)
+        {
+            return true;
+        }
+
+        var searchable = string.Join(' ', new[]
+        {
+            item.Title,
+            item.Summary ?? string.Empty,
+            item.Body,
+            string.Join(' ', item.Tags),
+            string.Join(' ', item.ChecklistItems.Select(static checklist => checklist.Label)),
+            string.Join(' ', item.ChecklistItems.Select(static checklist => checklist.Notes ?? string.Empty))
+        });
+
+        if (searchable.Contains(queryText, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        foreach (var token in TokenizeQueryText(queryText))
+        {
+            if (!searchable.Contains(token, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string[] TokenizeQueryText(string queryText) =>
+        queryText.Split([' ', '\t', '\r', '\n', ',', ';', ':', '/', '-', '_'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     public OfflineSyncSurfaceMergeResult ReconcilePortableAssets(IReadOnlyList<OfflineSyncPrepAsset> assets)
     {
