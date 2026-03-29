@@ -67,6 +67,7 @@
     var selectedSupportInstallationId = selectedSupportCase?.InstallationId;
     var selectedWorkspace = Model.SelectedWorkspace;
     var selectedWorkspaceServerPlane = Model.SelectedWorkspaceServerPlane;
+    var selectedWorkspaceRosterTransferPlan = Model.SelectedWorkspaceRosterTransferPlan;
     var selectedWorkspacePrepLibrarySearch = Model.SelectedWorkspacePrepLibrarySearch;
     var selectedWorkspacePrepLibraryQuery = Model.SelectedWorkspacePrepLibraryQuery;
     var selectedRun = Model.SelectedRun;
@@ -968,6 +969,64 @@
                                 </details>
                             }
 
+                            @if (selectedWorkspaceRosterTransferPlan is not null
+                                && selectedWorkspaceRosterTransferPlan.DossierOptions.Count > 0
+                                && selectedWorkspaceRosterTransferPlan.TargetGroups.Count > 0)
+                            {
+                                <details class="details-drawer">
+                                    <summary>Move governed roster state</summary>
+                                    <div class="settings-summary-list">
+                                        <div class="settings-summary-row">
+                                            <span>Movable dossiers</span>
+                                            <strong>@selectedWorkspaceRosterTransferPlan.DossierOptions.Count</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Target operator groups</span>
+                                            <strong>@selectedWorkspaceRosterTransferPlan.TargetGroups.Count</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Source campaign</span>
+                                            <strong>@selectedWorkspaceRosterTransferPlan.SourceCampaignName</strong>
+                                        </div>
+                                    </div>
+                                    <p><strong>Roster transfer:</strong> @selectedWorkspaceRosterTransferPlan.Summary</p>
+                                    <form id="rosterTransferForm" class="settings-form">
+                                        <div class="field">
+                                            <label for="rosterTransferDossier">Dossier</label>
+                                            <select id="rosterTransferDossier">
+                                                @foreach (var dossier in selectedWorkspaceRosterTransferPlan.DossierOptions)
+                                                {
+                                                    <option value="@dossier.DossierId">@dossier.DisplayName · @dossier.RunnerHandle · owner @dossier.CurrentOwnerDisplayName</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="field">
+                                            <label for="rosterTransferGroup">Target group</label>
+                                            <select id="rosterTransferGroup">
+                                                @foreach (var target in selectedWorkspaceRosterTransferPlan.TargetGroups)
+                                                {
+                                                    <option value="@target.GroupId">@target.GroupName · @HumanizeStatus(target.OperatorRole, "Operator")</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="field">
+                                            <label for="rosterTransferOwner">Target owner</label>
+                                            <select id="rosterTransferOwner"></select>
+                                        </div>
+                                        <div class="field">
+                                            <label for="rosterTransferCampaignTitle">Target campaign title</label>
+                                            <input id="rosterTransferCampaignTitle" placeholder="Use the target group's active campaign or create a transfer campaign" />
+                                        </div>
+                                        <div class="field">
+                                            <label for="rosterTransferNote">Operator note</label>
+                                            <textarea id="rosterTransferNote" rows="3" placeholder="Why is this dossier moving between rosters, campaigns, or owners?"></textarea>
+                                        </div>
+                                        <button class="button-like button-like--secondary" type="submit">Transfer governed roster state</button>
+                                        <p id="rosterTransferStatusNotice" class="muted-copy" hidden></p>
+                                    </form>
+                                </details>
+                            }
+
                             <details class="details-drawer">
                                 <summary>Rule and continuity health</summary>
                                 <ul class="muted-copy">
@@ -1593,6 +1652,21 @@
                                     </ul>
                                 </details>
                             }
+                            @if (op.RecentRosterTransfers is { Count: > 0 })
+                            {
+                                <details class="details-drawer">
+                                    <summary>Recent governed roster moves</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var transfer in op.RecentRosterTransfers)
+                                        {
+                                            <li>
+                                                <strong>@transfer.RunnerHandle:</strong> @transfer.Summary
+                                                <span> @transfer.TransferredAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
                         </details>
                     }
                     <p class="muted-copy">Recognition, badges, and sponsor motion stay secondary to campaign ownership, permissions, and real support closure.</p>
@@ -1714,6 +1788,7 @@
 (() => {
   const ui = window.ChummerUi;
   const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
+  const rosterTransferPlan = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceRosterTransferPlan));
   const revealHashTarget = () => {
     const hash = window.location.hash;
     if (!hash) return;
@@ -1742,6 +1817,45 @@
 
     form.addEventListener("submit", handler);
   };
+
+  const syncRosterTransferInputs = () => {
+    const dossierSelect = document.getElementById("rosterTransferDossier");
+    const groupSelect = document.getElementById("rosterTransferGroup");
+    const ownerSelect = document.getElementById("rosterTransferOwner");
+    const campaignInput = document.getElementById("rosterTransferCampaignTitle");
+    if (!dossierSelect || !groupSelect || !ownerSelect || !campaignInput) {
+      return;
+    }
+
+    const dossiers = Array.isArray(rosterTransferPlan?.DossierOptions) ? rosterTransferPlan.DossierOptions : [];
+    const targetGroups = Array.isArray(rosterTransferPlan?.TargetGroups) ? rosterTransferPlan.TargetGroups : [];
+    const selectedDossier = dossiers.find((item) => item.DossierId === dossierSelect.value) || dossiers[0];
+    const selectedGroup = targetGroups.find((item) => item.GroupId === groupSelect.value) || targetGroups[0];
+    ownerSelect.innerHTML = "";
+
+    const keepOwnerOption = document.createElement("option");
+    keepOwnerOption.value = "";
+    keepOwnerOption.textContent = selectedDossier?.CurrentOwnerDisplayName
+      ? `Keep current owner (${selectedDossier.CurrentOwnerDisplayName})`
+      : "Keep current owner";
+    ownerSelect.appendChild(keepOwnerOption);
+
+    const ownerOptions = Array.isArray(selectedGroup?.OwnerOptions) ? selectedGroup.OwnerOptions : [];
+    ownerOptions
+      .filter((item) => item.UserId !== selectedDossier?.CurrentOwnerUserId)
+      .forEach((item) => {
+        const option = document.createElement("option");
+        option.value = item.UserId;
+        option.textContent = `${item.DisplayName} (${ui.humanizeStatus(item.Role, "member")})`;
+        ownerSelect.appendChild(option);
+      });
+
+    campaignInput.placeholder = selectedGroup?.SuggestedCampaignTitle || "Use the target group's active campaign or create a transfer campaign";
+  };
+
+  syncRosterTransferInputs();
+  document.getElementById("rosterTransferDossier")?.addEventListener("change", syncRosterTransferInputs);
+  document.getElementById("rosterTransferGroup")?.addEventListener("change", syncRosterTransferInputs);
 
   bindSubmit("profileForm", async (event) => {
     event.preventDefault();
@@ -1849,6 +1963,40 @@
       ui.setNotice(notice, ui.describeError(error, "Participation settings could not be saved."), true);
     } finally {
       ui.setButtonBusy(button, false, "Saving...");
+    }
+  });
+
+  bindSubmit("rosterTransferForm", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("rosterTransferStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    const dossierSelect = document.getElementById("rosterTransferDossier");
+    const groupSelect = document.getElementById("rosterTransferGroup");
+    const ownerSelect = document.getElementById("rosterTransferOwner");
+    const campaignTitleInput = document.getElementById("rosterTransferCampaignTitle");
+    const noteInput = document.getElementById("rosterTransferNote");
+    if (!dossierSelect || !groupSelect || !ownerSelect || !campaignTitleInput || !noteInput) {
+      return;
+    }
+
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Moving...");
+    try {
+      await ui.requestJson("/api/v1/campaign-spine/me/roster-transfers", {
+        method: "POST",
+        json: {
+          dossierId: dossierSelect.value,
+          targetGroupId: groupSelect.value,
+          targetCampaignTitle: campaignTitleInput.value.trim() || null,
+          targetOwnerUserId: ownerSelect.value || null,
+          note: noteInput.value.trim() || null
+        }
+      });
+      window.location.href = "/account/work#community-ops";
+    } catch (error) {
+      ui.setNotice(notice, ui.describeError(error, "Roster transfer could not be recorded right now."), true);
+    } finally {
+      ui.setButtonBusy(button, false, "Moving...");
     }
   });
 

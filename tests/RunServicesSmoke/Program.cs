@@ -1613,6 +1613,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Advanced device recovery", StringComparison.Ordinal), "account access should use customer-facing recovery wording for advanced device details.");
     Assert(accountSource.Contains("Offline-ready return", StringComparison.Ordinal), "account access should describe claimed-device restore details in customer-facing offline-return wording.");
     Assert(accountSource.Contains("Roster transfer audit", StringComparison.Ordinal), "account work should expose explicit roster-transfer audit language on shared campaign views.");
+    Assert(accountSource.Contains("Move governed roster state", StringComparison.Ordinal), "account work should expose a real roster-transfer action instead of only historical audit receipts.");
+    Assert(accountSource.Contains("Recent governed roster moves", StringComparison.Ordinal), "account work should keep recent roster moves visible on the operator rail after ownership changes.");
+    Assert(accountSource.Contains("Transfer governed roster state", StringComparison.Ordinal), "account work should give operators a direct governed roster-transfer action.");
     var downloadDispatchSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
     var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
@@ -2214,6 +2217,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal), "campaign spine server plane api should carry prep packets into the bounded prefetch inventory summary.");
     Assert(workspaceServerPlanePayload.TravelMode.Boundaries.Any(item => item.Contains("Install-local caches", StringComparison.OrdinalIgnoreCase)), "campaign spine server plane api should keep travel boundaries explicit.");
     Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.NextSafeAction.Summary), "campaign spine server plane api should expose one bounded next safe action.");
+    var rosterTransferPlanResult = await campaignSpineController.GetMyCampaignWorkspaceRosterTransferPlan(workspaceId, CancellationToken.None);
+    var rosterTransferPlanPayload = (rosterTransferPlanResult.Result as OkObjectResult)?.Value as RosterTransferPlannerProjection ?? rosterTransferPlanResult.Value;
+    Assert(rosterTransferPlanPayload is not null && string.Equals(rosterTransferPlanPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine roster-transfer planner api should stay attached to the selected shared campaign view.");
+    Assert(rosterTransferPlanPayload!.DossierOptions.Count >= 1, "campaign spine roster-transfer planner api should expose governed dossier choices for the selected workspace.");
+    Assert(rosterTransferPlanPayload.TargetGroups.Count >= 1, "campaign spine roster-transfer planner api should expose operator-manageable target groups.");
+    Assert(rosterTransferPlanPayload.TargetGroups.Any(item => item.OwnerOptions.Count >= 1), "campaign spine roster-transfer planner api should expose target-owner choices from operator groups.");
     var prepLibraryResult = await campaignSpineController.GetMyCampaignWorkspacePrepLibrary(workspaceId, "opposition", CancellationToken.None);
     var prepLibraryPayload = (prepLibraryResult.Result as OkObjectResult)?.Value as CampaignPrepLibrarySearchResponse ?? prepLibraryResult.Value;
     Assert(prepLibraryPayload is not null && string.Equals(prepLibraryPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine prep-library api should expose the same stable workspace id.");
@@ -2427,6 +2436,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RuleEnvironmentHealth.Count >= 1, "account workspace detail route should expose rule-environment health cues from the workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.Label), "account workspace detail route should expose one bounded workspace-state label.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.EvidenceLines.Count >= 1, "account workspace detail route should expose evidence for the bounded workspace state.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceRosterTransferPlan is not null, "account workspace detail route should expose the governed roster-transfer planner on the selected shared campaign view.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceRosterTransferPlan?.DossierOptions.Count >= 1, "account workspace detail route should keep movable governed dossiers visible on the roster-transfer planner.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceRosterTransferPlan?.TargetGroups.Count >= 1, "account workspace detail route should keep operator-manageable target groups visible on the roster-transfer planner.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "account workspace detail route should surface the governed GM prep library.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.TravelReadyDeviceCount >= 1, "account workspace detail route should surface safehouse/travel readiness.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "account workspace detail route should explain that prep packets are carried in the prefetch inventory.");
@@ -2570,6 +2582,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var outsiderWorkspaceServerPlanePayload = (outsiderWorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? outsiderWorkspaceServerPlaneResult.Value;
     Assert(outsiderWorkspaceServerPlanePayload is not null && outsiderWorkspaceServerPlanePayload.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)), "target workspace server plane should preserve the roster-transfer receipt.");
     Assert(outsiderWorkspaceServerPlanePayload!.ChangePackets.Any(item => string.Equals(item.Kind, "roster_transfer", StringComparison.Ordinal)), "target workspace server plane should project roster transfer as a first-class change packet.");
+    var operatorWorkPage = await accountController.AccountPage(section: "work", caseId: null, CancellationToken.None) as ViewResult;
+    var operatorWorkModel = operatorWorkPage?.Model as AccountPageViewModel;
+    Assert(operatorWorkModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true, "account work should keep recent governed roster moves visible on the operator rail after a transfer.");
 
     var outsiderTransferDenied = await outsiderCampaignSpineController.TransferMyRoster(
         new RosterTransferRequest(

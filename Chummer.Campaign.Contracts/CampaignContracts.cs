@@ -89,12 +89,44 @@ public sealed record RosterTransferProjection(
     DateTimeOffset TransferredAtUtc);
 
 public sealed record RosterTransferRequest(
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string DossierId,
-    [property: Required(AllowEmptyStrings = false), StringLength(128)] string TargetGroupId,
-    [property: StringLength(128)] string? TargetCampaignId = null,
-    [property: StringLength(128)] string? TargetCampaignTitle = null,
-    [property: StringLength(128)] string? TargetOwnerUserId = null,
-    [property: StringLength(256)] string? Note = null);
+    [Required(AllowEmptyStrings = false), StringLength(128)] string DossierId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string TargetGroupId,
+    [StringLength(128)] string? TargetCampaignId = null,
+    [StringLength(128)] string? TargetCampaignTitle = null,
+    [StringLength(128)] string? TargetOwnerUserId = null,
+    [StringLength(256)] string? Note = null);
+
+public sealed record RosterTransferCandidateProjection(
+    string DossierId,
+    string RunnerHandle,
+    string DisplayName,
+    string CurrentOwnerUserId,
+    string CurrentOwnerDisplayName,
+    string CurrentCampaignId,
+    string CurrentCampaignName);
+
+public sealed record RosterTransferOwnerOptionProjection(
+    string UserId,
+    string DisplayName,
+    string Role);
+
+public sealed record RosterTransferTargetGroupProjection(
+    string GroupId,
+    string GroupName,
+    string GroupType,
+    string OperatorRole,
+    string SuggestedCampaignTitle,
+    IReadOnlyList<RosterTransferOwnerOptionProjection> OwnerOptions);
+
+public sealed record RosterTransferPlannerProjection(
+    string WorkspaceId,
+    string SourceGroupId,
+    string SourceGroupName,
+    string SourceCampaignId,
+    string SourceCampaignName,
+    string Summary,
+    IReadOnlyList<RosterTransferCandidateProjection> DossierOptions,
+    IReadOnlyList<RosterTransferTargetGroupProjection> TargetGroups);
 
 public sealed record RunnerDossierProjection(
     string DossierId,
@@ -203,7 +235,8 @@ public sealed record CommunityOperatorProjection(
     IReadOnlyList<string> Capabilities,
     int MemberCount,
     int ActiveCampaignCount,
-    int ActiveSponsorSessionCount);
+    int ActiveSponsorSessionCount,
+    IReadOnlyList<RosterTransferProjection>? RecentRosterTransfers = null);
 
 public sealed record CampaignReadinessCue(
     string CueId,
