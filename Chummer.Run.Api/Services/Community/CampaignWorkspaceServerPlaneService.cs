@@ -107,6 +107,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             TravelMode: travelMode,
             TravelPrefetches: context.Workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>(),
             AftermathPackages: context.Workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>(),
+            NextSessionCarryForward: context.Workspace.NextSessionCarryForward,
             NextSafeAction: nextSafeAction,
             GeneratedAtUtc: context.GeneratedAtUtc);
     }
@@ -274,6 +275,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 workspace.PrepLaunches?.FirstOrDefault()?.LaunchedAtUtc,
                 workspace.TravelPrefetches?.FirstOrDefault()?.StagedAtUtc,
                 workspace.AftermathPackages?.FirstOrDefault()?.GeneratedAtUtc,
+                workspace.NextSessionCarryForward?.UpdatedAtUtc,
                 leadRun?.UpdatedAtUtc
             }
             .Concat(relevantCases.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))

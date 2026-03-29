@@ -651,6 +651,10 @@ public sealed class CampaignSpineService
                 .Take(2)
                 .Select(static packet => $"{packet.Label} — {packet.Summary}")
             ?? []);
+        if (workspace.NextSessionCarryForward is not null)
+        {
+            readinessHighlights.Add($"Next session — {workspace.NextSessionCarryForward.Summary}");
+        }
         readinessHighlights.AddRange(
             workspace.Consequences?
                 .Take(2)
@@ -1490,7 +1494,8 @@ public sealed class CampaignSpineService
                 && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase));
         var activeSceneSummary = DescribeActiveSceneSummary(leadRun, activeScene, leadObjective);
         var nextSafeAction = ResolveWorkspaceNextSafeAction(campaign, restore, recapShelf, readinessCues, leadRun, activeScene, leadObjective);
-        var changePackets = BuildWorkspaceChangePackets(campaign, recapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages);
+        var nextSessionCarryForward = BuildNextSessionCarryForward(campaign, nextSafeAction, leadRun, activeScene, leadObjective, consequences, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages);
+        var changePackets = BuildWorkspaceChangePackets(campaign, recapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages, nextSessionCarryForward);
 
         return new CampaignWorkspaceProjection(
             WorkspaceId: workspaceId,
@@ -1512,7 +1517,8 @@ public sealed class CampaignSpineService
             RosterTransfers: rosterTransfers,
             PrepLaunches: workspacePrepLaunches,
             TravelPrefetches: workspaceTravelPrefetches,
-            AftermathPackages: workspaceAftermathPackages);
+            AftermathPackages: workspaceAftermathPackages,
+            NextSessionCarryForward: nextSessionCarryForward);
     }
 
     private static bool IsOperatorRole(string role)
@@ -1773,6 +1779,108 @@ public sealed class CampaignSpineService
         return $"Open {campaign.Name} from the latest continuity snapshot and keep the shared return lane attached to the current claimed install.";
     }
 
+    private static NextSessionCarryForwardProjection? BuildNextSessionCarryForward(
+        CampaignProjection campaign,
+        string nextSafeAction,
+        RunProjection? leadRun,
+        SceneProjection? activeScene,
+        ObjectiveProjection? leadObjective,
+        IReadOnlyList<CampaignConsequenceProjection> consequences,
+        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
+        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+    {
+        ContinuitySnapshotRef? continuity = campaign.LatestContinuity;
+        CampaignConsequenceProjection? leadConsequence = consequences.FirstOrDefault();
+        GovernedPrepLaunchProjection? leadPrepLaunch = prepLaunches.FirstOrDefault();
+        TravelPrefetchReceiptProjection? leadTravelPrefetch = travelPrefetchReceipts.FirstOrDefault();
+        AftermathRecapPackageProjection? leadAftermathPackage = aftermathPackages.FirstOrDefault();
+
+        if (continuity is null
+            && leadConsequence is null
+            && leadPrepLaunch is null
+            && leadTravelPrefetch is null
+            && leadAftermathPackage is null
+            && activeScene is null
+            && leadObjective is null)
+        {
+            return null;
+        }
+
+        string summary;
+        if (leadAftermathPackage is not null && activeScene is not null && leadObjective is not null)
+        {
+            summary = $"{leadAftermathPackage.Title} keeps {activeScene.Title} and {leadObjective.Title} reviewable before the next session resumes.";
+        }
+        else if (leadAftermathPackage is not null && leadObjective is not null)
+        {
+            summary = $"{leadAftermathPackage.Title} keeps {leadObjective.Title} reviewable before {leadRun?.Title ?? campaign.Name} resumes.";
+        }
+        else if (activeScene is not null && leadObjective is not null)
+        {
+            summary = $"{activeScene.Title} and {leadObjective.Title} stay pinned as the governed next-session return for {leadRun!.Title}.";
+        }
+        else if (leadAftermathPackage is not null)
+        {
+            summary = $"{leadAftermathPackage.Title} is pinned as the recap-safe carry-forward packet for {campaign.Name}.";
+        }
+        else if (leadConsequence is not null)
+        {
+            summary = $"{leadConsequence.Label} stays attached to the next-session return for {campaign.Name}.";
+        }
+        else if (activeScene is not null)
+        {
+            summary = $"{activeScene.Title} stays pinned as the live scene for the next session return.";
+        }
+        else
+        {
+            summary = continuity?.Summary ?? campaign.Summary;
+        }
+
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                continuity?.CapturedAtUtc,
+                activeScene?.UpdatedAtUtc,
+                leadObjective?.UpdatedAtUtc,
+                leadConsequence?.UpdatedAtUtc,
+                leadPrepLaunch?.LaunchedAtUtc,
+                leadTravelPrefetch?.StagedAtUtc,
+                leadAftermathPackage?.GeneratedAtUtc
+            }
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.UtcNow)
+            .Max();
+
+        string prepBindingSummary = leadPrepLaunch is null
+            ? string.Empty
+            : string.IsNullOrWhiteSpace(leadPrepLaunch.TargetSceneTitle)
+                ? $"{leadPrepLaunch.PacketTitle} stays bound to {(leadPrepLaunch.TargetRunTitle ?? campaign.Name)}."
+                : $"{leadPrepLaunch.PacketTitle} stays bound to {leadPrepLaunch.TargetRunTitle} / {leadPrepLaunch.TargetSceneTitle}.";
+        string travelSummary = leadTravelPrefetch is null
+            ? string.Empty
+            : $"{leadTravelPrefetch.DeviceRole} on {leadTravelPrefetch.Platform} already has the staged travel packet.";
+
+        return new NextSessionCarryForwardProjection(
+            CarryForwardId: StableId("next-session", $"{campaign.CampaignId}:{updatedAtUtc.ToUnixTimeMilliseconds()}"),
+            Label: "Next-session carry-forward",
+            Summary: summary,
+            ReturnSummary: continuity?.Summary ?? campaign.Summary,
+            NextSafeAction: nextSafeAction,
+            EvidenceLines: FinalizeLines(
+            [
+                continuity?.Summary ?? campaign.Summary,
+                activeScene is null ? string.Empty : $"{activeScene.Title} is live on {leadRun!.Title} at {activeScene.Revision}.",
+                leadObjective is null ? string.Empty : $"{leadObjective.Title} stays {leadObjective.Status} with {leadObjective.Pressure} pressure.",
+                leadAftermathPackage is null ? string.Empty : $"{leadAftermathPackage.Title}: {leadAftermathPackage.Summary}",
+                leadConsequence?.EvidenceLines.FirstOrDefault() ?? leadConsequence?.Summary ?? string.Empty,
+                prepBindingSummary,
+                travelSummary,
+                nextSafeAction
+            ]),
+            UpdatedAtUtc: updatedAtUtc);
+    }
+
     private static IReadOnlyList<WorkspaceChangePacketProjection> BuildWorkspaceChangePackets(
         CampaignProjection campaign,
         IReadOnlyList<PublicationSafeProjection> recapShelf,
@@ -1782,9 +1890,20 @@ public sealed class CampaignSpineService
         IReadOnlyList<RosterTransferProjection> rosterTransfers,
         IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
         IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
-        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages,
+        NextSessionCarryForwardProjection? nextSessionCarryForward)
     {
         List<WorkspaceChangePacketProjection> packets = [];
+        if (nextSessionCarryForward is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: nextSessionCarryForward.CarryForwardId,
+                Kind: "next_session_carry_forward",
+                Label: nextSessionCarryForward.Label,
+                Summary: nextSessionCarryForward.Summary,
+                UpdatedAtUtc: nextSessionCarryForward.UpdatedAtUtc));
+        }
+
         if (campaign.LatestContinuity is not null)
         {
             packets.Add(new WorkspaceChangePacketProjection(
