@@ -1275,6 +1275,18 @@ public sealed class CampaignSpineService
                 var progressionLabel = workspace is null ? "Ready to seed into a campaign" : "25 / 50 / 100 Karma path stays attached to the campaign return";
                 var nextSafeAction = ResolveBuildLabNextSafeAction(workspace, outputs, restore);
                 var runtimeCompatibilitySummary = DescribeBuildLabRuntimeCompatibility(runtimeFingerprint, workspace, restore);
+                var attachedOutputSummary = outputs.Length switch
+                {
+                    1 => "1 dossier or campaign-safe output is already attached to this handoff.",
+                    > 1 => $"{outputs.Length} dossier or campaign-safe outputs are already attached to this handoff.",
+                    _ => null
+                };
+                var readyOutputSummary = outputs.Length switch
+                {
+                    1 => "1 dossier or campaign-safe output is already ready for export and recap follow-through.",
+                    > 1 => $"{outputs.Length} dossier or campaign-safe outputs are already ready for export and recap follow-through.",
+                    _ => "Publication-safe outputs will appear as recap and dossier cards once the first run lands."
+                };
                 var campaignReturnSummary = workspace?.ReturnSummary
                     ?? "No campaign workspace is attached yet, so return still lands on the living dossier until the first governed campaign handoff exists.";
                 var supportClosureSummary = DescribeBuildLabSupportClosure(runtimeFingerprint, restore);
@@ -1290,17 +1302,17 @@ public sealed class CampaignSpineService
                     ExplainEntryId: $"buildlab.handoff.{dossier.DossierId}",
                     TradeoffLines:
                     [
-                        "Role overlap stays explicit before the handoff leaves build comparison.",
+                        attachedOutputSummary ?? "Role overlap stays explicit before the handoff leaves build comparison.",
                         workspace is null
                             ? "No campaign workspace is attached yet, so the handoff seeds the dossier first."
-                            : $"Campaign workspace {workspace.CampaignName} keeps the downstream continuity target visible."
+                            : $"Campaign workspace {workspace.CampaignName} keeps the downstream continuity target visible and the same upgrade path attached."
                     ],
                     ProgressionOutcomes:
                     [
-                        "Chosen variant keeps the next safe upgrade checkpoints attached to the dossier.",
-                        outputs.Length > 0
-                            ? "Export targets already point at dossier and campaign-safe outputs."
-                            : "Publication-safe outputs will appear as recap and dossier cards once the first run lands."
+                        workspace is null
+                            ? "25 / 50 / 100 Karma checkpoints stay attached to the living dossier until the first governed campaign workspace exists."
+                            : $"25 / 50 / 100 Karma checkpoints stay attached to {workspace.CampaignName} so the return path keeps the same upgrade plan.",
+                        readyOutputSummary
                     ],
                     Outputs: outputs,
                     UpdatedAtUtc: dossier.UpdatedAtUtc,
