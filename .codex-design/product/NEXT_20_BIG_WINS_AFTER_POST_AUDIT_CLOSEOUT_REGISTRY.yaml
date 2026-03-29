@@ -311,7 +311,7 @@ milestones:
       - chummer6-hub
       - chummer6-core
       - chummer6-design
-    status: in_progress
+    status: completed
     exit_criteria:
       - New users can reach a legal, understandable, playable runner and a campaign-ready first session without repo knowledge.
       - Guided onboarding reuses grounded explain, support, and campaign truth instead of parallel tutorial folklore.
