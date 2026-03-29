@@ -778,6 +778,12 @@ public sealed class PublicLandingController : Controller
             microProof.Add($"{historySnapshotCount} measured snapshot(s)");
         }
 
+        if (pulse.ClosureHealthWaitingCount is int closureWaitingCount
+            && pulse.ClosureHealthPendingHumanResponseCount is int pendingHumanResponseCount)
+        {
+            microProof.Add($"{closureWaitingCount} waiting closure / {pendingHumanResponseCount} pending human response");
+        }
+
         var rows = new List<PublicTrustPulseRowViewModel>
         {
             new("Recommended now", BuildTrustPulseRecommendedSummary(manifest, releaseExperience)),
@@ -785,6 +791,7 @@ public sealed class PublicLandingController : Controller
             new("Release proof", BuildReleaseProofSummary(manifest)),
             new("Launch readiness", BuildTrustPulseLaunchReadinessSummary(pulse)),
             new("Provider-route stewardship", BuildProviderRouteStewardshipSummary(pulse)),
+            new("Closure health", BuildTrustPulseClosureHealthSummary(pulse)),
             new("Adoption health", BuildTrustPulseAdoptionSummary(pulse)),
             new("Progress trend", BuildTrustPulseProgressTrendSummary(pulse)),
             new("Journey pulse", BuildJourneyPulseSummary(pulse)),
@@ -1281,6 +1288,25 @@ public sealed class PublicLandingController : Controller
         return segments.Count == 0
             ? "Measured adoption evidence is still accumulating."
             : string.Join(" ", segments);
+    }
+
+    private static string BuildTrustPulseClosureHealthSummary(PublicTrustPulseSnapshot pulse)
+    {
+        if (!string.IsNullOrWhiteSpace(pulse.ClosureHealthSummary))
+        {
+            return pulse.ClosureHealthSummary!;
+        }
+
+        if (pulse.ClosureHealthWaitingCount is int waitingCount
+            && pulse.ClosureHealthPendingHumanResponseCount is int pendingCount)
+        {
+            string openCaseSegment = pulse.ClosureHealthOpenCaseCount is int openCaseCount
+                ? $" {openCaseCount} open support packet(s) remain."
+                : string.Empty;
+            return $"{waitingCount} waiting closure / {pendingCount} pending human response.{openCaseSegment}".Trim();
+        }
+
+        return "Closure health is waiting on current support-packet evidence.";
     }
 
     private static string BuildTrustPulseProgressTrendSummary(PublicTrustPulseSnapshot pulse)

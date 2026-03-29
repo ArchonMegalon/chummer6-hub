@@ -14,6 +14,33 @@ Updated: 2026-03-29T21:20:00+02:00
 - Cross-repo build blocker from prior runs was the duplicated-attribute failure in `chummer-core-engine/Chummer.Contracts` during docker rebuild; resolved by pruning generated local artifacts in that adjacent repo before build (`../chummer-core-engine/Chummer.Contracts/obj_tmp` and stale `obj`) and not committing those external repo changes.
 - Working tree for this repo is currently clean after cleanup; no untracked artifacts remain.
 
+## Handoff refresh (2026-03-29T22:05:00+02:00)
+
+- Product pulse v2 moved from mostly mirrored-static trust fields to a synthesized evidence path:
+  - Added `WeeklyProductPulseArtifactService` to compose `/api/public/weekly-pulse` from the mirrored pulse plus live evidence overlays from:
+    - `.codex-design/product/PROGRESS_REPORT.generated.json`
+    - `.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json`
+    - `/docker/fleet/.codex-studio/published/JOURNEY_GATES.generated.json`
+    - `/docker/fleet/.codex-studio/published/SUPPORT_CASE_PACKETS.generated.json`
+    - `/docker/fleet/.codex-studio/published/STATUS_PLANE.generated.yaml`
+- Public trust surfaces now expose a first-class `Closure health` row backed by the synthesized weekly pulse instead of leaving support follow-through trapped in packet artifacts.
+- `PublicTrustPulseService` now reads the synthesized weekly pulse JSON rather than loading the mirrored pulse file directly.
+- Mirrored `WEEKLY_PRODUCT_PULSE.generated.json` was refreshed to include the new `closure_health` block and the updated summary language.
+- Verification added:
+  - new unit tests for `WeeklyProductPulseArtifactService`
+  - extended trust-pulse service tests for closure-health derivation
+  - entry-point/design-mirror assertions updated for the synthesized pulse path
+  - run-services smoke now asserts `Closure health` on landing and current-release trust panels
+- Full post-change verification passed:
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "WeeklyProductPulseArtifactServiceTests|PublicTrustPulseServiceTests|VerificationEntryPointTests|DesignMirrorExecutionPlanTests"`
+  - `bash scripts/ai/run_services_smoke.sh`
+  - `bash scripts/run_smoke.sh`
+  - `docker compose -f docker-compose.public-edge.yml up -d --build`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
+  - `bash scripts/audit-compliance.sh`
+
 ## Current state (2026-03-29T21:33:00+02:00)
 
 - Implemented trust-pulse trend surfacing from `PROGRESS_HISTORY.generated.json` into public trust rows.

@@ -63,16 +63,39 @@ public sealed class PublicTrustPulseServiceTests
         Assert.Equal("2026-03-29", snapshot.ProgressTrendToAsOf);
     }
 
+    [Fact]
+    public void LoadSnapshotReadsClosureHealthFromSynthesizedWeeklyPulse()
+    {
+        using var fixture = new PublicTrustPulseFixture();
+        fixture.WritePulse("chummer.weekly_product_pulse");
+        fixture.WriteJourneyGates(waitingClosureCount: 2, pendingHumanResponseCount: 1, blockedCount: 1, warningCount: 0);
+        fixture.WriteSupportPackets(openCaseCount: 3, reportedCaseCount: 5, materializedCount: 4, designImpactCount: 1);
+        fixture.WriteStatusPlane();
+        fixture.WriteLocalReleaseProof("passed");
+
+        var snapshot = fixture.CreateService().LoadSnapshot();
+
+        Assert.NotNull(snapshot);
+        Assert.Equal("watch", snapshot!.ClosureHealthState);
+        Assert.Equal(3, snapshot.ClosureHealthOpenCaseCount);
+        Assert.Equal(2, snapshot.ClosureHealthWaitingCount);
+        Assert.Equal(1, snapshot.ClosureHealthPendingHumanResponseCount);
+        Assert.Contains("waiting closure", snapshot.ClosureHealthSummary, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class PublicTrustPulseFixture : IDisposable
     {
         private readonly string _root;
         private readonly string _canonRoot;
+        private readonly string _fleetArtifactsRoot;
 
         public PublicTrustPulseFixture()
         {
             _root = Path.Combine(Path.GetTempPath(), "public-trust-pulse-tests", Guid.NewGuid().ToString("N"));
             _canonRoot = Path.Combine(_root, "repo");
+            _fleetArtifactsRoot = Path.Combine(_root, "fleet", ".codex-studio", "published");
             Directory.CreateDirectory(_canonRoot);
+            Directory.CreateDirectory(_fleetArtifactsRoot);
         }
 
         public PublicTrustPulseService CreateService()
@@ -80,11 +103,13 @@ public sealed class PublicTrustPulseServiceTests
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["CHUMMER_PUBLIC_CANON_ROOT"] = _canonRoot
+                    ["CHUMMER_PUBLIC_CANON_ROOT"] = _canonRoot,
+                    ["CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT"] = _fleetArtifactsRoot
                 })
                 .Build();
 
-            return new PublicTrustPulseService(configuration, NullLogger<PublicTrustPulseService>.Instance);
+            var weeklyPulse = new WeeklyProductPulseArtifactService(configuration, NullLogger<WeeklyProductPulseArtifactService>.Instance);
+            return new PublicTrustPulseService(weeklyPulse, configuration, NullLogger<PublicTrustPulseService>.Instance);
         }
 
         public void WritePulse(string contractName)
@@ -198,6 +223,92 @@ public sealed class PublicTrustPulseServiceTests
                             ["overall_progress_percent"] = 91
                         }
                     }
+                }));
+        }
+
+        public void WriteJourneyGates(int waitingClosureCount, int pendingHumanResponseCount, int blockedCount, int warningCount)
+        {
+            File.WriteAllText(
+                Path.Combine(_fleetArtifactsRoot, "JOURNEY_GATES.generated.json"),
+                JsonSerializer.Serialize(new Dictionary<string, object?>
+                {
+                    ["contract_name"] = "fleet.journey_gates",
+                    ["generated_at"] = "2026-03-29T09:01:00Z",
+                    ["summary"] = new Dictionary<string, object?>
+                    {
+                        ["overall_state"] = blockedCount > 0 ? "blocked" : "ready",
+                        ["blocked_count"] = blockedCount,
+                        ["warning_count"] = warningCount,
+                        ["recommended_action"] = "Resolve the blocking golden-journey gaps before widening publish claims."
+                    },
+                    ["journeys"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["signals"] = new Dictionary<string, object?>
+                            {
+                                ["support_closure_waiting_count"] = waitingClosureCount,
+                                ["support_needs_human_response_count"] = pendingHumanResponseCount
+                            }
+                        }
+                    }
+                }));
+        }
+
+        public void WriteSupportPackets(int openCaseCount, int reportedCaseCount, int materializedCount, int designImpactCount)
+        {
+            File.WriteAllText(
+                Path.Combine(_fleetArtifactsRoot, "SUPPORT_CASE_PACKETS.generated.json"),
+                JsonSerializer.Serialize(new Dictionary<string, object?>
+                {
+                    ["contract_name"] = "fleet.support_case_packets",
+                    ["generated_at"] = "2026-03-29T09:02:00Z",
+                    ["source"] = new Dictionary<string, object?>
+                    {
+                        ["materialized_count"] = materializedCount,
+                        ["reported_count"] = reportedCaseCount
+                    },
+                    ["summary"] = new Dictionary<string, object?>
+                    {
+                        ["open_case_count"] = openCaseCount,
+                        ["design_impact_count"] = designImpactCount
+                    }
+                }));
+        }
+
+        public void WriteStatusPlane()
+        {
+            File.WriteAllText(
+                Path.Combine(_fleetArtifactsRoot, "STATUS_PLANE.generated.yaml"),
+                """
+contract_name: fleet.status_plane
+generated_at: '2026-03-29T09:03:00Z'
+deployment_posture:
+  public_target_count: 4
+runtime_healing:
+  summary:
+    degraded_service_count: 0
+    alert_state: healthy
+projects:
+  - id: hub
+    deployment_promotion_stage: promoted_preview
+    deployment_access_posture: public
+""");
+        }
+
+        public void WriteLocalReleaseProof(string status)
+        {
+            var proofDir = Path.Combine(_canonRoot, ".codex-studio", "published");
+            Directory.CreateDirectory(proofDir);
+            File.WriteAllText(
+                Path.Combine(proofDir, "HUB_LOCAL_RELEASE_PROOF.generated.json"),
+                JsonSerializer.Serialize(new Dictionary<string, object?>
+                {
+                    ["contract_name"] = "chummer6-hub.local_release_proof",
+                    ["generated_at"] = "2026-03-29T09:04:00Z",
+                    ["status"] = status,
+                    ["journeys_passed"] = new[] { "install_claim_restore_continue", "build_explain_publish" },
+                    ["proof_routes"] = new[] { "/", "/downloads", "/help" }
                 }));
         }
 

@@ -6,27 +6,30 @@ namespace Chummer.Run.Api.Services;
 public sealed class PublicTrustPulseService
 {
     private const int MaxProgressTrendSamples = 8;
-    private const string DefaultPulseRelativePath = ".codex-design/product/WEEKLY_PRODUCT_PULSE.generated.json";
     private const string DefaultProgressHistoryRelativePath = ".codex-design/product/PROGRESS_HISTORY.generated.json";
     private const string DefaultProgressReportRelativePath = ".codex-design/product/PROGRESS_REPORT.generated.json";
     private const string DefaultLocalReleaseProofRelativePath = ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json";
-    private const string PulseFileKey = "CHUMMER_PUBLIC_WEEKLY_PULSE_FILE";
     private const string ProgressHistoryFileKey = "CHUMMER_PUBLIC_PROGRESS_HISTORY_FILE";
     private const string ProgressReportFileKey = "CHUMMER_PUBLIC_PROGRESS_REPORT_FILE";
     private const string LocalReleaseProofFileKey = "CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE";
+    private readonly WeeklyProductPulseArtifactService _weeklyPulse;
     private readonly IConfiguration _configuration;
     private readonly ILogger<PublicTrustPulseService> _logger;
 
-    public PublicTrustPulseService(IConfiguration configuration, ILogger<PublicTrustPulseService> logger)
+    public PublicTrustPulseService(
+        WeeklyProductPulseArtifactService weeklyPulse,
+        IConfiguration configuration,
+        ILogger<PublicTrustPulseService> logger)
     {
+        _weeklyPulse = weeklyPulse;
         _configuration = configuration;
         _logger = logger;
     }
 
     public PublicTrustPulseSnapshot? LoadSnapshot()
     {
-        string? pulsePath = ResolvePulsePath();
-        if (string.IsNullOrWhiteSpace(pulsePath) || !File.Exists(pulsePath))
+        string pulseJson = _weeklyPulse.LoadWeeklyPulseJson();
+        if (string.IsNullOrWhiteSpace(pulseJson))
         {
             return null;
         }
@@ -34,7 +37,7 @@ public sealed class PublicTrustPulseService
         try
         {
             var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
-            var payload = JsonSerializer.Deserialize<WeeklyProductPulsePayload>(File.ReadAllText(pulsePath), options);
+            var payload = JsonSerializer.Deserialize<WeeklyProductPulsePayload>(pulseJson, options);
             if (payload is null
                 || !string.Equals(payload.ContractName, "chummer.weekly_product_pulse", StringComparison.Ordinal))
             {
@@ -88,6 +91,11 @@ public sealed class PublicTrustPulseService
                 ProviderRouteCanary: payload.SupportingSignals?.ProviderRouteStewardship?.CanaryStatus,
                 ProviderRouteReviewDue: payload.SupportingSignals?.ProviderRouteStewardship?.ReviewDue,
                 ProviderRouteNextDecision: payload.SupportingSignals?.ProviderRouteStewardship?.NextDecision,
+                ClosureHealthState: payload.SupportingSignals?.ClosureHealth?.State,
+                ClosureHealthOpenCaseCount: payload.SupportingSignals?.ClosureHealth?.OpenCaseCount,
+                ClosureHealthWaitingCount: payload.SupportingSignals?.ClosureHealth?.WaitingClosureCount,
+                ClosureHealthPendingHumanResponseCount: payload.SupportingSignals?.ClosureHealth?.PendingHumanResponseCount,
+                ClosureHealthSummary: payload.SupportingSignals?.ClosureHealth?.Summary,
                 NextCheckpointQuestion: payload.NextCheckpointQuestion,
                 LocalReleaseProofStatus: localReleaseProof?.Status,
                 ProvenJourneyCount: localReleaseProof?.JourneysPassed?.Count,
@@ -95,7 +103,7 @@ public sealed class PublicTrustPulseService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Skipping public trust pulse after load failure from {Path}.", pulsePath);
+            _logger.LogWarning(ex, "Skipping public trust pulse after load failure from synthesized weekly pulse.");
             return null;
         }
     }
@@ -123,8 +131,6 @@ public sealed class PublicTrustPulseService
             return null;
         }
     }
-
-    private string? ResolvePulsePath() => ResolveExistingPath(PulseFileKey, DefaultPulseRelativePath);
 
     private string? ResolveProgressReportPath() => ResolveExistingPath(ProgressReportFileKey, DefaultProgressReportRelativePath);
 
@@ -234,13 +240,21 @@ public sealed class PublicTrustPulseService
         [property: JsonPropertyName("history_snapshot_count")] int? HistorySnapshotCount,
         [property: JsonPropertyName("longest_pole")] string? LongestPole,
         [property: JsonPropertyName("launch_readiness")] string? LaunchReadiness,
-        [property: JsonPropertyName("provider_route_stewardship")] WeeklyProductPulseProviderRouteStewardship? ProviderRouteStewardship);
+        [property: JsonPropertyName("provider_route_stewardship")] WeeklyProductPulseProviderRouteStewardship? ProviderRouteStewardship,
+        [property: JsonPropertyName("closure_health")] WeeklyProductPulseClosureHealth? ClosureHealth);
 
     private sealed record WeeklyProductPulseProviderRouteStewardship(
         [property: JsonPropertyName("default_status")] string? DefaultStatus,
         [property: JsonPropertyName("canary_status")] string? CanaryStatus,
         [property: JsonPropertyName("review_due")] string? ReviewDue,
         [property: JsonPropertyName("next_decision")] string? NextDecision);
+
+    private sealed record WeeklyProductPulseClosureHealth(
+        [property: JsonPropertyName("state")] string? State,
+        [property: JsonPropertyName("open_case_count")] int? OpenCaseCount,
+        [property: JsonPropertyName("waiting_closure_count")] int? WaitingClosureCount,
+        [property: JsonPropertyName("pending_human_response_count")] int? PendingHumanResponseCount,
+        [property: JsonPropertyName("summary")] string? Summary);
 
     private sealed record ProgressReportPayload(
         [property: JsonPropertyName("contract_name")] string? ContractName,
@@ -299,6 +313,11 @@ public sealed record PublicTrustPulseSnapshot(
     string? ProviderRouteCanary,
     string? ProviderRouteReviewDue,
     string? ProviderRouteNextDecision,
+    string? ClosureHealthState,
+    int? ClosureHealthOpenCaseCount,
+    int? ClosureHealthWaitingCount,
+    int? ClosureHealthPendingHumanResponseCount,
+    string? ClosureHealthSummary,
     int? ProvenJourneyCount,
     int? ProvenRouteCount);
 

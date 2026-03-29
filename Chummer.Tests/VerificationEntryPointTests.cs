@@ -148,24 +148,30 @@ public sealed class VerificationEntryPointTests
     {
         string serviceCollectionPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
         string servicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "PublicTrustPulseService.cs");
+        string pulseArtifactServicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "WeeklyProductPulseArtifactService.cs");
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
         string partialPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PublicTrustPulsePanel.cshtml");
 
         string serviceCollection = File.ReadAllText(serviceCollectionPath);
         string service = File.ReadAllText(servicePath);
+        string pulseArtifactService = File.ReadAllText(pulseArtifactServicePath);
         string controller = File.ReadAllText(controllerPath);
         string viewModel = File.ReadAllText(viewModelPath);
         string partial = File.ReadAllText(partialPath);
 
         Assert.Contains("PublicTrustPulseService", serviceCollection, StringComparison.Ordinal);
-        Assert.Contains("WEEKLY_PRODUCT_PULSE.generated.json", service, StringComparison.Ordinal);
+        Assert.Contains("WeeklyProductPulseArtifactService", serviceCollection, StringComparison.Ordinal);
+        Assert.Contains("LoadWeeklyPulseJson", service, StringComparison.Ordinal);
+        Assert.Contains("WEEKLY_PRODUCT_PULSE.generated.json", pulseArtifactService, StringComparison.Ordinal);
         Assert.Contains("BuildPublicTrustPulsePanel", controller, StringComparison.Ordinal);
         Assert.Contains("PublicTrustPulsePanelViewModel? TrustPulse", viewModel, StringComparison.Ordinal);
         Assert.Contains("Weekly trust pulse", partial, StringComparison.Ordinal);
         Assert.Contains("Current caution", controller, StringComparison.Ordinal);
+        Assert.Contains("Closure health", controller, StringComparison.Ordinal);
         Assert.Contains("Progress trend", controller, StringComparison.Ordinal);
         Assert.Contains("BuildTrustPulseProgressTrendSummary", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildTrustPulseClosureHealthSummary", controller, StringComparison.Ordinal);
     }
 
     [Fact]

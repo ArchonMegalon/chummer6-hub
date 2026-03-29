@@ -6,7 +6,7 @@
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
   "progress_history_source": "products/chummer/PROGRESS_HISTORY.generated.json",
-  "summary": "Next 20 Big Wins After Post-Audit Closeout remains the active wave; journey proof is blocked; overall progress is 100% in 'Public-fit polish'; the longest pole remains Core Engine.",
+  "summary": "Next 20 Big Wins After Post-Audit Closeout remains the active wave; journey proof is blocked; overall progress is 100% in 'Public-fit polish'; the longest pole remains Core Engine; support closure is clear.",
   "active_wave": "Next 20 Big Wins After Post-Audit Closeout",
   "active_wave_status": "in_progress",
   "journey_gate_health": {
@@ -99,6 +99,16 @@
       "canary_status": "Canary green on all active lanes",
       "review_due": "2026-06-01",
       "next_decision": "Promote once support fallout remains stable."
+    },
+    "closure_health": {
+      "state": "clear",
+      "open_case_count": 0,
+      "waiting_closure_count": 0,
+      "pending_human_response_count": 0,
+      "reported_case_count": 2,
+      "materialized_packet_count": 0,
+      "design_impact_count": 0,
+      "summary": "0 waiting closure / 0 pending human response. 0 open support packets across 2 reported cases."
     },
     "journey_gate_source": "/docker/fleet/.codex-studio/published/JOURNEY_GATES.generated.json",
     "post_audit_next20_status": "complete",
