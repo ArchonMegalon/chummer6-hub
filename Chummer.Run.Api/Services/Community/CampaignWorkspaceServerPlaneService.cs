@@ -10,6 +10,36 @@ namespace Chummer.Run.Api.Services.Community;
 
 public sealed class CampaignWorkspaceServerPlaneService
 {
+    private sealed record WorkspaceContext(
+        CampaignWorkspaceProjection Workspace,
+        CampaignWorkspaceDigestProjection? Digest,
+        WorkspaceRestoreProjection Restore,
+        RunProjection? LeadRun,
+        IReadOnlyList<SupportCaseDigestViewModel> SupportDigests,
+        DateTimeOffset GeneratedAtUtc);
+
+    private static readonly char[] SearchSeparators =
+    [
+        ' ',
+        ',',
+        '.',
+        ';',
+        ':',
+        '/',
+        '\\',
+        '(',
+        ')',
+        '[',
+        ']',
+        '{',
+        '}',
+        '-',
+        '_',
+        '\r',
+        '\n',
+        '\t'
+    ];
+
     private readonly CampaignSpineService _campaignSpine;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
@@ -31,6 +61,70 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         ArgumentNullException.ThrowIfNull(user);
 
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        if (context is null)
+        {
+            return null;
+        }
+
+        CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
+        TravelModeReadinessSummary travelMode = BuildTravelMode(context.Workspace, context.Restore, prepLibrary);
+
+        return new CampaignWorkspaceServerPlaneProjection(
+            Workspace: BuildWorkspaceSummary(context.Workspace, context.Digest, context.Restore),
+            CampaignSummary: BuildCampaignWorkspaceSummary(context.Workspace, context.Digest, context.Restore),
+            RosterReadiness: BuildRosterReadinessSummary(context.Workspace),
+            ReadinessCues: context.Workspace.ReadinessCues,
+            ChangePackets: context.Workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>(),
+            Consequences: context.Workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>(),
+            RosterTransfers: context.Workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>(),
+            DossierFreshness: BuildDossierFreshness(context.Workspace),
+            RuleEnvironmentHealth: BuildRuleEnvironmentHealth(context.Workspace, context.Restore),
+            Runboard: BuildRunboardSummary(context.Workspace, context.LeadRun),
+            ContinuityConflicts: BuildContinuityConflicts(context.Workspace, context.Restore),
+            RecapShelf: BuildRecapShelf(context.Workspace),
+            SupportClosures: BuildSupportClosures(context.SupportDigests),
+            KnownIssues: BuildKnownIssues(context.SupportDigests),
+            DecisionNotices: BuildDecisionNotices(context.Workspace, context.Digest, installLinking, context.SupportDigests),
+            PrepLibrary: prepLibrary,
+            TravelMode: travelMode,
+            NextSafeAction: BuildNextSafeActionCue(context.Workspace, installLinking, context.SupportDigests),
+            GeneratedAtUtc: context.GeneratedAtUtc);
+    }
+
+    public CampaignPrepLibrarySearchResponse? GetWorkspacePrepLibrary(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking = null,
+        string? queryText = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        if (context is null)
+        {
+            return null;
+        }
+
+        CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
+        string? normalizedQuery = NormalizeOptional(queryText);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = prepLibrary.Packets
+            .Where(packet => MatchesPrepLibraryQuery(packet, normalizedQuery))
+            .ToArray();
+
+        return new CampaignPrepLibrarySearchResponse(
+            WorkspaceId: context.Workspace.WorkspaceId,
+            CampaignId: context.Workspace.CampaignId,
+            QueryText: normalizedQuery,
+            Items: packets,
+            TotalCount: packets.Count);
+    }
+
+    private WorkspaceContext? ResolveWorkspaceContext(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking)
+    {
         if (string.IsNullOrWhiteSpace(workspaceId))
         {
             return null;
@@ -68,23 +162,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             .DefaultIfEmpty(DateTimeOffset.UtcNow)
             .Max();
 
-        return new CampaignWorkspaceServerPlaneProjection(
-            Workspace: BuildWorkspaceSummary(workspace, digest, accountSummary.Restore),
-            CampaignSummary: BuildCampaignWorkspaceSummary(workspace, digest, accountSummary.Restore),
-            RosterReadiness: BuildRosterReadinessSummary(workspace),
-            ReadinessCues: workspace.ReadinessCues,
-            ChangePackets: workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>(),
-            Consequences: workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>(),
-            RosterTransfers: workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>(),
-            DossierFreshness: BuildDossierFreshness(workspace),
-            RuleEnvironmentHealth: BuildRuleEnvironmentHealth(workspace, accountSummary.Restore),
-            Runboard: BuildRunboardSummary(workspace, leadRun),
-            ContinuityConflicts: BuildContinuityConflicts(workspace, accountSummary.Restore),
-            RecapShelf: BuildRecapShelf(workspace),
-            SupportClosures: BuildSupportClosures(supportDigests),
-            KnownIssues: BuildKnownIssues(supportDigests),
-            DecisionNotices: BuildDecisionNotices(workspace, digest, installLinking, supportDigests),
-            NextSafeAction: BuildNextSafeActionCue(workspace, installLinking, supportDigests),
+        return new WorkspaceContext(
+            Workspace: workspace,
+            Digest: digest,
+            Restore: accountSummary.Restore,
+            LeadRun: leadRun,
+            SupportDigests: supportDigests,
             GeneratedAtUtc: generatedAtUtc);
     }
 
@@ -430,6 +513,384 @@ public sealed class CampaignWorkspaceServerPlaneService
             SourceKind: "workspace");
     }
 
+    private static CampaignPrepLibrarySummary BuildPrepLibrary(
+        CampaignWorkspaceProjection workspace,
+        WorkspaceRestoreProjection restore,
+        RunProjection? leadRun)
+    {
+        IReadOnlyList<GovernedPrepPacketSummary> packets = BuildPrepPackets(workspace, restore, leadRun);
+        int reusableCount = packets.Count(static item => item.Reusable);
+        IReadOnlyList<string> searchTerms = packets
+            .SelectMany(static item => item.SearchTerms)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToArray();
+
+        string summary = packets.Count == 0
+            ? "No governed prep packet is compiled yet for this shared campaign view."
+            : $"{packets.Count} governed prep packet(s) stay attached to {workspace.CampaignName} without recreating local shadow prep notes.";
+        string bindingSummary = leadRun is null
+            ? "Packets stay bound to the shared campaign return lane so the next scene can reopen from governed truth."
+            : $"{packets.Count} packet(s) stay bound to {leadRun.Title}, the active return lane, and the campaign rule posture.";
+        string searchSummary = searchTerms.Count == 0
+            ? "Search tokens compile from the campaign, run, rule, recap, and restore spine."
+            : $"Search from {string.Join(", ", searchTerms.Take(6))}.";
+
+        return new CampaignPrepLibrarySummary(
+            Summary: summary,
+            BindingSummary: bindingSummary,
+            SearchSummary: searchSummary,
+            ReusablePacketCount: reusableCount,
+            SearchablePacketCount: packets.Count,
+            Packets: packets);
+    }
+
+    private static IReadOnlyList<GovernedPrepPacketSummary> BuildPrepPackets(
+        CampaignWorkspaceProjection workspace,
+        WorkspaceRestoreProjection restore,
+        RunProjection? leadRun)
+    {
+        List<GovernedPrepPacketSummary> packets = [];
+
+        if (BuildScenePrepPacket(workspace, leadRun) is { } scenePacket)
+        {
+            packets.Add(scenePacket);
+        }
+
+        if (BuildOppositionPrepPacket(workspace, leadRun) is { } oppositionPacket)
+        {
+            packets.Add(oppositionPacket);
+        }
+
+        if (BuildContinuityPrepPacket(workspace) is { } continuityPacket)
+        {
+            packets.Add(continuityPacket);
+        }
+
+        if (BuildTravelPrepPacket(workspace, restore) is { } travelPacket)
+        {
+            packets.Add(travelPacket);
+        }
+
+        return packets
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ThenBy(static item => item.Title, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static GovernedPrepPacketSummary? BuildScenePrepPacket(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? leadRun)
+    {
+        SceneProjection? activeScene = leadRun?.Scenes
+            .FirstOrDefault(item => string.Equals(item.SceneId, leadRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
+            ?? leadRun?.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
+        if (activeScene is null && string.IsNullOrWhiteSpace(workspace.ActiveSceneSummary))
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> evidence = new[]
+            {
+                activeScene?.Summary,
+                workspace.ActiveSceneSummary,
+                leadRun?.Objectives.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault()?.Summary,
+                workspace.RuleEnvironment.CompatibilityFingerprint
+            }
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Select(static item => item!.Trim())
+            .Take(4)
+            .ToArray();
+        string sceneTitle = activeScene?.Title ?? "Active scene";
+        string title = $"{sceneTitle} scene packet";
+        string summary = activeScene?.Summary
+            ?? workspace.ActiveSceneSummary
+            ?? "Current scene prep is compiled from the shared campaign return lane.";
+        string bindingSummary = leadRun is null
+            ? $"Bound to {workspace.CampaignName} from the current shared return lane."
+            : activeScene is null
+                ? $"Bound to {leadRun.Title} from the current shared return lane."
+                : $"Bound to {leadRun.Title} / {activeScene.Title} on {workspace.RuleEnvironment.CompatibilityFingerprint}.";
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"scene:{workspace.WorkspaceId}",
+            Kind: "scene_packet",
+            Title: title,
+            Summary: summary,
+            BindingSummary: bindingSummary,
+            Reusable: false,
+            SearchTerms: BuildSearchTerms(
+                workspace.CampaignName,
+                sceneTitle,
+                workspace.ActiveSceneSummary,
+                leadRun?.Title,
+                leadRun?.Objectives.Select(static item => item.Title),
+                workspace.RuleEnvironment.CompatibilityFingerprint,
+                workspace.RuleEnvironment.SourcePacks),
+            EvidenceLines: evidence,
+            UpdatedAtUtc: activeScene?.UpdatedAtUtc
+                ?? leadRun?.UpdatedAtUtc
+                ?? workspace.LatestContinuity?.CapturedAtUtc
+                ?? DateTimeOffset.UtcNow);
+    }
+
+    private static GovernedPrepPacketSummary? BuildOppositionPrepPacket(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? leadRun)
+    {
+        CampaignConsequenceProjection[] consequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .Take(3)
+            .ToArray();
+        if (consequences.Length == 0)
+        {
+            return null;
+        }
+
+        string labels = string.Join(", ", consequences.Select(static item => item.Label));
+        IReadOnlyList<string> evidence = consequences
+            .SelectMany(static item => item.EvidenceLines.Concat(item.Receipts.Select(static receipt => receipt.Summary)))
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"opposition:{workspace.WorkspaceId}",
+            Kind: "opposition_packet",
+            Title: $"{workspace.CampaignName} opposition packet",
+            Summary: $"{consequences.Length} governed opposition signal(s) are active: {labels}.",
+            BindingSummary: leadRun is null
+                ? "Reusable across the campaign so the next scene can bind real opposition truth without local shadow packet models."
+                : $"Reusable across {workspace.CampaignName}; currently bound to {leadRun.Title} and the active return lane.",
+            Reusable: true,
+            SearchTerms: BuildSearchTerms(
+                workspace.CampaignName,
+                labels,
+                consequences.Select(static item => item.Kind),
+                consequences.Select(static item => item.State),
+                consequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.SourceKind)),
+                leadRun?.Title,
+                leadRun?.Objectives.Select(static item => item.Title)),
+            EvidenceLines: evidence,
+            UpdatedAtUtc: consequences.Max(static item => item.UpdatedAtUtc));
+    }
+
+    private static GovernedPrepPacketSummary? BuildContinuityPrepPacket(CampaignWorkspaceProjection workspace)
+    {
+        if (workspace.LatestContinuity is null
+            && workspace.RecapShelf.Count == 0
+            && workspace.Dossiers.Count == 0)
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> evidence = new[]
+            {
+                workspace.LatestContinuity?.Summary
+            }
+            .Concat(workspace.RecapShelf.Select(static item => item.Summary))
+            .Concat(workspace.Dossiers.Select(static item => item.LatestContinuity?.Summary))
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Select(static item => item!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"continuity:{workspace.WorkspaceId}",
+            Kind: "continuity_packet",
+            Title: $"{workspace.CampaignName} continuity handoff",
+            Summary: workspace.RecapShelf.Count == 0
+                ? "Continuity is pinned to the current shared return lane even before the first recap-safe output is published."
+                : $"{workspace.RecapShelf.Count} recap-safe output(s) stay attached to the same shared continuity spine.",
+            BindingSummary: "Bound to the same continuity snapshot that reopens dossiers, recaps, and publication-safe follow-through.",
+            Reusable: false,
+            SearchTerms: BuildSearchTerms(
+                workspace.CampaignName,
+                workspace.ReturnSummary,
+                workspace.LatestContinuity?.Summary,
+                workspace.RecapShelf.Select(static item => item.Label),
+                workspace.RecapShelf.Select(static item => item.Kind),
+                workspace.Dossiers.Select(static item => item.RunnerHandle)),
+            EvidenceLines: evidence,
+            UpdatedAtUtc: workspace.LatestContinuity?.CapturedAtUtc
+                ?? DateTimeOffset.UtcNow);
+    }
+
+    private static GovernedPrepPacketSummary? BuildTravelPrepPacket(
+        CampaignWorkspaceProjection workspace,
+        WorkspaceRestoreProjection restore)
+    {
+        if (restore.ClaimedDevices.Count == 0
+            && restore.RecentArtifacts.Count == 0
+            && restore.RecentRuleEnvironments.Count == 0)
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> evidence = restore.ClaimedDevices
+            .Select(static item => item.RestoreSummary)
+            .Concat(restore.RecentArtifacts.Select(static item => item.Summary))
+            .Concat(restore.RecentRuleEnvironments.Select(static item => item.CompatibilityFingerprint))
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"travel:{workspace.WorkspaceId}",
+            Kind: "travel_packet",
+            Title: $"{workspace.CampaignName} travel cache packet",
+            Summary: $"{restore.RecentArtifacts.Count} reconnectable artifact(s) and {restore.RecentRuleEnvironments.Count} rule snapshot(s) stay staged for bounded offline return.",
+            BindingSummary: restore.ClaimedDevices.Count == 0
+                ? "The packet is compiled, but a claimed travel lane still needs to be linked before you trust it on another device."
+                : $"Reusable across {restore.ClaimedDevices.Count} claimed device(s) without moving install-local secrets into the roaming restore packet.",
+            Reusable: true,
+            SearchTerms: BuildSearchTerms(
+                workspace.CampaignName,
+                "safehouse",
+                "travel",
+                restore.ClaimedDevices.Select(static item => item.DeviceRole),
+                restore.ClaimedDevices.Select(static item => item.Platform),
+                restore.ClaimedDevices.Select(static item => item.HeadId),
+                restore.ClaimedDevices.Select(static item => item.Channel),
+                restore.RecentArtifacts.Select(static item => item.Label),
+                restore.RecentRuleEnvironments.Select(static item => item.CompatibilityFingerprint)),
+            EvidenceLines: evidence,
+            UpdatedAtUtc: restore.GeneratedAtUtc);
+    }
+
+    private static TravelModeReadinessSummary BuildTravelMode(
+        CampaignWorkspaceProjection workspace,
+        WorkspaceRestoreProjection restore,
+        CampaignPrepLibrarySummary prepLibrary)
+    {
+        int claimedDeviceCount = restore.ClaimedDevices.Count;
+        int travelReadyDeviceCount = restore.ClaimedDevices.Count(IsTravelReadyDevice);
+        string prefetchInventorySummary = $"{DescribeRestorePrefetchInventory(restore.RecentDossiers.Count, restore.RecentCampaigns.Count, restore.RecentRuleEnvironments.Count, restore.RecentArtifacts.Count)} plus {prepLibrary.Packets.Count} governed prep packet(s)";
+        string status = claimedDeviceCount == 0
+            ? "warning"
+            : restore.ConflictSummaries.Count > 0
+                ? "attention"
+                : travelReadyDeviceCount > 0
+                    ? "ready"
+                    : "review";
+        string summary = claimedDeviceCount == 0
+            ? $"Prefetch inventory is ready for {workspace.CampaignName}, but no claimed device return lane is linked yet."
+            : travelReadyDeviceCount > 0
+                ? $"{travelReadyDeviceCount} claimed device(s) can reopen {workspace.CampaignName} from a bounded travel/safehouse lane."
+                : $"{claimedDeviceCount} claimed device(s) can reopen {workspace.CampaignName}, but travel posture is not explicit yet.";
+        IReadOnlyList<string> boundaries = restore.LocalOnlyNotes
+            .Concat(new[]
+            {
+                "Install-local caches, secrets, and runtime state stay local even when travel packets are staged for bounded offline use."
+            })
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
+
+        return new TravelModeReadinessSummary(
+            Status: status,
+            Summary: summary,
+            PrefetchInventorySummary: prefetchInventorySummary,
+            ClaimedDeviceCount: claimedDeviceCount,
+            TravelReadyDeviceCount: travelReadyDeviceCount,
+            Devices: restore.ClaimedDevices
+                .Take(4)
+                .Select(device => new TravelModeDeviceReadinessCue(
+                    InstallationId: device.InstallationId,
+                    DeviceRole: device.DeviceRole,
+                    Platform: device.Platform,
+                    HeadId: device.HeadId,
+                    Channel: device.Channel,
+                    Status: ResolveTravelDeviceStatus(device, restore.ConflictSummaries.Count > 0),
+                    Summary: device.RestoreSummary))
+                .ToArray(),
+            Boundaries: boundaries);
+    }
+
+    private static IReadOnlyList<string> BuildSearchTerms(params object?[] values)
+    {
+        HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (string text in FlattenValues(values))
+        {
+            foreach (string rawToken in text.Split(SearchSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                string normalized = NormalizeSearchToken(rawToken);
+                if (normalized.Length >= 3)
+                {
+                    tokens.Add(normalized);
+                }
+            }
+        }
+
+        return tokens.Take(10).ToArray();
+    }
+
+    private static IEnumerable<string> FlattenValues(IEnumerable<object?> values)
+    {
+        foreach (object? value in values)
+        {
+            switch (value)
+            {
+                case null:
+                    continue;
+                case string text when !string.IsNullOrWhiteSpace(text):
+                    yield return text;
+                    break;
+                case IEnumerable<string> lines:
+                    foreach (string line in lines.Where(static item => !string.IsNullOrWhiteSpace(item)))
+                    {
+                        yield return line;
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private static string NormalizeSearchToken(string token)
+    {
+        char[] filtered = token.Where(char.IsLetterOrDigit).ToArray();
+        return filtered.Length == 0 ? string.Empty : new string(filtered);
+    }
+
+    private static bool MatchesPrepLibraryQuery(GovernedPrepPacketSummary packet, string? queryText)
+    {
+        if (string.IsNullOrWhiteSpace(queryText))
+        {
+            return true;
+        }
+
+        return new[]
+            {
+                packet.Title,
+                packet.Summary,
+                packet.BindingSummary
+            }
+            .Concat(packet.SearchTerms)
+            .Concat(packet.EvidenceLines)
+            .Any(text => text.Contains(queryText, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsTravelReadyDevice(ClaimedDeviceRestoreProjection device)
+        => string.Equals(device.DeviceRole, "travel_cache", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(device.DeviceRole, "play_tablet", StringComparison.OrdinalIgnoreCase)
+            || device.RestoreSummary.Contains("bounded offline use", StringComparison.OrdinalIgnoreCase)
+            || device.RestoreSummary.Contains("prefetch", StringComparison.OrdinalIgnoreCase);
+
+    private static string ResolveTravelDeviceStatus(ClaimedDeviceRestoreProjection device, bool hasConflicts)
+    {
+        if (hasConflicts)
+        {
+            return "attention";
+        }
+
+        return IsTravelReadyDevice(device) ? "ready" : "review";
+    }
+
     private static IReadOnlyList<SupportCaseProjection> SelectRelevantSupportCases(
         IReadOnlyList<SupportCaseProjection> supportCases,
         InstallLinkingSummaryDto? installLinking)
@@ -532,6 +993,9 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return "workstation";
     }
+
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string StableCueId(string value)
     {

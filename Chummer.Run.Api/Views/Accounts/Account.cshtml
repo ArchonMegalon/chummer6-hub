@@ -839,6 +839,11 @@
                             {
                                 <p><strong>Follow-through:</strong> @selectedWorkspaceServerPlane.NextSafeAction.Summary</p>
                             }
+                            @if (selectedWorkspaceServerPlane is not null)
+                            {
+                                <p><strong>GM prep:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
+                                <p><strong>Travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
+                            }
                             @if (selectedWorkspace.RecapShelf.Count > 0)
                             {
                                 <p><strong>Recent recap:</strong> @selectedWorkspace.RecapShelf[0].Summary</p>
@@ -983,6 +988,59 @@
                                     }
                                 </details>
                             }
+
+                            <details class="details-drawer">
+                                <summary>GM prep library and travel mode</summary>
+                                <div class="settings-summary-list">
+                                    <div class="settings-summary-row">
+                                        <span>Governed prep packets</span>
+                                        <strong>@selectedWorkspaceServerPlane.PrepLibrary.Packets.Count</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Reusable packets</span>
+                                        <strong>@selectedWorkspaceServerPlane.PrepLibrary.ReusablePacketCount</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Search posture</span>
+                                        <strong>@selectedWorkspaceServerPlane.PrepLibrary.SearchSummary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Travel-safe devices</span>
+                                        <strong>@(selectedWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready")</strong>
+                                    </div>
+                                </div>
+                                <p><strong>GM prep library:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
+                                <p><strong>Binding posture:</strong> @selectedWorkspaceServerPlane.PrepLibrary.BindingSummary</p>
+                                <p><strong>Safehouse / travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
+                                <p><strong>Prefetch inventory:</strong> @selectedWorkspaceServerPlane.TravelMode.PrefetchInventorySummary</p>
+                                @if (selectedWorkspaceServerPlane.PrepLibrary.Packets.Count > 0)
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var packet in selectedWorkspaceServerPlane.PrepLibrary.Packets)
+                                        {
+                                            <li><strong>@packet.Title:</strong> @packet.Summary <span>@packet.BindingSummary</span></li>
+                                        }
+                                    </ul>
+                                }
+                                @if (selectedWorkspaceServerPlane.TravelMode.Devices.Count > 0)
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var device in selectedWorkspaceServerPlane.TravelMode.Devices)
+                                        {
+                                            <li><strong>@device.DeviceRole:</strong> @device.Platform / @device.HeadId / @device.Channel. @device.Summary</li>
+                                        }
+                                    </ul>
+                                }
+                                @if (selectedWorkspaceServerPlane.TravelMode.Boundaries.Count > 0)
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var boundary in selectedWorkspaceServerPlane.TravelMode.Boundaries)
+                                        {
+                                            <li>@boundary</li>
+                                        }
+                                    </ul>
+                                }
+                            </details>
                         }
                     </article>
                 }

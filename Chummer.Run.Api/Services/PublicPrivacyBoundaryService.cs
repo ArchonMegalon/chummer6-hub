@@ -155,7 +155,7 @@ public sealed class PublicPrivacyBoundaryService
             ContractName = DefaultContractName,
             AsOf = privacyPage.UpdatedDate ?? privacyPage.EffectiveDate ?? string.Empty,
             Eyebrow = "Privacy boundary",
-            Heading = "Support, install, survey, and provider-backed help stay on a bounded clock",
+            Heading = "Support, survey, and assistant data stay on a bounded clock",
             Summary = "Chummer keeps support, install, survey, and provider-backed help surfaces on explicit retention windows and redaction rules instead of stockpiling raw payloads.",
             MicroProof = privacyPage.SummaryPoints ?? new List<string>(),
             Domains = BoundaryDomains
