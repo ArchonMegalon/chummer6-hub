@@ -8,8 +8,10 @@ namespace Chummer.Run.Api.Services;
 
 public sealed class WeeklyProductPulseArtifactService
 {
+    private const int MaxProgressTrendSamples = 8;
     private const string DefaultPulseRelativePath = ".codex-design/product/WEEKLY_PRODUCT_PULSE.generated.json";
     private const string DefaultProgressReportRelativePath = ".codex-design/product/PROGRESS_REPORT.generated.json";
+    private const string DefaultProgressHistoryRelativePath = ".codex-design/product/PROGRESS_HISTORY.generated.json";
     private const string DefaultLocalReleaseProofRelativePath = ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json";
     private const string DefaultFleetArtifactRoot = "/docker/fleet/.codex-studio/published";
     private const string FleetArtifactRootKey = "CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT";
@@ -48,12 +50,15 @@ public sealed class WeeklyProductPulseArtifactService
 
             WeeklyProductPulseSeed? seed = JsonSerializer.Deserialize<WeeklyProductPulseSeed>(baseJson, ReadOptions);
             ProgressReportPayload? progressReport = LoadOptionalJson<ProgressReportPayload>(ResolveOptionalCanonPath(DefaultProgressReportRelativePath));
+            ProgressHistoryPayload? progressHistory = LoadOptionalJson<ProgressHistoryPayload>(ResolveOptionalCanonPath(DefaultProgressHistoryRelativePath));
             JourneyGatesPayload? journeyGates = LoadOptionalJson<JourneyGatesPayload>(ResolveOptionalFleetArtifactPath(JourneyGatesFileName));
             SupportPacketsPayload? supportPackets = LoadOptionalJson<SupportPacketsPayload>(ResolveOptionalFleetArtifactPath(SupportPacketsFileName));
             StatusPlanePayload? statusPlane = LoadOptionalYaml<StatusPlanePayload>(ResolveOptionalFleetArtifactPath(StatusPlaneFileName));
             LocalReleaseProofPayload? localReleaseProof = LoadOptionalJson<LocalReleaseProofPayload>(ResolveOptionalCanonPath(DefaultLocalReleaseProofRelativePath));
 
             ClosureHealthInfo? closureHealth = ComputeClosureHealth(journeyGates, supportPackets);
+            AdoptionHealthInfo? adoptionHealth = ComputeAdoptionHealth(progressReport, localReleaseProof);
+            WeeklyProgressTrendInfo? progressTrend = ComputeProgressTrend(progressHistory);
             ProviderRouteInfo providerRoute = ComputeProviderRoute(statusPlane, seed);
             string launchReadiness = ComputeLaunchReadiness(journeyGates, localReleaseProof, providerRoute, closureHealth, seed);
 
@@ -125,6 +130,38 @@ public sealed class WeeklyProductPulseArtifactService
                     ["materialized_packet_count"] = closureHealth.MaterializedPacketCount,
                     ["design_impact_count"] = closureHealth.DesignImpactCount,
                     ["summary"] = closureHealth.Summary
+                };
+            }
+
+            if (adoptionHealth is not null)
+            {
+                supportingSignals["adoption_health"] = new JsonObject
+                {
+                    ["state"] = adoptionHealth.State,
+                    ["local_release_proof_status"] = adoptionHealth.LocalReleaseProofStatus,
+                    ["proven_journey_count"] = adoptionHealth.ProvenJourneyCount,
+                    ["proven_route_count"] = adoptionHealth.ProvenRouteCount,
+                    ["history_snapshot_count"] = adoptionHealth.HistorySnapshotCount,
+                    ["summary"] = adoptionHealth.Summary
+                };
+            }
+
+            if (progressTrend is not null)
+            {
+                supportingSignals["progress_trend"] = new JsonObject
+                {
+                    ["state"] = progressTrend.State,
+                    ["direction"] = progressTrend.Direction,
+                    ["delta_percent"] = progressTrend.DeltaPercent,
+                    ["from_as_of"] = progressTrend.FromAsOf,
+                    ["to_as_of"] = progressTrend.ToAsOf,
+                    ["sample_count"] = progressTrend.Samples.Count,
+                    ["summary"] = progressTrend.Summary,
+                    ["samples"] = new JsonArray(progressTrend.Samples.Select(static sample => (JsonNode)new JsonObject
+                    {
+                        ["as_of"] = sample.AsOf,
+                        ["overall_progress_percent"] = sample.OverallProgressPercent
+                    }).ToArray())
                 };
             }
 
@@ -301,6 +338,119 @@ public sealed class WeeklyProductPulseArtifactService
             Summary: summary);
     }
 
+    private static AdoptionHealthInfo? ComputeAdoptionHealth(
+        ProgressReportPayload? progressReport,
+        LocalReleaseProofPayload? localReleaseProof)
+    {
+        int historySnapshotCount = progressReport?.HistorySnapshotCount ?? 0;
+        int provenJourneyCount = localReleaseProof?.JourneysPassed?.Count ?? 0;
+        int provenRouteCount = localReleaseProof?.ProofRoutes?.Count ?? 0;
+        string localReleaseProofStatus = localReleaseProof?.Status ?? "unknown";
+
+        if (historySnapshotCount == 0
+            && provenJourneyCount == 0
+            && provenRouteCount == 0
+            && string.Equals(localReleaseProofStatus, "unknown", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        string state = string.Equals(localReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
+                       && provenJourneyCount > 0
+                       && provenRouteCount > 0
+            ? "clear"
+            : historySnapshotCount > 0
+                ? "early"
+                : "partial";
+
+        string proofSegment = string.Equals(localReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
+            ? "Current local edge proof passed."
+            : $"Current local edge proof is {localReleaseProofStatus}.";
+        string journeysSegment = provenJourneyCount > 0 && provenRouteCount > 0
+            ? $"{provenJourneyCount} journey proofs and {provenRouteCount} trust routes are on record."
+            : provenJourneyCount > 0
+                ? $"{provenJourneyCount} journey proofs are on record."
+                : provenRouteCount > 0
+                    ? $"{provenRouteCount} trust routes are on record."
+                    : "Journey-proof evidence is still accumulating.";
+        string historySegment = historySnapshotCount > 0
+            ? historySnapshotCount < 6
+                ? $"{historySnapshotCount} weekly snapshots are measured so far, so adoption history is still early."
+                : $"{historySnapshotCount} weekly snapshots are on record for the current public trust posture."
+            : "Weekly adoption history is not materialized yet.";
+
+        return new AdoptionHealthInfo(
+            State: state,
+            LocalReleaseProofStatus: localReleaseProofStatus,
+            ProvenJourneyCount: provenJourneyCount,
+            ProvenRouteCount: provenRouteCount,
+            HistorySnapshotCount: historySnapshotCount,
+            Summary: $"{proofSegment} {journeysSegment} {historySegment}");
+    }
+
+    private static WeeklyProgressTrendInfo? ComputeProgressTrend(ProgressHistoryPayload? progressHistory)
+    {
+        if (progressHistory?.Snapshots is null)
+        {
+            return null;
+        }
+
+        List<ProgressTrendSample> samples = progressHistory.Snapshots
+            .Where(static snapshot => !string.IsNullOrWhiteSpace(snapshot.AsOf) && snapshot.OverallProgressPercent.HasValue)
+            .Select(static snapshot => new ProgressTrendSample(snapshot.AsOf!, snapshot.OverallProgressPercent!.Value))
+            .OrderBy(static snapshot => snapshot.AsOf)
+            .ToList();
+
+        if (samples.Count == 0)
+        {
+            return null;
+        }
+
+        if (samples.Count > MaxProgressTrendSamples)
+        {
+            samples = samples.Skip(samples.Count - MaxProgressTrendSamples).ToList();
+        }
+
+        if (samples.Count < 2)
+        {
+            return new WeeklyProgressTrendInfo(
+                State: "early",
+                Direction: "flat",
+                DeltaPercent: 0,
+                FromAsOf: samples[0].AsOf,
+                ToAsOf: samples[0].AsOf,
+                Summary: "Progress trend is awaiting measured history; two weekly points are required.",
+                Samples: samples);
+        }
+
+        ProgressTrendSample previous = samples[^2];
+        ProgressTrendSample latest = samples[^1];
+        int delta = latest.OverallProgressPercent - previous.OverallProgressPercent;
+        string direction = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+        string directionLabel = direction switch
+        {
+            "up" => "Upward momentum",
+            "down" => "Regression",
+            _ => "Flat trend"
+        };
+        string deltaText = direction switch
+        {
+            "up" => $"+{Math.Abs(delta)}%",
+            "down" => $"-{Math.Abs(delta)}%",
+            _ => $"{Math.Abs(delta)}%"
+        };
+        string trendWindow = string.Join(" -> ", samples.Select(static sample => $"{sample.AsOf} {sample.OverallProgressPercent}%"));
+
+        return new WeeklyProgressTrendInfo(
+            State: Math.Abs(delta) == 0 ? "steady" : "moving",
+            Direction: direction,
+            DeltaPercent: Math.Abs(delta),
+            FromAsOf: previous.AsOf,
+            ToAsOf: latest.AsOf,
+            Summary: $"{directionLabel} {deltaText} from {previous.AsOf} to {latest.AsOf}. Trend window: {trendWindow}.",
+            Samples: samples);
+    }
+
     private static ProviderRouteInfo ComputeProviderRoute(StatusPlanePayload? statusPlane, WeeklyProductPulseSeed? seed)
     {
         if (statusPlane is null)
@@ -451,6 +601,14 @@ public sealed class WeeklyProductPulseArtifactService
     private sealed record ProgressReportLongestPole(
         [property: JsonPropertyName("label")] string? Label);
 
+    private sealed record ProgressHistoryPayload(
+        [property: JsonPropertyName("snapshot_count")] int? SnapshotCount,
+        [property: JsonPropertyName("snapshots")] IReadOnlyList<ProgressHistorySnapshot>? Snapshots);
+
+    private sealed record ProgressHistorySnapshot(
+        [property: JsonPropertyName("as_of")] string? AsOf,
+        [property: JsonPropertyName("overall_progress_percent")] int? OverallProgressPercent);
+
     private sealed record JourneyGatesPayload(
         [property: JsonPropertyName("generated_at")] string? GeneratedAt,
         [property: JsonPropertyName("summary")] JourneyGateSummary? Summary,
@@ -484,7 +642,9 @@ public sealed class WeeklyProductPulseArtifactService
 
     private sealed record LocalReleaseProofPayload(
         [property: JsonPropertyName("generated_at")] string? GeneratedAt,
-        [property: JsonPropertyName("status")] string? Status);
+        [property: JsonPropertyName("status")] string? Status,
+        [property: JsonPropertyName("journeys_passed")] IReadOnlyList<string>? JourneysPassed,
+        [property: JsonPropertyName("proof_routes")] IReadOnlyList<string>? ProofRoutes);
 
     private sealed record StatusPlanePayload(
         string? GeneratedAt,
@@ -517,9 +677,30 @@ public sealed class WeeklyProductPulseArtifactService
         int DesignImpactCount,
         string Summary);
 
+    private sealed record AdoptionHealthInfo(
+        string State,
+        string LocalReleaseProofStatus,
+        int ProvenJourneyCount,
+        int ProvenRouteCount,
+        int HistorySnapshotCount,
+        string Summary);
+
     private sealed record ProviderRouteInfo(
         string DefaultStatus,
         string CanaryStatus,
         string? ReviewDue,
         string? NextDecision);
+
+    private sealed record WeeklyProgressTrendInfo(
+        string State,
+        string Direction,
+        int DeltaPercent,
+        string FromAsOf,
+        string ToAsOf,
+        string Summary,
+        IReadOnlyList<ProgressTrendSample> Samples);
+
+    private sealed record ProgressTrendSample(
+        string AsOf,
+        int OverallProgressPercent);
 }

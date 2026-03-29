@@ -3021,6 +3021,12 @@ async Task VerifyPublicLandingProjectionAsync()
         Assert(string.Equals(weeklyPulseDocument.RootElement.GetProperty("active_wave").GetString(), "Next 20 Big Wins After Post-Audit Closeout", StringComparison.Ordinal), "weekly pulse endpoint should expose the current active wave from the mirrored design pulse.");
         Assert(weeklyPulseDocument.RootElement.TryGetProperty("next_checkpoint_question", out JsonElement checkpointQuestion)
             && !string.IsNullOrWhiteSpace(checkpointQuestion.GetString()), "weekly pulse endpoint should keep the next checkpoint question visible for the current wave.");
+        Assert(weeklyPulseDocument.RootElement.GetProperty("supporting_signals").TryGetProperty("closure_health", out JsonElement closureHealth)
+            && !string.IsNullOrWhiteSpace(closureHealth.GetProperty("summary").GetString()), "weekly pulse endpoint should expose closure-health evidence in supporting signals.");
+        Assert(weeklyPulseDocument.RootElement.GetProperty("supporting_signals").TryGetProperty("adoption_health", out JsonElement adoptionHealth)
+            && !string.IsNullOrWhiteSpace(adoptionHealth.GetProperty("summary").GetString()), "weekly pulse endpoint should expose adoption-health evidence in supporting signals.");
+        Assert(weeklyPulseDocument.RootElement.GetProperty("supporting_signals").TryGetProperty("progress_trend", out JsonElement progressTrend)
+            && progressTrend.GetProperty("samples").GetArrayLength() >= 2, "weekly pulse endpoint should expose measured progress-trend samples in supporting signals.");
         Assert(!weeklyPulseDocument.RootElement.TryGetProperty("active_nine_month_checkpoint", out _), "weekly pulse endpoint should mirror the current pulse artifact without the retired nine-month checkpoint block.");
     }
 

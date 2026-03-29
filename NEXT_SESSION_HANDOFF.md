@@ -41,6 +41,26 @@ Updated: 2026-03-29T21:20:00+02:00
   - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
   - `bash scripts/audit-compliance.sh`
 
+## Handoff refresh (2026-03-29T22:10:00+02:00)
+
+- Extended the synthesized weekly pulse artifact further so `/api/public/weekly-pulse` now includes machine-readable:
+  - `supporting_signals.adoption_health`
+  - `supporting_signals.progress_trend`
+  - alongside the already-added `supporting_signals.closure_health`
+- Adoption health now derives from the local release proof plus progress-report history depth.
+- Progress trend now derives directly from `PROGRESS_HISTORY.generated.json` and publishes direction, delta, range, summary, and bounded sample points.
+- The mirrored `WEEKLY_PRODUCT_PULSE.generated.json` was refreshed to include the new adoption/trend blocks so static canon and synthesized runtime stay aligned.
+- Smoke coverage now asserts that `/api/public/weekly-pulse` exposes closure-health, adoption-health, and measured progress-trend samples.
+- Full post-change verification passed again:
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "WeeklyProductPulseArtifactServiceTests|PublicTrustPulseServiceTests|VerificationEntryPointTests|DesignMirrorExecutionPlanTests"`
+  - `bash scripts/ai/run_services_smoke.sh`
+  - `bash scripts/run_smoke.sh`
+  - `docker compose -f docker-compose.public-edge.yml up -d --build`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
+  - `bash scripts/audit-compliance.sh`
+
 ## Current state (2026-03-29T21:33:00+02:00)
 
 - Implemented trust-pulse trend surfacing from `PROGRESS_HISTORY.generated.json` into public trust rows.
