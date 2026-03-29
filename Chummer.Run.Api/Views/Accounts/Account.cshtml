@@ -2212,6 +2212,10 @@
                                             <li>
                                                 <strong>@entry.CampaignName</strong>: @entry.RunTitle. @entry.LatestEventSummary
                                                 <span> Next: @entry.NextSafeAction</span>
+                                                @if (!string.IsNullOrWhiteSpace(entry.RecapSummary))
+                                                {
+                                                    <span> Recap: @entry.RecapSummary</span>
+                                                }
                                                 @if (!string.IsNullOrWhiteSpace(entry.ConsequenceSummary))
                                                 {
                                                     <span> Consequence: @entry.ConsequenceSummary</span>
