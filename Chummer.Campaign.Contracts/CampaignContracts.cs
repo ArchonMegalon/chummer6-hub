@@ -297,6 +297,10 @@ public sealed record CommunityOperatorProjection(
     int MemberCount,
     int ActiveCampaignCount,
     int ActiveSponsorSessionCount,
+    string OperationsSummary,
+    string CampaignReturnSummary,
+    IReadOnlyList<string> RecentReturnSummaries,
+    IReadOnlyList<string> Watchouts,
     IReadOnlyList<RosterTransferProjection>? RecentRosterTransfers = null);
 
 public sealed record CampaignReadinessCue(

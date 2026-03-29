@@ -547,10 +547,16 @@
                                                             <p>
                                                                 @HumanizeStatus(leadCommunityOperation.OperatorRole, "Member") · @leadCommunityOperation.CampaignVisibilitySummary
                                                                 <span> Roster: @leadCommunityOperation.MemberCount members · @leadCommunityOperation.ActiveCampaignCount campaigns.</span>
+                                                                <span> Pulse: @leadCommunityOperation.OperationsSummary</span>
+                                                                <span> Return: @leadCommunityOperation.CampaignReturnSummary</span>
                                                                 <span> Rules: @RuleEnvironmentSummary(leadCommunityOperation.RuleEnvironment).</span>
                                                                 @if (leadCommunityTransfer is not null)
                                                                 {
                                                                     <span> Latest move: @leadCommunityTransfer.RunnerHandle.</span>
+                                                                }
+                                                                @if (leadCommunityOperation.Watchouts.Count > 0)
+                                                                {
+                                                                    <span> Watchout: @leadCommunityOperation.Watchouts[0]</span>
                                                                 }
                                                             </p>
                                                         </div>

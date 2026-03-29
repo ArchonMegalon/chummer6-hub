@@ -2022,7 +2022,32 @@
                                     <span>Sponsor sessions</span>
                                     <strong>@(op.ActiveSponsorSessionCount == 0 ? "Quiet" : op.ActiveSponsorSessionCount.ToString())</strong>
                                 </div>
+                                <div class="settings-summary-row">
+                                    <span>Operations pulse</span>
+                                    <strong>@op.OperationsSummary</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Campaign return pulse</span>
+                                    <strong>@op.CampaignReturnSummary</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Operator watchouts</span>
+                                    <strong>@(op.Watchouts.Count == 0 ? "Quiet" : op.Watchouts[0])</strong>
+                                </div>
                             </div>
+                            <details class="details-drawer">
+                                <summary>Operations pulse</summary>
+                                <ul class="muted-copy">
+                                    @foreach (var returnSummary in op.RecentReturnSummaries)
+                                    {
+                                        <li>@returnSummary</li>
+                                    }
+                                    @foreach (var watchout in op.Watchouts)
+                                    {
+                                        <li><strong>Watchout:</strong> @watchout</li>
+                                    }
+                                </ul>
+                            </details>
                             @if (op.Capabilities.Count > 0)
                             {
                                 <details class="details-drawer">

@@ -558,6 +558,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Recent governed roster moves", "/account/work")
     require_snippet(body, transfer["runnerHandle"], "/account/work")
     require_snippet(body, "Prep launch audit", "/account/work")
+    require_snippet(body, "Operations pulse", "/account/work")
     status, body, _, _ = fetch(
         base_url,
         "/home/work",

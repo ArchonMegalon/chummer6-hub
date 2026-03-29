@@ -1595,6 +1595,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Open governed roster moves", StringComparison.Ordinal), "home work should keep a direct route back to the governed roster-move operator rail.");
     Assert(homeSource.Contains("Operator posture", StringComparison.Ordinal), "home work should surface organizer/operator posture on the same signed-in route instead of burying it behind the deeper account panel.");
     Assert(homeSource.Contains("@leadCommunityOperation.GroupName", StringComparison.Ordinal), "home work should surface the lead governed operator group directly from the campaign spine.");
+    Assert(homeSource.Contains("@leadCommunityOperation.OperationsSummary", StringComparison.Ordinal), "home work should surface the operator operations pulse directly on the calmer operator card.");
+    Assert(homeSource.Contains("@leadCommunityOperation.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface the operator campaign-return pulse directly on the calmer operator card.");
     Assert(homeSource.Contains("Open teams and permissions", StringComparison.Ordinal), "home work should keep a direct route back to the governed operator surface.");
     Assert(homeSource.Contains("Consequence watch", StringComparison.Ordinal), "home work should surface a dedicated consequence card instead of leaving consequence follow-through buried inside summary text.");
     Assert(homeSource.Contains("@leadConsequence.Label", StringComparison.Ordinal), "home work should surface the lead governed consequence directly from the workspace server plane.");
@@ -1677,6 +1679,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@workspace.NextSessionCarryForward.Summary", StringComparison.Ordinal), "account work should surface next-session carry-forward directly on the shared workspace list.");
     Assert(accountSource.Contains("Downtime brief", StringComparison.Ordinal), "account work should surface downtime follow-through on both the selected workspace detail and the shared workspace list.");
     Assert(accountSource.Contains("@selectedWorkspaceDowntimePackage.Summary", StringComparison.Ordinal), "account work should surface the selected downtime brief summary directly from the shared server-plane projection.");
+    Assert(accountSource.Contains("Operations pulse", StringComparison.Ordinal), "account teams and permissions should surface a first-class operations pulse instead of only raw counts.");
+    Assert(accountSource.Contains("@op.OperationsSummary", StringComparison.Ordinal), "account teams and permissions should surface the operator operations pulse directly from the shared projection.");
+    Assert(accountSource.Contains("@op.CampaignReturnSummary", StringComparison.Ordinal), "account teams and permissions should surface the campaign-return pulse directly from the shared projection.");
     Assert(accountSource.Contains("Search governed prep packets", StringComparison.Ordinal), "account work should expose a real governed prep-library search flow on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Label", StringComparison.Ordinal), "account work should surface the bounded workspace state directly from the server plane.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Summary", StringComparison.Ordinal), "account work should explain why the bounded workspace state is active on the selected campaign card.");
@@ -2209,6 +2214,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.Restore.LocalOnlyNotes.Count >= 1, "account page should keep install-local restore guardrails explicit.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.OperatorRole)), "account page should surface organizer/operator role posture.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.CampaignVisibilitySummary)), "account page should surface explicit campaign visibility posture for operator groups.");
+    Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.OperationsSummary)), "account page should surface an explicit operator operations pulse for organizer groups.");
+    Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.CampaignReturnSummary)), "account page should surface campaign-return pulse for organizer groups.");
     var campaignSummaryResult = await campaignSpineController.GetMyCampaignSummary(CancellationToken.None);
     var campaignSummaryPayload = (campaignSummaryResult.Result as OkObjectResult)?.Value as AccountCampaignSummary ?? campaignSummaryResult.Value;
     Assert(campaignSummaryPayload is not null, "campaign spine api should return the signed-in campaign summary.");
@@ -2220,6 +2227,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(freshPreviewSummary.RulesNavigator.Count >= 1, "freshly created accounts should receive a seeded grounded rule answer.");
     Assert(freshPreviewSummary.CreatorPublications.Count >= 1, "freshly created accounts should receive a seeded publication follow-through.");
     Assert(freshPreviewSummary.CommunityOperations.Count >= 1, "freshly created accounts should receive a seeded operator-aware campaign group.");
+    Assert(!string.IsNullOrWhiteSpace(freshPreviewSummary.CommunityOperations[0].OperationsSummary), "freshly created accounts should receive a seeded operator operations pulse.");
     var restoreResult = await campaignSpineController.GetMyRestoreProjection(CancellationToken.None);
     var restorePayload = (restoreResult.Result as OkObjectResult)?.Value as WorkspaceRestoreProjection ?? restoreResult.Value;
     Assert(restorePayload is not null && restorePayload.ClaimedDevices.Count >= 1, "campaign spine api should expose the restore packet for claimed-device recovery.");
@@ -2617,6 +2625,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.Consequences.Count >= 1, "signed-in home should keep governed consequence follow-through visible on the same workspace spine.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations.Count >= 1, "signed-in home should surface organizer/operator posture on the same account backbone.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].CampaignVisibilitySummary), "signed-in home should keep campaign visibility posture visible for the lead operator group.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].OperationsSummary), "signed-in home should keep the operator operations pulse visible for the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "signed-in home should receive customer-facing build-path titles directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "signed-in home should receive the next safe build action directly from the campaign spine service.");

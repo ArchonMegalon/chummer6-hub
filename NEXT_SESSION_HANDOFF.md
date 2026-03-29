@@ -14,6 +14,7 @@ Updated: 2026-03-29
   - governed aftermath recap packages on the shared workspace
   - governed next-session carry-forward packets on the shared workspace and server plane
   - governed downtime brief packets on the shared workspace and server plane
+  - richer operator operations pulse and campaign-return pulse on the shared account/control backbone
   - signed-in home/work aftermath recap visibility on the calmer home cockpit
   - signed-in home/work downtime brief visibility on the calmer home cockpit
   - signed-in home/work next-session carry-forward visibility on the calmer home cockpit
@@ -29,6 +30,8 @@ Updated: 2026-03-29
 - Added a dedicated `Aftermath recap` card on `/home/work` with bounded summary, evidence, return-shelf context, and a deep link back to the shared workspace return lane
 - Added a dedicated `Downtime brief` card on `/home/work` and matching `/account/work/workspaces/{workspaceId}` detail so downtime obligations and next-session follow-through stop hiding inside the generic aftermath list
 - Added a first-class `Next-session carry-forward` projection to the shared workspace and server plane, then surfaced it on both `/account/work/workspaces/{workspaceId}` and `/home/work` with return-lane truth, next-step truth, and bounded evidence
+- Deepened `Teams & permissions` with an explicit operator `Operations pulse`, campaign-return pulse, and bounded watchouts instead of leaving organizer posture at raw counts and one roster-move drawer
+- Extended the signed-in `/home/work` operator card so it now carries the operator operations pulse, campaign-return pulse, and a bounded watchout from the same shared projection
 - Added a dedicated `Consequence watch` card on `/home/work` so the lead governed campaign consequence and one evidence cue stay visible on the signed-in home cockpit instead of only appearing inside the shared summary prose
 - Added a dedicated `Roster move` card on `/home/work` so the latest governed transfer stays visible on the signed-in home cockpit and points back to the same operator rail
 - Extended the `/home/work` GM prep card so it now carries the latest governed prep-launch packet title and the latest staged travel-prefetch device receipt instead of only generic posture text
@@ -41,6 +44,7 @@ Updated: 2026-03-29
 - Extended `scripts/hub-live-audit.py` again so `/home/work` also has to show the dedicated consequence card after the signed-in workspace journey resolves
 - Extended `scripts/hub-live-audit.py` again so both `/home/work` and `/account/work/workspaces/{workspaceId}` have to show the next-session carry-forward surface on the live edge
 - Extended `scripts/hub-live-audit.py` again so the live signed-in journey now generates and verifies both a session recap package and a downtime brief package on the rebuilt edge
+- Extended `scripts/hub-live-audit.py` again so `/account/work` has to show the richer organizer `Operations pulse` on the rebuilt edge
 - Extended smoke coverage so source assertions lock the new home card and route-readiness gate in place
 - Verified the rebuilt local `chummer.run` edge with both host-level live audit and Playwright e2e against the already-running docker edge
 
@@ -59,7 +63,7 @@ CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hu
 
 ## Next highest-impact gaps
 
-1. Deepen organizer/operator depth on the same account/control backbone without inventing a parallel admin model.
+1. Keep deepening organizer/operator depth on the same account/control backbone without inventing a parallel admin model, especially beyond the new pulse summaries into larger community, league, or season operations.
 2. Push more of the campaign workspace v3 follow-through into durable receipts and shared projections instead of isolated cards, especially shared consequence/recap synthesis and broader long-lived campaign memory beyond the new next-session and downtime packets.
 3. Keep moving toward the cross-repo journey-proof gap: install -> claim -> restore -> continue and join campaign -> run -> recover -> recap still need stronger whole-product acceptance evidence outside this repo.
 
