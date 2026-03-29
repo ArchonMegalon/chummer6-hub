@@ -3,6 +3,7 @@ using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
+using Chummer.Campaign.Contracts;
 using Chummer.Run.Contracts.Community;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
@@ -494,26 +495,26 @@ public sealed class PublicLandingController : Controller
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
             var supportCaseSummaries = _supportPresentation.BuildList(supportCases, installLinking);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
-            var leadWorkspaceServerPlane = campaignSpine.Workspaces.Count == 0
-                ? null
-                : _workspaceServerPlane.GetWorkspaceServerPlane(user, campaignSpine.Workspaces[0].WorkspaceId, installLinking);
-            var model = new HomePageViewModel(
-                Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
-                CurrentSection: selectedSection,
-                Sections: BuildHomeSections(selectedSection),
-                Surface: surface,
-                Assets: assetCatalog,
-                User: user,
-                Links: links,
-                Experience: experience,
-                InstallLinking: installLinking,
-                SupportCases: supportCases,
-                SupportCaseSummaries: supportCaseSummaries,
-                CampaignSpine: campaignSpine,
-                LeadWorkspaceServerPlane: leadWorkspaceServerPlane,
-                PrimaryAction: BuildHomePrimaryAction(experience, installLinking),
-                NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath),
-                HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath));
+        var leadWorkspaceServerPlane = campaignSpine.Workspaces.Count == 0
+            ? null
+            : _workspaceServerPlane.GetWorkspaceServerPlane(user, campaignSpine.Workspaces[0].WorkspaceId, installLinking);
+        var model = new HomePageViewModel(
+            Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
+            CurrentSection: selectedSection,
+            Sections: BuildHomeSections(selectedSection),
+            Surface: surface,
+            Assets: assetCatalog,
+            User: user,
+            Links: links,
+            Experience: experience,
+            InstallLinking: installLinking,
+            SupportCases: supportCases,
+            SupportCaseSummaries: supportCaseSummaries,
+            CampaignSpine: campaignSpine,
+            LeadWorkspaceServerPlane: leadWorkspaceServerPlane,
+            PrimaryAction: BuildHomePrimaryAction(experience, campaignSpine, installLinking),
+            NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath),
+            HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath));
             return View("~/Views/PublicLanding/Home.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -585,7 +586,10 @@ public sealed class PublicLandingController : Controller
                 Action: _actions.ResolveFeatureAction(card, authenticated, currentPath)))
             .ToArray();
 
-    private static HomePrimaryActionViewModel BuildHomePrimaryAction(HubUserExperienceDto experience, InstallLinkingSummaryDto installLinking)
+    private static HomePrimaryActionViewModel BuildHomePrimaryAction(
+        HubUserExperienceDto experience,
+        AccountCampaignSummary campaignSpine,
+        InstallLinkingSummaryDto installLinking)
     {
         if (!experience.OnboardingCompleted)
         {
@@ -595,6 +599,22 @@ public sealed class PublicLandingController : Controller
                 "Complete the short setup flow so Chummer can recover your account, route updates, and keep your account surface calm.",
                 "Complete setup",
                 "/home/setup",
+                "primary");
+        }
+
+        bool hasNoCampaignWork = campaignSpine.Dossiers.Count == 0
+            && campaignSpine.Campaigns.Count == 0
+            && campaignSpine.Runs.Count == 0
+            && campaignSpine.Workspaces.Count == 0;
+
+        if ((installLinking.ClaimedInstallations?.Count ?? 0) > 0 && hasNoCampaignWork)
+        {
+            return new HomePrimaryActionViewModel(
+                "Starter lane",
+                "Open work and seed your first playable session",
+                "Your install is linked. Open the work lane to move from setup into the next safe session surface before returning to optional tasks.",
+                "Open work",
+                "/home/work",
                 "primary");
         }
 

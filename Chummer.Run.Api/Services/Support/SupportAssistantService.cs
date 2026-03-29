@@ -234,7 +234,16 @@ public sealed class SupportAssistantService
                 .Select(entry => new SupportAssistantCitation(
                     SourceKind: "build_truth",
                     Label: entry.Title,
-                    Summary: TrimForSummary($"{entry.NextSafeAction ?? entry.Summary} Return: {entry.CampaignReturnSummary ?? entry.ProgressionLabel} Support: {entry.SupportClosureSummary ?? string.Join(" | ", entry.ProgressionOutcomes.Take(1))}"),
+                    Summary: TrimForSummary(string.Join(
+                        " ",
+                        new[]
+                        {
+                            entry.NextSafeAction ?? entry.Summary,
+                            !string.IsNullOrWhiteSpace(entry.PlannerCoverageSummary) ? $"Coverage: {entry.PlannerCoverageSummary}" : null,
+                            entry.PlannerCoverageLines?.FirstOrDefault() is { Length: > 0 } coverageLine ? $"Coverage detail: {coverageLine}" : null,
+                            $"Return: {entry.CampaignReturnSummary ?? entry.ProgressionLabel}",
+                            $"Support: {entry.SupportClosureSummary ?? string.Join(" | ", entry.ProgressionOutcomes.Take(1))}"
+                        }.Where(static item => !string.IsNullOrWhiteSpace(item)))),
                     Href: "/account/work"))
                 .ToArray();
         }

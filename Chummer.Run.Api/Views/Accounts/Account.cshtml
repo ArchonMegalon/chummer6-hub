@@ -1537,6 +1537,13 @@
                                     <strong>@selectedBuildLabHandoff.SupportClosureSummary</strong>
                                 </div>
                             }
+                            @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.PlannerCoverageSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Planner coverage</span>
+                                    <strong>@selectedBuildLabHandoff.PlannerCoverageSummary</strong>
+                                </div>
+                            }
                         </div>
                         @if (selectedBuildLabHandoff.TradeoffLines.Count > 0)
                         {
@@ -1545,6 +1552,10 @@
                         @if (selectedBuildLabHandoff.ProgressionOutcomes.Count > 0)
                         {
                             <p><strong>Outcome:</strong> @string.Join(" ", selectedBuildLabHandoff.ProgressionOutcomes.Take(2))</p>
+                        }
+                        @if (selectedBuildLabHandoff.PlannerCoverageLines is { Count: > 0 })
+                        {
+                            <p><strong>Coverage:</strong> @string.Join(" ", selectedBuildLabHandoff.PlannerCoverageLines.Take(4))</p>
                         }
                         @if (selectedBuildLabHandoff.Outputs.Count > 0)
                         {
@@ -1966,6 +1977,10 @@
                                     @if (handoff.ProgressionOutcomes.Count > 0)
                                     {
                                         <span> Outcome: @handoff.ProgressionOutcomes[0].</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(handoff.PlannerCoverageSummary))
+                                    {
+                                        <span> Coverage: @handoff.PlannerCoverageSummary.</span>
                                     }
                                     @if (handoff.Outputs.Count > 0)
                                     {

@@ -32,6 +32,7 @@ Updated: 2026-03-29
   - safehouse / travel mode visibility, staged offline inventory, and recap follow-through
   - signed-in and public trust pulse now exposes install-aware `Who can get it now` and `Adoption health`
   - campaign memory projection now appears on signed-in home/work and workspace detail where available
+  - home starter lane now nudges linked users without existing campaign work into `/home/work` as a first-playable-session onboarding step
 
 ## What just landed
 
@@ -85,6 +86,14 @@ Updated: 2026-03-29
 - Extended `scripts/hub-live-audit.py` again so the live signed-in journey now generates and verifies both a session recap package and a downtime brief package on the rebuilt edge
 - Extended `scripts/hub-live-audit.py` again so `/account/work` has to show the richer organizer `Operations pulse` on the rebuilt edge
 - Extended `scripts/hub-live-audit.py` again so both `/account/work` and `/home/work` have to show the new organizer season/event rail on the rebuilt edge
+- Added starter-lane onboarding to signed-in public home and campaign spine:
+  - `/home/work` now unlocks with `effectiveWorkSurfaceReady` for seedable starter install states.
+  - `/api/v1/campaign-spine/me/workspaces/starter` now provides the starter workspace payload used by the onboarding button.
+  - `/home/work` starter path now deep-links to `/account/work/workspaces/{workspaceId}` and falls back cleanly when starter seeding is not yet available.
+- Extended signed-in home and account work build-path cards with planner-coverage summary plus evidence lines:
+  - `PlannerCoverageSummary` and `PlannerCoverageLines` now flow into projection DTOs, UI cards, and support-assistant citations.
+- Extended smoke/API assertions to validate the starter endpoint and coverage payload, and updated local proof marker generation inputs.
+- Completed milestone 19 in `.codex-design/product/NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_REGISTRY.yaml`.
 - Extended smoke coverage so source assertions lock the new home card and route-readiness gate in place
 - Verified the rebuilt local `chummer.run` edge with both host-level live audit and Playwright e2e against the already-running docker edge
 
@@ -101,12 +110,17 @@ CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh
 CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh
 ```
 
+## Recent verification outcome
+
+- Host-level smoke, compliance, and non-Playwright e2e checks pass on current docker edge.
+- Signed-in Playwright/live-audit checks still hit local rate limit (429) on support/case flow intermittently; retry after backoff for a full signed-in proof run.
+
 ## Next highest-impact gaps
 
 1. Keep deepening organizer/operator depth on the same account/control backbone without inventing a parallel admin model, especially beyond the new season/event rail into broader community, league, and multi-event operations.
 2. Push more of the campaign workspace v3 follow-through into durable receipts and shared projections instead of isolated cards, especially shared consequence/recap synthesis and broader long-lived campaign memory beyond the new next-session and downtime packets.
 3. Keep moving toward the cross-repo journey-proof gap: install -> claim -> restore -> continue and join campaign -> run -> recover -> recap still need stronger whole-product acceptance evidence outside this repo.
-4. Start the next design slice toward guided onboarding and first playable-session completion with measurable evidence across Hub and operator surfaces.
+4. Continue the guided onboarding slice so the starter lane evolves from workspace seeding into concrete first-session launch and campaign start proof.
 
 ## Guardrails
 

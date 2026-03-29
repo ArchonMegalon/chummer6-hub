@@ -8,7 +8,7 @@ status: in_progress
 waves:
   - id: W1
     name: Make the campaign OS indispensable
-    status: in_progress
+    status: completed
     milestone_ids:
       - 1
       - 2
@@ -17,7 +17,7 @@ waves:
       - 5
   - id: W2
     name: Widen the Build and Explain moat
-    status: in_progress
+    status: completed
     milestone_ids:
       - 6
       - 7
@@ -26,7 +26,7 @@ waves:
       - 10
   - id: W3
     name: Make exchange, output, and publication a second pillar
-    status: in_progress
+    status: completed
     milestone_ids:
       - 11
       - 12
@@ -311,7 +311,7 @@ milestones:
       - chummer6-hub
       - chummer6-core
       - chummer6-design
-    status: not_started
+    status: in_progress
     exit_criteria:
       - New users can reach a legal, understandable, playable runner and a campaign-ready first session without repo knowledge.
       - Guided onboarding reuses grounded explain, support, and campaign truth instead of parallel tutorial folklore.

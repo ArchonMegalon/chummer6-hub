@@ -543,7 +543,9 @@ public sealed record BuildLabHandoffProjection(
     string? RuntimeCompatibilitySummary = null,
     string? CampaignReturnSummary = null,
     string? SupportClosureSummary = null,
-    IReadOnlyList<string>? Watchouts = null);
+    IReadOnlyList<string>? Watchouts = null,
+    string? PlannerCoverageSummary = null,
+    IReadOnlyList<string>? PlannerCoverageLines = null);
 
 public sealed record RulesNavigatorAnswerProjection(
     string EntryId,

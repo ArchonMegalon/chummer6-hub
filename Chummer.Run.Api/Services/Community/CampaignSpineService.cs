@@ -187,6 +187,12 @@ public sealed class CampaignSpineService
             .FirstOrDefault(item => string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase));
     }
 
+    public CampaignWorkspaceProjection? GetStarterWorkspace(HubUserDto user, InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        return GetAccountSummary(user, installLinking).Workspaces.FirstOrDefault();
+    }
+
     public GovernedPrepLaunchProjection RecordPrepLaunch(
         HubUserDto user,
         CampaignWorkspaceProjection workspace,
@@ -2160,6 +2166,8 @@ public sealed class CampaignSpineService
                     ?? "No campaign workspace is attached yet, so return still lands on the living dossier until the first governed campaign handoff exists.";
                 var supportClosureSummary = DescribeBuildLabSupportClosure(runtimeFingerprint, restore);
                 var watchouts = BuildBuildLabWatchouts(workspace, outputs, restore);
+                var plannerCoverageSummary = BuildBuildLabPlannerCoverageSummary(workspace, outputs, restore);
+                var plannerCoverageLines = BuildBuildLabPlannerCoverageLines(workspace, outputs, restore);
                 return new BuildLabHandoffProjection(
                     HandoffId: StableId("buildlab", dossier.DossierId),
                     DossierId: dossier.DossierId,
@@ -2189,7 +2197,9 @@ public sealed class CampaignSpineService
                     RuntimeCompatibilitySummary: runtimeCompatibilitySummary,
                     CampaignReturnSummary: campaignReturnSummary,
                     SupportClosureSummary: supportClosureSummary,
-                    Watchouts: watchouts);
+                    Watchouts: watchouts,
+                    PlannerCoverageSummary: plannerCoverageSummary,
+                    PlannerCoverageLines: plannerCoverageLines);
             })
             .Take(3)
             .ToArray();
@@ -2255,6 +2265,72 @@ public sealed class CampaignSpineService
         }
 
         return $"Support can anchor closure on {artifact.Channel} {artifact.Version ?? "current"} for {artifact.Label} and the same runtime fingerprint ({runtimeFingerprint}).";
+    }
+
+    private static string BuildBuildLabPlannerCoverageSummary(
+        CampaignWorkspaceProjection? workspace,
+        IReadOnlyList<PublicationSafeProjection> outputs,
+        WorkspaceRestoreProjection restore)
+    {
+        const int totalCheckpoints = 4;
+        var coveredCheckpoints = 0;
+
+        if (workspace is not null)
+        {
+            coveredCheckpoints++;
+        }
+
+        if (outputs.Count > 0)
+        {
+            coveredCheckpoints++;
+        }
+
+        if (restore.ConflictSummaries.Count == 0)
+        {
+            coveredCheckpoints++;
+        }
+
+        if (restore.ClaimedDevices.Count > 0)
+        {
+            coveredCheckpoints++;
+        }
+
+        return $"{coveredCheckpoints} of {totalCheckpoints} build follow-through checkpoints are already grounded.";
+    }
+
+    private static IReadOnlyList<string> BuildBuildLabPlannerCoverageLines(
+        CampaignWorkspaceProjection? workspace,
+        IReadOnlyList<PublicationSafeProjection> outputs,
+        WorkspaceRestoreProjection restore)
+    {
+        List<string> lines =
+        [
+            workspace is null
+                ? "Campaign continuity: no governed campaign workspace is attached yet, so the handoff still lands on the living dossier first."
+                : $"Campaign continuity: {workspace.CampaignName} is already attached as the governed return lane for this handoff.",
+            outputs.Count switch
+            {
+                1 => "Outputs: 1 dossier or campaign-safe output is already attached to the handoff.",
+                > 1 => $"Outputs: {outputs.Count} dossier or campaign-safe outputs are already attached to the handoff.",
+                _ => "Outputs: no dossier or campaign-safe output is attached yet, so export and recap proof are still pending."
+            },
+            restore.ConflictSummaries.Count switch
+            {
+                0 => "Restore posture: no restore conflicts are currently blocking replay-safe handoff follow-through.",
+                1 => "Restore posture: 1 restore conflict still needs review before the handoff is replay-safe.",
+                _ => $"Restore posture: {restore.ConflictSummaries.Count} restore conflicts still need review before the handoff is replay-safe."
+            },
+            restore.ClaimedDevices.Count switch
+            {
+                0 => "Claimed install: no linked device is attached yet for install-aware follow-through.",
+                1 => "Claimed install: 1 linked device is already attached for install-aware follow-through.",
+                _ => $"Claimed install: {restore.ClaimedDevices.Count} linked devices are already attached for install-aware follow-through."
+            }
+        ];
+
+        return lines
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .ToArray();
     }
 
     private static SceneProjection? ResolveActiveScene(RunProjection run)

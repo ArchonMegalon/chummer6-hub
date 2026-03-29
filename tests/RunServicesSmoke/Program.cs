@@ -1570,7 +1570,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("showAccessSection && (!showOnboarding || accessSurfaceReady)", StringComparison.Ordinal), "home access should unlock when the account already has real device or support truth, even if the softer onboarding flag is still incomplete.");
     Assert(homeSource.Contains("Device roles", StringComparison.Ordinal), "home access should keep explicit device-role evidence on the signed-in route.");
     Assert(homeSource.Contains("GM-ready cues", StringComparison.Ordinal), "home work should use customer-facing continuity language instead of internal workspace wording.");
-    Assert(homeSource.Contains("showWorkSection && (!showOnboarding || workSurfaceReady)", StringComparison.Ordinal), "home work should unlock when claimed install and return truth already exist, instead of hiding the route behind a stale onboarding bit.");
+    Assert(homeSource.Contains("showWorkSection && (!showOnboarding || effectiveWorkSurfaceReady)", StringComparison.Ordinal), "home work should unlock when claimed install and return truth already exist, and also when starter lane can be seeded, instead of hiding the route behind a stale onboarding bit.");
+    Assert(homeSource.Contains("seedStarterWorkspace", StringComparison.Ordinal), "home work should include starter-lane seeding on the empty workspace first-run path.");
+    Assert(homeSource.Contains("/api/v1/campaign-spine/me/workspaces/starter", StringComparison.Ordinal), "home work should wire starter-lane seeding to the campaign-spine starter endpoint.");
     Assert(homeSource.Contains("Shared campaign view", StringComparison.Ordinal), "home work should surface the calmer shared campaign view card instead of hiding workspace return behind the deeper account route.");
     Assert(homeSource.Contains("Open shared campaign view", StringComparison.Ordinal), "home work should keep an explicit route back into the shared campaign view.");
     Assert(homeSource.Contains("/account/work/workspaces/", StringComparison.Ordinal), "home work should deep-link the shared campaign view instead of sending every route back to the generic work shell.");
@@ -1638,6 +1640,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@leadPrepLaunch.PacketTitle", StringComparison.Ordinal), "home work should surface the latest governed prep launch directly on the calmer prep card.");
     Assert(homeSource.Contains("@leadTravelPrefetch.DeviceRole", StringComparison.Ordinal), "home work should surface the latest staged travel-prefetch receipt directly on the calmer prep card.");
     Assert(homeSource.Contains("@handoff.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface build-path return truth directly on the calmer home card.");
+    Assert(homeSource.Contains("@handoff.PlannerCoverageSummary", StringComparison.Ordinal), "home work should surface build-path planner coverage directly on the calmer home card.");
     Assert(homeSource.Contains("@handoff.SupportClosureSummary", StringComparison.Ordinal), "home work should surface build-path support closure truth directly on the calmer home card.");
     Assert(homeSource.Contains("Open build path for @handoff.Title", StringComparison.Ordinal), "home work should keep the build handoff deep link specific to the visible build path instead of a generic CTA.");
     Assert(homeSource.Contains("@answer.SupportReuseHints[0]", StringComparison.Ordinal), "home work should surface grounded support-reuse hints directly from the shared rules projection.");
@@ -1695,8 +1698,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Finish on another device", StringComparison.Ordinal), "account access should describe pending claim codes as the remaining device handoff step.");
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
     Assert(accountSource.Contains("Closure:", StringComparison.Ordinal), "account build-path details should surface support-closure truth instead of leaving the new rail data unused.");
+    Assert(accountSource.Contains("Planner coverage", StringComparison.Ordinal), "account build-path details should surface planner-coverage truth instead of leaving follow-through grounding implicit.");
     Assert(accountSource.Contains("@selectedBuildLabHandoff.CampaignReturnSummary", StringComparison.Ordinal), "account build-path detail should surface build-handoff return truth directly from the shared projection.");
     Assert(accountSource.Contains("@selectedBuildLabHandoff.SupportClosureSummary", StringComparison.Ordinal), "account build-path detail should surface build-handoff support closure directly from the shared projection.");
+    Assert(accountSource.Contains("@selectedBuildLabHandoff.PlannerCoverageSummary", StringComparison.Ordinal), "account build-path detail should surface planner-coverage summary directly from the shared projection.");
+    Assert(accountSource.Contains("selectedBuildLabHandoff.PlannerCoverageLines", StringComparison.Ordinal), "account build-path detail should render planner-coverage lines directly from the shared projection.");
     Assert(accountSource.Contains("selectedBuildLabHandoff.ProgressionOutcomes", StringComparison.Ordinal), "account build-path detail should render progression outcomes directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.NextSafeAction", StringComparison.Ordinal), "account publication detail should surface the next creator-publication step directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.CampaignReturnSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication return truth directly from the shared projection.");
@@ -2300,9 +2306,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "account page should receive the next safe action directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].RuntimeCompatibilitySummary), "account page should receive runtime compatibility truth for the build handoff.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].SupportClosureSummary), "account page should receive support-closure truth for the build handoff.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].PlannerCoverageSummary), "account page should receive planner-coverage summary for the build handoff.");
+    Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].PlannerCoverageLines?.Count >= 4, "account page should receive planner-coverage evidence lines for the build handoff.");
     Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].TradeoffLines[0].Contains("campaign-safe output", StringComparison.OrdinalIgnoreCase), "account page should receive exact build-path output posture instead of generic tradeoff filler.");
     Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].ProgressionOutcomes[0].Contains("25 / 50 / 100 Karma checkpoints", StringComparison.Ordinal), "account page should receive planner checkpoints directly on the build-path handoff.");
     Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].ProgressionOutcomes[1].Contains("recap follow-through", StringComparison.Ordinal), "account page should receive export and recap follow-through posture on the build-path handoff.");
+    Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].PlannerCoverageLines![0].Contains("Campaign continuity:", StringComparison.Ordinal), "account page should receive campaign continuity planner coverage on the build-path handoff.");
     Assert(accountModel.CampaignSpine.RulesNavigator.Count >= 1, "account page should surface first-class rules navigator answers.");
     Assert(accountModel.CampaignSpine.MigrationReceipts.Count >= 1, "account page should surface legacy migration receipts.");
     Assert(accountModel.CampaignSpine.CreatorPublications.Count >= 1, "account page should surface creator publication posture.");
@@ -2504,6 +2513,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(handoffPayload!.CampaignReturnSummary), "campaign spine handoff api should keep campaign return truth attached.");
     Assert(handoffPayload.TradeoffLines[0].Contains("campaign-safe output", StringComparison.OrdinalIgnoreCase), "campaign spine handoff api should preserve exact output posture.");
     Assert(handoffPayload.ProgressionOutcomes[0].Contains("25 / 50 / 100 Karma checkpoints", StringComparison.Ordinal), "campaign spine handoff api should preserve the planner checkpoints directly on the handoff payload.");
+    Assert(!string.IsNullOrWhiteSpace(handoffPayload.PlannerCoverageSummary), "campaign spine handoff api should preserve planner-coverage summary directly on the handoff payload.");
+    Assert(handoffPayload.PlannerCoverageLines?.FirstOrDefault()?.Contains("Campaign continuity:", StringComparison.Ordinal) == true, "campaign spine handoff api should preserve campaign continuity planner coverage directly on the handoff payload.");
+    var starterWorkspaceResult = await campaignSpineController.SeedStarterWorkspace(CancellationToken.None);
+    var starterWorkspacePayload = (starterWorkspaceResult.Result as OkObjectResult)?.Value as CampaignWorkspaceProjection ?? starterWorkspaceResult.Value;
+    Assert(starterWorkspacePayload is not null && !string.IsNullOrWhiteSpace(starterWorkspacePayload.WorkspaceId), "campaign spine starter api should return a starter workspace for first session onboarding.");
     var rulesResult = await campaignSpineController.GetMyRulesNavigatorAnswer(rulesEntryId, CancellationToken.None);
     var rulesPayload = (rulesResult.Result as OkObjectResult)?.Value as RulesNavigatorAnswerProjection ?? rulesResult.Value;
     Assert(rulesPayload is not null && rulesPayload.EvidenceLines.Count >= 1, "campaign spine api should expose grounded rule-environment evidence.");
@@ -2803,6 +2817,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "signed-in home should receive customer-facing build-path titles directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "signed-in home should receive the next safe build action directly from the campaign spine service.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].PlannerCoverageSummary), "signed-in home should receive planner-coverage summary directly from the campaign spine service.");
     var authenticatedContactPage = await authenticatedLandingController.ContactPage(CancellationToken.None) as ViewResult;
     var authenticatedContactModel = authenticatedContactPage?.Model as TrustPageViewModel;
     Assert(authenticatedContactModel?.SupportIntake is not null, "authenticated contact page should project the first-party support intake.");
