@@ -23,7 +23,8 @@ public sealed record BuildLabConceptIntakeProjection(
     string? RuntimeCompatibilitySummary = null,
     string? CampaignFitSummary = null,
     string? SupportClosureSummary = null,
-    IReadOnlyList<string>? Watchouts = null);
+    IReadOnlyList<string>? Watchouts = null,
+    BuildLabTeamCoverageProjection? TeamCoverage = null);
 
 public sealed record BuildLabIntakeField(
     string FieldId,
@@ -82,6 +83,15 @@ public sealed record BuildLabVariantWarning(
     string Detail,
     string Kind,
     bool Emphasized = false,
+    string? ExplainEntryId = null);
+
+public sealed record BuildLabTeamCoverageProjection(
+    string Summary,
+    string CoverageSummary,
+    string RolePressureSummary,
+    IReadOnlyList<string> MissingRoleTags,
+    IReadOnlyList<string>? CoveredRoleTags = null,
+    IReadOnlyList<string>? DuplicateRoleTags = null,
     string? ExplainEntryId = null);
 
 public sealed record BuildLabProgressionTimeline(
