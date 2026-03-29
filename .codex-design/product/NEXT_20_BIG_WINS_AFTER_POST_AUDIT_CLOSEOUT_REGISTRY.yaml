@@ -26,7 +26,7 @@ waves:
       - 10
   - id: W3
     name: Make exchange, output, and publication a second pillar
-    status: not_started
+    status: in_progress
     milestone_ids:
       - 11
       - 12
