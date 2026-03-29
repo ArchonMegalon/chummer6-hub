@@ -1482,6 +1482,10 @@
                         {
                             <p><strong>Watchouts:</strong> @string.Join(" ", selectedCreatorPublication.Watchouts.Take(3))</p>
                         }
+                        @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.BuildHandoffId))
+                        {
+                            <a class="inline-link" href="@BuildHandoffDetailHref(selectedCreatorPublication.BuildHandoffId)">Open related build path</a>
+                        }
                     </article>
                 }
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
