@@ -2035,6 +2035,19 @@
                                     <strong>@op.SeasonEventSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
+                                    <span>Season board</span>
+                                    <strong>
+                                        @if (op.SeasonBoardEntries.Count == 0)
+                                        {
+                                            @:Pending
+                                        }
+                                        else
+                                        {
+                                            @op.SeasonBoardEntries.Count @:campaign lanes
+                                        }
+                                    </strong>
+                                </div>
+                                <div class="settings-summary-row">
                                     <span>Operator watchouts</span>
                                     <strong>@(op.Watchouts.Count == 0 ? "Quiet" : op.Watchouts[0])</strong>
                                 </div>
@@ -2068,6 +2081,30 @@
                                         }
                                     }
                                 </ul>
+                            </details>
+                            <details id="community-op-board-@op.GroupId" class="details-drawer">
+                                <summary>Season board</summary>
+                                @if (op.SeasonBoardEntries.Count == 0)
+                                {
+                                    <p class="muted-copy">No governed campaign lanes are attached yet.</p>
+                                }
+                                else
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var entry in op.SeasonBoardEntries)
+                                        {
+                                            <li>
+                                                <strong>@entry.CampaignName</strong>: @entry.RunTitle. @entry.LatestEventSummary
+                                                <span> Next: @entry.NextSafeAction</span>
+                                                @if (!string.IsNullOrWhiteSpace(entry.WatchoutSummary))
+                                                {
+                                                    <span> Watchout: @entry.WatchoutSummary</span>
+                                                }
+                                                <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(entry.WorkspaceId)}")">Open shared campaign view</a>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
                             </details>
                             @if (op.Capabilities.Count > 0)
                             {

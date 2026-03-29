@@ -167,6 +167,10 @@ internal static class StateStoreBackupVerification
 
         VerificationAssert.NotNull(restoredProjection, "Hub store restore should preserve artifact projections.");
         VerificationAssert.Equal(HubArtifactState.Deprecated.ToString(), restoredProjection!.State, "Hub store restore should preserve artifact lifecycle state.");
+        VerificationAssert.Equal(ArtifactVisibilityModes.LocalOnly, restoredProjection.Visibility, "Hub store restore should preserve projection visibility.");
+        VerificationAssert.Equal(ArtifactTrustTiers.LocalOnly, restoredProjection.TrustTier, "Hub store restore should preserve projection trust tier.");
+        VerificationAssert.Equal("retained-history", restoredProjection.ShelfAudience, "Deprecated artifacts should restore retained-history shelf posture.");
+        VerificationAssert.True(restoredProjection.ShelfSummary.Contains("retained-history", StringComparison.OrdinalIgnoreCase), "Hub store restore should preserve shelf posture summaries.");
         VerificationAssert.NotNull(restoredArtifact, "Hub store restore should preserve authored artifact metadata.");
         VerificationAssert.Equal("sr6", restoredArtifact!.RulesetId, "Hub store restore should preserve artifact ruleset metadata.");
         VerificationAssert.Equal(ArtifactVisibilityModes.LocalOnly, restoredArtifact.Visibility, "Hub store restore should preserve authored artifact visibility.");

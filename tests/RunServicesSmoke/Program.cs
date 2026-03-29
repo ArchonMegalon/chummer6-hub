@@ -1600,8 +1600,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Season / event pulse", StringComparison.Ordinal), "home work should surface a first-class season and event pulse on the calmer operator card.");
     Assert(homeSource.Contains("@leadCommunityOperation.SeasonEventSummary", StringComparison.Ordinal), "home work should surface the operator season-event pulse directly from the shared projection.");
     Assert(homeSource.Contains("Latest event:", StringComparison.Ordinal), "home work should keep one bounded event receipt on the lead operator card.");
-    Assert(homeSource.Contains("/account/work#community-op-events-", StringComparison.Ordinal), "home work should deep-link the operator card into the exact season-event rail instead of sending every organizer flow back to the generic operator shell.");
-    Assert(homeSource.Contains("Open teams and permissions", StringComparison.Ordinal), "home work should keep a direct route back to the governed operator surface.");
+    Assert(homeSource.Contains("Board:", StringComparison.Ordinal), "home work should surface one bounded season-board entry on the lead operator card.");
+    Assert(homeSource.Contains("@leadCommunityBoard.CampaignName", StringComparison.Ordinal), "home work should surface the lead season-board campaign directly from the shared operator projection.");
+    Assert(homeSource.Contains("/account/work#community-op-board-", StringComparison.Ordinal), "home work should deep-link the operator card into the exact season-board drawer instead of sending every organizer flow back to the generic operator shell.");
+    Assert(homeSource.Contains("Open season board", StringComparison.Ordinal), "home work should keep a direct route back to the governed season board.");
     Assert(homeSource.Contains("Consequence watch", StringComparison.Ordinal), "home work should surface a dedicated consequence card instead of leaving consequence follow-through buried inside summary text.");
     Assert(homeSource.Contains("@leadConsequence.Label", StringComparison.Ordinal), "home work should surface the lead governed consequence directly from the workspace server plane.");
     Assert(homeSource.Contains("@leadConsequenceEvidence", StringComparison.Ordinal), "home work should surface one bounded consequence evidence line on the calmer home card.");
@@ -1690,6 +1692,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@op.SeasonEventSummary", StringComparison.Ordinal), "account teams and permissions should surface the operator season-event pulse directly from the shared projection.");
     Assert(accountSource.Contains("<summary>Season &amp; event rail</summary>", StringComparison.Ordinal), "account teams and permissions should give the operator a dedicated auditable season and event rail.");
     Assert(accountSource.Contains("id=\"community-op-events-@op.GroupId\"", StringComparison.Ordinal), "account teams and permissions should give the season-event rail a stable deep-link target.");
+    Assert(accountSource.Contains("Season board", StringComparison.Ordinal), "account teams and permissions should surface a first-class season board for multi-campaign operators.");
+    Assert(accountSource.Contains("op.SeasonBoardEntries.Count == 0", StringComparison.Ordinal), "account teams and permissions should surface the season-board campaign count directly from the shared projection.");
+    Assert(accountSource.Contains("id=\"community-op-board-@op.GroupId\"", StringComparison.Ordinal), "account teams and permissions should give the season board a stable deep-link target.");
+    Assert(accountSource.Contains("@entry.LatestEventSummary", StringComparison.Ordinal), "account season board should surface the latest governed event summary for each campaign lane.");
+    Assert(accountSource.Contains("Open shared campaign view", StringComparison.Ordinal), "account season board should give operators a direct route from the board into the governed campaign lane.");
     Assert(accountSource.Contains("Search governed prep packets", StringComparison.Ordinal), "account work should expose a real governed prep-library search flow on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Label", StringComparison.Ordinal), "account work should surface the bounded workspace state directly from the server plane.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Summary", StringComparison.Ordinal), "account work should explain why the bounded workspace state is active on the selected campaign card.");
@@ -2228,6 +2235,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.CampaignReturnSummary)), "account page should surface campaign-return pulse for organizer groups.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.SeasonEventSummary)), "account page should surface a first-class season-event pulse for organizer groups.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentEventSummaries.Count >= 1), "account page should keep at least one recent governed event receipt attached to the operator rail.");
+    Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.SeasonBoardEntries.Count >= 2), "account page should keep a multi-campaign season board attached to the operator rail.");
+    Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.SeasonBoardEntries.All(entry => !string.IsNullOrWhiteSpace(entry.NextSafeAction))), "account season board should keep next-safe-action truth attached to each campaign lane.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.ActiveCampaignCount >= 2), "account page should surface a multi-campaign operator group on the same governed backbone.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.SeasonEventSummary.Contains("season rail", StringComparison.OrdinalIgnoreCase)), "account page should describe the multi-campaign operator group as a governed season rail.");
     var campaignSummaryResult = await campaignSpineController.GetMyCampaignSummary(CancellationToken.None);
@@ -2245,6 +2254,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(freshPreviewSummary.CommunityOperations[0].SeasonEventSummary), "freshly created accounts should receive a seeded operator season-event pulse.");
     Assert(freshPreviewSummary.CommunityOperations[0].ActiveCampaignCount >= 2, "freshly created accounts should receive a seeded multi-campaign operator group instead of a single-campaign placeholder.");
     Assert(freshPreviewSummary.CommunityOperations[0].SeasonEventSummary.Contains("season rail", StringComparison.OrdinalIgnoreCase), "freshly created accounts should receive a season-rail summary when one operator group carries multiple governed campaigns.");
+    Assert(freshPreviewSummary.CommunityOperations[0].SeasonBoardEntries.Count >= 2, "freshly created accounts should receive a seeded season board with more than one governed campaign lane.");
     var restoreResult = await campaignSpineController.GetMyRestoreProjection(CancellationToken.None);
     var restorePayload = (restoreResult.Result as OkObjectResult)?.Value as WorkspaceRestoreProjection ?? restoreResult.Value;
     Assert(restorePayload is not null && restorePayload.ClaimedDevices.Count >= 1, "campaign spine api should expose the restore packet for claimed-device recovery.");
@@ -2649,6 +2659,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].OperationsSummary), "signed-in home should keep the operator operations pulse visible for the lead operator group.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].SeasonEventSummary), "signed-in home should keep the operator season-event pulse visible for the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentEventSummaries.Count >= 1, "signed-in home should keep a bounded recent-event receipt attached to the lead operator group.");
+    Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].SeasonBoardEntries.Count >= 2, "signed-in home should keep the multi-campaign season board attached to the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "signed-in home should receive customer-facing build-path titles directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "signed-in home should receive the next safe build action directly from the campaign spine service.");
@@ -3129,7 +3140,8 @@ void VerifyRegistryWorkflow()
 void VerifyRegistryControllerHardening()
 {
     var registry = new HubArtifactStore();
-    var controller = new HubRegistryController(registry, new StubReleaseChannelManifestStore())
+    var workflow = new PublicationWorkflowService(registry);
+    var controller = new HubRegistryController(registry, new StubReleaseChannelManifestStore(), workflow)
     {
         ControllerContext = new ControllerContext
         {
@@ -3159,6 +3171,37 @@ void VerifyRegistryControllerHardening()
     var searchPayload = searchResult?.Value as RegistrySearchResponse;
     Assert(searchPayload?.Items.Count == 1, "registry search should support kind/state filtered projections");
     Assert(searchPayload?.Items[0].ImmutableRetentionRequired == true, "registry search items should advertise immutable retention");
+    Assert(searchPayload?.Items[0].Visibility == ArtifactVisibilityModes.LocalOnly, "registry search should surface artifact visibility");
+    Assert(searchPayload?.Items[0].TrustTier == ArtifactTrustTiers.LocalOnly, "registry search should surface artifact trust tier");
+    Assert(searchPayload?.Items[0].ShelfAudience == "owner-only", "local-only artifacts should project owner-only shelf posture");
+    Assert(searchPayload?.Items[0].ShelfSummary?.Contains("owner-controlled", StringComparison.OrdinalIgnoreCase) == true, "registry search should explain owner-only shelf posture");
+
+    var preview = controller.GetPreview(created!.Id).Result as OkObjectResult;
+    var previewPayload = preview?.Value as RegistryPreviewResponse;
+    Assert(previewPayload?.ShelfAudience == "owner-only", "registry preview should project owner-only shelf posture");
+    Assert(previewPayload?.ShelfSummary?.Contains("owner-controlled", StringComparison.OrdinalIgnoreCase) == true, "registry preview should explain owner-only shelf posture");
+
+    var submitted = workflow.Submit(new PublicationSubmissionRequest(
+        ArtifactId: created.Id,
+        ArtifactKind: created.Kind.ToString(),
+        Title: created.Name,
+        SubmittedBy: "controller.publisher",
+        Notes: "controller hardening publication"));
+    var approved = workflow.Review(
+        submitted.PublicationId,
+        new PublicationReviewRequest("controller.reviewer", Approved: true, Notes: "approved"),
+        submitted.ConcurrencyToken).Publication;
+    Assert(approved is not null, "registry controller hardening should be able to approve a publication against the created artifact");
+    var published = workflow.Publish(
+        approved!.PublicationId,
+        new PublicationPublishRequest("controller.publisher", "publish controller artifact"),
+        approved.ConcurrencyToken).Publication;
+    Assert(published is not null, "registry controller hardening should be able to publish the created artifact");
+    var deprecated = workflow.Moderate(
+        published!.PublicationId,
+        new PublicationModerationRequest("controller.moderator", "deprecate", Reason: "controller replacement path"),
+        published.ConcurrencyToken).Publication;
+    Assert(deprecated is not null, "registry controller hardening should be able to deprecate the published artifact");
 
     controller.RegisterInstall(created!.Id, new RegistryHubInstallEvent(
         ArtifactId: created.Id,
@@ -3175,6 +3218,12 @@ void VerifyRegistryControllerHardening()
     var projectionPayload = projection?.Value as RegistryProjectionResponse;
     Assert(projectionPayload?.SupersededByArtifactId == $"{created.Id}-replacement", "projection endpoint should expose supersession metadata");
     Assert(projectionPayload?.RuntimeFingerprint == "scene-ledger:v2", "projection endpoint should preserve runtime fingerprint");
+    Assert(projectionPayload?.Visibility == ArtifactVisibilityModes.LocalOnly, "projection endpoint should surface artifact visibility");
+    Assert(projectionPayload?.TrustTier == ArtifactTrustTiers.LocalOnly, "projection endpoint should surface artifact trust tier");
+    Assert(projectionPayload?.ShelfAudience == "retained-history", "superseded local-only artifacts should project retained-history shelf posture");
+    Assert(projectionPayload?.LatestPublicationState == PublicationState.Deprecated.ToString(), "projection endpoint should surface the latest publication state");
+    Assert(projectionPayload?.PublicationTrustBand == "replacement-advised", "projection endpoint should surface the latest publication trust band");
+    Assert(projectionPayload?.PublicationNextSafeActionSummary?.Contains("replacement artifact", StringComparison.OrdinalIgnoreCase) == true, "projection endpoint should surface the latest publication next-safe action");
 
     var installProjection = controller.GetInstallProjection(created.Id).Result as OkObjectResult;
     var installProjectionPayload = installProjection?.Value as HubArtifactInstallProjection;

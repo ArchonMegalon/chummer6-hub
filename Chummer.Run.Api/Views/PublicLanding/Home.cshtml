@@ -30,9 +30,13 @@
     var leadCommunityOperation = Model.CampaignSpine.CommunityOperations.FirstOrDefault();
     var leadCommunityTransfer = leadCommunityOperation?.RecentRosterTransfers?.FirstOrDefault();
     var leadCommunityEvent = leadCommunityOperation?.RecentEventSummaries.FirstOrDefault();
+    var leadCommunityBoard = leadCommunityOperation?.SeasonBoardEntries.FirstOrDefault();
     var leadCommunityEventsHref = leadCommunityOperation is null
         ? "/account/work#community-ops"
         : $"/account/work#community-op-events-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
+    var leadCommunityBoardHref = leadCommunityOperation is null
+        ? "/account/work#community-ops"
+        : $"/account/work#community-op-board-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
     var leadNextSessionCarryForward = leadWorkspaceServerPlane?.NextSessionCarryForward;
@@ -559,6 +563,10 @@
                                                                 {
                                                                     <span> Latest event: @leadCommunityEvent</span>
                                                                 }
+                                                                @if (leadCommunityBoard is not null)
+                                                                {
+                                                                    <span> Board: @leadCommunityBoard.CampaignName via @leadCommunityBoard.RunTitle. Next: @leadCommunityBoard.NextSafeAction</span>
+                                                                }
                                                                 @if (leadCommunityTransfer is not null)
                                                                 {
                                                                     <span> Latest move: @leadCommunityTransfer.RunnerHandle.</span>
@@ -569,7 +577,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@leadCommunityEventsHref">Open teams and permissions</a>
+                                                        <a class="inline-link" href="@leadCommunityBoardHref">Open season board</a>
                                                     </article>
                                                 }
 

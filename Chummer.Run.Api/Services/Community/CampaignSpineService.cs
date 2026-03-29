@@ -113,6 +113,7 @@ public sealed class CampaignSpineService
                             .Take(3)
                             .ToArray(),
                         RecentEventSummaries: BuildGroupRecentEventSummaries(groupWorkspaces),
+                        SeasonBoardEntries: BuildGroupSeasonBoardEntries(groupWorkspaces),
                         Watchouts: BuildGroupOperatorWatchouts(groupWorkspaces),
                         RecentRosterTransfers: transfers
                             .Where(item =>
@@ -1684,6 +1685,58 @@ public sealed class CampaignSpineService
             .Take(4)
             .ToArray();
     }
+
+    private static IReadOnlyList<CommunitySeasonBoardEntryProjection> BuildGroupSeasonBoardEntries(IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
+        => groupWorkspaces
+            .Select(workspace =>
+            {
+                var leadRun = workspace.Runs
+                    .OrderByDescending(static item => item.UpdatedAtUtc)
+                    .FirstOrDefault();
+                var leadChangePacket = workspace.ChangePackets?
+                    .OrderByDescending(static item => item.UpdatedAtUtc)
+                    .FirstOrDefault();
+                var leadAftermathPackage = workspace.AftermathPackages?
+                    .OrderByDescending(static item => item.GeneratedAtUtc)
+                    .FirstOrDefault();
+                var watchout = workspace.ReadinessCues
+                    .Where(static cue => NeedsAttention(cue.Severity))
+                    .Select(static cue => $"{cue.Title} — {cue.Summary}")
+                    .FirstOrDefault();
+                string latestEventSummary = leadChangePacket is not null
+                    ? $"{leadChangePacket.Label} — {leadChangePacket.Summary}"
+                    : workspace.NextSessionCarryForward is not null
+                        ? $"{workspace.NextSessionCarryForward.Label} — {workspace.NextSessionCarryForward.Summary}"
+                        : leadAftermathPackage is not null
+                            ? $"{leadAftermathPackage.Title} — {leadAftermathPackage.Summary}"
+                            : !string.IsNullOrWhiteSpace(workspace.ActiveSceneSummary)
+                                ? workspace.ActiveSceneSummary!
+                                : workspace.ReturnSummary;
+                DateTimeOffset updatedAtUtc = new DateTimeOffset?[]
+                    {
+                        leadChangePacket?.UpdatedAtUtc,
+                        workspace.NextSessionCarryForward?.UpdatedAtUtc,
+                        leadAftermathPackage?.GeneratedAtUtc,
+                        leadRun?.UpdatedAtUtc,
+                        workspace.LatestContinuity?.CapturedAtUtc
+                    }
+                    .Where(static item => item.HasValue)
+                    .Select(static item => item!.Value)
+                    .DefaultIfEmpty(DateTimeOffset.MinValue)
+                    .Max();
+                return new CommunitySeasonBoardEntryProjection(
+                    CampaignId: workspace.CampaignId,
+                    WorkspaceId: workspace.WorkspaceId,
+                    CampaignName: workspace.CampaignName,
+                    RunTitle: leadRun?.Title ?? "No live run yet",
+                    LatestEventSummary: latestEventSummary,
+                    NextSafeAction: workspace.NextSafeAction ?? "Open the shared campaign view and confirm the current return lane before you continue.",
+                    WatchoutSummary: watchout,
+                    UpdatedAtUtc: updatedAtUtc);
+            })
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ThenBy(static item => item.CampaignName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
     private static IReadOnlyList<string> BuildGroupOperatorWatchouts(IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
         => groupWorkspaces
