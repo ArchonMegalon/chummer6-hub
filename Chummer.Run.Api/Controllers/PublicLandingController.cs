@@ -783,6 +783,8 @@ public sealed class PublicLandingController : Controller
             new("Recommended now", BuildTrustPulseRecommendedSummary(manifest, releaseExperience)),
             new("Who can get it now", BuildTrustPulseAccessSummary(releaseExperience)),
             new("Release proof", BuildReleaseProofSummary(manifest)),
+            new("Launch readiness", BuildTrustPulseLaunchReadinessSummary(pulse)),
+            new("Provider-route stewardship", BuildProviderRouteStewardshipSummary(pulse)),
             new("Adoption health", BuildTrustPulseAdoptionSummary(pulse)),
             new("Journey pulse", BuildJourneyPulseSummary(pulse)),
             new("Current caution", BuildTrustPulseCautionSummary(pulse))
@@ -1195,6 +1197,53 @@ public sealed class PublicLandingController : Controller
         return segments.Count == 0
             ? "No extra caution note is published right now."
             : string.Join(" ", segments);
+    }
+
+    private static string BuildTrustPulseLaunchReadinessSummary(PublicTrustPulseSnapshot pulse)
+    {
+        if (!string.IsNullOrWhiteSpace(pulse.LaunchReadiness))
+        {
+            return pulse.LaunchReadiness!;
+        }
+
+        if (pulse.LongestPoleLabel is not null && string.Equals(pulse.JourneyGateState, "blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Launch remains paused: {pulse.LongestPoleLabel} requires closure before broad fan-out.";
+        }
+
+        if (pulse.ActiveWaveStatus is not null && string.Equals(pulse.ActiveWaveStatus, "in_progress", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Wave is still active. Continue from guided-wave proof and guard against scope regressions before expanding.";
+        }
+
+        if (string.Equals(pulse.ReleaseHealthState, "red", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Hold launch expansion while release health remains red and active blockers resolve.";
+        }
+
+        return pulse.JourneyGateState is not null
+            && string.Equals(pulse.JourneyGateState, "ready", StringComparison.OrdinalIgnoreCase)
+            && (pulse.BlockedJourneyCount ?? 0) == 0
+                ? "Ready to progress this wave if weekly signals stay stable."
+                : "Launch posture follows current governance signals; review before large rollout.";
+    }
+
+    private static string BuildProviderRouteStewardshipSummary(PublicTrustPulseSnapshot pulse)
+    {
+        string defaultStatus = string.IsNullOrWhiteSpace(pulse.ProviderRouteDefault)
+            ? "default route posture is governed by the Hub and not hard-coded in this lane"
+            : pulse.ProviderRouteDefault!;
+        string canaryStatus = string.IsNullOrWhiteSpace(pulse.ProviderRouteCanary)
+            ? "canary status is not yet mirrored here"
+            : pulse.ProviderRouteCanary!;
+        string reviewDue = string.IsNullOrWhiteSpace(pulse.ProviderRouteReviewDue)
+            ? string.Empty
+            : $"; next review due {pulse.ProviderRouteReviewDue}.";
+        string nextDecision = string.IsNullOrWhiteSpace(pulse.ProviderRouteNextDecision)
+            ? string.Empty
+            : $" Next decision: {pulse.ProviderRouteNextDecision}.";
+
+        return string.Join(string.Empty, [defaultStatus, " — ", canaryStatus, reviewDue, nextDecision]).Replace(" .", ".").Trim();
     }
 
     private static string BuildTrustPulseAdoptionSummary(PublicTrustPulseSnapshot pulse)

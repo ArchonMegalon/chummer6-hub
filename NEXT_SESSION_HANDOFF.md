@@ -31,6 +31,7 @@ Updated: 2026-03-29
   - route-readiness gating so `/home/access` and `/home/work` unlock once real device/return truth exists even if onboarding was not explicitly marked complete yet
   - safehouse / travel mode visibility, staged offline inventory, and recap follow-through
   - signed-in and public trust pulse now exposes install-aware `Who can get it now` and `Adoption health`
+  - signed-in and public trust pulse now also exposes `Launch readiness` plus `Provider-route stewardship` from the weekly pulse instead of leaving those milestone-20 signals trapped in canon JSON
   - campaign memory projection now appears on signed-in home/work and workspace detail where available
   - home starter lane now nudges linked users without existing campaign work into `/home/work` as a first-playable-session onboarding step
   - `/account/work` empty state now offers the same `Start first playable session` starter action instead of a dead-end generic message
@@ -42,6 +43,8 @@ Updated: 2026-03-29
 - Added a first-class `First playable session` projection to the shared workspace, calmer workspace digest, and bounded workspace server plane so starter-lane onboarding becomes real campaign-start proof instead of only a seeding button
 - Surfaced that first-session proof on both `/home/work` and `/account/work/workspaces/{workspaceId}` with campaign-start summary, bounded evidence, and the same next-step truth already used by the shared workspace
 - Retired the first-session proof automatically once governed prep launch, travel prefetch, or recap follow-through lands, so the starter lane does not linger after the campaign moves into durable continuity
+- Extended `PublicTrustPulseService` and signed-in/public trust-pulse rows so landing, downloads, help, and current-release surfaces now carry `Launch readiness` plus `Provider-route stewardship` straight from the weekly pulse
+- Added unit and smoke assertions that lock those launch/provider pulse rows into the public and signed-in surfaces instead of leaving them as unguarded controller copy
 - Added a `Start first playable session` action on `/account/work` empty-state copy so signed-in work follows the same starter-lane onboarding route as `/home/work`
 - Reused `/api/v1/campaign-spine/me/workspaces/starter` from the account route and added starter-lane feedback/redirect handling instead of inventing a second onboarding API
 - Added a dedicated `Aftermath recap` card on `/home/work` with bounded summary, evidence, return-shelf context, and a deep link back to the shared workspace return lane
@@ -129,6 +132,7 @@ CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hu
 2. Push more of the campaign workspace v3 follow-through into durable receipts and shared projections instead of isolated cards, especially shared consequence/recap synthesis and broader long-lived campaign memory beyond the new next-session and downtime packets.
 3. Keep moving toward the cross-repo journey-proof gap: install -> claim -> restore -> continue and join campaign -> run -> recover -> recap still need stronger whole-product acceptance evidence outside this repo.
 4. Continue the guided onboarding slice past first-session proof into broader first-session closure and first return, especially once the kickoff lane needs stronger support, recap, and community/operator follow-through without reopening a parallel onboarding model.
+5. Keep pushing milestone-20 pulse depth behind the new surface rows: real trend history, measured closure/adoption deltas, and provider-route canary automation still need to flow from evidence generation into the weekly pulse without hand-tended prose.
 
 ## Guardrails
 
