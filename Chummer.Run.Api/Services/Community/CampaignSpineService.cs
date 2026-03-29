@@ -707,6 +707,14 @@ public sealed class CampaignSpineService
         {
             readinessHighlights.Add($"Next session — {workspace.NextSessionCarryForward.Summary}");
         }
+        if (workspace.FirstPlayableSession is not null)
+        {
+            readinessHighlights.Add($"First playable session — {workspace.FirstPlayableSession.Summary}");
+            readinessHighlights.AddRange(
+                workspace.FirstPlayableSession.EvidenceLines
+                    .Take(2)
+                    .Select(static line => $"First-session evidence — {line}"));
+        }
         readinessHighlights.AddRange(
             workspace.Consequences?
                 .Take(2)
@@ -768,6 +776,7 @@ public sealed class CampaignSpineService
             ReadinessHighlights: FinalizeLines(readinessHighlights),
             Watchouts: FinalizeLines(watchouts),
             UpdatedAtUtc: updatedAtUtc,
+            FirstPlayableSession: workspace.FirstPlayableSession,
             CampaignMemory: workspace.CampaignMemory);
     }
 
@@ -1578,6 +1587,7 @@ public sealed class CampaignSpineService
                 && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase));
         var activeSceneSummary = DescribeActiveSceneSummary(leadRun, activeScene, leadObjective);
         var nextSafeAction = ResolveWorkspaceNextSafeAction(campaign, restore, recapShelf, readinessCues, leadRun, activeScene, leadObjective);
+        var firstPlayableSession = BuildFirstPlayableSession(campaign, restore, readinessCues, workspaceCrews, workspaceDossiers, leadRun, activeScene, leadObjective, nextSafeAction, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages);
         var nextSessionCarryForward = BuildNextSessionCarryForward(campaign, nextSafeAction, leadRun, activeScene, leadObjective, consequences, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages);
         var campaignMemory = BuildCampaignMemory(campaign, nextSafeAction, leadRun, activeScene, leadObjective, consequences, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages, nextSessionCarryForward);
         var changePackets = BuildWorkspaceChangePackets(campaign, recapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages, nextSessionCarryForward);
@@ -1604,6 +1614,7 @@ public sealed class CampaignSpineService
             TravelPrefetches: workspaceTravelPrefetches,
             AftermathPackages: workspaceAftermathPackages,
             NextSessionCarryForward: nextSessionCarryForward,
+            FirstPlayableSession: firstPlayableSession,
             CampaignMemory: campaignMemory);
     }
 
@@ -2400,6 +2411,75 @@ public sealed class CampaignSpineService
         }
 
         return $"Open {campaign.Name} from the latest continuity snapshot and keep the shared return lane attached to the current claimed install.";
+    }
+
+    private static FirstPlayableSessionProjection? BuildFirstPlayableSession(
+        CampaignProjection campaign,
+        WorkspaceRestoreProjection restore,
+        IReadOnlyList<CampaignReadinessCue> readinessCues,
+        IReadOnlyList<CrewProjection> workspaceCrews,
+        IReadOnlyList<RunnerDossierProjection> workspaceDossiers,
+        RunProjection? leadRun,
+        SceneProjection? activeScene,
+        ObjectiveProjection? leadObjective,
+        string nextSafeAction,
+        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
+        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+    {
+        if (leadRun is null
+            || activeScene is null
+            || workspaceDossiers.Count == 0
+            || workspaceCrews.Count == 0
+            || prepLaunches.Count > 0
+            || travelPrefetchReceipts.Count > 0
+            || aftermathPackages.Count > 0)
+        {
+            return null;
+        }
+
+        int crewMemberCount = workspaceCrews.Sum(static crew => crew.Members.Count);
+        CampaignReadinessCue? attentionCue = readinessCues.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
+        ClaimedDeviceRestoreProjection? claimedDevice = restore.ClaimedDevices.FirstOrDefault();
+        string rosterSummary = $"{workspaceDossiers.Count} dossier(s) and {crewMemberCount} crew member(s) are already attached to the shared return lane.";
+        string readinessSummary = attentionCue is null
+            ? "Rules, roster, and continuity already agree on the same kickoff lane."
+            : $"{attentionCue.Title} still needs review before the first session is fully clear.";
+        string summary = $"{campaign.Name} already has {leadRun.Title}, {activeScene.Title}, and {rosterSummary} {readinessSummary}";
+        string campaignStartSummary = leadObjective is null
+            ? $"{activeScene.Title} is the live campaign-start scene on {leadRun.Title}."
+            : $"{activeScene.Title} opens {leadRun.Title} while {leadObjective.Title} stays {leadObjective.Status} with {leadObjective.Pressure} pressure.";
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                campaign.LatestContinuity?.CapturedAtUtc,
+                leadRun.UpdatedAtUtc,
+                activeScene.UpdatedAtUtc,
+                leadObjective?.UpdatedAtUtc,
+                workspaceDossiers.Max(static item => (DateTimeOffset?)item.UpdatedAtUtc),
+                restore.GeneratedAtUtc
+            }
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(restore.GeneratedAtUtc)
+            .Max();
+
+        return new FirstPlayableSessionProjection(
+            SessionId: StableId("first-playable", $"{campaign.CampaignId}:{leadRun.RunId}:{updatedAtUtc.ToUnixTimeMilliseconds()}"),
+            Label: "First playable session",
+            Summary: summary,
+            CampaignStartSummary: campaignStartSummary,
+            NextSafeAction: nextSafeAction,
+            EvidenceLines: FinalizeLines(
+            [
+                campaign.LatestContinuity?.Summary ?? campaign.Summary,
+                $"{leadRun.Title} is active on {activeScene.Title} at {activeScene.Revision}.",
+                leadObjective is null ? string.Empty : $"{leadObjective.Title} remains {leadObjective.Status} with {leadObjective.Pressure} pressure.",
+                rosterSummary,
+                claimedDevice?.RestoreSummary ?? "Claimed install return will attach the same kickoff lane to the reopening device.",
+                attentionCue?.Summary ?? string.Empty,
+                nextSafeAction
+            ]),
+            UpdatedAtUtc: updatedAtUtc);
     }
 
     private static NextSessionCarryForwardProjection? BuildNextSessionCarryForward(

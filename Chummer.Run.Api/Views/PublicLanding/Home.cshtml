@@ -49,6 +49,8 @@
         : $"/account/work#community-op-guidance-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
+    var leadFirstPlayableSession = leadWorkspaceServerPlane?.FirstPlayableSession;
+    var leadFirstPlayableEvidence = leadFirstPlayableSession?.EvidenceLines.FirstOrDefault();
     var leadNextSessionCarryForward = leadWorkspaceServerPlane?.NextSessionCarryForward;
     var leadNextSessionEvidence = leadNextSessionCarryForward?.EvidenceLines.FirstOrDefault();
     var leadConsequence = leadWorkspaceServerPlane?.Consequences.FirstOrDefault();
@@ -389,6 +391,10 @@
                                                             {
                                                                 <span> Next: @workspace.NextSafeAction</span>
                                                             }
+                                                            @if (workspace.FirstPlayableSession is not null)
+                                                            {
+                                                                <span> First playable session: @workspace.FirstPlayableSession.CampaignStartSummary</span>
+                                                            }
                                                             @if (workspace.NextSessionCarryForward is not null)
                                                             {
                                                                 <span> Carry-forward: @workspace.NextSessionCarryForward.Summary</span>
@@ -428,6 +434,10 @@
                                                                 @if (leadNextSessionCarryForward is not null)
                                                                 {
                                                                     <span> Carry-forward: @leadNextSessionCarryForward.Summary</span>
+                                                                }
+                                                                @if (leadFirstPlayableSession is not null)
+                                                                {
+                                                                    <span> First session: @leadFirstPlayableSession.CampaignStartSummary</span>
                                                                 }
                                                                 <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "claim lane pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
                                                                 @if (leadWorkspaceServerPlane.AftermathPackages.Count > 0)
@@ -478,6 +488,26 @@
                                                     </div>
                                                     <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open shared campaign view</a>
                                                 </article>
+
+                                                @if (leadFirstPlayableSession is not null)
+                                                {
+                                                    <article class="app-rail__item">
+                                                        <span class="tag">First playable session</span>
+                                                        <div class="app-rail__copy">
+                                                            <h3>@leadFirstPlayableSession.Label</h3>
+                                                            <p>
+                                                                @leadFirstPlayableSession.Summary
+                                                                <span> Start: @leadFirstPlayableSession.CampaignStartSummary</span>
+                                                                <span> Next: @leadFirstPlayableSession.NextSafeAction</span>
+                                                                @if (!string.IsNullOrWhiteSpace(leadFirstPlayableEvidence))
+                                                                {
+                                                                    <span> Evidence: @leadFirstPlayableEvidence</span>
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-first-playable-session")">Open first playable session proof</a>
+                                                    </article>
+                                                }
 
                                                 @if (leadNextSessionCarryForward is not null)
                                                 {

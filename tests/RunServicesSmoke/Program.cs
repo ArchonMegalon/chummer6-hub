@@ -1578,8 +1578,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("/account/work/workspaces/", StringComparison.Ordinal), "home work should deep-link the shared campaign view instead of sending every route back to the generic work shell.");
     Assert(homeSource.Contains("@workspace.ActiveSceneSummary", StringComparison.Ordinal), "home work should surface active-scene change truth directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("@workspace.NextSafeAction", StringComparison.Ordinal), "home work should surface the next safe action directly on the calmer shared campaign card.");
+    Assert(homeSource.Contains("@workspace.FirstPlayableSession.CampaignStartSummary", StringComparison.Ordinal), "home work should surface first-session campaign-start proof directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("What changed for me", StringComparison.Ordinal), "home work should keep the explicit what-changed-for-me packet on the signed-in route.");
     Assert(homeSource.Contains("leadWorkspaceState?.Label", StringComparison.Ordinal), "home work should surface the bounded workspace state directly from the server plane.");
+    Assert(homeSource.Contains("Open first playable session proof", StringComparison.Ordinal), "home work should keep a direct route into the bounded first-session proof detail.");
+    Assert(homeSource.Contains("@leadFirstPlayableSession.CampaignStartSummary", StringComparison.Ordinal), "home work should surface the first-session campaign-start summary directly from the server plane.");
     Assert(homeSource.Contains("Next-session carry-forward", StringComparison.Ordinal), "home work should surface a dedicated next-session carry-forward card backed by the shared workspace projection.");
     Assert(homeSource.Contains("@leadNextSessionCarryForward.Summary", StringComparison.Ordinal), "home work should surface the next-session carry-forward summary directly from the server plane.");
     Assert(homeSource.Contains("@leadNextSessionCarryForward.ReturnSummary", StringComparison.Ordinal), "home work should keep return-lane truth attached to the calmer next-session card.");
@@ -1675,6 +1678,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("seedStarterWorkspaceFromAccount", StringComparison.Ordinal), "account work should wire the starter-lane button on the empty-state route.");
     Assert(accountSource.Contains("starterWorkspaceAccountNotice", StringComparison.Ordinal), "account work should surface starter-lane feedback on the empty-state route.");
     Assert(accountSource.Contains("/api/v1/campaign-spine/me/workspaces/starter", StringComparison.Ordinal), "account work should reuse the campaign-spine starter endpoint instead of inventing a second onboarding API.");
+    Assert(accountSource.Contains("selected-first-playable-session", StringComparison.Ordinal), "account work should keep a bounded first-session proof drawer on the selected shared campaign view.");
+    Assert(accountSource.Contains("selectedWorkspaceFirstPlayableSession.CampaignStartSummary", StringComparison.Ordinal), "account work should surface first-session campaign-start proof directly on the selected shared campaign view.");
     Assert(!accountSource.Contains("Workspaces and continuity", StringComparison.Ordinal), "account should avoid workspace-heavy section titles on the customer-facing route.");
     Assert(!accountSource.Contains("Campaign continuity, work-return surfaces, and team posture", StringComparison.Ordinal), "account work copy should avoid internal continuity posture phrasing.");
     Assert(!accountSource.Contains("Advanced continuity and restore", StringComparison.Ordinal), "account access should avoid internal restore drawer wording.");
@@ -2391,6 +2396,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspacePayload!.Consequences!.Any(item => string.Equals(item.Kind, "reputation", StringComparison.Ordinal) && item.Receipts.Count >= 1), "campaign spine workspace api should keep grounded reputation receipts attached.");
     Assert(workspacePayload.NextSessionCarryForward is not null, "campaign spine workspace api should expose a first-class next-session carry-forward projection.");
     Assert(workspacePayload.NextSessionCarryForward!.EvidenceLines.Count >= 1, "campaign spine workspace api should attach bounded next-session evidence lines.");
+    Assert(workspacePayload.FirstPlayableSession is not null, "campaign spine workspace api should expose a first-class first playable session projection before governed follow-through moves beyond onboarding.");
+    Assert(workspacePayload.FirstPlayableSession!.EvidenceLines.Count >= 1, "campaign spine workspace api should attach bounded first-session evidence lines.");
     Assert(workspacePayload.CampaignMemory is not null, "campaign spine workspace api should expose a first-class campaign-memory projection.");
     Assert(workspacePayload.CampaignMemory!.EvidenceLines.Count >= 1, "campaign spine workspace api should attach bounded campaign-memory evidence lines.");
     Assert(!string.IsNullOrWhiteSpace(workspacePayload?.ActiveSceneSummary), "campaign spine workspace api should expose an active-scene summary.");
@@ -2404,6 +2411,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(leadWorkspaceDigest.ReadinessHighlights.Count >= 1, "campaign spine workspace digests should preserve readiness highlights.");
     Assert(!string.IsNullOrWhiteSpace(leadWorkspaceDigest.SupportClosureSummary), "campaign spine workspace digests should preserve support-closure truth.");
     Assert(!string.IsNullOrWhiteSpace(leadWorkspaceDigest.RuleEnvironmentSummary), "campaign spine workspace digests should preserve rule-environment truth.");
+    Assert(leadWorkspaceDigest.FirstPlayableSession is not null, "campaign spine workspace digests should preserve calmer first-session proof.");
     Assert(leadWorkspaceDigest.CampaignMemory is not null, "campaign spine workspace digests should preserve the calmer campaign-memory summary.");
     Assert(leadWorkspaceDigest.CampaignMemory!.EvidenceLines.Count >= 1, "campaign spine workspace digests should preserve bounded campaign-memory evidence.");
     var workspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
@@ -2415,6 +2423,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.ChangePackets.Count >= 1, "campaign spine server plane api should preserve workspace change packets.");
     Assert(workspaceServerPlanePayload.Consequences.Count >= 4, "campaign spine server plane api should preserve the governed consequence ledger.");
     Assert(workspaceServerPlanePayload.Consequences.Any(item => string.Equals(item.Kind, "faction", StringComparison.Ordinal) && item.Receipts.Count >= 1), "campaign spine server plane api should keep grounded faction receipts visible.");
+    Assert(workspaceServerPlanePayload.FirstPlayableSession is not null, "campaign spine server plane api should expose the bounded first playable session proof.");
+    Assert(workspaceServerPlanePayload.FirstPlayableSession!.EvidenceLines.Count >= 1, "campaign spine server plane api should attach bounded first-session evidence.");
     Assert(workspaceServerPlanePayload.NextSessionCarryForward is not null, "campaign spine server plane api should expose the bounded next-session carry-forward projection.");
     Assert(workspaceServerPlanePayload.NextSessionCarryForward!.EvidenceLines.Count >= 1, "campaign spine server plane api should attach bounded next-session evidence lines.");
     Assert(workspaceServerPlanePayload.CampaignMemory is not null, "campaign spine server plane api should expose the bounded campaign-memory projection.");
@@ -2437,6 +2447,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.TravelPrefetches.Count == 0, "campaign spine server plane api should start without staged travel-prefetch receipts.");
     Assert(workspaceServerPlanePayload.AftermathPackages.Count == 0, "campaign spine server plane api should start without aftermath recap packages.");
     Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.NextSafeAction.Summary), "campaign spine server plane api should expose one bounded next safe action.");
+    var starterWorkspaceResult = await campaignSpineController.SeedStarterWorkspace(CancellationToken.None);
+    var starterWorkspacePayload = (starterWorkspaceResult.Result as OkObjectResult)?.Value as CampaignWorkspaceProjection ?? starterWorkspaceResult.Value;
+    Assert(starterWorkspacePayload is not null && !string.IsNullOrWhiteSpace(starterWorkspacePayload.WorkspaceId), "campaign spine starter api should return a starter workspace for first session onboarding.");
+    Assert(starterWorkspacePayload!.FirstPlayableSession is not null, "campaign spine starter api should return first-session proof on the starter workspace payload.");
     var rosterTransferPlanResult = await campaignSpineController.GetMyCampaignWorkspaceRosterTransferPlan(workspaceId, CancellationToken.None);
     var rosterTransferPlanPayload = (rosterTransferPlanResult.Result as OkObjectResult)?.Value as RosterTransferPlannerProjection ?? rosterTransferPlanResult.Value;
     Assert(rosterTransferPlanPayload is not null && string.Equals(rosterTransferPlanPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine roster-transfer planner api should stay attached to the selected shared campaign view.");
@@ -2504,6 +2518,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project aftermath recap packages after generation.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "aftermath_recap", StringComparison.Ordinal)) == true, "campaign spine server plane api should add aftermath recap packages into the bounded what-changed packet rail.");
     Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, downtimeBriefPayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project downtime brief packets after generation.");
+    Assert(refreshedWorkspaceServerPlanePayload?.FirstPlayableSession is null, "campaign spine server plane api should retire starter-session proof once governed prep, travel, and recap follow-through have landed.");
     Assert(refreshedWorkspaceServerPlanePayload?.NextSessionCarryForward is not null, "campaign spine server plane api should refresh the next-session carry-forward packet after the governed actions land.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the next-session carry-forward packet on the bounded what-changed rail.");
     Assert(refreshedWorkspaceServerPlanePayload?.CampaignMemory is not null, "campaign spine server plane api should refresh campaign memory after governed follow-through lands.");
@@ -2519,9 +2534,6 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(handoffPayload.ProgressionOutcomes[0].Contains("25 / 50 / 100 Karma checkpoints", StringComparison.Ordinal), "campaign spine handoff api should preserve the planner checkpoints directly on the handoff payload.");
     Assert(!string.IsNullOrWhiteSpace(handoffPayload.PlannerCoverageSummary), "campaign spine handoff api should preserve planner-coverage summary directly on the handoff payload.");
     Assert(handoffPayload.PlannerCoverageLines?.FirstOrDefault()?.Contains("Campaign continuity:", StringComparison.Ordinal) == true, "campaign spine handoff api should preserve campaign continuity planner coverage directly on the handoff payload.");
-    var starterWorkspaceResult = await campaignSpineController.SeedStarterWorkspace(CancellationToken.None);
-    var starterWorkspacePayload = (starterWorkspaceResult.Result as OkObjectResult)?.Value as CampaignWorkspaceProjection ?? starterWorkspaceResult.Value;
-    Assert(starterWorkspacePayload is not null && !string.IsNullOrWhiteSpace(starterWorkspacePayload.WorkspaceId), "campaign spine starter api should return a starter workspace for first session onboarding.");
     var rulesResult = await campaignSpineController.GetMyRulesNavigatorAnswer(rulesEntryId, CancellationToken.None);
     var rulesPayload = (rulesResult.Result as OkObjectResult)?.Value as RulesNavigatorAnswerProjection ?? rulesResult.Value;
     Assert(rulesPayload is not null && rulesPayload.EvidenceLines.Count >= 1, "campaign spine api should expose grounded rule-environment evidence.");
