@@ -19,5 +19,51 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     IReadOnlyList<SupportClosureCue> SupportClosures,
     IReadOnlyList<KnownIssueAffectingInstall> KnownIssues,
     IReadOnlyList<DecisionNotice> DecisionNotices,
+    CampaignPrepLibrarySummary PrepLibrary,
+    TravelModeReadinessSummary TravelMode,
     NextSafeActionCue NextSafeAction,
     DateTimeOffset GeneratedAtUtc);
+
+public sealed record CampaignPrepLibrarySummary(
+    string Summary,
+    string BindingSummary,
+    string SearchSummary,
+    int ReusablePacketCount,
+    int SearchablePacketCount,
+    IReadOnlyList<GovernedPrepPacketSummary> Packets);
+
+public sealed record GovernedPrepPacketSummary(
+    string PacketId,
+    string Kind,
+    string Title,
+    string Summary,
+    string BindingSummary,
+    bool Reusable,
+    IReadOnlyList<string> SearchTerms,
+    IReadOnlyList<string> EvidenceLines,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record CampaignPrepLibrarySearchResponse(
+    string WorkspaceId,
+    string CampaignId,
+    string? QueryText,
+    IReadOnlyList<GovernedPrepPacketSummary> Items,
+    int TotalCount);
+
+public sealed record TravelModeReadinessSummary(
+    string Status,
+    string Summary,
+    string PrefetchInventorySummary,
+    int ClaimedDeviceCount,
+    int TravelReadyDeviceCount,
+    IReadOnlyList<TravelModeDeviceReadinessCue> Devices,
+    IReadOnlyList<string> Boundaries);
+
+public sealed record TravelModeDeviceReadinessCue(
+    string InstallationId,
+    string DeviceRole,
+    string Platform,
+    string HeadId,
+    string Channel,
+    string Status,
+    string Summary);

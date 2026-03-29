@@ -281,6 +281,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await expectBodyText(page, 'Server-plane follow-through', '/account/work/workspaces detail');
   await expectBodyText(page, 'Roster readiness and dossier freshness', '/account/work/workspaces detail');
   await expectBodyText(page, 'Rule and continuity health', '/account/work/workspaces detail');
+  await expectBodyText(page, 'GM prep library and travel mode', '/account/work/workspaces detail');
+  await expectBodyText(page, 'Safehouse / travel mode', '/account/work/workspaces detail');
   await expectBodyText(page, 'Support follow-through', '/account/work/workspaces detail');
   await assertNoBannedCopy(page, '/account/work/workspaces detail');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail');

@@ -15,7 +15,7 @@ public sealed class PublicPrivacyBoundaryServiceTests
 
         var panel = fixture.CreateService().BuildPanel("privacy");
 
-        Assert.Equal("Support, install, survey, and provider-backed help stay on a bounded clock", panel.Heading);
+        Assert.Equal("Support, survey, and assistant data stay on a bounded clock", panel.Heading);
         Assert.Equal("/help", panel.PrimaryAction.Href);
         Assert.Contains(panel.Domains, static item => string.Equals(item.Label, "Provider-backed help", StringComparison.Ordinal) && item.RetentionSummary.Contains("30 days", StringComparison.Ordinal));
         Assert.Contains(panel.Domains, static item => string.Equals(item.Label, "Install linkage", StringComparison.Ordinal) && item.RetentionSummary.Contains("365 days", StringComparison.Ordinal));
