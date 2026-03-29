@@ -1995,7 +1995,7 @@
                 {
                     @foreach (var op in Model.CampaignSpine.CommunityOperations)
                     {
-                        <details class="details-drawer">
+                        <details id="community-op-@op.GroupId" class="details-drawer">
                             <summary>@op.GroupName · @HumanizeStatus(op.OperatorRole, "Member")</summary>
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
@@ -2052,7 +2052,7 @@
                                     }
                                 </ul>
                             </details>
-                            <details class="details-drawer">
+                            <details id="community-op-events-@op.GroupId" class="details-drawer">
                                 <summary>Season &amp; event rail</summary>
                                 <ul class="muted-copy">
                                     <li>@op.SeasonEventSummary</li>

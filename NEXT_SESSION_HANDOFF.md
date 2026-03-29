@@ -35,6 +35,7 @@ Updated: 2026-03-29
 - Added a first-class `Season / event pulse` and `Season & event rail` to `Teams & permissions`, backed by governed run, carry-forward, change-packet, and recap receipts from the shared campaign/operator projection
 - Extended the signed-in `/home/work` operator card so it now carries the operator operations pulse, campaign-return pulse, and a bounded watchout from the same shared projection
 - Extended the signed-in `/home/work` operator card so it now also carries the operator season/event pulse and one bounded recent-event receipt from the same shared projection
+- Deep-linked the signed-in `/home/work` operator card directly into the exact `Season & event rail` drawer on `/account/work` instead of dropping users at the generic operator shell
 - Added a dedicated `Consequence watch` card on `/home/work` so the lead governed campaign consequence and one evidence cue stay visible on the signed-in home cockpit instead of only appearing inside the shared summary prose
 - Added a dedicated `Roster move` card on `/home/work` so the latest governed transfer stays visible on the signed-in home cockpit and points back to the same operator rail
 - Extended the `/home/work` GM prep card so it now carries the latest governed prep-launch packet title and the latest staged travel-prefetch device receipt instead of only generic posture text

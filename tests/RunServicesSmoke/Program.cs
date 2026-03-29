@@ -1600,6 +1600,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Season / event pulse", StringComparison.Ordinal), "home work should surface a first-class season and event pulse on the calmer operator card.");
     Assert(homeSource.Contains("@leadCommunityOperation.SeasonEventSummary", StringComparison.Ordinal), "home work should surface the operator season-event pulse directly from the shared projection.");
     Assert(homeSource.Contains("Latest event:", StringComparison.Ordinal), "home work should keep one bounded event receipt on the lead operator card.");
+    Assert(homeSource.Contains("/account/work#community-op-events-", StringComparison.Ordinal), "home work should deep-link the operator card into the exact season-event rail instead of sending every organizer flow back to the generic operator shell.");
     Assert(homeSource.Contains("Open teams and permissions", StringComparison.Ordinal), "home work should keep a direct route back to the governed operator surface.");
     Assert(homeSource.Contains("Consequence watch", StringComparison.Ordinal), "home work should surface a dedicated consequence card instead of leaving consequence follow-through buried inside summary text.");
     Assert(homeSource.Contains("@leadConsequence.Label", StringComparison.Ordinal), "home work should surface the lead governed consequence directly from the workspace server plane.");
@@ -1688,6 +1689,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Season / event pulse", StringComparison.Ordinal), "account teams and permissions should surface a first-class season and event pulse instead of treating larger organizer work as implicit.");
     Assert(accountSource.Contains("@op.SeasonEventSummary", StringComparison.Ordinal), "account teams and permissions should surface the operator season-event pulse directly from the shared projection.");
     Assert(accountSource.Contains("<summary>Season &amp; event rail</summary>", StringComparison.Ordinal), "account teams and permissions should give the operator a dedicated auditable season and event rail.");
+    Assert(accountSource.Contains("id=\"community-op-events-@op.GroupId\"", StringComparison.Ordinal), "account teams and permissions should give the season-event rail a stable deep-link target.");
     Assert(accountSource.Contains("Search governed prep packets", StringComparison.Ordinal), "account work should expose a real governed prep-library search flow on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Label", StringComparison.Ordinal), "account work should surface the bounded workspace state directly from the server plane.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Summary", StringComparison.Ordinal), "account work should explain why the bounded workspace state is active on the selected campaign card.");
