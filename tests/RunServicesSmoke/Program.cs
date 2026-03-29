@@ -1561,8 +1561,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Need product proof before you install or return?", StringComparison.Ordinal), "home access should keep proof follow-through as a calmer note instead of a third equal-weight rail card.");
     Assert(!homeSource.Contains("Need product proof before you act?", StringComparison.Ordinal), "home access should not revive the louder proof rail copy.");
     Assert(homeSource.Contains("<summary>Release and device state</summary>", StringComparison.Ordinal), "home access should collapse secondary release and device detail under one calmer disclosure.");
+    Assert(homeSource.Contains("showAccessSection && (!showOnboarding || accessSurfaceReady)", StringComparison.Ordinal), "home access should unlock when the account already has real device or support truth, even if the softer onboarding flag is still incomplete.");
     Assert(homeSource.Contains("Device roles", StringComparison.Ordinal), "home access should keep explicit device-role evidence on the signed-in route.");
     Assert(homeSource.Contains("GM-ready cues", StringComparison.Ordinal), "home work should use customer-facing continuity language instead of internal workspace wording.");
+    Assert(homeSource.Contains("showWorkSection && (!showOnboarding || workSurfaceReady)", StringComparison.Ordinal), "home work should unlock when claimed install and return truth already exist, instead of hiding the route behind a stale onboarding bit.");
     Assert(homeSource.Contains("Shared campaign view", StringComparison.Ordinal), "home work should surface the calmer shared campaign view card instead of hiding workspace return behind the deeper account route.");
     Assert(homeSource.Contains("Open shared campaign view", StringComparison.Ordinal), "home work should keep an explicit route back into the shared campaign view.");
     Assert(homeSource.Contains("/account/work/workspaces/", StringComparison.Ordinal), "home work should deep-link the shared campaign view instead of sending every route back to the generic work shell.");
@@ -1572,6 +1574,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("leadWorkspaceState?.Label", StringComparison.Ordinal), "home work should surface the bounded workspace state directly from the server plane.");
     Assert(homeSource.Contains("@leadWorkspaceServerPlane.ChangePackets[0].Summary", StringComparison.Ordinal), "home work should surface the first server-plane change packet directly on the what-changed card.");
     Assert(homeSource.Contains("@leadWorkspaceServerPlane.NextSafeAction.Summary", StringComparison.Ordinal), "home work should surface the bounded next safe action directly on the what-changed card.");
+    Assert(homeSource.Contains("Aftermath recap", StringComparison.Ordinal), "home work should surface a dedicated aftermath recap card instead of burying recap follow-through inside generic change text.");
+    Assert(homeSource.Contains("@leadAftermathPackage.Title", StringComparison.Ordinal), "home work should surface the latest aftermath package title directly from the bounded server plane.");
+    Assert(homeSource.Contains("@leadAftermathPackage.Summary", StringComparison.Ordinal), "home work should surface the latest aftermath package summary directly from the bounded server plane.");
+    Assert(homeSource.Contains("@leadAftermathEvidence", StringComparison.Ordinal), "home work should surface one bounded aftermath evidence line on the signed-in home route.");
+    Assert(homeSource.Contains("Open aftermath and return", StringComparison.Ordinal), "home work should keep a direct route into the aftermath return lane.");
     Assert(homeSource.Contains("Consequence:", StringComparison.Ordinal), "home work should surface one short consequence cue directly on the shared campaign card.");
     Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
@@ -2588,6 +2595,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "home work route should keep the governed prep library visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "home work route should keep bounded prep-carrying travel inventory visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep aftermath recap packages visible on the lead workspace spine.");
+    Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the aftermath package attached to the bounded return shelf.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary), "home work route should keep publication trust visible on the shared home projection.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1, "home work route should keep the claimed-device return packet visible on the shared home projection.");

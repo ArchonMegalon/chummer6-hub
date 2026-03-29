@@ -29,6 +29,11 @@
     var restoreDevices = Model.CampaignSpine.Restore.ClaimedDevices.Take(1).ToArray();
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
+    var leadAftermathPackage = leadWorkspaceServerPlane?.AftermathPackages.FirstOrDefault();
+    var leadAftermathShelfEntry = leadWorkspaceServerPlane?.RecapShelf
+        .FirstOrDefault(item => string.Equals(item.EntryId, leadAftermathPackage?.PackageId, StringComparison.OrdinalIgnoreCase))
+        ?? leadWorkspaceServerPlane?.RecapShelf.FirstOrDefault();
+    var leadAftermathEvidence = leadAftermathPackage?.EvidenceLines.FirstOrDefault();
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
     var releasedOrNotifiedCases = Model.SupportCaseSummaries
         .Where(item =>
@@ -39,6 +44,19 @@
         .Take(2)
         .ToArray();
     var recentReceipts = Model.InstallLinking.RecentReceipts.Take(2).ToArray();
+    var accessSurfaceReady = claimedInstallations > 0
+        || activeAccessRights > 0
+        || pendingClaims > 0
+        || recentReceipts.Length > 0
+        || restoreConflicts > 0
+        || releasedOrNotifiedCases.Length > 0;
+    var workSurfaceReady = (claimedInstallations > 0 || pendingClaims > 0)
+        && (dossiers.Length > 0
+            || campaigns.Length > 0
+            || runs.Length > 0
+            || workspaces.Length > 0
+            || leadWorkspaceServerPlane is not null
+            || restoreDevices.Length > 0);
     var showOverviewSection = string.Equals(Model.CurrentSection, "overview", StringComparison.OrdinalIgnoreCase);
     var showAccessSection = string.Equals(Model.CurrentSection, "access", StringComparison.OrdinalIgnoreCase);
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
@@ -111,7 +129,7 @@
             </div>
         }
 
-        @if (showAccessSection && !showOnboarding)
+        @if (showAccessSection && (!showOnboarding || accessSurfaceReady))
         {
             <section class="release-shelf release-shelf--manual">
                 <div class="home-stream">
@@ -216,7 +234,7 @@
             </section>
         }
 
-        @if (showWorkSection && !showOnboarding)
+        @if (showWorkSection && (!showOnboarding || workSurfaceReady))
         {
             <section class="release-shelf release-shelf--manual">
                 <div class="home-stream">
@@ -320,6 +338,10 @@
                                                                     <span> Change: @leadWorkspaceServerPlane.ChangePackets[0].Summary</span>
                                                                 }
                                                                 <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "claim lane pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
+                                                                @if (leadWorkspaceServerPlane.AftermathPackages.Count > 0)
+                                                                {
+                                                                    <span> Aftermath: @leadWorkspaceServerPlane.AftermathPackages.Count package(s).</span>
+                                                                }
                                                             }
                                                         </p>
                                                     </div>
@@ -339,6 +361,64 @@
                                             <p class="home-stream__summary">Build paths and grounded rule answers stay next to your return path so you can see what to inspect before reopening a dossier, session, or support thread.</p>
                                         </div>
                                         <div class="app-rail">
+                                            @if (leadWorkspaceServerPlane is not null)
+                                            {
+                                                <article class="app-rail__item">
+                                                    <span class="tag">What changed</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>What changed for me</h3>
+                                                        <p>
+                                                            @(leadWorkspaceState?.Label): @(leadWorkspaceState?.Summary)
+                                                            @if (leadWorkspaceServerPlane.ChangePackets.Count > 0)
+                                                            {
+                                                                <span> Change: @leadWorkspaceServerPlane.ChangePackets[0].Summary</span>
+                                                            }
+                                                            <span> Next: @leadWorkspaceServerPlane.NextSafeAction.Summary</span>
+                                                            @if (leadWorkspaceServerPlane.DecisionNotices.Count > 0)
+                                                            {
+                                                                <span> Notice: @leadWorkspaceServerPlane.DecisionNotices[0].Summary</span>
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open shared campaign view</a>
+                                                </article>
+
+                                                @if (leadAftermathPackage is not null)
+                                                {
+                                                    <article class="app-rail__item">
+                                                        <span class="tag">Aftermath recap</span>
+                                                        <div class="app-rail__copy">
+                                                            <h3>@leadAftermathPackage.Title</h3>
+                                                            <p>
+                                                                @leadAftermathPackage.Summary
+                                                                @if (!string.IsNullOrWhiteSpace(leadAftermathEvidence))
+                                                                {
+                                                                    <span> Evidence: @leadAftermathEvidence</span>
+                                                                }
+                                                                @if (leadAftermathShelfEntry is not null)
+                                                                {
+                                                                    <span> Return shelf: @leadAftermathShelfEntry.Label.</span>
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#aftermath-packages")">Open aftermath and return</a>
+                                                    </article>
+                                                }
+
+                                                <article class="app-rail__item">
+                                                    <span class="tag">GM prep</span>
+                                                    <div class="app-rail__copy">
+                                                        <h3>@leadWorkspaceServerPlane.PrepLibrary.Summary</h3>
+                                                        <p>
+                                                            @leadWorkspaceServerPlane.TravelMode.Summary
+                                                            <span> Search: @leadWorkspaceServerPlane.PrepLibrary.SearchSummary</span>
+                                                            <span> Safehouse / travel mode: @leadWorkspaceServerPlane.TravelMode.PrefetchInventorySummary.</span>
+                                                        </p>
+                                                    </div>
+                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open prep and travel</a>
+                                                </article>
+                                            }
+
                                             @if (buildHandoffs.Length == 0 && rulesAnswers.Length == 0)
                                             {
                                                 <article class="app-rail__item">
@@ -352,28 +432,6 @@
                                             }
                                             else
                                             {
-                                                @if (leadWorkspaceServerPlane is not null)
-                                                {
-                                                    <article class="app-rail__item">
-                                                        <span class="tag">What changed</span>
-                                                        <div class="app-rail__copy">
-                                                            <h3>What changed for me</h3>
-                                                            <p>
-                                                                @(leadWorkspaceState?.Label): @(leadWorkspaceState?.Summary)
-                                                                @if (leadWorkspaceServerPlane.ChangePackets.Count > 0)
-                                                                {
-                                                                    <span> Change: @leadWorkspaceServerPlane.ChangePackets[0].Summary</span>
-                                                                }
-                                                                <span> Next: @leadWorkspaceServerPlane.NextSafeAction.Summary</span>
-                                                                @if (leadWorkspaceServerPlane.DecisionNotices.Count > 0)
-                                                                {
-                                                                    <span> Notice: @leadWorkspaceServerPlane.DecisionNotices[0].Summary</span>
-                                                                }
-                                                            </p>
-                                                        </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open shared campaign view</a>
-                                                    </article>
-                                                }
                                                 @if (buildHandoffs.Length > 0)
                                                 {
                                                     var handoff = buildHandoffs[0];
@@ -429,21 +487,6 @@
                                                             </p>
                                                         </div>
                                                         <a class="inline-link" href="@($"/account/work/rules/{Uri.EscapeDataString(answer.EntryId)}")">Open grounded rule context</a>
-                                                    </article>
-                                                }
-                                                @if (leadWorkspaceServerPlane is not null)
-                                                {
-                                                    <article class="app-rail__item">
-                                                        <span class="tag">GM prep</span>
-                                                        <div class="app-rail__copy">
-                                                            <h3>@leadWorkspaceServerPlane.PrepLibrary.Summary</h3>
-                                                            <p>
-                                                                @leadWorkspaceServerPlane.TravelMode.Summary
-                                                                <span> Search: @leadWorkspaceServerPlane.PrepLibrary.SearchSummary</span>
-                                                                <span> Safehouse / travel mode: @leadWorkspaceServerPlane.TravelMode.PrefetchInventorySummary.</span>
-                                                            </p>
-                                                        </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open prep and travel</a>
                                                     </article>
                                                 }
                                             }

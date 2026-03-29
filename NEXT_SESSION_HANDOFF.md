@@ -12,17 +12,18 @@ Updated: 2026-03-29
   - governed prep launch receipts on the shared workspace
   - governed travel-prefetch receipts on the shared workspace
   - governed aftermath recap packages on the shared workspace
+  - signed-in home/work aftermath recap visibility on the calmer home cockpit
+  - route-readiness gating so `/home/access` and `/home/work` unlock once real device/return truth exists even if onboarding was not explicitly marked complete yet
   - safehouse / travel mode visibility, staged offline inventory, and recap follow-through
 
 ## What just landed
 
-- Persisted governed aftermath recap packages in Hub campaign truth
-- Added `/api/v1/campaign-spine/me/workspaces/{workspaceId}/aftermath-recap-packages`
-- Added the signed-in `Generate aftermath recap package` action on `/account/work/workspaces/{workspaceId}`
-- Added aftermath recap packages to workspace detail, work rails, recap shelf projections, creator-publication inputs, and bounded change-packet projections
-- Kept the travel-prefetch lane visible before a device is claimed and kept the new aftermath lane tied to the same shared return rail
-- Taught `scripts/hub-live-audit.py` to verify prep launch, travel prefetch, aftermath recap packaging, and roster transfer on the live edge after minting a real install claim
-- Refreshed local proof artifacts and smoke coverage for the new lane
+- Added a dedicated `Aftermath recap` card on `/home/work` with bounded summary, evidence, return-shelf context, and a deep link back to the shared workspace return lane
+- Extended the shared campaign summary on signed-in home to call out aftermath-package count alongside GM prep and travel readiness
+- Replaced the blunt onboarding-only gate on `/home/access` and `/home/work` with route-readiness checks based on actual device, support, install, and campaign-return truth
+- Taught `scripts/hub-live-audit.py` to verify the new `/home/work` aftermath lane after it drives prep launch, travel prefetch, aftermath recap packaging, and roster transfer on the live edge
+- Extended smoke coverage so source assertions lock the new home card and route-readiness gate in place
+- Verified the rebuilt local `chummer.run` edge with both host-level live audit and Playwright e2e against the already-running docker edge
 
 ## Verify first
 
@@ -34,6 +35,7 @@ bash scripts/audit-compliance.sh
 docker compose -f docker-compose.public-edge.yml up -d --build
 python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work
 CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh
+CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh
 ```
 
 ## Next highest-impact gaps
