@@ -39,11 +39,15 @@
     var leadRosterAuditLine = leadRosterTransfer?.AuditLines.FirstOrDefault();
     var leadPrepLaunch = leadWorkspaceServerPlane?.PrepLaunches.FirstOrDefault();
     var leadTravelPrefetch = leadWorkspaceServerPlane?.TravelPrefetches.FirstOrDefault();
-    var leadAftermathPackage = leadWorkspaceServerPlane?.AftermathPackages.FirstOrDefault();
+    var leadAftermathPackage = leadWorkspaceServerPlane?.AftermathPackages
+        .FirstOrDefault(item => !string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
+    var leadDowntimePackage = leadWorkspaceServerPlane?.AftermathPackages
+        .FirstOrDefault(item => string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
     var leadAftermathShelfEntry = leadWorkspaceServerPlane?.RecapShelf
         .FirstOrDefault(item => string.Equals(item.EntryId, leadAftermathPackage?.PackageId, StringComparison.OrdinalIgnoreCase))
         ?? leadWorkspaceServerPlane?.RecapShelf.FirstOrDefault();
     var leadAftermathEvidence = leadAftermathPackage?.EvidenceLines.FirstOrDefault();
+    var leadDowntimeEvidence = leadDowntimePackage?.EvidenceLines.FirstOrDefault();
     var restoreConflicts = Model.CampaignSpine.Restore.ConflictSummaries.Count;
     var releasedOrNotifiedCases = Model.SupportCaseSummaries
         .Where(item =>
@@ -472,6 +476,28 @@
                                                             </p>
                                                         </div>
                                                         <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#aftermath-packages")">Open aftermath and return</a>
+                                                    </article>
+                                                }
+
+                                                @if (leadDowntimePackage is not null)
+                                                {
+                                                    <article class="app-rail__item">
+                                                        <span class="tag">Downtime brief</span>
+                                                        <div class="app-rail__copy">
+                                                            <h3>@leadDowntimePackage.Title</h3>
+                                                            <p>
+                                                                @leadDowntimePackage.Summary
+                                                                @if (!string.IsNullOrWhiteSpace(leadDowntimeEvidence))
+                                                                {
+                                                                    <span> Evidence: @leadDowntimeEvidence</span>
+                                                                }
+                                                                @if (leadNextSessionCarryForward is not null)
+                                                                {
+                                                                    <span> Next: @leadNextSessionCarryForward.NextSafeAction</span>
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-downtime-brief")">Open downtime brief</a>
                                                     </article>
                                                 }
 

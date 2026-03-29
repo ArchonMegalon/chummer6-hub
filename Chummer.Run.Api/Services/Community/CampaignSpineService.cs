@@ -1973,7 +1973,7 @@ public sealed class CampaignSpineService
             packets.Add(new WorkspaceChangePacketProjection(
                 PacketId: StableId("packet", $"{campaign.CampaignId}:aftermath:{aftermathPackage.PackageId}"),
                 Kind: "aftermath_recap",
-                Label: "Aftermath recap package",
+                Label: DescribeAftermathChangeLabel(aftermathPackage.PackageKind),
                 Summary: aftermathPackage.Summary,
                 UpdatedAtUtc: aftermathPackage.GeneratedAtUtc));
         }
@@ -2002,6 +2002,14 @@ public sealed class CampaignSpineService
             Label: package.Title,
             Summary: package.Summary,
             ArtifactId: package.ArtifactId);
+
+    private static string DescribeAftermathChangeLabel(string packageKind)
+        => packageKind.Trim().ToLowerInvariant() switch
+        {
+            "downtime_brief" => "Downtime brief",
+            "after_action_report" => "After-action report",
+            _ => "Aftermath recap package"
+        };
 
     private static string DescribePrepLaunchSummary(
         CampaignWorkspaceProjection workspace,
