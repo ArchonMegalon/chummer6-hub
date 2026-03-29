@@ -1659,7 +1659,12 @@
                 }
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
                 {
-                    <p class="muted-copy">No shared campaign view yet. The first claimed install or campaign handoff will seed the long-lived runner identity and the first shared run view.</p>
+                    <p class="muted-copy">No shared campaign view yet. Use the starter lane to seed the first playable session before you come back for deeper work follow-through.</p>
+                    <div class="stacked-actions">
+                        <button id="seedStarterWorkspaceFromAccount" class="button-like button-like--primary" type="button">Start first playable session</button>
+                        <a class="inline-link" href="/home/work">Open starter lane on Home</a>
+                    </div>
+                    <p id="starterWorkspaceAccountNotice" class="muted-copy" aria-live="polite"></p>
                 }
                 else
                 {
@@ -2613,6 +2618,15 @@
   const travelPrefetchInventorySummary = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary));
   const selectedWorkspaceId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspace?.WorkspaceId));
   const workspaceDetailHref = (workspaceId) => `/account/work/workspaces/${encodeURIComponent(workspaceId)}`;
+  const starterWorkspaceButton = document.getElementById("seedStarterWorkspaceFromAccount");
+  const starterWorkspaceNotice = document.getElementById("starterWorkspaceAccountNotice");
+  const setStarterWorkspaceNotice = (message, isError = false) => {
+    if (!starterWorkspaceNotice) {
+      return;
+    }
+
+    ui.setNotice(starterWorkspaceNotice, message, isError);
+  };
   const revealHashTarget = () => {
     const hash = window.location.hash;
     if (!hash) return;
@@ -2631,6 +2645,26 @@
   window.addEventListener("hashchange", revealHashTarget);
   document.querySelectorAll("[data-account-tab]").forEach((link) => {
     link.addEventListener("click", () => window.setTimeout(revealHashTarget, 0));
+  });
+  starterWorkspaceButton?.addEventListener("click", async () => {
+    ui.clearNotice(starterWorkspaceNotice);
+    ui.setButtonBusy(starterWorkspaceButton, true, "Starting...");
+    try {
+      const payload = await ui.requestJson("/api/v1/campaign-spine/me/workspaces/starter", {
+        method: "POST"
+      });
+      const workspaceId = payload?.workspaceId || payload?.WorkspaceId;
+      if (typeof workspaceId === "string" && workspaceId.length > 0) {
+        window.location.href = workspaceDetailHref(workspaceId);
+        return;
+      }
+
+      setStarterWorkspaceNotice("Starter workspace is not ready yet. Open Home > Work to continue.", true);
+    } catch (error) {
+      setStarterWorkspaceNotice(ui.describeError(error, "Starter workspace could not be seeded right now."), true);
+    } finally {
+      ui.setButtonBusy(starterWorkspaceButton, false, "Starting...");
+    }
   });
 
   const bindSubmit = (formId, handler) => {
