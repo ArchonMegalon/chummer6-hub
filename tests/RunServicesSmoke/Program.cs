@@ -1618,6 +1618,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Transfer governed roster state", StringComparison.Ordinal), "account work should give operators a direct governed roster-transfer action.");
     Assert(accountSource.Contains("Launch governed prep packet", StringComparison.Ordinal), "account work should expose a real governed prep-launch action on the selected campaign card.");
     Assert(accountSource.Contains("Recent governed prep launches", StringComparison.Ordinal), "account work should keep recent governed prep-launch receipts visible on the selected campaign card.");
+    Assert(accountSource.Contains("Stage travel prefetch", StringComparison.Ordinal), "account work should expose a real claimed-device travel-prefetch action on the selected campaign card.");
+    Assert(accountSource.Contains("Recent travel prefetch receipts", StringComparison.Ordinal), "account work should keep staged travel-prefetch receipts visible on the selected campaign card.");
     var downloadDispatchSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
     var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
@@ -2219,6 +2221,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.TravelMode.TravelReadyDeviceCount >= 1, "campaign spine server plane api should expose safehouse/travel readiness for claimed devices.");
     Assert(workspaceServerPlanePayload.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal), "campaign spine server plane api should carry prep packets into the bounded prefetch inventory summary.");
     Assert(workspaceServerPlanePayload.TravelMode.Boundaries.Any(item => item.Contains("Install-local caches", StringComparison.OrdinalIgnoreCase)), "campaign spine server plane api should keep travel boundaries explicit.");
+    Assert(workspaceServerPlanePayload.TravelPrefetches.Count == 0, "campaign spine server plane api should start without staged travel-prefetch receipts.");
     Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.NextSafeAction.Summary), "campaign spine server plane api should expose one bounded next safe action.");
     var rosterTransferPlanResult = await campaignSpineController.GetMyCampaignWorkspaceRosterTransferPlan(workspaceId, CancellationToken.None);
     var rosterTransferPlanPayload = (rosterTransferPlanResult.Result as OkObjectResult)?.Value as RosterTransferPlannerProjection ?? rosterTransferPlanResult.Value;
@@ -2244,10 +2247,22 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(prepLaunchPayload is not null && string.Equals(prepLaunchPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine prep-launch api should record a governed packet launch against the selected workspace.");
     Assert(string.Equals(prepLaunchPayload!.PacketId, prepLibraryPayload.Items[0].PacketId, StringComparison.Ordinal), "campaign spine prep-launch api should preserve the governed packet identity.");
     Assert(prepLaunchPayload.Summary.Contains("without recreating local shadow prep notes", StringComparison.OrdinalIgnoreCase), "campaign spine prep-launch api should explain that the target bind avoided local shadow prep notes.");
+    var travelPrefetchResult = await campaignSpineController.StageMyCampaignWorkspaceTravelPrefetch(
+        workspaceId,
+        new TravelPrefetchStageRequest(
+            InstallationId: workspaceServerPlanePayload.TravelMode.Devices[0].InstallationId,
+            Note: "Stage the bounded offline set for the safehouse lane."),
+        CancellationToken.None);
+    var travelPrefetchPayload = (travelPrefetchResult.Result as OkObjectResult)?.Value as TravelPrefetchReceiptProjection ?? travelPrefetchResult.Value;
+    Assert(travelPrefetchPayload is not null && string.Equals(travelPrefetchPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine travel-prefetch api should record a claimed-device prefetch receipt against the selected workspace.");
+    Assert(travelPrefetchPayload!.PrefetchSummary.Contains("exact offline prefetch set", StringComparison.OrdinalIgnoreCase), "campaign spine travel-prefetch api should describe the staged exact offline set.");
+    Assert(travelPrefetchPayload.InventoryLines.Any(item => item.Contains("Governed prep packets", StringComparison.OrdinalIgnoreCase)), "campaign spine travel-prefetch api should name governed prep packets in the staged inventory.");
     var refreshedWorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
     var refreshedWorkspaceServerPlanePayload = (refreshedWorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? refreshedWorkspaceServerPlaneResult.Value;
     Assert(refreshedWorkspaceServerPlanePayload?.PrepLaunches.Any(item => string.Equals(item.LaunchId, prepLaunchPayload.LaunchId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project governed prep-launch receipts after launch.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "prep_launch", StringComparison.Ordinal)) == true, "campaign spine server plane api should add prep-launch receipts into the bounded what-changed packet rail.");
+    Assert(refreshedWorkspaceServerPlanePayload?.TravelPrefetches.Any(item => string.Equals(item.ReceiptId, travelPrefetchPayload.ReceiptId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project staged travel-prefetch receipts after staging.");
+    Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "travel_prefetch", StringComparison.Ordinal)) == true, "campaign spine server plane api should add staged travel-prefetch receipts into the bounded what-changed packet rail.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
@@ -2461,6 +2476,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "account workspace detail route should surface the governed GM prep library.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLaunches.Any(item => string.Equals(item.LaunchId, prepLaunchPayload!.LaunchId, StringComparison.Ordinal)) == true, "account workspace detail route should surface recent governed prep-launch receipts.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.TravelReadyDeviceCount >= 1, "account workspace detail route should surface safehouse/travel readiness.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelPrefetches.Any(item => string.Equals(item.ReceiptId, travelPrefetchPayload!.ReceiptId, StringComparison.Ordinal)) == true, "account workspace detail route should surface staged travel-prefetch receipts.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "account workspace detail route should explain that prep packets are carried in the prefetch inventory.");
     var searchableWorkspaceDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, workspaceId: workspaceId, prepQuery: "opposition") as ViewResult;
     var searchableWorkspaceDetailModel = searchableWorkspaceDetailPage?.Model as AccountPageViewModel;
@@ -2468,6 +2484,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(searchableWorkspaceDetailModel?.SelectedWorkspacePrepLibrarySearch?.TotalCount >= 1, "account workspace detail search should return matching governed prep packets.");
     Assert(searchableWorkspaceDetailModel?.SelectedWorkspacePrepLibrarySearch?.Items.Any(item => item.Title.Contains("opposition", StringComparison.OrdinalIgnoreCase) || item.SearchTerms.Any(term => term.Contains("opposition", StringComparison.OrdinalIgnoreCase))) == true, "account workspace detail search should surface the governed opposition packet.");
     Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "prep_launch", StringComparison.Ordinal)) == true, "account workspace detail search should keep prep-launch receipts on the what-changed rail.");
+    Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "travel_prefetch", StringComparison.Ordinal)) == true, "account workspace detail search should keep travel-prefetch receipts on the what-changed rail.");
     var accountRunDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, runId: runId) as ViewResult;
     var accountRunDetailModel = accountRunDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountRunDetailModel?.SelectedRun?.RunId, runId, StringComparison.Ordinal), "account run detail route should load the selected live run context.");
@@ -2500,6 +2517,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane!.PrepLibrary.Packets.Count >= 3, "signed-in home should surface the governed GM prep library on the home cockpit.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.PrepLaunches.Any(item => string.Equals(item.LaunchId, prepLaunchPayload!.LaunchId, StringComparison.Ordinal)) == true, "signed-in home should surface the latest governed prep-launch receipt on the same workspace spine.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount >= 1, "signed-in home should surface safehouse/travel readiness on the home cockpit.");
+    Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.TravelPrefetches.Any(item => string.Equals(item.ReceiptId, travelPrefetchPayload!.ReceiptId, StringComparison.Ordinal)) == true, "signed-in home should surface the latest staged travel-prefetch receipt on the same workspace spine.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "signed-in home should receive customer-facing build-path titles directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "signed-in home should receive the next safe build action directly from the campaign spine service.");
@@ -2545,6 +2563,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(workHomeModel?.LeadWorkspaceServerPlane?.WorkspaceState.Label), "home work route should keep the bounded workspace state visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Count >= 1, "home work route should keep the what-changed packet tied to a real change packet.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "prep_launch", StringComparison.Ordinal)) == true, "home work route should keep governed prep-launch receipts on the bounded what-changed rail.");
+    Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "travel_prefetch", StringComparison.Ordinal)) == true, "home work route should keep staged travel-prefetch receipts on the bounded what-changed rail.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "home work route should keep the governed prep library visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "home work route should keep bounded prep-carrying travel inventory visible.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");

@@ -111,6 +111,14 @@ def require_snippet(body: str, snippet: str, path: str) -> None:
         raise AssertionError(f"{path} missing required text: {snippet}")
 
 
+def extract_first_match(body: str, pattern: str, path: str, label: str) -> str:
+    match = re.search(pattern, body, re.IGNORECASE)
+    if not match:
+        raise AssertionError(f"{path} missing {label}")
+
+    return unescape(match.group(1)).strip()
+
+
 def extract_antiforgery_token(body: str, path: str) -> str:
     match = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', body)
     if not match:
@@ -119,12 +127,116 @@ def extract_antiforgery_token(body: str, path: str) -> str:
     return unescape(match.group(1))
 
 
+def extract_dispatch_path(body: str, path: str) -> str:
+    return extract_first_match(body, r'href="([^"]*/downloads/install/[^"]+)"', path, "signed-in install handoff link")
+
+
+def extract_claim_code(body: str, path: str) -> str:
+    return extract_first_match(body, r'id="claimCodeValue"[^>]*>([^<]+)<', path, "install claim code")
+
+
 def extract_cookie(headers: dict[str, str], *, path: str) -> str:
     cookie = headers.get("set-cookie")
     if not cookie:
         raise AssertionError(f"{path} did not return a cookie")
 
     return cookie.split(";", 1)[0]
+
+
+def ensure_claimed_device(
+    base_url: str,
+    *,
+    cookie_header: str,
+    public_host: str | None = None,
+    forwarded_proto: str | None = None,
+) -> tuple[dict[str, object], str]:
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/campaign-spine/me",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/campaign-spine/me returned {status}, expected 200")
+
+    summary = json.loads(body)
+    claimed_devices = ((summary.get("restore") or {}).get("claimedDevices") or [])
+    if claimed_devices:
+        installation_id = claimed_devices[0].get("installationId")
+        if not installation_id:
+            raise AssertionError("signed-in restore exposed a claimed device without an installation id")
+        return summary, installation_id
+
+    status, body, _, _ = fetch(
+        base_url,
+        "/downloads",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/downloads returned {status}, expected 200 for install handoff discovery")
+
+    dispatch_path = extract_dispatch_path(body, "/downloads")
+    status, body, _, _ = fetch(
+        base_url,
+        dispatch_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{dispatch_path} returned {status}, expected 200")
+
+    claim_code = extract_claim_code(body, dispatch_path)
+    installation_id = f"install-live-audit-{int(time.time())}"
+    redeem_body = json.dumps(
+        {
+            "claimCode": claim_code,
+            "installationId": installation_id,
+            "headId": "avalonia",
+            "applicationVersion": "0.0-live-audit",
+            "channelId": "preview",
+            "platform": "linux",
+            "arch": "x64",
+            "publicKey": "live-audit-public-key",
+            "hostLabel": "live-audit-host",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/install-linking/redeem",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=redeem_body,
+        request_headers={"Content-Type": "application/json"},
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/install-linking/redeem returned {status}: {body[:400]}")
+
+    redeem = json.loads(body)
+    redeemed_installation_id = ((redeem.get("installation") or {}).get("installationId") if isinstance(redeem, dict) else None)
+    if redeemed_installation_id != installation_id:
+        raise AssertionError("install claim redemption did not bind the expected installation id")
+
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/campaign-spine/me",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/campaign-spine/me returned {status}, expected 200 after install claim")
+
+    summary = json.loads(body)
+    claimed_devices = ((summary.get("restore") or {}).get("claimedDevices") or [])
+    if not claimed_devices:
+        raise AssertionError("install claim redemption did not surface a claimed device in restore")
+
+    return summary, installation_id
 
 
 def verify_signed_in_work_audit(
@@ -188,17 +300,12 @@ def verify_signed_in_work_audit(
     if not location.endswith("/account/work"):
         raise AssertionError(f"/auth/email/callback redirected to {location!r}, expected /account/work")
 
-    status, body, _, _ = fetch(
+    summary, claimed_installation_id = ensure_claimed_device(
         base_url,
-        "/api/v1/campaign-spine/me",
+        cookie_header=cookie_header,
         public_host=public_host,
         forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
     )
-    if status != 200:
-        raise AssertionError(f"/api/v1/campaign-spine/me returned {status}, expected 200")
-
-    summary = json.loads(body)
     workspaces = summary.get("workspaces") or []
     if not workspaces:
         raise AssertionError("signed-in campaign summary did not expose any workspaces")
@@ -232,6 +339,7 @@ def verify_signed_in_work_audit(
         "Move governed roster state",
         "Transfer governed roster state",
         "Launch governed prep packet",
+        "Stage travel prefetch",
         "GM prep library and travel mode",
     ):
         require_snippet(body, snippet, workspace_path)
@@ -316,6 +424,33 @@ def verify_signed_in_work_audit(
     if not prep_launch.get("launchId"):
         raise AssertionError("prep launch response did not expose a launch id")
 
+    travel_prefetch_body = json.dumps(
+        {
+            "installationId": claimed_installation_id,
+            "note": "Signed-in live audit staging the exact offline set.",
+        }
+    ).encode("utf-8")
+    travel_prefetch_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/travel-prefetches"
+    status, body, _, _ = fetch(
+        base_url,
+        travel_prefetch_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=travel_prefetch_body,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"{travel_prefetch_path} returned {status}: {body[:400]}")
+
+    travel_prefetch = json.loads(body)
+    if not travel_prefetch.get("receiptId"):
+        raise AssertionError("travel prefetch response did not expose a receipt id")
+
     payload = json.dumps(
         {
             "dossierId": dossier_options[0]["dossierId"],
@@ -365,9 +500,11 @@ def verify_signed_in_work_audit(
         raise AssertionError(f"{workspace_path} returned {status}, expected 200 after prep launch")
     require_snippet(body, "Recent governed prep launches", workspace_path)
     require_snippet(body, prep_launch["packetTitle"], workspace_path)
+    require_snippet(body, "Recent travel prefetch receipts", workspace_path)
+    require_snippet(body, travel_prefetch["deviceRole"], workspace_path)
     print(
         "ok signed-in /account/work -> "
-        f"{final_url} workspace={workspace_id} prep_launch={prep_launch['launchId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
+        f"{final_url} workspace={workspace_id} install={claimed_installation_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
     )
 
 

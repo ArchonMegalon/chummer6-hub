@@ -285,6 +285,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await expectBodyText(page, 'Roster readiness and dossier freshness', '/account/work/workspaces detail');
   await expectBodyText(page, 'Move governed roster state', '/account/work/workspaces detail');
   await expectBodyText(page, 'Launch governed prep packet', '/account/work/workspaces detail');
+  await expectBodyText(page, 'Stage travel prefetch', '/account/work/workspaces detail');
   await expectBodyText(page, 'Rule and continuity health', '/account/work/workspaces detail');
   await expectBodyText(page, 'GM prep library and travel mode', '/account/work/workspaces detail');
   await expectBodyText(page, 'Safehouse / travel mode', '/account/work/workspaces detail');

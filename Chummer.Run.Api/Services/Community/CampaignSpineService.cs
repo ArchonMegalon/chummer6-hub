@@ -69,8 +69,11 @@ public sealed class CampaignSpineService
             var prepLaunches = _store.PrepLaunches
                 .OrderByDescending(static item => item.LaunchedAtUtc)
                 .ToArray();
+            var travelPrefetchReceipts = _store.TravelPrefetchReceipts
+                .OrderByDescending(static item => item.StagedAtUtc)
+                .ToArray();
             var workspaces = campaigns
-                .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore, transfers, prepLaunches))
+                .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore, transfers, prepLaunches, travelPrefetchReceipts))
                 .OrderByDescending(static workspace => workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.MinValue)
                 .ToArray();
             var operations = _store.GroupsById.Values
@@ -196,6 +199,56 @@ public sealed class CampaignSpineService
 
             _store.PersistLocked();
             return launch;
+        }
+    }
+
+    public TravelPrefetchReceiptProjection RecordTravelPrefetch(
+        HubUserDto user,
+        CampaignWorkspaceProjection workspace,
+        ClaimedDeviceRestoreProjection device,
+        string prefetchSummary,
+        IReadOnlyList<string> inventoryLines,
+        IReadOnlyList<string> boundaries,
+        string? note = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(device);
+
+        string normalizedPrefetchSummary = AccountService.NormalizeOptional(prefetchSummary)
+            ?? throw new ArgumentException("prefetchSummary is required.", nameof(prefetchSummary));
+        string? normalizedNote = AccountService.NormalizeOptional(note);
+
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            var receipt = new TravelPrefetchReceiptProjection(
+                ReceiptId: StableId("travel-prefetch", $"{workspace.WorkspaceId}:{device.InstallationId}:{now.ToUnixTimeMilliseconds()}"),
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignId: workspace.CampaignId,
+                InstallationId: device.InstallationId,
+                DeviceRole: device.DeviceRole,
+                Platform: device.Platform,
+                HeadId: device.HeadId,
+                Channel: device.Channel,
+                PrefetchSummary: normalizedPrefetchSummary,
+                InventoryLines: FinalizeLines(
+                    inventoryLines.Concat(
+                    [
+                        normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
+                    ])),
+                Boundaries: FinalizeLines(boundaries),
+                InitiatedByUserId: user.UserId,
+                StagedAtUtc: now);
+
+            _store.TravelPrefetchReceipts.Add(receipt);
+            if (_store.TravelPrefetchReceipts.Count > 64)
+            {
+                _store.TravelPrefetchReceipts.RemoveRange(64, _store.TravelPrefetchReceipts.Count - 64);
+            }
+
+            _store.PersistLocked();
+            return receipt;
         }
     }
 
@@ -1239,7 +1292,8 @@ public sealed class CampaignSpineService
         IReadOnlyList<CrewProjection> crews,
         WorkspaceRestoreProjection restore,
         IReadOnlyList<RosterTransferProjection> transfers,
-        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches)
+        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
+        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts)
     {
         var workspaceCrews = crews
             .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
@@ -1262,6 +1316,11 @@ public sealed class CampaignSpineService
             .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(static item => item.LaunchedAtUtc)
+            .ToArray();
+        var workspaceTravelPrefetches = travelPrefetchReceipts
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.StagedAtUtc)
             .ToArray();
 
         var readinessCues = new List<CampaignReadinessCue>();
@@ -1341,6 +1400,14 @@ public sealed class CampaignSpineService
                 Title: "Governed prep binding is attached",
                 Summary: $"{workspacePrepLaunches.Length} recent packet launch receipt(s) keep opposition and scene prep bound to this campaign without recreating local shadow prep notes."));
         }
+        if (workspaceTravelPrefetches.Length > 0)
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:travel-prefetch"),
+                Severity: "ready",
+                Title: "Travel prefetch is staged",
+                Summary: $"{workspaceTravelPrefetches.Length} recent travel-prefetch receipt(s) keep the exact offline inventory deliberate and reviewable per claimed device."));
+        }
 
         var recapShelf = workspaceDossiers
             .SelectMany(static item => item.Projections)
@@ -1357,7 +1424,7 @@ public sealed class CampaignSpineService
                 && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase));
         var activeSceneSummary = DescribeActiveSceneSummary(leadRun, activeScene, leadObjective);
         var nextSafeAction = ResolveWorkspaceNextSafeAction(campaign, restore, recapShelf, readinessCues, leadRun, activeScene, leadObjective);
-        var changePackets = BuildWorkspaceChangePackets(campaign, recapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches);
+        var changePackets = BuildWorkspaceChangePackets(campaign, recapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches);
 
         return new CampaignWorkspaceProjection(
             WorkspaceId: workspaceId,
@@ -1377,7 +1444,8 @@ public sealed class CampaignSpineService
             ChangePackets: changePackets,
             Consequences: consequences,
             RosterTransfers: rosterTransfers,
-            PrepLaunches: workspacePrepLaunches);
+            PrepLaunches: workspacePrepLaunches,
+            TravelPrefetches: workspaceTravelPrefetches);
     }
 
     private static bool IsOperatorRole(string role)
@@ -1645,7 +1713,8 @@ public sealed class CampaignSpineService
         SceneProjection? activeScene,
         ObjectiveProjection? leadObjective,
         IReadOnlyList<RosterTransferProjection> rosterTransfers,
-        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches)
+        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
+        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts)
     {
         List<WorkspaceChangePacketProjection> packets = [];
         if (campaign.LatestContinuity is not null)
@@ -1698,6 +1767,17 @@ public sealed class CampaignSpineService
                 Label: "GM prep launch",
                 Summary: prepLaunch.Summary,
                 UpdatedAtUtc: prepLaunch.LaunchedAtUtc));
+        }
+
+        TravelPrefetchReceiptProjection? travelPrefetch = travelPrefetchReceipts.FirstOrDefault();
+        if (travelPrefetch is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:travel-prefetch:{travelPrefetch.ReceiptId}"),
+                Kind: "travel_prefetch",
+                Label: "Travel prefetch staged",
+                Summary: travelPrefetch.PrefetchSummary,
+                UpdatedAtUtc: travelPrefetch.StagedAtUtc));
         }
 
         PublicationSafeProjection? recap = recapShelf.FirstOrDefault();
