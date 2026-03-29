@@ -520,6 +520,18 @@ def verify_signed_in_work_audit(
     require_snippet(body, "GM prep launch", "/account/work")
     status, body, _, _ = fetch(
         base_url,
+        "/home/work",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/home/work returned {status}, expected 200")
+    require_snippet(body, "Aftermath recap", "/home/work")
+    require_snippet(body, aftermath_package["title"], "/home/work")
+    require_snippet(body, "Open aftermath and return", "/home/work")
+    status, body, _, _ = fetch(
+        base_url,
         workspace_path,
         public_host=public_host,
         forwarded_proto=forwarded_proto,
