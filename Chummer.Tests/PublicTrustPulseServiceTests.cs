@@ -23,6 +23,10 @@ public sealed class PublicTrustPulseServiceTests
         Assert.Equal("ready", snapshot.JourneyGateState);
         Assert.Equal("Cloud & Publishing", snapshot.LongestPoleLabel);
         Assert.Equal(73, snapshot.OverallProgressPercent);
+        Assert.NotNull(snapshot.ProgressTrendSamples);
+        Assert.Equal(5, snapshot.ProgressTrendSamples.Count);
+        Assert.Equal("2026-03-23", snapshot.ProgressTrendSamples[0].AsOf);
+        Assert.Equal(73, snapshot.ProgressTrendSamples[0].OverallProgressPercent);
         Assert.Equal("Hold launch expansion pending route-canary validation.", snapshot.LaunchReadiness);
         Assert.Equal("Pilot defaults are governed", snapshot.ProviderRouteDefault);
         Assert.Equal("Canary green on all active lanes", snapshot.ProviderRouteCanary);

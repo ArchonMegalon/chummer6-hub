@@ -328,7 +328,7 @@ milestones:
       - executive-assistant
       - chummer6-design
       - chummer6-hub
-    status: not_started
+    status: in_progress
     exit_criteria:
       - The weekly pulse uses real adoption, closure, and health trends plus provider-route defaults and canaries.
       - Launch, freeze, and reroute decisions no longer depend on hand-maintained prose drift.

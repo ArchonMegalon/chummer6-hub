@@ -1285,22 +1285,69 @@ public sealed class PublicLandingController : Controller
 
     private static string BuildTrustPulseProgressTrendSummary(PublicTrustPulseSnapshot pulse)
     {
-        if (pulse.ProgressTrendDirection is null
-            || pulse.ProgressTrendFromAsOf is null
-            || pulse.ProgressTrendToAsOf is null
-            || pulse.ProgressTrendDeltaPercent is null)
+        if (pulse.ProgressTrendSamples is not { Count: > 1 } samples)
         {
             return pulse.ProgressHistorySnapshotCount is not null && pulse.ProgressHistorySnapshotCount > 1
                 ? $"Trend needs two distinct snapshots to calculate movement. {pulse.ProgressHistorySnapshotCount} snapshot(s) are available."
                 : "Progress trend is awaiting measured history; two weekly points are required.";
         }
 
-        return pulse.ProgressTrendDirection switch
+        string trendWindow = string.Join(
+            " → ",
+            samples.Select(static sample =>
+                $"{sample.AsOf} {sample.OverallProgressPercent}%"));
+
+        string sparkline = BuildProgressTrendSparkline(samples);
+        if (pulse.ProgressTrendDirection is null
+            || pulse.ProgressTrendFromAsOf is null
+            || pulse.ProgressTrendToAsOf is null
+            || pulse.ProgressTrendDeltaPercent is null)
         {
-            "up" => $"Upward momentum: +{pulse.ProgressTrendDeltaPercent.Value}% from {pulse.ProgressTrendFromAsOf} to {pulse.ProgressTrendToAsOf}.",
-            "down" => $"Regression detected: -{pulse.ProgressTrendDeltaPercent.Value}% from {pulse.ProgressTrendFromAsOf} to {pulse.ProgressTrendToAsOf}.",
-            _ => $"Flat trend: {pulse.ProgressTrendFromAsOf} -> {pulse.ProgressTrendToAsOf} at {pulse.ProgressTrendDeltaPercent.Value}%."
+            return $"Weekly trend window: {trendWindow}. {sparkline}";
+        }
+
+        string direction = pulse.ProgressTrendDirection switch
+        {
+            "up" => $"Upward momentum",
+            "down" => "Regression",
+            _ => "Flat trend"
         };
+
+        string deltaSign = pulse.ProgressTrendDirection switch
+        {
+            "up" => $"+{pulse.ProgressTrendDeltaPercent.Value}%",
+            "down" => $"-{pulse.ProgressTrendDeltaPercent.Value}%",
+            _ => $"{pulse.ProgressTrendDeltaPercent.Value}%"
+        };
+
+        return
+            $"{direction} {deltaSign} from {pulse.ProgressTrendFromAsOf} to {pulse.ProgressTrendToAsOf}. Trend window: {trendWindow}. {sparkline}";
+
+    }
+
+    private static string BuildProgressTrendSparkline(IReadOnlyList<ProgressHistoryTrendPoint> points)
+    {
+        if (points.Count < 2)
+        {
+            return string.Empty;
+        }
+
+        const string bars = "▁▂▃▄▅▆▇█";
+        int min = points.Min(static point => point.OverallProgressPercent);
+        int max = points.Max(static point => point.OverallProgressPercent);
+        if (min == max)
+        {
+            return $"Trend sparkline: {string.Concat(Enumerable.Repeat('▁', points.Count))}";
+        }
+
+        string barsString = string.Concat(points.Select(point =>
+        {
+            double scaled = (point.OverallProgressPercent - min) / (double)(max - min);
+            int index = (int)Math.Clamp(Math.Round(scaled * (bars.Length - 1)), 0, bars.Length - 1);
+            return bars[index];
+        }));
+
+        return $"Trend sparkline: {barsString}";
     }
 
     private static string HumanizeToken(string? value, string fallback)
