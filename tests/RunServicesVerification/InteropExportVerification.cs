@@ -1,3 +1,4 @@
+using Chummer.Contracts.Hub;
 using Chummer.Run.AI.Services.Interop;
 using Chummer.Run.AI.Services.Ops;
 using Chummer.Run.AI.Services.Session;
@@ -46,6 +47,14 @@ internal static class InteropExportVerification
             SourceEventIds: Array.Empty<string>(),
             CreatedBy: "gm.interop",
             RuntimeFingerprint: "interop:fp"));
+        ops.CreatePrepAssetFromProject(new GmPrepAssetCatalogImportRequest(
+            CampaignId: "campaign_interop",
+            SessionId: "session_interop",
+            SceneId: "scene_interop",
+            Project: BuildGovernedEncounterProject(),
+            AdditionalTags: ["interop"],
+            CreatedBy: "gm.interop",
+            RuntimeFingerprint: "interop:fp"));
 
         var package = interop.Export(new InteropExportRequest(
             CampaignId: "campaign_interop",
@@ -64,6 +73,12 @@ internal static class InteropExportVerification
                 item.AssetKind == InteropAssetKind.Prep
                 && string.Equals(item.DisplayName, "Reusable extraction ladder", StringComparison.Ordinal)),
             "Interop export should include reusable campaign prep assets alongside session-scoped prep.");
+        VerificationAssert.True(
+            package.Assets.Any(item =>
+                item.AssetKind == InteropAssetKind.Prep
+                && item.PayloadJson.Contains("\"governedProject\"", StringComparison.OrdinalIgnoreCase)
+                && item.PayloadJson.Contains("\"projectId\":\"renraku-checkpoint\"", StringComparison.OrdinalIgnoreCase)),
+            "Interop export should preserve governed packet provenance inside prep payloads.");
 
         var import = interop.Import(new InteropImportRequest(package, ImportedBy: "gm.interop"));
         VerificationAssert.Equal(package.Manifest.TotalCount, import.ImportedCount, "Interop import should accept untampered payloads.");
@@ -89,4 +104,36 @@ internal static class InteropExportVerification
 
         return Task.CompletedTask;
     }
+
+    private static HubProjectDetailProjection BuildGovernedEncounterProject() =>
+        new(
+            Summary: new HubCatalogItem(
+                ItemId: "renraku-checkpoint",
+                Kind: HubCatalogItemKinds.EncounterPack,
+                Title: "Renraku checkpoint",
+                Description: "Checkpoint packet with scanner pressure and red samurai presence.",
+                RulesetId: "sr5",
+                Visibility: "public",
+                TrustTier: "verified",
+                LinkTarget: "/hub/encounters/renraku-checkpoint",
+                Version: "1.0.0"),
+            OwnerId: "hub:default",
+            CatalogKind: "npc-vault",
+            PublicationStatus: "published",
+            ReviewState: "approved",
+            RuntimeFingerprint: "npcvault:renraku-checkpoint:v1",
+            OwnerReview: null,
+            AggregateReview: null,
+            Facts:
+            [
+                new HubProjectDetailFact("threat", "Threat", "High")
+            ],
+            Dependencies:
+            [
+                new HubProjectDependency(HubProjectDependencyKinds.IncludesNpcEntry, HubCatalogItemKinds.NpcEntry, "red-samurai", "1.0.0", "lead")
+            ],
+            Actions:
+            [
+                new HubProjectAction("clone-encounter-pack", "Clone to Library", HubProjectActionKinds.CloneToLibrary)
+            ]);
 }

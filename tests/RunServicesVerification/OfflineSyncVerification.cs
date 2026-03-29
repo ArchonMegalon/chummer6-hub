@@ -1,3 +1,4 @@
+using Chummer.Contracts.Hub;
 using Chummer.Run.AI.Services.Ops;
 using Chummer.Run.AI.Services.Session;
 using Chummer.Run.AI.Services.Spider;
@@ -58,6 +59,13 @@ internal static class OfflineSyncVerification
             Body: "Escalate from roadblock to drone tail to full strike-team response.",
             Tags: ["library", "travel"],
             CreatedBy: "gm.ops"));
+        var governedEncounterPrep = ops.CreatePrepAssetFromProject(new GmPrepAssetCatalogImportRequest(
+            CampaignId: "campaign-offline",
+            SessionId: "session-offline",
+            SceneId: "scene-kitsap",
+            Project: BuildGovernedEncounterProject(),
+            AdditionalTags: ["travel"],
+            CreatedBy: "gm.ops"));
 
         var snapshot = sync.CreateSnapshot(new OfflineSyncSnapshotRequest(
             CampaignId: "campaign-offline",
@@ -67,8 +75,11 @@ internal static class OfflineSyncVerification
             DeviceId: "tablet-1"));
 
         VerificationAssert.Equal("offline_sync_snapshot_v1", snapshot.ContractFamily, "Offline snapshots should use canonical family.");
-        VerificationAssert.True(snapshot.PrepAssets.Count == 2, "Snapshot should include scene prep plus reusable campaign prep assets.");
+        VerificationAssert.True(snapshot.PrepAssets.Count == 3, "Snapshot should include scene prep, governed packet prep, and reusable campaign prep assets.");
         VerificationAssert.True(snapshot.PrepAssets.Any(item => item.AssetId == reusableLibraryAsset.AssetId), "Snapshot should include reusable campaign prep assets for offline library continuity.");
+        VerificationAssert.True(
+            snapshot.PrepAssets.Any(item => item.AssetId == governedEncounterPrep.AssetId && item.GovernedProject?.ProjectId == "renraku-checkpoint"),
+            "Snapshot should preserve governed packet provenance for offline packet bindings.");
         VerificationAssert.True(snapshot.SessionProjection.Events.Count == 2, "Snapshot should include current ledger events.");
 
         var reconcile = await sync.ReconcileAsync(new OfflineSyncReconcileRequest(
@@ -116,4 +127,36 @@ internal static class OfflineSyncVerification
         VerificationAssert.True(reconcile.PrepSurface.ImportedCount >= 1, "Reconcile should merge prep assets.");
         VerificationAssert.Equal("offline_sync_snapshot_v1", reconcile.ContractFamily, "Reconcile should return canonical offline family.");
     }
+
+    private static HubProjectDetailProjection BuildGovernedEncounterProject() =>
+        new(
+            Summary: new HubCatalogItem(
+                ItemId: "renraku-checkpoint",
+                Kind: HubCatalogItemKinds.EncounterPack,
+                Title: "Renraku checkpoint",
+                Description: "Checkpoint packet with scanner pressure and red samurai presence.",
+                RulesetId: "sr5",
+                Visibility: "public",
+                TrustTier: "verified",
+                LinkTarget: "/hub/encounters/renraku-checkpoint",
+                Version: "1.0.0"),
+            OwnerId: "hub:default",
+            CatalogKind: "npc-vault",
+            PublicationStatus: "published",
+            ReviewState: "approved",
+            RuntimeFingerprint: "npcvault:renraku-checkpoint:v1",
+            OwnerReview: null,
+            AggregateReview: null,
+            Facts:
+            [
+                new HubProjectDetailFact("threat", "Threat", "High")
+            ],
+            Dependencies:
+            [
+                new HubProjectDependency(HubProjectDependencyKinds.IncludesNpcEntry, HubCatalogItemKinds.NpcEntry, "red-samurai", "1.0.0", "lead")
+            ],
+            Actions:
+            [
+                new HubProjectAction("clone-encounter-pack", "Clone to Library", HubProjectActionKinds.CloneToLibrary)
+            ]);
 }

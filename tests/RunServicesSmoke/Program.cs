@@ -2191,7 +2191,20 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.DecisionNotices.Count >= 1, "campaign spine server plane api should expose bounded follow-through notices.");
     Assert(workspaceServerPlanePayload.CampaignSummary.RestoreSummary.Contains("Prefetch inventory:", StringComparison.Ordinal), "campaign spine server plane api should make restore prefetch inventory explicit.");
     Assert(workspaceServerPlanePayload.CampaignSummary.RestoreSummary.Contains("bounded offline use", StringComparison.Ordinal), "campaign spine server plane api should keep restore posture tied to bounded offline use.");
+    Assert(workspaceServerPlanePayload.PrepLibrary.Packets.Count >= 3, "campaign spine server plane api should expose a governed GM prep library compiled from workspace truth.");
+    Assert(workspaceServerPlanePayload.PrepLibrary.ReusablePacketCount >= 1, "campaign spine server plane api should expose reusable prep packets for campaign rebinding.");
+    Assert(workspaceServerPlanePayload.PrepLibrary.SearchSummary.Contains("Search", StringComparison.Ordinal), "campaign spine server plane api should expose explicit prep-library search posture.");
+    Assert(workspaceServerPlanePayload.PrepLibrary.Packets.Any(item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal) && item.SearchTerms.Count >= 3), "campaign spine server plane api should expose searchable governed opposition packets.");
+    Assert(workspaceServerPlanePayload.TravelMode.TravelReadyDeviceCount >= 1, "campaign spine server plane api should expose safehouse/travel readiness for claimed devices.");
+    Assert(workspaceServerPlanePayload.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal), "campaign spine server plane api should carry prep packets into the bounded prefetch inventory summary.");
+    Assert(workspaceServerPlanePayload.TravelMode.Boundaries.Any(item => item.Contains("Install-local caches", StringComparison.OrdinalIgnoreCase)), "campaign spine server plane api should keep travel boundaries explicit.");
     Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.NextSafeAction.Summary), "campaign spine server plane api should expose one bounded next safe action.");
+    var prepLibraryResult = await campaignSpineController.GetMyCampaignWorkspacePrepLibrary(workspaceId, "opposition", CancellationToken.None);
+    var prepLibraryPayload = (prepLibraryResult.Result as OkObjectResult)?.Value as CampaignPrepLibrarySearchResponse ?? prepLibraryResult.Value;
+    Assert(prepLibraryPayload is not null && string.Equals(prepLibraryPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine prep-library api should expose the same stable workspace id.");
+    Assert(string.Equals(prepLibraryPayload!.QueryText, "opposition", StringComparison.Ordinal), "campaign spine prep-library api should echo the normalized search query.");
+    Assert(prepLibraryPayload.TotalCount >= 1, "campaign spine prep-library api should support search across governed prep packets.");
+    Assert(prepLibraryPayload.Items.Any(item => item.Title.Contains("opposition", StringComparison.OrdinalIgnoreCase) || item.SearchTerms.Any(term => term.Contains("opposition", StringComparison.OrdinalIgnoreCase))), "campaign spine prep-library api should return the governed opposition packet for matching search.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
@@ -2395,6 +2408,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.SupportClosures.Count >= 1, "account workspace detail route should expose support-closure cues from the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.DecisionNotices.Count >= 1, "account workspace detail route should expose bounded decision notices from the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RuleEnvironmentHealth.Count >= 1, "account workspace detail route should expose rule-environment health cues from the workspace server plane.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "account workspace detail route should surface the governed GM prep library.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.TravelReadyDeviceCount >= 1, "account workspace detail route should surface safehouse/travel readiness.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "account workspace detail route should explain that prep packets are carried in the prefetch inventory.");
     var accountRunDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, runId: runId) as ViewResult;
     var accountRunDetailModel = accountRunDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountRunDetailModel?.SelectedRun?.RunId, runId, StringComparison.Ordinal), "account run detail route should load the selected live run context.");
@@ -3267,6 +3283,8 @@ async Task VerifyGmOpsBoardWorkflowAsync()
         CreatedBy: "gm.smoke",
         RuntimeFingerprint: "ops-smoke")).Result as CreatedAtActionResult;
     var governedPacket = NotNull(governedPacketCreate?.Value as GmPrepAssetRecord, "ops-board should bind governed encounter packets into campaign prep assets");
+    var governedPacketReference = NotNull(governedPacket.GovernedProject, "governed prep bindings should carry structured governed-project provenance");
+    Assert(governedPacketReference.ProjectId == "renraku-checkpoint", "governed prep bindings should preserve the source project id");
     Assert(governedPacket.Tags.Contains(HubCatalogItemKinds.EncounterPack, StringComparer.OrdinalIgnoreCase), "governed prep bindings should keep the source packet kind as a tag");
     Assert(governedPacket.Body.Contains("red-samurai", StringComparison.OrdinalIgnoreCase), "governed prep bindings should preserve dependency truth from the imported encounter packet");
 

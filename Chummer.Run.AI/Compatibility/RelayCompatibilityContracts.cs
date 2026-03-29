@@ -107,6 +107,16 @@ internal sealed record OfflineSyncPrepChecklistItem(
     bool Completed = false,
     string? Notes = null);
 
+[Obsolete("Use Chummer.Play.Contracts.Relay.OfflineSyncPrepGovernedProjectReference.")]
+internal sealed record OfflineSyncPrepGovernedProjectReference(
+    string ProjectKind,
+    string ProjectId,
+    string Title,
+    string RulesetId,
+    string LinkTarget,
+    string TrustTier,
+    string? RuntimeFingerprint = null);
+
 [Obsolete("Use Chummer.Play.Contracts.Relay.OfflineSyncPrepAsset.")]
 internal sealed record OfflineSyncPrepAsset(
     string AssetId,
@@ -127,7 +137,8 @@ internal sealed record OfflineSyncPrepAsset(
     DateTimeOffset UpdatedAtUtc,
     DateTimeOffset? LastRevealedAtUtc = null,
     string? LastRevealChannel = null,
-    int RevealCount = 0);
+    int RevealCount = 0,
+    OfflineSyncPrepGovernedProjectReference? GovernedProject = null);
 
 [Obsolete("Use Chummer.Play.Contracts.Relay.OfflineSyncSnapshotRequest.")]
 internal sealed record OfflineSyncSnapshotRequest(

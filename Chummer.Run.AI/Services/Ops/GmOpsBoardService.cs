@@ -50,6 +50,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         public required string Status { get; set; }
         public string? CreatedBy { get; init; }
         public string? RuntimeFingerprint { get; init; }
+        public GmPrepAssetGovernedProjectReference? GovernedProject { get; set; }
         public required DateTimeOffset CreatedAtUtc { get; init; }
         public required DateTimeOffset UpdatedAtUtc { get; set; }
         public DateTimeOffset? LastRevealedAtUtc { get; set; }
@@ -154,6 +155,11 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
     }
 
     public GmPrepAssetRecord CreatePrepAsset(GmPrepAssetCreateRequest request)
+        => CreatePrepAssetCore(request, governedProject: null);
+
+    private GmPrepAssetRecord CreatePrepAssetCore(
+        GmPrepAssetCreateRequest request,
+        GmPrepAssetGovernedProjectReference? governedProject)
     {
         var now = DateTimeOffset.UtcNow;
         var assetId = $"prep_{Guid.NewGuid():N}";
@@ -175,6 +181,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             Status = request.Kind is GmPrepAssetKind.RevealSurface or GmPrepAssetKind.PlayerScreen ? "ready" : "draft",
             CreatedBy = NormalizeOptional(request.CreatedBy),
             RuntimeFingerprint = NormalizeOptional(request.RuntimeFingerprint),
+            GovernedProject = governedProject,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
@@ -194,7 +201,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             throw new ArgumentOutOfRangeException(nameof(request.Project), $"Unsupported governed prep packet kind '{request.Project.Summary.Kind}'.");
         }
 
-        return CreatePrepAsset(new GmPrepAssetCreateRequest(
+        return CreatePrepAssetCore(new GmPrepAssetCreateRequest(
             CampaignId: request.CampaignId,
             SessionId: request.SessionId,
             SceneId: request.SceneId,
@@ -208,7 +215,8 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             SourceEventIds: Array.Empty<string>(),
             Reusable: request.Reusable,
             CreatedBy: request.CreatedBy,
-            RuntimeFingerprint: request.RuntimeFingerprint));
+            RuntimeFingerprint: request.RuntimeFingerprint),
+            BuildGovernedProjectReference(request.Project));
     }
 
     public GmPrepAssetRecord? GetPrepAsset(string assetId)
@@ -412,6 +420,11 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             item.Summary ?? string.Empty,
             item.Body,
             string.Join(' ', item.Tags),
+            item.GovernedProject?.ProjectKind ?? string.Empty,
+            item.GovernedProject?.ProjectId ?? string.Empty,
+            item.GovernedProject?.Title ?? string.Empty,
+            item.GovernedProject?.RulesetId ?? string.Empty,
+            item.GovernedProject?.LinkTarget ?? string.Empty,
             string.Join(' ', item.ChecklistItems.Select(static checklist => checklist.Label)),
             string.Join(' ', item.ChecklistItems.Select(static checklist => checklist.Notes ?? string.Empty))
         });
@@ -490,6 +503,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                     local.LastRevealedAtUtc = asset.LastRevealedAtUtc;
                     local.LastRevealChannel = NormalizeOptional(asset.LastRevealChannel);
                     local.RevealCount = asset.RevealCount;
+                    local.GovernedProject = NormalizeGovernedProject(asset.GovernedProject);
                 }
 
                 imported++;
@@ -518,6 +532,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 Status = string.IsNullOrWhiteSpace(asset.Status) ? "draft" : asset.Status.Trim(),
                 CreatedBy = NormalizeOptional(asset.CreatedBy),
                 RuntimeFingerprint = NormalizeOptional(asset.RuntimeFingerprint),
+                GovernedProject = NormalizeGovernedProject(asset.GovernedProject),
                 CreatedAtUtc = asset.CreatedAtUtc,
                 UpdatedAtUtc = asset.UpdatedAtUtc,
                 LastRevealedAtUtc = asset.LastRevealedAtUtc,
@@ -558,6 +573,25 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 .Select(static item => item.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+
+    private static GmPrepAssetGovernedProjectReference? NormalizeGovernedProject(OfflineSyncPrepGovernedProjectReference? governedProject)
+    {
+        if (governedProject is null
+            || string.IsNullOrWhiteSpace(governedProject.ProjectKind)
+            || string.IsNullOrWhiteSpace(governedProject.ProjectId))
+        {
+            return null;
+        }
+
+        return new GmPrepAssetGovernedProjectReference(
+            ProjectKind: governedProject.ProjectKind.Trim(),
+            ProjectId: governedProject.ProjectId.Trim(),
+            Title: governedProject.Title.Trim(),
+            RulesetId: governedProject.RulesetId.Trim(),
+            LinkTarget: governedProject.LinkTarget.Trim(),
+            TrustTier: governedProject.TrustTier.Trim(),
+            RuntimeFingerprint: NormalizeOptional(governedProject.RuntimeFingerprint));
+    }
 
     private static bool SupportsGovernedPacketBinding(string projectKind) =>
         string.Equals(projectKind, HubCatalogItemKinds.NpcEntry, StringComparison.Ordinal)
@@ -622,6 +656,16 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             project.Summary.TrustTier,
             ..(additionalTags ?? Array.Empty<string>())
         ]);
+
+    private static GmPrepAssetGovernedProjectReference BuildGovernedProjectReference(HubProjectDetailProjection project) =>
+        new(
+            ProjectKind: project.Summary.Kind,
+            ProjectId: project.Summary.ItemId,
+            Title: project.Summary.Title,
+            RulesetId: project.Summary.RulesetId,
+            LinkTarget: project.Summary.LinkTarget,
+            TrustTier: project.Summary.TrustTier,
+            RuntimeFingerprint: NormalizeOptional(project.RuntimeFingerprint));
 
     private static string ResolveCatalogKindLabel(string kind) =>
         kind switch
@@ -709,7 +753,8 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             state.UpdatedAtUtc,
             state.LastRevealedAtUtc,
             state.LastRevealChannel,
-            state.RevealCount);
+            state.RevealCount,
+            state.GovernedProject);
 
     private static GmPrepAssetSummary ToSummary(PrepAssetState state) =>
         new(
@@ -726,5 +771,6 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             state.ChecklistItems.Count,
             state.ChecklistItems.Count(item => item.Completed),
             state.UpdatedAtUtc,
-            state.LastRevealedAtUtc);
+            state.LastRevealedAtUtc,
+            state.GovernedProject);
 }

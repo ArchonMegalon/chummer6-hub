@@ -124,6 +124,8 @@ internal static class GmOpsBoardVerification
         VerificationAssert.Equal(1, projection.ChecklistSummary.CompletedItems, "Ops board should summarize completed checklist items.");
         VerificationAssert.True(projection.RevealSurfaces.Any(item => item.AssetId == reveal.AssetId), "Ops board should surface reveal assets for player delivery.");
         VerificationAssert.Equal(3, sceneOnlyAssets.TotalCount, "Scene-scoped prep lists should stay focused on direct scene assets by default, including governed packet bindings.");
+        VerificationAssert.NotNull(governedEncounterPrep.GovernedProject, "Governed packet prep should carry structured governed-project provenance.");
+        VerificationAssert.Equal("renraku-checkpoint", governedEncounterPrep.GovernedProject!.ProjectId, "Governed packet prep should preserve the source project id.");
         VerificationAssert.True(
             governedEncounterPrep.Tags.Contains(HubCatalogItemKinds.EncounterPack, StringComparer.OrdinalIgnoreCase),
             "Governed packet prep should retain the source encounter-pack kind as a searchable tag.");

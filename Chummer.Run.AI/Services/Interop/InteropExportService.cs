@@ -180,7 +180,8 @@ public sealed class InteropExportService : IInteropExportService
                 item.ChecklistItemCount,
                 item.ChecklistCompletedCount,
                 item.UpdatedAtUtc,
-                item.LastRevealedAtUtc
+                item.LastRevealedAtUtc,
+                item.GovernedProject
             }, _jsonOptions);
 
             yield return new StoredAsset(
