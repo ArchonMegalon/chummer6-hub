@@ -78,6 +78,12 @@ public sealed class CampaignSpineService
             var workspaces = campaigns
                 .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore, transfers, prepLaunches, travelPrefetchReceipts, aftermathPackages))
                 .OrderByDescending(static workspace => ResolveWorkspaceFreshnessUtc(workspace))
+                .ThenByDescending(static workspace => ResolveWorkspaceActivityBreadth(workspace))
+                .ThenByDescending(static workspace => workspace.AftermathPackages?.Count ?? 0)
+                .ThenByDescending(static workspace => workspace.PrepLaunches?.Count ?? 0)
+                .ThenByDescending(static workspace => workspace.TravelPrefetches?.Count ?? 0)
+                .ThenByDescending(static workspace => workspace.RosterTransfers?.Count ?? 0)
+                .ThenBy(static workspace => workspace.CampaignName, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             var operations = _store.GroupsById.Values
                 .Where(group => group.Memberships.Any(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase) && IsOperatorRole(member.Role)))
@@ -91,6 +97,12 @@ public sealed class CampaignSpineService
                     var groupWorkspaces = workspaces
                         .Where(workspace => groupCampaigns.Any(campaign => string.Equals(campaign.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase)))
                         .OrderByDescending(static workspace => ResolveWorkspaceFreshnessUtc(workspace))
+                        .ThenByDescending(static workspace => ResolveWorkspaceActivityBreadth(workspace))
+                        .ThenByDescending(static workspace => workspace.AftermathPackages?.Count ?? 0)
+                        .ThenByDescending(static workspace => workspace.PrepLaunches?.Count ?? 0)
+                        .ThenByDescending(static workspace => workspace.TravelPrefetches?.Count ?? 0)
+                        .ThenByDescending(static workspace => workspace.RosterTransfers?.Count ?? 0)
+                        .ThenBy(static workspace => workspace.CampaignName, StringComparer.OrdinalIgnoreCase)
                         .ToArray();
                     return new CommunityOperatorProjection(
                         GroupId: group.GroupId,
@@ -1702,6 +1714,19 @@ public sealed class CampaignSpineService
             .Select(static item => item!.Value)
             .DefaultIfEmpty(DateTimeOffset.MinValue)
             .Max();
+    }
+
+    private static int ResolveWorkspaceActivityBreadth(CampaignWorkspaceProjection workspace)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+
+        return (workspace.ChangePackets?.Count ?? 0)
+            + (workspace.AftermathPackages?.Count ?? 0)
+            + (workspace.PrepLaunches?.Count ?? 0)
+            + (workspace.TravelPrefetches?.Count ?? 0)
+            + (workspace.RosterTransfers?.Count ?? 0)
+            + (workspace.Consequences?.Count ?? 0)
+            + (workspace.NextSessionCarryForward is null ? 0 : 1);
     }
 
     private static IReadOnlyList<CommunitySeasonBoardEntryProjection> BuildGroupSeasonBoardEntries(IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
