@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Rulesets;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
@@ -131,6 +132,7 @@ public sealed class CampaignSpineService
                         InviteCampaigns: BuildGroupInviteCampaigns(groupCampaigns),
                         RecentJoinCodes: BuildGroupRecentJoinCodes(_store.JoinCodesByValue.Values, group.GroupId, now),
                         RecentBoostCodes: BuildGroupRecentBoostCodes(_store.BoostCodesByValue.Values, groupCampaigns, group.GroupId),
+                        RecentSponsorSessions: BuildGroupRecentSponsorSessions(_store.SponsorSessionsById.Values, _store.UsersById, groupCampaigns, group.GroupId),
                         SeasonBoardEntries: BuildGroupSeasonBoardEntries(groupWorkspaces),
                         Watchouts: BuildGroupOperatorWatchouts(groupWorkspaces),
                         RecentRosterTransfers: transfers
@@ -1786,6 +1788,85 @@ public sealed class CampaignSpineService
             })
             .ToArray();
 
+    private static IReadOnlyList<CommunitySponsorSessionProjection> BuildGroupRecentSponsorSessions(
+        IEnumerable<SponsorSessionState> sponsorSessions,
+        IReadOnlyDictionary<string, HubUserDto> usersById,
+        IReadOnlyList<CampaignProjection> groupCampaigns,
+        string groupId)
+        => sponsorSessions
+            .Where(item => string.Equals(item.GroupId, groupId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => DescribeSponsorSessionPriority(item.Status))
+            .ThenByDescending(static item => item.AuthorizedAtUtc ?? item.UpdatedAtUtc)
+            .ThenByDescending(static item => item.UpdatedAtUtc)
+            .Take(5)
+            .Select(item =>
+            {
+                usersById.TryGetValue(item.UserId, out var user);
+                var campaign = groupCampaigns.FirstOrDefault(candidate => string.Equals(candidate.CampaignId, item.BoostCampaignId, StringComparison.OrdinalIgnoreCase));
+                var latestEvent = item.Events
+                    .OrderByDescending(static entry => entry.CreatedAtUtc)
+                    .FirstOrDefault();
+                return new CommunitySponsorSessionProjection(
+                    SponsorSessionId: item.SponsorSessionId,
+                    UserId: item.UserId,
+                    UserDisplayName: user?.DisplayName ?? "Community member",
+                    CampaignId: item.BoostCampaignId ?? campaign?.CampaignId ?? string.Empty,
+                    CampaignName: campaign?.Name ?? groupCampaigns.FirstOrDefault()?.Name ?? "Governed sponsor lane",
+                    Status: item.Status,
+                    StatusSummary: DescribeSponsorSessionStatus(item),
+                    RequestedLaneRole: item.RequestedLaneRole,
+                    AuthorizationTier: item.AuthorizationTier,
+                    LatestEventSummary: latestEvent?.Message,
+                    UpdatedAtUtc: item.UpdatedAtUtc);
+            })
+            .ToArray();
+
+    private static int DescribeSponsorSessionPriority(string? status)
+        => (status ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "active" => 6,
+            "auth_ready" => 5,
+            "lane_pending" => 5,
+            "pending_auth" => 5,
+            "waiting_for_slot" => 4,
+            "fleet_lane_created" => 4,
+            "consented" => 3,
+            "intent_created" => 2,
+            "stopped" => 1,
+            "revoked" => 0,
+            _ => 1
+        };
+
+    private static string DescribeSponsorSessionStatus(SponsorSessionState item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        var tier = string.Equals(item.AuthorizationTier, "unknown", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : item.AuthorizationTier.Replace('_', ' ');
+        var role = string.IsNullOrWhiteSpace(item.RequestedLaneRole)
+            ? "participant"
+            : item.RequestedLaneRole.Replace('_', ' ');
+        var status = (item.Status ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "active" => "Active on Fleet",
+            "auth_ready" => "Ready for activation",
+            "lane_pending" => "Lane is warming",
+            "pending_auth" => "Waiting for device auth",
+            "waiting_for_slot" => "Queued for the next sponsor slot",
+            "fleet_lane_created" => "Fleet lane created",
+            "consented" => "Consent recorded",
+            "intent_created" => "Intent recorded",
+            "stopped" => "Stopped",
+            "revoked" => "Revoked",
+            _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase((item.Status ?? "tracked").Replace('_', ' '))
+        };
+
+        return tier is null
+            ? $"{status} · {role} lane"
+            : $"{status} · {role} lane · {tier} tier";
+    }
+
     private static DateTimeOffset ResolveCommunityOperatorFreshnessUtc(CommunityOperatorProjection operation)
     {
         ArgumentNullException.ThrowIfNull(operation);
@@ -1794,6 +1875,7 @@ public sealed class CampaignSpineService
             .Select(static entry => (DateTimeOffset?)entry.UpdatedAtUtc)
             .Concat(operation.RecentJoinCodes.Select(static code => (DateTimeOffset?)code.CreatedAtUtc))
             .Concat(operation.RecentBoostCodes.Select(static code => (DateTimeOffset?)(code.RedeemedAtUtc ?? code.CreatedAtUtc)))
+            .Concat(operation.RecentSponsorSessions.Select(static session => (DateTimeOffset?)session.UpdatedAtUtc))
             .Concat((operation.RecentRosterTransfers ?? Array.Empty<RosterTransferProjection>()).Select(static transfer => (DateTimeOffset?)transfer.TransferredAtUtc))
             .Where(static item => item.HasValue)
             .Select(static item => item!.Value)
@@ -1817,6 +1899,7 @@ public sealed class CampaignSpineService
             + operation.SeasonBoardEntries.Count
             + operation.RecentJoinCodes.Count
             + operation.RecentBoostCodes.Count
+            + operation.RecentSponsorSessions.Count
             + (operation.RecentRosterTransfers?.Count ?? 0)
             + operation.Watchouts.Count
             + inviteCapabilityCount;
@@ -2576,12 +2659,13 @@ public sealed class CampaignSpineService
 
         if (workspace is not null)
         {
+            IReadOnlyList<RulesetEnvironmentDiffProjection> diffs = BuildWorkspaceRulesNavigatorDiffs(workspace);
             entries.Add(new RulesNavigatorAnswerProjection(
                 EntryId: StableId("rules", workspace.WorkspaceId),
                 Question: "Why is this campaign return pinned to the current rule environment?",
                 ShortAnswer: "Because campaign continuity and support closure both follow the same approved compatibility fingerprint.",
-                BeforeSummary: "Before approval, restore posture is review-heavy and support has to caveat the answer path.",
-                AfterSummary: $"After approval, {workspace.RuleEnvironment.CompatibilityFingerprint} becomes the grounded answer path for build, play, and support.",
+                BeforeSummary: diffs[0].BeforeSummary,
+                AfterSummary: diffs[0].AfterSummary,
                 ExplainEntryId: $"rules.navigator.{workspace.WorkspaceId}",
                 ProvenanceLabel: $"{workspace.RuleEnvironment.OwnerScope} scope · {workspace.RuleEnvironment.CompatibilityFingerprint}",
                 EvidenceLines:
@@ -2594,17 +2678,19 @@ public sealed class CampaignSpineService
                 [
                     "Support can reuse this answer when a case asks which rules posture is live on the current channel.",
                     "Operator review can link the same evidence when deciding whether to freeze or reroute a campaign change."
-                ]));
+                ],
+                Diffs: diffs));
         }
 
         if (operation is not null)
         {
+            IReadOnlyList<RulesetEnvironmentDiffProjection> diffs = BuildOperatorRulesNavigatorDiffs(operation);
             entries.Add(new RulesNavigatorAnswerProjection(
                 EntryId: StableId("rules", operation.GroupId),
                 Question: "How does group visibility change the campaign operator posture?",
                 ShortAnswer: "Operator permissions stay subordinate to campaign visibility and the approved rule environment.",
-                BeforeSummary: "Before visibility is explicit, group operations tend to rely on memory and side channels.",
-                AfterSummary: $"After visibility is explicit, {operation.CampaignVisibilitySummary} becomes part of the grounded decision surface.",
+                BeforeSummary: diffs[0].BeforeSummary,
+                AfterSummary: diffs[0].AfterSummary,
                 ExplainEntryId: $"rules.navigator.group.{operation.GroupId}",
                 ProvenanceLabel: $"{operation.GroupType} group · {operation.OperatorRole}",
                 EvidenceLines:
@@ -2617,10 +2703,63 @@ public sealed class CampaignSpineService
                 [
                     "Support can reuse this answer for permissions or campaign-visibility questions.",
                     "Hub can cite the same operator posture in account and organizer surfaces."
-                ]));
+                ],
+                Diffs: diffs));
         }
 
         return entries;
+    }
+
+    private static IReadOnlyList<RulesetEnvironmentDiffProjection> BuildWorkspaceRulesNavigatorDiffs(
+        CampaignWorkspaceProjection workspace)
+    {
+        string explainRoot = $"rules.navigator.{workspace.WorkspaceId}";
+        string readinessReason = workspace.ReadinessCues.FirstOrDefault(static cue => !string.IsNullOrWhiteSpace(cue.Summary))?.Summary
+            ?? "The campaign workspace still computes readiness from the same governed return context.";
+
+        return
+        [
+            new RulesetEnvironmentDiffProjection(
+                DiffId: StableId("rules-diff", $"{workspace.WorkspaceId}:campaign-return"),
+                Label: "Campaign return",
+                BeforeSummary: "Before approval, restore posture is review-heavy and support has to caveat the answer path.",
+                AfterSummary: $"After approval, {workspace.RuleEnvironment.CompatibilityFingerprint} becomes the grounded answer path for build, play, and support.",
+                ReasonSummary: workspace.ReturnSummary,
+                ExplainEntryId: $"{explainRoot}:campaign-return"),
+            new RulesetEnvironmentDiffProjection(
+                DiffId: StableId("rules-diff", $"{workspace.WorkspaceId}:readiness"),
+                Label: "Campaign readiness",
+                BeforeSummary: "Before the rule environment is explicit, readiness cues can drift away from the live return path.",
+                AfterSummary: $"After approval, {workspace.ReadinessCues.Count} readiness cue(s) stay tied to {workspace.RuleEnvironment.CompatibilityFingerprint} instead of a side calculation.",
+                ReasonSummary: readinessReason,
+                ExplainEntryId: $"{explainRoot}:readiness")
+        ];
+    }
+
+    private static IReadOnlyList<RulesetEnvironmentDiffProjection> BuildOperatorRulesNavigatorDiffs(
+        CommunityOperatorProjection operation)
+    {
+        string explainRoot = $"rules.navigator.group.{operation.GroupId}";
+        string returnReason = operation.RecentReturnSummaries.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item))
+            ?? operation.CampaignReturnSummary;
+
+        return
+        [
+            new RulesetEnvironmentDiffProjection(
+                DiffId: StableId("rules-diff", $"{operation.GroupId}:visibility"),
+                Label: "Operator visibility",
+                BeforeSummary: "Before visibility is explicit, group operations tend to rely on memory and side channels.",
+                AfterSummary: $"After visibility is explicit, {operation.CampaignVisibilitySummary} becomes part of the grounded decision surface.",
+                ReasonSummary: operation.OperationsSummary,
+                ExplainEntryId: $"{explainRoot}:visibility"),
+            new RulesetEnvironmentDiffProjection(
+                DiffId: StableId("rules-diff", $"{operation.GroupId}:rule-environment"),
+                Label: "Group rule environment",
+                BeforeSummary: "Before the group rule environment is explicit, campaign operator decisions can drift into one-off interpretation.",
+                AfterSummary: $"After the rule environment is explicit, {operation.RuleEnvironment.CompatibilityFingerprint} anchors {operation.ActiveCampaignCount} active campaign(s) on the same operator rail.",
+                ReasonSummary: returnReason,
+                ExplainEntryId: $"{explainRoot}:rule-environment")
+        ];
     }
 
     private static IReadOnlyList<LegacyMigrationReceiptProjection> BuildMigrationReceipts(

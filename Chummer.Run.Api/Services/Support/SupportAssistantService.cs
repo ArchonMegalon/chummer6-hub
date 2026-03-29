@@ -180,7 +180,16 @@ public sealed class SupportAssistantService
                 .Select(entry => new SupportAssistantCitation(
                     SourceKind: "rules_truth",
                     Label: entry.Question,
-                    Summary: TrimForSummary($"{entry.ShortAnswer} Evidence: {string.Join(" | ", entry.EvidenceLines.Take(2))}"),
+                    Summary: TrimForSummary(string.Join(
+                        " ",
+                        new[]
+                        {
+                            entry.ShortAnswer,
+                            entry.Diffs?.FirstOrDefault() is { } diff
+                                ? $"Diff: {diff.Label} -> {diff.AfterSummary}"
+                                : null,
+                            $"Evidence: {string.Join(" | ", entry.EvidenceLines.Take(2))}"
+                        }.Where(static item => !string.IsNullOrWhiteSpace(item)))),
                     Href: "/home"))
                 .ToArray();
         }

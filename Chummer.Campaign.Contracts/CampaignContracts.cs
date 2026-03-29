@@ -1,3 +1,4 @@
+using Chummer.Contracts.Rulesets;
 using System.ComponentModel.DataAnnotations;
 
 namespace Chummer.Campaign.Contracts;
@@ -305,6 +306,7 @@ public sealed record CommunityOperatorProjection(
     IReadOnlyList<CommunityInviteCampaignProjection> InviteCampaigns,
     IReadOnlyList<CommunityJoinCodeProjection> RecentJoinCodes,
     IReadOnlyList<CommunityBoostCodeProjection> RecentBoostCodes,
+    IReadOnlyList<CommunitySponsorSessionProjection> RecentSponsorSessions,
     IReadOnlyList<CommunitySeasonBoardEntryProjection> SeasonBoardEntries,
     IReadOnlyList<string> Watchouts,
     IReadOnlyList<RosterTransferProjection>? RecentRosterTransfers = null);
@@ -333,6 +335,19 @@ public sealed record CommunityBoostCodeProjection(
     string StatusSummary,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? RedeemedAtUtc);
+
+public sealed record CommunitySponsorSessionProjection(
+    string SponsorSessionId,
+    string UserId,
+    string UserDisplayName,
+    string CampaignId,
+    string CampaignName,
+    string Status,
+    string StatusSummary,
+    string RequestedLaneRole,
+    string AuthorizationTier,
+    string? LatestEventSummary,
+    DateTimeOffset UpdatedAtUtc);
 
 public sealed record CommunitySeasonBoardEntryProjection(
     string CampaignId,
@@ -522,7 +537,8 @@ public sealed record RulesNavigatorAnswerProjection(
     string ExplainEntryId,
     string ProvenanceLabel,
     IReadOnlyList<string> EvidenceLines,
-    IReadOnlyList<string> SupportReuseHints);
+    IReadOnlyList<string> SupportReuseHints,
+    IReadOnlyList<RulesetEnvironmentDiffProjection>? Diffs = null);
 
 public sealed record LegacyMigrationFieldProjection(
     string FieldId,
