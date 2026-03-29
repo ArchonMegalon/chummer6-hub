@@ -84,6 +84,12 @@
         || recentReceipts.Length > 0
         || restoreConflicts > 0
         || releasedOrNotifiedCases.Length > 0;
+    var hasSeedableStarterWork = (claimedInstallations > 0 || pendingClaims > 0)
+        && dossiers.Length == 0
+        && campaigns.Length == 0
+        && runs.Length == 0
+        && workspaces.Length == 0
+        && leadWorkspaceServerPlane is null;
     var workSurfaceReady = (claimedInstallations > 0 || pendingClaims > 0)
         && (dossiers.Length > 0
             || campaigns.Length > 0
@@ -91,6 +97,7 @@
             || workspaces.Length > 0
             || leadWorkspaceServerPlane is not null
             || restoreDevices.Length > 0);
+    var effectiveWorkSurfaceReady = workSurfaceReady || hasSeedableStarterWork;
     var showOverviewSection = string.Equals(Model.CurrentSection, "overview", StringComparison.OrdinalIgnoreCase);
     var showAccessSection = string.Equals(Model.CurrentSection, "access", StringComparison.OrdinalIgnoreCase);
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
@@ -296,7 +303,7 @@
             </section>
         }
 
-        @if (showWorkSection && (!showOnboarding || workSurfaceReady))
+        @if (showWorkSection && (!showOnboarding || effectiveWorkSurfaceReady))
         {
             <section class="release-shelf release-shelf--manual">
                 <div class="home-stream">
@@ -311,14 +318,25 @@
                                     <div class="app-rail">
                                         @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0 && workspaces.Length == 0)
                                         {
-                                                <article class="app-rail__item">
-                                                    <span class="tag">Ready</span>
-                                                    <div class="app-rail__copy">
-                                                        <h3>No long-lived runner yet</h3>
-                                                        <p>Your first claimed install or campaign handoff will seed the living dossier and the first return path here.</p>
+                                            <article class="app-rail__item">
+                                                <span class="tag">Ready</span>
+                                                <div class="app-rail__copy">
+                                                    <h3>No long-lived runner yet</h3>
+                                                    <p>Your first install and first workspace are ready to be stitched into a session lane here.</p>
+                                                </div>
+                                                @if (hasSeedableStarterWork)
+                                                {
+                                                    <div class="stacked-actions">
+                                                        <button id="seedStarterWorkspace" class="button-like button-like--primary" type="button">Start first playable session</button>
+                                                        <a class="inline-link" href="/account/access">Review install setup first</a>
                                                     </div>
+                                                    <p id="starterWorkspaceNotice" class="muted-copy" aria-live="polite"></p>
+                                                }
+                                                else
+                                                {
                                                     <a class="inline-link" href="/downloads">Start from downloads</a>
-                                                </article>
+                                                }
+                                            </article>
                                         }
                                         else
                                         {
@@ -702,6 +720,10 @@
                                                                 {
                                                                     <span> Return: @handoff.CampaignReturnSummary.</span>
                                                                 }
+                                                                @if (!string.IsNullOrWhiteSpace(handoff.PlannerCoverageSummary))
+                                                                {
+                                                                    <span> Coverage: @handoff.PlannerCoverageSummary.</span>
+                                                                }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SupportClosureSummary))
                                                                 {
                                                                     <span> Support: @handoff.SupportClosureSummary.</span>
@@ -941,7 +963,9 @@
     recoveryCopy: document.getElementById("homeRecoveryCopy"),
     setupCardTitle: document.getElementById("setupCardTitle"),
     setupCardCopy: document.getElementById("setupCardCopy"),
-    openSetupButton: document.getElementById("openSetupButton")
+    openSetupButton: document.getElementById("openSetupButton"),
+    seedStarterWorkspaceButton: document.getElementById("seedStarterWorkspace"),
+    starterWorkspaceNotice: document.getElementById("starterWorkspaceNotice")
   };
   let step = 0;
 
@@ -978,6 +1002,31 @@
   nextButton.addEventListener("click", () => showStep(Math.min(step + 1, panels.length - 1)));
   backButton.addEventListener("click", () => showStep(Math.max(step - 1, 0)));
   showStep(step);
+
+  const setStarterWorkspaceNotice = (message) => {
+    if (!nodes.starterWorkspaceNotice) return;
+    ui.setNotice(nodes.starterWorkspaceNotice, message);
+  };
+
+  nodes.seedStarterWorkspaceButton?.addEventListener("click", async () => {
+    try {
+      await ui.withBusyState(nodes.seedStarterWorkspaceButton, "Starting session...", async () => {
+        const payload = await ui.requestJson("/api/v1/campaign-spine/me/workspaces/starter", {
+          method: "POST"
+        });
+        const workspaceId = payload?.WorkspaceId || payload?.workspaceId;
+        if (typeof workspaceId === "string" && workspaceId.length > 0) {
+          window.location.href = `/account/work/workspaces/${encodeURIComponent(workspaceId)}`;
+          return;
+        }
+
+        setStarterWorkspaceNotice("Starter workspace is not ready yet. Open Account Work to continue.");
+        window.location.href = "/account/work";
+      });
+    } catch (error) {
+      setStarterWorkspaceNotice(ui.describeError(error, "Starter workspace could not be seeded right now."));
+    }
+  });
 
   onboardingForm.addEventListener("submit", async (event) => {
     event.preventDefault();

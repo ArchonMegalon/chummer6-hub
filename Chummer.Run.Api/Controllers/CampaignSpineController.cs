@@ -85,6 +85,25 @@ public sealed class CampaignSpineController : ControllerBase
         }
     }
 
+    [HttpPost("me/workspaces/starter")]
+    [ProducesResponseType<CampaignWorkspaceProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CampaignWorkspaceProjection>> SeedStarterWorkspace(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            CampaignWorkspaceProjection? starter = _campaignSpine.GetStarterWorkspace(user, installLinking);
+            return starter is null ? NotFound() : Ok(starter);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpGet("me/workspace-digests")]
     [ProducesResponseType<IReadOnlyList<CampaignWorkspaceDigestProjection>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<CampaignWorkspaceDigestProjection>>> GetMyCampaignWorkspaceDigests(CancellationToken cancellationToken)

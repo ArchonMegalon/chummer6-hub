@@ -29,6 +29,7 @@ REQUIRED_MARKERS = {
         'accountModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction',
         'accountModel.CampaignSpine.BuildLabHandoffs[0].RuntimeCompatibilitySummary',
         'accountModel.CampaignSpine.BuildLabHandoffs[0].SupportClosureSummary',
+        'accountModel.CampaignSpine.BuildLabHandoffs[0].PlannerCoverageSummary',
         'accountModel.CampaignSpine.BuildLabHandoffs[0].TradeoffLines[0].Contains("campaign-safe output"',
         'accountModel.CampaignSpine.BuildLabHandoffs[0].ProgressionOutcomes[0].Contains("25 / 50 / 100 Karma checkpoints"',
         'accountModel.CampaignSpine.BuildLabHandoffs[0].ProgressionOutcomes[1].Contains("recap follow-through"',
