@@ -2031,6 +2031,10 @@
                                     <strong>@op.CampaignReturnSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
+                                    <span>Season / event pulse</span>
+                                    <strong>@op.SeasonEventSummary</strong>
+                                </div>
+                                <div class="settings-summary-row">
                                     <span>Operator watchouts</span>
                                     <strong>@(op.Watchouts.Count == 0 ? "Quiet" : op.Watchouts[0])</strong>
                                 </div>
@@ -2045,6 +2049,23 @@
                                     @foreach (var watchout in op.Watchouts)
                                     {
                                         <li><strong>Watchout:</strong> @watchout</li>
+                                    }
+                                </ul>
+                            </details>
+                            <details class="details-drawer">
+                                <summary>Season &amp; event rail</summary>
+                                <ul class="muted-copy">
+                                    <li>@op.SeasonEventSummary</li>
+                                    @if (op.RecentEventSummaries.Count == 0)
+                                    {
+                                        <li>No governed season or event receipts are attached yet.</li>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var eventSummary in op.RecentEventSummaries)
+                                        {
+                                            <li>@eventSummary</li>
+                                        }
                                     }
                                 </ul>
                             </details>
