@@ -2033,7 +2033,9 @@ async Task VerifyPublicLandingProjectionAsync()
         Visibility: "group",
         Capabilities: new[] { "can_manage_members", "can_issue_join_codes", "can_issue_boost_codes", "can_hold_shared_entitlements" }));
     var seededCampaign = groups.GetOrCreateCampaign(operatorGroup.GroupId, "hub", "Smoke Campaign");
+    var seededSeasonCampaign = groups.GetOrCreateCampaign(operatorGroup.GroupId, "hub-season", "Smoke Season");
     Assert(string.Equals(seededCampaign.GroupId, operatorGroup.GroupId, StringComparison.Ordinal), "smoke campaign should attach to the seeded operator group.");
+    Assert(string.Equals(seededSeasonCampaign.GroupId, operatorGroup.GroupId, StringComparison.Ordinal), "secondary smoke season campaign should stay on the same seeded operator group.");
     var installSummary = installLinking.GetSummary(linkedUser.UserId, "subject.demo");
     Assert(installSummary.RecentReceipts.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal)), "signed-in downloads should mint a durable download receipt.");
     Assert(installSummary.PendingClaimTickets.Any(static item => string.Equals(item.ArtifactId, "smoke-poc-linux-x64", StringComparison.Ordinal) && string.Equals(item.Status, InstallClaimTicketStates.Pending, StringComparison.Ordinal)), "signed-in downloads should mint a pending install claim ticket.");
@@ -2226,6 +2228,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.CampaignReturnSummary)), "account page should surface campaign-return pulse for organizer groups.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.SeasonEventSummary)), "account page should surface a first-class season-event pulse for organizer groups.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentEventSummaries.Count >= 1), "account page should keep at least one recent governed event receipt attached to the operator rail.");
+    Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.ActiveCampaignCount >= 2), "account page should surface a multi-campaign operator group on the same governed backbone.");
+    Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.SeasonEventSummary.Contains("season rail", StringComparison.OrdinalIgnoreCase)), "account page should describe the multi-campaign operator group as a governed season rail.");
     var campaignSummaryResult = await campaignSpineController.GetMyCampaignSummary(CancellationToken.None);
     var campaignSummaryPayload = (campaignSummaryResult.Result as OkObjectResult)?.Value as AccountCampaignSummary ?? campaignSummaryResult.Value;
     Assert(campaignSummaryPayload is not null, "campaign spine api should return the signed-in campaign summary.");
@@ -2239,17 +2243,23 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(freshPreviewSummary.CommunityOperations.Count >= 1, "freshly created accounts should receive a seeded operator-aware campaign group.");
     Assert(!string.IsNullOrWhiteSpace(freshPreviewSummary.CommunityOperations[0].OperationsSummary), "freshly created accounts should receive a seeded operator operations pulse.");
     Assert(!string.IsNullOrWhiteSpace(freshPreviewSummary.CommunityOperations[0].SeasonEventSummary), "freshly created accounts should receive a seeded operator season-event pulse.");
+    Assert(freshPreviewSummary.CommunityOperations[0].ActiveCampaignCount >= 2, "freshly created accounts should receive a seeded multi-campaign operator group instead of a single-campaign placeholder.");
+    Assert(freshPreviewSummary.CommunityOperations[0].SeasonEventSummary.Contains("season rail", StringComparison.OrdinalIgnoreCase), "freshly created accounts should receive a season-rail summary when one operator group carries multiple governed campaigns.");
     var restoreResult = await campaignSpineController.GetMyRestoreProjection(CancellationToken.None);
     var restorePayload = (restoreResult.Result as OkObjectResult)?.Value as WorkspaceRestoreProjection ?? restoreResult.Value;
     Assert(restorePayload is not null && restorePayload.ClaimedDevices.Count >= 1, "campaign spine api should expose the restore packet for claimed-device recovery.");
     string workspaceId = campaignSummaryPayload!.Workspaces[0].WorkspaceId;
-    string runId = campaignSummaryPayload.Runs[0].RunId;
-    string handoffId = campaignSummaryPayload.BuildLabHandoffs[0].HandoffId;
     string rulesEntryId = campaignSummaryPayload.RulesNavigator[0].EntryId;
-    string publicationId = campaignSummaryPayload.CreatorPublications[0].PublicationId;
     var workspaceResult = await campaignSpineController.GetMyCampaignWorkspace(workspaceId, CancellationToken.None);
     var workspacePayload = (workspaceResult.Result as OkObjectResult)?.Value as CampaignWorkspaceProjection ?? workspaceResult.Value;
     Assert(workspacePayload is not null && string.Equals(workspacePayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine api should expose a stable workspace summary.");
+    string runId = workspacePayload!.Runs[0].RunId;
+    string handoffId = campaignSummaryPayload.BuildLabHandoffs
+        .First(item => string.Equals(item.CampaignId, workspacePayload.CampaignId, StringComparison.OrdinalIgnoreCase))
+        .HandoffId;
+    string publicationId = campaignSummaryPayload.CreatorPublications
+        .First(item => string.Equals(item.CampaignId, workspacePayload.CampaignId, StringComparison.OrdinalIgnoreCase))
+        .PublicationId;
     Assert(workspacePayload?.ReadinessCues.Count >= 1, "campaign spine workspace api should keep readiness cues attached to the workspace summary.");
     Assert(workspacePayload?.Consequences?.Count >= 4, "campaign spine workspace api should expose the governed consequence ledger.");
     Assert(workspacePayload!.Consequences!.Any(item => string.Equals(item.Kind, "reputation", StringComparison.Ordinal) && item.Receipts.Count >= 1), "campaign spine workspace api should keep grounded reputation receipts attached.");

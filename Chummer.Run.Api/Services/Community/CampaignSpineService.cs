@@ -476,16 +476,16 @@ public sealed class CampaignSpineService
                 : request.TargetOwnerUserId.Trim();
             var currentOwner = _store.UsersById.GetValueOrDefault(currentOwnerUserId)
                 ?? throw new KeyNotFoundException($"Unknown target owner: {currentOwnerUserId}");
+            var targetCampaign = ResolveOrCreateTransferCampaignLocked(targetGroup, request.TargetCampaignId, request.TargetCampaignTitle, now);
             if (!string.Equals(previousOwnerUserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase)
                 && _store.DossiersById.Values.Any(item =>
                     !string.Equals(item.DossierId, dossier.DossierId, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(item.OwnerUserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase)))
+                    && string.Equals(item.OwnerUserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(item.CampaignId, targetCampaign.CampaignId, StringComparison.OrdinalIgnoreCase)))
             {
-                throw new InvalidOperationException("target owner already has a governed dossier; transfer would overwrite assignment truth.");
+                throw new InvalidOperationException("target owner already has a governed dossier in the selected campaign; transfer would overwrite assignment truth.");
             }
-
-            var targetCampaign = ResolveOrCreateTransferCampaignLocked(targetGroup, request.TargetCampaignId, request.TargetCampaignTitle, now);
-            string targetCrewId = StableId("crew", targetGroup.GroupId);
+            string targetCrewId = ResolveCrewIdLocked(targetCampaign.CampaignId);
             string targetRunId = StableId("run", targetCampaign.CampaignId);
             string targetSceneId = StableId("scene", targetCampaign.CampaignId);
             var targetCrew = _store.CrewsById.GetValueOrDefault(targetCrewId);
@@ -569,7 +569,7 @@ public sealed class CampaignSpineService
                 SourceGroupName: sourceGroup.Name,
                 SourceCampaignId: sourceCampaign.CampaignId,
                 SourceCampaignName: sourceCampaign.Name,
-                SourceCrewId: sourceCrew?.CrewId ?? StableId("crew", sourceGroup.GroupId),
+                SourceCrewId: sourceCrew?.CrewId ?? ResolveCrewIdLocked(sourceCampaign.CampaignId),
                 SourceCrewName: sourceCrew?.Name ?? $"{sourceGroup.Name} crew",
                 TargetGroupId: targetGroup.GroupId,
                 TargetGroupName: targetGroup.Name,
@@ -782,14 +782,6 @@ public sealed class CampaignSpineService
         return created;
     }
 
-    private bool ShouldAttachMemberToCampaignLocked(string userId, string campaignId)
-    {
-        var existing = _store.DossiersById.Values.FirstOrDefault(item => string.Equals(item.OwnerUserId, userId, StringComparison.OrdinalIgnoreCase));
-        return existing is null
-            || string.IsNullOrWhiteSpace(existing.CampaignId)
-            || string.Equals(existing.CampaignId, campaignId, StringComparison.OrdinalIgnoreCase);
-    }
-
     private bool EnsureSeedDataLocked(HubUserDto user, InstallLinkingSummaryDto? installLinking, DateTimeOffset now)
     {
         var changed = false;
@@ -889,7 +881,7 @@ public sealed class CampaignSpineService
                 continue;
             }
 
-            var crewId = StableId("crew", sponsorCampaign.GroupId);
+            var crewId = ResolveCrewIdLocked(sponsorCampaign.CampaignId);
             var runId = StableId("run", sponsorCampaign.CampaignId);
             var sceneId = StableId("scene", sponsorCampaign.CampaignId);
             var objectiveId = StableId("obj", sponsorCampaign.CampaignId);
@@ -904,11 +896,6 @@ public sealed class CampaignSpineService
             var memberDetails = group.Memberships
                 .Select(member =>
                 {
-                    if (!ShouldAttachMemberToCampaignLocked(member.UserId, sponsorCampaign.CampaignId))
-                    {
-                        return (Assignment: (CrewAssignmentProjection?)null, Dossier: (RunnerDossierProjection?)null);
-                    }
-
                     var userRecord = _store.UsersById.GetValueOrDefault(member.UserId);
                     if (userRecord is null)
                     {
@@ -1037,6 +1024,7 @@ public sealed class CampaignSpineService
         var changed = false;
         var groupId = StableId("group", $"personal-preview:{user.UserId}");
         var campaignId = StableId("campaign", $"personal-preview:{user.UserId}");
+        var seasonCampaignId = StableId("campaign", $"personal-preview:{user.UserId}:season");
         var membership = new GroupMembershipDto(
             MembershipId: StableId("membership", $"personal-preview:{user.UserId}"),
             GroupId: groupId,
@@ -1091,6 +1079,18 @@ public sealed class CampaignSpineService
             changed = true;
         }
 
+        if (!_store.CampaignsById.ContainsKey(seasonCampaignId))
+        {
+            _store.CampaignsById[seasonCampaignId] = new BoostCampaignDto(
+                CampaignId: seasonCampaignId,
+                GroupId: groupId,
+                ProjectId: "campaign-os-preview-season",
+                Title: $"{user.DisplayName} preview season",
+                Status: "active",
+                CreatedAtUtc: now.AddMinutes(1));
+            changed = true;
+        }
+
         return changed;
     }
 
@@ -1103,7 +1103,12 @@ public sealed class CampaignSpineService
         string campaignTitle,
         DateTimeOffset now)
     {
-        var existing = _store.DossiersById.Values.FirstOrDefault(item => string.Equals(item.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase));
+        var existing = _store.DossiersById.Values.FirstOrDefault(item =>
+                string.Equals(item.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.CampaignId, campaignId, StringComparison.OrdinalIgnoreCase))
+            ?? _store.DossiersById.Values.FirstOrDefault(item =>
+                string.Equals(item.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase)
+                && string.IsNullOrWhiteSpace(item.CampaignId));
         DateTimeOffset continuityCapturedAt = existing is not null
             && string.Equals(existing.CampaignId, campaignId, StringComparison.OrdinalIgnoreCase)
             && string.Equals(existing.CurrentRunId, runId, StringComparison.OrdinalIgnoreCase)
@@ -1190,6 +1195,13 @@ public sealed class CampaignSpineService
         _store.DossiersById[existing.DossierId] = existing;
         return existing;
     }
+
+    private string ResolveCrewIdLocked(string campaignId)
+        => _store.CrewsById.Values
+            .Where(item => string.Equals(item.CampaignId, campaignId, StringComparison.OrdinalIgnoreCase))
+            .Select(static item => item.CrewId)
+            .FirstOrDefault()
+            ?? StableId("crew", campaignId);
 
     private static WorkspaceRestoreProjection BuildRestoreProjection(
         HubUserDto user,
