@@ -31,6 +31,8 @@
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
     var leadRosterTransfer = leadWorkspaceServerPlane?.RosterTransfers.FirstOrDefault();
     var leadRosterAuditLine = leadRosterTransfer?.AuditLines.FirstOrDefault();
+    var leadPrepLaunch = leadWorkspaceServerPlane?.PrepLaunches.FirstOrDefault();
+    var leadTravelPrefetch = leadWorkspaceServerPlane?.TravelPrefetches.FirstOrDefault();
     var leadAftermathPackage = leadWorkspaceServerPlane?.AftermathPackages.FirstOrDefault();
     var leadAftermathShelfEntry = leadWorkspaceServerPlane?.RecapShelf
         .FirstOrDefault(item => string.Equals(item.EntryId, leadAftermathPackage?.PackageId, StringComparison.OrdinalIgnoreCase))
@@ -432,6 +434,14 @@
                                                         <h3>@leadWorkspaceServerPlane.PrepLibrary.Summary</h3>
                                                         <p>
                                                             @leadWorkspaceServerPlane.TravelMode.Summary
+                                                            @if (leadPrepLaunch is not null)
+                                                            {
+                                                                <span> Latest launch: @leadPrepLaunch.PacketTitle@(string.IsNullOrWhiteSpace(leadPrepLaunch.TargetRunTitle) ? string.Empty : $" for {leadPrepLaunch.TargetRunTitle}").</span>
+                                                            }
+                                                            @if (leadTravelPrefetch is not null)
+                                                            {
+                                                                <span> Latest travel receipt: @leadTravelPrefetch.DeviceRole on @leadTravelPrefetch.Platform.</span>
+                                                            }
                                                             <span> Search: @leadWorkspaceServerPlane.PrepLibrary.SearchSummary</span>
                                                             <span> Safehouse / travel mode: @leadWorkspaceServerPlane.TravelMode.PrefetchInventorySummary.</span>
                                                         </p>
