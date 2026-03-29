@@ -125,6 +125,9 @@ public sealed class CampaignSpineService
                             .Take(3)
                             .ToArray(),
                         RecentEventSummaries: BuildGroupRecentEventSummaries(groupWorkspaces),
+                        InviteCampaigns: BuildGroupInviteCampaigns(groupCampaigns),
+                        RecentJoinCodes: BuildGroupRecentJoinCodes(_store.JoinCodesByValue.Values, group.GroupId, now),
+                        RecentBoostCodes: BuildGroupRecentBoostCodes(_store.BoostCodesByValue.Values, groupCampaigns, group.GroupId),
                         SeasonBoardEntries: BuildGroupSeasonBoardEntries(groupWorkspaces),
                         Watchouts: BuildGroupOperatorWatchouts(groupWorkspaces),
                         RecentRosterTransfers: transfers
@@ -1697,6 +1700,73 @@ public sealed class CampaignSpineService
             .Take(4)
             .ToArray();
     }
+
+    private static IReadOnlyList<CommunityInviteCampaignProjection> BuildGroupInviteCampaigns(IReadOnlyList<CampaignProjection> groupCampaigns)
+        => groupCampaigns
+            .Select(static campaign => new CommunityInviteCampaignProjection(
+                CampaignId: campaign.CampaignId,
+                CampaignName: campaign.Name,
+                Status: campaign.Status))
+            .ToArray();
+
+    private static IReadOnlyList<CommunityJoinCodeProjection> BuildGroupRecentJoinCodes(
+        IEnumerable<JoinCodeDto> joinCodes,
+        string groupId,
+        DateTimeOffset now)
+        => joinCodes
+            .Where(item => string.Equals(item.GroupId, groupId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.CreatedAtUtc)
+            .Take(5)
+            .Select(item =>
+            {
+                bool expired = item.ExpiresAtUtc is { } expiresAt && expiresAt <= now;
+                string status = expired ? "expired" : "active";
+                string statusSummary = expired
+                    ? $"Expired on {item.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC. Issue a fresh member code if this lane still matters."
+                    : item.ExpiresAtUtc is { } activeUntil
+                        ? $"Active until {activeUntil:yyyy-MM-dd HH:mm} UTC and used {item.Uses} time(s)."
+                        : $"Active with no expiry and used {item.Uses} time(s).";
+                return new CommunityJoinCodeProjection(
+                    JoinCodeId: item.JoinCodeId,
+                    Code: item.Code,
+                    Role: item.Role,
+                    Status: status,
+                    StatusSummary: statusSummary,
+                    CreatedAtUtc: item.CreatedAtUtc,
+                    ExpiresAtUtc: item.ExpiresAtUtc,
+                    Uses: item.Uses);
+            })
+            .ToArray();
+
+    private static IReadOnlyList<CommunityBoostCodeProjection> BuildGroupRecentBoostCodes(
+        IEnumerable<BoostCodeDto> boostCodes,
+        IReadOnlyList<CampaignProjection> groupCampaigns,
+        string groupId)
+        => boostCodes
+            .Where(item => string.Equals(item.GroupId, groupId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.CreatedAtUtc)
+            .Take(5)
+            .Select(item =>
+            {
+                string campaignName = groupCampaigns
+                    .FirstOrDefault(campaign => string.Equals(campaign.CampaignId, item.CampaignId, StringComparison.OrdinalIgnoreCase))
+                    ?.Name
+                    ?? item.CampaignId;
+                bool redeemed = string.Equals(item.Status, "redeemed", StringComparison.OrdinalIgnoreCase);
+                string statusSummary = redeemed
+                    ? $"Redeemed on {item.RedeemedAtUtc:yyyy-MM-dd HH:mm} UTC for {campaignName}. Issue a fresh sponsor code if this lane needs another seat."
+                    : $"Active for {campaignName}. Redeem it on the governed sponsorship lane instead of passing raw lane ids around.";
+                return new CommunityBoostCodeProjection(
+                    BoostCodeId: item.BoostCodeId,
+                    Code: item.Code,
+                    CampaignId: item.CampaignId,
+                    CampaignName: campaignName,
+                    Status: redeemed ? "redeemed" : "active",
+                    StatusSummary: statusSummary,
+                    CreatedAtUtc: item.CreatedAtUtc,
+                    RedeemedAtUtc: item.RedeemedAtUtc);
+            })
+            .ToArray();
 
     private static DateTimeOffset ResolveWorkspaceFreshnessUtc(CampaignWorkspaceProjection workspace)
     {

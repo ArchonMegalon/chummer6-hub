@@ -1998,6 +1998,9 @@
                 {
                     @foreach (var op in Model.CampaignSpine.CommunityOperations)
                     {
+                        var inviteSummary = op.RecentJoinCodes.Count == 0 && op.RecentBoostCodes.Count == 0
+                            ? "Issue governed member and sponsor entry from one calmer operator rail."
+                            : $"{op.RecentJoinCodes.Count} join code(s) and {op.RecentBoostCodes.Count} sponsor code(s) stay on one governed rail.";
                         <details id="community-op-@op.GroupId" class="details-drawer">
                             <summary>@op.GroupName · @HumanizeStatus(op.OperatorRole, "Member")</summary>
                             <div class="settings-summary-list">
@@ -2053,6 +2056,10 @@
                                 <div class="settings-summary-row">
                                     <span>Launch &amp; closure</span>
                                     <strong>@organizerGuidanceSummary</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Invite / sponsorship</span>
+                                    <strong>@inviteSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Operator watchouts</span>
@@ -2112,6 +2119,116 @@
                                         }
                                     </ul>
                                 }
+                            </details>
+                            <details id="community-op-invites-@op.GroupId" class="details-drawer">
+                                <summary>Invite &amp; sponsorship rail</summary>
+                                <div class="settings-summary-list">
+                                    <div class="settings-summary-row">
+                                        <span>Join codes</span>
+                                        <strong>@(op.RecentJoinCodes.Count == 0 ? "Quiet" : $"{op.RecentJoinCodes.Count} recent")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Boost codes</span>
+                                        <strong>@(op.RecentBoostCodes.Count == 0 ? "Quiet" : $"{op.RecentBoostCodes.Count} recent")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Active sponsor sessions</span>
+                                        <strong>@(op.ActiveSponsorSessionCount == 0 ? "Quiet" : op.ActiveSponsorSessionCount.ToString())</strong>
+                                    </div>
+                                </div>
+                                <p class="muted-copy">Community invites, sponsorship entry, and stale-code recovery stay on the same governed operator rail instead of getting pushed into chat folklore.</p>
+                                <div class="grid-split">
+                                    <form class="settings-form" data-join-code-form data-group-id="@op.GroupId">
+                                        <h3>Issue governed join code</h3>
+                                        <label>
+                                            Member role
+                                            <select name="role">
+                                                <option value="member">Member</option>
+                                                <option value="booster">Booster</option>
+                                            </select>
+                                        </label>
+                                        <label>
+                                            Time to live
+                                            <select name="ttl">
+                                                <option value="7.00:00:00">7 days</option>
+                                                <option value="1.00:00:00">24 hours</option>
+                                                <option value="30.00:00:00">30 days</option>
+                                                <option value="">No expiry</option>
+                                            </select>
+                                        </label>
+                                        <button class="button-like button-like--ghost" type="submit">Issue join code</button>
+                                        <p class="status-copy" data-join-code-notice hidden></p>
+                                        <div class="settings-summary-list" data-join-code-result hidden></div>
+                                    </form>
+                                    <form class="settings-form" data-boost-code-form data-group-id="@op.GroupId">
+                                        <h3>Issue governed boost code</h3>
+                                        @if (op.InviteCampaigns.Count > 0)
+                                        {
+                                            <label>
+                                                Campaign lane
+                                                <select name="campaignId">
+                                                    @foreach (var campaign in op.InviteCampaigns)
+                                                    {
+                                                        <option value="@campaign.CampaignId">@campaign.CampaignName · @HumanizeStatus(campaign.Status, "Active")</option>
+                                                    }
+                                                </select>
+                                            </label>
+                                        }
+                                        <label>
+                                            Sponsor label
+                                            <input name="label" type="text" value="community_operator" />
+                                        </label>
+                                        <button class="button-like button-like--ghost" type="submit">Issue boost code</button>
+                                        <p class="status-copy" data-boost-code-notice hidden></p>
+                                        <div class="settings-summary-list" data-boost-code-result hidden></div>
+                                    </form>
+                                </div>
+                                <details class="details-drawer">
+                                    <summary>Code recovery guide</summary>
+                                    <ul class="muted-copy">
+                                        <li>If a member reports a stale join code, issue a fresh code here and resend the same member guidance rail for downloads, help, and closure.</li>
+                                        <li>If a sponsor code was redeemed on the wrong lane or already spent, issue a fresh boost code for the governed campaign lane instead of reusing stale sponsor state.</li>
+                                        <li>Keep release, install, and support guidance on the member-guidance rail so invite recovery never depends on repo trivia.</li>
+                                    </ul>
+                                </details>
+                                <details class="details-drawer">
+                                    <summary>Recent join codes</summary>
+                                    @if (op.RecentJoinCodes.Count == 0)
+                                    {
+                                        <p class="muted-copy">No governed join codes have been issued on this operator rail yet.</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="muted-copy">
+                                            @foreach (var joinCode in op.RecentJoinCodes)
+                                            {
+                                                <li>
+                                                    <strong>@joinCode.Code</strong>: @HumanizeStatus(joinCode.Role, "Member") · @HumanizeStatus(joinCode.Status, "Active")
+                                                    <span> @joinCode.StatusSummary</span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </details>
+                                <details class="details-drawer">
+                                    <summary>Recent boost codes</summary>
+                                    @if (op.RecentBoostCodes.Count == 0)
+                                    {
+                                        <p class="muted-copy">No governed boost codes have been issued on this operator rail yet.</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="muted-copy">
+                                            @foreach (var boostCode in op.RecentBoostCodes)
+                                            {
+                                                <li>
+                                                    <strong>@boostCode.Code</strong>: @boostCode.CampaignName · @HumanizeStatus(boostCode.Status, "Active")
+                                                    <span> @boostCode.StatusSummary</span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </details>
                             </details>
                             <details id="community-op-guidance-@op.GroupId" class="details-drawer">
                                 <summary>Member guidance rail</summary>
@@ -2528,6 +2645,107 @@
     syncAftermathPackagePreview();
   });
   document.getElementById("aftermathPackageTitle")?.addEventListener("input", syncAftermathPackagePreview);
+
+  const formatUtcLabel = (value, fallback = "Not scheduled") => {
+    if (!value) {
+      return fallback;
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+      ? value
+      : `${parsed.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+  };
+
+  document.querySelectorAll("[data-join-code-form]").forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const notice = form.querySelector("[data-join-code-notice]");
+      const result = form.querySelector("[data-join-code-result]");
+      const button = form.querySelector("button[type='submit']");
+      const role = form.querySelector("select[name='role']");
+      const ttl = form.querySelector("select[name='ttl']");
+      const groupId = form.dataset.groupId;
+      if (!groupId || !role || !ttl) {
+        return;
+      }
+
+      ui.clearNotice(notice);
+      if (result) {
+        result.hidden = true;
+        result.innerHTML = "";
+      }
+      ui.setButtonBusy(button, true, "Issuing...");
+      try {
+        const payload = await ui.requestJson(`/api/v1/groups/${encodeURIComponent(groupId)}/join-codes`, {
+          method: "POST",
+          json: {
+            subjectId,
+            role: role.value,
+            ttl: ttl.value || null
+          }
+        });
+        if (result) {
+          result.hidden = false;
+          result.innerHTML = `
+            <div class="settings-summary-row"><span>Join code</span><strong>${payload.code || ""}</strong></div>
+            <div class="settings-summary-row"><span>Role</span><strong>${ui.humanizeStatus(payload.role, "Member")}</strong></div>
+            <div class="settings-summary-row"><span>Expires</span><strong>${formatUtcLabel(payload.expiresAtUtc, "No expiry")}</strong></div>`;
+        }
+        ui.setNotice(notice, "Governed join code issued. Resend the member-guidance rail with it.");
+      } catch (error) {
+        ui.setNotice(notice, ui.describeError(error, "Join code could not be issued right now."), true);
+      } finally {
+        ui.setButtonBusy(button, false, "Issuing...");
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-boost-code-form]").forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const notice = form.querySelector("[data-boost-code-notice]");
+      const result = form.querySelector("[data-boost-code-result]");
+      const button = form.querySelector("button[type='submit']");
+      const campaign = form.querySelector("select[name='campaignId']");
+      const label = form.querySelector("input[name='label']");
+      const groupId = form.dataset.groupId;
+      if (!groupId || !label) {
+        return;
+      }
+
+      ui.clearNotice(notice);
+      if (result) {
+        result.hidden = true;
+        result.innerHTML = "";
+      }
+      ui.setButtonBusy(button, true, "Issuing...");
+      try {
+        const payload = await ui.requestJson("/api/v1/boost-codes", {
+          method: "POST",
+          json: {
+            subjectId,
+            groupId,
+            campaignId: campaign?.value || null,
+            label: label.value.trim() || "community_operator"
+          }
+        });
+        const selectedCampaign = campaign?.options?.[campaign.selectedIndex]?.textContent?.trim() || payload.campaignId || "Governed lane";
+        if (result) {
+          result.hidden = false;
+          result.innerHTML = `
+            <div class="settings-summary-row"><span>Boost code</span><strong>${payload.code || ""}</strong></div>
+            <div class="settings-summary-row"><span>Campaign lane</span><strong>${selectedCampaign}</strong></div>
+            <div class="settings-summary-row"><span>Status</span><strong>${ui.humanizeStatus(payload.status, "Active")}</strong></div>`;
+        }
+        ui.setNotice(notice, "Governed boost code issued. Keep sponsorship on this same operator rail.");
+      } catch (error) {
+        ui.setNotice(notice, ui.describeError(error, "Boost code could not be issued right now."), true);
+      } finally {
+        ui.setButtonBusy(button, false, "Issuing...");
+      }
+    });
+  });
 
   bindSubmit("profileForm", async (event) => {
     event.preventDefault();
