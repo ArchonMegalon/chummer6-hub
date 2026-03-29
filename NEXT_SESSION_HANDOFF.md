@@ -1,6 +1,18 @@
 # Next Session Handoff
 
 Updated: 2026-03-29T21:20:00+02:00
+ 
+## Handoff refresh (2026-03-29T21:45:00+02:00)
+
+- Local execution status is clean and green from the required full verification loop:
+  - `docker compose -f docker-compose.public-edge.yml up -d --build` completes successfully.
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work` passes.
+  - `bash scripts/ai/run_services_smoke.sh` passes.
+  - `bash scripts/run_smoke.sh` passes.
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh` passes.
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh` passes.
+- Cross-repo build blocker from prior runs was the duplicated-attribute failure in `chummer-core-engine/Chummer.Contracts` during docker rebuild; resolved by pruning generated local artifacts in that adjacent repo before build (`../chummer-core-engine/Chummer.Contracts/obj_tmp` and stale `obj`) and not committing those external repo changes.
+- Working tree for this repo is currently clean after cleanup; no untracked artifacts remain.
 
 ## Current state (2026-03-29T21:33:00+02:00)
 
