@@ -2140,6 +2140,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "account page should receive the next safe action directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].RuntimeCompatibilitySummary), "account page should receive runtime compatibility truth for the build handoff.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.BuildLabHandoffs[0].SupportClosureSummary), "account page should receive support-closure truth for the build handoff.");
+    Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].TradeoffLines[0].Contains("campaign-safe output", StringComparison.OrdinalIgnoreCase), "account page should receive exact build-path output posture instead of generic tradeoff filler.");
+    Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].ProgressionOutcomes[0].Contains("25 / 50 / 100 Karma checkpoints", StringComparison.Ordinal), "account page should receive planner checkpoints directly on the build-path handoff.");
+    Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].ProgressionOutcomes[1].Contains("recap follow-through", StringComparison.Ordinal), "account page should receive export and recap follow-through posture on the build-path handoff.");
     Assert(accountModel.CampaignSpine.RulesNavigator.Count >= 1, "account page should surface first-class rules navigator answers.");
     Assert(accountModel.CampaignSpine.MigrationReceipts.Count >= 1, "account page should surface legacy migration receipts.");
     Assert(accountModel.CampaignSpine.CreatorPublications.Count >= 1, "account page should surface creator publication posture.");
@@ -2224,6 +2227,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var handoffPayload = (handoffResult.Result as OkObjectResult)?.Value as BuildLabHandoffProjection ?? handoffResult.Value;
     Assert(handoffPayload is not null && handoffPayload.Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "campaign spine api should expose the customer-facing build-path handoff detail.");
     Assert(!string.IsNullOrWhiteSpace(handoffPayload!.CampaignReturnSummary), "campaign spine handoff api should keep campaign return truth attached.");
+    Assert(handoffPayload.TradeoffLines[0].Contains("campaign-safe output", StringComparison.OrdinalIgnoreCase), "campaign spine handoff api should preserve exact output posture.");
+    Assert(handoffPayload.ProgressionOutcomes[0].Contains("25 / 50 / 100 Karma checkpoints", StringComparison.Ordinal), "campaign spine handoff api should preserve the planner checkpoints directly on the handoff payload.");
     var rulesResult = await campaignSpineController.GetMyRulesNavigatorAnswer(rulesEntryId, CancellationToken.None);
     var rulesPayload = (rulesResult.Result as OkObjectResult)?.Value as RulesNavigatorAnswerProjection ?? rulesResult.Value;
     Assert(rulesPayload is not null && rulesPayload.EvidenceLines.Count >= 1, "campaign spine api should expose grounded rule-environment evidence.");
