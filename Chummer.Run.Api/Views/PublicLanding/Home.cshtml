@@ -30,6 +30,9 @@
     var leadCommunityOperation = Model.CampaignSpine.CommunityOperations.FirstOrDefault();
     var leadCommunityTransfer = leadCommunityOperation?.RecentRosterTransfers?.FirstOrDefault();
     var leadCommunityEvent = leadCommunityOperation?.RecentEventSummaries.FirstOrDefault();
+    var leadCommunityEventsHref = leadCommunityOperation is null
+        ? "/account/work#community-ops"
+        : $"/account/work#community-op-events-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
     var leadNextSessionCarryForward = leadWorkspaceServerPlane?.NextSessionCarryForward;
@@ -566,7 +569,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="/account/work#community-ops">Open teams and permissions</a>
+                                                        <a class="inline-link" href="@leadCommunityEventsHref">Open teams and permissions</a>
                                                     </article>
                                                 }
 
