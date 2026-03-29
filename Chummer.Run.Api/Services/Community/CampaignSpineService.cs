@@ -77,7 +77,7 @@ public sealed class CampaignSpineService
                 .ToArray();
             var workspaces = campaigns
                 .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore, transfers, prepLaunches, travelPrefetchReceipts, aftermathPackages))
-                .OrderByDescending(static workspace => workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.MinValue)
+                .OrderByDescending(static workspace => ResolveWorkspaceFreshnessUtc(workspace))
                 .ToArray();
             var operations = _store.GroupsById.Values
                 .Where(group => group.Memberships.Any(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase) && IsOperatorRole(member.Role)))
@@ -90,7 +90,7 @@ public sealed class CampaignSpineService
                         .ToArray();
                     var groupWorkspaces = workspaces
                         .Where(workspace => groupCampaigns.Any(campaign => string.Equals(campaign.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase)))
-                        .OrderByDescending(static workspace => workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.MinValue)
+                        .OrderByDescending(static workspace => ResolveWorkspaceFreshnessUtc(workspace))
                         .ToArray();
                     return new CommunityOperatorProjection(
                         GroupId: group.GroupId,
@@ -1684,6 +1684,24 @@ public sealed class CampaignSpineService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
+    }
+
+    private static DateTimeOffset ResolveWorkspaceFreshnessUtc(CampaignWorkspaceProjection workspace)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+
+        return new[] { workspace.LatestContinuity?.CapturedAtUtc, workspace.NextSessionCarryForward?.UpdatedAtUtc }
+            .Concat((workspace.Runs ?? Array.Empty<RunProjection>()).Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
+            .Concat((workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>()).Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
+            .Concat((workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>()).Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
+            .Concat((workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>()).Select(static item => (DateTimeOffset?)item.TransferredAtUtc))
+            .Concat((workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>()).Select(static item => (DateTimeOffset?)item.LaunchedAtUtc))
+            .Concat((workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>()).Select(static item => (DateTimeOffset?)item.StagedAtUtc))
+            .Concat((workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>()).Select(static item => (DateTimeOffset?)item.GeneratedAtUtc))
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.MinValue)
+            .Max();
     }
 
     private static IReadOnlyList<CommunitySeasonBoardEntryProjection> BuildGroupSeasonBoardEntries(IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)

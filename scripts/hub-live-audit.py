@@ -190,7 +190,7 @@ def ensure_claimed_device(
         raise AssertionError(f"{dispatch_path} returned {status}, expected 200")
 
     claim_code = extract_claim_code(body, dispatch_path)
-    installation_id = f"install-live-audit-{int(time.time())}"
+    installation_id = f"install-live-audit-{time.time_ns()}"
     redeem_body = json.dumps(
         {
             "claimCode": claim_code,
@@ -562,6 +562,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Season / event pulse", "/account/work")
     require_snippet(body, "Season &amp; event rail", "/account/work")
     require_snippet(body, "Season board", "/account/work")
+    require_snippet(body, "Open shared campaign view", "/account/work")
     status, body, _, _ = fetch(
         base_url,
         "/home/work",
@@ -725,7 +726,7 @@ def main() -> int:
     print(f"ok /api/public/privacy-boundaries -> {final_url}")
 
     if args.verify_signed_in_work:
-        signed_in_email = args.signed_in_email or f"live-audit-{int(time.time())}@example.invalid"
+        signed_in_email = args.signed_in_email or f"live-audit-{time.time_ns()}@example.invalid"
         verify_signed_in_work_audit(
             args.base_url,
             email=signed_in_email,

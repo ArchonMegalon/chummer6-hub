@@ -1,6 +1,6 @@
 product: chummer
 version: 1
-last_reviewed: 2026-03-29
+last_reviewed: 2026-03-28
 program_wave: next_20_big_wins_after_post_audit_closeout
 goal: make the campaign OS indispensable, widen Build and Explain, elevate exchange and publication, and turn trust plus operator depth into launch-scale product truth.
 status: in_progress
@@ -35,7 +35,7 @@ waves:
       - 15
   - id: W4
     name: Trust, operator depth, and launch scale
-    status: in_progress
+    status: not_started
     milestone_ids:
       - 16
       - 17
@@ -118,7 +118,7 @@ milestones:
       - chummer6-core
       - chummer6-ui
       - chummer6-hub
-    status: not_started
+    status: in_progress
     exit_criteria:
       - Users can model multiple future advancement paths with deterministic tradeoff explanations.
       - Planner output respects campaign-aware constraints and hands off cleanly into living dossier truth.
@@ -132,7 +132,7 @@ milestones:
       - chummer6-core
       - chummer6-ui
       - chummer6-hub
-    status: not_started
+    status: in_progress
     exit_criteria:
       - Build Lab can reason about crew fit, role overlap, missing capabilities, and campaign role pressure.
       - Team optimization results are grounded in explainable receipts instead of opaque scoring folklore.
@@ -265,7 +265,7 @@ milestones:
       - chummer6-hub
       - executive-assistant
       - chummer6-design
-    status: in_progress
+    status: not_started
     exit_criteria:
       - Campaign operators can run larger communities, seasons, and events on the same account and control backbone.
       - League and season operation surfaces are auditable and governed instead of spreadsheet cargo.
