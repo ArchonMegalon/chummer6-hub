@@ -3,18 +3,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from html import unescape
 from html.parser import HTMLParser
 from urllib.error import HTTPError
-from urllib.parse import urlencode, urljoin
+from urllib.parse import quote, urlencode, urljoin
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 BANNED_COPY = re.compile(r"\b(Read the linked detail|Read more|Learn more)\b", re.IGNORECASE)
+SUPPORT_AUDIT_TITLE = "Live audit support verification case"
+SUPPORT_AUDIT_SUMMARY = "Signed-in live audit is verifying the assistant-led fix verification lane."
+SUPPORT_AUDIT_DETAIL_PREFIX = "Signed-in live audit is verifying the assistant-led fix verification lane on the rebuilt local edge."
 
 
 @dataclass
@@ -93,6 +98,61 @@ def fetch(
         return exc.code, body, response_headers, exc.geturl()
 
 
+def load_json_object(body: str, path: str) -> dict[str, object]:
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise AssertionError(f"{path} returned invalid JSON: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise AssertionError(f"{path} returned {type(payload).__name__}, expected a JSON object")
+
+    return payload
+
+
+def resolve_internal_token(explicit_token: str | None, compose_file: str | None) -> str:
+    if explicit_token and explicit_token.strip():
+        return explicit_token.strip()
+
+    env_token = os.environ.get("FLEET_INTERNAL_API_TOKEN", "").strip()
+    if env_token:
+        return env_token
+
+    if not compose_file:
+        raise AssertionError("signed-in support verification requires an internal automation token")
+
+    compose_ps = subprocess.run(
+        ["docker", "compose", "-f", compose_file, "ps", "-q", "chummer-portal"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if compose_ps.returncode != 0:
+        raise AssertionError(f"could not resolve chummer-portal container from {compose_file}: {compose_ps.stderr.strip()}")
+
+    container_id = next((line.strip() for line in compose_ps.stdout.splitlines() if line.strip()), "")
+    if not container_id:
+        raise AssertionError(f"could not resolve chummer-portal container from {compose_file}")
+
+    inspect = subprocess.run(
+        ["docker", "inspect", "--format", "{{range .Config.Env}}{{println .}}{{end}}", container_id],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if inspect.returncode != 0:
+        raise AssertionError(f"could not inspect {container_id} for FLEET_INTERNAL_API_TOKEN: {inspect.stderr.strip()}")
+
+    token_prefix = "FLEET_INTERNAL_API_TOKEN="
+    for line in inspect.stdout.splitlines():
+        if line.startswith(token_prefix):
+            token = line[len(token_prefix):].strip()
+            if token:
+                return token
+
+    raise AssertionError("signed-in support verification requires FLEET_INTERNAL_API_TOKEN, but it is not configured on chummer-portal")
+
+
 def verify_https_redirect(base_url: str, path: str, public_host: str) -> None:
     status, _, headers, _ = fetch(base_url, path, public_host=public_host, follow_redirects=False)
     if status not in {301, 302, 307, 308}:
@@ -153,25 +213,7 @@ def ensure_claimed_device(
     cookie_header: str,
     public_host: str | None = None,
     forwarded_proto: str | None = None,
-) -> tuple[dict[str, object], str]:
-    status, body, _, _ = fetch(
-        base_url,
-        "/api/v1/campaign-spine/me",
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"/api/v1/campaign-spine/me returned {status}, expected 200")
-
-    summary = json.loads(body)
-    claimed_devices = ((summary.get("restore") or {}).get("claimedDevices") or [])
-    if claimed_devices:
-        installation_id = claimed_devices[0].get("installationId")
-        if not installation_id:
-            raise AssertionError("signed-in restore exposed a claimed device without an installation id")
-        return summary, installation_id
-
+) -> tuple[dict[str, object], str, str]:
     status, body, _, _ = fetch(
         base_url,
         "/downloads",
@@ -195,12 +237,13 @@ def ensure_claimed_device(
 
     claim_code = extract_claim_code(body, dispatch_path)
     installation_id = f"install-live-audit-{time.time_ns()}"
+    initial_version = "0.0-live-audit"
     redeem_body = json.dumps(
         {
             "claimCode": claim_code,
             "installationId": installation_id,
             "headId": "avalonia",
-            "applicationVersion": "0.0-live-audit",
+            "applicationVersion": initial_version,
             "channelId": "preview",
             "platform": "linux",
             "arch": "x64",
@@ -220,10 +263,13 @@ def ensure_claimed_device(
     if status != 200:
         raise AssertionError(f"/api/v1/install-linking/redeem returned {status}: {body[:400]}")
 
-    redeem = json.loads(body)
+    redeem = load_json_object(body, "/api/v1/install-linking/redeem")
     redeemed_installation_id = ((redeem.get("installation") or {}).get("installationId") if isinstance(redeem, dict) else None)
     if redeemed_installation_id != installation_id:
         raise AssertionError("install claim redemption did not bind the expected installation id")
+    access_token = ((redeem.get("grant") or {}).get("accessToken") if isinstance(redeem, dict) else None)
+    if not access_token:
+        raise AssertionError("install claim redemption did not expose an installation grant access token")
 
     status, body, _, _ = fetch(
         base_url,
@@ -235,18 +281,19 @@ def ensure_claimed_device(
     if status != 200:
         raise AssertionError(f"/api/v1/campaign-spine/me returned {status}, expected 200 after install claim")
 
-    summary = json.loads(body)
+    summary = load_json_object(body, "/api/v1/campaign-spine/me")
     claimed_devices = ((summary.get("restore") or {}).get("claimedDevices") or [])
     if not claimed_devices:
         raise AssertionError("install claim redemption did not surface a claimed device in restore")
 
-    return summary, installation_id
+    return summary, installation_id, str(access_token)
 
 
 def verify_signed_in_work_audit(
     base_url: str,
     *,
     email: str,
+    internal_token: str,
     public_host: str | None = None,
     forwarded_proto: str | None = None,
 ) -> None:
@@ -304,7 +351,7 @@ def verify_signed_in_work_audit(
     if not location.endswith("/account/work"):
         raise AssertionError(f"/auth/email/callback redirected to {location!r}, expected /account/work")
 
-    summary, claimed_installation_id = ensure_claimed_device(
+    summary, claimed_installation_id, current_grant_access_token = ensure_claimed_device(
         base_url,
         cookie_header=cookie_header,
         public_host=public_host,
@@ -377,6 +424,247 @@ def verify_signed_in_work_audit(
 
     workspace_token = extract_antiforgery_token(body, workspace_path)
     subject_id = extract_subject_id(body, workspace_path)
+    support_case_payload = json.dumps(
+        {
+            "kind": "bug_report",
+            "title": SUPPORT_AUDIT_TITLE,
+            "summary": SUPPORT_AUDIT_SUMMARY,
+            "detail": f"{SUPPORT_AUDIT_DETAIL_PREFIX} Marker {time.time_ns()}.",
+            "installationId": claimed_installation_id,
+            "applicationVersion": "0.0-live-audit",
+            "releaseChannel": "preview",
+            "headId": "avalonia",
+            "platform": "linux",
+            "arch": "x64",
+            "source": "hub_account",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/support/cases",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=support_case_payload,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 202:
+        raise AssertionError(f"/api/v1/support/cases returned {status}: {body[:400]}")
+
+    support_case = load_json_object(body, "/api/v1/support/cases")
+    support_case_id = str(support_case.get("caseId") or "")
+    if not support_case_id:
+        raise AssertionError("support case submission did not expose a case id")
+    support_detail_path = f"/account/support/{quote(support_case_id, safe='')}"
+    support_fixed_version = f"0.0-live-audit-fix-{time.time_ns()}"
+    transition_payload = json.dumps(
+        {
+            "targetStatus": "released_to_reporter_channel",
+            "note": f"Fix is live on preview {support_fixed_version}.",
+            "fixedVersion": support_fixed_version,
+            "fixedChannel": "preview",
+            "actor": "fleet_automation",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        f"/api/v1/support/cases/{quote(support_case_id, safe='')}/transition",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=transition_payload,
+        request_headers={
+            "Authorization": f"Bearer {internal_token}",
+            "Content-Type": "application/json",
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/support/cases/{support_case_id}/transition returned {status}: {body[:400]}")
+    released_case = load_json_object(body, f"/api/v1/support/cases/{support_case_id}/transition")
+    if released_case.get("status") != "released_to_reporter_channel":
+        raise AssertionError("support case did not enter released_to_reporter_channel")
+
+    assistant_release_payload = json.dumps(
+        {
+            "query": "Has the preview fix for my linked install shipped yet?",
+            "installationId": claimed_installation_id,
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/support/cases/assistant",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=assistant_release_payload,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/support/cases/assistant pre-refresh returned {status}: {body[:400]}")
+    released_assistant = load_json_object(body, "/api/v1/support/cases/assistant")
+    require_snippet(str(released_assistant.get("answer") or ""), support_fixed_version, "/api/v1/support/cases/assistant")
+    if not any(str(item.get("actionId") or "") == "open_downloads" for item in released_assistant.get("actions") or [] if isinstance(item, dict)):
+        raise AssertionError("support assistant did not direct the reporter back to downloads before the fix build was installed")
+
+    notify_payload = json.dumps(
+        {
+            "note": f"Reporter notified that preview {support_fixed_version} contains the fix.",
+            "actor": "hub",
+            "channel": "account_history",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        f"/api/v1/support/cases/{quote(support_case_id, safe='')}/notify",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=notify_payload,
+        request_headers={
+            "Authorization": f"Bearer {internal_token}",
+            "Content-Type": "application/json",
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/support/cases/{support_case_id}/notify returned {status}: {body[:400]}")
+    notified_case = load_json_object(body, f"/api/v1/support/cases/{support_case_id}/notify")
+    if notified_case.get("status") != "user_notified":
+        raise AssertionError("support case did not enter user_notified")
+
+    status, body, _, _ = fetch(
+        base_url,
+        support_detail_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{support_detail_path} returned {status}, expected 200")
+    require_snippet(body, "Release progress:", support_detail_path)
+    require_snippet(body, claimed_installation_id, support_detail_path)
+    require_snippet(body, support_fixed_version, support_detail_path)
+    require_snippet(body, "Update it to preview", support_detail_path)
+
+    refresh_payload = json.dumps(
+        {
+            "installationId": claimed_installation_id,
+            "accessToken": current_grant_access_token,
+            "headId": "avalonia",
+            "applicationVersion": support_fixed_version,
+            "channelId": "preview",
+            "platform": "linux",
+            "arch": "x64",
+            "publicKey": f"live-audit-public-key-{time.time_ns()}",
+            "hostLabel": "live-audit-host",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/install-linking/grants/refresh",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=refresh_payload,
+        request_headers={"Content-Type": "application/json"},
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/install-linking/grants/refresh returned {status}: {body[:400]}")
+    refresh_result = load_json_object(body, "/api/v1/install-linking/grants/refresh")
+    if not refresh_result.get("rotated"):
+        raise AssertionError("installation grant refresh did not rotate onto the reporter-ready fix build")
+    refreshed_grant = refresh_result.get("grant") or {}
+    current_grant_access_token = str((refreshed_grant.get("accessToken") if isinstance(refreshed_grant, dict) else "") or "")
+    if not current_grant_access_token:
+        raise AssertionError("installation grant refresh did not expose the next grant access token")
+
+    status, body, _, _ = fetch(
+        base_url,
+        support_detail_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{support_detail_path} returned {status}, expected 200 after install refresh")
+    require_snippet(body, "Fix worked here", support_detail_path)
+    require_snippet(body, "Still broken", support_detail_path)
+    require_snippet(body, support_fixed_version, support_detail_path)
+
+    assistant_ready_payload = json.dumps(
+        {
+            "query": "Can I verify the preview fix on my linked install now?",
+            "installationId": claimed_installation_id,
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/support/cases/assistant",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=assistant_ready_payload,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/support/cases/assistant verification-ready returned {status}: {body[:400]}")
+    ready_assistant = load_json_object(body, "/api/v1/support/cases/assistant")
+    require_snippet(str(ready_assistant.get("answer") or ""), "Use the verification buttons", "/api/v1/support/cases/assistant")
+    ready_actions = [item for item in ready_assistant.get("actions") or [] if isinstance(item, dict)]
+    verify_action = next((item for item in ready_actions if str(item.get("actionId") or "") == "verify_fix_on_case"), None)
+    if verify_action is None:
+        raise AssertionError("support assistant did not surface verify_fix_on_case once the linked install was ready")
+    if str(verify_action.get("href") or "") != support_detail_path:
+        raise AssertionError("support assistant did not route verify_fix_on_case back to the tracked account support detail")
+
+    verify_payload = json.dumps(
+        {
+            "outcome": "confirmed_fixed",
+            "note": f"Preview {support_fixed_version} fixed it here.",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        f"/api/v1/support/cases/{quote(support_case_id, safe='')}/verify",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=verify_payload,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/support/cases/{support_case_id}/verify returned {status}: {body[:400]}")
+    verified_case = load_json_object(body, f"/api/v1/support/cases/{support_case_id}/verify")
+    if verified_case.get("reporterVerificationState") != "confirmed_fixed":
+        raise AssertionError("support case verification did not record a confirmed_fixed outcome")
+
+    status, body, _, _ = fetch(
+        base_url,
+        support_detail_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{support_detail_path} returned {status}, expected 200 after reporter verification")
+    require_snippet(body, "Closed and confirmed", support_detail_path)
+    require_snippet(body, support_fixed_version, support_detail_path)
+
     community_operations = summary.get("communityOperations") or []
     if not community_operations:
         raise AssertionError("/api/v1/campaign-spine/me did not expose any governed community operation")
@@ -839,7 +1127,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Downtime brief", workspace_path)
     print(
         "ok signed-in /account/work -> "
-        f"{final_url} workspace={workspace_id} install={claimed_installation_id} join_code={join_code['code']} boost_code={boost_code['code']} sponsor_session={sponsor_session_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} downtime={downtime_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
+        f"{final_url} workspace={workspace_id} install={claimed_installation_id} support_case={support_case_id} support_fix={support_fixed_version} join_code={join_code['code']} boost_code={boost_code['code']} sponsor_session={sponsor_session_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} downtime={downtime_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
     )
 
 
@@ -849,8 +1137,10 @@ def main() -> int:
     parser.add_argument("--public-host", default=None, help="Optional Host header for reverse-proxied local edge checks.")
     parser.add_argument("--forwarded-proto", default=None, help="Optional X-Forwarded-Proto header for reverse-proxied local edge checks.")
     parser.add_argument("--verify-http-redirects", action="store_true", help="Verify that the local HTTP edge redirects to the public HTTPS host.")
-    parser.add_argument("--verify-signed-in-work", action="store_true", help="Verify the signed-in account/work journey, including the governed roster-transfer live action.")
+    parser.add_argument("--verify-signed-in-work", action="store_true", help="Verify the signed-in account/work journey, including governed support verification, roster transfer, and operator live actions.")
     parser.add_argument("--signed-in-email", default=None, help="Optional example.invalid email used for the signed-in work audit. Defaults to a generated value.")
+    parser.add_argument("--internal-token", default=None, help="Optional internal support automation bearer token for signed-in support verification.")
+    parser.add_argument("--compose-file", default="docker-compose.public-edge.yml", help="Compose file used to resolve FLEET_INTERNAL_API_TOKEN when --verify-signed-in-work is enabled.")
     parser.add_argument("--poll-seconds", type=int, default=0, help="Sleep before starting the audit.")
     args = parser.parse_args()
 
@@ -954,10 +1244,12 @@ def main() -> int:
     print(f"ok /api/public/privacy-boundaries -> {final_url}")
 
     if args.verify_signed_in_work:
+        internal_token = resolve_internal_token(args.internal_token, args.compose_file)
         signed_in_email = args.signed_in_email or f"live-audit-{time.time_ns()}@example.invalid"
         verify_signed_in_work_audit(
             args.base_url,
             email=signed_in_email,
+            internal_token=internal_token,
             public_host=args.public_host,
             forwarded_proto=args.forwarded_proto,
         )

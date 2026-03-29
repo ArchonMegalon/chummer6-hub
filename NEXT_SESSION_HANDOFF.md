@@ -19,6 +19,7 @@ Updated: 2026-03-29
   - explicit sponsor-session operator rail on the shared account/control backbone
   - explicit league/season operations rail on the shared account/control backbone
   - support assistant verification-ready action on install-current reporter cases
+  - live-edge proof for the signed-in support assistant verification loop on a claimed install
   - multi-campaign preview season bootstrap on one operator group
   - signed-in home/work aftermath recap visibility on the calmer home cockpit
   - signed-in home/work downtime brief visibility on the calmer home cockpit
@@ -50,6 +51,8 @@ Updated: 2026-03-29
 - Extended the signed-in live audit so `/account/work` and `/home/work` also have to render the new league-and-season operations rail after the signed-in transfer flow resolves
 - Tightened the grounded support assistant so reporter-facing fix questions now escalate from “read the timeline” to an explicit `Verify fix now` action once the linked install is already on the reporter-ready build
 - Extended smoke coverage so verification-ready assistant answers must explicitly point back to the tracked case detail and tell the reporter to use the live verification buttons
+- Extended `scripts/hub-live-audit.py` so the rebuilt local `chummer.run` edge now submits a real signed-in support case, moves it through internal release and reporter notification, refreshes the claimed install onto the fix build, asks the assistant before and after the update, and proves the `Verify fix now` action plus reporter confirmation on `/account/support/{caseId}`
+- Extended `scripts/cleanup_synthetic_support_cases.py` so synthetic support cases created by the live signed-in audit are cleaned up if a later run exits before reporter confirmation
 - Fixed bounded receipt retention for governed prep launches, travel-prefetch receipts, and aftermath recap packages so the newest receipts survive once the local proof store crosses its 64-item cap
 - Biased signed-in home lead-workspace ordering toward the richer live lane when two workspaces share the same latest transfer timestamp, so `/home/work` keeps the active prep/aftermath lane instead of drifting to a thinner transfer-only lane
 - Extended smoke coverage with an aftermath-retention overflow regression so the newest generated recap package must remain visible on `/home/work` after the cap is exceeded
