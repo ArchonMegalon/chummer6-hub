@@ -127,7 +127,7 @@ wait_for_hub_edge
 
 hub_live_audit_args=(--base-url "$HUB_BASE_URL")
 if [[ "$HUB_BASE_URL" == http://* ]]; then
-  hub_live_audit_args+=(--public-host "$HUB_PUBLIC_HOST" --forwarded-proto https --verify-http-redirects)
+  hub_live_audit_args+=(--public-host "$HUB_PUBLIC_HOST" --forwarded-proto https --verify-http-redirects --verify-signed-in-work)
 fi
 
 python3 scripts/hub-live-audit.py "${hub_live_audit_args[@]}"

@@ -40,7 +40,8 @@ python3 scripts/hub-live-audit.py \
   --base-url "$HUB_LOCAL_BASE_URL" \
   --public-host "$HUB_PUBLIC_HOST" \
   --forwarded-proto https \
-  --verify-http-redirects
+  --verify-http-redirects \
+  --verify-signed-in-work
 
 if [[ "$HUB_CLOSEOUT_LIVE_AUDIT" == "1" || "$HUB_CLOSEOUT_LIVE_AUDIT" == "true" || "$HUB_CLOSEOUT_LIVE_AUDIT" == "TRUE" ]]; then
   echo

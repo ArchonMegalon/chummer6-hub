@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 import time
 from dataclasses import dataclass
+from html import unescape
 from html.parser import HTMLParser
 from urllib.error import HTTPError
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
@@ -63,6 +65,9 @@ def fetch(
     public_host: str | None = None,
     forwarded_proto: str | None = None,
     follow_redirects: bool = True,
+    method: str = "GET",
+    body: bytes | None = None,
+    request_headers: dict[str, str] | None = None,
 ) -> tuple[int, str, dict[str, str], str]:
     url = urljoin(base_url, path)
     headers = {"User-Agent": "chummer-hub-live-audit"}
@@ -70,8 +75,10 @@ def fetch(
         headers["Host"] = public_host
     if forwarded_proto:
         headers["X-Forwarded-Proto"] = forwarded_proto
+    if request_headers:
+        headers.update(request_headers)
 
-    request = Request(url, headers=headers)
+    request = Request(url, headers=headers, data=body, method=method)
     opener = build_opener() if follow_redirects else build_opener(NoRedirectHandler())
     try:
         with opener.open(request, timeout=20) as response:
@@ -99,12 +106,194 @@ def verify_https_redirect(base_url: str, path: str, public_host: str) -> None:
     print(f"ok {path} redirects -> {location}")
 
 
+def require_snippet(body: str, snippet: str, path: str) -> None:
+    if snippet not in body:
+        raise AssertionError(f"{path} missing required text: {snippet}")
+
+
+def extract_antiforgery_token(body: str, path: str) -> str:
+    match = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', body)
+    if not match:
+        raise AssertionError(f"{path} missing antiforgery token")
+
+    return unescape(match.group(1))
+
+
+def extract_cookie(headers: dict[str, str], *, path: str) -> str:
+    cookie = headers.get("set-cookie")
+    if not cookie:
+        raise AssertionError(f"{path} did not return a cookie")
+
+    return cookie.split(";", 1)[0]
+
+
+def verify_signed_in_work_audit(
+    base_url: str,
+    *,
+    email: str,
+    public_host: str | None = None,
+    forwarded_proto: str | None = None,
+) -> None:
+    status, body, headers, _ = fetch(
+        base_url,
+        "/login?next=%2Faccount%2Fwork",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+    )
+    if status != 200:
+        raise AssertionError(f"/login returned {status}, expected 200")
+
+    antiforgery_cookie = extract_cookie(headers, path="/login")
+    antiforgery_token = extract_antiforgery_token(body, "/login")
+    login_form = urlencode(
+        {
+            "__RequestVerificationToken": antiforgery_token,
+            "email": email,
+            "next": "/account/work",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/auth/email/start",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=login_form,
+        request_headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Cookie": antiforgery_cookie,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/auth/email/start returned {status}, expected 200")
+
+    callback_match = re.search(r'href="([^"]*/auth/email/callback\?[^"]+)"', body)
+    if not callback_match:
+        raise AssertionError("/auth/email/start did not render the preview callback link")
+
+    status, _, headers, _ = fetch(
+        base_url,
+        unescape(callback_match.group(1)),
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        follow_redirects=False,
+        request_headers={"Cookie": antiforgery_cookie},
+    )
+    if status not in {301, 302, 303, 307, 308}:
+        raise AssertionError(f"/auth/email/callback returned {status}, expected redirect")
+
+    auth_cookie = extract_cookie(headers, path="/auth/email/callback")
+    cookie_header = f"{antiforgery_cookie}; {auth_cookie}"
+    location = headers.get("location", "")
+    if not location.endswith("/account/work"):
+        raise AssertionError(f"/auth/email/callback redirected to {location!r}, expected /account/work")
+
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/campaign-spine/me",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/campaign-spine/me returned {status}, expected 200")
+
+    summary = json.loads(body)
+    workspaces = summary.get("workspaces") or []
+    if not workspaces:
+        raise AssertionError("signed-in campaign summary did not expose any workspaces")
+
+    workspace_id = workspaces[0]["workspaceId"]
+    workspace_path = f"/account/work/workspaces/{workspace_id}"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_path} returned {status}, expected 200")
+
+    for snippet in (
+        "What changed for me",
+        "Move governed roster state",
+        "Transfer governed roster state",
+        "GM prep library and travel mode",
+    ):
+        require_snippet(body, snippet, workspace_path)
+
+    workspace_token = extract_antiforgery_token(body, workspace_path)
+    plan_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/roster-transfer-plan"
+    status, body, _, _ = fetch(
+        base_url,
+        plan_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{plan_path} returned {status}, expected 200")
+
+    roster_plan = json.loads(body)
+    dossier_options = roster_plan.get("dossierOptions") or []
+    target_groups = roster_plan.get("targetGroups") or []
+    if not dossier_options:
+        raise AssertionError(f"{plan_path} did not expose dossier options")
+    if not target_groups:
+        raise AssertionError(f"{plan_path} did not expose target groups")
+
+    payload = json.dumps(
+        {
+            "dossierId": dossier_options[0]["dossierId"],
+            "targetGroupId": target_groups[0]["groupId"],
+            "targetCampaignTitle": target_groups[0].get("suggestedCampaignTitle"),
+            "note": "Live signed-in roster transfer audit.",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/campaign-spine/me/roster-transfers",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=payload,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/campaign-spine/me/roster-transfers returned {status}: {body[:400]}")
+
+    transfer = json.loads(body)
+    status, body, _, final_url = fetch(
+        base_url,
+        "/account/work",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/account/work returned {status}, expected 200")
+
+    require_snippet(body, "Recent governed roster moves", "/account/work")
+    require_snippet(body, transfer["runnerHandle"], "/account/work")
+    print(
+        "ok signed-in /account/work -> "
+        f"{final_url} workspace={workspace_id} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Audit the public Chummer Hub surface.")
     parser.add_argument("--base-url", default="https://chummer.run", help="Base URL to audit.")
     parser.add_argument("--public-host", default=None, help="Optional Host header for reverse-proxied local edge checks.")
     parser.add_argument("--forwarded-proto", default=None, help="Optional X-Forwarded-Proto header for reverse-proxied local edge checks.")
     parser.add_argument("--verify-http-redirects", action="store_true", help="Verify that the local HTTP edge redirects to the public HTTPS host.")
+    parser.add_argument("--verify-signed-in-work", action="store_true", help="Verify the signed-in account/work journey, including the governed roster-transfer live action.")
+    parser.add_argument("--signed-in-email", default=None, help="Optional example.invalid email used for the signed-in work audit. Defaults to a generated value.")
     parser.add_argument("--poll-seconds", type=int, default=0, help="Sleep before starting the audit.")
     args = parser.parse_args()
 
@@ -206,6 +395,15 @@ def main() -> int:
     if status != 200 or '"contractName": "chummer.public_privacy_boundaries"' not in body:
         raise AssertionError("/api/public/privacy-boundaries did not serve the mirrored privacy-boundary artifact")
     print(f"ok /api/public/privacy-boundaries -> {final_url}")
+
+    if args.verify_signed_in_work:
+        signed_in_email = args.signed_in_email or f"live-audit-{int(time.time())}@example.invalid"
+        verify_signed_in_work_audit(
+            args.base_url,
+            email=signed_in_email,
+            public_host=args.public_host,
+            forwarded_proto=args.forwarded_proto,
+        )
 
     return 0
 
