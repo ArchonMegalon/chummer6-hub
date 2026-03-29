@@ -69,26 +69,42 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
         TravelModeReadinessSummary travelMode = BuildTravelMode(context.Workspace, context.Restore, prepLibrary);
+        IReadOnlyList<DossierFreshnessCue> dossierFreshness = BuildDossierFreshness(context.Workspace);
+        IReadOnlyList<RuleEnvironmentHealthCue> ruleEnvironmentHealth = BuildRuleEnvironmentHealth(context.Workspace, context.Restore);
+        IReadOnlyList<ContinuityConflictCue> continuityConflicts = BuildContinuityConflicts(context.Workspace, context.Restore);
+        IReadOnlyList<SupportClosureCue> supportClosures = BuildSupportClosures(context.SupportDigests);
+        IReadOnlyList<KnownIssueAffectingInstall> knownIssues = BuildKnownIssues(context.SupportDigests);
+        IReadOnlyList<DecisionNotice> decisionNotices = BuildDecisionNotices(context.Workspace, context.Digest, installLinking, context.SupportDigests);
+        NextSafeActionCue nextSafeAction = BuildNextSafeActionCue(context.Workspace, installLinking, context.SupportDigests);
+        WorkspaceStateSummary workspaceState = BuildWorkspaceStateSummary(
+            context.Workspace,
+            installLinking,
+            ruleEnvironmentHealth,
+            continuityConflicts,
+            context.SupportDigests,
+            travelMode,
+            nextSafeAction);
 
         return new CampaignWorkspaceServerPlaneProjection(
             Workspace: BuildWorkspaceSummary(context.Workspace, context.Digest, context.Restore),
             CampaignSummary: BuildCampaignWorkspaceSummary(context.Workspace, context.Digest, context.Restore),
+            WorkspaceState: workspaceState,
             RosterReadiness: BuildRosterReadinessSummary(context.Workspace),
             ReadinessCues: context.Workspace.ReadinessCues,
             ChangePackets: context.Workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>(),
             Consequences: context.Workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>(),
             RosterTransfers: context.Workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>(),
-            DossierFreshness: BuildDossierFreshness(context.Workspace),
-            RuleEnvironmentHealth: BuildRuleEnvironmentHealth(context.Workspace, context.Restore),
+            DossierFreshness: dossierFreshness,
+            RuleEnvironmentHealth: ruleEnvironmentHealth,
             Runboard: BuildRunboardSummary(context.Workspace, context.LeadRun),
-            ContinuityConflicts: BuildContinuityConflicts(context.Workspace, context.Restore),
+            ContinuityConflicts: continuityConflicts,
             RecapShelf: BuildRecapShelf(context.Workspace),
-            SupportClosures: BuildSupportClosures(context.SupportDigests),
-            KnownIssues: BuildKnownIssues(context.SupportDigests),
-            DecisionNotices: BuildDecisionNotices(context.Workspace, context.Digest, installLinking, context.SupportDigests),
+            SupportClosures: supportClosures,
+            KnownIssues: knownIssues,
+            DecisionNotices: decisionNotices,
             PrepLibrary: prepLibrary,
             TravelMode: travelMode,
-            NextSafeAction: BuildNextSafeActionCue(context.Workspace, installLinking, context.SupportDigests),
+            NextSafeAction: nextSafeAction,
             GeneratedAtUtc: context.GeneratedAtUtc);
     }
 
@@ -229,6 +245,119 @@ public sealed class CampaignWorkspaceServerPlaneService
             UpdatedAtUtc: digest?.UpdatedAtUtc
                 ?? workspace.LatestContinuity?.CapturedAtUtc
                 ?? restore.GeneratedAtUtc);
+    }
+
+    private static WorkspaceStateSummary BuildWorkspaceStateSummary(
+        CampaignWorkspaceProjection workspace,
+        InstallLinkingSummaryDto? installLinking,
+        IReadOnlyList<RuleEnvironmentHealthCue> ruleEnvironmentHealth,
+        IReadOnlyList<ContinuityConflictCue> continuityConflicts,
+        IReadOnlyList<SupportCaseDigestViewModel> supportDigests,
+        TravelModeReadinessSummary travelMode,
+        NextSafeActionCue nextSafeAction)
+    {
+        ContinuityConflictCue? blockingConflict = continuityConflicts.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
+        if (blockingConflict is not null)
+        {
+            return new WorkspaceStateSummary(
+                Status: "restore_conflict_present",
+                Label: "Restore review before play",
+                Summary: $"{blockingConflict.Summary} {nextSafeAction.Summary}",
+                EvidenceLines: BuildEvidenceLines(
+                    blockingConflict.Summary,
+                    blockingConflict.ResolutionAction,
+                    travelMode.Summary,
+                    travelMode.PrefetchInventorySummary));
+        }
+
+        if (string.Equals(nextSafeAction.SourceKind, "install_linking", StringComparison.OrdinalIgnoreCase))
+        {
+            return new WorkspaceStateSummary(
+                Status: "blocked_before_play",
+                Label: "Finish install claim first",
+                Summary: $"{nextSafeAction.Summary} {travelMode.Summary}",
+                EvidenceLines: BuildEvidenceLines(
+                    nextSafeAction.Summary,
+                    travelMode.Summary,
+                    travelMode.PrefetchInventorySummary));
+        }
+
+        RuleEnvironmentHealthCue? ruleAttention = ruleEnvironmentHealth.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
+        if (ruleAttention is not null)
+        {
+            return new WorkspaceStateSummary(
+                Status: "rule_environment_mismatch",
+                Label: "Rules need review",
+                Summary: $"{ruleAttention.Summary} {nextSafeAction.Summary}",
+                EvidenceLines: BuildEvidenceLines(
+                    ruleAttention.Title,
+                    ruleAttention.Summary,
+                    nextSafeAction.Summary));
+        }
+
+        SupportCaseDigestViewModel? supportAction = supportDigests.FirstOrDefault(static item => item.ReporterActionNeeded)
+            ?? supportDigests.FirstOrDefault(static item => item.CanVerifyFix);
+        if (supportAction is not null)
+        {
+            return new WorkspaceStateSummary(
+                Status: "support_closure_pending",
+                Label: "Support closure pending",
+                Summary: $"{supportAction.ClosureSummary} {supportAction.NextSafeAction}",
+                EvidenceLines: BuildEvidenceLines(
+                    supportAction.ReleaseProgressSummary,
+                    supportAction.ClosureSummary,
+                    supportAction.AffectedInstallSummary,
+                    supportAction.NextSafeAction));
+        }
+
+        ClaimedInstallationDto[] claimedInstallations = installLinking?.ClaimedInstallations?.ToArray() ?? Array.Empty<ClaimedInstallationDto>();
+        if (claimedInstallations.Any(static item => string.Equals(item.Channel, "preview", StringComparison.OrdinalIgnoreCase))
+            && claimedInstallations.Any(static item => !string.Equals(item.Channel, "preview", StringComparison.OrdinalIgnoreCase)))
+        {
+            return new WorkspaceStateSummary(
+                Status: "preview_diverged",
+                Label: "Preview differs across devices",
+                Summary: "Claimed devices do not currently share one channel posture, so preview fixes and install trust can diverge by machine.",
+                EvidenceLines: BuildEvidenceLines(
+                    claimedInstallations
+                        .Select(static item => $"{ResolveDeviceRole(item)} on {item.Platform}/{item.HeadId} stays on {item.Channel}."),
+                    nextSafeAction.Summary));
+        }
+
+        CampaignReadinessCue? readinessAttention = workspace.ReadinessCues.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
+        if (readinessAttention is not null)
+        {
+            return new WorkspaceStateSummary(
+                Status: "attention_needed",
+                Label: "Attention needed",
+                Summary: $"{readinessAttention.Summary} {nextSafeAction.Summary}",
+                EvidenceLines: BuildEvidenceLines(
+                    readinessAttention.Title,
+                    readinessAttention.Summary,
+                    travelMode.Summary,
+                    nextSafeAction.Summary));
+        }
+
+        if (travelMode.TravelReadyDeviceCount > 0 && travelMode.TravelReadyDeviceCount < travelMode.ClaimedDeviceCount)
+        {
+            return new WorkspaceStateSummary(
+                Status: "offline_but_usable",
+                Label: "Offline-safe on some devices",
+                Summary: $"{travelMode.Summary} {nextSafeAction.Summary}",
+                EvidenceLines: BuildEvidenceLines(
+                    travelMode.Summary,
+                    travelMode.PrefetchInventorySummary,
+                    nextSafeAction.Summary));
+        }
+
+        return new WorkspaceStateSummary(
+            Status: "healthy",
+            Label: "Ready to continue",
+            Summary: $"{workspace.CampaignName} can reopen from the shared return lane without a blocking restore, rules, or support conflict right now.",
+            EvidenceLines: BuildEvidenceLines(
+                workspace.ReturnSummary,
+                travelMode.Summary,
+                nextSafeAction.Summary));
     }
 
     private static RosterReadinessSummary BuildRosterReadinessSummary(CampaignWorkspaceProjection workspace)
@@ -828,6 +957,14 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return tokens.Take(10).ToArray();
     }
+
+    private static IReadOnlyList<string> BuildEvidenceLines(params object?[] values)
+        => FlattenValues(values)
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Select(static item => item.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
 
     private static IEnumerable<string> FlattenValues(IEnumerable<object?> values)
     {

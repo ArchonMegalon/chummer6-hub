@@ -6,6 +6,7 @@ namespace Chummer.Run.Api.Contracts;
 public sealed record CampaignWorkspaceServerPlaneProjection(
     WorkspaceSummary Workspace,
     CampaignWorkspaceSummary CampaignSummary,
+    WorkspaceStateSummary WorkspaceState,
     RosterReadinessSummary RosterReadiness,
     IReadOnlyList<CampaignReadinessCue> ReadinessCues,
     IReadOnlyList<WorkspaceChangePacketProjection> ChangePackets,
@@ -23,6 +24,12 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     TravelModeReadinessSummary TravelMode,
     NextSafeActionCue NextSafeAction,
     DateTimeOffset GeneratedAtUtc);
+
+public sealed record WorkspaceStateSummary(
+    string Status,
+    string Label,
+    string Summary,
+    IReadOnlyList<string> EvidenceLines);
 
 public sealed record CampaignPrepLibrarySummary(
     string Summary,

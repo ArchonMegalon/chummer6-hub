@@ -864,8 +864,16 @@
                         @if (selectedWorkspaceServerPlane is not null)
                         {
                             <details class="details-drawer" open>
-                                <summary>Server-plane follow-through</summary>
+                                <summary>What changed for me</summary>
                                 <div class="settings-summary-list">
+                                    <div class="settings-summary-row">
+                                        <span>Workspace state</span>
+                                        <strong>@selectedWorkspaceServerPlane.WorkspaceState.Label</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Why it changed</span>
+                                        <strong>@selectedWorkspaceServerPlane.WorkspaceState.Summary</strong>
+                                    </div>
                                     <div class="settings-summary-row">
                                         <span>Roster readiness</span>
                                         <strong>@selectedWorkspaceServerPlane.RosterReadiness.Summary</strong>
@@ -879,10 +887,23 @@
                                         <strong>@selectedWorkspaceServerPlane.NextSafeAction.Label · @selectedWorkspaceServerPlane.NextSafeAction.Summary</strong>
                                     </div>
                                     <div class="settings-summary-row">
+                                        <span>Recent change</span>
+                                        <strong>@(selectedWorkspaceServerPlane.ChangePackets.Count == 0 ? "No recent packet" : $"{selectedWorkspaceServerPlane.ChangePackets[0].Label} · {selectedWorkspaceServerPlane.ChangePackets[0].Summary}")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
                                         <span>Transfer audit</span>
                                         <strong>@(selectedWorkspaceServerPlane.RosterTransfers.Count == 0 ? "No recent moves" : $"{selectedWorkspaceServerPlane.RosterTransfers.Count} receipts")</strong>
                                     </div>
                                 </div>
+                                @if (selectedWorkspaceServerPlane.WorkspaceState.EvidenceLines.Count > 0)
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var evidence in selectedWorkspaceServerPlane.WorkspaceState.EvidenceLines)
+                                        {
+                                            <li>@evidence</li>
+                                        }
+                                    </ul>
+                                }
                                 @if (selectedWorkspaceServerPlane.SupportClosures.Count > 0)
                                 {
                                     <ul class="muted-copy">
