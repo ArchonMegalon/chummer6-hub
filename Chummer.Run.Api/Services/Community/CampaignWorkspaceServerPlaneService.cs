@@ -107,6 +107,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             TravelMode: travelMode,
             TravelPrefetches: context.Workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>(),
             AftermathPackages: context.Workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>(),
+            CampaignMemory: context.Workspace.CampaignMemory,
             NextSessionCarryForward: context.Workspace.NextSessionCarryForward,
             NextSafeAction: nextSafeAction,
             GeneratedAtUtc: context.GeneratedAtUtc);
