@@ -88,6 +88,17 @@ internal static class GmOpsBoardVerification
             sessionId: "session_ops",
             sceneId: "scene_downtown",
             includeReusableCampaignAssets: true);
+        var reusableLibrarySearch = ops.ListPrepAssets(
+            campaignId: "campaign_ops",
+            sessionId: "session_ops",
+            sceneId: "scene_downtown",
+            includeReusableCampaignAssets: true,
+            queryText: "reusable threat");
+        var checklistSearch = ops.ListPrepAssets(
+            campaignId: "campaign_ops",
+            sessionId: "session_ops",
+            sceneId: "scene_downtown",
+            queryText: "spoofed badges");
         var exportedAssets = ops.ExportPortableAssets(
             "campaign_ops",
             "session_ops",
@@ -102,6 +113,14 @@ internal static class GmOpsBoardVerification
         VerificationAssert.True(
             sceneWithLibrary.Items.Any(item => item.AssetId == libraryNote.AssetId),
             "Prep lists should optionally include reusable campaign assets that stay compatible with the requested session.");
+        VerificationAssert.Equal(1, reusableLibrarySearch.TotalCount, "Prep lists should support reusable library search by title and tag tokens.");
+        VerificationAssert.True(
+            reusableLibrarySearch.Items.Any(item => item.AssetId == libraryNote.AssetId),
+            "Prep list search should return the matching reusable campaign asset.");
+        VerificationAssert.Equal(1, checklistSearch.TotalCount, "Prep lists should support search across checklist labels.");
+        VerificationAssert.True(
+            checklistSearch.Items.Any(item => item.AssetId == checklist.AssetId),
+            "Prep list search should return the checklist asset when the label matches the query.");
         VerificationAssert.True(
             exportedAssets.Any(item => item.AssetId == libraryNote.AssetId),
             "Portable prep export should include reusable campaign assets for GM library continuity.");

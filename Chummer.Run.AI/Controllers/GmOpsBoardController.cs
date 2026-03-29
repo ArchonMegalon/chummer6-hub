@@ -68,9 +68,10 @@ public sealed class GmOpsBoardController : ControllerBase
         [FromQuery] string? sessionId = null,
         [FromQuery] string? sceneId = null,
         [FromQuery] GmPrepAssetKind? kind = null,
-        [FromQuery] bool includeReusableCampaignAssets = false)
+        [FromQuery] bool includeReusableCampaignAssets = false,
+        [FromQuery] string? queryText = null)
     {
-        return Ok(_opsBoard.ListPrepAssets(campaignId, sessionId, sceneId, kind, includeReusableCampaignAssets));
+        return Ok(_opsBoard.ListPrepAssets(campaignId, sessionId, sceneId, kind, includeReusableCampaignAssets, queryText));
     }
 
     [HttpPost("prep-assets/{assetId}/checklist")]
