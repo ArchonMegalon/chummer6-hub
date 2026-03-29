@@ -89,7 +89,7 @@ milestones:
       - chummer6-core
       - chummer6-media-factory
       - chummer6-ui
-    status: not_started
+    status: in_progress
     exit_criteria:
       - Opposition, scene, and prep packets are reusable governed objects with search and campaign-binding semantics.
       - GM prep flows can launch governed opposition truth without recreating local shadow packet models.
