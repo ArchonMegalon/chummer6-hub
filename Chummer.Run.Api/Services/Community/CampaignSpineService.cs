@@ -974,10 +974,10 @@ public sealed class CampaignSpineService
                     RestoreSummary: BuildClaimedDeviceRestoreSummary(
                         installation,
                         deviceRole,
-                        dossiers.Count,
-                        campaigns.Count,
-                        ruleEnvironments.Length,
-                        recentArtifacts.Length));
+                        dossiers,
+                        campaigns,
+                        ruleEnvironments,
+                        recentArtifacts));
             })
             .Take(4)
             .ToArray();
@@ -1003,17 +1003,20 @@ public sealed class CampaignSpineService
     private static string BuildClaimedDeviceRestoreSummary(
         ClaimedInstallationDto installation,
         string deviceRole,
-        int dossierCount,
-        int campaignCount,
-        int ruleEnvironmentCount,
-        int artifactCount)
+        IReadOnlyList<RunnerDossierProjection> dossiers,
+        IReadOnlyList<CampaignProjection> campaigns,
+        IReadOnlyList<RuleEnvironmentRef> ruleEnvironments,
+        IReadOnlyList<RestoreArtifactProjection> recentArtifacts)
     {
         string baseSummary = $"{installation.Platform ?? "unknown"} · {installation.HeadId ?? "desktop"} · {installation.Version}";
-        string inventory = DescribeRestorePrefetchInventory(dossierCount, campaignCount, ruleEnvironmentCount, artifactCount);
+        string inventory = DescribeRestorePrefetchInventory(dossiers.Count, campaigns.Count, ruleEnvironments.Count, recentArtifacts.Count);
         string laneSummary = string.Equals(deviceRole, "travel_cache", StringComparison.OrdinalIgnoreCase)
             ? "Travel-safe cache keeps"
             : "Claimed-device return keeps";
-        return $"{baseSummary}. {laneSummary} {inventory} ready for bounded offline use.";
+        string exactSet = DescribeRestorePrefetchSet(dossiers, campaigns, ruleEnvironments, recentArtifacts);
+        return string.IsNullOrWhiteSpace(exactSet)
+            ? $"{baseSummary}. {laneSummary} {inventory} ready for bounded offline use."
+            : $"{baseSummary}. {laneSummary} {inventory} ready for bounded offline use. Exact set: {exactSet}.";
     }
 
     private static string DescribeRestorePrefetchInventory(
@@ -1022,6 +1025,37 @@ public sealed class CampaignSpineService
         int ruleEnvironmentCount,
         int artifactCount)
         => $"{dossierCount} dossier(s), {campaignCount} campaign(s), {ruleEnvironmentCount} rule snapshot(s), and {artifactCount} reconnectable artifact(s)";
+
+    private static string DescribeRestorePrefetchSet(
+        IReadOnlyList<RunnerDossierProjection> dossiers,
+        IReadOnlyList<CampaignProjection> campaigns,
+        IReadOnlyList<RuleEnvironmentRef> ruleEnvironments,
+        IReadOnlyList<RestoreArtifactProjection> recentArtifacts)
+    {
+        List<string> segments = [];
+
+        if (dossiers.Count > 0)
+        {
+            segments.Add($"dossiers {string.Join(", ", dossiers.Take(3).Select(static dossier => $"{dossier.DisplayName} ({dossier.DossierId})"))}");
+        }
+
+        if (campaigns.Count > 0)
+        {
+            segments.Add($"campaigns {string.Join(", ", campaigns.Take(3).Select(static campaign => $"{campaign.Name} ({campaign.CampaignId})"))}");
+        }
+
+        if (ruleEnvironments.Count > 0)
+        {
+            segments.Add($"rules {string.Join(", ", ruleEnvironments.Take(3).Select(static environment => $"{environment.CompatibilityFingerprint} [{environment.ApprovalState}]"))}");
+        }
+
+        if (recentArtifacts.Count > 0)
+        {
+            segments.Add($"artifacts {string.Join(", ", recentArtifacts.Take(3).Select(static artifact => $"{artifact.Label} ({artifact.ArtifactId})"))}");
+        }
+
+        return string.Join("; ", segments);
+    }
 
     private static RuleEnvironmentRef DefaultRuleEnvironment(string environmentId, string ownerScope)
         => new(
