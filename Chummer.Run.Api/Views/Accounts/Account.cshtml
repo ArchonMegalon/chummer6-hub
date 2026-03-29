@@ -2212,6 +2212,14 @@
                                             <li>
                                                 <strong>@entry.CampaignName</strong>: @entry.RunTitle. @entry.LatestEventSummary
                                                 <span> Next: @entry.NextSafeAction</span>
+                                                @if (!string.IsNullOrWhiteSpace(entry.CampaignMemorySummary))
+                                                {
+                                                    <span> Memory: @entry.CampaignMemorySummary</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(entry.CampaignMemoryReturnSummary))
+                                                {
+                                                    <span> Return: @entry.CampaignMemoryReturnSummary</span>
+                                                }
                                                 @if (!string.IsNullOrWhiteSpace(entry.WatchoutSummary))
                                                 {
                                                     <span> Watchout: @entry.WatchoutSummary</span>

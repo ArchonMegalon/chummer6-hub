@@ -1777,7 +1777,10 @@ public sealed class CampaignSpineService
         List<(DateTimeOffset UpdatedAtUtc, string Summary)> lines = [];
         foreach (var entry in seasonBoardEntries)
         {
-            lines.Add((entry.UpdatedAtUtc, $"{entry.CampaignName}: {entry.RunTitle} · {entry.LatestEventSummary} Next: {entry.NextSafeAction}"));
+            string memorySummary = string.IsNullOrWhiteSpace(entry.CampaignMemorySummary)
+                ? string.Empty
+                : $" Memory: {entry.CampaignMemorySummary}";
+            lines.Add((entry.UpdatedAtUtc, $"{entry.CampaignName}: {entry.RunTitle} · {entry.LatestEventSummary} Next: {entry.NextSafeAction}{memorySummary}"));
         }
 
         foreach (var sponsorSession in recentSponsorSessions)
@@ -2053,6 +2056,7 @@ public sealed class CampaignSpineService
                     {
                         leadChangePacket?.UpdatedAtUtc,
                         workspace.NextSessionCarryForward?.UpdatedAtUtc,
+                        workspace.CampaignMemory?.UpdatedAtUtc,
                         leadAftermathPackage?.GeneratedAtUtc,
                         leadRun?.UpdatedAtUtc,
                         workspace.LatestContinuity?.CapturedAtUtc
@@ -2067,6 +2071,8 @@ public sealed class CampaignSpineService
                     CampaignName: workspace.CampaignName,
                     RunTitle: leadRun?.Title ?? "No live run yet",
                     LatestEventSummary: latestEventSummary,
+                    CampaignMemorySummary: workspace.CampaignMemory?.Summary,
+                    CampaignMemoryReturnSummary: workspace.CampaignMemory?.ReturnSummary,
                     NextSafeAction: workspace.NextSafeAction ?? "Open the shared campaign view and confirm the current return lane before you continue.",
                     WatchoutSummary: watchout,
                     UpdatedAtUtc: updatedAtUtc);
