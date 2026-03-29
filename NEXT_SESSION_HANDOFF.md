@@ -52,6 +52,7 @@ Updated: 2026-03-29
 - Added explicit stale-code recovery copy and problem-detail recovery guidance so missing or expired join/boost codes now point users back to a fresh governed code and the same member-guidance rail instead of leaking repo vocabulary
 - Backfilled the default preview operator group with governed invite and sponsorship capabilities so the signed-in organizer rail is materially usable on the rebuilt local edge, not just on manually created campaign groups
 - Extended the signed-in live audit so it now issues real join and boost codes, verifies the stale-code recovery responses, and proves the new invite rail on both `/account/work` and `/home/work`
+- Reordered community operator projections so the signed-in `/home/work` operator card prefers the freshest and richest governed operator lane instead of falling back to alphabetical group order
 - Added a dedicated `Consequence watch` card on `/home/work` so the lead governed campaign consequence and one evidence cue stay visible on the signed-in home cockpit instead of only appearing inside the shared summary prose
 - Added a dedicated `Roster move` card on `/home/work` so the latest governed transfer stays visible on the signed-in home cockpit and points back to the same operator rail
 - Extended the `/home/work` GM prep card so it now carries the latest governed prep-launch packet title and the latest staged travel-prefetch device receipt instead of only generic posture text

@@ -91,7 +91,6 @@ public sealed class CampaignSpineService
                 .ToArray();
             var operations = _store.GroupsById.Values
                 .Where(group => group.Memberships.Any(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase) && IsOperatorRole(member.Role)))
-                .OrderBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(group =>
                 {
                     var groupCampaigns = _store.CampaignSpinesById.Values
@@ -141,6 +140,11 @@ public sealed class CampaignSpineService
                             .Take(5)
                             .ToArray());
                 })
+                .OrderByDescending(static operation => ResolveCommunityOperatorFreshnessUtc(operation))
+                .ThenByDescending(static operation => ResolveCommunityOperatorActivityBreadth(operation))
+                .ThenByDescending(static operation => operation.ActiveCampaignCount)
+                .ThenByDescending(static operation => operation.ActiveSponsorSessionCount)
+                .ThenBy(static operation => operation.GroupName, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             var buildLabHandoffs = BuildBuildLabHandoffs(dossiers, workspaces, restore);
             var rulesNavigator = BuildRulesNavigatorEntries(workspaces, operations);
@@ -1781,6 +1785,42 @@ public sealed class CampaignSpineService
                     RedeemedAtUtc: item.RedeemedAtUtc);
             })
             .ToArray();
+
+    private static DateTimeOffset ResolveCommunityOperatorFreshnessUtc(CommunityOperatorProjection operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+
+        return operation.SeasonBoardEntries
+            .Select(static entry => (DateTimeOffset?)entry.UpdatedAtUtc)
+            .Concat(operation.RecentJoinCodes.Select(static code => (DateTimeOffset?)code.CreatedAtUtc))
+            .Concat(operation.RecentBoostCodes.Select(static code => (DateTimeOffset?)(code.RedeemedAtUtc ?? code.CreatedAtUtc)))
+            .Concat((operation.RecentRosterTransfers ?? Array.Empty<RosterTransferProjection>()).Select(static transfer => (DateTimeOffset?)transfer.TransferredAtUtc))
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.MinValue)
+            .Max();
+    }
+
+    private static int ResolveCommunityOperatorActivityBreadth(CommunityOperatorProjection operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+
+        int inviteCapabilityCount = operation.Capabilities.Count(capability =>
+            string.Equals(capability, "can_issue_join_codes", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(capability, "can_issue_boost_codes", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(capability, "can_manage_members", StringComparison.OrdinalIgnoreCase));
+
+        return operation.ActiveCampaignCount
+            + operation.ActiveSponsorSessionCount
+            + operation.RecentReturnSummaries.Count
+            + operation.RecentEventSummaries.Count
+            + operation.SeasonBoardEntries.Count
+            + operation.RecentJoinCodes.Count
+            + operation.RecentBoostCodes.Count
+            + (operation.RecentRosterTransfers?.Count ?? 0)
+            + operation.Watchouts.Count
+            + inviteCapabilityCount;
+    }
 
     private static DateTimeOffset ResolveWorkspaceFreshnessUtc(CampaignWorkspaceProjection workspace)
     {
