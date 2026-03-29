@@ -107,6 +107,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             TravelMode: travelMode,
             TravelPrefetches: context.Workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>(),
             AftermathPackages: context.Workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>(),
+            FirstPlayableSession: context.Workspace.FirstPlayableSession,
             CampaignMemory: context.Workspace.CampaignMemory,
             NextSessionCarryForward: context.Workspace.NextSessionCarryForward,
             NextSafeAction: nextSafeAction,
@@ -344,7 +345,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             RuleEnvironmentSummary: digest?.RuleEnvironmentSummary
                 ?? $"{workspace.RuleEnvironment.OwnerScope} · {workspace.RuleEnvironment.ApprovalState} · {workspace.RuleEnvironment.CompatibilityFingerprint}",
             SessionReadinessSummary: attentionCue is null
-                ? "Session return is green across the current roster, active scene, and claimed-install restore posture."
+                ? workspace.FirstPlayableSession?.Summary
+                  ?? "Session return is green across the current roster, active scene, and claimed-install restore posture."
                 : $"{attentionCue.Title}: {attentionCue.Summary}",
             RestoreSummary: restoreSummary,
             PublicationSummary: publicationSummary,
@@ -454,6 +456,18 @@ public sealed class CampaignWorkspaceServerPlaneService
                 EvidenceLines: BuildEvidenceLines(
                     travelMode.Summary,
                     travelMode.PrefetchInventorySummary,
+                    nextSafeAction.Summary));
+        }
+
+        if (workspace.FirstPlayableSession is not null)
+        {
+            return new WorkspaceStateSummary(
+                Status: "first_playable_ready",
+                Label: "First playable session ready",
+                Summary: $"{workspace.FirstPlayableSession.Summary} {nextSafeAction.Summary}",
+                EvidenceLines: BuildEvidenceLines(
+                    workspace.FirstPlayableSession.EvidenceLines,
+                    travelMode.Summary,
                     nextSafeAction.Summary));
         }
 

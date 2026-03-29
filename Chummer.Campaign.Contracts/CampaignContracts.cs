@@ -380,6 +380,15 @@ public sealed record CampaignMemoryProjection(
     IReadOnlyList<string> EvidenceLines,
     DateTimeOffset UpdatedAtUtc);
 
+public sealed record FirstPlayableSessionProjection(
+    string SessionId,
+    string Label,
+    string Summary,
+    string CampaignStartSummary,
+    string NextSafeAction,
+    IReadOnlyList<string> EvidenceLines,
+    DateTimeOffset UpdatedAtUtc);
+
 public sealed record WorkspaceChangePacketProjection(
     string PacketId,
     string Kind,
@@ -418,6 +427,7 @@ public sealed record CampaignWorkspaceProjection(
     IReadOnlyList<TravelPrefetchReceiptProjection>? TravelPrefetches = null,
     IReadOnlyList<AftermathRecapPackageProjection>? AftermathPackages = null,
     NextSessionCarryForwardProjection? NextSessionCarryForward = null,
+    FirstPlayableSessionProjection? FirstPlayableSession = null,
     CampaignMemoryProjection? CampaignMemory = null);
 
 public sealed record CampaignWorkspaceDigestProjection(
@@ -433,6 +443,7 @@ public sealed record CampaignWorkspaceDigestProjection(
     IReadOnlyList<string> ReadinessHighlights,
     IReadOnlyList<string> Watchouts,
     DateTimeOffset UpdatedAtUtc,
+    FirstPlayableSessionProjection? FirstPlayableSession = null,
     CampaignMemoryProjection? CampaignMemory = null);
 
 public sealed record WorkspaceSummary(

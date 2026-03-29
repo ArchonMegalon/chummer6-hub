@@ -73,6 +73,8 @@
     var selectedWorkspaceRosterTransferPlan = Model.SelectedWorkspaceRosterTransferPlan;
     var selectedWorkspacePrepLibrarySearch = Model.SelectedWorkspacePrepLibrarySearch;
     var selectedWorkspacePrepLibraryQuery = Model.SelectedWorkspacePrepLibraryQuery;
+    var selectedWorkspaceFirstPlayableSession = selectedWorkspaceServerPlane?.FirstPlayableSession ?? selectedWorkspace?.FirstPlayableSession;
+    var selectedWorkspaceFirstPlayableEvidence = selectedWorkspaceFirstPlayableSession?.EvidenceLines.FirstOrDefault();
     var selectedWorkspaceNextSessionCarryForward = selectedWorkspaceServerPlane?.NextSessionCarryForward;
     var selectedWorkspacePrepLaunches = selectedWorkspaceServerPlane?.PrepLaunches ?? Array.Empty<Chummer.Campaign.Contracts.GovernedPrepLaunchProjection>();
     var selectedWorkspaceTravelPrefetches = selectedWorkspaceServerPlane?.TravelPrefetches ?? Array.Empty<Chummer.Campaign.Contracts.TravelPrefetchReceiptProjection>();
@@ -821,6 +823,10 @@
                                 <strong>@(selectedWorkspace.ActiveSceneSummary ?? "No active scene summary yet")</strong>
                             </div>
                             <div class="settings-summary-row">
+                                <span>First playable session</span>
+                                <strong>@(selectedWorkspaceFirstPlayableSession is null ? "Pending" : selectedWorkspaceFirstPlayableSession.CampaignStartSummary)</strong>
+                            </div>
+                            <div class="settings-summary-row">
                                 <span>Support follow-through</span>
                                 <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support follow-through stays attached to the linked install and release lane that reopen this shared campaign view.")</strong>
                             </div>
@@ -854,6 +860,10 @@
                             @if (!string.IsNullOrWhiteSpace(selectedWorkspaceServerPlane?.NextSafeAction.Summary))
                             {
                                 <p><strong>Follow-through:</strong> @selectedWorkspaceServerPlane.NextSafeAction.Summary</p>
+                            }
+                            @if (selectedWorkspaceFirstPlayableSession is not null)
+                            {
+                                <p><strong>First playable session:</strong> @selectedWorkspaceFirstPlayableSession.Summary</p>
                             }
                             @if (selectedWorkspaceServerPlane is not null)
                             {
@@ -919,6 +929,10 @@
                                         <strong>@selectedWorkspaceServerPlane.NextSafeAction.Label · @selectedWorkspaceServerPlane.NextSafeAction.Summary</strong>
                                     </div>
                                     <div class="settings-summary-row">
+                                        <span>First playable session</span>
+                                        <strong>@(selectedWorkspaceFirstPlayableSession is null ? "Pending" : $"{selectedWorkspaceFirstPlayableSession.Label} · {selectedWorkspaceFirstPlayableSession.CampaignStartSummary}")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
                                         <span>Next-session carry-forward</span>
                                         <strong>@(selectedWorkspaceNextSessionCarryForward is null ? "Pending" : $"{selectedWorkspaceNextSessionCarryForward.Label} · {selectedWorkspaceNextSessionCarryForward.Summary}")</strong>
                                     </div>
@@ -980,6 +994,40 @@
                                     </ul>
                                 }
                             </details>
+
+                            @if (selectedWorkspaceFirstPlayableSession is not null)
+                            {
+                                <details id="selected-first-playable-session" class="details-drawer" open>
+                                    <summary>First playable session</summary>
+                                    <div class="settings-summary-list">
+                                        <div class="settings-summary-row">
+                                            <span>Session summary</span>
+                                            <strong>@selectedWorkspaceFirstPlayableSession.Summary</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Campaign start</span>
+                                            <strong>@selectedWorkspaceFirstPlayableSession.CampaignStartSummary</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Next step</span>
+                                            <strong>@selectedWorkspaceFirstPlayableSession.NextSafeAction</strong>
+                                        </div>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(selectedWorkspaceFirstPlayableEvidence))
+                                    {
+                                        <p><strong>Lead evidence:</strong> @selectedWorkspaceFirstPlayableEvidence</p>
+                                    }
+                                    @if (selectedWorkspaceFirstPlayableSession.EvidenceLines.Count > 0)
+                                    {
+                                        <ul class="muted-copy">
+                                            @foreach (var evidence in selectedWorkspaceFirstPlayableSession.EvidenceLines)
+                                            {
+                                                <li>@evidence</li>
+                                            }
+                                        </ul>
+                                    }
+                                </details>
+                            }
 
                             @if (selectedWorkspaceCampaignMemory is not null)
                             {
@@ -1692,6 +1740,10 @@
                                 <div class="settings-summary-row">
                                     <span>Active scene</span>
                                     <strong>@(workspace.ActiveSceneSummary ?? "No scene pinned yet")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>First playable session</span>
+                                    <strong>@(workspace.FirstPlayableSession is null ? "Pending" : workspace.FirstPlayableSession.CampaignStartSummary)</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Next safe action</span>
