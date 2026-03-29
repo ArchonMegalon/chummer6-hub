@@ -1671,6 +1671,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!accountSource.Contains("Rules Navigator answers", StringComparison.Ordinal), "account copy should avoid internal Rules Navigator wording on the customer-facing surface.");
     Assert(accountSource.Contains("Build paths", StringComparison.Ordinal), "account should describe Build Lab follow-through as customer-facing build paths.");
     Assert(accountSource.Contains("Grounded rule answers", StringComparison.Ordinal), "account should describe Rules Navigator follow-through as grounded rule answers.");
+    Assert(accountSource.Contains("Start first playable session", StringComparison.Ordinal), "account work should offer starter-lane follow-through when the shared campaign view is still empty.");
+    Assert(accountSource.Contains("seedStarterWorkspaceFromAccount", StringComparison.Ordinal), "account work should wire the starter-lane button on the empty-state route.");
+    Assert(accountSource.Contains("starterWorkspaceAccountNotice", StringComparison.Ordinal), "account work should surface starter-lane feedback on the empty-state route.");
+    Assert(accountSource.Contains("/api/v1/campaign-spine/me/workspaces/starter", StringComparison.Ordinal), "account work should reuse the campaign-spine starter endpoint instead of inventing a second onboarding API.");
     Assert(!accountSource.Contains("Workspaces and continuity", StringComparison.Ordinal), "account should avoid workspace-heavy section titles on the customer-facing route.");
     Assert(!accountSource.Contains("Campaign continuity, work-return surfaces, and team posture", StringComparison.Ordinal), "account work copy should avoid internal continuity posture phrasing.");
     Assert(!accountSource.Contains("Advanced continuity and restore", StringComparison.Ordinal), "account access should avoid internal restore drawer wording.");
