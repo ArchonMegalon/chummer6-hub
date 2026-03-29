@@ -22,6 +22,11 @@ public sealed class PublicTrustPulseServiceTests
         Assert.Equal("ready", snapshot.JourneyGateState);
         Assert.Equal("Cloud & Publishing", snapshot.LongestPoleLabel);
         Assert.Equal(73, snapshot.OverallProgressPercent);
+        Assert.Equal("Hold launch expansion pending route-canary validation.", snapshot.LaunchReadiness);
+        Assert.Equal("Pilot defaults are governed", snapshot.ProviderRouteDefault);
+        Assert.Equal("Canary green on all active lanes", snapshot.ProviderRouteCanary);
+        Assert.Equal("2026-06-01", snapshot.ProviderRouteReviewDue);
+        Assert.Equal("Promote once support fallout remains stable.", snapshot.ProviderRouteNextDecision);
         Assert.Equal("What is the smallest cross-repo slice that makes the campaign OS indispensable and turns trust, adoption, and publication depth into a real launch advantage?", snapshot.NextCheckpointQuestion);
     }
 
@@ -94,7 +99,15 @@ public sealed class PublicTrustPulseServiceTests
                         ["overall_progress_percent"] = 73,
                         ["phase_label"] = "Scale & stabilize",
                         ["history_snapshot_count"] = 4,
-                        ["longest_pole"] = "Cloud & Publishing"
+                        ["longest_pole"] = "Cloud & Publishing",
+                        ["launch_readiness"] = "Hold launch expansion pending route-canary validation.",
+                        ["provider_route_stewardship"] = new Dictionary<string, object?>
+                        {
+                            ["default_status"] = "Pilot defaults are governed",
+                            ["canary_status"] = "Canary green on all active lanes",
+                            ["review_due"] = "2026-06-01",
+                            ["next_decision"] = "Promote once support fallout remains stable."
+                        }
                     }
                 }));
         }

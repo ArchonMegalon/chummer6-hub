@@ -67,6 +67,11 @@ public sealed class PublicTrustPulseService
                 PhaseLabel: payload.SupportingSignals?.PhaseLabel,
                 HistorySnapshotCount: payload.SupportingSignals?.HistorySnapshotCount ?? progressReport?.HistorySnapshotCount,
                 LongestPoleLabel: payload.SupportingSignals?.LongestPole,
+                LaunchReadiness: payload.SupportingSignals?.LaunchReadiness,
+                ProviderRouteDefault: payload.SupportingSignals?.ProviderRouteStewardship?.DefaultStatus,
+                ProviderRouteCanary: payload.SupportingSignals?.ProviderRouteStewardship?.CanaryStatus,
+                ProviderRouteReviewDue: payload.SupportingSignals?.ProviderRouteStewardship?.ReviewDue,
+                ProviderRouteNextDecision: payload.SupportingSignals?.ProviderRouteStewardship?.NextDecision,
                 NextCheckpointQuestion: payload.NextCheckpointQuestion,
                 LocalReleaseProofStatus: localReleaseProof?.Status,
                 ProvenJourneyCount: localReleaseProof?.JourneysPassed?.Count,
@@ -162,7 +167,15 @@ public sealed class PublicTrustPulseService
         [property: JsonPropertyName("overall_progress_percent")] int? OverallProgressPercent,
         [property: JsonPropertyName("phase_label")] string? PhaseLabel,
         [property: JsonPropertyName("history_snapshot_count")] int? HistorySnapshotCount,
-        [property: JsonPropertyName("longest_pole")] string? LongestPole);
+        [property: JsonPropertyName("longest_pole")] string? LongestPole,
+        [property: JsonPropertyName("launch_readiness")] string? LaunchReadiness,
+        [property: JsonPropertyName("provider_route_stewardship")] WeeklyProductPulseProviderRouteStewardship? ProviderRouteStewardship);
+
+    private sealed record WeeklyProductPulseProviderRouteStewardship(
+        [property: JsonPropertyName("default_status")] string? DefaultStatus,
+        [property: JsonPropertyName("canary_status")] string? CanaryStatus,
+        [property: JsonPropertyName("review_due")] string? ReviewDue,
+        [property: JsonPropertyName("next_decision")] string? NextDecision);
 
     private sealed record ProgressReportPayload(
         [property: JsonPropertyName("contract_name")] string? ContractName,
@@ -195,5 +208,10 @@ public sealed record PublicTrustPulseSnapshot(
     string? LongestPoleLabel,
     string? NextCheckpointQuestion,
     string? LocalReleaseProofStatus,
+    string? LaunchReadiness,
+    string? ProviderRouteDefault,
+    string? ProviderRouteCanary,
+    string? ProviderRouteReviewDue,
+    string? ProviderRouteNextDecision,
     int? ProvenJourneyCount,
     int? ProvenRouteCount);
