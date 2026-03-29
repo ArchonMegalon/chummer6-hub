@@ -865,7 +865,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     }
     catch (CommunityAccessDeniedException ex)
     {
-        memberJoinCodeBlocked = ex.Message.Contains("owner or manager", StringComparison.OrdinalIgnoreCase);
+        memberJoinCodeBlocked = ex.Message.Contains("owner, manager, admin, or gm", StringComparison.OrdinalIgnoreCase);
     }
 
     Assert(memberJoinCodeBlocked, "non-manager members should not be allowed to mint join codes.");
@@ -882,7 +882,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     }
     catch (CommunityAccessDeniedException ex)
     {
-        memberBoostCodeBlocked = ex.Message.Contains("owner or manager", StringComparison.OrdinalIgnoreCase);
+        memberBoostCodeBlocked = ex.Message.Contains("owner, manager, admin, or gm", StringComparison.OrdinalIgnoreCase);
     }
 
     Assert(memberBoostCodeBlocked, "non-manager members should not be allowed to mint boost codes.");
@@ -2288,6 +2288,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(freshPreviewSummary.CommunityOperations.Count >= 1, "freshly created accounts should receive a seeded operator-aware campaign group.");
     Assert(!string.IsNullOrWhiteSpace(freshPreviewSummary.CommunityOperations[0].OperationsSummary), "freshly created accounts should receive a seeded operator operations pulse.");
     Assert(!string.IsNullOrWhiteSpace(freshPreviewSummary.CommunityOperations[0].SeasonEventSummary), "freshly created accounts should receive a seeded operator season-event pulse.");
+    Assert(freshPreviewSummary.CommunityOperations[0].Capabilities.Contains("can_issue_join_codes", StringComparer.OrdinalIgnoreCase), "freshly created accounts should receive invite authority on the seeded operator group.");
+    Assert(freshPreviewSummary.CommunityOperations[0].Capabilities.Contains("can_issue_boost_codes", StringComparer.OrdinalIgnoreCase), "freshly created accounts should receive sponsorship authority on the seeded operator group.");
     Assert(freshPreviewSummary.CommunityOperations[0].ActiveCampaignCount >= 2, "freshly created accounts should receive a seeded multi-campaign operator group instead of a single-campaign placeholder.");
     Assert(freshPreviewSummary.CommunityOperations[0].SeasonEventSummary.Contains("season rail", StringComparison.OrdinalIgnoreCase), "freshly created accounts should receive a season-rail summary when one operator group carries multiple governed campaigns.");
     Assert(freshPreviewSummary.CommunityOperations[0].SeasonBoardEntries.Count >= 2, "freshly created accounts should receive a seeded season board with more than one governed campaign lane.");
