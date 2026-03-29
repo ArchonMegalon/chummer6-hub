@@ -1642,7 +1642,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.BuildHandoffId))
                         {
-                            <a class="inline-link" href="@BuildHandoffDetailHref(selectedCreatorPublication.BuildHandoffId)">Open related build path</a>
+                            <a class="inline-link" href="@BuildHandoffDetailHref(selectedCreatorPublication.BuildHandoffId)">Open build path for @selectedCreatorPublication.Title</a>
                         }
                     </article>
                 }
