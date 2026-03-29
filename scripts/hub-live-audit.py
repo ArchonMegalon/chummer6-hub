@@ -203,6 +203,18 @@ def verify_signed_in_work_audit(
     if not workspaces:
         raise AssertionError("signed-in campaign summary did not expose any workspaces")
 
+    status, body, _, _ = fetch(
+        base_url,
+        "/account/access",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/account/access returned {status}, expected 200")
+    require_snippet(body, "Cross-device recovery", "/account/access")
+    require_snippet(body, "What stays on this device", "/account/access")
+
     workspace_id = workspaces[0]["workspaceId"]
     workspace_path = f"/account/work/workspaces/{workspace_id}"
     status, body, _, _ = fetch(
@@ -222,6 +234,19 @@ def verify_signed_in_work_audit(
         "GM prep library and travel mode",
     ):
         require_snippet(body, snippet, workspace_path)
+
+    search_path = f"{workspace_path}?prepQuery=opposition"
+    status, search_body, _, _ = fetch(
+        base_url,
+        search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{search_path} returned {status}, expected 200")
+    require_snippet(search_body, "Search results:", search_path)
+    require_snippet(search_body, "opposition", search_path)
 
     workspace_token = extract_antiforgery_token(body, workspace_path)
     plan_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/roster-transfer-plan"
