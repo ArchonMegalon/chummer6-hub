@@ -2046,6 +2046,10 @@
                                     <strong>@op.OperationsSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
+                                    <span>League / season operations</span>
+                                    <strong>@op.LeagueOperationsSummary</strong>
+                                </div>
+                                <div class="settings-summary-row">
                                     <span>Campaign return pulse</span>
                                     <strong>@op.CampaignReturnSummary</strong>
                                 </div>
@@ -2093,6 +2097,23 @@
                                     @foreach (var watchout in op.Watchouts)
                                     {
                                         <li><strong>Watchout:</strong> @watchout</li>
+                                    }
+                                </ul>
+                            </details>
+                            <details id="community-op-league-@op.GroupId" class="details-drawer">
+                                <summary>League / season operations</summary>
+                                <ul class="muted-copy">
+                                    <li>@op.LeagueOperationsSummary</li>
+                                    @if (op.RecentLeagueAuditLines.Count == 0)
+                                    {
+                                        <li>No governed league or season audit lines are attached yet.</li>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var leagueLine in op.RecentLeagueAuditLines)
+                                        {
+                                            <li>@leagueLine</li>
+                                        }
                                     }
                                 </ul>
                             </details>

@@ -1604,6 +1604,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Latest event:", StringComparison.Ordinal), "home work should keep one bounded event receipt on the lead operator card.");
     Assert(homeSource.Contains("Board:", StringComparison.Ordinal), "home work should surface one bounded season-board entry on the lead operator card.");
     Assert(homeSource.Contains("@leadCommunityBoard.CampaignName", StringComparison.Ordinal), "home work should surface the lead season-board campaign directly from the shared operator projection.");
+    Assert(homeSource.Contains("League:", StringComparison.Ordinal), "home work should surface a bounded league-and-season operations summary on the lead operator card.");
+    Assert(homeSource.Contains("@leadCommunityOperation.LeagueOperationsSummary", StringComparison.Ordinal), "home work should surface the shared league-operations summary directly from the operator projection.");
+    Assert(homeSource.Contains("/account/work#community-op-league-", StringComparison.Ordinal), "home work should deep-link the operator card into the league-and-season operations rail.");
+    Assert(homeSource.Contains("Open league rail", StringComparison.Ordinal), "home work should give operators a direct route to the league-and-season operations rail.");
     Assert(homeSource.Contains("/account/work#community-op-board-", StringComparison.Ordinal), "home work should deep-link the operator card into the exact season-board drawer instead of sending every organizer flow back to the generic operator shell.");
     Assert(homeSource.Contains("Open season board", StringComparison.Ordinal), "home work should keep a direct route back to the governed season board.");
     Assert(homeSource.Contains("Invites:", StringComparison.Ordinal), "home work should keep invite and sponsorship posture attached to the lead operator card.");
@@ -1699,6 +1703,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@selectedWorkspaceDowntimePackage.Summary", StringComparison.Ordinal), "account work should surface the selected downtime brief summary directly from the shared server-plane projection.");
     Assert(accountSource.Contains("Operations pulse", StringComparison.Ordinal), "account teams and permissions should surface a first-class operations pulse instead of only raw counts.");
     Assert(accountSource.Contains("@op.OperationsSummary", StringComparison.Ordinal), "account teams and permissions should surface the operator operations pulse directly from the shared projection.");
+    Assert(accountSource.Contains("League / season operations", StringComparison.Ordinal), "account teams and permissions should surface a first-class league-and-season operations summary on the operator rail.");
+    Assert(accountSource.Contains("@op.LeagueOperationsSummary", StringComparison.Ordinal), "account teams and permissions should surface the shared league-operations summary directly from the operator projection.");
+    Assert(accountSource.Contains("id=\"community-op-league-@op.GroupId\"", StringComparison.Ordinal), "account teams and permissions should give the league-and-season rail a stable deep-link target.");
     Assert(accountSource.Contains("@op.CampaignReturnSummary", StringComparison.Ordinal), "account teams and permissions should surface the campaign-return pulse directly from the shared projection.");
     Assert(accountSource.Contains("Season / event pulse", StringComparison.Ordinal), "account teams and permissions should surface a first-class season and event pulse instead of treating larger organizer work as implicit.");
     Assert(accountSource.Contains("@op.SeasonEventSummary", StringComparison.Ordinal), "account teams and permissions should surface the operator season-event pulse directly from the shared projection.");
@@ -2291,9 +2298,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.OperatorRole)), "account page should surface organizer/operator role posture.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.CampaignVisibilitySummary)), "account page should surface explicit campaign visibility posture for operator groups.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.OperationsSummary)), "account page should surface an explicit operator operations pulse for organizer groups.");
+    Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.LeagueOperationsSummary)), "account page should surface an explicit league-and-season operations summary for organizer groups.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.CampaignReturnSummary)), "account page should surface campaign-return pulse for organizer groups.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => !string.IsNullOrWhiteSpace(item.SeasonEventSummary)), "account page should surface a first-class season-event pulse for organizer groups.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentEventSummaries.Count >= 1), "account page should keep at least one recent governed event receipt attached to the operator rail.");
+    Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentLeagueAuditLines.Count >= 1), "account page should keep bounded league-and-season audit lines attached to the operator rail.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.InviteCampaigns.Count >= 2), "account page should keep multi-campaign invite choices on the operator rail.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentJoinCodes.Any(code => string.Equals(code.Code, operatorJoinCode.Code, StringComparison.Ordinal))), "account page should keep recent governed join codes attached to the operator rail.");
     Assert(accountModel.CampaignSpine.CommunityOperations.Any(item => item.RecentBoostCodes.Any(code => string.Equals(code.Code, operatorBoostCode.Code, StringComparison.Ordinal))), "account page should keep recent governed boost codes attached to the operator rail.");
@@ -2315,6 +2324,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(freshPreviewSummary.CreatorPublications.Count >= 1, "freshly created accounts should receive a seeded publication follow-through.");
     Assert(freshPreviewSummary.CommunityOperations.Count >= 1, "freshly created accounts should receive a seeded operator-aware campaign group.");
     Assert(!string.IsNullOrWhiteSpace(freshPreviewSummary.CommunityOperations[0].OperationsSummary), "freshly created accounts should receive a seeded operator operations pulse.");
+    Assert(!string.IsNullOrWhiteSpace(freshPreviewSummary.CommunityOperations[0].LeagueOperationsSummary), "freshly created accounts should receive a seeded league-and-season operations summary.");
     Assert(!string.IsNullOrWhiteSpace(freshPreviewSummary.CommunityOperations[0].SeasonEventSummary), "freshly created accounts should receive a seeded operator season-event pulse.");
     Assert(freshPreviewSummary.CommunityOperations[0].Capabilities.Contains("can_issue_join_codes", StringComparer.OrdinalIgnoreCase), "freshly created accounts should receive invite authority on the seeded operator group.");
     Assert(freshPreviewSummary.CommunityOperations[0].Capabilities.Contains("can_issue_boost_codes", StringComparer.OrdinalIgnoreCase), "freshly created accounts should receive sponsorship authority on the seeded operator group.");
@@ -2725,8 +2735,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations.Count >= 1, "signed-in home should surface organizer/operator posture on the same account backbone.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].CampaignVisibilitySummary), "signed-in home should keep campaign visibility posture visible for the lead operator group.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].OperationsSummary), "signed-in home should keep the operator operations pulse visible for the lead operator group.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].LeagueOperationsSummary), "signed-in home should keep the league-and-season operations summary visible for the lead operator group.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].SeasonEventSummary), "signed-in home should keep the operator season-event pulse visible for the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentEventSummaries.Count >= 1, "signed-in home should keep a bounded recent-event receipt attached to the lead operator group.");
+    Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentLeagueAuditLines.Count >= 1, "signed-in home should keep bounded league-and-season audit lines attached to the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentJoinCodes.Any(code => string.Equals(code.Code, operatorJoinCode.Code, StringComparison.Ordinal)), "signed-in home should keep recent governed join codes attached to the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentBoostCodes.Any(code => string.Equals(code.Code, operatorBoostCode.Code, StringComparison.Ordinal)), "signed-in home should keep recent governed boost codes attached to the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].RecentSponsorSessions.Any(session => string.Equals(session.SponsorSessionId, operatorSponsorSession.SponsorSessionId, StringComparison.Ordinal)), "signed-in home should keep recent governed sponsor sessions attached to the lead operator group.");
