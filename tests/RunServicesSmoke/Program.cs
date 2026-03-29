@@ -2544,6 +2544,16 @@ async Task VerifyPublicLandingProjectionAsync()
     var readyToVerifyDownloadsPage = await authenticatedLandingController.DownloadsPage(CancellationToken.None) as ViewResult;
     var readyToVerifyDownloadsModel = readyToVerifyDownloadsPage?.Model as DownloadsPageViewModel;
     Assert(string.Equals(readyToVerifyDownloadsModel?.SignedInStatus?.Heading, "Your linked install can verify a fix now", StringComparison.Ordinal), "signed-in downloads should switch from update-needed to verification-ready once the linked install matches the fix build.");
+    var readyToVerifyAssistant = await supportCasesController.AskAssistant(
+        new SupportAssistantRequest(
+            Query: "Can I verify the preview fix on my linked install now?",
+            InstallationId: "install-smoke-001"),
+        CancellationToken.None);
+    var readyToVerifyAssistantPayload = (readyToVerifyAssistant.Result as OkObjectResult)?.Value as SupportAssistantResponse;
+    Assert(readyToVerifyAssistantPayload is not null, "support assistant should answer verification-ready questions for signed-in reporters.");
+    Assert(readyToVerifyAssistantPayload!.Answer.Contains("Use the verification buttons", StringComparison.Ordinal), "support assistant should explicitly ask the reporter to verify the fix once the linked install is ready.");
+    Assert(readyToVerifyAssistantPayload.Actions.Any(static item => string.Equals(item.ActionId, "verify_fix_on_case", StringComparison.Ordinal)), "support assistant should surface a direct fix-verification action once the linked install is ready.");
+    Assert(readyToVerifyAssistantPayload.Actions.Any(item => string.Equals(item.Href, readyToVerifyAccountDetailModel!.SelectedSupportCaseSummary!.DetailHref, StringComparison.Ordinal)), "support assistant should route the verification-ready action back to the tracked case detail.");
     var verifiedFixedResult = await supportCasesController.VerifyReporterFix(
         supportCase.CaseId,
         new SupportCaseVerificationRequest(

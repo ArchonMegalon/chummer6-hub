@@ -255,10 +255,10 @@ public sealed class SupportAssistantService
         {
             SupportCasePresentationViewModel latest = caseMatches[0];
             string guidance = latest.Case.Status switch
-            {
+                {
                 SupportCaseStatuses.ReleasedToReporterChannel or SupportCaseStatuses.Fixed or SupportCaseStatuses.UserNotified
                     when latest.FixReadyOnLinkedInstall
-                        => $"{latest.InstallReadinessSummary} Confirm the result on this same tracked case instead of opening a duplicate thread.",
+                        => $"{latest.InstallReadinessSummary} Use the verification buttons on this same tracked case now to confirm whether the fix worked here or whether the issue is still broken.",
                 SupportCaseStatuses.ReleasedToReporterChannel or SupportCaseStatuses.Fixed or SupportCaseStatuses.UserNotified
                     when latest.NeedsLinkedInstall
                         => $"{latest.InstallReadinessSummary} Once that copy is linked, come back to this same case to verify the fix.",
@@ -305,6 +305,11 @@ public sealed class SupportAssistantService
         if (caseMatches.Count > 0)
         {
             Add("open_account_support", "Open support timeline", "/account/support", "Review the tracked case and its latest status.");
+
+            if (caseMatches.FirstOrDefault(static item => item.CanVerifyFix) is { } readyToVerify)
+            {
+                Add("verify_fix_on_case", "Verify fix now", readyToVerify.DetailHref, "The linked install is already on the reporter-ready fix, so confirm whether the fix worked here.");
+            }
 
             if (caseMatches.Any(static item => item.NeedsLinkedInstall))
             {
