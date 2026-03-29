@@ -71,6 +71,7 @@
     var selectedWorkspacePrepLibrarySearch = Model.SelectedWorkspacePrepLibrarySearch;
     var selectedWorkspacePrepLibraryQuery = Model.SelectedWorkspacePrepLibraryQuery;
     var selectedWorkspacePrepLaunches = selectedWorkspaceServerPlane?.PrepLaunches ?? Array.Empty<Chummer.Campaign.Contracts.GovernedPrepLaunchProjection>();
+    var selectedWorkspaceTravelPrefetches = selectedWorkspaceServerPlane?.TravelPrefetches ?? Array.Empty<Chummer.Campaign.Contracts.TravelPrefetchReceiptProjection>();
     var selectedRun = Model.SelectedRun;
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
@@ -1095,11 +1096,47 @@
                                     <span>Travel-safe devices</span>
                                     <strong>@(selectedWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready")</strong>
                                 </div>
+                                <div class="settings-summary-row">
+                                    <span>Travel prefetch receipts</span>
+                                    <strong>@(selectedWorkspaceTravelPrefetches.Count == 0 ? "No staged receipts yet" : $"{selectedWorkspaceTravelPrefetches.Count} staged")</strong>
+                                </div>
                             </div>
                             <p><strong>GM prep library:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
                             <p><strong>Binding posture:</strong> @selectedWorkspaceServerPlane.PrepLibrary.BindingSummary</p>
                             <p><strong>Safehouse / travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
                             <p><strong>Prefetch inventory:</strong> @selectedWorkspaceServerPlane.TravelMode.PrefetchInventorySummary</p>
+                            @if (selectedWorkspaceServerPlane.TravelMode.Devices.Count > 0)
+                            {
+                                <form id="travelPrefetchForm" class="settings-form">
+                                    <div class="field">
+                                        <label for="travelPrefetchInstallation">Claimed device</label>
+                                        <select id="travelPrefetchInstallation" required>
+                                            @foreach (var device in selectedWorkspaceServerPlane.TravelMode.Devices)
+                                            {
+                                                <option value="@device.InstallationId">@device.DeviceRole · @device.Platform / @device.HeadId / @device.Channel</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="field">
+                                        <label for="travelPrefetchNote">Operator note</label>
+                                        <textarea id="travelPrefetchNote" rows="3" placeholder="Why are you staging this travel-safe prefetch set?"></textarea>
+                                    </div>
+                                    <div id="travelPrefetchPreview" class="settings-summary-list" hidden></div>
+                                    <button class="button-like button-like--secondary" type="submit">Stage travel prefetch</button>
+                                    <p id="travelPrefetchStatusNotice" class="muted-copy" hidden></p>
+                                </form>
+                            }
+                            else
+                            {
+                                <div class="settings-form">
+                                    <p><strong>Stage travel prefetch</strong></p>
+                                    <p class="muted-copy">Claim a device from Downloads or Devices &amp; access first. The staged packet stays bounded to dossiers, campaigns, rule environments, recent artifacts, and governed prep packets while secrets and runtime caches stay install-local.</p>
+                                    <div class="stacked-actions">
+                                        <a class="button-like button-like--secondary" href="/downloads">Claim a device from Downloads</a>
+                                        <a class="button-like button-like--ghost" href="/account/access">Open Devices &amp; access</a>
+                                    </div>
+                                </div>
+                            }
                             @if (selectedWorkspaceServerPlane.PrepLibrary.Packets.Count > 0)
                             {
                                 <form id="prepLaunchForm" class="settings-form">
@@ -1184,6 +1221,18 @@
                                         @foreach (var launch in selectedWorkspacePrepLaunches)
                                         {
                                             <li><strong>@launch.PacketTitle:</strong> @launch.Summary</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+                            @if (selectedWorkspaceTravelPrefetches.Count > 0)
+                            {
+                                <details class="details-drawer" id="travel-prefetches">
+                                    <summary>Recent travel prefetch receipts</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var receipt in selectedWorkspaceTravelPrefetches)
+                                        {
+                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary</li>
                                         }
                                     </ul>
                                 </details>
@@ -1380,6 +1429,10 @@
                                     <span>Prep launch audit</span>
                                     <strong>@(workspace.PrepLaunches is { Count: > 0 } ? $"{workspace.PrepLaunches.Count} receipts" : "No recent launches")</strong>
                                 </div>
+                                <div class="settings-summary-row">
+                                    <span>Travel prefetch audit</span>
+                                    <strong>@(workspace.TravelPrefetches is { Count: > 0 } ? $"{workspace.TravelPrefetches.Count} receipts" : "No recent prefetches")</strong>
+                                </div>
                             </div>
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open shared campaign view</a>
@@ -1428,6 +1481,19 @@
                                         @foreach (var launch in workspace.PrepLaunches)
                                         {
                                             <li><strong>@launch.PacketTitle:</strong> @launch.Summary</li>
+                                        }
+                                    </ul>
+                                </details>
+                            }
+
+                            @if (workspace.TravelPrefetches is { Count: > 0 })
+                            {
+                                <details class="details-drawer">
+                                    <summary>Travel prefetch audit</summary>
+                                    <ul class="muted-copy">
+                                        @foreach (var receipt in workspace.TravelPrefetches)
+                                        {
+                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary</li>
                                         }
                                     </ul>
                                 </details>
@@ -1862,6 +1928,8 @@
   const rosterTransferPlan = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceRosterTransferPlan));
   const prepLaunchPackets = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceServerPlane?.PrepLibrary.Packets ?? Array.Empty<Chummer.Run.Api.Contracts.GovernedPrepPacketSummary>()));
   const prepLaunchRuns = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspace?.Runs ?? Array.Empty<Chummer.Campaign.Contracts.RunProjection>()));
+  const travelModeDevices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceServerPlane?.TravelMode.Devices ?? Array.Empty<Chummer.Run.Api.Contracts.TravelModeDeviceReadinessCue>()));
+  const travelPrefetchInventorySummary = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary));
   const selectedWorkspaceId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspace?.WorkspaceId));
   const workspaceDetailHref = (workspaceId) => `/account/work/workspaces/${encodeURIComponent(workspaceId)}`;
   const revealHashTarget = () => {
@@ -1987,6 +2055,34 @@
   document.getElementById("prepLaunchRun")?.addEventListener("change", syncPrepLaunchTargets);
   document.getElementById("prepLaunchPacket")?.addEventListener("change", syncPrepLaunchTargets);
   document.getElementById("prepLaunchScene")?.addEventListener("change", syncPrepLaunchTargets);
+
+  const syncTravelPrefetchPreview = () => {
+    const installationSelect = document.getElementById("travelPrefetchInstallation");
+    const preview = document.getElementById("travelPrefetchPreview");
+    if (!installationSelect || !preview) {
+      return;
+    }
+
+    const device = Array.isArray(travelModeDevices)
+      ? travelModeDevices.find((item) => item && item.InstallationId === installationSelect.value) || travelModeDevices[0]
+      : null;
+    const rows = [
+      ["Device", device ? `${device.DeviceRole} · ${device.Platform} / ${device.HeadId} / ${device.Channel}` : "Select a claimed device"],
+      ["Status", device?.Status ? ui.humanizeStatus(device.Status, "Review") : "Review"],
+      ["Restore posture", device?.Summary || "Travel posture will be staged against the claimed device."],
+      ["Prefetch inventory", travelPrefetchInventorySummary || "Prefetch inventory stays governed on the shared workspace."]
+    ];
+
+    preview.hidden = false;
+    preview.innerHTML = rows.map(([label, value]) => `
+      <div class="settings-summary-row">
+        <span>${label}</span>
+        <strong>${value}</strong>
+      </div>`).join("");
+  };
+
+  syncTravelPrefetchPreview();
+  document.getElementById("travelPrefetchInstallation")?.addEventListener("change", syncTravelPrefetchPreview);
 
   bindSubmit("profileForm", async (event) => {
     event.preventDefault();
@@ -2160,6 +2256,34 @@
       ui.setNotice(notice, ui.describeError(error, "Governed prep launch could not be recorded right now."), true);
     } finally {
       ui.setButtonBusy(button, false, "Launching...");
+    }
+  });
+
+  bindSubmit("travelPrefetchForm", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("travelPrefetchStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    const installationSelect = document.getElementById("travelPrefetchInstallation");
+    const noteInput = document.getElementById("travelPrefetchNote");
+    if (!installationSelect || !selectedWorkspaceId) {
+      return;
+    }
+
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Staging...");
+    try {
+      await ui.requestJson(`/api/v1/campaign-spine/me/workspaces/${encodeURIComponent(selectedWorkspaceId)}/travel-prefetches`, {
+        method: "POST",
+        json: {
+          installationId: installationSelect.value,
+          note: noteInput?.value.trim() || null
+        }
+      });
+      window.location.href = `${workspaceDetailHref(selectedWorkspaceId)}#travel-prefetches`;
+    } catch (error) {
+      ui.setNotice(notice, ui.describeError(error, "Travel prefetch could not be staged right now."), true);
+    } finally {
+      ui.setButtonBusy(button, false, "Staging...");
     }
   });
 

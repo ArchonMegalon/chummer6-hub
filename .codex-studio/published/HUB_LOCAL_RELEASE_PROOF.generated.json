@@ -4,7 +4,7 @@
   "base_url": "https://chummer.run",
   "compose_file": "docker-compose.public-edge.yml",
   "playwright_timeout_seconds": 300,
-  "edge_rebuild_skipped": false,
+  "edge_rebuild_skipped": true,
   "journeys_passed": [
     "install_claim_restore_continue",
     "build_explain_publish",
@@ -19,5 +19,5 @@
     "/account/support",
     "/contact"
   ],
-  "generated_at": "2026-03-29T09:34:36Z"
+  "generated_at": "2026-03-29T09:48:56Z"
 }

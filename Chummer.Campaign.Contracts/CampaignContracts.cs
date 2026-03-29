@@ -150,6 +150,25 @@ public sealed record GovernedPrepLaunchProjection(
     IReadOnlyList<string> AuditLines,
     DateTimeOffset LaunchedAtUtc);
 
+public sealed record TravelPrefetchStageRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string InstallationId,
+    [StringLength(256)] string? Note = null);
+
+public sealed record TravelPrefetchReceiptProjection(
+    string ReceiptId,
+    string WorkspaceId,
+    string CampaignId,
+    string InstallationId,
+    string DeviceRole,
+    string Platform,
+    string HeadId,
+    string Channel,
+    string PrefetchSummary,
+    IReadOnlyList<string> InventoryLines,
+    IReadOnlyList<string> Boundaries,
+    string InitiatedByUserId,
+    DateTimeOffset StagedAtUtc);
+
 public sealed record RunnerDossierProjection(
     string DossierId,
     string RunnerHandle,
@@ -291,7 +310,8 @@ public sealed record CampaignWorkspaceProjection(
     IReadOnlyList<WorkspaceChangePacketProjection>? ChangePackets = null,
     IReadOnlyList<CampaignConsequenceProjection>? Consequences = null,
     IReadOnlyList<RosterTransferProjection>? RosterTransfers = null,
-    IReadOnlyList<GovernedPrepLaunchProjection>? PrepLaunches = null);
+    IReadOnlyList<GovernedPrepLaunchProjection>? PrepLaunches = null,
+    IReadOnlyList<TravelPrefetchReceiptProjection>? TravelPrefetches = null);
 
 public sealed record CampaignWorkspaceDigestProjection(
     string WorkspaceId,

@@ -105,6 +105,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             PrepLibrary: prepLibrary,
             PrepLaunches: context.Workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>(),
             TravelMode: travelMode,
+            TravelPrefetches: context.Workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>(),
             NextSafeAction: nextSafeAction,
             GeneratedAtUtc: context.GeneratedAtUtc);
     }
@@ -171,6 +172,40 @@ public sealed class CampaignWorkspaceServerPlaneService
             request.Note);
     }
 
+    public TravelPrefetchReceiptProjection? StageTravelPrefetch(
+        HubUserDto user,
+        string workspaceId,
+        TravelPrefetchStageRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(request);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        if (context is null)
+        {
+            return null;
+        }
+
+        ClaimedDeviceRestoreProjection device = context.Restore.ClaimedDevices
+            .FirstOrDefault(item => string.Equals(item.InstallationId, request.InstallationId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new KeyNotFoundException($"Unknown claimed device: {request.InstallationId}");
+        CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
+        IReadOnlyList<string> inventoryLines = BuildTravelPrefetchInventoryLines(context.Workspace, context.Restore, prepLibrary, device);
+        string prefetchSummary = BuildTravelPrefetchSummary(context.Workspace, device, prepLibrary);
+        return _campaignSpine.RecordTravelPrefetch(
+            user,
+            context.Workspace,
+            device,
+            prefetchSummary,
+            inventoryLines,
+            context.Restore.LocalOnlyNotes.Concat(
+            [
+                "Install-local caches, secrets, and runtime state stay local even when travel packets are staged for bounded offline use."
+            ]).ToArray(),
+            request.Note);
+    }
+
     private WorkspaceContext? ResolveWorkspaceContext(
         HubUserDto user,
         string workspaceId,
@@ -206,6 +241,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 workspace.LatestContinuity?.CapturedAtUtc,
                 workspace.RosterTransfers?.FirstOrDefault()?.TransferredAtUtc,
                 workspace.PrepLaunches?.FirstOrDefault()?.LaunchedAtUtc,
+                workspace.TravelPrefetches?.FirstOrDefault()?.StagedAtUtc,
                 leadRun?.UpdatedAtUtc
             }
             .Concat(relevantCases.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
@@ -1079,6 +1115,39 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return run.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, normalized, StringComparison.OrdinalIgnoreCase))
             ?? throw new KeyNotFoundException($"Unknown target scene: {normalized}");
+    }
+
+    private static string BuildTravelPrefetchSummary(
+        CampaignWorkspaceProjection workspace,
+        ClaimedDeviceRestoreProjection device,
+        CampaignPrepLibrarySummary prepLibrary)
+    {
+        string deviceLabel = $"{device.DeviceRole} on {device.Platform}/{device.HeadId}";
+        return $"Staged the exact offline prefetch set for {deviceLabel} on {device.Channel} with {prepLibrary.Packets.Count} governed prep packet(s) attached to {workspace.CampaignName}.";
+    }
+
+    private static IReadOnlyList<string> BuildTravelPrefetchInventoryLines(
+        CampaignWorkspaceProjection workspace,
+        WorkspaceRestoreProjection restore,
+        CampaignPrepLibrarySummary prepLibrary,
+        ClaimedDeviceRestoreProjection device)
+    {
+        List<string> lines =
+        [
+            $"Device lane: {device.DeviceRole} on {device.Platform}/{device.HeadId} via {device.Channel}.",
+            $"Campaign: {workspace.CampaignName}.",
+            $"Dossiers: {(restore.RecentDossiers.Count == 0 ? "none" : string.Join(", ", restore.RecentDossiers.Take(3).Select(static item => item.DisplayName)))}.",
+            $"Rule environments: {(restore.RecentRuleEnvironments.Count == 0 ? "none" : string.Join(", ", restore.RecentRuleEnvironments.Take(2).Select(static item => item.CompatibilityFingerprint)))}.",
+            $"Artifacts: {(restore.RecentArtifacts.Count == 0 ? "none" : string.Join(", ", restore.RecentArtifacts.Take(3).Select(static item => item.Label)))}.",
+            $"Governed prep packets: {(prepLibrary.Packets.Count == 0 ? "none" : string.Join(", ", prepLibrary.Packets.Take(3).Select(static item => item.Title)))}."
+        ];
+
+        if (restore.RecentCampaigns.Count > 0)
+        {
+            lines.Insert(3, $"Campaign returns: {string.Join(", ", restore.RecentCampaigns.Take(2).Select(static item => item.Name))}.");
+        }
+
+        return lines;
     }
 
     private static bool IsTravelReadyDevice(ClaimedDeviceRestoreProjection device)

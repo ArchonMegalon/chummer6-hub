@@ -199,6 +199,41 @@ public sealed class CampaignSpineController : ControllerBase
         }
     }
 
+    [HttpPost("me/workspaces/{workspaceId}/travel-prefetches")]
+    [ProducesResponseType<TravelPrefetchReceiptProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TravelPrefetchReceiptProjection>> StageMyCampaignWorkspaceTravelPrefetch(
+        [FromRoute] string workspaceId,
+        [FromBody] TravelPrefetchStageRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("travel-prefetch payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var receipt = _workspaceServerPlane.StageTravelPrefetch(user, workspaceId, request, installLinking);
+            return receipt is null ? NotFound() : Ok(receipt);
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
     [HttpPost("me/roster-transfers")]
     [ProducesResponseType<RosterTransferProjection>(StatusCodes.Status200OK)]
     public async Task<ActionResult<RosterTransferProjection>> TransferMyRoster([FromBody] RosterTransferRequest? request, CancellationToken cancellationToken)
