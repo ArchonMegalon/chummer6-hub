@@ -497,7 +497,11 @@ public sealed record CreatorPublicationProjection(
     string DiscoverySummary,
     string Visibility,
     string PublicationStatus,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string? NextSafeAction = null,
+    string? CampaignReturnSummary = null,
+    string? SupportClosureSummary = null,
+    IReadOnlyList<string>? Watchouts = null);
 
 public sealed record AccountCampaignSummary(
     IReadOnlyList<RunnerDossierProjection> Dossiers,

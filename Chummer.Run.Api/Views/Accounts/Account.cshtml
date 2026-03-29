@@ -1456,7 +1456,32 @@
                                 <span>Status</span>
                                 <strong>@HumanizeStatus(selectedCreatorPublication.PublicationStatus, "Published")</strong>
                             </div>
+                            @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.NextSafeAction))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Next step</span>
+                                    <strong>@selectedCreatorPublication.NextSafeAction</strong>
+                                </div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.CampaignReturnSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Return</span>
+                                    <strong>@selectedCreatorPublication.CampaignReturnSummary</strong>
+                                </div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.SupportClosureSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Support</span>
+                                    <strong>@selectedCreatorPublication.SupportClosureSummary</strong>
+                                </div>
+                            }
                         </div>
+                        @if (selectedCreatorPublication.Watchouts is { Count: > 0 })
+                        {
+                            <p><strong>Watchouts:</strong> @string.Join(" ", selectedCreatorPublication.Watchouts.Take(3))</p>
+                        }
                     </article>
                 }
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
@@ -1799,6 +1824,18 @@
                                 <li>
                                     <strong><a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">@publication.Title</a></strong>: @publication.Summary
                                     <span> Source: @publication.ProvenanceSummary. Discovery: @publication.DiscoverySummary.</span>
+                                    @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
+                                    {
+                                        <span> Next: @publication.NextSafeAction.</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
+                                    {
+                                        <span> Return: @publication.CampaignReturnSummary.</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(publication.SupportClosureSummary))
+                                    {
+                                        <span> Support: @publication.SupportClosureSummary.</span>
+                                    }
                                 </li>
                             }
                         </ul>

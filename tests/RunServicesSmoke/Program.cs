@@ -1598,6 +1598,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Migration return", StringComparison.Ordinal), "home work should surface migration return instead of leaving legacy carry-forward buried in the deeper work route.");
     Assert(homeSource.Contains("Open migration return", StringComparison.Ordinal), "home work should keep a direct route back into migration return.");
     Assert(homeSource.Contains("Publication status", StringComparison.Ordinal), "home work should surface creator-publication status instead of leaving publication trust buried in the deeper account route.");
+    Assert(homeSource.Contains("@publication.NextSafeAction", StringComparison.Ordinal), "home work should surface the publication next step directly from the shared creator-publication projection.");
+    Assert(homeSource.Contains("@publication.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface creator-publication return truth directly from the shared projection.");
+    Assert(homeSource.Contains("@publication.SupportClosureSummary", StringComparison.Ordinal), "home work should surface creator-publication support closure directly from the shared projection.");
     Assert(homeSource.Contains("Open publication status", StringComparison.Ordinal), "home work should keep a direct route into publication status.");
     Assert(homeSource.Contains("/account/work/publications/", StringComparison.Ordinal), "home work should deep-link publication follow-through into the signed-in work detail route.");
     Assert(homeSource.Contains("Device return", StringComparison.Ordinal), "home work should surface the calmer device-return card for claimed-device continuity.");
@@ -1642,6 +1645,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Finish on another device", StringComparison.Ordinal), "account access should describe pending claim codes as the remaining device handoff step.");
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
     Assert(accountSource.Contains("Closure:", StringComparison.Ordinal), "account build-path details should surface support-closure truth instead of leaving the new rail data unused.");
+    Assert(accountSource.Contains("@selectedCreatorPublication.NextSafeAction", StringComparison.Ordinal), "account publication detail should surface the next creator-publication step directly from the shared projection.");
+    Assert(accountSource.Contains("@selectedCreatorPublication.CampaignReturnSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication return truth directly from the shared projection.");
+    Assert(accountSource.Contains("@selectedCreatorPublication.SupportClosureSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication support closure directly from the shared projection.");
+    Assert(accountSource.Contains("@publication.NextSafeAction", StringComparison.Ordinal), "account publication list should surface the next creator-publication step directly from the shared projection.");
     Assert(accountSource.Contains("Recent change packets", StringComparison.Ordinal), "account work should surface recent change packets for the shared campaign view.");
     Assert(accountSource.Contains("Consequence ledger", StringComparison.Ordinal), "account work should surface the governed consequence ledger for the shared campaign view.");
     Assert(accountSource.Contains("Lead consequence", StringComparison.Ordinal), "account work should summarize the leading consequence directly on the selected campaign card.");
@@ -2167,6 +2174,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.RulesNavigator.Count >= 1, "account page should surface first-class rules navigator answers.");
     Assert(accountModel.CampaignSpine.MigrationReceipts.Count >= 1, "account page should surface legacy migration receipts.");
     Assert(accountModel.CampaignSpine.CreatorPublications.Count >= 1, "account page should surface creator publication posture.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].NextSafeAction), "account page should keep creator-publication next-step truth attached.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].CampaignReturnSummary), "account page should keep creator-publication return truth attached.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].SupportClosureSummary), "account page should keep creator-publication support closure attached.");
     Assert(accountModel.CampaignSpine.Restore.RecentRuleEnvironments.Count >= 1, "account page should surface restore-ready rule environments.");
     Assert(accountModel.CampaignSpine.Restore.RecentArtifacts.Count >= 1, "account page should surface reconnectable artifact truth.");
     Assert(accountModel.CampaignSpine.Restore.Entitlements.Count >= 1, "account page should surface active entitlements in the roaming restore packet.");
@@ -2307,6 +2317,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var publicationResult = await campaignSpineController.GetMyCreatorPublication(publicationId, CancellationToken.None);
     var publicationPayload = (publicationResult.Result as OkObjectResult)?.Value as CreatorPublicationProjection ?? publicationResult.Value;
     Assert(publicationPayload is not null && string.Equals(publicationPayload.PublicationId, publicationId, StringComparison.Ordinal), "campaign spine api should expose creator-publication posture from the same campaign truth.");
+    Assert(!string.IsNullOrWhiteSpace(publicationPayload!.NextSafeAction), "campaign spine api should keep the creator-publication next step attached.");
+    Assert(!string.IsNullOrWhiteSpace(publicationPayload.CampaignReturnSummary), "campaign spine api should keep creator-publication return truth attached.");
+    Assert(!string.IsNullOrWhiteSpace(publicationPayload.SupportClosureSummary), "campaign spine api should keep creator-publication support closure attached.");
     var missingWorkspaceResult = await campaignSpineController.GetMyCampaignWorkspace("workspace-missing", CancellationToken.None);
     Assert(missingWorkspaceResult.Result is NotFoundResult, "campaign spine workspace api should return 404 when the signed-in workspace does not exist.");
     var missingWorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane("workspace-missing", CancellationToken.None);
@@ -2528,6 +2541,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var accountPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: publicationId) as ViewResult;
     var accountPublicationDetailModel = accountPublicationDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountPublicationDetailModel?.SelectedCreatorPublication?.PublicationId, publicationId, StringComparison.Ordinal), "account publication detail route should load the selected creator-publication follow-through.");
+    Assert(!string.IsNullOrWhiteSpace(accountPublicationDetailModel?.SelectedCreatorPublication?.NextSafeAction), "account publication detail route should keep the creator-publication next step visible.");
+    Assert(!string.IsNullOrWhiteSpace(accountPublicationDetailModel?.SelectedCreatorPublication?.CampaignReturnSummary), "account publication detail route should keep creator-publication return truth visible.");
+    Assert(!string.IsNullOrWhiteSpace(accountPublicationDetailModel?.SelectedCreatorPublication?.SupportClosureSummary), "account publication detail route should keep creator-publication support closure visible.");
 
     var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
@@ -2582,6 +2598,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(contactSubmittedModel.TrackedCaseSummary.AffectedInstallSummary?.Contains("install-smoke-001", StringComparison.Ordinal) == true, "contact confirmation should keep the affected install attached to the tracked case.");
     Assert(authenticatedHomeModel.CampaignSpine.RulesNavigator.Count >= 1, "signed-in home should surface grounded rules navigator answers.");
     Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Count >= 1, "signed-in home should surface creator publication posture.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CreatorPublications[0].NextSafeAction), "signed-in home should keep creator-publication next-step truth attached.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CreatorPublications[0].CampaignReturnSummary), "signed-in home should keep creator-publication return truth attached.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CreatorPublications[0].SupportClosureSummary), "signed-in home should keep creator-publication support closure attached.");
     Assert(authenticatedHomeModel.CampaignSpine.MigrationReceipts.Count >= 1, "signed-in home should surface migration receipt truth.");
     Assert(authenticatedHomeModel.InstallLinking.ClaimedInstallations?.Any(static item => string.Equals(item.Platform, "linux", StringComparison.OrdinalIgnoreCase)) == true, "signed-in home should surface claimed install posture.");
     var accessHomePage = await authenticatedLandingController.HomePage("access", CancellationToken.None) as ViewResult;
@@ -2603,6 +2622,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the aftermath package attached to the bounded return shelf.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary), "home work route should keep publication trust visible on the shared home projection.");
+    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].NextSafeAction), "home work route should keep creator-publication next-step truth visible on the shared home projection.");
+    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].CampaignReturnSummary), "home work route should keep creator-publication return truth visible on the shared home projection.");
+    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].SupportClosureSummary), "home work route should keep creator-publication support closure visible on the shared home projection.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1, "home work route should keep the claimed-device return packet visible on the shared home projection.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Any(item => item.RestoreSummary.Contains("bounded offline use", StringComparison.Ordinal)), "home work route should surface bounded offline prefetch on the claimed-device return card.");
 
