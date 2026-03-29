@@ -110,6 +110,45 @@
       "design_impact_count": 0,
       "summary": "0 waiting closure / 0 pending human response. 0 open support packets across 2 reported cases."
     },
+    "adoption_health": {
+      "state": "clear",
+      "local_release_proof_status": "passed",
+      "proven_journey_count": 4,
+      "proven_route_count": 6,
+      "history_snapshot_count": 5,
+      "summary": "Current local edge proof passed. 4 journey proofs and 6 trust routes are on record. 5 weekly snapshots are measured so far, so adoption history is still early."
+    },
+    "progress_trend": {
+      "state": "steady",
+      "direction": "flat",
+      "delta_percent": 0,
+      "from_as_of": "2026-03-28",
+      "to_as_of": "2026-03-29",
+      "sample_count": 5,
+      "summary": "Flat trend 0% from 2026-03-28 to 2026-03-29. Trend window: 2026-03-23 100% -> 2026-03-25 73% -> 2026-03-27 73% -> 2026-03-28 100% -> 2026-03-29 100%.",
+      "samples": [
+        {
+          "as_of": "2026-03-23",
+          "overall_progress_percent": 100
+        },
+        {
+          "as_of": "2026-03-25",
+          "overall_progress_percent": 73
+        },
+        {
+          "as_of": "2026-03-27",
+          "overall_progress_percent": 73
+        },
+        {
+          "as_of": "2026-03-28",
+          "overall_progress_percent": 100
+        },
+        {
+          "as_of": "2026-03-29",
+          "overall_progress_percent": 100
+        }
+      ]
+    },
     "journey_gate_source": "/docker/fleet/.codex-studio/published/JOURNEY_GATES.generated.json",
     "post_audit_next20_status": "complete",
     "active_wave_registry": "products/chummer/NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_REGISTRY.yaml",

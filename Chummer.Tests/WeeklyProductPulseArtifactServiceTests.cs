@@ -14,6 +14,7 @@ public sealed class WeeklyProductPulseArtifactServiceTests
         using var fixture = new WeeklyPulseFixture();
         fixture.WriteBasePulse();
         fixture.WriteProgressReport();
+        fixture.WriteProgressHistory();
         fixture.WriteJourneyGates();
         fixture.WriteSupportPackets();
         fixture.WriteStatusPlane();
@@ -31,6 +32,11 @@ public sealed class WeeklyProductPulseArtifactServiceTests
         Assert.Equal("Pilot defaults are governed", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("default_status").GetString());
         Assert.Equal("clear", document.RootElement.GetProperty("supporting_signals").GetProperty("closure_health").GetProperty("state").GetString());
         Assert.Equal(0, document.RootElement.GetProperty("supporting_signals").GetProperty("closure_health").GetProperty("waiting_closure_count").GetInt32());
+        Assert.Equal("clear", document.RootElement.GetProperty("supporting_signals").GetProperty("adoption_health").GetProperty("state").GetString());
+        Assert.Equal(2, document.RootElement.GetProperty("supporting_signals").GetProperty("adoption_health").GetProperty("proven_journey_count").GetInt32());
+        Assert.Equal("moving", document.RootElement.GetProperty("supporting_signals").GetProperty("progress_trend").GetProperty("state").GetString());
+        Assert.Equal("up", document.RootElement.GetProperty("supporting_signals").GetProperty("progress_trend").GetProperty("direction").GetString());
+        Assert.Equal(2, document.RootElement.GetProperty("supporting_signals").GetProperty("progress_trend").GetProperty("delta_percent").GetInt32());
     }
 
     private sealed class WeeklyPulseFixture : IDisposable
@@ -156,6 +162,35 @@ public sealed class WeeklyProductPulseArtifactServiceTests
                 }));
         }
 
+        public void WriteProgressHistory()
+        {
+            File.WriteAllText(
+                Path.Combine(_canonRoot, ".codex-design", "product", "PROGRESS_HISTORY.generated.json"),
+                JsonSerializer.Serialize(new Dictionary<string, object?>
+                {
+                    ["contract_name"] = "fleet.public_progress_history",
+                    ["snapshot_count"] = 3,
+                    ["snapshots"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["as_of"] = "2026-03-27",
+                            ["overall_progress_percent"] = 98
+                        },
+                        new Dictionary<string, object?>
+                        {
+                            ["as_of"] = "2026-03-28",
+                            ["overall_progress_percent"] = 98
+                        },
+                        new Dictionary<string, object?>
+                        {
+                            ["as_of"] = "2026-03-29",
+                            ["overall_progress_percent"] = 100
+                        }
+                    }
+                }));
+        }
+
         public void WriteSupportPackets()
         {
             File.WriteAllText(
@@ -205,7 +240,9 @@ projects:
                 {
                     ["contract_name"] = "chummer6-hub.local_release_proof",
                     ["generated_at"] = "2026-03-29T08:40:12Z",
-                    ["status"] = "passed"
+                    ["status"] = "passed",
+                    ["journeys_passed"] = new[] { "install_claim_restore_continue", "build_explain_publish" },
+                    ["proof_routes"] = new[] { "/", "/downloads", "/help" }
                 }));
         }
 

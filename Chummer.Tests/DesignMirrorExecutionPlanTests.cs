@@ -39,6 +39,8 @@ public sealed class DesignMirrorExecutionPlanTests
             "\"active_wave_registry\": \"products/chummer/NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_REGISTRY.yaml\"",
             "\"journey_gate_health\"",
             "\"closure_health\"",
+            "\"adoption_health\"",
+            "\"progress_trend\"",
             "\"next_checkpoint_question\""
         ];
 
