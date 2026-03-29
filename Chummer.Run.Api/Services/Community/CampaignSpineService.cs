@@ -66,8 +66,11 @@ public sealed class CampaignSpineService
             var transfers = _store.RosterTransfers
                 .OrderByDescending(static item => item.TransferredAtUtc)
                 .ToArray();
+            var prepLaunches = _store.PrepLaunches
+                .OrderByDescending(static item => item.LaunchedAtUtc)
+                .ToArray();
             var workspaces = campaigns
-                .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore, transfers))
+                .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore, transfers, prepLaunches))
                 .OrderByDescending(static workspace => workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.MinValue)
                 .ToArray();
             var operations = _store.GroupsById.Values
@@ -130,6 +133,70 @@ public sealed class CampaignSpineService
 
         return GetAccountSummary(user, installLinking).Workspaces
             .FirstOrDefault(item => string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public GovernedPrepLaunchProjection RecordPrepLaunch(
+        HubUserDto user,
+        CampaignWorkspaceProjection workspace,
+        string packetId,
+        string packetKind,
+        string packetTitle,
+        string packetSummary,
+        RunProjection? targetRun,
+        SceneProjection? targetScene,
+        string? note = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(workspace);
+
+        string normalizedPacketId = AccountService.NormalizeOptional(packetId)
+            ?? throw new ArgumentException("packetId is required.", nameof(packetId));
+        string normalizedPacketKind = AccountService.NormalizeOptional(packetKind)
+            ?? throw new ArgumentException("packetKind is required.", nameof(packetKind));
+        string normalizedPacketTitle = AccountService.NormalizeOptional(packetTitle)
+            ?? throw new ArgumentException("packetTitle is required.", nameof(packetTitle));
+        string normalizedPacketSummary = AccountService.NormalizeOptional(packetSummary) ?? normalizedPacketTitle;
+        string? normalizedNote = AccountService.NormalizeOptional(note);
+
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            var launch = new GovernedPrepLaunchProjection(
+                LaunchId: StableId("prep-launch", $"{workspace.WorkspaceId}:{normalizedPacketId}:{targetRun?.RunId ?? "campaign"}:{targetScene?.SceneId ?? "scene"}:{now.ToUnixTimeMilliseconds()}"),
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignId: workspace.CampaignId,
+                PacketId: normalizedPacketId,
+                PacketKind: normalizedPacketKind,
+                PacketTitle: normalizedPacketTitle,
+                TargetRunId: targetRun?.RunId,
+                TargetRunTitle: targetRun?.Title,
+                TargetSceneId: targetScene?.SceneId,
+                TargetSceneTitle: targetScene?.Title,
+                InitiatedByUserId: user.UserId,
+                Summary: DescribePrepLaunchSummary(workspace, normalizedPacketTitle, targetRun, targetScene),
+                AuditLines: FinalizeLines(
+                [
+                    $"Bound governed packet {normalizedPacketTitle} ({normalizedPacketKind}) from {workspace.CampaignName}.",
+                    $"Packet summary: {normalizedPacketSummary}",
+                    targetRun is null
+                        ? $"Binding target stays campaign-wide on {workspace.CampaignName}."
+                        : targetScene is null
+                            ? $"Binding target: {targetRun.Title}."
+                            : $"Binding target: {targetRun.Title} / {targetScene.Title}.",
+                    $"Rule posture: {workspace.RuleEnvironment.CompatibilityFingerprint}.",
+                    normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
+                ]),
+                LaunchedAtUtc: now);
+
+            _store.PrepLaunches.Add(launch);
+            if (_store.PrepLaunches.Count > 64)
+            {
+                _store.PrepLaunches.RemoveRange(64, _store.PrepLaunches.Count - 64);
+            }
+
+            _store.PersistLocked();
+            return launch;
+        }
     }
 
     public IReadOnlyList<CampaignWorkspaceDigestProjection> GetWorkspaceDigests(HubUserDto user, InstallLinkingSummaryDto? installLinking = null)
@@ -1171,7 +1238,8 @@ public sealed class CampaignSpineService
         IReadOnlyList<RunProjection> runs,
         IReadOnlyList<CrewProjection> crews,
         WorkspaceRestoreProjection restore,
-        IReadOnlyList<RosterTransferProjection> transfers)
+        IReadOnlyList<RosterTransferProjection> transfers,
+        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches)
     {
         var workspaceCrews = crews
             .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
@@ -1188,6 +1256,12 @@ public sealed class CampaignSpineService
             .Where(item => string.Equals(item.SourceCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(item.TargetCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(static item => item.TransferredAtUtc)
+            .ToArray();
+        string workspaceId = StableId("workspace", campaign.CampaignId);
+        var workspacePrepLaunches = prepLaunches
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.LaunchedAtUtc)
             .ToArray();
 
         var readinessCues = new List<CampaignReadinessCue>();
@@ -1259,6 +1333,14 @@ public sealed class CampaignSpineService
                 Title: "Roster transfer audit is attached",
                 Summary: $"{rosterTransfers.Length} recent dossier move(s) keep source, target, and ownership receipts attached to this campaign view."));
         }
+        if (workspacePrepLaunches.Length > 0)
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:prep-launches"),
+                Severity: "ready",
+                Title: "Governed prep binding is attached",
+                Summary: $"{workspacePrepLaunches.Length} recent packet launch receipt(s) keep opposition and scene prep bound to this campaign without recreating local shadow prep notes."));
+        }
 
         var recapShelf = workspaceDossiers
             .SelectMany(static item => item.Projections)
@@ -1275,10 +1357,10 @@ public sealed class CampaignSpineService
                 && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase));
         var activeSceneSummary = DescribeActiveSceneSummary(leadRun, activeScene, leadObjective);
         var nextSafeAction = ResolveWorkspaceNextSafeAction(campaign, restore, recapShelf, readinessCues, leadRun, activeScene, leadObjective);
-        var changePackets = BuildWorkspaceChangePackets(campaign, recapShelf, leadRun, activeScene, leadObjective, rosterTransfers);
+        var changePackets = BuildWorkspaceChangePackets(campaign, recapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches);
 
         return new CampaignWorkspaceProjection(
-            WorkspaceId: StableId("workspace", campaign.CampaignId),
+            WorkspaceId: workspaceId,
             CampaignId: campaign.CampaignId,
             CampaignName: campaign.Name,
             Visibility: campaign.Visibility,
@@ -1294,7 +1376,8 @@ public sealed class CampaignSpineService
             NextSafeAction: nextSafeAction,
             ChangePackets: changePackets,
             Consequences: consequences,
-            RosterTransfers: rosterTransfers);
+            RosterTransfers: rosterTransfers,
+            PrepLaunches: workspacePrepLaunches);
     }
 
     private static bool IsOperatorRole(string role)
@@ -1561,7 +1644,8 @@ public sealed class CampaignSpineService
         RunProjection? leadRun,
         SceneProjection? activeScene,
         ObjectiveProjection? leadObjective,
-        IReadOnlyList<RosterTransferProjection> rosterTransfers)
+        IReadOnlyList<RosterTransferProjection> rosterTransfers,
+        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches)
     {
         List<WorkspaceChangePacketProjection> packets = [];
         if (campaign.LatestContinuity is not null)
@@ -1605,6 +1689,17 @@ public sealed class CampaignSpineService
                 UpdatedAtUtc: rosterTransfer.TransferredAtUtc));
         }
 
+        GovernedPrepLaunchProjection? prepLaunch = prepLaunches.FirstOrDefault();
+        if (prepLaunch is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:prep-launch:{prepLaunch.LaunchId}"),
+                Kind: "prep_launch",
+                Label: "GM prep launch",
+                Summary: prepLaunch.Summary,
+                UpdatedAtUtc: prepLaunch.LaunchedAtUtc));
+        }
+
         PublicationSafeProjection? recap = recapShelf.FirstOrDefault();
         if (recap is not null)
         {
@@ -1620,6 +1715,25 @@ public sealed class CampaignSpineService
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .Take(4)
             .ToArray();
+    }
+
+    private static string DescribePrepLaunchSummary(
+        CampaignWorkspaceProjection workspace,
+        string packetTitle,
+        RunProjection? targetRun,
+        SceneProjection? targetScene)
+    {
+        if (targetRun is null)
+        {
+            return $"Bound {packetTitle} to {workspace.CampaignName} as campaign-wide governed prep truth.";
+        }
+
+        if (targetScene is null)
+        {
+            return $"Bound {packetTitle} to {targetRun.Title} without recreating local shadow prep notes.";
+        }
+
+        return $"Bound {packetTitle} to {targetRun.Title} / {targetScene.Title} without recreating local shadow prep notes.";
     }
 
     private static IReadOnlyList<CampaignConsequenceProjection> BuildCampaignConsequences(

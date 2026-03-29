@@ -103,6 +103,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             KnownIssues: knownIssues,
             DecisionNotices: decisionNotices,
             PrepLibrary: prepLibrary,
+            PrepLaunches: context.Workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>(),
             TravelMode: travelMode,
             NextSafeAction: nextSafeAction,
             GeneratedAtUtc: context.GeneratedAtUtc);
@@ -134,6 +135,40 @@ public sealed class CampaignWorkspaceServerPlaneService
             QueryText: normalizedQuery,
             Items: packets,
             TotalCount: packets.Count);
+    }
+
+    public GovernedPrepLaunchProjection? LaunchWorkspacePrepPacket(
+        HubUserDto user,
+        string workspaceId,
+        GovernedPrepLaunchRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(request);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        if (context is null)
+        {
+            return null;
+        }
+
+        CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
+        GovernedPrepPacketSummary packet = prepLibrary.Packets
+            .FirstOrDefault(item => string.Equals(item.PacketId, request.PacketId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new KeyNotFoundException($"Unknown governed prep packet: {request.PacketId}");
+
+        RunProjection? targetRun = ResolvePrepLaunchRun(context.Workspace, context.LeadRun, request.TargetRunId);
+        SceneProjection? targetScene = ResolvePrepLaunchScene(targetRun, request.TargetSceneId);
+        return _campaignSpine.RecordPrepLaunch(
+            user,
+            context.Workspace,
+            packet.PacketId,
+            packet.Kind,
+            packet.Title,
+            packet.Summary,
+            targetRun,
+            targetScene,
+            request.Note);
     }
 
     private WorkspaceContext? ResolveWorkspaceContext(
@@ -170,6 +205,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 accountSummary.Restore.GeneratedAtUtc,
                 workspace.LatestContinuity?.CapturedAtUtc,
                 workspace.RosterTransfers?.FirstOrDefault()?.TransferredAtUtc,
+                workspace.PrepLaunches?.FirstOrDefault()?.LaunchedAtUtc,
                 leadRun?.UpdatedAtUtc
             }
             .Concat(relevantCases.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
@@ -1010,6 +1046,39 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Concat(packet.SearchTerms)
             .Concat(packet.EvidenceLines)
             .Any(text => text.Contains(queryText, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static RunProjection? ResolvePrepLaunchRun(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? leadRun,
+        string? targetRunId)
+    {
+        string? normalized = NormalizeOptional(targetRunId);
+        if (normalized is null)
+        {
+            return leadRun;
+        }
+
+        return workspace.Runs.FirstOrDefault(item => string.Equals(item.RunId, normalized, StringComparison.OrdinalIgnoreCase))
+            ?? throw new KeyNotFoundException($"Unknown target run: {normalized}");
+    }
+
+    private static SceneProjection? ResolvePrepLaunchScene(RunProjection? run, string? targetSceneId)
+    {
+        if (run is null)
+        {
+            return null;
+        }
+
+        string? normalized = NormalizeOptional(targetSceneId);
+        if (normalized is null)
+        {
+            return run.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, run.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
+                ?? run.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
+        }
+
+        return run.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, normalized, StringComparison.OrdinalIgnoreCase))
+            ?? throw new KeyNotFoundException($"Unknown target scene: {normalized}");
     }
 
     private static bool IsTravelReadyDevice(ClaimedDeviceRestoreProjection device)

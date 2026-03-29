@@ -21,6 +21,7 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     IReadOnlyList<KnownIssueAffectingInstall> KnownIssues,
     IReadOnlyList<DecisionNotice> DecisionNotices,
     CampaignPrepLibrarySummary PrepLibrary,
+    IReadOnlyList<GovernedPrepLaunchProjection> PrepLaunches,
     TravelModeReadinessSummary TravelMode,
     NextSafeActionCue NextSafeAction,
     DateTimeOffset GeneratedAtUtc);
