@@ -93,6 +93,13 @@
     "phase_label": "Public-fit polish",
     "history_snapshot_count": 5,
     "longest_pole": "Core Engine",
+    "launch_readiness": "Hold launch expansion pending route-canary validation.",
+    "provider_route_stewardship": {
+      "default_status": "Pilot defaults are governed",
+      "canary_status": "Canary green on all active lanes",
+      "review_due": "2026-06-01",
+      "next_decision": "Promote once support fallout remains stable."
+    },
     "journey_gate_source": "/docker/fleet/.codex-studio/published/JOURNEY_GATES.generated.json",
     "post_audit_next20_status": "complete",
     "active_wave_registry": "products/chummer/NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_REGISTRY.yaml",

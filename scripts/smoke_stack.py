@@ -14,6 +14,12 @@ from typing import Dict, List, Optional, Tuple
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+COMPOSE_FILE_CANDIDATES = [
+    REPO_ROOT / "docker-compose.public-edge.yml",
+    REPO_ROOT / "docker-compose.yml",
+    REPO_ROOT / "docker-compose.yaml",
+]
+DEFAULT_COMPOSE_FILE = next((item for item in COMPOSE_FILE_CANDIDATES if item.exists()), None)
 
 
 def detect_compose_base() -> List[str]:
@@ -40,6 +46,8 @@ COMPOSE_BASE = detect_compose_base()
 def compose_env() -> Dict[str, str]:
     env = os.environ.copy()
     env.setdefault("TUNNEL_TOKEN", "dummy")
+    if "COMPOSE_FILE" not in env and DEFAULT_COMPOSE_FILE is not None:
+        env["COMPOSE_FILE"] = str(DEFAULT_COMPOSE_FILE.relative_to(REPO_ROOT))
     return env
 
 
@@ -124,6 +132,11 @@ def host_for_url(host: str) -> str:
     return host
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def published_tcp_bindings(ports: Dict[str, object]) -> List[Tuple[str, str, int]]:
     bindings: List[Tuple[str, str, int]] = []
     if not isinstance(ports, dict):
@@ -167,8 +180,9 @@ def tcp_check(host: str, port: int, timeout: float = 2.5) -> None:
 
 def http_get(url: str, *, headers: Optional[Dict[str, str]] = None, timeout: float = 4.0) -> Tuple[int, str]:
     request = urllib.request.Request(url, headers=headers or {}, method="GET")
+    opener = urllib.request.build_opener(_NoRedirect())
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with opener.open(request, timeout=timeout) as response:
             status = getattr(response, "status", response.getcode())
             body = response.read(160).decode("utf-8", "ignore")
             return status, body
@@ -225,7 +239,7 @@ def http_probe(service: str, ports: Dict[str, object]) -> Tuple[Optional[bool], 
         return False, f"GET / -> {status}"
 
     status, _ = http_get(f"{base_url}/")
-    if status in (200, 301, 302, 400, 401, 403, 404, 405):
+    if status in (200, 301, 302, 307, 400, 401, 403, 404, 405):
         return True, f"GET / -> {status}"
     return False, f"GET / -> {status}"
 
