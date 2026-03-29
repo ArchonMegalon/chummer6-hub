@@ -63,6 +63,15 @@ public sealed record OfflineSyncPrepChecklistItem(
     bool Completed = false,
     string? Notes = null);
 
+public sealed record OfflineSyncPrepGovernedProjectReference(
+    string ProjectKind,
+    string ProjectId,
+    string Title,
+    string RulesetId,
+    string LinkTarget,
+    string TrustTier,
+    string? RuntimeFingerprint = null);
+
 public sealed record OfflineSyncPrepAsset(
     string AssetId,
     string CampaignId,
@@ -82,7 +91,8 @@ public sealed record OfflineSyncPrepAsset(
     DateTimeOffset UpdatedAtUtc,
     DateTimeOffset? LastRevealedAtUtc = null,
     string? LastRevealChannel = null,
-    int RevealCount = 0);
+    int RevealCount = 0,
+    OfflineSyncPrepGovernedProjectReference? GovernedProject = null);
 
 public sealed record OfflineSyncSnapshotRequest(
     string CampaignId,

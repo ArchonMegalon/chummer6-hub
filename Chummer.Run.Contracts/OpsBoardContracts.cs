@@ -94,6 +94,15 @@ public sealed record GmPrepAssetCreateRequest(
     string? CreatedBy = null,
     string? RuntimeFingerprint = null);
 
+public sealed record GmPrepAssetGovernedProjectReference(
+    string ProjectKind,
+    string ProjectId,
+    string Title,
+    string RulesetId,
+    string LinkTarget,
+    string TrustTier,
+    string? RuntimeFingerprint = null);
+
 public sealed record GmPrepAssetCatalogImportRequest(
     [Required(AllowEmptyStrings = false), StringLength(128)] string CampaignId,
     [StringLength(128)] string? SessionId,
@@ -126,7 +135,8 @@ public sealed record GmPrepAssetRecord(
     DateTimeOffset UpdatedAtUtc,
     DateTimeOffset? LastRevealedAtUtc = null,
     string? LastRevealChannel = null,
-    int RevealCount = 0);
+    int RevealCount = 0,
+    GmPrepAssetGovernedProjectReference? GovernedProject = null);
 
 public sealed record GmPrepAssetSummary(
     string AssetId,
@@ -142,7 +152,8 @@ public sealed record GmPrepAssetSummary(
     int ChecklistItemCount,
     int ChecklistCompletedCount,
     DateTimeOffset UpdatedAtUtc,
-    DateTimeOffset? LastRevealedAtUtc = null);
+    DateTimeOffset? LastRevealedAtUtc = null,
+    GmPrepAssetGovernedProjectReference? GovernedProject = null);
 
 public sealed record GmPrepAssetListResponse(
     IReadOnlyList<GmPrepAssetSummary> Items,

@@ -132,7 +132,8 @@ public sealed class OfflineSyncService : IOfflineSyncService
             UpdatedAtUtc: asset.UpdatedAtUtc,
             LastRevealedAtUtc: asset.LastRevealedAtUtc,
             LastRevealChannel: asset.LastRevealChannel,
-            RevealCount: asset.RevealCount);
+            RevealCount: asset.RevealCount,
+            GovernedProject: ToPortableGovernedProject(asset.GovernedProject));
     }
 
     private static string RecomputePackageHash(OfflineSyncSnapshotPackage snapshot)
@@ -153,7 +154,7 @@ public sealed class OfflineSyncService : IOfflineSyncService
     {
         var payload = string.Join('|', assets
             .OrderBy(static item => item.AssetId, StringComparer.Ordinal)
-            .Select(static item => $"{item.AssetId}:{item.Kind}:{item.Status}:{item.UpdatedAtUtc:O}:{string.Join(",", item.Tags)}"));
+            .Select(static item => $"{item.AssetId}:{item.Kind}:{item.Status}:{item.UpdatedAtUtc:O}:{string.Join(",", item.Tags)}:{item.GovernedProject?.ProjectKind}:{item.GovernedProject?.ProjectId}"));
         return ComputeHash(payload);
     }
 
@@ -162,6 +163,23 @@ public sealed class OfflineSyncService : IOfflineSyncService
         using var sha = SHA256.Create();
         var bytes = Encoding.UTF8.GetBytes(payload);
         return Convert.ToHexString(sha.ComputeHash(bytes));
+    }
+
+    private static OfflineSyncPrepGovernedProjectReference? ToPortableGovernedProject(GmPrepAssetGovernedProjectReference? governedProject)
+    {
+        if (governedProject is null)
+        {
+            return null;
+        }
+
+        return new OfflineSyncPrepGovernedProjectReference(
+            ProjectKind: governedProject.ProjectKind,
+            ProjectId: governedProject.ProjectId,
+            Title: governedProject.Title,
+            RulesetId: governedProject.RulesetId,
+            LinkTarget: governedProject.LinkTarget,
+            TrustTier: governedProject.TrustTier,
+            RuntimeFingerprint: governedProject.RuntimeFingerprint);
     }
 
     private static string? NormalizeOptional(string? value) =>
