@@ -111,7 +111,7 @@ public sealed class GroupService
         var group = RequireGroup(groupId);
         if (!CanIssueJoinCodes(group, requester.UserId))
         {
-            throw new CommunityAccessDeniedException("requester must be a group owner or manager to issue join codes.");
+            throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm to issue join codes.");
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -185,7 +185,7 @@ public sealed class GroupService
         var group = RequireGroup(request.GroupId);
         if (!CanIssueBoostCodes(group, requester.UserId))
         {
-            throw new CommunityAccessDeniedException("requester must be a group owner or manager to issue boost codes.");
+            throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm to issue boost codes.");
         }
 
         lock (_store.Gate)
@@ -319,7 +319,8 @@ public sealed class GroupService
     private static bool IsElevatedRole(string? role)
         => string.Equals(AccountService.NormalizeOptional(role), "owner", StringComparison.OrdinalIgnoreCase)
             || string.Equals(AccountService.NormalizeOptional(role), "admin", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(AccountService.NormalizeOptional(role), "manager", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(AccountService.NormalizeOptional(role), "manager", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(AccountService.NormalizeOptional(role), "gm", StringComparison.OrdinalIgnoreCase);
 
     private static string NormalizeJoinRole(string? role)
         => (AccountService.NormalizeOptional(role) ?? "member").ToLowerInvariant() switch

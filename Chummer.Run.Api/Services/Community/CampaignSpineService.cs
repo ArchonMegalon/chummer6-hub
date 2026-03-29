@@ -13,6 +13,10 @@ public sealed class CampaignSpineService
     private static readonly JsonSerializerOptions ComparisonJsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly IReadOnlyList<string> DefaultPersonalPreviewCapabilities =
     [
+        "can_manage_members",
+        "can_issue_join_codes",
+        "can_issue_boost_codes",
+        "can_hold_shared_entitlements",
         "campaign_workspace",
         "build_lab",
         "rules_navigator",
@@ -1062,14 +1066,24 @@ public sealed class CampaignSpineService
                 UpdatedAtUtc: now);
             changed = true;
         }
-        else if (existingGroup.Memberships.All(member => !string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)))
+        else
         {
-            _store.GroupsById[groupId] = existingGroup with
+            bool missingMembership = existingGroup.Memberships.All(member => !string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase));
+            bool missingCapabilities = DefaultPersonalPreviewCapabilities.Except(existingGroup.Capabilities, StringComparer.OrdinalIgnoreCase).Any();
+            if (missingMembership || missingCapabilities)
             {
-                Memberships = existingGroup.Memberships.Concat([membership]).ToArray(),
-                UpdatedAtUtc = now
-            };
-            changed = true;
+                _store.GroupsById[groupId] = existingGroup with
+                {
+                    Memberships = missingMembership
+                        ? existingGroup.Memberships.Concat([membership]).ToArray()
+                        : existingGroup.Memberships,
+                    Capabilities = missingCapabilities
+                        ? existingGroup.Capabilities.Concat(DefaultPersonalPreviewCapabilities).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+                        : existingGroup.Capabilities,
+                    UpdatedAtUtc = now
+                };
+                changed = true;
+            }
         }
 
         if (_store.UsersById.TryGetValue(user.UserId, out var existingUser)
