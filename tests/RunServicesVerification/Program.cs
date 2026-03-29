@@ -13,6 +13,7 @@ await SupportCrashVerification.RunAsync();
 await StateStoreBackupVerification.RunAsync();
 CompatibilityVerification.Run();
 await HubApiRuntimeGuardrailVerification.RunAsync();
+await CampaignSpineRestoreVerification.RunAsync();
 await WorkspaceLifecycleRetentionVerification.RunAsync();
 await HubRequestObservabilityVerification.RunAsync();
 HubExtractionReadinessVerification.Run();
