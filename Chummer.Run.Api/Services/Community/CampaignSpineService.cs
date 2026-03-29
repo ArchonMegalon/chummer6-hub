@@ -1780,7 +1780,10 @@ public sealed class CampaignSpineService
             string memorySummary = string.IsNullOrWhiteSpace(entry.CampaignMemorySummary)
                 ? string.Empty
                 : $" Memory: {entry.CampaignMemorySummary}";
-            lines.Add((entry.UpdatedAtUtc, $"{entry.CampaignName}: {entry.RunTitle} · {entry.LatestEventSummary} Next: {entry.NextSafeAction}{memorySummary}"));
+            string consequenceSummary = string.IsNullOrWhiteSpace(entry.ConsequenceSummary)
+                ? string.Empty
+                : $" Consequence: {entry.ConsequenceSummary}";
+            lines.Add((entry.UpdatedAtUtc, $"{entry.CampaignName}: {entry.RunTitle} · {entry.LatestEventSummary} Next: {entry.NextSafeAction}{consequenceSummary}{memorySummary}"));
         }
 
         foreach (var sponsorSession in recentSponsorSessions)
@@ -2039,6 +2042,9 @@ public sealed class CampaignSpineService
                 var leadAftermathPackage = workspace.AftermathPackages?
                     .OrderByDescending(static item => item.GeneratedAtUtc)
                     .FirstOrDefault();
+                var leadConsequence = workspace.Consequences?
+                    .OrderByDescending(static item => item.UpdatedAtUtc)
+                    .FirstOrDefault();
                 var watchout = workspace.ReadinessCues
                     .Where(static cue => NeedsAttention(cue.Severity))
                     .Select(static cue => $"{cue.Title} — {cue.Summary}")
@@ -2056,6 +2062,7 @@ public sealed class CampaignSpineService
                     {
                         leadChangePacket?.UpdatedAtUtc,
                         workspace.NextSessionCarryForward?.UpdatedAtUtc,
+                        leadConsequence?.UpdatedAtUtc,
                         workspace.CampaignMemory?.UpdatedAtUtc,
                         leadAftermathPackage?.GeneratedAtUtc,
                         leadRun?.UpdatedAtUtc,
@@ -2071,6 +2078,7 @@ public sealed class CampaignSpineService
                     CampaignName: workspace.CampaignName,
                     RunTitle: leadRun?.Title ?? "No live run yet",
                     LatestEventSummary: latestEventSummary,
+                    ConsequenceSummary: leadConsequence is null ? null : $"{leadConsequence.Label} — {leadConsequence.Summary}",
                     CampaignMemorySummary: workspace.CampaignMemory?.Summary,
                     CampaignMemoryReturnSummary: workspace.CampaignMemory?.ReturnSummary,
                     NextSafeAction: workspace.NextSafeAction ?? "Open the shared campaign view and confirm the current return lane before you continue.",
