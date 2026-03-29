@@ -761,7 +761,9 @@ public sealed class PublicLandingController : Controller
         var rows = new List<PublicTrustPulseRowViewModel>
         {
             new("Recommended now", BuildTrustPulseRecommendedSummary(manifest, releaseExperience)),
+            new("Who can get it now", BuildTrustPulseAccessSummary(releaseExperience)),
             new("Release proof", BuildReleaseProofSummary(manifest)),
+            new("Adoption health", BuildTrustPulseAdoptionSummary(pulse)),
             new("Journey pulse", BuildJourneyPulseSummary(pulse)),
             new("Current caution", BuildTrustPulseCautionSummary(pulse))
         };
@@ -1114,6 +1116,26 @@ public sealed class PublicLandingController : Controller
         return $"{releaseExperience.Recommended.Title} on {releaseExperience.Display.ChannelLabel}. {accessSummary}";
     }
 
+    private static string BuildTrustPulseAccessSummary(ReleaseExperienceViewModel releaseExperience)
+    {
+        if (releaseExperience.Recommended is null)
+        {
+            return "No release handoff is published yet.";
+        }
+
+        if (releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable)
+        {
+            return "Signed-in handoff is the live path now, so the install stays linked and support can follow the exact device.";
+        }
+
+        if (releaseExperience.GuestDownloadAvailable)
+        {
+            return "Guest-readable handoff is visible now, and signing in adds linked-install follow-through.";
+        }
+
+        return "Signed-in handoff is available now for linked-install follow-through.";
+    }
+
     private static string BuildJourneyPulseSummary(PublicTrustPulseSnapshot pulse)
     {
         string state = HumanizeToken(pulse.JourneyGateState, "Unknown");
@@ -1152,6 +1174,42 @@ public sealed class PublicLandingController : Controller
 
         return segments.Count == 0
             ? "No extra caution note is published right now."
+            : string.Join(" ", segments);
+    }
+
+    private static string BuildTrustPulseAdoptionSummary(PublicTrustPulseSnapshot pulse)
+    {
+        List<string> segments = [];
+
+        if (!string.IsNullOrWhiteSpace(pulse.LocalReleaseProofStatus))
+        {
+            segments.Add(string.Equals(pulse.LocalReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
+                ? "Current local edge proof passed."
+                : $"Current local edge proof is {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
+        }
+
+        if (pulse.ProvenJourneyCount is int journeyCount && journeyCount > 0 && pulse.ProvenRouteCount is int routeCount && routeCount > 0)
+        {
+            segments.Add($"{journeyCount} journey proofs and {routeCount} trust routes are on record.");
+        }
+        else if (pulse.ProvenJourneyCount is int journeyOnly && journeyOnly > 0)
+        {
+            segments.Add($"{journeyOnly} journey proofs are on record.");
+        }
+        else if (pulse.ProvenRouteCount is int routeOnly && routeOnly > 0)
+        {
+            segments.Add($"{routeOnly} trust routes are on record.");
+        }
+
+        if (pulse.HistorySnapshotCount is int historySnapshotCount && historySnapshotCount > 0)
+        {
+            segments.Add(historySnapshotCount < 6
+                ? $"{historySnapshotCount} weekly snapshots are measured so far, so adoption history is still early."
+                : $"{historySnapshotCount} weekly snapshots are on record for the current public trust posture.");
+        }
+
+        return segments.Count == 0
+            ? "Measured adoption evidence is still accumulating."
             : string.Join(" ", segments);
     }
 

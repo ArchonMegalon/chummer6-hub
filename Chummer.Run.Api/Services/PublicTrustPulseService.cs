@@ -6,7 +6,11 @@ namespace Chummer.Run.Api.Services;
 public sealed class PublicTrustPulseService
 {
     private const string DefaultPulseRelativePath = ".codex-design/product/WEEKLY_PRODUCT_PULSE.generated.json";
+    private const string DefaultProgressReportRelativePath = ".codex-design/product/PROGRESS_REPORT.generated.json";
+    private const string DefaultLocalReleaseProofRelativePath = ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json";
     private const string PulseFileKey = "CHUMMER_PUBLIC_WEEKLY_PULSE_FILE";
+    private const string ProgressReportFileKey = "CHUMMER_PUBLIC_PROGRESS_REPORT_FILE";
+    private const string LocalReleaseProofFileKey = "CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE";
     private readonly IConfiguration _configuration;
     private readonly ILogger<PublicTrustPulseService> _logger;
 
@@ -34,6 +38,17 @@ public sealed class PublicTrustPulseService
                 return null;
             }
 
+            var progressReport = LoadOptionalArtifact<ProgressReportPayload>(
+                ResolveProgressReportPath(),
+                options,
+                static payload => string.Equals(payload.ContractName, "fleet.public_progress_report", StringComparison.Ordinal),
+                "public progress report");
+            var localReleaseProof = LoadOptionalArtifact<LocalReleaseProofPayload>(
+                ResolveLocalReleaseProofPath(),
+                options,
+                static payload => string.Equals(payload.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal),
+                "hub local release proof");
+
             return new PublicTrustPulseSnapshot(
                 AsOf: payload.AsOf ?? string.Empty,
                 Summary: payload.Summary ?? string.Empty,
@@ -50,9 +65,12 @@ public sealed class PublicTrustPulseService
                 ReleaseHealthReason: payload.Snapshot?.ReleaseHealth?.Reason,
                 OverallProgressPercent: payload.SupportingSignals?.OverallProgressPercent,
                 PhaseLabel: payload.SupportingSignals?.PhaseLabel,
-                HistorySnapshotCount: payload.SupportingSignals?.HistorySnapshotCount,
+                HistorySnapshotCount: payload.SupportingSignals?.HistorySnapshotCount ?? progressReport?.HistorySnapshotCount,
                 LongestPoleLabel: payload.SupportingSignals?.LongestPole,
-                NextCheckpointQuestion: payload.NextCheckpointQuestion);
+                NextCheckpointQuestion: payload.NextCheckpointQuestion,
+                LocalReleaseProofStatus: localReleaseProof?.Status,
+                ProvenJourneyCount: localReleaseProof?.JourneysPassed?.Count,
+                ProvenRouteCount: localReleaseProof?.ProofRoutes?.Count);
         }
         catch (Exception ex)
         {
@@ -61,26 +79,54 @@ public sealed class PublicTrustPulseService
         }
     }
 
-    private string? ResolvePulsePath()
+    private TPayload? LoadOptionalArtifact<TPayload>(
+        string? path,
+        JsonSerializerOptions options,
+        Func<TPayload, bool> validator,
+        string label)
+        where TPayload : class
     {
-        if (_configuration[PulseFileKey]?.Trim() is { Length: > 0 } configuredPulsePath)
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
-            return configuredPulsePath;
+            return null;
         }
 
-        var relativePath = DefaultPulseRelativePath.Replace('/', Path.DirectorySeparatorChar);
-        string? canonRoot = _configuration["CHUMMER_PUBLIC_CANON_ROOT"]?.Trim();
-        var candidates = new[]
+        try
         {
-            !string.IsNullOrWhiteSpace(canonRoot) ? Path.Combine(canonRoot, relativePath) : null,
-            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
-            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath)),
-            Path.GetFullPath(Path.Combine("/docker/chummercomplete/chummer.run-services", relativePath))
-        };
+            var payload = JsonSerializer.Deserialize<TPayload>(File.ReadAllText(path), options);
+            return payload is not null && validator(payload) ? payload : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping optional {Label} after load failure from {Path}.", label, path);
+            return null;
+        }
+    }
 
-        return candidates
+    private string? ResolvePulsePath() => ResolveExistingPath(PulseFileKey, DefaultPulseRelativePath);
+
+    private string? ResolveProgressReportPath() => ResolveExistingPath(ProgressReportFileKey, DefaultProgressReportRelativePath);
+
+    private string? ResolveLocalReleaseProofPath() => ResolveExistingPath(LocalReleaseProofFileKey, DefaultLocalReleaseProofRelativePath);
+
+    private string? ResolveExistingPath(string configKey, string defaultRelativePath)
+    {
+        if (_configuration[configKey]?.Trim() is { Length: > 0 } configuredPath)
+        {
+            return configuredPath;
+        }
+
+        var relativePath = defaultRelativePath.Replace('/', Path.DirectorySeparatorChar);
+        string? canonRoot = _configuration["CHUMMER_PUBLIC_CANON_ROOT"]?.Trim();
+        return new[]
+            {
+                !string.IsNullOrWhiteSpace(canonRoot) ? Path.Combine(canonRoot, relativePath) : null,
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath)),
+                Path.GetFullPath(Path.Combine("/docker/chummercomplete/chummer.run-services", relativePath))
+            }
             .Where(static candidate => !string.IsNullOrWhiteSpace(candidate))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(static candidate => File.Exists(candidate));
@@ -117,6 +163,16 @@ public sealed class PublicTrustPulseService
         [property: JsonPropertyName("phase_label")] string? PhaseLabel,
         [property: JsonPropertyName("history_snapshot_count")] int? HistorySnapshotCount,
         [property: JsonPropertyName("longest_pole")] string? LongestPole);
+
+    private sealed record ProgressReportPayload(
+        [property: JsonPropertyName("contract_name")] string? ContractName,
+        [property: JsonPropertyName("history_snapshot_count")] int? HistorySnapshotCount);
+
+    private sealed record LocalReleaseProofPayload(
+        [property: JsonPropertyName("contract_name")] string? ContractName,
+        [property: JsonPropertyName("status")] string? Status,
+        [property: JsonPropertyName("journeys_passed")] IReadOnlyList<string>? JourneysPassed,
+        [property: JsonPropertyName("proof_routes")] IReadOnlyList<string>? ProofRoutes);
 }
 
 public sealed record PublicTrustPulseSnapshot(
@@ -137,4 +193,7 @@ public sealed record PublicTrustPulseSnapshot(
     string? PhaseLabel,
     int? HistorySnapshotCount,
     string? LongestPoleLabel,
-    string? NextCheckpointQuestion);
+    string? NextCheckpointQuestion,
+    string? LocalReleaseProofStatus,
+    int? ProvenJourneyCount,
+    int? ProvenRouteCount);

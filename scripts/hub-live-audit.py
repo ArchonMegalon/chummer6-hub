@@ -1156,12 +1156,12 @@ def main() -> int:
         AuditRoute(
             "/now",
             "Current preview, visible proof, and known posture",
-            required_texts=("What you can verify now", "Build, explain, and run with visible evidence", "Status guide"),
+            required_texts=("What you can verify now", "Build, explain, and run with visible evidence", "Who can get it now", "Adoption health", "Status guide"),
             expects_header_count=1),
         AuditRoute(
             "/downloads",
             "Install the current preview",
-            required_texts=("Create account to get preview", "Already have an account? Sign in", "Advanced download options", "Release notes, known issues, and requirements"),
+            required_texts=("Create account to get preview", "Already have an account? Sign in", "Advanced download options", "Release notes, known issues, and requirements", "Who can get it now", "Adoption health"),
             forbidden_texts=("Package details",),
             expects_header_count=1),
         AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Status guide"), forbidden_texts=("Research tracks",), expects_header_count=1),
@@ -1169,7 +1169,7 @@ def main() -> int:
         AuditRoute("/artifacts/current-preview-build", "Current preview build", required_texts=("Anyone evaluating the preview",), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", required_texts=("Anyone evaluating the preview",), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute("/participate", "Choose how to participate", expects_header_count=1),
-        AuditRoute("/help", "Get help without guessing", required_texts=("Fallback:", "Support, survey, and assistant data stay on a bounded clock"), expects_header_count=1),
+        AuditRoute("/help", "Get help without guessing", required_texts=("Fallback:", "Support, survey, and assistant data stay on a bounded clock", "Who can get it now", "Adoption health"), expects_header_count=1),
         AuditRoute("/faq", "Plain answers before you spend more time", expects_header_count=1),
         AuditRoute("/contact", "Open the right support case", expects_header_count=1),
         AuditRoute("/privacy", "What Chummer stores, and what it does not", required_texts=("Support, survey, and assistant data stay on a bounded clock",), expects_header_count=1),
