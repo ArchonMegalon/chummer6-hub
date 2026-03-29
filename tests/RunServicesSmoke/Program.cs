@@ -1589,6 +1589,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Operator posture", StringComparison.Ordinal), "home work should surface organizer/operator posture on the same signed-in route instead of burying it behind the deeper account panel.");
     Assert(homeSource.Contains("@leadCommunityOperation.GroupName", StringComparison.Ordinal), "home work should surface the lead governed operator group directly from the campaign spine.");
     Assert(homeSource.Contains("Open teams and permissions", StringComparison.Ordinal), "home work should keep a direct route back to the governed operator surface.");
+    Assert(homeSource.Contains("Consequence watch", StringComparison.Ordinal), "home work should surface a dedicated consequence card instead of leaving consequence follow-through buried inside summary text.");
+    Assert(homeSource.Contains("@leadConsequence.Label", StringComparison.Ordinal), "home work should surface the lead governed consequence directly from the workspace server plane.");
+    Assert(homeSource.Contains("@leadConsequenceEvidence", StringComparison.Ordinal), "home work should surface one bounded consequence evidence line on the calmer home card.");
     Assert(homeSource.Contains("Consequence:", StringComparison.Ordinal), "home work should surface one short consequence cue directly on the shared campaign card.");
     Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
@@ -2576,6 +2579,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount >= 1, "signed-in home should surface safehouse/travel readiness on the home cockpit.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.TravelPrefetches.Any(item => string.Equals(item.ReceiptId, travelPrefetchPayload!.ReceiptId, StringComparison.Ordinal)) == true, "signed-in home should surface the latest staged travel-prefetch receipt on the same workspace spine.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "signed-in home should surface the latest aftermath recap package on the same workspace spine.");
+    Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.Consequences.Count >= 1, "signed-in home should keep governed consequence follow-through visible on the same workspace spine.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations.Count >= 1, "signed-in home should surface organizer/operator posture on the same account backbone.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].CampaignVisibilitySummary), "signed-in home should keep campaign visibility posture visible for the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
@@ -2632,6 +2636,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "home work route should keep the governed prep library visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "home work route should keep bounded prep-carrying travel inventory visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep aftermath recap packages visible on the lead workspace spine.");
+    Assert(workHomeModel?.LeadWorkspaceServerPlane?.Consequences.Count >= 1, "home work route should keep governed consequence follow-through visible on the lead workspace spine.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the aftermath package attached to the bounded return shelf.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary), "home work route should keep publication trust visible on the shared home projection.");
