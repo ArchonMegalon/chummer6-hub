@@ -562,7 +562,12 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Season / event pulse", "/account/work")
     require_snippet(body, "Season &amp; event rail", "/account/work")
     require_snippet(body, "Season board", "/account/work")
+    require_snippet(body, "Member guidance rail", "/account/work")
     require_snippet(body, "Open shared campaign view", "/account/work")
+    require_snippet(body, "Open current release", "/account/work")
+    require_snippet(body, "Open downloads", "/account/work")
+    require_snippet(body, "Open help and trust", "/account/work")
+    require_snippet(body, "Open support closure", "/account/work")
     status, body, _, _ = fetch(
         base_url,
         "/home/work",
@@ -587,7 +592,9 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Season / event pulse", "/home/work")
     require_snippet(body, "Latest event:", "/home/work")
     require_snippet(body, "Board:", "/home/work")
+    require_snippet(body, "Guide: current preview, downloads, and closure posture stay on the same operator rail.", "/home/work")
     require_snippet(body, "Open season board", "/home/work")
+    require_snippet(body, "Open member guidance", "/home/work")
     require_snippet(body, "Consequence watch", "/home/work")
     require_snippet(body, prep_launch["packetTitle"], "/home/work")
     require_snippet(body, travel_prefetch["deviceRole"], "/home/work")

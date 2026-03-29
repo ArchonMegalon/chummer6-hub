@@ -52,6 +52,9 @@
     var rulesNavigatorCount = Model.CampaignSpine.RulesNavigator.Count;
     var migrationReceiptCount = Model.CampaignSpine.MigrationReceipts.Count;
     var creatorPublicationCount = Model.CampaignSpine.CreatorPublications.Count;
+    var organizerGuidanceSummary = openSupportCases == 0
+        ? "Current preview, member downloads, and help stay on one calmer operator rail."
+        : $"{openSupportCases} tracked support case(s), current preview truth, and member downloads stay on one calmer operator rail.";
     var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
     var showChannelsSection = telegramChannel is not null;
@@ -2048,6 +2051,10 @@
                                     </strong>
                                 </div>
                                 <div class="settings-summary-row">
+                                    <span>Launch &amp; closure</span>
+                                    <strong>@organizerGuidanceSummary</strong>
+                                </div>
+                                <div class="settings-summary-row">
                                     <span>Operator watchouts</span>
                                     <strong>@(op.Watchouts.Count == 0 ? "Quiet" : op.Watchouts[0])</strong>
                                 </div>
@@ -2105,6 +2112,43 @@
                                         }
                                     </ul>
                                 }
+                            </details>
+                            <details id="community-op-guidance-@op.GroupId" class="details-drawer">
+                                <summary>Member guidance rail</summary>
+                                <div class="app-rail">
+                                    <article class="app-rail__item">
+                                        <span class="tag">Current release</span>
+                                        <div class="app-rail__copy">
+                                            <h3>Current preview posture</h3>
+                                            <p>Point members to the live preview posture, current recommendation, and known caution state without translating repo status by hand.</p>
+                                        </div>
+                                        <a class="inline-link" href="/now">Open current release</a>
+                                    </article>
+                                    <article class="app-rail__item">
+                                        <span class="tag">Member downloads</span>
+                                        <div class="app-rail__copy">
+                                            <h3>Install and update handoff</h3>
+                                            <p>Use the real downloads route when members need the current installer, update handoff, or claim path instead of passing around stale links.</p>
+                                        </div>
+                                        <a class="inline-link" href="/downloads">Open downloads</a>
+                                    </article>
+                                    <article class="app-rail__item">
+                                        <span class="tag">Help &amp; trust</span>
+                                        <div class="app-rail__copy">
+                                            <h3>Known help and trust posture</h3>
+                                            <p>Help, contact, and privacy-boundary guidance stay on the same first-party surface so organizers can point members to the real recovery path.</p>
+                                        </div>
+                                        <a class="inline-link" href="/help">Open help and trust</a>
+                                    </article>
+                                    <article class="app-rail__item">
+                                        <span class="tag">Support closure</span>
+                                        <div class="app-rail__copy">
+                                            <h3>@(openSupportCases == 0 ? "Quiet support posture" : "Tracked support follow-through")</h3>
+                                            <p>@(openSupportCases == 0 ? "No tracked support case is blocking organizer guidance right now, so members can stay on the public release and help routes." : $"{openSupportCases} tracked support case(s) are still visible on this account if member guidance needs a real closure reference.")</p>
+                                        </div>
+                                        <a class="inline-link" href="/account/support">Open support closure</a>
+                                    </article>
+                                </div>
                             </details>
                             @if (op.Capabilities.Count > 0)
                             {
