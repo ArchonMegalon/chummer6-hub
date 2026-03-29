@@ -1639,6 +1639,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@leadTravelPrefetch.DeviceRole", StringComparison.Ordinal), "home work should surface the latest staged travel-prefetch receipt directly on the calmer prep card.");
     Assert(homeSource.Contains("@handoff.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface build-path return truth directly on the calmer home card.");
     Assert(homeSource.Contains("@handoff.SupportClosureSummary", StringComparison.Ordinal), "home work should surface build-path support closure truth directly on the calmer home card.");
+    Assert(homeSource.Contains("Open build path for @handoff.Title", StringComparison.Ordinal), "home work should keep the build handoff deep link specific to the visible build path instead of a generic CTA.");
     Assert(homeSource.Contains("@answer.SupportReuseHints[0]", StringComparison.Ordinal), "home work should surface grounded support-reuse hints directly from the shared rules projection.");
     Assert(homeSource.Contains("Next:", StringComparison.Ordinal), "home work should keep a short next-step cue on the calmer build follow-through card.");
     Assert(homeSource.Contains("<summary>Build, explain, and next step</summary>", StringComparison.Ordinal), "home work should collapse the secondary build and rules follow-through under one calmer disclosure.");
@@ -1700,7 +1701,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@selectedCreatorPublication.NextSafeAction", StringComparison.Ordinal), "account publication detail should surface the next creator-publication step directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.CampaignReturnSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication return truth directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.SupportClosureSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication support closure directly from the shared projection.");
-    Assert(accountSource.Contains("Open related build path", StringComparison.Ordinal), "account publication detail should give the customer a direct path back to the related build follow-through.");
+    Assert(accountSource.Contains("Open build path for @selectedCreatorPublication.Title", StringComparison.Ordinal), "account publication detail should give the customer a title-specific path back to the related build follow-through.");
     Assert(accountSource.Contains("@publication.NextSafeAction", StringComparison.Ordinal), "account publication list should surface the next creator-publication step directly from the shared projection.");
     Assert(accountSource.Contains("Recent change packets", StringComparison.Ordinal), "account work should surface recent change packets for the shared campaign view.");
     Assert(accountSource.Contains("Consequence ledger", StringComparison.Ordinal), "account work should surface the governed consequence ledger for the shared campaign view.");
