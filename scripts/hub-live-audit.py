@@ -546,6 +546,8 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Roster move", "/home/work")
     require_snippet(body, transfer["runnerHandle"], "/home/work")
     require_snippet(body, "Open governed roster moves", "/home/work")
+    require_snippet(body, "Operator posture", "/home/work")
+    require_snippet(body, "Open teams and permissions", "/home/work")
     require_snippet(body, prep_launch["packetTitle"], "/home/work")
     require_snippet(body, travel_prefetch["deviceRole"], "/home/work")
     status, body, _, _ = fetch(

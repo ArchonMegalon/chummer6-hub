@@ -1586,6 +1586,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Roster move", StringComparison.Ordinal), "home work should surface a dedicated roster-move card instead of collapsing operator actions into one-line campaign summaries.");
     Assert(homeSource.Contains("@leadRosterTransfer.RunnerHandle", StringComparison.Ordinal), "home work should surface the moved runner handle directly from the governed transfer receipt.");
     Assert(homeSource.Contains("Open governed roster moves", StringComparison.Ordinal), "home work should keep a direct route back to the governed roster-move operator rail.");
+    Assert(homeSource.Contains("Operator posture", StringComparison.Ordinal), "home work should surface organizer/operator posture on the same signed-in route instead of burying it behind the deeper account panel.");
+    Assert(homeSource.Contains("@leadCommunityOperation.GroupName", StringComparison.Ordinal), "home work should surface the lead governed operator group directly from the campaign spine.");
+    Assert(homeSource.Contains("Open teams and permissions", StringComparison.Ordinal), "home work should keep a direct route back to the governed operator surface.");
     Assert(homeSource.Contains("Consequence:", StringComparison.Ordinal), "home work should surface one short consequence cue directly on the shared campaign card.");
     Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
     Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
@@ -2573,6 +2576,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount >= 1, "signed-in home should surface safehouse/travel readiness on the home cockpit.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.TravelPrefetches.Any(item => string.Equals(item.ReceiptId, travelPrefetchPayload!.ReceiptId, StringComparison.Ordinal)) == true, "signed-in home should surface the latest staged travel-prefetch receipt on the same workspace spine.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "signed-in home should surface the latest aftermath recap package on the same workspace spine.");
+    Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations.Count >= 1, "signed-in home should surface organizer/operator posture on the same account backbone.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].CampaignVisibilitySummary), "signed-in home should keep campaign visibility posture visible for the lead operator group.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "signed-in home should receive customer-facing build-path titles directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "signed-in home should receive the next safe build action directly from the campaign spine service.");
@@ -2695,6 +2700,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var postTransferWorkHomePage = await authenticatedLandingController.HomePage("work", CancellationToken.None) as ViewResult;
     var postTransferWorkHomeModel = postTransferWorkHomePage?.Model as HomePageViewModel;
     Assert(postTransferWorkHomeModel?.LeadWorkspaceServerPlane?.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true, "home work should keep the governed roster-transfer receipt visible on the lead workspace spine after a transfer.");
+    Assert(postTransferWorkHomeModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true, "home work should keep the same governed roster-move audit visible on the operator posture card after a transfer.");
 
     var outsiderTransferDenied = await outsiderCampaignSpineController.TransferMyRoster(
         new RosterTransferRequest(

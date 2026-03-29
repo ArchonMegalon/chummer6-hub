@@ -27,6 +27,8 @@
     var migrationReceipts = Model.CampaignSpine.MigrationReceipts.Take(1).ToArray();
     var creatorPublications = Model.CampaignSpine.CreatorPublications.Take(1).ToArray();
     var restoreDevices = Model.CampaignSpine.Restore.ClaimedDevices.Take(1).ToArray();
+    var leadCommunityOperation = Model.CampaignSpine.CommunityOperations.FirstOrDefault();
+    var leadCommunityTransfer = leadCommunityOperation?.RecentRosterTransfers?.FirstOrDefault();
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
     var leadRosterTransfer = leadWorkspaceServerPlane?.RosterTransfers.FirstOrDefault();
@@ -80,6 +82,34 @@
         "setup" => "Finish the short setup flow first, then come back to access and work with a steadier account.",
         _ => "Pick up where you left off: finish the basics, install the current preview, and keep track of what is opening next."
     };
+
+    static string HumanizeStatus(string? value, string fallback = "Not connected")
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "active" => "Ready",
+            "linked" => "Ready",
+            "pending" => "Pending",
+            "pending_verification" => "Verification sent",
+            "verified" => "Verified",
+            "approved" => "Approved",
+            "self_service" => "Self-service",
+            "review" => "Needs review",
+            "warning" => "Needs attention",
+            "attention" => "Needs attention",
+            "ready" => "Ready",
+            "revoked" => "Revoked",
+            _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '))
+        };
+    }
+
+    static string RuleEnvironmentSummary(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
+        => $"{environment.OwnerScope} scope · {environment.CompatibilityFingerprint} · {HumanizeStatus(environment.ApprovalState, "Review")}";
 }
 
 <section class="home-command">
@@ -425,6 +455,26 @@
                                                             </p>
                                                         </div>
                                                         <a class="inline-link" href="/account/work#community-ops">Open governed roster moves</a>
+                                                    </article>
+                                                }
+
+                                                @if (leadCommunityOperation is not null)
+                                                {
+                                                    <article class="app-rail__item">
+                                                        <span class="tag">Operator posture</span>
+                                                        <div class="app-rail__copy">
+                                                            <h3>@leadCommunityOperation.GroupName</h3>
+                                                            <p>
+                                                                @HumanizeStatus(leadCommunityOperation.OperatorRole, "Member") · @leadCommunityOperation.CampaignVisibilitySummary
+                                                                <span> Roster: @leadCommunityOperation.MemberCount members · @leadCommunityOperation.ActiveCampaignCount campaigns.</span>
+                                                                <span> Rules: @RuleEnvironmentSummary(leadCommunityOperation.RuleEnvironment).</span>
+                                                                @if (leadCommunityTransfer is not null)
+                                                                {
+                                                                    <span> Latest move: @leadCommunityTransfer.RunnerHandle.</span>
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <a class="inline-link" href="/account/work#community-ops">Open teams and permissions</a>
                                                     </article>
                                                 }
 
