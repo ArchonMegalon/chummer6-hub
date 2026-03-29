@@ -34,6 +34,9 @@
     var leadCommunityBoardHref = leadCommunityOperation is null
         ? "/account/work#community-ops"
         : $"/account/work#community-op-board-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
+    var leadCommunityGuidanceHref = leadCommunityOperation is null
+        ? "/account/work#community-ops"
+        : $"/account/work#community-op-guidance-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
     var leadNextSessionCarryForward = leadWorkspaceServerPlane?.NextSessionCarryForward;
@@ -564,6 +567,7 @@
                                                                 {
                                                                     <span> Board: @leadCommunityBoard.CampaignName via @leadCommunityBoard.RunTitle. Next: @leadCommunityBoard.NextSafeAction</span>
                                                                 }
+                                                                <span> Guide: current preview, downloads, and closure posture stay on the same operator rail.</span>
                                                                 @if (leadCommunityTransfer is not null)
                                                                 {
                                                                     <span> Latest move: @leadCommunityTransfer.RunnerHandle.</span>
@@ -574,7 +578,10 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@leadCommunityBoardHref">Open season board</a>
+                                                        <div class="stacked-actions">
+                                                            <a class="inline-link" href="@leadCommunityBoardHref">Open season board</a>
+                                                            <a class="inline-link" href="@leadCommunityGuidanceHref">Open member guidance</a>
+                                                        </div>
                                                     </article>
                                                 }
 

@@ -1604,6 +1604,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@leadCommunityBoard.CampaignName", StringComparison.Ordinal), "home work should surface the lead season-board campaign directly from the shared operator projection.");
     Assert(homeSource.Contains("/account/work#community-op-board-", StringComparison.Ordinal), "home work should deep-link the operator card into the exact season-board drawer instead of sending every organizer flow back to the generic operator shell.");
     Assert(homeSource.Contains("Open season board", StringComparison.Ordinal), "home work should keep a direct route back to the governed season board.");
+    Assert(homeSource.Contains("Guide: current preview, downloads, and closure posture stay on the same operator rail.", StringComparison.Ordinal), "home work should keep bounded organizer guidance attached to the lead operator card.");
+    Assert(homeSource.Contains("/account/work#community-op-guidance-", StringComparison.Ordinal), "home work should deep-link the operator card into the organizer guidance rail.");
+    Assert(homeSource.Contains("Open member guidance", StringComparison.Ordinal), "home work should give operators a direct route to the member-guidance rail.");
     Assert(homeSource.Contains("Consequence watch", StringComparison.Ordinal), "home work should surface a dedicated consequence card instead of leaving consequence follow-through buried inside summary text.");
     Assert(homeSource.Contains("@leadConsequence.Label", StringComparison.Ordinal), "home work should surface the lead governed consequence directly from the workspace server plane.");
     Assert(homeSource.Contains("@leadConsequenceEvidence", StringComparison.Ordinal), "home work should surface one bounded consequence evidence line on the calmer home card.");
@@ -1697,6 +1700,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("id=\"community-op-board-@op.GroupId\"", StringComparison.Ordinal), "account teams and permissions should give the season board a stable deep-link target.");
     Assert(accountSource.Contains("@entry.LatestEventSummary", StringComparison.Ordinal), "account season board should surface the latest governed event summary for each campaign lane.");
     Assert(accountSource.Contains("Open shared campaign view", StringComparison.Ordinal), "account season board should give operators a direct route from the board into the governed campaign lane.");
+    Assert(accountSource.Contains("Launch &amp; closure", StringComparison.Ordinal), "account teams and permissions should keep organizer release and closure posture visible on the same operator surface.");
+    Assert(accountSource.Contains("Member guidance rail", StringComparison.Ordinal), "account teams and permissions should provide a bounded member-guidance rail for organizer workflows.");
+    Assert(accountSource.Contains("Open current release", StringComparison.Ordinal), "account organizer guidance should link operators to the current release posture.");
+    Assert(accountSource.Contains("Open downloads", StringComparison.Ordinal), "account organizer guidance should link operators to the real member download handoff.");
+    Assert(accountSource.Contains("Open help and trust", StringComparison.Ordinal), "account organizer guidance should link operators to the help and trust surfaces.");
+    Assert(accountSource.Contains("Open support closure", StringComparison.Ordinal), "account organizer guidance should keep support follow-through on the same account backbone.");
     Assert(accountSource.Contains("Search governed prep packets", StringComparison.Ordinal), "account work should expose a real governed prep-library search flow on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Label", StringComparison.Ordinal), "account work should surface the bounded workspace state directly from the server plane.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Summary", StringComparison.Ordinal), "account work should explain why the bounded workspace state is active on the selected campaign card.");

@@ -1,6 +1,6 @@
 product: chummer
 version: 1
-last_reviewed: 2026-03-28
+last_reviewed: 2026-03-29
 program_wave: next_20_big_wins_after_post_audit_closeout
 goal: make the campaign OS indispensable, widen Build and Explain, elevate exchange and publication, and turn trust plus operator depth into launch-scale product truth.
 status: in_progress
@@ -35,7 +35,7 @@ waves:
       - 15
   - id: W4
     name: Trust, operator depth, and launch scale
-    status: not_started
+    status: in_progress
     milestone_ids:
       - 16
       - 17
@@ -265,7 +265,7 @@ milestones:
       - chummer6-hub
       - executive-assistant
       - chummer6-design
-    status: not_started
+    status: in_progress
     exit_criteria:
       - Campaign operators can run larger communities, seasons, and events on the same account and control backbone.
       - League and season operation surfaces are auditable and governed instead of spreadsheet cargo.
