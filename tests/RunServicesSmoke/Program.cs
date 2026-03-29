@@ -136,6 +136,7 @@ async Task VerifyPublicationWorkflowAsync()
         Assert(!string.IsNullOrWhiteSpace(created.ConcurrencyToken), "new publications should expose a concurrency token");
         Assert(created.ApprovalAuditTrail.Count == 1, "new publications should expose a seeded approval audit trail");
         Assert(created.ModerationTimeline.PendingDecision == "review", "pending review publications should project review as the next decision");
+        Assert(created.ModerationTimeline.NextSafeActionSummary?.Contains("approval review", StringComparison.OrdinalIgnoreCase) == true, "pending review publications should expose an explicit next safe action summary");
 
         var staleReview = workflow.Review(created.PublicationId, new PublicationReviewRequest(
             Reviewer: "moderator.demo",
@@ -152,6 +153,7 @@ async Task VerifyPublicationWorkflowAsync()
         Assert(reviewed.Publication?.Version == 2, "review should advance the publication version");
         Assert(reviewed.Publication?.ApprovalAuditTrail.Any(entry => entry.Stage == "approval-review" && entry.Outcome == "approved" && entry.ApprovalBacked) == true, "review should append an approval-backed audit receipt");
         Assert(reviewed.Publication?.ModerationTimeline.PendingDecision == "publish", "approved publications should project publish as the next decision");
+        Assert(reviewed.Publication?.ModerationTimeline.NextSafeActionSummary?.Contains("Publish the approved artifact", StringComparison.Ordinal) == true, "approved publications should expose an explicit publish-safe next action summary");
 
         var rejectedCreated = workflow.Submit(new PublicationSubmissionRequest(
             ArtifactId: $"artifact_{artifactKind.ToLowerInvariant()}_reject",
@@ -179,6 +181,7 @@ async Task VerifyPublicationWorkflowAsync()
         Assert(published.Publication?.State == PublicationState.Published, "publish should transition to published");
         Assert(published.Publication?.ImmutableRetentionRequired == true, "published artifacts should require immutable retention");
         Assert(published.Publication?.PublishedAtUtc is not null, "published artifacts should stamp publication time");
+        Assert(published.Publication?.ModerationTimeline.NextSafeActionSummary?.Contains("live published artifact", StringComparison.OrdinalIgnoreCase) == true, "published artifacts should expose an explicit moderation-watch next action summary");
 
         var delisted = workflow.Moderate(created.PublicationId, new PublicationModerationRequest(
             Moderator: "moderator.demo",
@@ -212,6 +215,7 @@ async Task VerifyPublicationWorkflowAsync()
         Assert(superseded.Publication!.Events.Count == 6, "publication should keep append-only lifecycle events");
         Assert(superseded.Publication.ApprovalAuditTrail.Count == 6, "publication should keep append-only approval audit receipts");
         Assert(superseded.Publication.ModerationTimeline.PendingDecision == "retention-audit", "superseded publications should project retention audit follow-up");
+        Assert(superseded.Publication.ModerationTimeline.NextSafeActionSummary?.Contains("install and audit history", StringComparison.OrdinalIgnoreCase) == true, "superseded publications should expose an explicit retained-history next action summary");
 
         var postPublishReview = workflow.Review(created.PublicationId, new PublicationReviewRequest(
             Reviewer: "moderator.demo",

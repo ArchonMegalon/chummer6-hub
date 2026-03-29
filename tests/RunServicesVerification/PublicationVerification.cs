@@ -22,6 +22,7 @@ internal static class PublicationVerification
         VerificationAssert.True(created.ApprovalAuditTrail.Count == 1, "Submissions should initialize an approval audit trail.");
         VerificationAssert.Equal("review", created.ModerationTimeline.PendingDecision, "Pending review publications should project the next review decision.");
         VerificationAssert.True(created.ModerationTimeline.OperatorAttentionRequired, "Pending review publications should require operator attention.");
+        VerificationAssert.True(created.ModerationTimeline.NextSafeActionSummary?.Contains("approval review", StringComparison.OrdinalIgnoreCase) == true, "Pending review publications should expose an explicit next safe action summary.");
 
         var staleReview = workflow.Review(
             created.PublicationId,
@@ -36,6 +37,7 @@ internal static class PublicationVerification
         VerificationAssert.Equal(PublicationMutationStatus.Success, approved.Status, "Review should succeed with the current token.");
         VerificationAssert.Equal(PublicationState.Approved, approved.Publication!.State, "Review should transition the publication to approved.");
         VerificationAssert.Equal("publish", approved.Publication.ModerationTimeline.PendingDecision, "Approved publications should project publication as the next decision.");
+        VerificationAssert.True(approved.Publication.ModerationTimeline.NextSafeActionSummary?.Contains("Publish the approved artifact", StringComparison.Ordinal) == true, "Approved publications should expose an explicit publish-safe next action summary.");
         VerificationAssert.True(
             approved.Publication.ApprovalAuditTrail.Any(entry => entry.Stage == "approval-review" && entry.Outcome == "approved" && entry.ApprovalBacked),
             "Approved publications should retain approval-backed review receipts.");
@@ -67,6 +69,7 @@ internal static class PublicationVerification
             approved.Publication!.ConcurrencyToken);
         VerificationAssert.Equal(PublicationState.Published, published.Publication!.State, "Approved publications should publish.");
         VerificationAssert.True(published.Publication.ImmutableRetentionRequired, "Published artifacts should require immutable retention.");
+        VerificationAssert.True(published.Publication.ModerationTimeline.NextSafeActionSummary?.Contains("live published artifact", StringComparison.OrdinalIgnoreCase) == true, "Published publications should expose an explicit moderation-watch next action summary.");
 
         var delisted = workflow.Moderate(
             created.PublicationId,
@@ -95,6 +98,7 @@ internal static class PublicationVerification
         VerificationAssert.Equal(6, superseded.Publication.Events.Count, "Publication history should remain append-only.");
         VerificationAssert.Equal(6, superseded.Publication.ApprovalAuditTrail.Count, "Approval audit trail should stay append-only with lifecycle history.");
         VerificationAssert.Equal("retention-audit", superseded.Publication.ModerationTimeline.PendingDecision, "Superseded publications should project retention audit follow-up.");
+        VerificationAssert.True(superseded.Publication.ModerationTimeline.NextSafeActionSummary?.Contains("install and audit history", StringComparison.OrdinalIgnoreCase) == true, "Superseded publications should expose an explicit retained-history next action summary.");
 
         var postPublishReview = workflow.Review(
             created.PublicationId,
