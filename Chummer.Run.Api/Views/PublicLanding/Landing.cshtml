@@ -31,6 +31,8 @@
     var trustPulseLaunchReadiness = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal));
     var trustPulseAdoption = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal));
     var trustPulseClosure = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Closure health", StringComparison.Ordinal));
+    var trustPulseProgress = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Progress trend", StringComparison.Ordinal));
+    var trustPulseProviderRoute = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Provider-route stewardship", StringComparison.Ordinal));
     var trustPulseCaution = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal));
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
@@ -131,6 +133,14 @@
         @if (trustPulseClosure is not null)
         {
             <p><strong>@trustPulseClosure.Label:</strong> @trustPulseClosure.Value</p>
+        }
+        @if (trustPulseProgress is not null)
+        {
+            <p><strong>@trustPulseProgress.Label:</strong> @trustPulseProgress.Value</p>
+        }
+        @if (trustPulseProviderRoute is not null)
+        {
+            <p><strong>@trustPulseProviderRoute.Label:</strong> @trustPulseProviderRoute.Value</p>
         }
         @if (trustPulseCaution is not null)
         {
