@@ -1,6 +1,23 @@
 # Next Session Handoff
 
-Updated: 2026-03-29T21:20:00+02:00
+Updated: 2026-03-30T06:27:17+02:00
+
+## Handoff refresh (2026-03-30T06:27:17+02:00)
+
+- Commit `eb2ab8eb` (`Deepen install-specific trust and pulse fallback`) is already on `main` and matches `origin/main`.
+- Signed-in downloads trust status now includes install-aware `Recommended for this install` and `Install posture` rows so a linked install can be compared against both the promoted public shelf and any support-directed fix lane.
+- `PublicTrustPulseService` now prefers the synthesized weekly-pulse `supporting_signals.adoption_health` and `supporting_signals.progress_trend` blocks when present, while still backfilling raw progress/local-proof metadata when those artifacts exist.
+- Trust-pulse fixture coverage is now pinned to temp-local optional artifact paths so test results do not bleed in from repo-local generated canon files.
+- Smoke coverage now locks the new signed-in downloads rows in both update-needed and verification-ready states.
+- Re-verified clean on the rebuilt local edge with:
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "WeeklyProductPulseArtifactServiceTests|PublicTrustPulseServiceTests|VerificationEntryPointTests|DesignMirrorExecutionPlanTests"`
+  - `bash scripts/ai/run_services_smoke.sh`
+  - `bash scripts/run_smoke.sh`
+  - `docker compose -f docker-compose.public-edge.yml up -d --build`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
+  - `bash scripts/audit-compliance.sh`
  
 ## Handoff refresh (2026-03-29T21:45:00+02:00)
 
