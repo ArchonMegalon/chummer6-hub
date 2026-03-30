@@ -3,9 +3,11 @@ using System.Text;
 using System.Text.Json;
 using Chummer.Campaign.Contracts;
 using Chummer.Contracts.Rulesets;
+using Chummer.Hub.Registry.Contracts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Registry.Services;
 
 namespace Chummer.Run.Api.Services.Community;
 
@@ -28,15 +30,18 @@ public sealed class CampaignSpineService
     private readonly CommunityStore _store;
     private readonly WorkspaceLifecyclePolicyService _lifecyclePolicy;
     private readonly CampaignArtifactRegistryBridge _artifactRegistry;
+    private readonly IHubPublicationDraftService? _publicationDrafts;
 
     public CampaignSpineService(
         CommunityStore store,
         WorkspaceLifecyclePolicyService lifecyclePolicy,
-        CampaignArtifactRegistryBridge artifactRegistry)
+        CampaignArtifactRegistryBridge artifactRegistry,
+        IHubPublicationDraftService? publicationDrafts = null)
     {
         _store = store;
         _lifecyclePolicy = lifecyclePolicy;
         _artifactRegistry = artifactRegistry;
+        _publicationDrafts = publicationDrafts;
     }
 
     public AccountCampaignSummary GetAccountSummary(HubUserDto user, InstallLinkingSummaryDto? installLinking = null)
@@ -163,7 +168,7 @@ public sealed class CampaignSpineService
             var buildLabHandoffs = BuildBuildLabHandoffs(dossiers, workspaces, restore);
             var rulesNavigator = BuildRulesNavigatorEntries(workspaces, operations);
             var migrationReceipts = BuildMigrationReceipts(dossiers, campaigns);
-            var creatorPublications = BuildCreatorPublications(workspaces, dossiers, buildLabHandoffs);
+            var creatorPublications = AttachRegistryPublicationPosture(BuildCreatorPublications(workspaces, dossiers, buildLabHandoffs));
             workspaces = AttachCreatorPublicationPosture(workspaces, creatorPublications).ToArray();
 
             return new AccountCampaignSummary(
@@ -3696,6 +3701,66 @@ public sealed class CampaignSpineService
             })
             .ToArray();
     }
+
+    private IReadOnlyList<CreatorPublicationProjection> AttachRegistryPublicationPosture(
+        IReadOnlyList<CreatorPublicationProjection> creatorPublications)
+    {
+        if (_publicationDrafts is null)
+        {
+            return creatorPublications;
+        }
+
+        return creatorPublications
+            .Select(publication =>
+            {
+                HubPublicationReceipt? receipt = _publicationDrafts.GetPublicationReceipt(publication.PublicationId);
+                if (receipt is null)
+                {
+                    return publication;
+                }
+
+                string publicationStatus = MapRegistryPublicationStatus(receipt);
+                var (trustBand, discoverable, trustSummary, discoverySummary, moderationSummary) =
+                    BuildCreatorPublicationTrustPosture(publicationStatus, publication.Visibility);
+                return publication with
+                {
+                    PublicationStatus = publicationStatus,
+                    TrustBand = trustBand,
+                    Discoverable = discoverable,
+                    DiscoverySummary = discoverySummary,
+                    NextSafeAction = ResolveRegistryNextSafeAction(receipt, publication.NextSafeAction),
+                    TrustSummary = trustSummary,
+                    ModerationSummary = moderationSummary
+                };
+            })
+            .ToArray();
+    }
+
+    private static string MapRegistryPublicationStatus(HubPublicationReceipt receipt)
+    {
+        string publicationStatus = receipt.PublicationStatus.Trim().ToLowerInvariant();
+        return publicationStatus switch
+        {
+            "review_pending" => "pending_review",
+            "approved_for_publication" => "approved",
+            "changes_requested" => "rejected",
+            "draft" => "preview_ready",
+            "archived" => "draft",
+            _ => publicationStatus
+        };
+    }
+
+    private static string? ResolveRegistryNextSafeAction(HubPublicationReceipt receipt, string? existing)
+        => receipt.ReviewState switch
+        {
+            var state when string.Equals(state, HubReviewStates.PendingReview, StringComparison.OrdinalIgnoreCase)
+                => "Hold the creator packet on governed creator, campaign, and moderation surfaces until the registry review resolves.",
+            var state when string.Equals(state, HubReviewStates.Approved, StringComparison.OrdinalIgnoreCase)
+                => "Approval is in. Publish or annotate the governed packet next so discovery and shelf posture stay honest.",
+            var state when string.Equals(state, HubReviewStates.Rejected, StringComparison.OrdinalIgnoreCase)
+                => "Revise the governed packet and resubmit it before you widen discovery or creator comparison.",
+            _ => existing
+        };
 
     private static (string TrustBand, bool Discoverable, string TrustSummary, string DiscoverySummary, string ModerationSummary) BuildCreatorPublicationTrustPosture(string publicationStatus, string visibility)
     {
