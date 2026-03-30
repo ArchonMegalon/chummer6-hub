@@ -1806,7 +1806,24 @@ def main() -> int:
         raise AssertionError("--verify-http-redirects requires --public-host")
 
     routes = [
-        AuditRoute("/", "Create account to get preview", required_texts=("Final pool 9",), expects_header_count=1),
+        AuditRoute(
+            "/",
+            "Create account to get preview",
+            required_texts=(
+                "Final pool 9",
+                "Who can get it now",
+                "Release proof",
+                "Launch readiness",
+                "Adoption health",
+                "Closure health",
+                "Progress trend",
+                "Journey pulse",
+                "Provider-route stewardship",
+                "Current caution",
+                "trust-pulse-trend__point",
+                "Open what works today",
+                "Open progress"),
+            expects_header_count=1),
         AuditRoute("/what-is-chummer", "One product for rules truth, living dossiers, and session return.", expects_header_count=1),
         AuditRoute(
             "/now",

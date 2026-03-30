@@ -1,6 +1,23 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T10:11:48+02:00
+Updated: 2026-03-30T10:43:28+02:00
+
+## Handoff refresh (2026-03-30T10:43:28+02:00)
+
+- The public front door now has release-blocking proof coverage for the full weekly trust pulse instead of only the hero/proof teaser:
+  - `scripts/hub-live-audit.py` now fails `/` unless the rebuilt `chummer.run` landing route renders the full weekly pulse label set (`Who can get it now`, `Release proof`, `Launch readiness`, `Adoption health`, `Closure health`, `Progress trend`, `Journey pulse`, `Provider-route stewardship`, `Current caution`), the measured trend rail (`trust-pulse-trend__point`), and the `/now` plus `/progress` trust-pulse actions.
+  - `scripts/e2e-hub-playwright.cjs` now enforces the same front-door pulse rows in the browser lane and requires at least two rendered `.trust-pulse-trend__point` elements on `/` so the landing trust pulse cannot silently collapse back to a thin summary block.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "RunServicesSmoke|PublicTrustPulseServiceTests|WeeklyProductPulseArtifactServiceTests"`
+  - `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build`
+  - `bash scripts/run_smoke.sh`
+  - `bash scripts/ai/run_services_smoke.sh`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
+  - `bash scripts/audit-compliance.sh`
 
 ## Handoff refresh (2026-03-30T10:11:48+02:00)
 

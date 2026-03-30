@@ -184,6 +184,18 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     assert.equal(await page.locator('header[data-site-header]').count(), 1, 'Landing should only render one site header.');
     await expectVisible(page, 'text=Create account to get preview');
     await assertTextCount(page, 'Final pool 9', 1, 'Landing');
+    await expectVisible(page, 'text=Who can get it now');
+    await expectVisible(page, 'text=Release proof');
+    await expectVisible(page, 'text=Launch readiness');
+    await expectVisible(page, 'text=Adoption health');
+    await expectVisible(page, 'text=Closure health');
+    await expectVisible(page, 'text=Progress trend');
+    await expectVisible(page, 'text=Journey pulse');
+    await expectVisible(page, 'text=Provider-route stewardship');
+    await expectVisible(page, 'text=Current caution');
+    await expectVisible(page, 'text=Open what works today');
+    await expectVisible(page, 'text=Open progress');
+    await expectMinimumCount(page, '.trust-pulse-trend__point', 2, 'Landing trust pulse');
     await assertNoBannedCopy(page, 'Landing');
   });
 
