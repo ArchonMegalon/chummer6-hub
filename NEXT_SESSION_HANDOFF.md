@@ -1,6 +1,22 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T06:27:17+02:00
+Updated: 2026-03-30T06:34:49+02:00
+
+## Handoff refresh (2026-03-30T06:34:49+02:00)
+
+- Commit `b6366275` (`Visualize trust trends and route verify-ready fixes`) is already on `main` and matches `origin/main`.
+- The shared weekly trust pulse panel now renders measured progress points directly from `ProgressTrendSamples` instead of leaving the trend only in prose.
+- `PublicTrustPulsePanelViewModel` now carries explicit trend samples, `_PublicTrustPulsePanel.cshtml` renders them, and `site.css` adds the compact trend rail styling used by `/`, `/help`, `/downloads`, and `/now`.
+- Verification coverage now asserts the new trend-sample rail is part of the public trust pulse model, and the shared verification entry-point test locks the new panel/view-model seam in place.
+- Re-verified clean on the rebuilt local edge with:
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "PublicTrustPulseServiceTests|VerificationEntryPointTests"`
+  - `bash scripts/ai/run_services_smoke.sh`
+  - `bash scripts/run_smoke.sh`
+  - `docker compose -f docker-compose.public-edge.yml up -d --build`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
+  - `bash scripts/audit-compliance.sh`
 
 ## Handoff refresh (2026-03-30T06:27:17+02:00)
 
