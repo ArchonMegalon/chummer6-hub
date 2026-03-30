@@ -1,6 +1,18 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T07:58:45+02:00
+Updated: 2026-03-30T08:00:33+02:00
+
+## Handoff refresh (2026-03-30T08:00:33+02:00)
+
+- The workspace artifact-shelf proof now follows the creator-publication deep link instead of only checking that the link exists:
+  - `scripts/hub-live-audit.py` now extracts the first `/account/work/publications/{publicationId}` link from the signed-in workspace-detail shelf, opens it, and requires the rendered publication status, trust, discovery, and build-path follow-through.
+  - `scripts/e2e-hub-playwright.cjs` now clicks the same publication-status link in the browser lane and asserts the destination route renders the publication-status card rather than leaving the deep link unproven.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T07:58:45+02:00)
 

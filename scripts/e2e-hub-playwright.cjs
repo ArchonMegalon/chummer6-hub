@@ -326,6 +326,19 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail');
 
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.locator('a[href*="/account/work/publications/"]').first().click()
+  ]);
+  assert(/\/account\/work\/publications\//.test(page.url()), 'Publication detail route should open from the workspace artifact shelf.');
+  await expectBodyText(page, 'Publication status', '/account/work/publications detail');
+  await expectBodyText(page, 'Trust', '/account/work/publications detail');
+  await expectBodyText(page, 'Discovery', '/account/work/publications detail');
+  await expectBodyText(page, 'Status', '/account/work/publications detail');
+  await expectBodyText(page, 'Open build path for', '/account/work/publications detail');
+  await assertNoBannedCopy(page, '/account/work/publications detail');
+  await assertNoPageErrors(page, pageErrors, '/account/work/publications detail');
+
   await gotoAndAssert(page, pageErrors, '/account/settings', async () => {
     await expectVisible(page, 'text=More settings');
   });
