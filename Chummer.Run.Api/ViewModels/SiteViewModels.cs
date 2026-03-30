@@ -178,6 +178,7 @@ public sealed record ShelfPageViewModel(
     string Heading,
     string Intro,
     IReadOnlyList<ResolvedPublicCardViewModel> Items,
+    IReadOnlyList<CreatorPublicationProjection>? PublicCreatorPublications = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null,
     IReadOnlyList<RecapShelfEntry>? SignedInRecapShelf = null,

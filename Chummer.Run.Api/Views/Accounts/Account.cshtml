@@ -1972,6 +1972,13 @@
                                         <span>Artifact receipt</span>
                                         <strong>@selectedCreatorPublicationReceipt.Artifact.Kind · @selectedCreatorPublicationReceipt.Artifact.ArtifactId · @selectedCreatorPublicationReceipt.Artifact.Version</strong>
                                     </div>
+                                    @if (selectedCreatorPublicationReceipt.PublishedAtUtc is not null)
+                                    {
+                                        <div class="settings-summary-row">
+                                            <span>Published</span>
+                                            <strong>@selectedCreatorPublicationReceipt.PublishedAtUtc.Value.ToString("yyyy-MM-dd HH:mm 'UTC'")</strong>
+                                        </div>
+                                    }
                                 }
                                 @if (!string.IsNullOrWhiteSpace(selectedCreatorPublicationDraftDetail.LatestModerationNotes))
                                 {
@@ -2011,6 +2018,19 @@
                                     <textarea id="creatorPublicationRejectNotes" name="notes" rows="3" placeholder="State what needs to change before this draft can re-enter governed review."></textarea>
                                     <div class="stacked-actions">
                                         <button class="button-like button-like--secondary" type="submit">Request changes</button>
+                                    </div>
+                                </form>
+                            }
+                            @if (string.Equals(selectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Approved, StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(selectedCreatorPublicationReceipt?.PublicationStatus, Chummer.Hub.Registry.Contracts.HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(selectedCreatorPublicationDraftDetail.Draft.State, Chummer.Hub.Registry.Contracts.HubPublicationStates.Archived, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <form class="settings-form" method="post" action="/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/publish">
+                                    @Html.AntiForgeryToken()
+                                    <label for="creatorPublicationPublishNotes">Publish notes</label>
+                                    <textarea id="creatorPublicationPublishNotes" name="notes" rows="3" placeholder="State why this packet is ready for governed creator discovery and public shelf follow-through."></textarea>
+                                    <div class="stacked-actions">
+                                        <button class="button-like button-like--primary" type="submit">Publish on creator shelf</button>
                                     </div>
                                 </form>
                             }

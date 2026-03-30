@@ -29,6 +29,7 @@ public sealed class PublicLandingController : Controller
     private readonly InstallLinkingService _installLinking;
     private readonly CampaignSpineService _campaignSpine;
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
+    private readonly PublicCreatorPublicationDiscoveryService _publicCreatorDiscovery;
     private readonly HubPageChromeService _chrome;
     private readonly PublicTrustContentService _trustContent;
     private readonly PublicPrivacyBoundaryService _privacyBoundaries;
@@ -51,6 +52,7 @@ public sealed class PublicLandingController : Controller
         InstallLinkingService installLinking,
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
+        PublicCreatorPublicationDiscoveryService publicCreatorDiscovery,
         HubPageChromeService chrome,
         PublicTrustContentService trustContent,
         PublicPrivacyBoundaryService privacyBoundaries,
@@ -72,6 +74,7 @@ public sealed class PublicLandingController : Controller
         _installLinking = installLinking;
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
+        _publicCreatorDiscovery = publicCreatorDiscovery;
         _chrome = chrome;
         _trustContent = trustContent;
         _privacyBoundaries = privacyBoundaries;
@@ -307,6 +310,7 @@ public sealed class PublicLandingController : Controller
         var signedInArtifactView = NormalizeSignedInArtifactView(Request.Query["view"].ToString());
         IReadOnlyList<RecapShelfEntry> signedInRecapShelf = Array.Empty<RecapShelfEntry>();
         IReadOnlyList<CreatorPublicationProjection> signedInCreatorPublications = Array.Empty<CreatorPublicationProjection>();
+        IReadOnlyList<CreatorPublicationProjection> publicCreatorPublications = _publicCreatorDiscovery.ListDiscoverable();
         var subject = await TryGetOptionalPublicSurfaceSubjectAsync("/artifacts", cancellationToken);
         if (subject is not null)
         {
@@ -332,6 +336,7 @@ public sealed class PublicLandingController : Controller
             Heading: "Proof gallery",
             Intro: "Browse the packs, briefs, and proof surfaces that make the preview feel tangible.",
             Items: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/artifacts"),
+            PublicCreatorPublications: publicCreatorPublications,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
             SignedInRecapShelf: signedInRecapShelf,

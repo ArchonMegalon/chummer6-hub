@@ -3751,7 +3751,14 @@ public sealed class CampaignSpineService
     }
 
     private static string? ResolveRegistryNextSafeAction(HubPublicationReceipt receipt, string? existing)
-        => receipt.ReviewState switch
+    {
+        if (string.Equals(receipt.PublicationStatus, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase)
+            || receipt.PublishedAtUtc is not null)
+        {
+            return "Keep the governed packet live on creator discovery, lineage, and shelf surfaces while provenance and support posture stay current.";
+        }
+
+        return receipt.ReviewState switch
         {
             var state when string.Equals(state, HubReviewStates.PendingReview, StringComparison.OrdinalIgnoreCase)
                 => "Hold the creator packet on governed creator, campaign, and moderation surfaces until the registry review resolves.",
@@ -3761,6 +3768,7 @@ public sealed class CampaignSpineService
                 => "Revise the governed packet and resubmit it before you widen discovery or creator comparison.",
             _ => existing
         };
+    }
 
     private static (string TrustBand, bool Discoverable, string TrustSummary, string DiscoverySummary, string ModerationSummary) BuildCreatorPublicationTrustPosture(string publicationStatus, string visibility)
     {
