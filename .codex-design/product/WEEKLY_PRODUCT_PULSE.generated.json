@@ -2,11 +2,11 @@
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 1,
   "generated_at": "2026-03-29T08:36:12Z",
-  "as_of": "2026-03-29",
+  "as_of": "2026-03-30",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
   "progress_history_source": "products/chummer/PROGRESS_HISTORY.generated.json",
-  "summary": "Next 20 Big Wins After Post-Audit Closeout remains the active wave; journey proof is blocked; overall progress is 100% in 'Public-fit polish'; the longest pole remains Core Engine; support closure is clear.",
+  "summary": "Next 20 Big Wins After Post-Audit Closeout remains the active wave; journey proof is blocked; overall progress is 100% in 'Public-fit polish'; the longest pole remains Core Engine.",
   "active_wave": "Next 20 Big Wins After Post-Audit Closeout",
   "active_wave_status": "in_progress",
   "journey_gate_health": {
@@ -17,7 +17,7 @@
   },
   "governor_decisions": [
     {
-      "decision_id": "2026-03-29-closeout-and-continue-next-20-big-wins-after-post-audit-closeout",
+      "decision_id": "2026-03-30-closeout-and-continue-next-20-big-wins-after-post-audit-closeout",
       "action": "closeout_and_continue",
       "reason": "Keep the recommended wave on Next 20 Big Wins After Post-Audit Closeout now that the Post-Audit Next 20 Big Wins program is materially closed. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 5 snapshots, and the pacing risk is still concentrated in Core Engine rather than in reopened foundation, campaign-middle, or trust-surface blockers.",
       "cited_signals": [
@@ -73,7 +73,7 @@
     "public_promise_drift_count": 0,
     "governor_decisions": [
       {
-        "decision_id": "2026-03-29-closeout-and-continue-next-20-big-wins-after-post-audit-closeout",
+        "decision_id": "2026-03-30-closeout-and-continue-next-20-big-wins-after-post-audit-closeout",
         "action": "closeout_and_continue",
         "reason": "Keep the recommended wave on Next 20 Big Wins After Post-Audit Closeout now that the Post-Audit Next 20 Big Wins program is materially closed. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 5 snapshots, and the pacing risk is still concentrated in Core Engine rather than in reopened foundation, campaign-middle, or trust-surface blockers.",
         "cited_signals": [
@@ -93,61 +93,12 @@
     "phase_label": "Public-fit polish",
     "history_snapshot_count": 5,
     "longest_pole": "Core Engine",
-    "launch_readiness": "Hold launch expansion pending route-canary validation.",
+    "launch_readiness": "Hold launch expansion while Core Engine keeps trust-critical proof blocked.",
     "provider_route_stewardship": {
       "default_status": "Pilot defaults are governed",
-      "canary_status": "Canary green on all active lanes",
-      "review_due": "2026-06-01",
-      "next_decision": "Promote once support fallout remains stable."
-    },
-    "closure_health": {
-      "state": "clear",
-      "open_case_count": 0,
-      "waiting_closure_count": 0,
-      "pending_human_response_count": 0,
-      "reported_case_count": 2,
-      "materialized_packet_count": 0,
-      "design_impact_count": 0,
-      "summary": "0 waiting closure / 0 pending human response. 0 open support packets across 2 reported cases."
-    },
-    "adoption_health": {
-      "state": "clear",
-      "local_release_proof_status": "passed",
-      "proven_journey_count": 4,
-      "proven_route_count": 6,
-      "history_snapshot_count": 5,
-      "summary": "Current local edge proof passed. 4 journey proofs and 6 trust routes are on record. 5 weekly snapshots are measured so far, so adoption history is still early."
-    },
-    "progress_trend": {
-      "state": "steady",
-      "direction": "flat",
-      "delta_percent": 0,
-      "from_as_of": "2026-03-28",
-      "to_as_of": "2026-03-29",
-      "sample_count": 5,
-      "summary": "Flat trend 0% from 2026-03-28 to 2026-03-29. Trend window: 2026-03-23 100% -> 2026-03-25 73% -> 2026-03-27 73% -> 2026-03-28 100% -> 2026-03-29 100%.",
-      "samples": [
-        {
-          "as_of": "2026-03-23",
-          "overall_progress_percent": 100
-        },
-        {
-          "as_of": "2026-03-25",
-          "overall_progress_percent": 73
-        },
-        {
-          "as_of": "2026-03-27",
-          "overall_progress_percent": 73
-        },
-        {
-          "as_of": "2026-03-28",
-          "overall_progress_percent": 100
-        },
-        {
-          "as_of": "2026-03-29",
-          "overall_progress_percent": 100
-        }
-      ]
+      "canary_status": "Canary review required before widening defaults",
+      "review_due": "2026-04-13",
+      "next_decision": "Hold default promotion until blocked journey proof and trust fallout are cleared."
     },
     "journey_gate_source": "/docker/fleet/.codex-studio/published/JOURNEY_GATES.generated.json",
     "post_audit_next20_status": "complete",
