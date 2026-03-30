@@ -714,7 +714,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         var normalizedKind = item.Kind.Trim().ToLowerInvariant();
         return normalizedKind.Contains("recap", StringComparison.Ordinal)
             || normalizedKind.Contains("after", StringComparison.Ordinal)
-            || normalizedKind.Contains("downtime", StringComparison.Ordinal);
+            || normalizedKind.Contains("downtime", StringComparison.Ordinal)
+            || normalizedKind.Contains("replay", StringComparison.Ordinal);
     }
 
     private static string DescribeRecapShelfAudience(PublicationSafeProjection item, bool creatorLinked)
@@ -749,6 +750,11 @@ public sealed class CampaignWorkspaceServerPlaneService
         if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
         {
             return $"{workspace.CampaignName} keeps this GM-facing packet on the shared campaign rail so organizer follow-through stays reviewable.";
+        }
+
+        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        {
+            return $"{workspace.CampaignName} keeps this replay-safe artifact pinned to the shared continuity lane so contested turns can be reviewed without forking campaign truth.";
         }
 
         return $"{workspace.CampaignName} keeps this recap-safe artifact pinned to the shared continuity lane for return, audit, and reuse.";
@@ -798,6 +804,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             return "Campaign return and GM prep reuse the same packet before creator publication is opened.";
         }
 
+        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        {
+            return "Campaign return and contested-turn review reuse the same replay-safe packet before creator publication is opened.";
+        }
+
         return "Campaign return already trusts this recap-safe artifact, and creator publication can promote the same truth without rebuilding it.";
     }
 
@@ -809,6 +820,11 @@ public sealed class CampaignWorkspaceServerPlaneService
         if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
         {
             return "Keep prep, aftermath, and next-session follow-through on the shared campaign rail before you branch into another export lane.";
+        }
+
+        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        {
+            return "Keep contested-turn review on the shared campaign rail before you widen the replay artifact audience or publish another copy.";
         }
 
         if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
@@ -1431,6 +1447,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         => NormalizeOptional(packageKind)?.ToLowerInvariant() switch
         {
             "session_recap" => "session_recap",
+            "replay_timeline" => "replay_timeline",
             "after_action_report" => "after_action_report",
             "downtime_brief" => "downtime_brief",
             null => throw new InvalidOperationException("aftermath package kind is required."),
@@ -1452,6 +1469,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         string runTitle = run?.Title ?? workspace.CampaignName;
         return packageKind switch
         {
+            "replay_timeline" => $"{runTitle} replay timeline",
             "after_action_report" => $"{runTitle} after-action report",
             "downtime_brief" => $"{workspace.CampaignName} downtime brief",
             _ => $"{runTitle} session recap"
@@ -1468,6 +1486,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         string subject = run?.Title ?? workspace.CampaignName;
         return packageKind switch
         {
+            "replay_timeline" => $"Generated a replay timeline for {subject} so contested turns, continuity, and consequence carry-forward stay reviewable on the same governed package.",
             "after_action_report" => $"Generated an after-action report for {subject} with {openObjectiveCount} open objective(s) and {consequenceCount} consequence signal(s) carried into the shared return lane.",
             "downtime_brief" => $"Generated a downtime brief for {workspace.CampaignName} so the next session return keeps aftermath, carry-forward obligations, and publication-safe continuity in one packet.",
             _ => $"Generated a session recap package for {subject} with {openObjectiveCount} open objective(s) and {consequenceCount} consequence signal(s) pinned for safe return and creator follow-through."
@@ -1494,6 +1513,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             activeScene is null ? "Active scene: no pinned scene." : $"Active scene: {activeScene.Title} ({activeScene.Revision}).",
             $"Open objectives: {openObjectiveCount}.",
             $"Continuity: {workspace.LatestContinuity?.Summary ?? workspace.ReturnSummary}.",
+            packageKind == "replay_timeline"
+                ? "Replay posture: governed contested-turn review stays attached to the same campaign return lane."
+                : string.Empty,
             $"Governed prep launches: {workspace.PrepLaunches?.Count ?? 0}.",
             $"Travel prefetch receipts: {workspace.TravelPrefetches?.Count ?? 0}.",
             $"Restore artifacts in scope: {restore.RecentArtifacts.Count}.",

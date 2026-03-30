@@ -2758,6 +2758,19 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(downtimeBriefPayload!.Summary.Contains("downtime brief", StringComparison.OrdinalIgnoreCase), "campaign spine downtime brief api should describe the governed downtime packet it generated.");
     Assert(downtimeBriefPayload.EvidenceLines.Any(item => item.Contains("Continuity:", StringComparison.OrdinalIgnoreCase)), "campaign spine downtime brief api should carry bounded continuity evidence lines.");
     Assert(string.Equals(downtimeBriefPayload.ArtifactKind, "RecapPackage", StringComparison.Ordinal), "campaign spine downtime brief api should register durable recap artifacts on the same registry seam.");
+    var replayTimelineResult = await campaignSpineController.GenerateMyCampaignWorkspaceAftermathRecapPackage(
+        workspaceId,
+        new AftermathRecapPackageRequest(
+            RunId: runId,
+            PackageKind: "replay_timeline",
+            Title: null,
+            Note: "Keep contested-turn replay and return review grounded on the same governed package."),
+        CancellationToken.None);
+    var replayTimelinePayload = (replayTimelineResult.Result as OkObjectResult)?.Value as AftermathRecapPackageProjection ?? replayTimelineResult.Value;
+    Assert(replayTimelinePayload is not null && string.Equals(replayTimelinePayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine replay timeline api should record a governed replay package against the selected workspace.");
+    Assert(replayTimelinePayload!.Summary.Contains("replay timeline", StringComparison.OrdinalIgnoreCase), "campaign spine replay timeline api should describe the governed replay package it generated.");
+    Assert(string.Equals(replayTimelinePayload.ArtifactKind, "ReplayPackage", StringComparison.Ordinal), "campaign spine replay timeline api should register governed replay artifacts on the durable registry seam.");
+    Assert(replayTimelinePayload.EvidenceLines.Any(item => item.Contains("Replay posture:", StringComparison.OrdinalIgnoreCase)), "campaign spine replay timeline api should carry replay posture evidence lines.");
     var refreshedWorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
     var refreshedWorkspaceServerPlanePayload = (refreshedWorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? refreshedWorkspaceServerPlaneResult.Value;
     Assert(refreshedWorkspaceServerPlanePayload?.PrepLaunches.Any(item => string.Equals(item.LaunchId, prepLaunchPayload.LaunchId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project governed prep-launch receipts after launch.");
@@ -2767,6 +2780,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project aftermath recap packages after generation.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "aftermath_recap", StringComparison.Ordinal)) == true, "campaign spine server plane api should add aftermath recap packages into the bounded what-changed packet rail.");
     Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, downtimeBriefPayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project downtime brief packets after generation.");
+    Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, replayTimelinePayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project replay timeline packages after generation.");
+    Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "replay_package", StringComparison.Ordinal)) == true, "campaign spine server plane api should name replay packages explicitly on the bounded what-changed rail.");
     Assert(refreshedWorkspaceServerPlanePayload?.FirstPlayableSession is null, "campaign spine server plane api should retire starter-session proof once governed prep, travel, and recap follow-through have landed.");
     Assert(refreshedWorkspaceServerPlanePayload?.NextSessionCarryForward is not null, "campaign spine server plane api should refresh the next-session carry-forward packet after the governed actions land.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the next-session carry-forward packet on the bounded what-changed rail.");
