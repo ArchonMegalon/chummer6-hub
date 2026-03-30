@@ -41,8 +41,21 @@
         };
     }
 
+    static bool IsDiscoverablePublicCreatorPublication(CreatorPublicationProjection? publication)
+        => publication is not null
+            && publication.Discoverable
+            && string.Equals(publication.PublicationStatus, "published", StringComparison.OrdinalIgnoreCase);
+
     static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
     static string PublicCreatorPublicationHref(string publicationId) => $"/artifacts/creator/{Uri.EscapeDataString(publicationId)}";
+    static string CreatorPublicationHref(CreatorPublicationProjection? publication, string publicationId)
+        => IsDiscoverablePublicCreatorPublication(publication)
+            ? PublicCreatorPublicationHref(publicationId)
+            : PublicationDetailHref(publicationId);
+    static string CreatorPublicationLinkLabel(CreatorPublicationProjection? publication)
+        => IsDiscoverablePublicCreatorPublication(publication)
+            ? "Open published creator packet"
+            : "Open publication status";
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
     static string ArtifactViewHref(string view)
         => string.Equals(view, "all", StringComparison.Ordinal)
@@ -186,7 +199,7 @@
                     }
                     @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
                     {
-                        <a class="inline-link" href="@PublicationDetailHref(item.CreatorPublicationId)">Open publication status</a>
+                        <a class="inline-link" href="@CreatorPublicationHref(linkedPublication, item.CreatorPublicationId)">@CreatorPublicationLinkLabel(linkedPublication)</a>
                     }
                 </article>
             }
@@ -235,7 +248,7 @@
                     {
                         <a class="inline-link" href="@BuildHandoffDetailHref(publication.BuildHandoffId)">Open build path for @publication.Title</a>
                     }
-                    <a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">Open publication status</a>
+                    <a class="inline-link" href="@CreatorPublicationHref(publication, publication.PublicationId)">@CreatorPublicationLinkLabel(publication)</a>
                 </article>
             }
         </div>

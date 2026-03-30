@@ -58,6 +58,38 @@ async function expectBodyText(page, needle, label) {
   );
 }
 
+function isPublicCreatorPublicationPath(path) {
+  return /\/artifacts\/creator\//.test(path || '');
+}
+
+async function assertCreatorPublicationDetail(page, pageErrors, path, label) {
+  await gotoAndAssert(page, pageErrors, path, async () => {
+    const currentPath = new URL(page.url()).pathname;
+    if (isPublicCreatorPublicationPath(path)) {
+      assert(/\/artifacts\/creator\//.test(currentPath), `${label} should open the public creator packet route.`);
+      await expectBodyText(page, 'Governed creator discovery', label);
+      await expectBodyText(page, 'Public creator packet', label);
+      await expectBodyText(page, 'Why this packet is live', label);
+      await expectBodyText(page, 'Provenance', label);
+      await expectBodyText(page, 'Trust', label);
+      await expectBodyText(page, 'Discovery', label);
+      await expectBodyText(page, 'Back to creator discovery', label);
+      await expectBodyText(page, 'Open artifacts shelf', label);
+    } else {
+      assert(/\/account\/work\/publications\//.test(currentPath), `${label} should open the signed-in publication detail route.`);
+      await expectBodyText(page, 'Publication status', label);
+      await expectBodyText(page, 'Trust', label);
+      await expectBodyText(page, 'Trust ranking', label);
+      await expectBodyText(page, 'Discovery', label);
+      await expectBodyText(page, 'Discoverable now', label);
+      await expectBodyText(page, 'Status', label);
+      await expectBodyText(page, 'Open build path for', label);
+    }
+
+    await assertNoBannedCopy(page, label);
+  });
+}
+
 async function expandDetailsBySummary(page, summaryText, label) {
   const summary = page.locator('summary').filter({ hasText: summaryText }).first();
   if (await summary.count() === 0) {
@@ -172,6 +204,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   let homeSeasonBoardPath;
   let homeInviteRailPath;
   let homeSponsorRailPath;
+  let publicCreatorPublicationPath;
   let runDetailPath;
   let rulesDetailPath;
 
@@ -343,8 +376,13 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Current proof surfaces');
     await expectVisible(page, 'text=Preview in progress');
     await expectVisible(page, 'text=Status guide');
+    await expectVisible(page, 'text=Governed creator discovery');
+    await expectVisible(page, 'text=Published creator packets');
+    await expectVisible(page, 'text=Open published creator packet');
+    publicCreatorPublicationPath = await readFirstHref(page, 'a[href*="/artifacts/creator/"]', '/artifacts');
     await assertNoBannedCopy(page, 'Artifacts');
   });
+  await assertCreatorPublicationDetail(page, pageErrors, publicCreatorPublicationPath, '/artifacts -> public creator packet');
 
   await page.goto(`${baseUrl}/signup?next=${encodeURIComponent(signupNext)}`, { waitUntil: 'domcontentloaded' });
   await expectVisible(page, 'input[name="email"]');
@@ -416,7 +454,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     homeWorkspacePath = await readFirstHref(page, 'a[href*="/account/work/workspaces/"]', '/home/work');
     homeBuildHandoffPath = await readFirstHref(page, 'a[href*="/account/work/build-handoffs/"]', '/home/work');
     homeRulesPath = await readFirstHref(page, 'a[href*="/account/work/rules/"]', '/home/work');
-    homePublicationPath = await readFirstHref(page, 'a[href*="/account/work/publications/"]', '/home/work');
+    homePublicationPath = await readFirstHref(page, 'a[href*="/artifacts/creator/"], a[href*="/account/work/publications/"]', '/home/work');
     homeNextSessionPath = await readFirstHref(page, 'a[href*="#selected-next-session-carry-forward"]', '/home/work');
     homeAftermathPath = await readFirstHref(page, 'a[href*="#aftermath-packages"]', '/home/work');
     homeDowntimePath = await readFirstHref(page, 'a[href*="#selected-downtime-brief"]', '/home/work');
@@ -480,15 +518,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await assertNoBannedCopy(page, '/home/work -> rules detail');
   });
 
-  await gotoAndAssert(page, pageErrors, homePublicationPath, async () => {
-    await expectBodyText(page, 'Publication status', '/home/work -> publication detail');
-    await expectBodyText(page, 'Trust', '/home/work -> publication detail');
-    await expectBodyText(page, 'Trust ranking', '/home/work -> publication detail');
-    await expectBodyText(page, 'Discovery', '/home/work -> publication detail');
-    await expectBodyText(page, 'Discoverable now', '/home/work -> publication detail');
-    await expectBodyText(page, 'Status', '/home/work -> publication detail');
-    await assertNoBannedCopy(page, '/home/work -> publication detail');
-  });
+  await assertCreatorPublicationDetail(page, pageErrors, homePublicationPath, '/home/work -> publication detail');
 
   await gotoAndAssert(page, pageErrors, homeNextSessionPath, async () => {
     assert.equal(new URL(page.url()).hash, '#selected-next-session-carry-forward', '/home/work next-session link should preserve the target anchor.');
