@@ -134,7 +134,8 @@ public sealed record LandingPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> AvailableToday,
     IReadOnlyList<ResolvedPublicCardViewModel> PreviewItems,
     IReadOnlyList<ResolvedPublicCardViewModel> ComingNext,
-    IReadOnlyList<ResolvedPublicCardViewModel> Artifacts);
+    IReadOnlyList<ResolvedPublicCardViewModel> Artifacts,
+    AccountCampaignSummary? CampaignSpine = null);
 
 public sealed record StoryPageViewModel(
     SiteChromeViewModel Chrome,

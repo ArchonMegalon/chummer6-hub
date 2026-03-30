@@ -115,7 +115,8 @@ public sealed class PublicLandingController : Controller
             AvailableToday: ResolveCards(nowCards.Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/"),
             PreviewItems: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/"),
             ComingNext: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: false, "/"),
-            Artifacts: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/"));
+            Artifacts: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/"),
+            CampaignSpine: await BuildLandingCampaignSpineAsync(cancellationToken));
         return View("~/Views/PublicLanding/Landing.cshtml", model);
     }
 
@@ -1049,6 +1050,19 @@ public sealed class PublicLandingController : Controller
 
         var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
         return _signedInTrustStatus.Build(user, manifest, releaseExperience);
+    }
+
+    private async Task<AccountCampaignSummary?> BuildLandingCampaignSpineAsync(CancellationToken cancellationToken)
+    {
+        var subject = await TryGetOptionalPublicSurfaceSubjectAsync("/", cancellationToken);
+        if (subject is null)
+        {
+            return null;
+        }
+
+        var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        return _campaignSpine.GetAccountSummary(user, installLinking);
     }
 
     private SupportIntakeOverrides ResolveSupportIntakeOverridesFromQuery()

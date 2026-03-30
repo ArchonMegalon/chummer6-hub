@@ -30,6 +30,11 @@
     var productProofSection = Section("product_proof");
     var worksNowSection = Section("whats_real_now");
     var closingSection = Section("closing_cta");
+    var starterWorkspace = Model.CampaignSpine?.Workspaces
+        .FirstOrDefault(static workspace => workspace.FirstPlayableSession is not null)
+        ?? Model.CampaignSpine?.Workspaces.FirstOrDefault();
+    var starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession;
+    var starterFirstPlayableEvidence = starterFirstPlayableSession?.EvidenceLines.FirstOrDefault();
 
     PublicLandingSectionDto Section(string id)
         => sectionsById.TryGetValue(id, out var section)
@@ -109,6 +114,44 @@
             <a class="button-like button-like--secondary" href="/now">Open what works today</a>
             <a class="button-like button-like--ghost" href="/progress">Open progress</a>
         </div>
+    </section>
+}
+
+@if (Model.Chrome.Authenticated)
+{
+    <section class="release-footnote">
+        <p class="eyebrow">Starter lane</p>
+        <h2 class="editorial-title">Reach the first playable session from the signed-in front door</h2>
+        @if (starterFirstPlayableSession is not null && starterWorkspace is not null)
+        {
+            <div class="editorial-copy">
+                <p>
+                    @starterFirstPlayableSession.Summary
+                    <span> Playable kickoff: @starterFirstPlayableSession.CampaignStartSummary.</span>
+                    <span> Next: @starterFirstPlayableSession.NextSafeAction.</span>
+                </p>
+                <p><strong>Legal runner:</strong> @starterFirstPlayableSession.RuleReadySummary</p>
+                <p><strong>Understandable return:</strong> @starterFirstPlayableSession.ReturnLaneSummary</p>
+                <p><strong>Campaign-ready lane:</strong> @starterFirstPlayableSession.CampaignReadySummary</p>
+                @if (!string.IsNullOrWhiteSpace(starterFirstPlayableEvidence))
+                {
+                    <p><strong>Grounded evidence:</strong> @starterFirstPlayableEvidence</p>
+                }
+            </div>
+            <div class="stacked-actions">
+                <a class="button-like button-like--primary" href="/home/work">Open starter lane on Home</a>
+                <a class="button-like button-like--ghost" href="@($"/account/work/workspaces/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}#selected-first-playable-session")">Open first playable session proof</a>
+            </div>
+        }
+        else
+        {
+            <div class="editorial-copy">
+                <p>The signed-in starter lane reuses the same campaign, trust, and support truth once your first shared campaign view is seeded, so onboarding does not fork into tutorial folklore.</p>
+            </div>
+            <div class="stacked-actions">
+                <a class="button-like button-like--primary" href="/home/work">Open starter lane on Home</a>
+            </div>
+        }
     </section>
 }
 
