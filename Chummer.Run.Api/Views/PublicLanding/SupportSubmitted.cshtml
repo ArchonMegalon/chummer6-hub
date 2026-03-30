@@ -3,6 +3,12 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-support-submitted";
+
+    static string TrustRowValue(
+        SignedInTrustStatusPanelViewModel? panel,
+        string label,
+        string fallback)
+        => panel?.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))?.Value ?? fallback;
 }
 
 <section class="trust-page-hero">
@@ -22,6 +28,11 @@
         }
     </div>
 </section>
+
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
 
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
@@ -61,6 +72,24 @@
                 <p>@Model.TrackedCaseSummary.FollowUpLaneSummary</p>
             </div>
         </article>
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>Linked install state</h3>
+                <p>@Model.TrackedCaseSummary.InstallReadinessSummary</p>
+            </div>
+        </article>
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>Fix confirmation</h3>
+                <p>@Model.TrackedCaseSummary.VerificationSummary</p>
+            </div>
+        </article>
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>Release lane</h3>
+                <p>@Model.TrackedCaseSummary.ReleaseProgressSummary</p>
+            </div>
+        </article>
         @if (!string.IsNullOrWhiteSpace(Model.TrackedCaseSummary.AffectedInstallSummary))
         {
             <article class="compact-rail__item">
@@ -68,6 +97,18 @@
                     <h3>Affected install</h3>
                     <p>@Model.TrackedCaseSummary.AffectedInstallSummary</p>
                 </div>
+            </article>
+        }
+        @if (Model.SignedInStatus is not null)
+        {
+            <article class="compact-rail__item">
+                <div class="compact-rail__copy">
+                    <h3>Signed-in trust snapshot</h3>
+                    <p><strong>Who can get it now:</strong> @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm the live access posture.")</p>
+                    <p><strong>Fix availability:</strong> @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open the current release to confirm the tracked fix lane.")</p>
+                    <p><strong>Current caution:</strong> @TrustRowValue(Model.SignedInStatus, "Current caution", "Open the current release to confirm the current caution lane.")</p>
+                </div>
+                <a class="inline-link" href="#signed-in-trust-status">Review trust snapshot</a>
             </article>
         }
     </section>
