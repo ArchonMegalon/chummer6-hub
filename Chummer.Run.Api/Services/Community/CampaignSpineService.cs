@@ -3337,6 +3337,7 @@ public sealed class CampaignSpineService
                 var supportClosureSummary = !string.IsNullOrWhiteSpace(leadHandoff?.SupportClosureSummary)
                     ? leadHandoff.SupportClosureSummary
                     : DescribeCreatorPublicationSupportClosure(workspace);
+                var lineageSummary = DescribeCreatorPublicationLineage(artifact, leadHandoff, workspace);
                 const string publicationStatus = "preview_ready";
                 var (trustBand, discoverable) = BuildCreatorPublicationTrustPosture(publicationStatus, workspace.Visibility);
                 var watchouts = BuildCreatorPublicationWatchouts(workspace, leadHandoff);
@@ -3359,7 +3360,8 @@ public sealed class CampaignSpineService
                     CampaignReturnSummary: campaignReturnSummary,
                     SupportClosureSummary: supportClosureSummary,
                     BuildHandoffId: leadHandoff?.HandoffId,
-                    Watchouts: watchouts);
+                    Watchouts: watchouts,
+                    LineageSummary: lineageSummary);
             })
             .ToArray();
     }
@@ -3435,6 +3437,19 @@ public sealed class CampaignSpineService
         => string.IsNullOrWhiteSpace(publicationStatus)
             ? string.Empty
             : publicationStatus.Trim().Replace('-', '_').ToLowerInvariant();
+
+    private static string DescribeCreatorPublicationLineage(
+        string artifactId,
+        BuildLabHandoffProjection? leadHandoff,
+        CampaignWorkspaceProjection workspace)
+    {
+        if (!string.IsNullOrWhiteSpace(leadHandoff?.HandoffId))
+        {
+            return $"{leadHandoff.Title} remains the current lineage anchor for artifact {artifactId} until a governed successor publication replaces it.";
+        }
+
+        return $"{workspace.CampaignName} keeps artifact {artifactId} as the current lineage anchor until a governed successor publication is promoted.";
+    }
 
     private static bool SupportsCreatorShelfProjection(PublicationSafeProjection item)
     {

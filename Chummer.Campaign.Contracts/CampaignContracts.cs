@@ -624,7 +624,8 @@ public sealed record CreatorPublicationProjection(
     string? CampaignReturnSummary = null,
     string? SupportClosureSummary = null,
     string? BuildHandoffId = null,
-    IReadOnlyList<string>? Watchouts = null);
+    IReadOnlyList<string>? Watchouts = null,
+    string? LineageSummary = null);
 
 public sealed record AccountCampaignSummary(
     IReadOnlyList<RunnerDossierProjection> Dossiers,

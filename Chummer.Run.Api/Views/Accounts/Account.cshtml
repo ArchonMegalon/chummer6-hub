@@ -1762,6 +1762,13 @@
                                 <span>Visibility</span>
                                 <strong>@HumanizeStatus(selectedCreatorPublication.Visibility, "Shared")</strong>
                             </div>
+                            @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.LineageSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Lineage</span>
+                                    <strong>@selectedCreatorPublication.LineageSummary</strong>
+                                </div>
+                            }
                             <div class="settings-summary-row">
                                 <span>Discoverable now</span>
                                 <strong>@(selectedCreatorPublication.Discoverable ? "Eligible now" : "Still bounded")</strong>
@@ -2255,6 +2262,10 @@
                                 <li>
                                     <strong><a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">@publication.Title</a></strong>: @publication.Summary
                                     <span> Provenance: @publication.ProvenanceSummary. Visibility: @HumanizeStatus(publication.Visibility, "Shared"). Trust ranking: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @publication.DiscoverySummary. Discoverable: @(publication.Discoverable ? "Eligible now" : "Still bounded"). Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
+                                    @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
+                                    {
+                                        <span> Lineage: @publication.LineageSummary.</span>
+                                    }
                                     @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                                     {
                                         <span> Next: @publication.NextSafeAction.</span>

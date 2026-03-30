@@ -1691,6 +1691,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@publication.ProvenanceSummary", StringComparison.Ordinal), "home work should surface creator-publication provenance directly from the shared projection.");
     Assert(homeSource.Contains("HumanizeStatus(publication.Visibility, \"Shared\")", StringComparison.Ordinal), "home work should humanize creator-publication visibility directly on the signed-in home route.");
     Assert(homeSource.Contains("@publication.DiscoverySummary", StringComparison.Ordinal), "home work should surface creator-publication discovery posture directly from the shared projection.");
+    Assert(homeSource.Contains("@publication.LineageSummary", StringComparison.Ordinal), "home work should surface creator-publication lineage directly from the shared projection.");
     Assert(homeSource.Contains("HumanizeStatus(publication.TrustBand, \"Draft\")", StringComparison.Ordinal), "home work should humanize creator-publication trust ranking directly on the signed-in home route.");
     Assert(homeSource.Contains("publication.Discoverable ? \"Eligible now\" : \"Still bounded\"", StringComparison.Ordinal), "home work should surface creator-publication discoverability posture directly on the signed-in home route.");
     Assert(homeSource.Contains("HumanizeStatus(publication.PublicationStatus, \"Published\")", StringComparison.Ordinal), "home work should humanize creator-publication state directly on the signed-in home route.");
@@ -1777,6 +1778,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("selectedBuildLabHandoff.ProgressionOutcomes", StringComparison.Ordinal), "account build-path detail should render progression outcomes directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.ProvenanceSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication provenance directly from the shared projection.");
     Assert(accountSource.Contains("HumanizeStatus(selectedCreatorPublication.Visibility, \"Shared\")", StringComparison.Ordinal), "account publication detail should humanize creator-publication visibility directly from the shared projection.");
+    Assert(accountSource.Contains("@selectedCreatorPublication.LineageSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication lineage directly from the shared projection.");
     Assert(accountSource.Contains("HumanizeStatus(selectedCreatorPublication.TrustBand, \"Draft\")", StringComparison.Ordinal), "account publication detail should humanize creator-publication trust ranking directly from the shared projection.");
     Assert(accountSource.Contains("selectedCreatorPublication.Discoverable ? \"Eligible now\" : \"Still bounded\"", StringComparison.Ordinal), "account publication detail should surface creator-publication discoverability posture directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.NextSafeAction", StringComparison.Ordinal), "account publication detail should surface the next creator-publication step directly from the shared projection.");
@@ -1785,6 +1787,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Open build path for @selectedCreatorPublication.Title", StringComparison.Ordinal), "account publication detail should give the customer a title-specific path back to the related build follow-through.");
     Assert(accountSource.Contains("@publication.ProvenanceSummary", StringComparison.Ordinal), "account publication list should surface creator-publication provenance directly from the shared projection.");
     Assert(accountSource.Contains("HumanizeStatus(publication.Visibility, \"Shared\")", StringComparison.Ordinal), "account publication list should humanize creator-publication visibility directly from the shared projection.");
+    Assert(accountSource.Contains("@publication.LineageSummary", StringComparison.Ordinal), "account publication list should surface creator-publication lineage directly from the shared projection.");
     Assert(accountSource.Contains("HumanizeStatus(publication.TrustBand, \"Draft\")", StringComparison.Ordinal), "account publication list should humanize creator-publication trust ranking directly from the shared projection.");
     Assert(accountSource.Contains("publication.Discoverable ? \"Eligible now\" : \"Still bounded\"", StringComparison.Ordinal), "account publication list should surface creator-publication discoverability posture directly from the shared projection.");
     Assert(accountSource.Contains("HumanizeStatus(publication.PublicationStatus, \"Published\")", StringComparison.Ordinal), "account publication list should humanize creator-publication state directly from the shared projection.");
@@ -2410,6 +2413,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.MigrationReceipts.Count >= 1, "account page should surface legacy migration receipts.");
     Assert(accountModel.CampaignSpine.CreatorPublications.Count >= 1, "account page should surface creator publication posture.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].TrustBand), "account page should keep creator-publication trust ranking attached.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].LineageSummary), "account page should keep creator-publication lineage attached.");
     Assert(accountModel.CampaignSpine.CreatorPublications[0].Discoverable == false, "preview-ready creator publications should stay off discoverable surfaces until they are actually published.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].NextSafeAction), "account page should keep creator-publication next-step truth attached.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].CampaignReturnSummary), "account page should keep creator-publication return truth attached.");
