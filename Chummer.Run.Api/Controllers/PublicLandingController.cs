@@ -805,12 +805,14 @@ public sealed class PublicLandingController : Controller
         string summary = string.IsNullOrWhiteSpace(pulse.Summary)
             ? "The weekly pulse keeps the release posture, journey evidence, and caution lane visible in one customer-safe panel."
             : pulse.Summary;
+        var trendSamples = BuildTrustPulseTrendSamples(pulse);
 
         return new PublicTrustPulsePanelViewModel(
             Eyebrow: "Weekly trust pulse",
             Heading: heading,
             Summary: summary,
             MicroProof: microProof,
+            TrendSamples: trendSamples,
             Rows: rows,
             PrimaryAction: new TrustPageActionViewModel("Open progress", "/progress", "secondary"),
             SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "ghost"));
@@ -895,7 +897,7 @@ public sealed class PublicLandingController : Controller
                 Heading: "Your linked install can verify a fix now",
                 Summary: followThrough.VerificationSummary,
                 Rows: rows,
-                PrimaryAction: new TrustPageActionViewModel("Open support timeline", "/account/support", "primary"),
+                PrimaryAction: new TrustPageActionViewModel("Verify fix on this install", followThrough.DetailHref, "primary"),
                 SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"));
         }
 
@@ -1587,6 +1589,21 @@ public sealed class PublicLandingController : Controller
         return
             $"{direction} {deltaSign} from {pulse.ProgressTrendFromAsOf} to {pulse.ProgressTrendToAsOf}. Trend window: {trendWindow}. {sparkline}";
 
+    }
+
+    private static IReadOnlyList<PublicTrustPulseTrendPointViewModel> BuildTrustPulseTrendSamples(PublicTrustPulseSnapshot pulse)
+    {
+        if (pulse.ProgressTrendSamples is not { Count: > 1 } samples)
+        {
+            return Array.Empty<PublicTrustPulseTrendPointViewModel>();
+        }
+
+        return samples
+            .Select((sample, index) => new PublicTrustPulseTrendPointViewModel(
+                AsOf: sample.AsOf,
+                OverallProgressPercent: sample.OverallProgressPercent,
+                Current: index == samples.Count - 1))
+            .ToArray();
     }
 
     private static string BuildProgressTrendSparkline(IReadOnlyList<ProgressHistoryTrendPoint> points)
