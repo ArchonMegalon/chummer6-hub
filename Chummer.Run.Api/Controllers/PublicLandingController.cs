@@ -359,9 +359,14 @@ public sealed class PublicLandingController : Controller
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Support case submitted", "What happens next after a first-party support report reaches Chummer.", $"/contact/submitted/{caseId}", cancellationToken);
         var subject = await TryGetOptionalSubjectAsync(cancellationToken);
         var authenticated = subject is not null;
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var user = subject is null
+            ? null
+            : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
         var trackedCase = subject is null
             ? null
-            : _supportCases.GetForReporter(caseId, _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email).UserId, subject.SubjectId);
+            : _supportCases.GetForReporter(caseId, user!.UserId, subject.SubjectId);
         var highlights = new List<string>
         {
             $"Case id {caseId}",
@@ -403,7 +408,8 @@ public sealed class PublicLandingController : Controller
             Highlights: highlights,
             Actions: actions,
             Attachments: trackedCase?.Attachments ?? Array.Empty<SupportCaseAttachmentProjection>(),
-            TrackedCaseSummary: trackedCase is null ? null : _supportPresentation.Build(trackedCase)));
+            TrackedCaseSummary: trackedCase is null ? null : _supportPresentation.Build(trackedCase),
+            SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience)));
     }
 
     [HttpPost("/contact")]
