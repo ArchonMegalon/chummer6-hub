@@ -448,8 +448,17 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"/account/access returned {status}, expected 200")
+    require_snippet(body, "Recent install handoffs", "/account/access")
     require_snippet(body, "Cross-device recovery", "/account/access")
+    require_snippet(body, "Advanced device recovery", "/account/access")
+    require_snippet(body, "Offline-ready return", "/account/access")
     require_snippet(body, "What stays on this device", "/account/access")
+    require_snippet(body, "Open downloads", "/account/access")
+    require_snippet(body, "How install linking works", "/account/access")
+    require_snippet(body, "live-audit-host", "/account/access")
+    require_snippet(body, "0.0-live-audit on preview", "/account/access")
+    if current_grant_access_token in body:
+        raise AssertionError("/account/access leaked the raw installation access token")
 
     status, body, _, _ = fetch(
         base_url,
@@ -463,6 +472,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "What changed for you", "/home/access")
     require_snippet(body, "Release and device state", "/home/access")
     require_snippet(body, "Open Devices &amp; access", "/home/access")
+    require_snippet(body, "Open what works today", "/home/access")
 
     workspace_id = workspaces[0]["workspaceId"]
     workspace_path = f"/account/work/workspaces/{workspace_id}"
@@ -770,6 +780,20 @@ def verify_signed_in_work_audit(
         raise AssertionError(f"{support_detail_path} returned {status}, expected 200 after reporter verification")
     require_snippet(body, "Closed and confirmed", support_detail_path)
     require_snippet(body, support_fixed_version, support_detail_path)
+
+    status, body, _, _ = fetch(
+        base_url,
+        "/home/access",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/home/access returned {status}, expected 200 after reporter verification")
+    require_snippet(body, SUPPORT_AUDIT_TITLE, "/home/access")
+    require_snippet(body, support_fixed_version, "/home/access")
+    require_snippet(body, claimed_installation_id, "/home/access")
+    require_snippet(body, "Open downloads", "/home/access")
 
     community_operations = summary.get("communityOperations") or []
     if not community_operations:

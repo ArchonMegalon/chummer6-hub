@@ -274,6 +274,11 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/home/access', async () => {
     await expectVisible(page, 'text=Access and return');
     await expectVisible(page, 'text=Finish setup before you worry about devices and follow-up');
+    await expectBodyText(page, 'Release and device state', '/home/access');
+    await expandDetailsBySummary(page, 'Release and device state', '/home/access');
+    await expectBodyText(page, 'Open current release', '/home/access');
+    await expectBodyText(page, 'Open Devices & access', '/home/access');
+    await expectBodyText(page, 'Open what works today', '/home/access');
     const bodyText = await page.locator('body').innerText();
     assert.equal(bodyText.includes('Need product proof before you act?'), false, '/home/access should use the calmer proof follow-through note.');
   });
@@ -434,6 +439,22 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/account/access', async () => {
     await expectVisible(page, 'text=Devices & access');
+    await expectBodyText(page, 'Recent install handoffs', '/account/access');
+    await expectBodyText(page, 'Cross-device recovery', '/account/access');
+    await expectBodyText(page, 'Advanced device recovery', '/account/access');
+    await expectBodyText(page, 'Open downloads', '/account/access');
+    await expectBodyText(page, 'How install linking works', '/account/access');
+    await expandDetailsBySummary(page, 'Finish on another device', '/account/access');
+    await expectBodyText(page, 'use before', '/account/access finish-on-another-device');
+    await expectVisible(page, 'text=Copy');
+    await expandDetailsBySummary(page, 'Advanced device recovery', '/account/access');
+    const offlineReturnSummary = page.locator('summary').filter({ hasText: 'Offline-ready return' }).first();
+    if (await offlineReturnSummary.count()) {
+      await expandDetailsBySummary(page, 'Offline-ready return', '/account/access');
+      await expectBodyText(page, 'Offline-ready return', '/account/access');
+    }
+    await expandDetailsBySummary(page, 'What stays on this device', '/account/access');
+    await expectBodyText(page, 'What stays on this device', '/account/access');
     const bodyText = await page.locator('body').innerText();
     assert.equal(bodyText.includes('grant_installation_'), false, '/account/access should not leak raw install grant ids.');
   });
