@@ -943,13 +943,24 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/roadmap/nexus-pan', async () => {
     await expectVisible(page, 'text=Why this horizon matters now');
+    await expectVisible(page, 'text=Current pain, expected unlock, and the live proof you should compare first');
     await expectVisible(page, 'text=Compare with current proof');
+    await expectVisible(page, 'text=Need a decision instead?');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/roadmap/nexus-pan compare link'), '/now');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/roadmap/nexus-pan support link'), '/contact#support-intake');
+    await assertNoBannedCopy(page, '/roadmap/nexus-pan');
   });
 
   await gotoAndAssert(page, pageErrors, '/artifacts/current-preview-build', async () => {
     await expectVisible(page, 'text=Use and verify this proof');
+    await expectVisible(page, 'text=What this live artifact shows, who it helps, and what to check next');
     await expectVisible(page, 'text=Available today');
     await expectVisible(page, 'text=Start from the live surface');
+    await expectVisible(page, 'text=Open current release');
+    await expectVisible(page, 'text=Open support');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/artifacts/current-preview-build release link'), '/now');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/artifacts/current-preview-build support link'), '/contact#support-intake');
+    await assertNoBannedCopy(page, '/artifacts/current-preview-build');
   });
 
   console.log(`hub playwright e2e completed against ${baseUrl}`);
