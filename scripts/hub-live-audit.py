@@ -591,6 +591,35 @@ def verify_signed_in_work_audit(
     if not support_case_id:
         raise AssertionError("support case submission did not expose a case id")
     support_detail_path = f"/account/support/{quote(support_case_id, safe='')}"
+    assistant_case_payload = json.dumps(
+        {
+            "query": SUPPORT_AUDIT_TITLE,
+            "installationId": claimed_installation_id,
+            "caseId": support_case_id,
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/support/cases/assistant",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=assistant_case_payload,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/support/cases/assistant case-truth check returned {status}: {body[:400]}")
+    case_truth_assistant = load_json_object(body, "/api/v1/support/cases/assistant")
+    case_truth_citations = [item for item in case_truth_assistant.get("citations") or [] if isinstance(item, dict)]
+    if not any(str(item.get("sourceKind") or "") == "support_case" for item in case_truth_citations):
+        raise AssertionError("support assistant did not cite the newly filed support case on the signed-in support route")
+    case_truth_actions = [item for item in case_truth_assistant.get("actions") or [] if isinstance(item, dict)]
+    if not any(str(item.get("actionId") or "") == "open_account_support" for item in case_truth_actions):
+        raise AssertionError("support assistant did not route the newly filed support case back to the signed-in support timeline")
     support_fixed_version = f"0.0-live-audit-fix-{time.time_ns()}"
     transition_payload = json.dumps(
         {

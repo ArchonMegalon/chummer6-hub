@@ -699,6 +699,22 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, `text=${supportCaseTitle}`);
     await expectVisible(page, 'text=Need routing help first?');
   });
+  await expandDetailsBySummary(page, 'Need routing help first?', '/account/support history');
+  await page.fill('#supportAssistantQuery', supportCaseTitle);
+  await Promise.all([
+    expectVisible(page, '#supportAssistantAnswer', '/account/support case-truth assistant answer'),
+    expectVisible(page, '#supportAssistantActions', '/account/support case-truth assistant actions'),
+    expectVisible(page, '#supportAssistantCitations', '/account/support case-truth assistant citations'),
+    page.getByRole('button', { name: /Check guidance/i }).click()
+  ]);
+  await expectVisible(page, 'text=Grounded guidance loaded');
+  await expectVisible(page, 'text=Open support timeline');
+  const caseTruthAnswer = await page.locator('#supportAssistantAnswer').innerText();
+  assert(
+    caseTruthAnswer.includes('I found') && caseTruthAnswer.includes(supportCaseTitle),
+    `/account/support assistant should ground the query on the tracked case, got: ${caseTruthAnswer}`
+  );
+  await expectVisible(page, `#supportAssistantCitations text=${supportCaseTitle}`);
   const supportHistorySelector = `a[href="${trackedSupportCasePath}"]`;
   const supportHistoryHref = await readFirstHref(page, supportHistorySelector, '/account/support history');
   assert.equal(supportHistoryHref, trackedSupportCasePath, '/account/support history should keep the tracked case detail href.');

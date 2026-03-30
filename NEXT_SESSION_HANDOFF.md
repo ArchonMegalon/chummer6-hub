@@ -1,6 +1,17 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:54:20+02:00
+Updated: 2026-03-30T08:55:46+02:00
+
+## Handoff refresh (2026-03-30T08:55:46+02:00)
+
+- Signed-in support proof now closes the assistant’s tracked-case loop instead of stopping at generic help/work routing:
+  - `scripts/hub-live-audit.py` now creates a support case and immediately re-queries `/api/v1/support/cases/assistant` with that exact `caseId`, failing unless the response cites a `support_case` and offers the `open_account_support` timeline action.
+  - `scripts/e2e-hub-playwright.cjs` now returns to `/account/support` after filing the uniquely titled case, reopens the assistant drawer, asks for that exact tracked case by title, requires the grounded answer and citation row, then verifies the signed-in history link still reopens the same detail route.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:54:20+02:00)
 
