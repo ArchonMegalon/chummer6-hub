@@ -348,7 +348,8 @@ public sealed class PublicLandingController : Controller
             _trustContent.BuildPrivacyPage(chrome) with
             {
                 PrivacyBoundary = _privacyBoundaries.BuildPanel("privacy"),
-                TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience)
+                TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
+                SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken)
             });
     }
 
@@ -363,7 +364,8 @@ public sealed class PublicLandingController : Controller
             "~/Views/PublicLanding/TrustPage.cshtml",
             _trustContent.BuildTermsPage(chrome) with
             {
-                TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience)
+                TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
+                SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken)
             });
     }
 
