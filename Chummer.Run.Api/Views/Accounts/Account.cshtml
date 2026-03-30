@@ -1860,10 +1860,24 @@
                                 <span>Trust ranking</span>
                                 <strong>@HumanizeStatus(selectedCreatorPublication.TrustBand, "Draft")</strong>
                             </div>
+                            @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.TrustSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Trust posture</span>
+                                    <strong>@selectedCreatorPublication.TrustSummary</strong>
+                                </div>
+                            }
                             <div class="settings-summary-row">
                                 <span>Discovery</span>
                                 <strong>@selectedCreatorPublication.DiscoverySummary</strong>
                             </div>
+                            @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.ComparisonSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Compare by</span>
+                                    <strong>@selectedCreatorPublication.ComparisonSummary</strong>
+                                </div>
+                            }
                             <div class="settings-summary-row">
                                 <span>Visibility</span>
                                 <strong>@HumanizeStatus(selectedCreatorPublication.Visibility, "Shared")</strong>
@@ -1902,6 +1916,13 @@
                                 <div class="settings-summary-row">
                                     <span>Support</span>
                                     <strong>@selectedCreatorPublication.SupportClosureSummary</strong>
+                                </div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.ModerationSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Moderation</span>
+                                    <strong>@selectedCreatorPublication.ModerationSummary</strong>
                                 </div>
                             }
                         </div>
@@ -2219,6 +2240,14 @@
                                                 {
                                                     <span> Discovery: @linkedPublication.DiscoverySummary</span>
                                                 }
+                                                @if (!string.IsNullOrWhiteSpace(linkedPublication?.TrustSummary))
+                                                {
+                                                    <span> Trust: @linkedPublication.TrustSummary</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(linkedPublication?.ComparisonSummary))
+                                                {
+                                                    <span> Compare by: @linkedPublication.ComparisonSummary</span>
+                                                }
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
                                                 {
                                                     <span> Lineage: @linkedPublication.LineageSummary</span>
@@ -2230,6 +2259,10 @@
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.SupportClosureSummary))
                                                 {
                                                     <span> Support: @linkedPublication.SupportClosureSummary</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(linkedPublication?.ModerationSummary))
+                                                {
+                                                    <span> Moderation: @linkedPublication.ModerationSummary</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
                                                 {
@@ -2407,10 +2440,18 @@
                             {
                                 <li>
                                     <strong><a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">@publication.Title</a></strong>: @publication.Summary
-                                    <span> Provenance: @publication.ProvenanceSummary. Visibility: @HumanizeStatus(publication.Visibility, "Shared"). Trust ranking: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @publication.DiscoverySummary. Discoverable: @(publication.Discoverable ? "Eligible now" : "Still bounded"). Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
+                                    <span> Provenance: @publication.ProvenanceSummary. Visibility: @HumanizeStatus(publication.Visibility, "Shared"). Trust ranking: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @publication.DiscoverySummary Discoverable: @(publication.Discoverable ? "Eligible now" : "Still bounded"). Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
+                                    @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
+                                    {
+                                        <span> Trust: @publication.TrustSummary</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
+                                    {
+                                        <span> Compare by: @publication.ComparisonSummary</span>
+                                    }
                                     @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
                                     {
-                                        <span> Lineage: @publication.LineageSummary.</span>
+                                        <span> Lineage: @publication.LineageSummary</span>
                                     }
                                     @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                                     {
@@ -2423,6 +2464,10 @@
                                     @if (!string.IsNullOrWhiteSpace(publication.SupportClosureSummary))
                                     {
                                         <span> Support: @publication.SupportClosureSummary.</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
+                                    {
+                                        <span> Moderation: @publication.ModerationSummary</span>
                                     }
                                     @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
                                     {

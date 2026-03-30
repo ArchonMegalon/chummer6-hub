@@ -148,6 +148,14 @@
                     {
                         <p class="muted-copy"><strong>Discovery:</strong> @linkedPublication.DiscoverySummary</p>
                     }
+                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.TrustSummary))
+                    {
+                        <p class="muted-copy"><strong>Trust:</strong> @linkedPublication.TrustSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.ComparisonSummary))
+                    {
+                        <p class="muted-copy"><strong>Compare by:</strong> @linkedPublication.ComparisonSummary</p>
+                    }
                     @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
                     {
                         <p class="muted-copy"><strong>Lineage:</strong> @linkedPublication.LineageSummary</p>
@@ -159,6 +167,10 @@
                     @if (!string.IsNullOrWhiteSpace(linkedPublication?.SupportClosureSummary))
                     {
                         <p class="muted-copy"><strong>Support:</strong> @linkedPublication.SupportClosureSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.ModerationSummary))
+                    {
+                        <p class="muted-copy"><strong>Moderation:</strong> @linkedPublication.ModerationSummary</p>
                     }
                     @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
                     {
@@ -187,6 +199,14 @@
                     </div>
                     <p class="muted-copy"><strong>Provenance:</strong> @publication.ProvenanceSummary</p>
                     <p class="muted-copy"><strong>Discovery:</strong> @publication.DiscoverySummary</p>
+                    @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
+                    {
+                        <p class="muted-copy"><strong>Trust:</strong> @publication.TrustSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
+                    {
+                        <p class="muted-copy"><strong>Compare by:</strong> @publication.ComparisonSummary</p>
+                    }
                     @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
                     {
                         <p class="muted-copy"><strong>Lineage:</strong> @publication.LineageSummary</p>
@@ -198,6 +218,10 @@
                     @if (!string.IsNullOrWhiteSpace(publication.SupportClosureSummary))
                     {
                         <p class="muted-copy"><strong>Support:</strong> @publication.SupportClosureSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
+                    {
+                        <p class="muted-copy"><strong>Moderation:</strong> @publication.ModerationSummary</p>
                     }
                     @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                     {
