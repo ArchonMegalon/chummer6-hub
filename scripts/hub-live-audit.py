@@ -459,6 +459,22 @@ def verify_signed_in_work_audit(
 
     status, body, _, _ = fetch(
         base_url,
+        "/participate/codex",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/participate/codex returned {status}, expected 200")
+    require_snippet(body, "Help Chummer show its work.", "/participate/codex")
+    require_snippet(body, "I want to participate", "/participate/codex")
+    require_snippet(body, "One decision, one code, one clean handoff", "/participate/codex")
+    require_snippet(body, "Generate fresh code", "/participate/codex")
+    require_snippet(body, "Open a fresh contribution lane", "/participate/codex")
+    require_snippet(body, "Technical details and controls", "/participate/codex")
+
+    status, body, _, _ = fetch(
+        base_url,
         "/account/access",
         public_host=public_host,
         forwarded_proto=forwarded_proto,

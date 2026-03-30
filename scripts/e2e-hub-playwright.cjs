@@ -105,6 +105,19 @@ async function readDefinitionValue(page, label, path) {
   return (await value.innerText()).trim();
 }
 
+async function waitForParticipationPhase(page) {
+  await page.waitForFunction(() => {
+    const authorize = document.getElementById('authorizeState');
+    const complete = document.getElementById('completeState');
+    const unavailable = document.getElementById('unavailableState');
+    return Boolean(
+      (authorize && !authorize.hidden)
+      || (complete && !complete.hidden)
+      || (unavailable && !unavailable.hidden)
+    );
+  }, { timeout: 15000 });
+}
+
 function assertLoginRedirect(page, expectedNext, label) {
   const current = new URL(page.url());
   assert.equal(current.pathname, '/login', `${label} should redirect to /login.`);
@@ -881,7 +894,51 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/support history');
 
   await gotoAndAssert(page, pageErrors, '/participate/codex', async () => {
+    await expectVisible(page, 'text=Help Chummer show its work.');
+    await expectVisible(page, 'text=I want to participate');
     await expectVisible(page, 'text=Authorize in ChatGPT');
+    await expectBodyText(page, 'One decision, one code, one clean handoff', '/participate/codex');
+    await page.locator('#openParticipationWizardButton').click();
+    await expectVisible(page, '#participationWizardDialog');
+    await waitForParticipationPhase(page);
+
+    const unavailableVisible = await page.locator('#unavailableState').isVisible().catch(() => false);
+    if (unavailableVisible) {
+      await expectVisible(page, 'text=Participation is unavailable right now');
+      await expectVisible(page, 'text=Back to home');
+      await expectVisible(page, 'text=Open account');
+      await expectVisible(page, 'text=How it works');
+      await assertNoBannedCopy(page, '/participate/codex unavailable');
+      return;
+    }
+
+    const completeVisible = await page.locator('#completeState').isVisible().catch(() => false);
+    if (completeVisible) {
+      await expectVisible(page, "text=Thanks, you're set");
+      await expectVisible(page, 'text=Back to home');
+      await expectVisible(page, 'text=Open account');
+      await assertNoBannedCopy(page, '/participate/codex complete');
+      return;
+    }
+
+    await expectVisible(page, '#authorizeState');
+    const participationHeading = await page.locator('#participationHeading').innerText();
+    if (participationHeading.includes('Waiting for an available slot')) {
+      await expectBodyText(page, 'All contribution slots are busy right now.', '/participate/codex queued');
+      await expectBodyText(page, 'No code yet. Chummer is waiting for a contribution slot to open.', '/participate/codex queued');
+    } else {
+      assert.equal(participationHeading.includes('Authorize in ChatGPT'), true, `/participate/codex should reach the authorize heading or the queued heading, got: ${participationHeading}`);
+      const code = await page.locator('#authorizationCode').innerText();
+      assert.equal(code.startsWith('A fresh code will appear here after you start.'), false, '/participate/codex should render a fresh one-time code after starting the contribution lane.');
+      assert.equal(await page.locator('#openAuthorizationLink').isEnabled(), true, '/participate/codex should enable the authorization link once a contribution lane exists.');
+      await expectVisible(page, 'text=Keep this page open.');
+    }
+
+    await expectVisible(page, 'text=Technical details and controls');
+    await expectVisible(page, 'text=Contribution id');
+    await page.locator('#cancelContributionButton').click();
+    await expectBodyText(page, 'This contribution lane has been stopped. You can start again whenever you want.', '/participate/codex stopped');
+    await assertNoBannedCopy(page, '/participate/codex');
   });
 
   await gotoAndAssert(page, pageErrors, '/roadmap/nexus-pan', async () => {
