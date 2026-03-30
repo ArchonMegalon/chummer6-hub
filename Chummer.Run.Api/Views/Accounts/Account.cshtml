@@ -2151,7 +2151,7 @@
                             {
                                 <li>
                                     <strong><a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">@publication.Title</a></strong>: @publication.Summary
-                                    <span> Source: @publication.ProvenanceSummary. Discovery: @publication.DiscoverySummary.</span>
+                                    <span> Source: @publication.ProvenanceSummary. Discovery: @publication.DiscoverySummary. Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
                                     @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                                     {
                                         <span> Next: @publication.NextSafeAction.</span>
