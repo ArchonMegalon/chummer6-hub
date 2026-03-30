@@ -398,6 +398,7 @@ public sealed record HomePageViewModel(
     AccountCampaignSummary CampaignSpine,
     CampaignWorkspaceServerPlaneProjection? LeadWorkspaceServerPlane,
     HomePrimaryActionViewModel PrimaryAction,
+    SignedInTrustStatusPanelViewModel? SignedInStatus,
     IReadOnlyList<ResolvedPublicCardViewModel> NowRail,
     IReadOnlyList<ResolvedPublicCardViewModel> HorizonRail);
 

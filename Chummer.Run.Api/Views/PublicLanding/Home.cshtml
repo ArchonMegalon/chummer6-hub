@@ -150,6 +150,12 @@
 
     static string RuleEnvironmentSummary(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
         => $"{environment.OwnerScope} scope · {environment.CompatibilityFingerprint} · {HumanizeStatus(environment.ApprovalState, "Review")}";
+
+    static string TrustRowValue(
+        SignedInTrustStatusPanelViewModel? panel,
+        string label,
+        string fallback)
+        => panel?.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))?.Value ?? fallback;
 }
 
 <section class="home-command">
@@ -201,6 +207,11 @@
                     <a class="button-like button-like--ghost" href="/account/access">Open Devices &amp; access</a>
                 </article>
             </div>
+
+            @if (Model.SignedInStatus is not null)
+            {
+                @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+            }
         }
 
         @if (showAccessSection && (!showOnboarding || accessSurfaceReady))
@@ -716,6 +727,9 @@
                                                                     <span> Sponsors: @leadCommunitySponsorSession.UserDisplayName on @leadCommunitySponsorSession.CampaignName. @leadCommunitySponsorSession.StatusSummary.</span>
                                                                 }
                                                                 <span> Guide: current preview, downloads, and closure posture stay on the same operator rail.</span>
+                                                                <span> Access now: @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm the live access posture.")</span>
+                                                                <span> Fix: @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open the current release to confirm the tracked fix lane.")</span>
+                                                                <span> Caution: @TrustRowValue(Model.SignedInStatus, "Current caution", "Open the current release to confirm the current caution lane.")</span>
                                                                 @if (leadCommunityTransfer is not null)
                                                                 {
                                                                     <span> Latest move: @leadCommunityTransfer.RunnerHandle.</span>
