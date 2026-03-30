@@ -106,6 +106,7 @@ public sealed class PublicLandingController : Controller
             Manifest: manifest,
             ReleaseExperience: releaseExperience,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
             PrimaryHeroAction: primaryHeroAction,
             SecondaryHeroAction: secondaryHeroAction,
             Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/"),

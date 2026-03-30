@@ -155,7 +155,7 @@ trust_pages:
     effective_date: "2026-03-25"
     updated_date: "2026-03-28"
     summary_points:
-      - "The installer stays the same for everyone"
+      - "The published package stays the same for everyone"
       - "Hub stores account and support state"
       - "Provider secrets stay out of Hub"
 """);

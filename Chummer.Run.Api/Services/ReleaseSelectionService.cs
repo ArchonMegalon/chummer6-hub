@@ -321,7 +321,7 @@ public sealed class ReleaseSelectionService
     private static string RecommendedSupport(PublicReleaseArtifactDto download)
         => IsInstaller(download)
             ? $"This is the default recommended installer for {PlatformLabel(download)}."
-            : $"A packaged installer is not published for {PlatformLabel(download)} yet. This is the cleanest current preview package for that platform.";
+            : $"This is the clearest current preview package for {PlatformLabel(download)}.";
 
     private static string AlternativeSupport(PublicReleaseArtifactDto download)
         => IsInstaller(download)
@@ -332,17 +332,17 @@ public sealed class ReleaseSelectionService
     {
         if (authenticated)
         {
-            return "Signed-in download: the same published artifact plus a claim code you can use to link this copy on first launch.";
+            return "Signed-in download: the same published artifact plus recovery, support, and any optional device-linking help tied back to your account.";
         }
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
         {
-            return "The current preview starts with account creation so Chummer can attach the install handoff to your account from the first launch.";
+            return "The current preview starts with account creation so Chummer can keep the download handoff and recovery path attached from the first launch.";
         }
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRecommended, StringComparison.OrdinalIgnoreCase))
         {
-            return "You can download this copy as a guest, but signing in keeps the install handoff and support continuity attached to your account.";
+            return "You can download this copy as a guest, but signing in keeps recovery, support continuity, and any available device linking attached to your account.";
         }
 
         return recommended ? RecommendedSupport(download) : AlternativeSupport(download);
@@ -366,7 +366,7 @@ public sealed class ReleaseSelectionService
     private static string RecommendedActionLabel(PublicReleaseArtifactDto download)
         => IsInstaller(download)
             ? $"Download Chummer for {PlatformLabel(download)}"
-            : $"Download preview package for {PlatformLabel(download)}";
+            : $"Download Chummer preview for {PlatformLabel(download)}";
 
     private static string AlternativeActionLabel(PublicReleaseArtifactDto download)
         => IsInstaller(download)
@@ -378,6 +378,11 @@ public sealed class ReleaseSelectionService
         if (recommended && IsInstaller(download))
         {
             return $"Chummer for {PlatformLabel(download)}";
+        }
+
+        if (recommended)
+        {
+            return $"Chummer preview for {PlatformLabel(download)}";
         }
 
         if (IsInstaller(download))
@@ -513,7 +518,7 @@ public sealed class ReleaseSelectionService
         {
             return new PlatformShelfNoticeViewModel(
                 $"{label} is not on the public shelf yet",
-                $"The current preview does not publish a promoted {label} installer yet. Built artifacts may exist as internal release evidence, but /downloads only exposes platforms that have cleared signing, promotion, and public release-truth checks.");
+                $"The current preview does not publish a promoted {label} download yet. Built artifacts may exist as internal release evidence, but /downloads only exposes platforms that have cleared signing, promotion, and public release-truth checks.");
         }
 
         return new PlatformShelfNoticeViewModel(

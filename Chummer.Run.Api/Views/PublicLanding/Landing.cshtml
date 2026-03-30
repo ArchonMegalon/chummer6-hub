@@ -35,6 +35,12 @@
         => sectionsById.TryGetValue(id, out var section)
             ? section
             : throw new InvalidOperationException($"Landing section '{id}' is required.");
+
+    static string TrustRowValue(
+        SignedInTrustStatusPanelViewModel? panel,
+        string label,
+        string fallback)
+        => panel?.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))?.Value ?? fallback;
 }
 
 <section class="launch-hero">
@@ -85,6 +91,11 @@
         }
     </div>
 </section>
+
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
 
 @if (trustPulse is not null)
 {
@@ -189,6 +200,12 @@
         {
             <a class="button-like button-like--primary" href="/home">Open home</a>
             <p class="muted-copy">Your setup, updates, and access state already live in the signed-in product.</p>
+            @if (Model.SignedInStatus is not null)
+            {
+                <p class="muted-copy"><strong>Access now:</strong> @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the signed-in trust snapshot to confirm live access posture.")</p>
+                <p class="muted-copy"><strong>Fix availability:</strong> @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open the signed-in trust snapshot to confirm the tracked fix lane.")</p>
+                <p class="muted-copy"><strong>Current caution:</strong> @TrustRowValue(Model.SignedInStatus, "Current caution", "Open the signed-in trust snapshot to confirm the current caution lane.")</p>
+            }
         }
         else
         {

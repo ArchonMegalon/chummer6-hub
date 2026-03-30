@@ -22,6 +22,7 @@ public sealed class BlazorShellComponentTests
         string[] viewPaths =
         [
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml"),

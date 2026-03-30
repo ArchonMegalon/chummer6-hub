@@ -5,24 +5,29 @@
     ViewData["SurfaceClass"] = "surface-downloads";
     var release = Model.ReleaseExperience;
     var guestGateRequired = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
+    var recommendedIsInstaller = release.Recommended?.Installer == true;
     var platformShelfNotice = !string.IsNullOrWhiteSpace(release.PlatformShelfNoticeSummary);
 }
 
 <section class="release-stage">
     <div class="release-stage__lead">
         <p class="eyebrow">Downloads</p>
-        <h1 class="page-title">Install the current preview</h1>
+        <h1 class="page-title">@(recommendedIsInstaller ? "Install the current preview" : "Download the current preview")</h1>
         <p class="page-copy">
             @(platformShelfNotice
                 ? "This device platform is not on the current public shelf. Read the current platform note before treating the preview as installable on this machine."
-                : "Start with the recommended installer for this device. Release details and advanced packages stay underneath so the first decision stays simple.")
+                : recommendedIsInstaller
+                    ? "Start with the recommended installer for this device. Release details and advanced packages stay underneath so the first decision stays simple."
+                    : "Start with the recommended package for this device. Release details and setup notes stay underneath so the first decision stays simple.")
         </p>
         <p class="release-stage__note">
             @(platformShelfNotice
                 ? release.PlatformShelfNoticeSummary
                 : guestGateRequired
                 ? release.GuestGateSummary
-                : "Use the recommended installer first. Everything else stays collapsed underneath unless you know you need it.")
+                : recommendedIsInstaller
+                    ? "Use the recommended installer first. Everything else stays collapsed underneath unless you know you need it."
+                    : "Use the recommended package first. Everything else stays collapsed underneath unless you know you need it.")
         </p>
         @if (platformShelfNotice)
         {
@@ -63,7 +68,9 @@ else
             <div class="recommended-download__copy">
                 <span class="tag">@(guestGateRequired ? release.GuestGateHeading : "Recommended")</span>
                 <h2>@release.Recommended.Title</h2>
-                <p>Use the recommended installer first. Release detail, alternate packages, and manual paths stay collapsed underneath.</p>
+                <p>@(recommendedIsInstaller
+                    ? "Use the recommended installer first. Release detail, alternate packages, and manual paths stay collapsed underneath."
+                    : "Use the recommended package first. Release detail, alternate packages, and setup notes stay collapsed underneath.")</p>
                 <p class="muted-copy">@release.Display.ChannelLabel · @release.Display.BuildLabel · @release.Display.PublishedLabel</p>
                 <div class="recommended-download__meta">
                     <span>@release.Recommended.PlatformLabel</span>
@@ -96,7 +103,7 @@ else
                             <strong>@(Model.Manifest.KnownIssueSummary ?? "Check the install and trust lane before you commit a fresh device to this preview.")</strong>
                         </div>
                         <div class="settings-summary-row">
-                            <span>Update posture</span>
+                            <span>Update status</span>
                             <strong>@release.UpdatePostureSummary</strong>
                         </div>
                         @if (!string.IsNullOrWhiteSpace(Model.Manifest.SupportabilitySummary))
@@ -107,7 +114,7 @@ else
                             </div>
                         }
                         <div class="settings-summary-row">
-                            <span>Install path</span>
+                            <span>@(recommendedIsInstaller ? "Install path" : "Download path")</span>
                             <strong>@release.Recommended.SupportLine</strong>
                         </div>
                         @if (!string.IsNullOrWhiteSpace(Model.Manifest.FixAvailabilitySummary))
