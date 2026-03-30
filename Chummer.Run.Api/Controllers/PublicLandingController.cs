@@ -241,7 +241,9 @@ public sealed class PublicLandingController : Controller
                 HeadLabel: option.HeadLabel,
                 ClaimCode: dispatch.ClaimTicket?.ClaimCode,
                 ClaimCodeExpiresAtUtc: dispatch.ClaimTicket?.ExpiresAtUtc,
-                Steps: release.SignedInDispatchSteps);
+                Steps: release.SignedInDispatchSteps,
+                TrustPulse: BuildPublicTrustPulsePanel(manifest, release),
+                SignedInStatus: _signedInTrustStatus.Build(user, manifest, release));
             return View("~/Views/PublicLanding/DownloadDispatch.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)

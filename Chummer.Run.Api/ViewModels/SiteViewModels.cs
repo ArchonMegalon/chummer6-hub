@@ -207,7 +207,9 @@ public sealed record DownloadDispatchPageViewModel(
     string HeadLabel,
     string? ClaimCode,
     DateTimeOffset? ClaimCodeExpiresAtUtc,
-    IReadOnlyList<string> Steps);
+    IReadOnlyList<string> Steps,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record TrustPageSectionViewModel(
     string Id,
