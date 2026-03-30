@@ -2065,9 +2065,35 @@
                                         {
                                             <li>
                                                 <strong>@item.Label</strong>: @item.Summary
+                                                <span> Audience: @PublicSurfaceStatus.AudienceLabel(item.Audience).</span>
+                                                @if (!string.IsNullOrWhiteSpace(item.OwnershipSummary))
+                                                {
+                                                    <span> Ownership: @item.OwnershipSummary</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(item.PublicationState))
+                                                {
+                                                    <span> Publication: @HumanizeStatus(item.PublicationState, "Ready").</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(item.TrustBand))
+                                                {
+                                                    <span> Trust ranking: @HumanizeStatus(item.TrustBand, "Draft").</span>
+                                                    <span> Discoverable now: @(item.Discoverable ? "Eligible now" : "Still bounded").</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
+                                                {
+                                                    <span> @item.PublicationSummary</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
+                                                {
+                                                    <span> Next: @item.NextSafeAction</span>
+                                                }
                                                 @if (!string.IsNullOrWhiteSpace(item.ArtifactId))
                                                 {
                                                     <span> (@item.ArtifactId)</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
+                                                {
+                                                    <a class="inline-link" href="@PublicationDetailHref(item.CreatorPublicationId)">Open publication status</a>
                                                 }
                                             </li>
                                         }
