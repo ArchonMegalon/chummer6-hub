@@ -142,7 +142,9 @@ public sealed record StoryPageViewModel(
     AssetCatalogViewModel Assets,
     IReadOnlyList<ResolvedPublicCardViewModel> Workflows,
     IReadOnlyList<PublicFeatureCardDto> TrustPillars,
-    IReadOnlyList<ResolvedPublicCardViewModel> Lanes);
+    IReadOnlyList<ResolvedPublicCardViewModel> Lanes,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record NowPageViewModel(
     SiteChromeViewModel Chrome,
@@ -162,7 +164,9 @@ public sealed record HorizonsPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
-    IReadOnlyList<ResolvedPublicCardViewModel> Horizons);
+    IReadOnlyList<ResolvedPublicCardViewModel> Horizons,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record ShelfPageViewModel(
     SiteChromeViewModel Chrome,
@@ -171,7 +175,9 @@ public sealed record ShelfPageViewModel(
     string Eyebrow,
     string Heading,
     string Intro,
-    IReadOnlyList<ResolvedPublicCardViewModel> Items);
+    IReadOnlyList<ResolvedPublicCardViewModel> Items,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record DownloadsPageViewModel(
     SiteChromeViewModel Chrome,
@@ -351,7 +357,9 @@ public sealed record ParticipatePageViewModel(
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
     IReadOnlyList<ResolvedPublicCardViewModel> PublicLane,
-    IReadOnlyList<ResolvedPublicCardViewModel> SignedInLane);
+    IReadOnlyList<ResolvedPublicCardViewModel> SignedInLane,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record FeatureDetailFactViewModel(
     string Label,

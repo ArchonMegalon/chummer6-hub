@@ -1566,6 +1566,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!storySource.Contains("Go deeper only where you still need proof", StringComparison.Ordinal), "product story should not end with another full-width guidance section after the differentiation grid.");
     Assert(storySource.Contains("Use this page to decide whether Chummer fits.", StringComparison.Ordinal), "product story should frame itself as a fit-and-differentiation page instead of a second action surface.");
     Assert(storySource.Contains("Need proof?", StringComparison.Ordinal), "product story should end with a quieter inline route note instead of a second hero-like CTA cluster.");
+    Assert(storySource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "product story should reuse the shared signed-in trust panel instead of inventing a story-only trust surface.");
+    Assert(storySource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "product story should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
     var nowSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml"));
     Assert(nowSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "now page should include the unified public status guide.");
     Assert(nowSource.Contains("Supporting proof around the core loop", StringComparison.Ordinal), "now should keep supporting proof behind a calmer secondary disclosure.");
@@ -1575,9 +1577,13 @@ async Task VerifyPublicLandingProjectionAsync()
     var shelfSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml"));
     Assert(shelfSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "artifact shelf should include the unified public status guide.");
     Assert(!shelfSource.Contains("static string DisplayStatus", StringComparison.Ordinal), "artifact shelf should use the shared public status presenter instead of a local badge mapper.");
+    Assert(shelfSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "artifact shelf should reuse the shared signed-in trust panel instead of inventing a shelf-only trust surface.");
+    Assert(shelfSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "artifact shelf should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
     var horizonsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml"));
     Assert(horizonsSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "horizons should include the unified public status guide.");
     Assert(horizonsSource.Contains("PublicSurfaceStatus.ResearchTrack", StringComparison.Ordinal), "roadmap should use the shared public status presenter for its visible maturity language.");
+    Assert(horizonsSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "horizons should reuse the shared signed-in trust panel instead of inventing a roadmap-only trust surface.");
+    Assert(horizonsSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "horizons should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
     Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Inspectable"), PublicSurfaceStatus.AvailableToday, StringComparison.Ordinal), "inspectable proof should present as available-today proof on the public surface.");
     Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Preview"), PublicSurfaceStatus.PreviewInProgress, StringComparison.Ordinal), "preview artifact concepts should present as preview-in-progress on the public surface.");
     Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Designing"), PublicSurfaceStatus.DesigningInPublic, StringComparison.Ordinal), "designing horizons should present with the shared customer-facing roadmap label.");
@@ -2120,6 +2126,12 @@ async Task VerifyPublicLandingProjectionAsync()
     var storyView = await controller.ProductStoryPage(CancellationToken.None) as ViewResult;
     var storyModel = storyView?.Model as StoryPageViewModel;
     Assert(storyModel is not null && storyModel.TrustPillars.Count == 3, "product story page should expose the three trust pillars.");
+    Assert(storyModel!.TrustPulse is not null, "guest product story should surface the weekly public trust pulse.");
+    Assert(storyModel.SignedInStatus is null, "guest product story should not project install-specific signed-in trust posture.");
+    var authenticatedStoryView = await authenticatedLandingController.ProductStoryPage(CancellationToken.None) as ViewResult;
+    var authenticatedStoryModel = authenticatedStoryView?.Model as StoryPageViewModel;
+    Assert(authenticatedStoryModel?.TrustPulse is not null, "authenticated product story should keep the weekly public trust pulse visible.");
+    Assert(authenticatedStoryModel?.SignedInStatus is not null, "authenticated product story should project the shared signed-in trust status.");
     var roadmapDetailView = await controller.RoadmapDetailPage("runsite", CancellationToken.None) as ViewResult;
     var roadmapDetailModel = roadmapDetailView?.Model as FeatureDetailPageViewModel;
     Assert(roadmapDetailModel is not null && !string.IsNullOrWhiteSpace(roadmapDetailModel.ProofNote), "roadmap detail pages should expose a verification note instead of a bare placeholder shell.");
@@ -2139,11 +2151,15 @@ async Task VerifyPublicLandingProjectionAsync()
     var participateView = await controller.ParticipatePage(CancellationToken.None) as ViewResult;
     var participateModel = participateView?.Model as ParticipatePageViewModel;
     Assert(participateModel is not null, "participate page should render through the MVC view layer.");
+    Assert(participateModel!.TrustPulse is not null, "guest participate page should surface the weekly public trust pulse.");
+    Assert(participateModel.SignedInStatus is null, "guest participate page should not project install-specific signed-in trust posture.");
     Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Open guided contribution", StringComparison.Ordinal) && string.Equals(card.Action.Href, "/login?next=/participate/codex", StringComparison.Ordinal)), "guest participate page should route guided contribution through login first.");
     Assert(participateModel.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Join beta waitlist", StringComparison.Ordinal) && string.Equals(card.Action.Href, "/signup?next=/account/settings", StringComparison.Ordinal)), "guest participate page should route beta follow-up through signup first.");
     var authenticatedParticipateView = await authenticatedLandingController.ParticipatePage(CancellationToken.None) as ViewResult;
     var authenticatedParticipateModel = authenticatedParticipateView?.Model as ParticipatePageViewModel;
     Assert(authenticatedParticipateModel is not null, "authenticated participate page should render through the MVC view layer.");
+    Assert(authenticatedParticipateModel!.TrustPulse is not null, "authenticated participate page should keep the weekly public trust pulse visible.");
+    Assert(authenticatedParticipateModel.SignedInStatus is not null, "authenticated participate page should project the shared signed-in trust status.");
     Assert(authenticatedParticipateModel!.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Open guided contribution", StringComparison.Ordinal) && string.Equals(card.Action.Href, "/participate/codex", StringComparison.Ordinal)), "signed-in participate page should keep the direct guided-contribution route.");
     Assert(authenticatedParticipateModel.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Join beta waitlist", StringComparison.Ordinal) && string.Equals(card.Action.Href, "/account/settings", StringComparison.Ordinal)), "signed-in participate page should keep the direct beta waitlist route.");
     var privacyPage = trustContent.BuildPrivacyPage(chrome.BuildPublicChrome("Privacy", "What Chummer stores, and what it does not.", "/privacy"));
@@ -3252,6 +3268,20 @@ async Task VerifyPublicLandingProjectionAsync()
             string.Equals(card.Card.Id, "artifact_runsite_pack", StringComparison.Ordinal)
             && !string.Equals(card.Action.Href, "/artifacts", StringComparison.Ordinal)),
         "artifacts shelf should point teaser cards at deliberate related detail pages");
+    Assert(artifactsModel!.TrustPulse is not null, "guest artifacts shelf should surface the weekly public trust pulse.");
+    Assert(artifactsModel.SignedInStatus is null, "guest artifacts shelf should not project install-specific signed-in trust posture.");
+    var authenticatedArtifactsView = await authenticatedLandingController.ArtifactsPage(CancellationToken.None) as ViewResult;
+    var authenticatedArtifactsModel = authenticatedArtifactsView?.Model as ShelfPageViewModel;
+    Assert(authenticatedArtifactsModel?.TrustPulse is not null, "authenticated artifacts shelf should keep the weekly public trust pulse visible.");
+    Assert(authenticatedArtifactsModel?.SignedInStatus is not null, "authenticated artifacts shelf should project the shared signed-in trust status.");
+    var horizonsView = await controller.HorizonsPage(CancellationToken.None) as ViewResult;
+    var horizonsModel = horizonsView?.Model as HorizonsPageViewModel;
+    Assert(horizonsModel?.TrustPulse is not null, "guest horizons page should surface the weekly public trust pulse.");
+    Assert(horizonsModel?.SignedInStatus is null, "guest horizons page should not project install-specific signed-in trust posture.");
+    var authenticatedHorizonsView = await authenticatedLandingController.HorizonsPage(CancellationToken.None) as ViewResult;
+    var authenticatedHorizonsModel = authenticatedHorizonsView?.Model as HorizonsPageViewModel;
+    Assert(authenticatedHorizonsModel?.TrustPulse is not null, "authenticated horizons page should keep the weekly public trust pulse visible.");
+    Assert(authenticatedHorizonsModel?.SignedInStatus is not null, "authenticated horizons page should project the shared signed-in trust status.");
 
     Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal)), "participate page should preserve the booster guest-login handoff.");
     Assert(!participateModel.PublicLane.Any(static card => card.Card.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");

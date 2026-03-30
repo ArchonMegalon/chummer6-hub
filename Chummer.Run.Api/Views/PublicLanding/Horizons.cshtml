@@ -23,6 +23,16 @@
     </div>
 </section>
 
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
 @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
 
 @foreach (var group in groups)

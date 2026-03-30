@@ -11,6 +11,16 @@
     <p class="page-copy">Public bug reports stay open. Suggestions, beta follow-up, and guided contribution use the account path when you want the next step attached to you.</p>
 </section>
 
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
 <section class="editorial-block editorial-block--lanes">
     <div class="lane-strip-list">
         <article class="lane-strip">
