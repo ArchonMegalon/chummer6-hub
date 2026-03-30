@@ -852,6 +852,8 @@
                                                         <p>
                                                             @publication.Summary
                                                             <span>Trust: @publication.ProvenanceSummary.</span>
+                                                            <span>Discovery: @publication.DiscoverySummary.</span>
+                                                            <span>State: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
                                                             @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                                                             {
                                                                 <span> Next: @publication.NextSafeAction.</span>
