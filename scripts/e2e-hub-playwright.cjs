@@ -224,6 +224,38 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await assertNoBannedCopy(page, '/participate');
   });
 
+  await gotoAndAssert(page, pageErrors, '/faq', async () => {
+    await expectVisible(page, 'text=Plain answers before you spend more time');
+    await expectVisible(page, 'input[data-faq-filter]');
+    await expectVisible(page, 'text=Search the FAQ');
+    await expectVisible(page, 'text=Still stuck? Open support');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/downloads"]', '/faq downloads link'), '/downloads');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/faq support link'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/faq now link'), '/now');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/contact#support-intake"]', '/faq footer support link'), '/contact#support-intake');
+    await assertNoBannedCopy(page, '/faq');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/privacy', async () => {
+    await expectVisible(page, 'text=What Chummer stores, and what it does not');
+    await expectVisible(page, 'text=Support, survey, and assistant data stay on a bounded clock');
+    await expectVisible(page, 'text=What changed in this version');
+    await expectVisible(page, 'text=Weekly trust pulse');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/downloads"]', '/privacy downloads link'), '/downloads');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/help"]', '/privacy help link'), '/help');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/contact#support-intake"]', '/privacy support link'), '/contact#support-intake');
+    await assertNoBannedCopy(page, '/privacy');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/terms', async () => {
+    await expectVisible(page, 'text=Preview terms in plain language');
+    await expectVisible(page, 'text=What changed in this version');
+    await expectVisible(page, 'text=Create account to get preview');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/downloads"]', '/terms downloads link'), '/downloads');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/help"]', '/terms help link'), '/help');
+    await assertNoBannedCopy(page, '/terms');
+  });
+
   await page.goto(`${baseUrl}/home/access`, { waitUntil: 'domcontentloaded' });
   assertLoginRedirect(page, '/home/access', 'Signed-out /home/access');
   await assertNoPageErrors(page, pageErrors, 'Signed-out /home/access redirect');
