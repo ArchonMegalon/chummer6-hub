@@ -869,7 +869,8 @@
                                                         <h3>@publication.Title</h3>
                                                         <p>
                                                             @publication.Summary
-                                                            <span>Trust: @publication.ProvenanceSummary.</span>
+                                                            <span>Provenance: @publication.ProvenanceSummary.</span>
+                                                            <span>Visibility: @HumanizeStatus(publication.Visibility, "Shared").</span>
                                                             <span>Trust ranking: @HumanizeStatus(publication.TrustBand, "Draft").</span>
                                                             <span>Discovery: @publication.DiscoverySummary.</span>
                                                             <span>Discoverable now: @(publication.Discoverable ? "Eligible now" : "Still bounded").</span>
