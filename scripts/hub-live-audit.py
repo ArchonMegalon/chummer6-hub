@@ -1522,7 +1522,7 @@ def verify_signed_in_work_audit(
             public_host=public_host,
             forwarded_proto=forwarded_proto,
             cookie_header=cookie_header,
-            required_texts=("First playable session", "Session summary"),
+            required_texts=("First playable session", "Playable kickoff", "Legal runner", "Understandable return", "Campaign-ready lane"),
         )
     fetch_fragment_target(
         base_url,
