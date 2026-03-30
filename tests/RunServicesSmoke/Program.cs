@@ -1647,11 +1647,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Open campaign memory", StringComparison.Ordinal), "home work should keep a direct route into the bounded campaign-memory detail.");
     Assert(homeSource.Contains("@leadWorkspaceServerPlane.ChangePackets[0].Summary", StringComparison.Ordinal), "home work should surface the first server-plane change packet directly on the what-changed card.");
     Assert(homeSource.Contains("@leadWorkspaceServerPlane.NextSafeAction.Summary", StringComparison.Ordinal), "home work should surface the bounded next safe action directly on the what-changed card.");
-    Assert(homeSource.Contains("Aftermath recap", StringComparison.Ordinal), "home work should surface a dedicated aftermath recap card instead of burying recap follow-through inside generic change text.");
+    Assert(homeSource.Contains("@leadAftermathTag", StringComparison.Ordinal), "home work should label the lead aftermath card from package kind instead of hard-coding recap-only wording.");
     Assert(homeSource.Contains("@leadAftermathPackage.Title", StringComparison.Ordinal), "home work should surface the latest aftermath package title directly from the bounded server plane.");
     Assert(homeSource.Contains("@leadAftermathPackage.Summary", StringComparison.Ordinal), "home work should surface the latest aftermath package summary directly from the bounded server plane.");
     Assert(homeSource.Contains("@leadAftermathEvidence", StringComparison.Ordinal), "home work should surface one bounded aftermath evidence line on the signed-in home route.");
-    Assert(homeSource.Contains("Open aftermath and return", StringComparison.Ordinal), "home work should keep a direct route into the aftermath return lane.");
+    Assert(homeSource.Contains("@leadAftermathRouteLabel", StringComparison.Ordinal), "home work should keep the lead aftermath route label aligned with replay or recap package kind.");
+    Assert(homeSource.Contains("Replay timeline", StringComparison.Ordinal), "home work should expose replay-safe labeling once replay packages reach the same return rail.");
     Assert(homeSource.Contains("Downtime brief", StringComparison.Ordinal), "home work should surface a dedicated downtime brief card instead of leaving downtime follow-through buried inside the generic aftermath list.");
     Assert(homeSource.Contains("@leadDowntimePackage.Title", StringComparison.Ordinal), "home work should surface the latest downtime brief title directly from the bounded server plane.");
     Assert(homeSource.Contains("@leadDowntimeEvidence", StringComparison.Ordinal), "home work should surface one bounded downtime evidence line on the signed-in home route.");
@@ -1815,8 +1816,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Recent governed prep launches", StringComparison.Ordinal), "account work should keep recent governed prep-launch receipts visible on the selected campaign card.");
     Assert(accountSource.Contains("Stage travel prefetch", StringComparison.Ordinal), "account work should expose a real claimed-device travel-prefetch action on the selected campaign card.");
     Assert(accountSource.Contains("Recent travel prefetch receipts", StringComparison.Ordinal), "account work should keep staged travel-prefetch receipts visible on the selected campaign card.");
-    Assert(accountSource.Contains("Generate aftermath recap package", StringComparison.Ordinal), "account work should expose a real aftermath recap packaging action on the selected campaign card.");
-    Assert(accountSource.Contains("Recent aftermath recap packages", StringComparison.Ordinal), "account work should keep generated aftermath recap packages visible on the selected campaign card.");
+    Assert(accountSource.Contains("Generate aftermath or replay package", StringComparison.Ordinal), "account work should expose a real aftermath or replay packaging action on the selected campaign card.");
+    Assert(accountSource.Contains("Recent aftermath and replay packages", StringComparison.Ordinal), "account work should keep generated aftermath and replay packages visible on the selected campaign card.");
+    Assert(accountSource.Contains("<option value=\"replay_timeline\">Replay timeline</option>", StringComparison.Ordinal), "account work should let operators generate replay timelines from the same governed package rail.");
     var downloadDispatchSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
     var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
@@ -2771,6 +2773,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(replayTimelinePayload!.Summary.Contains("replay timeline", StringComparison.OrdinalIgnoreCase), "campaign spine replay timeline api should describe the governed replay package it generated.");
     Assert(string.Equals(replayTimelinePayload.ArtifactKind, "ReplayPackage", StringComparison.Ordinal), "campaign spine replay timeline api should register governed replay artifacts on the durable registry seam.");
     Assert(replayTimelinePayload.EvidenceLines.Any(item => item.Contains("Replay posture:", StringComparison.OrdinalIgnoreCase)), "campaign spine replay timeline api should carry replay posture evidence lines.");
+    Assert(!string.IsNullOrWhiteSpace(replayTimelinePayload.ProvenanceSummary), "campaign spine replay timeline api should preserve artifact provenance on the generated replay package.");
+    Assert(!string.IsNullOrWhiteSpace(replayTimelinePayload.AuditSummary), "campaign spine replay timeline api should preserve artifact audit posture on the generated replay package.");
+    Assert(replayTimelinePayload.EvidenceLines.Any(item => item.StartsWith("Registry artifact:", StringComparison.OrdinalIgnoreCase)), "campaign spine replay timeline api should attach the durable registry artifact evidence line.");
     var refreshedWorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
     var refreshedWorkspaceServerPlanePayload = (refreshedWorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? refreshedWorkspaceServerPlaneResult.Value;
     Assert(refreshedWorkspaceServerPlanePayload?.PrepLaunches.Any(item => string.Equals(item.LaunchId, prepLaunchPayload.LaunchId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project governed prep-launch receipts after launch.");
@@ -2782,6 +2787,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, downtimeBriefPayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project downtime brief packets after generation.");
     Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, replayTimelinePayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project replay timeline packages after generation.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "replay_package", StringComparison.Ordinal)) == true, "campaign spine server plane api should name replay packages explicitly on the bounded what-changed rail.");
+    Assert(refreshedWorkspaceServerPlanePayload?.RecapShelf.Any(item => string.Equals(item.EntryId, replayTimelinePayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should attach replay packages to the same richer return shelf.");
+    var replayShelfPayload = refreshedWorkspaceServerPlanePayload?.RecapShelf
+        .FirstOrDefault(item => string.Equals(item.EntryId, replayTimelinePayload.PackageId, StringComparison.Ordinal));
+    Assert(replayShelfPayload is not null, "campaign spine server plane api should project replay packages on the richer recap shelf.");
+    Assert(replayShelfPayload?.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) == true, "campaign spine server plane api should keep replay packages creator-linkable on the shared return shelf.");
+    Assert(!string.IsNullOrWhiteSpace(replayShelfPayload?.CreatorPublicationId), "campaign spine server plane api should carry creator-publication linkage on replay shelf entries.");
     Assert(refreshedWorkspaceServerPlanePayload?.FirstPlayableSession is null, "campaign spine server plane api should retire starter-session proof once governed prep, travel, and recap follow-through have landed.");
     Assert(refreshedWorkspaceServerPlanePayload?.NextSessionCarryForward is not null, "campaign spine server plane api should refresh the next-session carry-forward packet after the governed actions land.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the next-session carry-forward packet on the bounded what-changed rail.");
@@ -3058,6 +3069,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelPrefetches.Any(item => string.Equals(item.ReceiptId, travelPrefetchPayload!.ReceiptId, StringComparison.Ordinal)) == true, "account workspace detail route should surface staged travel-prefetch receipts.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "account workspace detail route should surface aftermath recap packages.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, downtimeBriefPayload!.PackageId, StringComparison.Ordinal)) == true, "account workspace detail route should surface downtime brief packages.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, replayTimelinePayload!.PackageId, StringComparison.Ordinal)) == true, "account workspace detail route should surface replay timeline packages.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal)) == true, "account workspace detail route should keep replay packages on the richer return shelf.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "account workspace detail route should explain that prep packets are carried in the prefetch inventory.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RecapShelf.Count >= 1, "account workspace detail route should project the richer recap shelf through the workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RecapShelf[0].OwnershipSummary), "account workspace detail route should surface explicit ownership posture on recap-shelf entries.");
@@ -3074,6 +3087,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "prep_launch", StringComparison.Ordinal)) == true, "account workspace detail search should keep prep-launch receipts on the what-changed rail.");
     Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "travel_prefetch", StringComparison.Ordinal)) == true, "account workspace detail search should keep travel-prefetch receipts on the what-changed rail.");
     Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "aftermath_recap", StringComparison.Ordinal)) == true, "account workspace detail search should keep aftermath recap packages on the what-changed rail.");
+    Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "replay_package", StringComparison.Ordinal)) == true, "account workspace detail search should keep replay packages on the what-changed rail.");
     Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)) == true, "account workspace detail search should keep the next-session carry-forward packet on the what-changed rail.");
     var accountRunDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, runId: runId) as ViewResult;
     var accountRunDetailModel = accountRunDetailPage?.Model as AccountPageViewModel;
@@ -3209,9 +3223,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "prep_launch", StringComparison.Ordinal)) == true, "home work route should keep governed prep-launch receipts on the bounded what-changed rail.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "travel_prefetch", StringComparison.Ordinal)) == true, "home work route should keep staged travel-prefetch receipts on the bounded what-changed rail.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "aftermath_recap", StringComparison.Ordinal)) == true, "home work route should keep aftermath recap packages on the bounded what-changed rail.");
+    Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "replay_package", StringComparison.Ordinal)) == true, "home work route should keep replay packages on the bounded what-changed rail.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "home work route should keep the governed prep library visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "home work route should keep bounded prep-carrying travel inventory visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep aftermath recap packages visible on the lead workspace spine.");
+    Assert(workHomeModel?.LeadWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, replayTimelinePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep replay packages visible on the lead workspace spine.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.Consequences.Count >= 1, "home work route should keep governed consequence follow-through visible on the lead workspace spine.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.CampaignMemory is not null, "home work route should keep the bounded campaign-memory projection visible on the lead workspace spine.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the aftermath package attached to the bounded return shelf.");
@@ -3226,6 +3242,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(recapShelfPayload?.PublicationSummary?.Contains("creator shelf", StringComparison.OrdinalIgnoreCase) == true, "home work route should explain that the same artifact already feeds creator publication posture.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.CreatorPublicationId), "home work route should keep the linked creator-publication id attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.NextSafeAction), "home work route should keep the next safe shelf action attached to the recap shelf entry.");
+    Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the replay package attached to the bounded return shelf.");
+    var replayWorkHomeShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
+        .FirstOrDefault(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal));
+    Assert(replayWorkHomeShelfPayload is not null, "home work route should surface the replay package on the richer recap-shelf projection.");
+    Assert(replayWorkHomeShelfPayload?.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) == true, "home work route should mark replay artifacts as usable from the creator shelf as well as the campaign shelf.");
+    Assert(!string.IsNullOrWhiteSpace(replayWorkHomeShelfPayload?.CreatorPublicationId), "home work route should keep the linked creator-publication id attached to replay shelf entries.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.ProvenanceSummary), "home work route should keep explicit provenance attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.AuditSummary), "home work route should keep explicit audit posture attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");

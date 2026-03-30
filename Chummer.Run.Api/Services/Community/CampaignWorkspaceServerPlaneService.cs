@@ -1447,6 +1447,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         => NormalizeOptional(packageKind)?.ToLowerInvariant() switch
         {
             "session_recap" => "session_recap",
+            "session_replay" => "replay_timeline",
             "replay_timeline" => "replay_timeline",
             "after_action_report" => "after_action_report",
             "downtime_brief" => "downtime_brief",
