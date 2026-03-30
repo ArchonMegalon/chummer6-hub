@@ -607,6 +607,8 @@ public sealed record CreatorPublicationProjection(
     string DiscoverySummary,
     string Visibility,
     string PublicationStatus,
+    string? TrustBand,
+    bool Discoverable,
     DateTimeOffset UpdatedAtUtc,
     string? NextSafeAction = null,
     string? CampaignReturnSummary = null,

@@ -861,7 +861,9 @@
                                                         <p>
                                                             @publication.Summary
                                                             <span>Trust: @publication.ProvenanceSummary.</span>
+                                                            <span>Trust ranking: @HumanizeStatus(publication.TrustBand, "Draft").</span>
                                                             <span>Discovery: @publication.DiscoverySummary.</span>
+                                                            <span>Discoverable now: @(publication.Discoverable ? "Eligible now" : "Still bounded").</span>
                                                             <span>State: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
                                                             @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                                                             {
