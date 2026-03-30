@@ -3006,7 +3006,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var authenticatedContactPage = await authenticatedLandingController.ContactPage(CancellationToken.None) as ViewResult;
     var authenticatedContactModel = authenticatedContactPage?.Model as TrustPageViewModel;
     Assert(authenticatedContactModel?.SupportIntake is not null, "authenticated contact page should project the first-party support intake.");
+    Assert(authenticatedContactModel?.SignedInStatus is not null, "authenticated contact page should project the shared signed-in trust status.");
     Assert(authenticatedContactModel?.TrustPulse is not null, "authenticated contact page should surface the weekly public trust pulse.");
+    Assert(authenticatedContactModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "authenticated contact page should surface who-can-get-it-now posture next to support intake.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedContactModel!.SupportIntake!.DefaultInstallationId), "authenticated contact page should prefill install-aware support context when a linked install exists.");
     Assert(authenticatedContactModel.SupportIntake.ContextHint?.Contains("linked install", StringComparison.OrdinalIgnoreCase) == true, "authenticated contact page should explain where the prefilled install context came from.");
     Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultReleaseChannel, "preview", StringComparison.Ordinal), "authenticated contact page should prefill the install release channel.");
@@ -3016,6 +3018,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var queryPrefilledContactPage = await authenticatedLandingController.ContactPage(CancellationToken.None) as ViewResult;
     var queryPrefilledContactModel = queryPrefilledContactPage?.Model as TrustPageViewModel;
     Assert(queryPrefilledContactModel?.SupportIntake is not null, "query-prefilled contact page should keep the first-party support intake intact.");
+    Assert(queryPrefilledContactModel?.SignedInStatus is not null, "query-prefilled contact page should keep the shared signed-in trust status intact.");
     Assert(queryPrefilledContactModel?.TrustPulse is not null, "query-prefilled contact page should keep the weekly public trust pulse intact.");
     Assert(string.Equals(queryPrefilledContactModel!.SupportIntake!.DefaultKind, SupportCaseKinds.InstallHelp, StringComparison.Ordinal), "query-prefilled contact page should preserve the requested support case type.");
     Assert(string.Equals(queryPrefilledContactModel.SupportIntake.DefaultTitle, "Mobile follow-through needs grounded runtime", StringComparison.Ordinal), "query-prefilled contact page should preserve the requested support title.");
