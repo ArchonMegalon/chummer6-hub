@@ -345,6 +345,29 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/Shelf.cshtml", model);
     }
 
+    [HttpGet("/artifacts/creator/{publicationId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> CreatorPublicationDetailPage([FromRoute] string publicationId, CancellationToken cancellationToken)
+    {
+        CreatorPublicationProjection? publication = _publicCreatorDiscovery.GetDiscoverable(publicationId);
+        if (publication is null)
+        {
+            return NotFound();
+        }
+
+        var currentPath = $"/artifacts/creator/{Uri.EscapeDataString(publicationId)}";
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var model = new PublicCreatorPublicationPageViewModel(
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync(publication.Title, publication.Summary, currentPath, cancellationToken),
+            Publication: publication,
+            BackHref: "/artifacts#governed-creator-discovery",
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+        return View("~/Views/PublicLanding/PublicCreatorPublication.cshtml", model);
+    }
+
     [HttpGet("/help")]
     [Produces("text/html")]
     public async Task<IActionResult> HelpPage(CancellationToken cancellationToken)

@@ -42,6 +42,7 @@
     }
 
     static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
+    static string PublicCreatorPublicationHref(string publicationId) => $"/artifacts/creator/{Uri.EscapeDataString(publicationId)}";
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
     static string ArtifactViewHref(string view)
         => string.Equals(view, "all", StringComparison.Ordinal)
@@ -284,6 +285,7 @@
                     {
                         <p class="muted-copy"><strong>Next:</strong> @publication.NextSafeAction</p>
                     }
+                    <a class="inline-link" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open published creator packet</a>
                 </article>
             }
         </div>

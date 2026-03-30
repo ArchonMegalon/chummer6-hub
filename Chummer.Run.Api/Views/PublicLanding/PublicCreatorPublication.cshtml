@@ -1,0 +1,122 @@
+@model PublicCreatorPublicationPageViewModel
+@{
+    ViewData["Title"] = Model.Publication.Title;
+    ViewData["Chrome"] = Model.Chrome;
+
+    static string HumanizeStatus(string? value, string fallback = "Not connected")
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "active" => "Ready",
+            "linked" => "Ready",
+            "pending" => "Pending",
+            "pending_verification" => "Verification sent",
+            "verified" => "Verified",
+            "approved" => "Approved",
+            "published" => "Published",
+            "self_service" => "Self-service",
+            "review" => "Needs review",
+            "warning" => "Needs attention",
+            "attention" => "Needs attention",
+            "ready" => "Ready",
+            "revoked" => "Revoked",
+            _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '))
+        };
+    }
+}
+
+<section class="story-cinematic">
+    <div class="story-cinematic__copy">
+        <p class="eyebrow">Governed creator discovery</p>
+        <h1 class="page-title">@Model.Publication.Title</h1>
+        <p class="page-copy">@Model.Publication.Summary</p>
+        <div class="trust-claim__microproof">
+            <span>@HumanizeStatus(Model.Publication.PublicationStatus, "Published")</span>
+            <span>@HumanizeStatus(Model.Publication.TrustBand, "Draft")</span>
+            <span>@(Model.Publication.Discoverable ? "Eligible now" : "Still bounded")</span>
+        </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="@Model.BackHref">Back to creator discovery</a>
+            <a class="button-like button-like--ghost" href="/artifacts">Open artifacts shelf</a>
+        </div>
+    </div>
+</section>
+
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
+<section class="trust-rail-section">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Public creator packet</p>
+        <h2 class="editorial-title">Why this packet is live</h2>
+        <p class="editorial-copy">This page keeps discovery, trust, comparison, lineage, moderation, and next-step posture on the same governed public route.</p>
+    </div>
+    <div class="trust-rail-list">
+        <article class="trust-rail">
+            <span class="tag">Provenance</span>
+            <p>@Model.Publication.ProvenanceSummary</p>
+        </article>
+        <article class="trust-rail">
+            <span class="tag">Trust</span>
+            <p>@(Model.Publication.TrustSummary ?? "Trust posture is not available yet.")</p>
+        </article>
+        <article class="trust-rail">
+            <span class="tag">Discovery</span>
+            <p>@Model.Publication.DiscoverySummary</p>
+        </article>
+        @if (!string.IsNullOrWhiteSpace(Model.Publication.ComparisonSummary))
+        {
+            <article class="trust-rail">
+                <span class="tag">Compare by</span>
+                <p>@Model.Publication.ComparisonSummary</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Publication.LineageSummary))
+        {
+            <article class="trust-rail">
+                <span class="tag">Lineage</span>
+                <p>@Model.Publication.LineageSummary</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Publication.ModerationSummary))
+        {
+            <article class="trust-rail">
+                <span class="tag">Moderation</span>
+                <p>@Model.Publication.ModerationSummary</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Publication.CampaignReturnSummary))
+        {
+            <article class="trust-rail">
+                <span class="tag">Return</span>
+                <p>@Model.Publication.CampaignReturnSummary</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Publication.SupportClosureSummary))
+        {
+            <article class="trust-rail">
+                <span class="tag">Support</span>
+                <p>@Model.Publication.SupportClosureSummary</p>
+            </article>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Publication.NextSafeAction))
+        {
+            <article class="trust-rail">
+                <span class="tag">Next</span>
+                <p>@Model.Publication.NextSafeAction</p>
+            </article>
+        }
+    </div>
+</section>
