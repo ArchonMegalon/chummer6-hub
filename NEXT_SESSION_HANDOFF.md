@@ -1,6 +1,18 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:15:57+02:00
+Updated: 2026-03-30T08:19:55+02:00
+
+## Handoff refresh (2026-03-30T08:19:55+02:00)
+
+- Signed-in `home/work` proof now follows the anchored return-lane and operator-guidance links instead of only asserting the CTA copy:
+  - `scripts/hub-live-audit.py` now resolves the rendered anchor targets for next-session carry-forward, aftermath return, downtime brief, campaign memory, governed roster moves, and member guidance; it fetches the base route, verifies the target id exists, and requires the anchored section content to render. The live audit fetcher now retries transient request timeouts so the heavier signed-in route walk stays stable on the local edge.
+  - `scripts/e2e-hub-playwright.cjs` now captures those same anchored `home/work` links, navigates to each one, verifies the URL hash is preserved, and asserts the expected bounded section content on the target signed-in route.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:15:57+02:00)
 

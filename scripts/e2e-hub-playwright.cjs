@@ -119,6 +119,12 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   let homeBuildHandoffPath;
   let homeRulesPath;
   let homePublicationPath;
+  let homeNextSessionPath;
+  let homeAftermathPath;
+  let homeDowntimePath;
+  let homeCampaignMemoryPath;
+  let homeRosterMovesPath;
+  let homeMemberGuidancePath;
   let runDetailPath;
   let rulesDetailPath;
 
@@ -269,6 +275,12 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     homeBuildHandoffPath = await readFirstHref(page, 'a[href*="/account/work/build-handoffs/"]', '/home/work');
     homeRulesPath = await readFirstHref(page, 'a[href*="/account/work/rules/"]', '/home/work');
     homePublicationPath = await readFirstHref(page, 'a[href*="/account/work/publications/"]', '/home/work');
+    homeNextSessionPath = await readFirstHref(page, 'a[href*="#selected-next-session-carry-forward"]', '/home/work');
+    homeAftermathPath = await readFirstHref(page, 'a[href*="#aftermath-packages"]', '/home/work');
+    homeDowntimePath = await readFirstHref(page, 'a[href*="#selected-downtime-brief"]', '/home/work');
+    homeCampaignMemoryPath = await readFirstHref(page, 'a[href*="#selected-campaign-memory"]', '/home/work');
+    homeRosterMovesPath = await readFirstHref(page, 'a[href="/account/work#community-ops"]', '/home/work');
+    homeMemberGuidancePath = await readFirstHref(page, 'a[href*="#community-op-guidance-"]', '/home/work');
   });
 
   await gotoAndAssert(page, pageErrors, '/home/setup', async () => {
@@ -303,6 +315,42 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectBodyText(page, 'Discovery', '/home/work -> publication detail');
     await expectBodyText(page, 'Status', '/home/work -> publication detail');
     await assertNoBannedCopy(page, '/home/work -> publication detail');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeNextSessionPath, async () => {
+    assert.equal(new URL(page.url()).hash, '#selected-next-session-carry-forward', '/home/work next-session link should preserve the target anchor.');
+    await expectBodyText(page, 'Next-session carry-forward', '/home/work -> next-session return');
+    await expectBodyText(page, 'Carry-forward summary', '/home/work -> next-session return');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeAftermathPath, async () => {
+    assert.equal(new URL(page.url()).hash, '#aftermath-packages', '/home/work aftermath link should preserve the target anchor.');
+    await expectBodyText(page, 'Aftermath and recap', '/home/work -> aftermath return');
+    await expectBodyText(page, 'Recent aftermath recap packages', '/home/work -> aftermath return');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeDowntimePath, async () => {
+    assert.equal(new URL(page.url()).hash, '#selected-downtime-brief', '/home/work downtime link should preserve the target anchor.');
+    await expectBodyText(page, 'Downtime brief', '/home/work -> downtime brief');
+    await expectBodyText(page, 'Next-session return', '/home/work -> downtime brief');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeCampaignMemoryPath, async () => {
+    assert.equal(new URL(page.url()).hash, '#selected-campaign-memory', '/home/work campaign-memory link should preserve the target anchor.');
+    await expectBodyText(page, 'Campaign memory', '/home/work -> campaign memory');
+    await expectBodyText(page, 'Return lane', '/home/work -> campaign memory');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeRosterMovesPath, async () => {
+    assert.equal(new URL(page.url()).hash, '#community-ops', '/home/work roster-moves link should preserve the target anchor.');
+    await expectBodyText(page, 'Teams & permissions', '/home/work -> roster moves');
+    await expectBodyText(page, 'Recent governed roster moves', '/home/work -> roster moves');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeMemberGuidancePath, async () => {
+    assert.equal(new URL(page.url()).hash.startsWith('#community-op-guidance-'), true, '/home/work member-guidance link should preserve the target anchor.');
+    await expectBodyText(page, 'Member guidance rail', '/home/work -> member guidance');
+    await expectBodyText(page, 'Current preview posture', '/home/work -> member guidance');
   });
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {
