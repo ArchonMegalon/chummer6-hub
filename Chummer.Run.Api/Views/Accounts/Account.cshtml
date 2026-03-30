@@ -1792,6 +1792,21 @@
                                     <span>First playable session</span>
                                     <strong>@(workspace.FirstPlayableSession is null ? "Pending" : workspace.FirstPlayableSession.CampaignStartSummary)</strong>
                                 </div>
+                                @if (workspace.FirstPlayableSession is not null)
+                                {
+                                    <div class="settings-summary-row">
+                                        <span>Legal runner</span>
+                                        <strong>@workspace.FirstPlayableSession.RuleReadySummary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Understandable return</span>
+                                        <strong>@workspace.FirstPlayableSession.ReturnLaneSummary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Campaign-ready lane</span>
+                                        <strong>@workspace.FirstPlayableSession.CampaignReadySummary</strong>
+                                    </div>
+                                }
                                 <div class="settings-summary-row">
                                     <span>Next safe action</span>
                                     <strong>@(workspace.NextSafeAction ?? "Open the shared campaign view and confirm the current return lane before you continue.")</strong>

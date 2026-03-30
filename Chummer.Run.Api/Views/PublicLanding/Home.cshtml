@@ -394,6 +394,8 @@
                                                             @if (workspace.FirstPlayableSession is not null)
                                                             {
                                                                 <span> First playable session: @workspace.FirstPlayableSession.CampaignStartSummary</span>
+                                                                <span> Legal runner: @workspace.FirstPlayableSession.RuleReadySummary</span>
+                                                                <span> Campaign-ready lane: @workspace.FirstPlayableSession.CampaignReadySummary</span>
                                                             }
                                                             @if (workspace.NextSessionCarryForward is not null)
                                                             {
