@@ -44,6 +44,8 @@ public sealed class PublicTrustPulseService
                 return null;
             }
 
+            WeeklyProductPulseAdoptionHealth? adoptionHealth = payload.SupportingSignals?.AdoptionHealth;
+            WeeklyProductPulseProgressTrend? pulseProgressTrend = payload.SupportingSignals?.ProgressTrend;
             var progressReport = LoadOptionalArtifact<ProgressReportPayload>(
                 ResolveProgressReportPath(),
                 options,
@@ -54,8 +56,13 @@ public sealed class PublicTrustPulseService
                 options,
                 static payload => string.Equals(payload.ContractName, "fleet.public_progress_history", StringComparison.Ordinal),
                 "public progress history");
-            var progressTrend = ComputeProgressTrend(progressHistory);
-            var progressTrendSamples = ExtractProgressTrendSamples(progressHistory);
+            var progressTrend = CreateProgressTrendInfo(pulseProgressTrend) ?? ComputeProgressTrend(progressHistory);
+            var progressTrendSamples = ExtractPulseProgressTrendSamples(pulseProgressTrend);
+            if (progressTrendSamples.Count == 0)
+            {
+                progressTrendSamples = ExtractProgressTrendSamples(progressHistory);
+            }
+
             var localReleaseProof = LoadOptionalArtifact<LocalReleaseProofPayload>(
                 ResolveLocalReleaseProofPath(),
                 options,
@@ -78,12 +85,16 @@ public sealed class PublicTrustPulseService
                 ReleaseHealthReason: payload.Snapshot?.ReleaseHealth?.Reason,
                 OverallProgressPercent: payload.SupportingSignals?.OverallProgressPercent,
                 PhaseLabel: payload.SupportingSignals?.PhaseLabel,
-                HistorySnapshotCount: payload.SupportingSignals?.HistorySnapshotCount ?? progressReport?.HistorySnapshotCount,
-                ProgressHistorySnapshotCount: progressHistory?.SnapshotCount,
-                ProgressTrendDirection: progressTrend?.Direction,
-                ProgressTrendDeltaPercent: progressTrend?.DeltaPercent,
-                ProgressTrendFromAsOf: progressTrend?.FromAsOf,
-                ProgressTrendToAsOf: progressTrend?.ToAsOf,
+                HistorySnapshotCount: payload.SupportingSignals?.HistorySnapshotCount
+                    ?? adoptionHealth?.HistorySnapshotCount
+                    ?? progressReport?.HistorySnapshotCount,
+                ProgressHistorySnapshotCount: progressHistory?.SnapshotCount
+                    ?? adoptionHealth?.HistorySnapshotCount
+                    ?? payload.SupportingSignals?.HistorySnapshotCount,
+                ProgressTrendDirection: pulseProgressTrend?.Direction ?? progressTrend?.Direction,
+                ProgressTrendDeltaPercent: pulseProgressTrend?.DeltaPercent ?? progressTrend?.DeltaPercent,
+                ProgressTrendFromAsOf: pulseProgressTrend?.FromAsOf ?? progressTrend?.FromAsOf,
+                ProgressTrendToAsOf: pulseProgressTrend?.ToAsOf ?? progressTrend?.ToAsOf,
                 ProgressTrendSamples: progressTrendSamples.Count > 0 ? progressTrendSamples : null,
                 LongestPoleLabel: payload.SupportingSignals?.LongestPole,
                 LaunchReadiness: payload.SupportingSignals?.LaunchReadiness,
@@ -97,9 +108,9 @@ public sealed class PublicTrustPulseService
                 ClosureHealthPendingHumanResponseCount: payload.SupportingSignals?.ClosureHealth?.PendingHumanResponseCount,
                 ClosureHealthSummary: payload.SupportingSignals?.ClosureHealth?.Summary,
                 NextCheckpointQuestion: payload.NextCheckpointQuestion,
-                LocalReleaseProofStatus: localReleaseProof?.Status,
-                ProvenJourneyCount: localReleaseProof?.JourneysPassed?.Count,
-                ProvenRouteCount: localReleaseProof?.ProofRoutes?.Count);
+                LocalReleaseProofStatus: adoptionHealth?.LocalReleaseProofStatus ?? localReleaseProof?.Status,
+                ProvenJourneyCount: adoptionHealth?.ProvenJourneyCount ?? localReleaseProof?.JourneysPassed?.Count,
+                ProvenRouteCount: adoptionHealth?.ProvenRouteCount ?? localReleaseProof?.ProofRoutes?.Count);
         }
         catch (Exception ex)
         {
@@ -138,6 +149,24 @@ public sealed class PublicTrustPulseService
 
     private string? ResolveLocalReleaseProofPath() => ResolveExistingPath(LocalReleaseProofFileKey, DefaultLocalReleaseProofRelativePath);
 
+    private static ProgressTrendInfo? CreateProgressTrendInfo(WeeklyProductPulseProgressTrend? progressTrend)
+    {
+        if (progressTrend is null
+            || string.IsNullOrWhiteSpace(progressTrend.Direction)
+            || progressTrend.DeltaPercent is null
+            || string.IsNullOrWhiteSpace(progressTrend.FromAsOf)
+            || string.IsNullOrWhiteSpace(progressTrend.ToAsOf))
+        {
+            return null;
+        }
+
+        return new ProgressTrendInfo(
+            Direction: progressTrend.Direction,
+            DeltaPercent: progressTrend.DeltaPercent.Value,
+            FromAsOf: progressTrend.FromAsOf,
+            ToAsOf: progressTrend.ToAsOf);
+    }
+
     private static ProgressTrendInfo? ComputeProgressTrend(ProgressHistoryPayload? payload)
     {
         if (payload?.Snapshots is null)
@@ -160,6 +189,22 @@ public sealed class PublicTrustPulseService
             DeltaPercent: Math.Abs(delta),
             FromAsOf: previous.AsOf,
             ToAsOf: latest.AsOf);
+    }
+
+    private static List<ProgressHistoryTrendPoint> ExtractPulseProgressTrendSamples(WeeklyProductPulseProgressTrend? progressTrend)
+    {
+        if (progressTrend?.Samples is null)
+        {
+            return new List<ProgressHistoryTrendPoint>(0);
+        }
+
+        return progressTrend.Samples
+            .Where(static sample =>
+                !string.IsNullOrWhiteSpace(sample.AsOf)
+                && sample.OverallProgressPercent.HasValue)
+            .Select(static sample => new ProgressHistoryTrendPoint(sample.AsOf!, sample.OverallProgressPercent!.Value))
+            .OrderBy(static sample => sample.AsOf)
+            .ToList();
     }
 
     private static List<ProgressHistoryTrendPoint> ExtractProgressTrendSamples(ProgressHistoryPayload? payload)
@@ -241,7 +286,9 @@ public sealed class PublicTrustPulseService
         [property: JsonPropertyName("longest_pole")] string? LongestPole,
         [property: JsonPropertyName("launch_readiness")] string? LaunchReadiness,
         [property: JsonPropertyName("provider_route_stewardship")] WeeklyProductPulseProviderRouteStewardship? ProviderRouteStewardship,
-        [property: JsonPropertyName("closure_health")] WeeklyProductPulseClosureHealth? ClosureHealth);
+        [property: JsonPropertyName("closure_health")] WeeklyProductPulseClosureHealth? ClosureHealth,
+        [property: JsonPropertyName("adoption_health")] WeeklyProductPulseAdoptionHealth? AdoptionHealth,
+        [property: JsonPropertyName("progress_trend")] WeeklyProductPulseProgressTrend? ProgressTrend);
 
     private sealed record WeeklyProductPulseProviderRouteStewardship(
         [property: JsonPropertyName("default_status")] string? DefaultStatus,
@@ -255,6 +302,28 @@ public sealed class PublicTrustPulseService
         [property: JsonPropertyName("waiting_closure_count")] int? WaitingClosureCount,
         [property: JsonPropertyName("pending_human_response_count")] int? PendingHumanResponseCount,
         [property: JsonPropertyName("summary")] string? Summary);
+
+    private sealed record WeeklyProductPulseAdoptionHealth(
+        [property: JsonPropertyName("state")] string? State,
+        [property: JsonPropertyName("local_release_proof_status")] string? LocalReleaseProofStatus,
+        [property: JsonPropertyName("proven_journey_count")] int? ProvenJourneyCount,
+        [property: JsonPropertyName("proven_route_count")] int? ProvenRouteCount,
+        [property: JsonPropertyName("history_snapshot_count")] int? HistorySnapshotCount,
+        [property: JsonPropertyName("summary")] string? Summary);
+
+    private sealed record WeeklyProductPulseProgressTrend(
+        [property: JsonPropertyName("state")] string? State,
+        [property: JsonPropertyName("direction")] string? Direction,
+        [property: JsonPropertyName("delta_percent")] int? DeltaPercent,
+        [property: JsonPropertyName("from_as_of")] string? FromAsOf,
+        [property: JsonPropertyName("to_as_of")] string? ToAsOf,
+        [property: JsonPropertyName("sample_count")] int? SampleCount,
+        [property: JsonPropertyName("summary")] string? Summary,
+        [property: JsonPropertyName("samples")] IReadOnlyList<WeeklyProductPulseProgressTrendSample>? Samples);
+
+    private sealed record WeeklyProductPulseProgressTrendSample(
+        [property: JsonPropertyName("as_of")] string? AsOf,
+        [property: JsonPropertyName("overall_progress_percent")] int? OverallProgressPercent);
 
     private sealed record ProgressReportPayload(
         [property: JsonPropertyName("contract_name")] string? ContractName,
