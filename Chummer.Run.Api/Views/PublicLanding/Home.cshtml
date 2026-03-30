@@ -395,6 +395,7 @@
                                                             {
                                                                 <span> First playable session: @workspace.FirstPlayableSession.CampaignStartSummary</span>
                                                                 <span> Legal runner: @workspace.FirstPlayableSession.RuleReadySummary</span>
+                                                                <span> Understandable return: @workspace.FirstPlayableSession.ReturnLaneSummary</span>
                                                                 <span> Campaign-ready lane: @workspace.FirstPlayableSession.CampaignReadySummary</span>
                                                             }
                                                             @if (workspace.NextSessionCarryForward is not null)
@@ -440,6 +441,9 @@
                                                                 @if (leadFirstPlayableSession is not null)
                                                                 {
                                                                     <span> First session: @leadFirstPlayableSession.CampaignStartSummary</span>
+                                                                    <span> Legal runner: @leadFirstPlayableSession.RuleReadySummary</span>
+                                                                    <span> Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</span>
+                                                                    <span> Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary</span>
                                                                 }
                                                                 <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "claim lane pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
                                                                 @if (leadWorkspaceServerPlane.AftermathPackages.Count > 0)

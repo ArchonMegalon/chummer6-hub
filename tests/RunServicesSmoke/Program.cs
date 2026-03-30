@@ -1686,6 +1686,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Open publication status", StringComparison.Ordinal), "home work should keep a direct route into publication status.");
     Assert(homeSource.Contains("Open build path for @publication.Title", StringComparison.Ordinal), "home work should keep a title-specific route from publication status back into the related build follow-through.");
     Assert(homeSource.Contains("/account/work/publications/", StringComparison.Ordinal), "home work should deep-link publication follow-through into the signed-in work detail route.");
+    Assert(homeSource.Contains("Understandable return: @workspace.FirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "home work should surface understandable-return proof directly on the shared campaign card instead of compressing it away.");
+    Assert(homeSource.Contains("Legal runner: @leadFirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "home work should carry legal-runner proof onto the calmer lead first-session card.");
+    Assert(homeSource.Contains("Understandable return: @leadFirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "home work should carry understandable-return proof onto the calmer lead first-session card.");
+    Assert(homeSource.Contains("Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "home work should carry campaign-ready proof onto the calmer lead first-session card.");
     Assert(homeSource.Contains("Device return", StringComparison.Ordinal), "home work should surface the calmer device-return card for claimed-device continuity.");
     Assert(homeSource.Contains("Open device return", StringComparison.Ordinal), "home work should keep a direct route into the device-return lane when claimed-device continuity already exists.");
     Assert(homeSource.Contains("@supportCase.ClosureSummary", StringComparison.Ordinal), "home access should surface support-closure truth directly from the shared support presenter.");
