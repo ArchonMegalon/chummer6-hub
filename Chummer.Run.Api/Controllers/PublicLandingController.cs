@@ -496,6 +496,8 @@ public sealed class PublicLandingController : Controller
             var links = _links.GetSummary(subject.SubjectId);
             var experience = _experience.GetOrCreate(subject.SubjectId);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+            var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
             var supportCaseSummaries = _supportPresentation.BuildList(supportCases, installLinking);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
@@ -517,6 +519,7 @@ public sealed class PublicLandingController : Controller
             CampaignSpine: campaignSpine,
             LeadWorkspaceServerPlane: leadWorkspaceServerPlane,
             PrimaryAction: BuildHomePrimaryAction(experience, campaignSpine, installLinking),
+            SignedInStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience),
             NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath),
             HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath));
             return View("~/Views/PublicLanding/Home.cshtml", model);

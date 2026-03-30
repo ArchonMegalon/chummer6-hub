@@ -1671,6 +1671,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("/account/work#community-op-sponsor-sessions-", StringComparison.Ordinal), "home work should deep-link the operator card into the sponsor-session rail.");
     Assert(homeSource.Contains("Open sponsor rail", StringComparison.Ordinal), "home work should give operators a direct route to the sponsor-session rail.");
     Assert(homeSource.Contains("Guide: current preview, downloads, and closure posture stay on the same operator rail.", StringComparison.Ordinal), "home work should keep bounded organizer guidance attached to the lead operator card.");
+    Assert(homeSource.Contains("Model.SignedInStatus", StringComparison.Ordinal), "signed-in home should project the shared signed-in trust panel instead of keeping trust posture trapped on account-only routes.");
+    Assert(homeSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "signed-in home should reuse the shared signed-in trust panel instead of inventing a home-only trust surface.");
+    Assert(homeSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "home operator guidance should reuse the signed-in trust posture for current access guidance.");
+    Assert(homeSource.Contains("TrustRowValue(Model.SignedInStatus, \"Fix availability\"", StringComparison.Ordinal), "home operator guidance should reuse the signed-in trust posture for fix guidance.");
+    Assert(homeSource.Contains("TrustRowValue(Model.SignedInStatus, \"Current caution\"", StringComparison.Ordinal), "home operator guidance should reuse the signed-in trust posture for the caution lane.");
     Assert(homeSource.Contains("/account/work#community-op-guidance-", StringComparison.Ordinal), "home work should deep-link the operator card into the organizer guidance rail.");
     Assert(homeSource.Contains("Open member guidance", StringComparison.Ordinal), "home work should give operators a direct route to the member-guidance rail.");
     Assert(homeSource.Contains("Consequence watch", StringComparison.Ordinal), "home work should surface a dedicated consequence card instead of leaving consequence follow-through buried inside summary text.");
@@ -2954,6 +2959,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel is not null, "signed-in home page should render through the MVC view layer.");
     Assert(string.Equals(authenticatedHomeModel!.CurrentSection, "overview", StringComparison.Ordinal), "default home route should land on the overview section.");
     Assert(authenticatedHomeModel.Sections.Any(static section => string.Equals(section.Href, "/home/access", StringComparison.Ordinal)), "home should expose the dedicated access section link.");
+    Assert(authenticatedHomeModel.SignedInStatus is not null, "signed-in home should project the shared signed-in trust status.");
+    Assert(authenticatedHomeModel.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "signed-in home should surface who-can-get-it-now posture directly in the shared trust panel.");
+    Assert(authenticatedHomeModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "signed-in home should surface a non-empty fix-availability row directly in the shared trust panel.");
+    Assert(authenticatedHomeModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "signed-in home should surface a non-empty install-specific caution row directly in the shared trust panel.");
     Assert(authenticatedHomeModel!.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "signed-in home should surface tracked support context.");
     Assert(authenticatedHomeModel.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && item.ClosureSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase)), "signed-in home access should surface release closure truth from the shared support presenter.");
     Assert(authenticatedHomeModel.CampaignSpine.Dossiers.Count >= 1, "signed-in home should surface living dossier continuity.");
@@ -3033,10 +3042,12 @@ async Task VerifyPublicLandingProjectionAsync()
     var accessHomeModel = accessHomePage?.Model as HomePageViewModel;
     Assert(string.Equals(accessHomeModel?.CurrentSection, "access", StringComparison.Ordinal), "home access route should render the access section.");
     Assert(string.Equals(accessHomeModel?.Chrome.Title, "Home · Access", StringComparison.Ordinal), "home access route should project its own chrome title.");
+    Assert(accessHomeModel?.SignedInStatus is not null, "home access route should keep the shared signed-in trust panel available.");
     var workHomePage = await authenticatedLandingController.HomePage("work", CancellationToken.None) as ViewResult;
     var workHomeModel = workHomePage?.Model as HomePageViewModel;
     Assert(string.Equals(workHomeModel?.CurrentSection, "work", StringComparison.Ordinal), "home work route should render the work section.");
     Assert(string.Equals(workHomeModel?.Chrome.Title, "Home · Work", StringComparison.Ordinal), "home work route should project its own chrome title.");
+    Assert(workHomeModel?.SignedInStatus is not null, "home work route should keep the shared signed-in trust panel available.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel?.LeadWorkspaceServerPlane?.WorkspaceState.Label), "home work route should keep the bounded workspace state visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Count >= 1, "home work route should keep the what-changed packet tied to a real change packet.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "prep_launch", StringComparison.Ordinal)) == true, "home work route should keep governed prep-launch receipts on the bounded what-changed rail.");
