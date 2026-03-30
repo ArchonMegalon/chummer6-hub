@@ -133,6 +133,11 @@
                 <p><strong>Legal runner:</strong> @starterFirstPlayableSession.RuleReadySummary</p>
                 <p><strong>Understandable return:</strong> @starterFirstPlayableSession.ReturnLaneSummary</p>
                 <p><strong>Campaign-ready lane:</strong> @starterFirstPlayableSession.CampaignReadySummary</p>
+                @if (Model.SignedInStatus is not null)
+                {
+                    <p><strong>Fix availability:</strong> @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open the signed-in trust snapshot to confirm the grounded fix lane.")</p>
+                    <p><strong>Current caution:</strong> @TrustRowValue(Model.SignedInStatus, "Current caution", "Open the signed-in trust snapshot to confirm the current caution lane.")</p>
+                }
                 @if (!string.IsNullOrWhiteSpace(starterFirstPlayableEvidence))
                 {
                     <p><strong>Grounded evidence:</strong> @starterFirstPlayableEvidence</p>
@@ -141,6 +146,7 @@
             <div class="stacked-actions">
                 <a class="button-like button-like--primary" href="/home/work">Open starter lane on Home</a>
                 <a class="button-like button-like--ghost" href="@($"/account/work/workspaces/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}#selected-first-playable-session")">Open first playable session proof</a>
+                <a class="button-like button-like--ghost" href="/contact?kind=install_help">Open install support</a>
             </div>
         }
         else
