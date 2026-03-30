@@ -9,6 +9,7 @@ namespace Chummer.Run.Api.Services;
 public sealed class WeeklyProductPulseArtifactService
 {
     private const int MaxProgressTrendSamples = 8;
+    private const int ProviderRouteReviewCadenceDays = 14;
     private const string DefaultPulseRelativePath = ".codex-design/product/WEEKLY_PRODUCT_PULSE.generated.json";
     private const string DefaultProgressReportRelativePath = ".codex-design/product/PROGRESS_REPORT.generated.json";
     private const string DefaultProgressHistoryRelativePath = ".codex-design/product/PROGRESS_HISTORY.generated.json";
@@ -59,7 +60,7 @@ public sealed class WeeklyProductPulseArtifactService
             ClosureHealthInfo? closureHealth = ComputeClosureHealth(journeyGates, supportPackets);
             AdoptionHealthInfo? adoptionHealth = ComputeAdoptionHealth(progressReport, localReleaseProof);
             WeeklyProgressTrendInfo? progressTrend = ComputeProgressTrend(progressHistory);
-            ProviderRouteInfo providerRoute = ComputeProviderRoute(statusPlane, seed);
+            ProviderRouteInfo providerRoute = ComputeProviderRoute(statusPlane, closureHealth, localReleaseProof, seed);
             string launchReadiness = ComputeLaunchReadiness(journeyGates, localReleaseProof, providerRoute, closureHealth, seed);
 
             JsonObject journeyGateHealth = EnsureObject(pulse, "journey_gate_health");
@@ -451,25 +452,52 @@ public sealed class WeeklyProductPulseArtifactService
             Samples: samples);
     }
 
-    private static ProviderRouteInfo ComputeProviderRoute(StatusPlanePayload? statusPlane, WeeklyProductPulseSeed? seed)
+    private static ProviderRouteInfo ComputeProviderRoute(
+        StatusPlanePayload? statusPlane,
+        ClosureHealthInfo? closureHealth,
+        LocalReleaseProofPayload? localReleaseProof,
+        WeeklyProductPulseSeed? seed)
     {
         if (statusPlane is null)
         {
+            string fallbackDefaultStatus = seed?.SupportingSignals?.ProviderRouteStewardship?.DefaultStatus ?? "Pilot defaults are not yet governed";
+            string fallbackCanaryStatus = seed?.SupportingSignals?.ProviderRouteStewardship?.CanaryStatus ?? "Canary evidence is still accumulating";
+            bool fallbackCanaryHealthy = string.Equals(fallbackCanaryStatus, "Canary green on all active lanes", StringComparison.Ordinal);
+            bool fallbackHubIsPublicPilot = string.Equals(fallbackDefaultStatus, "Pilot defaults are governed", StringComparison.Ordinal);
+            string fallbackNextDecision = localReleaseProof is null && closureHealth is null
+                ? seed?.SupportingSignals?.ProviderRouteStewardship?.NextDecision
+                    ?? ComputeProviderRouteDecision(
+                        fallbackHubIsPublicPilot,
+                        fallbackCanaryHealthy ? 1 : 0,
+                        fallbackCanaryHealthy,
+                        closureHealth,
+                        localReleaseProof)
+                : ComputeProviderRouteDecision(
+                    fallbackHubIsPublicPilot,
+                    fallbackCanaryHealthy ? 1 : 0,
+                    fallbackCanaryHealthy,
+                    closureHealth,
+                    localReleaseProof);
             return new ProviderRouteInfo(
-                DefaultStatus: seed?.SupportingSignals?.ProviderRouteStewardship?.DefaultStatus ?? "Pilot defaults are not yet governed",
-                CanaryStatus: seed?.SupportingSignals?.ProviderRouteStewardship?.CanaryStatus ?? "Canary evidence is still accumulating",
-                ReviewDue: seed?.SupportingSignals?.ProviderRouteStewardship?.ReviewDue,
-                NextDecision: seed?.SupportingSignals?.ProviderRouteStewardship?.NextDecision);
+                DefaultStatus: fallbackDefaultStatus,
+                CanaryStatus: fallbackCanaryStatus,
+                ReviewDue: ComputeProviderRouteReviewDue(seed?.GeneratedAt, seed?.SupportingSignals?.ProviderRouteStewardship?.ReviewDue),
+                NextDecision: fallbackNextDecision);
         }
 
-        bool hubIsPublicPilot = statusPlane?.Projects?.Any(static project =>
+        StatusPlanePayload liveStatusPlane = statusPlane;
+
+        bool hubIsPublicPilot = liveStatusPlane.Projects?.Any(static project =>
             string.Equals(project.Id, "hub", StringComparison.OrdinalIgnoreCase)
             && string.Equals(project.DeploymentAccessPosture, "public", StringComparison.OrdinalIgnoreCase)
             && string.Equals(project.DeploymentPromotionStage, "promoted_preview", StringComparison.OrdinalIgnoreCase)) == true;
 
-        int publicTargetCount = statusPlane?.DeploymentPosture?.PublicTargetCount ?? 0;
-        int degradedServiceCount = statusPlane?.RuntimeHealing?.Summary?.DegradedServiceCount ?? 0;
-        string alertState = statusPlane?.RuntimeHealing?.Summary?.AlertState ?? string.Empty;
+        int publicTargetCount = liveStatusPlane.DeploymentPosture?.PublicTargetCount ?? 0;
+        int degradedServiceCount = liveStatusPlane.RuntimeHealing?.Summary?.DegradedServiceCount ?? 0;
+        string alertState = liveStatusPlane.RuntimeHealing?.Summary?.AlertState ?? string.Empty;
+        bool canaryHealthy = degradedServiceCount == 0
+            && string.Equals(alertState, "healthy", StringComparison.OrdinalIgnoreCase)
+            && publicTargetCount > 0;
 
         string defaultStatus = hubIsPublicPilot
             ? "Pilot defaults are governed"
@@ -477,22 +505,71 @@ public sealed class WeeklyProductPulseArtifactService
                 ? "Pilot defaults still need operator review"
                 : "Pilot defaults are not yet governed";
 
-        string canaryStatus = degradedServiceCount == 0
-            && string.Equals(alertState, "healthy", StringComparison.OrdinalIgnoreCase)
-            && publicTargetCount > 0
+        string canaryStatus = canaryHealthy
                 ? "Canary green on all active lanes"
                 : degradedServiceCount > 0
                     ? $"Canary watch on {degradedServiceCount} active lane(s)"
                     : "Canary evidence is still accumulating";
+        string? reviewEvidenceGeneratedAt = !string.IsNullOrWhiteSpace(liveStatusPlane.GeneratedAt)
+            ? liveStatusPlane.GeneratedAt
+            : seed?.GeneratedAt;
 
         return new ProviderRouteInfo(
             DefaultStatus: defaultStatus,
             CanaryStatus: canaryStatus,
-            ReviewDue: seed?.SupportingSignals?.ProviderRouteStewardship?.ReviewDue,
-            NextDecision: seed?.SupportingSignals?.ProviderRouteStewardship?.NextDecision
-                ?? (degradedServiceCount == 0
-                    ? "Promote once support fallout remains stable."
-                    : "Hold broad promotion until route canaries return to green."));
+            ReviewDue: ComputeProviderRouteReviewDue(reviewEvidenceGeneratedAt, seed?.SupportingSignals?.ProviderRouteStewardship?.ReviewDue),
+            NextDecision: ComputeProviderRouteDecision(
+                hubIsPublicPilot,
+                publicTargetCount,
+                canaryHealthy,
+                closureHealth,
+                localReleaseProof));
+    }
+
+    private static string? ComputeProviderRouteReviewDue(string? generatedAt, string? seedReviewDue)
+    {
+        if (DateTimeOffset.TryParse(generatedAt, out DateTimeOffset parsed))
+        {
+            return parsed.ToUniversalTime().AddDays(ProviderRouteReviewCadenceDays).ToString("yyyy-MM-dd");
+        }
+
+        return seedReviewDue;
+    }
+
+    private static string ComputeProviderRouteDecision(
+        bool hubIsPublicPilot,
+        int publicTargetCount,
+        bool canaryHealthy,
+        ClosureHealthInfo? closureHealth,
+        LocalReleaseProofPayload? localReleaseProof)
+    {
+        if (publicTargetCount == 0)
+        {
+            return "Hold broad promotion until public route canary coverage exists.";
+        }
+
+        if (!canaryHealthy)
+        {
+            return "Hold broad promotion until route canaries return to green.";
+        }
+
+        if (!string.Equals(localReleaseProof?.Status, "passed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Hold broad promotion until fresh local release proof passes on the public edge.";
+        }
+
+        if (closureHealth is not null
+            && !string.Equals(closureHealth.State, "clear", StringComparison.Ordinal))
+        {
+            return "Keep the current pilot default until support closure returns to a clear posture.";
+        }
+
+        if (!hubIsPublicPilot)
+        {
+            return "Finish the public pilot promotion path before making this the default route.";
+        }
+
+        return "Promote once canaries stay green and support fallout remains clear through the next route review.";
     }
 
     private static string ComputeLaunchReadiness(
