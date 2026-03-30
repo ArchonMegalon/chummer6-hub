@@ -329,10 +329,16 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await expectVisible(page, 'text=Name and timezone');
   await page.locator('[data-onboarding-next]').click();
   await expectVisible(page, 'text=What you want from Chummer');
+  await page.locator('[data-step-panel="2"] input[value="player"]').check();
   await page.locator('[data-onboarding-next]').click();
   await expectVisible(page, 'text=Backup sign-in and updates');
   await expectVisible(page, '[data-onboarding-submit]');
-  await page.locator('[data-close-onboarding]').click();
+  await page.locator('#onboardingFollow').check();
+  await page.locator('#onboardingBeta').check();
+  await Promise.all([
+    expectVisible(page, 'text=Setup saved.'),
+    page.locator('[data-onboarding-submit]').click()
+  ]);
   await page.waitForSelector('#home-onboarding', { state: 'hidden' });
   await assertNoBannedCopy(page, '/home/setup');
   await assertNoPageErrors(page, pageErrors, '/home/setup');
@@ -610,10 +616,47 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/account/settings', async () => {
     await expectVisible(page, 'text=More settings');
+    await expandDetailsBySummary(page, 'Privacy', '/account/settings');
+    await expectBodyText(page, 'Choose what stays visible while deeper identifiers remain tucked away.', '/account/settings');
+    await expectBodyText(page, 'Visibility', '/account/settings');
+    await expectBodyText(page, 'Recovery posture', '/account/settings');
+    await expectBodyText(page, 'Provider-backed help', '/account/settings');
+
+    await expandDetailsBySummary(page, 'Participation', '/account/settings');
+    await expectBodyText(page, 'Tell Chummer which lanes matter to you and which updates you actually want to hear about.', '/account/settings');
+    await expectBodyText(page, 'Follow roadmap updates', '/account/settings');
+    await expectBodyText(page, 'Invite me when the right beta opens', '/account/settings');
+    await page.locator('#followHorizons').check();
+    await page.locator('#betaInterest').check();
+    await Promise.all([
+      expectVisible(page, 'text=Participation settings saved.'),
+      page.locator('#experienceForm button[type="submit"]').click()
+    ]);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await assertNoPageErrors(page, pageErrors, '/account/settings reload');
+    await expandDetailsBySummary(page, 'Participation', '/account/settings reload');
+    assert.equal(await page.locator('#followHorizons').isChecked(), true, '/account/settings should persist follow-horizons after save.');
+    assert.equal(await page.locator('#betaInterest').isChecked(), true, '/account/settings should persist beta-interest after save.');
+
+    await expandDetailsBySummary(page, 'Help and policy', '/account/settings');
+    await expectBodyText(page, 'When you need support, privacy, or preview-use guidance, use the first-party pages instead of guessing.', '/account/settings');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/help"]', '/account/settings help link'), '/help');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/privacy"]', '/account/settings privacy link'), '/privacy');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/terms"]', '/account/settings terms link'), '/terms');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/contact"]', '/account/settings contact link'), '/contact');
+    await assertNoBannedCopy(page, '/account/settings');
   });
 
   await gotoAndAssert(page, pageErrors, '/account/advanced', async () => {
     await expectVisible(page, 'text=Advanced account details');
+    await expectBodyText(page, 'Hub account id', '/account/advanced');
+    await expectBodyText(page, 'Primary auth', '/account/advanced');
+    await expectBodyText(page, 'Linked identities', '/account/advanced');
+    await expectBodyText(page, 'Linked channels', '/account/advanced');
+    await expectBodyText(page, 'Recovery posture', '/account/advanced');
+    await expectBodyText(page, 'Follow horizons', '/account/advanced');
+    await expectMinimumCount(page, '.detail-grid--account dd', 6, '/account/advanced detail values');
+    await assertNoBannedCopy(page, '/account/advanced');
   });
 
   await gotoAndAssert(page, pageErrors, '/account/support', async () => {
