@@ -1554,6 +1554,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession", StringComparison.Ordinal), "landing should derive the signed-in starter lane from the grounded first playable session truth already attached to the campaign spine.");
     Assert(landingSource.Contains("Open starter lane on Home", StringComparison.Ordinal), "landing should keep a direct signed-in starter-lane route instead of forcing repo knowledge.");
     Assert(landingSource.Contains("Open first playable session proof", StringComparison.Ordinal), "landing should keep a direct route from the front door into the bounded first-session proof drawer.");
+    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Fix availability\"", StringComparison.Ordinal), "landing starter lane should reuse signed-in fix-availability truth instead of tutorial prose.");
+    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Current caution\"", StringComparison.Ordinal), "landing starter lane should reuse signed-in caution truth instead of tutorial prose.");
+    Assert(landingSource.Contains("Open install support", StringComparison.Ordinal), "landing starter lane should keep install-support follow-through on the same governed front-door rail.");
     var trustPulseBodySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_PublicTrustPulseBody.cshtml"));
     Assert(trustPulseBodySource.Contains("@if (Model.TrendSamples.Count > 1)", StringComparison.Ordinal), "shared trust pulse body should render measured progress points directly on the weekly trust pulse.");
     Assert(trustPulseBodySource.Contains("trust-pulse-trend__point", StringComparison.Ordinal), "shared trust pulse body should carry the measured-trend rail.");
