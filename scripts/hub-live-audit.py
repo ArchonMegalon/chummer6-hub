@@ -1279,8 +1279,28 @@ def main() -> int:
         public_host=args.public_host,
         forwarded_proto=args.forwarded_proto,
     )
-    if status != 200 or '"contract_name": "chummer.weekly_product_pulse"' not in body:
+    pulse_payload = load_json_object(body, "/api/public/weekly-pulse")
+    if status != 200 or str(pulse_payload.get("contract_name") or "").strip() != "chummer.weekly_product_pulse":
         raise AssertionError("/api/public/weekly-pulse did not serve the mirrored weekly pulse artifact")
+
+    journey_gate_health = pulse_payload.get("journey_gate_health")
+    if not isinstance(journey_gate_health, dict):
+        raise AssertionError("/api/public/weekly-pulse is missing journey_gate_health")
+    if str(journey_gate_health.get("state") or "").strip().lower() != "ready":
+        raise AssertionError("/api/public/weekly-pulse did not reflect the current Fleet ready-state journey proof")
+    if int(journey_gate_health.get("blocked_count") or 0) != 0:
+        raise AssertionError("/api/public/weekly-pulse still reports blocked journey gates")
+
+    supporting_signals = pulse_payload.get("supporting_signals")
+    if not isinstance(supporting_signals, dict):
+        raise AssertionError("/api/public/weekly-pulse is missing supporting_signals")
+    for key in ("closure_health", "adoption_health", "progress_trend", "provider_route_stewardship"):
+        if not isinstance(supporting_signals.get(key), dict):
+            raise AssertionError(f"/api/public/weekly-pulse is missing supporting_signals.{key}")
+
+    launch_readiness = str(supporting_signals.get("launch_readiness") or "").strip()
+    if not launch_readiness:
+        raise AssertionError("/api/public/weekly-pulse is missing supporting_signals.launch_readiness")
     print(f"ok /api/public/weekly-pulse -> {final_url}")
 
     status, body, _, final_url = fetch(
