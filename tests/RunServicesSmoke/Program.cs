@@ -1819,6 +1819,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Generate aftermath or replay package", StringComparison.Ordinal), "account work should expose a real aftermath or replay packaging action on the selected campaign card.");
     Assert(accountSource.Contains("Recent aftermath and replay packages", StringComparison.Ordinal), "account work should keep generated aftermath and replay packages visible on the selected campaign card.");
     Assert(accountSource.Contains("<option value=\"replay_timeline\">Replay timeline</option>", StringComparison.Ordinal), "account work should let operators generate replay timelines from the same governed package rail.");
+    Assert(shelfSource.Contains("aftermath or replay follow-through", StringComparison.Ordinal), "signed-in artifact shelf should describe the campaign lane with replay-safe follow-through instead of recap-only wording.");
+    Assert(shelfSource.Contains("live aftermath, replay, and linked creator-publication record", StringComparison.Ordinal), "signed-in artifact shelf should describe the all-views lane with replay-safe outputs instead of recap-only wording.");
     var downloadDispatchSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
     var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
@@ -3400,6 +3402,16 @@ async Task VerifyPublicLandingProjectionAsync()
         Assert(privacyBoundaryDocument.RootElement.GetProperty("surfaceRules").EnumerateArray().Any(item => string.Equals(item.GetProperty("label").GetString(), "Provider-backed help", StringComparison.Ordinal)), "privacy-boundary endpoint should keep the provider-backed help rule explicit.");
     }
 
+    var artifactShelfReplayResult = await campaignSpineController.GenerateMyCampaignWorkspaceAftermathRecapPackage(
+        workspaceId,
+        new AftermathRecapPackageRequest(
+            RunId: runId,
+            PackageKind: "replay_timeline",
+            Title: null,
+            Note: "Refresh replay posture immediately before signed-in artifact shelf proof."),
+        CancellationToken.None);
+    var artifactShelfReplayPayload = (artifactShelfReplayResult.Result as OkObjectResult)?.Value as AftermathRecapPackageProjection ?? artifactShelfReplayResult.Value;
+    Assert(artifactShelfReplayPayload is not null, "signed-in artifact shelf proof should be able to mint a fresh replay package before shelf filtering is evaluated.");
     var artifactsView = await controller.ArtifactsPage(CancellationToken.None) as ViewResult;
     var artifactsModel = artifactsView?.Model as ShelfPageViewModel;
     Assert(
@@ -3420,6 +3432,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedRecapShelf.GroupBy(static item => string.IsNullOrWhiteSpace(item.ArtifactId) ? item.EntryId : item.ArtifactId, StringComparer.OrdinalIgnoreCase).All(group => group.Count() == 1), "authenticated artifacts shelf should dedupe recap artifacts by governed artifact identity.");
     Assert(authenticatedRecapShelf.All(static item => !string.IsNullOrWhiteSpace(item.ProvenanceSummary)), "authenticated artifacts shelf should keep provenance attached to every signed-in recap artifact.");
     Assert(authenticatedRecapShelf.All(static item => !string.IsNullOrWhiteSpace(item.AuditSummary)), "authenticated artifacts shelf should keep audit posture attached to every signed-in recap artifact.");
+    Assert(authenticatedRecapShelf.Any(item => string.Equals(item.EntryId, artifactShelfReplayPayload!.PackageId, StringComparison.Ordinal)), "authenticated artifacts shelf should surface replay packages on the signed-in return shelf.");
+    var authenticatedReplayArtifact = authenticatedRecapShelf.FirstOrDefault(item => string.Equals(item.EntryId, artifactShelfReplayPayload!.PackageId, StringComparison.Ordinal));
+    Assert(authenticatedReplayArtifact?.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) == true, "authenticated artifacts shelf should keep replay artifacts creator-linked on the shared signed-in shelf.");
+    Assert(!string.IsNullOrWhiteSpace(authenticatedReplayArtifact?.CreatorPublicationId), "authenticated artifacts shelf should keep creator-publication linkage attached to replay artifacts.");
     authenticatedLandingController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?view=personal");
     var personalArtifactsView = await authenticatedLandingController.ArtifactsPage(CancellationToken.None) as ViewResult;
     var personalArtifactsModel = personalArtifactsView?.Model as ShelfPageViewModel;
@@ -3431,6 +3447,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var campaignArtifactsModel = campaignArtifactsView?.Model as ShelfPageViewModel;
     Assert(string.Equals(campaignArtifactsModel?.SignedInArtifactView, "campaign", StringComparison.Ordinal), "authenticated artifacts shelf should honor the explicit campaign view filter.");
     Assert(campaignArtifactsModel?.SignedInRecapShelf?.Count > 0 && campaignArtifactsModel.SignedInRecapShelf.All(static item => item.Audience.Contains("campaign", StringComparison.OrdinalIgnoreCase)), "campaign artifact view should keep only artifacts that are governable on the campaign rail.");
+    Assert(campaignArtifactsModel?.SignedInRecapShelf?.Any(item => string.Equals(item.EntryId, artifactShelfReplayPayload!.PackageId, StringComparison.Ordinal)) == true, "campaign artifact view should keep replay packages on the campaign rail.");
     Assert(campaignArtifactsModel?.SignedInCreatorPublications?.Count == 0, "campaign artifact view should keep creator publication cards off the campaign shelf.");
     authenticatedLandingController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?view=creator");
     var creatorArtifactsView = await authenticatedLandingController.ArtifactsPage(CancellationToken.None) as ViewResult;
@@ -3438,6 +3455,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(creatorArtifactsModel?.SignedInArtifactView, "creator", StringComparison.Ordinal), "authenticated artifacts shelf should honor the explicit creator view filter.");
     Assert(creatorArtifactsModel?.SignedInCreatorPublications?.Count > 0, "creator artifact view should surface linked creator publications instead of staying empty.");
     Assert(creatorArtifactsModel?.SignedInRecapShelf?.All(static item => item.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(item.CreatorPublicationId)) == true, "creator artifact view should keep only creator-linked artifact lineage on the recap shelf.");
+    Assert(creatorArtifactsModel?.SignedInRecapShelf?.Any(item => string.Equals(item.EntryId, artifactShelfReplayPayload!.PackageId, StringComparison.Ordinal)) == true, "creator artifact view should keep replay packages when they are linked into creator publication posture.");
     authenticatedLandingController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?view=shadow");
     var fallbackArtifactsView = await authenticatedLandingController.ArtifactsPage(CancellationToken.None) as ViewResult;
     var fallbackArtifactsModel = fallbackArtifactsView?.Model as ShelfPageViewModel;
