@@ -1,6 +1,17 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T10:09:44+02:00
+Updated: 2026-03-30T10:11:48+02:00
+
+## Handoff refresh (2026-03-30T10:11:48+02:00)
+
+- Public roadmap and artifact detail pages are now part of the stronger public release-proof lane instead of only grazing their headings:
+  - `scripts/hub-live-audit.py` now treats `/artifacts/current-preview-build` and `/roadmap/nexus-pan` as richer public proof surfaces and requires their real guidance rails (`Use and verify this proof`, `What this live artifact shows, who it helps, and what to check next`, `Start from the live surface`, `Open current release`, `Open support`, `Current pain, expected unlock, and the live proof you should compare first`, `Need a decision instead?`, `Compare with current proof`).
+  - `scripts/e2e-hub-playwright.cjs` now enforces those same public detail-route rails in the browser lane and proves the honest next-step links back into `/now` and `/contact#support-intake` on both the live artifact page and the roadmap detail page.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T10:09:44+02:00)
 
