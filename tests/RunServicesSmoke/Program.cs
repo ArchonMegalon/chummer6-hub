@@ -3523,6 +3523,61 @@ void VerifyRegistryControllerHardening()
     Assert(searchPayload?.Items[0].ShelfSummary?.Contains("owner-controlled", StringComparison.OrdinalIgnoreCase) == true, "registry search should explain owner-only shelf posture");
     Assert(searchPayload?.Items[0].ShelfOwnershipSummary?.Contains("originating account or install", StringComparison.OrdinalIgnoreCase) == true, "registry search should explain owner-only ownership posture");
 
+    var creatorShelfCreate = controller.CreateArtifact(new HubArtifactCreateRequest(
+        Name: "Creator Shelf Projection",
+        Kind: HubArtifactKind.BuildIdea,
+        Version: "2.0.1",
+        RulesetId: "sr6",
+        Visibility: ArtifactVisibilityModes.Shared,
+        TrustTier: ArtifactTrustTiers.Curated,
+        OwnerId: "hub.controller",
+        PublisherId: "pub.creator-shelf",
+        Summary: "creator shelf smoke",
+        Description: null,
+        RuntimeFingerprint: "creator-shelf:v1"));
+    var creatorShelfCreated = (creatorShelfCreate.Result as CreatedAtActionResult)?.Value as HubArtifactMetadata;
+    Assert(creatorShelfCreated is not null, "registry create should return a creator-shelf artifact");
+    var campaignShelfCreate = controller.CreateArtifact(new HubArtifactCreateRequest(
+        Name: "Campaign Shelf Projection",
+        Kind: HubArtifactKind.BuildKit,
+        Version: "2.0.1",
+        RulesetId: "sr6",
+        Visibility: ArtifactVisibilityModes.CampaignShared,
+        TrustTier: ArtifactTrustTiers.Curated,
+        OwnerId: "hub.controller",
+        PublisherId: null,
+        Summary: "campaign shelf smoke",
+        Description: null,
+        RuntimeFingerprint: "campaign-shelf:v1"));
+    var campaignShelfCreated = (campaignShelfCreate.Result as CreatedAtActionResult)?.Value as HubArtifactMetadata;
+    Assert(campaignShelfCreated is not null, "registry create should return a campaign-shelf artifact");
+    var personalShelfCreate = controller.CreateArtifact(new HubArtifactCreateRequest(
+        Name: "Personal Shelf Projection",
+        Kind: HubArtifactKind.RuleProfile,
+        Version: "2.0.1",
+        RulesetId: "sr6",
+        Visibility: ArtifactVisibilityModes.Shared,
+        TrustTier: ArtifactTrustTiers.Curated,
+        OwnerId: "hub.controller",
+        PublisherId: null,
+        Summary: "personal shelf smoke",
+        Description: null,
+        RuntimeFingerprint: "personal-shelf:v1"));
+    var personalShelfCreated = (personalShelfCreate.Result as CreatedAtActionResult)?.Value as HubArtifactMetadata;
+    Assert(personalShelfCreated is not null, "registry create should return a personal-shelf artifact");
+
+    var creatorShelfSearch = controller.SearchArtifacts(query: "Shelf Projection", kind: null, state: null, page: 1, pageSize: 10, shelfAudience: "creator").Result as OkObjectResult;
+    var creatorShelfPayload = creatorShelfSearch?.Value as RegistrySearchResponse;
+    Assert(creatorShelfPayload?.Items.Count == 1 && creatorShelfPayload.Items[0].ShelfAudience == "creator" && creatorShelfPayload.Items[0].Id == creatorShelfCreated!.Id, "registry search should support creator shelf filtering on downstream hosted callers");
+
+    var campaignShelfSearch = controller.SearchArtifacts(query: "Shelf Projection", kind: null, state: null, page: 1, pageSize: 10, shelfAudience: "campaign").Result as OkObjectResult;
+    var campaignShelfPayload = campaignShelfSearch?.Value as RegistrySearchResponse;
+    Assert(campaignShelfPayload?.Items.Count == 1 && campaignShelfPayload.Items[0].ShelfAudience == "campaign" && campaignShelfPayload.Items[0].Id == campaignShelfCreated!.Id, "registry search should support campaign shelf filtering on downstream hosted callers");
+
+    var personalShelfSearch = controller.SearchArtifacts(query: "Shelf Projection", kind: null, state: null, page: 1, pageSize: 10, shelfAudience: "personal").Result as OkObjectResult;
+    var personalShelfPayload = personalShelfSearch?.Value as RegistrySearchResponse;
+    Assert(personalShelfPayload?.Items.Count == 1 && personalShelfPayload.Items[0].ShelfAudience == "personal" && personalShelfPayload.Items[0].Id == personalShelfCreated!.Id, "registry search should support personal shelf filtering on downstream hosted callers");
+
     var preview = controller.GetPreview(created!.Id).Result as OkObjectResult;
     var previewPayload = preview?.Value as RegistryPreviewResponse;
     Assert(previewPayload?.ShelfAudience == "owner-only", "registry preview should project owner-only shelf posture");
@@ -3639,6 +3694,9 @@ void VerifyRegistryControllerHardening()
     var badStateSearch = controller.SearchArtifacts(query: null, kind: null, state: "UnknownState", page: 1, pageSize: 10);
     var badStateResult = badStateSearch.Result as BadRequestObjectResult;
     Assert(badStateResult is not null, "invalid registry state filters should fail fast");
+    var badShelfAudienceSearch = controller.SearchArtifacts(query: null, kind: null, state: null, page: 1, pageSize: 10, shelfAudience: "shadow");
+    var badShelfAudienceResult = badShelfAudienceSearch.Result as BadRequestObjectResult;
+    Assert(badShelfAudienceResult is not null, "invalid registry shelf-audience filters should fail fast");
 }
 
 async Task VerifyAiGatewayWorkflowAsync()
