@@ -1543,22 +1543,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("Preview in progress:", StringComparison.Ordinal), "landing should demote preview-in-progress copy to a quieter shelf note instead of a full third state card.");
     Assert(landingSource.Contains("Need the full picture?", StringComparison.Ordinal), "landing should route deeper proof evaluation through one quiet inline note instead of a second button stack.");
     Assert(landingSource.Contains("PublicSurfaceStatus.DisplayLabel", StringComparison.Ordinal), "landing should use the shared public status presenter instead of route-local badge labels.");
-    Assert(landingSource.Contains("var trustPulseAccess = trustPulse?.Rows.FirstOrDefault", StringComparison.Ordinal), "landing should bind who-can-get-it-now directly from the shared trust pulse.");
-    Assert(landingSource.Contains("<p><strong>@trustPulseAccess.Label:</strong> @trustPulseAccess.Value</p>", StringComparison.Ordinal), "landing should render who-can-get-it-now directly on the public trust pulse instead of leaving it model-only.");
-    Assert(landingSource.Contains("var trustPulseRelease = trustPulse?.Rows.FirstOrDefault", StringComparison.Ordinal), "landing should bind release-proof directly from the shared trust pulse.");
-    Assert(landingSource.Contains("<p><strong>@trustPulseRelease.Label:</strong> @trustPulseRelease.Value</p>", StringComparison.Ordinal), "landing should render release-proof directly on the public trust pulse instead of leaving it model-only.");
-    Assert(landingSource.Contains("var trustPulseLaunchReadiness = trustPulse?.Rows.FirstOrDefault", StringComparison.Ordinal), "landing should bind launch-readiness directly from the shared trust pulse.");
-    Assert(landingSource.Contains("<p><strong>@trustPulseLaunchReadiness.Label:</strong> @trustPulseLaunchReadiness.Value</p>", StringComparison.Ordinal), "landing should render launch-readiness directly on the public trust pulse instead of leaving it model-only.");
-    Assert(landingSource.Contains("var trustPulseAdoption = trustPulse?.Rows.FirstOrDefault", StringComparison.Ordinal), "landing should bind adoption health directly from the shared trust pulse.");
-    Assert(landingSource.Contains("var trustPulseClosure = trustPulse?.Rows.FirstOrDefault", StringComparison.Ordinal), "landing should bind closure-health directly from the shared trust pulse.");
-    Assert(landingSource.Contains("<p><strong>@trustPulseClosure.Label:</strong> @trustPulseClosure.Value</p>", StringComparison.Ordinal), "landing should render closure-health directly on the public trust pulse instead of leaving it model-only.");
-    Assert(landingSource.Contains("<p><strong>@trustPulseAdoption.Label:</strong> @trustPulseAdoption.Value</p>", StringComparison.Ordinal), "landing should render adoption health directly on the public trust pulse instead of leaving it model-only.");
-    Assert(landingSource.Contains("var trustPulseProgress = trustPulse?.Rows.FirstOrDefault", StringComparison.Ordinal), "landing should bind progress-trend directly from the shared trust pulse.");
-    Assert(landingSource.Contains("<p><strong>@trustPulseProgress.Label:</strong> @trustPulseProgress.Value</p>", StringComparison.Ordinal), "landing should render progress-trend directly on the public trust pulse instead of leaving it model-only.");
-    Assert(landingSource.Contains("var trustPulseJourney = trustPulse?.Rows.FirstOrDefault", StringComparison.Ordinal), "landing should bind journey-pulse directly from the shared trust pulse.");
-    Assert(landingSource.Contains("<p><strong>@trustPulseJourney.Label:</strong> @trustPulseJourney.Value</p>", StringComparison.Ordinal), "landing should render journey-pulse directly on the public trust pulse instead of leaving it model-only.");
-    Assert(landingSource.Contains("var trustPulseProviderRoute = trustPulse?.Rows.FirstOrDefault", StringComparison.Ordinal), "landing should bind provider-route stewardship directly from the shared trust pulse.");
-    Assert(landingSource.Contains("<p><strong>@trustPulseProviderRoute.Label:</strong> @trustPulseProviderRoute.Value</p>", StringComparison.Ordinal), "landing should render provider-route stewardship directly on the public trust pulse instead of leaving it model-only.");
+    Assert(landingSource.Contains("@if (trustPulse.TrendSamples.Count > 1)", StringComparison.Ordinal), "landing should render measured progress points directly on the weekly trust pulse.");
+    Assert(landingSource.Contains("trust-pulse-trend__point", StringComparison.Ordinal), "landing should carry the shared measured-trend rail on the front-door trust pulse.");
+    Assert(landingSource.Contains("@foreach (var row in trustPulse.Rows)", StringComparison.Ordinal), "landing should render every weekly trust row from the shared pulse instead of binding a brittle subset.");
+    Assert(landingSource.Contains("<span>@row.Label</span>", StringComparison.Ordinal), "landing should project the shared weekly trust labels directly in the front-door pulse.");
+    Assert(landingSource.Contains("<strong>@row.Value</strong>", StringComparison.Ordinal), "landing should project the shared weekly trust values directly in the front-door pulse.");
     var storySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml"));
     Assert(!storySource.Contains("One path from install to session return", StringComparison.Ordinal), "product story should not drift back into a second install/support explainer.");
     Assert(!storySource.Contains("From first install to next session", StringComparison.Ordinal), "product story should stay focused on differentiation instead of retelling the install path.");
@@ -3540,12 +3529,20 @@ void VerifyRegistryControllerHardening()
     var publishedSearchPayload = publishedSearch?.Value as RegistrySearchResponse;
     Assert(publishedSearchPayload?.Items[0].LatestPublicationState == PublicationState.Deprecated.ToString(), "registry search should surface the latest publication state");
     Assert(publishedSearchPayload?.Items[0].PublicationTrustBand == "replacement-advised", "registry search should surface the latest publication trust band");
+    Assert(!string.IsNullOrWhiteSpace(publishedSearchPayload?.Items[0].PublicationTrustSummary), "registry search should surface the latest publication trust summary");
+    Assert(!string.IsNullOrWhiteSpace(publishedSearchPayload?.Items[0].PublicationDiscoverySummary), "registry search should surface the latest publication discovery summary");
+    Assert(!string.IsNullOrWhiteSpace(publishedSearchPayload?.Items[0].PublicationLineageSummary), "registry search should surface the latest publication lineage summary");
+    Assert(publishedSearchPayload?.Items[0].PublicationDiscoverable == false, "registry search should surface the latest publication discoverability posture");
     Assert(publishedSearchPayload?.Items[0].PublicationNextSafeActionSummary?.Contains("replacement artifact", StringComparison.OrdinalIgnoreCase) == true, "registry search should surface the latest publication next-safe action");
 
     var publishedPreview = controller.GetPreview(created.Id).Result as OkObjectResult;
     var publishedPreviewPayload = publishedPreview?.Value as RegistryPreviewResponse;
     Assert(publishedPreviewPayload?.LatestPublicationState == PublicationState.Deprecated.ToString(), "registry preview should surface the latest publication state");
     Assert(publishedPreviewPayload?.PublicationTrustBand == "replacement-advised", "registry preview should surface the latest publication trust band");
+    Assert(!string.IsNullOrWhiteSpace(publishedPreviewPayload?.PublicationTrustSummary), "registry preview should surface the latest publication trust summary");
+    Assert(!string.IsNullOrWhiteSpace(publishedPreviewPayload?.PublicationDiscoverySummary), "registry preview should surface the latest publication discovery summary");
+    Assert(!string.IsNullOrWhiteSpace(publishedPreviewPayload?.PublicationLineageSummary), "registry preview should surface the latest publication lineage summary");
+    Assert(publishedPreviewPayload?.PublicationDiscoverable == false, "registry preview should surface the latest publication discoverability posture");
     Assert(publishedPreviewPayload?.PublicationNextSafeActionSummary?.Contains("replacement artifact", StringComparison.OrdinalIgnoreCase) == true, "registry preview should surface the latest publication next-safe action");
 
     controller.RegisterInstall(created!.Id, new RegistryHubInstallEvent(
@@ -3568,6 +3565,10 @@ void VerifyRegistryControllerHardening()
     Assert(projectionPayload?.ShelfAudience == "retained-history", "superseded local-only artifacts should project retained-history shelf posture");
     Assert(projectionPayload?.LatestPublicationState == PublicationState.Deprecated.ToString(), "projection endpoint should surface the latest publication state");
     Assert(projectionPayload?.PublicationTrustBand == "replacement-advised", "projection endpoint should surface the latest publication trust band");
+    Assert(!string.IsNullOrWhiteSpace(projectionPayload?.PublicationTrustSummary), "projection endpoint should surface the latest publication trust summary");
+    Assert(!string.IsNullOrWhiteSpace(projectionPayload?.PublicationDiscoverySummary), "projection endpoint should surface the latest publication discovery summary");
+    Assert(!string.IsNullOrWhiteSpace(projectionPayload?.PublicationLineageSummary), "projection endpoint should surface the latest publication lineage summary");
+    Assert(projectionPayload?.PublicationDiscoverable == false, "projection endpoint should surface the latest publication discoverability posture");
     Assert(projectionPayload?.PublicationNextSafeActionSummary?.Contains("replacement artifact", StringComparison.OrdinalIgnoreCase) == true, "projection endpoint should surface the latest publication next-safe action");
 
     var installProjection = controller.GetInstallProjection(created.Id).Result as OkObjectResult;
