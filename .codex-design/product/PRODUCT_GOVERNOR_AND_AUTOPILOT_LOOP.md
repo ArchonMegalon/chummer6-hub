@@ -93,6 +93,14 @@ It is a bounded analysis lane:
 
 ## Autopilot loop
 
+Canonical meaning for the loop lives in design canon.
+The live operator implementation lives in Fleet:
+
+* design defines signal meaning, authority, freeze/reroute rules, and allowed actions
+* Fleet owns the durable runtime loop, traces, evals, canaries, packets, dashboards, and operator evidence
+* Hub owns the user, install, community, and support/control truth those loops read or update
+* shell sessions may start or inspect the loop, but they are entrypoints only and not the durable control plane
+
 The closed loop is:
 
 1. Observe
