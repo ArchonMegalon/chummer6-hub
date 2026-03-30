@@ -178,6 +178,31 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void AccountSurfaceReusesSignedInTrustStatusProjection()
+    {
+        string serviceCollectionPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
+        string servicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "SignedInTrustStatusService.cs");
+        string publicControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
+        string accountViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
+
+        string serviceCollection = File.ReadAllText(serviceCollectionPath);
+        string service = File.ReadAllText(servicePath);
+        string publicController = File.ReadAllText(publicControllerPath);
+        string accountController = File.ReadAllText(accountControllerPath);
+        string viewModel = File.ReadAllText(viewModelPath);
+        string accountView = File.ReadAllText(accountViewPath);
+
+        Assert.Contains("SignedInTrustStatusService", serviceCollection, StringComparison.Ordinal);
+        Assert.Contains("Who can get it now", service, StringComparison.Ordinal);
+        Assert.Contains("_signedInTrustStatus.Build", publicController, StringComparison.Ordinal);
+        Assert.Contains("_signedInTrustStatus.Build", accountController, StringComparison.Ordinal);
+        Assert.Contains("SignedInTrustStatusPanelViewModel? SignedInTrustStatus", viewModel, StringComparison.Ordinal);
+        Assert.Contains("_SignedInTrustStatusPanel.cshtml", accountView, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PublicProgressControllerPublishesWeeklyPulseArtifact()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicProgressController.cs");

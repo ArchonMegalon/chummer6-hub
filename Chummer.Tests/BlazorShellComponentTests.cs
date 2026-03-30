@@ -17,10 +17,11 @@ public sealed class BlazorShellComponentTests
     }
 
     [Fact]
-    public void PublicLandingViewsIncludeSignedInTrustPanelPartial()
+    public void SignedInTrustPanelPartialIsReusedAcrossHostedViews()
     {
         string[] viewPaths =
         [
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")

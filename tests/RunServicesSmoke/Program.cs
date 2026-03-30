@@ -560,6 +560,10 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
             IssuedAtUtc: DateTimeOffset.UtcNow,
             ExpiresAtUtc: DateTimeOffset.UtcNow.AddHours(1))))), configuration);
     var google = CreateGoogleService(configuration, browserAuth, identityLinks, accounts, loggerFactory, tempRoot);
+    var releases = new PublicReleaseManifestService(configuration);
+    var releaseSelection = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+    var weeklyPulseArtifact = new WeeklyProductPulseArtifactService(configuration, loggerFactory.CreateLogger<WeeklyProductPulseArtifactService>());
+    var trustPulse = new PublicTrustPulseService(weeklyPulseArtifact, configuration, loggerFactory.CreateLogger<PublicTrustPulseService>());
     var privacyBoundaries = new PublicPrivacyBoundaryService(new PublicCanonFileLoader(configuration), new PublicRouteCatalogService(new PublicCanonFileLoader(configuration)));
     var identityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(request =>
     {
@@ -578,8 +582,9 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         CountryCode: "AT"));
     var experience = new UserExperienceService(store, accounts);
     var supportPresentation = new SupportCasePresentationService();
+    var signedInTrustStatus = new SignedInTrustStatusService(installLinking, supportCases, supportPresentation, trustPulse);
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
-    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, privacyBoundaries, loggerFactory.CreateLogger<AccountsController>())
+    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -1721,6 +1726,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!accountSource.Contains("Rules Navigator answers", StringComparison.Ordinal), "account copy should avoid internal Rules Navigator wording on the customer-facing surface.");
     Assert(accountSource.Contains("Build paths", StringComparison.Ordinal), "account should describe Build Lab follow-through as customer-facing build paths.");
     Assert(accountSource.Contains("Grounded rule answers", StringComparison.Ordinal), "account should describe Rules Navigator follow-through as grounded rule answers.");
+    Assert(accountSource.Contains("Model.SignedInTrustStatus", StringComparison.Ordinal), "account should project the signed-in trust panel directly on the account surface.");
+    Assert(accountSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "account should reuse the shared signed-in trust panel instead of a link-only trust rail.");
     Assert(accountSource.Contains("Start first playable session", StringComparison.Ordinal), "account work should offer starter-lane follow-through when the shared campaign view is still empty.");
     Assert(accountSource.Contains("seedStarterWorkspaceFromAccount", StringComparison.Ordinal), "account work should wire the starter-lane button on the empty-state route.");
     Assert(accountSource.Contains("starterWorkspaceAccountNotice", StringComparison.Ordinal), "account work should surface starter-lane feedback on the empty-state route.");
@@ -1966,15 +1973,16 @@ async Task VerifyPublicLandingProjectionAsync()
     var trustPulse = new PublicTrustPulseService(weeklyPulseArtifact, configuration, loggerFactory.CreateLogger<PublicTrustPulseService>());
     var privacyBoundaries = new PublicPrivacyBoundaryService(canon, routes);
     var supportPresentation = new SupportCasePresentationService();
+    var signedInTrustStatus = new SignedInTrustStatusService(installLinking, supportCases, supportPresentation, trustPulse);
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
-    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2030,7 +2038,10 @@ async Task VerifyPublicLandingProjectionAsync()
         workspaceServerPlane,
         chrome,
         google,
+        releases,
+        releaseSelection,
         privacyBoundaries,
+        signedInTrustStatus,
         loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -2383,6 +2394,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var accountModel = accountPage?.Model as AccountPageViewModel;
     Assert(accountModel is not null && accountModel.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "account page should surface support-case history beside installs and access.");
     Assert(accountModel!.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(item.ClosureSummary)), "account page should project support lifecycle and closure summaries instead of only raw case rows.");
+    Assert(accountModel.SignedInTrustStatus is not null, "account page should project install-specific trust status directly on the signed-in account surface.");
+    Assert(accountModel.SignedInTrustStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "account page should surface who-can-get-it-now posture inside the signed-in trust panel.");
+    Assert(accountModel.SignedInTrustStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof passed", StringComparison.Ordinal)), "account page should surface adoption health inside the signed-in trust panel.");
+    Assert(accountModel.SignedInTrustStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "account page should surface the install-specific caution lane inside the signed-in trust panel.");
     Assert(accountModel.PrivacyBoundary is not null, "account page should surface the signed-in privacy boundary next to visibility and recovery posture.");
     Assert(string.Equals(accountModel!.CurrentSection, "profile", StringComparison.Ordinal), "default account route should land on the profile section.");
     Assert(accountModel.CoreSections.Any(static section => string.Equals(section.Href, "/account/access", StringComparison.Ordinal)), "account should expose the devices-and-access section link.");
@@ -2655,6 +2670,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var accountSupportModel = accountSupportPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountSupportModel?.CurrentSection, "support", StringComparison.Ordinal), "account support route should render the support section.");
     Assert(string.Equals(accountSupportModel?.Chrome.Title, "Account · Support", StringComparison.Ordinal), "account support route should project its own chrome title.");
+    Assert(accountSupportModel?.SignedInTrustStatus is not null, "account support route should keep the signed-in trust panel visible beside tracked support.");
     var accountSupportDetailPage = await accountController.AccountPage(section: "support", caseId: supportCase.CaseId, CancellationToken.None) as ViewResult;
     var accountSupportDetailModel = accountSupportDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountSupportDetailModel?.SelectedSupportCase?.CaseId, supportCase.CaseId, StringComparison.Ordinal), "account support detail route should load the selected tracked case.");
@@ -2865,6 +2881,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var accountAccessModel = accountAccessPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountAccessModel?.CurrentSection, "access", StringComparison.Ordinal), "account access route should render the devices-and-access section.");
     Assert(string.Equals(accountAccessModel?.Chrome.Title, "Account · Devices & access", StringComparison.Ordinal), "account access route should project its own chrome title.");
+    Assert(accountAccessModel?.SignedInTrustStatus is not null, "account access route should keep the install-specific trust panel visible on the device surface.");
+    Assert(accountAccessModel?.SignedInTrustStatus?.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)) == true, "account access route should keep the current access posture visible next to linked-install details.");
     var accountWorkspaceDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, workspaceId: workspaceId) as ViewResult;
     var accountWorkspaceDetailModel = accountWorkspaceDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountWorkspaceDetailModel?.CurrentSection, "work", StringComparison.Ordinal), "account workspace detail route should land inside the work section.");
@@ -3222,7 +3240,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -3260,7 +3278,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
     Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
-    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, privacyBoundaries, loggerFactory.CreateLogger<AccountsController>())
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

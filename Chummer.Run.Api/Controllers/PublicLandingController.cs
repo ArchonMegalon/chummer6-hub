@@ -33,6 +33,7 @@ public sealed class PublicLandingController : Controller
     private readonly PublicTrustContentService _trustContent;
     private readonly PublicPrivacyBoundaryService _privacyBoundaries;
     private readonly PublicTrustPulseService _trustPulse;
+    private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly ILogger<PublicLandingController> _logger;
@@ -54,6 +55,7 @@ public sealed class PublicLandingController : Controller
         PublicTrustContentService trustContent,
         PublicPrivacyBoundaryService privacyBoundaries,
         PublicTrustPulseService trustPulse,
+        SignedInTrustStatusService signedInTrustStatus,
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
         ILogger<PublicLandingController> logger)
@@ -74,6 +76,7 @@ public sealed class PublicLandingController : Controller
         _trustContent = trustContent;
         _privacyBoundaries = privacyBoundaries;
         _trustPulse = trustPulse;
+        _signedInTrustStatus = signedInTrustStatus;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
         _logger = logger;
@@ -831,119 +834,7 @@ public sealed class PublicLandingController : Controller
         }
 
         var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-        var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
-        var supportSummaries = _supportPresentation.BuildList(_supportCases.ListForReporter(user.UserId, subject.SubjectId).Items, installLinking);
-        var pulse = _trustPulse.LoadSnapshot();
-        var latestInstallation = installLinking.ClaimedInstallations?
-            .OrderByDescending(static item => item.UpdatedAtUtc)
-            .FirstOrDefault();
-        var installCount = installLinking.ClaimedInstallations?.Count ?? 0;
-        var followThrough = supportSummaries
-            .Where(static item => item.ReporterActionNeeded || item.NeedsLinkedInstall || item.NeedsInstallUpdate || item.CanVerifyFix)
-            .OrderByDescending(static item => item.Case.UpdatedAtUtc)
-            .FirstOrDefault();
-        var rows = new List<SignedInTrustStatusRowViewModel>
-        {
-            new(
-                "Linked installs",
-                installCount > 0
-                    ? $"{installCount} linked"
-                    : installLinking.PendingClaimTickets.Count > 0
-                        ? $"{installLinking.PendingClaimTickets.Count} claim pending"
-                        : "No linked install yet"),
-            new(
-                "Current linked build",
-                latestInstallation is null
-                    ? "No linked build yet"
-                    : $"{ResolveInstallationDisplayLabel(latestInstallation)} · {latestInstallation.Version} on {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}"),
-            new(
-                "Recommended for this install",
-                BuildSignedInInstallRecommendationSummary(manifest, releaseExperience, latestInstallation, followThrough)),
-            new(
-                "Install posture",
-                BuildSignedInInstallPostureSummary(manifest, latestInstallation, followThrough)),
-            new(
-                "Fix availability",
-                BuildSignedInFixAvailabilitySummary(manifest, releaseExperience, latestInstallation, followThrough)),
-            new(
-                "Current caution",
-                BuildSignedInInstallCautionSummary(manifest, latestInstallation, followThrough)),
-            new(
-                "Adoption health",
-                pulse is null
-                    ? BuildReleaseProofSummary(manifest)
-                    : BuildTrustPulseAdoptionSummary(pulse)),
-            new("Release proof", BuildReleaseProofSummary(manifest)),
-            new(
-                "Support follow-through",
-                followThrough is null
-                    ? "No active fix, relink, or evidence follow-through is waiting on this account."
-                    : $"{followThrough.StageLabel} · {followThrough.NextSafeAction}")
-        };
-
-        if (followThrough?.NeedsLinkedInstall == true)
-        {
-            return new SignedInTrustStatusPanelViewModel(
-                Eyebrow: "Signed-in trust status",
-                Heading: "Relink the affected install",
-                Summary: followThrough.InstallReadinessSummary,
-                Rows: rows,
-                PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
-                SecondaryAction: new TrustPageActionViewModel("Open support timeline", "/account/support", "secondary"));
-        }
-
-        if (followThrough?.NeedsInstallUpdate == true)
-        {
-            return new SignedInTrustStatusPanelViewModel(
-                Eyebrow: "Signed-in trust status",
-                Heading: "Update your linked install",
-                Summary: followThrough.InstallReadinessSummary,
-                Rows: rows,
-                PrimaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "primary"),
-                SecondaryAction: new TrustPageActionViewModel("Open support timeline", "/account/support", "secondary"));
-        }
-
-        if (followThrough?.CanVerifyFix == true)
-        {
-            return new SignedInTrustStatusPanelViewModel(
-                Eyebrow: "Signed-in trust status",
-                Heading: "Your linked install can verify a fix now",
-                Summary: followThrough.VerificationSummary,
-                Rows: rows,
-                PrimaryAction: new TrustPageActionViewModel("Verify fix on this install", followThrough.DetailHref, "primary"),
-                SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"));
-        }
-
-        if (followThrough?.ReporterActionNeeded == true)
-        {
-            return new SignedInTrustStatusPanelViewModel(
-                Eyebrow: "Signed-in trust status",
-                Heading: "Support needs one more detail",
-                Summary: followThrough.NextSafeAction,
-                Rows: rows,
-                PrimaryAction: new TrustPageActionViewModel("Open support timeline", "/account/support", "primary"),
-                SecondaryAction: new TrustPageActionViewModel("Open help", "/help", "secondary"));
-        }
-
-        if (latestInstallation is null)
-        {
-            return new SignedInTrustStatusPanelViewModel(
-                Eyebrow: "Signed-in trust status",
-                Heading: "No linked install is attached yet",
-                Summary: "Claim the current preview first so downloads, support closure, and recovery stay attached to this account instead of turning into a fresh unknown device next time.",
-                Rows: rows,
-                PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
-                SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"));
-        }
-
-        string installationLabel = ResolveInstallationDisplayLabel(latestInstallation);
-        return new SignedInTrustStatusPanelViewModel(
-            Eyebrow: "Signed-in trust status",
-            Heading: $"{installationLabel} is attached",
-            Summary: $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery are all using the same claimed install context right now.",
-            Rows: rows,
-            PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"));
+        return _signedInTrustStatus.Build(user, manifest, releaseExperience);
     }
 
     private SupportIntakeOverrides ResolveSupportIntakeOverridesFromQuery()

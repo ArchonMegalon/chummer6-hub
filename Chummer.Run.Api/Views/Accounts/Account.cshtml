@@ -226,6 +226,11 @@
         </aside>
 
         <div class="account-pane">
+            @if (Model.SignedInTrustStatus is not null)
+            {
+                @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInTrustStatus)
+            }
+
             @if (showProfileSection)
             {
             <section id="profile" class="settings-section" data-account-panel>

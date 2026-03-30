@@ -24,7 +24,10 @@ public sealed class AccountsController : Controller
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
+    private readonly PublicReleaseManifestService _releases;
+    private readonly ReleaseSelectionService _releaseSelection;
     private readonly PublicPrivacyBoundaryService _privacyBoundaries;
+    private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly ILogger<AccountsController> _logger;
 
     public AccountsController(
@@ -39,7 +42,10 @@ public sealed class AccountsController : Controller
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
         HubPageChromeService chrome,
         HubGoogleAuthService google,
+        PublicReleaseManifestService releases,
+        ReleaseSelectionService releaseSelection,
         PublicPrivacyBoundaryService privacyBoundaries,
+        SignedInTrustStatusService signedInTrustStatus,
         ILogger<AccountsController> logger)
     {
         _accounts = accounts;
@@ -53,7 +59,10 @@ public sealed class AccountsController : Controller
         _workspaceServerPlane = workspaceServerPlane;
         _chrome = chrome;
         _google = google;
+        _releases = releases;
+        _releaseSelection = releaseSelection;
         _privacyBoundaries = privacyBoundaries;
+        _signedInTrustStatus = signedInTrustStatus;
         _logger = logger;
     }
 
@@ -97,6 +106,8 @@ public sealed class AccountsController : Controller
                 : _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
             var selectedSupportCaseSummary = selectedSupportCase is null ? null : _supportPresentation.Build(selectedSupportCase, installLinking);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
+            var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+            var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
             var selectedWorkspace = FindById(campaignSpine.Workspaces, workspaceId, static item => item.WorkspaceId);
             var selectedWorkspaceServerPlane = selectedWorkspace is null
                 ? null
@@ -135,6 +146,7 @@ public sealed class AccountsController : Controller
                 SelectedBuildLabHandoff: selectedBuildLabHandoff,
                 SelectedRulesNavigatorAnswer: selectedRulesNavigatorAnswer,
                 SelectedCreatorPublication: selectedCreatorPublication,
+                SignedInTrustStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience),
                 PrivacyBoundary: _privacyBoundaries.BuildPanel("account"));
             return View("~/Views/Accounts/Account.cshtml", model);
         }

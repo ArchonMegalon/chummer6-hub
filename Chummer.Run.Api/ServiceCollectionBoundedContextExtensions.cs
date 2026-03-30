@@ -23,6 +23,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<CampaignOsLocalProofService>();
         services.AddSingleton<PublicReleaseManifestService>();
         services.AddSingleton<ReleaseSelectionService>();
+        services.AddSingleton<SignedInTrustStatusService>();
         return services;
     }
 
