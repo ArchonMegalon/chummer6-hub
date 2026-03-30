@@ -511,7 +511,13 @@ public sealed record RecapShelfEntry(
     string Label,
     string Summary,
     string? ArtifactId,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string Audience = "campaign",
+    string? OwnershipSummary = null,
+    string? PublicationState = null,
+    string? PublicationSummary = null,
+    string? CreatorPublicationId = null,
+    string? NextSafeAction = null);
 
 public sealed record RestoreArtifactProjection(
     string ArtifactId,

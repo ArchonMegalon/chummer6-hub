@@ -1602,6 +1602,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@leadDowntimePackage.Title", StringComparison.Ordinal), "home work should surface the latest downtime brief title directly from the bounded server plane.");
     Assert(homeSource.Contains("@leadDowntimeEvidence", StringComparison.Ordinal), "home work should surface one bounded downtime evidence line on the signed-in home route.");
     Assert(homeSource.Contains("Open downtime brief", StringComparison.Ordinal), "home work should keep a direct route into the downtime brief detail.");
+    Assert(homeSource.Contains("PublicSurfaceStatus.AudienceLabel(leadAftermathShelfEntry.Audience)", StringComparison.Ordinal), "home work should humanize artifact shelf audience directly on the aftermath card.");
+    Assert(homeSource.Contains("@leadAftermathShelfEntry.PublicationSummary", StringComparison.Ordinal), "home work should surface artifact publication posture directly from the recap-shelf projection on the aftermath card.");
+    Assert(homeSource.Contains("@leadAftermathShelfEntry.NextSafeAction", StringComparison.Ordinal), "home work should surface the next artifact-shelf step directly from the recap-shelf projection on the aftermath card.");
     Assert(homeSource.Contains("Roster move", StringComparison.Ordinal), "home work should surface a dedicated roster-move card instead of collapsing operator actions into one-line campaign summaries.");
     Assert(homeSource.Contains("@leadRosterTransfer.RunnerHandle", StringComparison.Ordinal), "home work should surface the moved runner handle directly from the governed transfer receipt.");
     Assert(homeSource.Contains("Open governed roster moves", StringComparison.Ordinal), "home work should keep a direct route back to the governed roster-move operator rail.");
@@ -1693,6 +1696,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Roster transfer audit", StringComparison.Ordinal), "account work should expose explicit roster-transfer audit language on shared campaign views.");
     Assert(accountSource.Contains("Move governed roster state", StringComparison.Ordinal), "account work should expose a real roster-transfer action instead of only historical audit receipts.");
     Assert(accountSource.Contains("Recent governed roster moves", StringComparison.Ordinal), "account work should keep recent roster moves visible on the operator rail after ownership changes.");
+    Assert(accountSource.Contains("Artifact shelf posture", StringComparison.Ordinal), "account work should give the selected campaign card a first-class artifact shelf posture drawer.");
+    Assert(accountSource.Contains("PublicSurfaceStatus.AudienceLabel(item.Audience)", StringComparison.Ordinal), "account work should humanize artifact shelf audiences directly on the selected campaign card.");
+    Assert(accountSource.Contains("@item.OwnershipSummary", StringComparison.Ordinal), "account work should surface artifact ownership posture directly from the shared recap-shelf projection.");
+    Assert(accountSource.Contains("@HumanizeStatus(item.PublicationState, \"Ready\")", StringComparison.Ordinal), "account work should surface artifact publication state directly from the shared recap-shelf projection.");
+    Assert(accountSource.Contains("@item.PublicationSummary", StringComparison.Ordinal), "account work should surface artifact publication posture directly from the shared recap-shelf projection.");
+    Assert(accountSource.Contains("@item.NextSafeAction", StringComparison.Ordinal), "account work should surface the next artifact-shelf step directly from the shared recap-shelf projection.");
+    Assert(accountSource.Contains("item.CreatorPublicationId", StringComparison.Ordinal), "account work should deep-link artifact shelf entries back into creator publication status when the same truth is already published.");
     Assert(accountSource.Contains("Transfer governed roster state", StringComparison.Ordinal), "account work should give operators a direct governed roster-transfer action.");
     Assert(accountSource.Contains("Launch governed prep packet", StringComparison.Ordinal), "account work should expose a real governed prep-launch action on the selected campaign card.");
     Assert(accountSource.Contains("Recent governed prep launches", StringComparison.Ordinal), "account work should keep recent governed prep-launch receipts visible on the selected campaign card.");
@@ -2907,6 +2917,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.Consequences.Count >= 1, "home work route should keep governed consequence follow-through visible on the lead workspace spine.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.CampaignMemory is not null, "home work route should keep the bounded campaign-memory projection visible on the lead workspace spine.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the aftermath package attached to the bounded return shelf.");
+    var recapShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
+        .FirstOrDefault(item => string.Equals(item.EntryId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal));
+    Assert(recapShelfPayload is not null, "home work route should surface the generated aftermath package on the richer recap-shelf projection.");
+    Assert(recapShelfPayload?.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) == true, "home work route should mark the lead aftermath artifact as usable from the creator shelf as well as the campaign shelf.");
+    Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.OwnershipSummary), "home work route should keep explicit artifact ownership posture attached to the recap shelf.");
+    Assert(string.Equals(recapShelfPayload?.PublicationState, "preview_ready", StringComparison.Ordinal), "home work route should carry creator-publication state directly on the linked recap shelf entry.");
+    Assert(recapShelfPayload?.PublicationSummary?.Contains("creator shelf", StringComparison.OrdinalIgnoreCase) == true, "home work route should explain that the same artifact already feeds creator publication posture.");
+    Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.CreatorPublicationId), "home work route should keep the linked creator-publication id attached to the recap shelf entry.");
+    Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.NextSafeAction), "home work route should keep the next safe shelf action attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary), "home work route should keep publication trust visible on the shared home projection.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].NextSafeAction), "home work route should keep creator-publication next-step truth visible on the shared home projection.");

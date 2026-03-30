@@ -1462,6 +1462,41 @@
                                     </div>
                                 </div>
                                 <p><strong>Return lane:</strong> @selectedWorkspace.ReturnSummary</p>
+                                @if (selectedWorkspaceServerPlane.RecapShelf.Count > 0)
+                                {
+                                    <details class="details-drawer" id="selected-recap-shelf">
+                                        <summary>Artifact shelf posture</summary>
+                                        <ul class="muted-copy">
+                                            @foreach (var item in selectedWorkspaceServerPlane.RecapShelf)
+                                            {
+                                                <li>
+                                                    <strong>@item.Label</strong>: @item.Summary
+                                                    <span> Audience: @PublicSurfaceStatus.AudienceLabel(item.Audience).</span>
+                                                    @if (!string.IsNullOrWhiteSpace(item.OwnershipSummary))
+                                                    {
+                                                        <span> Ownership: @item.OwnershipSummary</span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(item.PublicationState))
+                                                    {
+                                                        <span> Publication: @HumanizeStatus(item.PublicationState, "Ready").</span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
+                                                    {
+                                                        <span> @item.PublicationSummary</span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
+                                                    {
+                                                        <span> Next: @item.NextSafeAction</span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
+                                                    {
+                                                        <a class="inline-link" href="@($"/account/work/publications/{Uri.EscapeDataString(item.CreatorPublicationId)}")">Open publication status</a>
+                                                    }
+                                                </li>
+                                            }
+                                        </ul>
+                                    </details>
+                                }
                                 @if (selectedWorkspace!.Runs.Count > 0)
                                 {
                                     <form id="aftermathPackageForm" class="settings-form">

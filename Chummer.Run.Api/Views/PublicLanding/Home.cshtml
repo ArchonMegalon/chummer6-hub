@@ -544,6 +544,15 @@
                                                                 @if (leadAftermathShelfEntry is not null)
                                                                 {
                                                                     <span> Return shelf: @leadAftermathShelfEntry.Label.</span>
+                                                                    <span> Audience: @PublicSurfaceStatus.AudienceLabel(leadAftermathShelfEntry.Audience).</span>
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationSummary))
+                                                                    {
+                                                                        <span> Publication: @leadAftermathShelfEntry.PublicationSummary</span>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.NextSafeAction))
+                                                                    {
+                                                                        <span> Next: @leadAftermathShelfEntry.NextSafeAction</span>
+                                                                    }
                                                                 }
                                                             </p>
                                                         </div>
