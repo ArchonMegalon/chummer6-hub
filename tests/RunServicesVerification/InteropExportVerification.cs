@@ -68,6 +68,14 @@ internal static class InteropExportVerification
         VerificationAssert.True(package.Manifest.SessionCount >= 1, "Interop export should include session assets.");
         VerificationAssert.True(package.Manifest.EncounterCount >= 1, "Interop export should include encounter assets.");
         VerificationAssert.True(package.Manifest.PrepCount >= 1, "Interop export should include prep assets.");
+        VerificationAssert.Equal("chummer.portable-campaign-session.v1", package.Compatibility.FormatId, "Interop export should publish a portable exchange format id.");
+        VerificationAssert.Equal(InteropCompatibilityStates.Compatible, package.Compatibility.CompatibilityState, "Session-scoped interop export should be fully compatible.");
+        VerificationAssert.True(
+            package.Compatibility.SupportedExchangeFormats.Contains("foundry-vtt.scene-ledger.v1"),
+            "Interop export should advertise ecosystem exchange formats instead of behaving like a backup-only payload.");
+        VerificationAssert.True(
+            package.Compatibility.Notes.Any(note => note.Summary.Contains("Session session_interop is pinned", StringComparison.Ordinal)),
+            "Interop export should explain pinned-session portability when session scope is supplied.");
         VerificationAssert.True(
             package.Assets.Any(item =>
                 item.AssetKind == InteropAssetKind.Prep
@@ -82,8 +90,25 @@ internal static class InteropExportVerification
 
         var import = interop.Import(new InteropImportRequest(package, ImportedBy: "gm.interop"));
         VerificationAssert.Equal(package.Manifest.TotalCount, import.ImportedCount, "Interop import should accept untampered payloads.");
+        VerificationAssert.Equal(package.Manifest.TotalCount, import.MutatedCount, "Merge import should mutate every accepted asset.");
         VerificationAssert.Equal(0, import.RejectedCount, "Interop import should not reject untampered payloads.");
         VerificationAssert.True(import.ProvenanceRoundTrip, "Interop import should preserve round-trip provenance.");
+        VerificationAssert.True(
+            import.Compatibility.ReceiptSummary.Contains("Merge import accepted", StringComparison.Ordinal),
+            "Interop import should return a user-facing merge receipt.");
+
+        var inspectOnly = interop.Import(new InteropImportRequest(
+            package,
+            ImportedBy: "gm.interop",
+            Mode: InteropImportMode.InspectOnly));
+        VerificationAssert.Equal(package.Manifest.TotalCount, inspectOnly.ImportedCount, "Inspect-only should validate every untampered asset.");
+        VerificationAssert.Equal(0, inspectOnly.MutatedCount, "Inspect-only should not mutate campaign truth.");
+        VerificationAssert.True(
+            inspectOnly.Assets.All(item => string.Equals(item.Outcome, "inspected", StringComparison.Ordinal)),
+            "Inspect-only should mark accepted assets as inspected instead of imported.");
+        VerificationAssert.True(
+            inspectOnly.Compatibility.ReceiptSummary.Contains("Inspect-only validated", StringComparison.Ordinal),
+            "Inspect-only should emit an explicit no-mutation receipt.");
 
         var tamperedFirst = package.Assets[0] with { PayloadJson = package.Assets[0].PayloadJson + " " };
         var tamperedAssets = package.Assets.ToArray();
@@ -93,6 +118,16 @@ internal static class InteropExportVerification
         var tamperedImport = interop.Import(new InteropImportRequest(tamperedPackage, ImportedBy: "gm.interop"));
         VerificationAssert.True(tamperedImport.RejectedCount >= 1, "Tampered interop payloads must be rejected.");
         VerificationAssert.True(!tamperedImport.ProvenanceRoundTrip, "Tampered interop payloads should fail round-trip provenance checks.");
+        VerificationAssert.Equal(InteropCompatibilityStates.Incompatible, tamperedImport.Compatibility.CompatibilityState, "Tampered imports must surface incompatible receipts.");
+
+        var tamperedReplace = interop.Import(new InteropImportRequest(
+            tamperedPackage,
+            ImportedBy: "gm.interop",
+            Mode: InteropImportMode.Replace));
+        VerificationAssert.Equal(0, tamperedReplace.MutatedCount, "Replace must not mutate campaign truth when any asset fails validation.");
+        VerificationAssert.True(
+            tamperedReplace.Assets.Any(item => string.Equals(item.Outcome, "blocked", StringComparison.Ordinal)),
+            "Replace should block otherwise accepted assets when the full cutover cannot be completed safely.");
 
         var roundTrip = interop.RoundTrip(new InteropRoundTripRequest(
             Export: new InteropExportRequest(

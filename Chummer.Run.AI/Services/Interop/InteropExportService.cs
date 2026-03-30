@@ -16,6 +16,20 @@ public interface IInteropExportService
 
 public sealed class InteropExportService : IInteropExportService
 {
+    private static readonly string[] CampaignSupportedExchangeFormats =
+    [
+        "chummer.portable-dossier.v1",
+        "chummer.portable-campaign.v1"
+    ];
+
+    private static readonly string[] SessionSupportedExchangeFormats =
+    [
+        "chummer.portable-dossier.v1",
+        "chummer.portable-campaign.v1",
+        "session-runtime-bundle.v1",
+        "foundry-vtt.scene-ledger.v1"
+    ];
+
     private sealed record StoredAsset(
         string CampaignId,
         string? SessionId,
@@ -56,6 +70,7 @@ public sealed class InteropExportService : IInteropExportService
             .ToArray();
 
         var manifest = BuildManifest(assets);
+        var compatibility = BuildExportCompatibilityReceipt(campaignId, sessionId, request, manifest);
         return new InteropContracts.InteropExportPackage(
             PackageId: packageId,
             CampaignId: campaignId,
@@ -65,6 +80,7 @@ public sealed class InteropExportService : IInteropExportService
             ExportedAtUtc: exportedAtUtc,
             ExportedBy: request.RequestedBy,
             Manifest: manifest,
+            Compatibility: compatibility,
             Assets: assets);
     }
 
@@ -76,12 +92,8 @@ public sealed class InteropExportService : IInteropExportService
         var campaignId = package.CampaignId.Trim();
         var sessionId = NormalizeOptional(package.SessionId);
 
-        if (request.Mode == InteropContracts.InteropImportMode.Replace)
-        {
-            RemoveCampaignAssets(campaignId);
-        }
-
         var results = new List<InteropContracts.InteropImportAssetResult>(package.Assets.Count);
+        var stagedAssets = new List<StoredAsset>(package.Assets.Count);
         foreach (var document in package.Assets)
         {
             var payloadSha = ComputeSha256Hex(document.PayloadJson);
@@ -100,7 +112,7 @@ public sealed class InteropExportService : IInteropExportService
                 continue;
             }
 
-            UpsertAsset(new StoredAsset(
+            stagedAssets.Add(new StoredAsset(
                 CampaignId: campaignId,
                 SessionId: sessionId,
                 AssetKind: document.AssetKind,
@@ -111,12 +123,57 @@ public sealed class InteropExportService : IInteropExportService
             results.Add(new InteropContracts.InteropImportAssetResult(
                 AssetKind: document.AssetKind,
                 AssetId: document.AssetId,
-                Outcome: "imported",
-                ProvenanceRoundTrip: true));
+                Outcome: request.Mode == InteropContracts.InteropImportMode.InspectOnly ? "inspected" : "imported",
+                ProvenanceRoundTrip: true,
+                Detail: request.Mode == InteropContracts.InteropImportMode.InspectOnly
+                    ? "validated without mutating campaign truth"
+                    : null));
         }
 
         var importedCount = results.Count(item => string.Equals(item.Outcome, "imported", StringComparison.Ordinal));
-        var rejectedCount = results.Count - importedCount;
+        if (request.Mode == InteropContracts.InteropImportMode.InspectOnly)
+        {
+            importedCount = results.Count(item => string.Equals(item.Outcome, "inspected", StringComparison.Ordinal));
+        }
+
+        var rejectedCount = results.Count(item => string.Equals(item.Outcome, "rejected", StringComparison.Ordinal));
+        if (request.Mode == InteropContracts.InteropImportMode.Replace && rejectedCount > 0)
+        {
+            for (int i = 0; i < results.Count; i++)
+            {
+                InteropContracts.InteropImportAssetResult result = results[i];
+                if (!string.Equals(result.Outcome, "imported", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                results[i] = result with
+                {
+                    Outcome = "blocked",
+                    Detail = "replace cutover was blocked because at least one asset failed provenance or compatibility validation"
+                };
+            }
+
+            importedCount = 0;
+        }
+
+        var canMutate = request.Mode != InteropContracts.InteropImportMode.InspectOnly
+            && (request.Mode != InteropContracts.InteropImportMode.Replace || rejectedCount == 0);
+        if (canMutate)
+        {
+            if (request.Mode == InteropContracts.InteropImportMode.Replace)
+            {
+                RemoveCampaignAssets(campaignId);
+            }
+
+            foreach (StoredAsset stagedAsset in stagedAssets)
+            {
+                UpsertAsset(stagedAsset);
+            }
+        }
+
+        var mutatedCount = canMutate ? importedCount : 0;
+        var compatibility = BuildImportCompatibilityReceipt(package, request.Mode, importedCount, mutatedCount, rejectedCount);
         return new InteropContracts.InteropImportResult(
             PackageId: package.PackageId,
             CampaignId: campaignId,
@@ -124,9 +181,11 @@ public sealed class InteropExportService : IInteropExportService
             ImportedBy: importedBy,
             Mode: request.Mode,
             ImportedCount: importedCount,
+            MutatedCount: mutatedCount,
             RejectedCount: rejectedCount,
             ProvenanceRoundTrip: results.All(static item => item.ProvenanceRoundTrip),
             ImportedAtUtc: importedAtUtc,
+            Compatibility: compatibility,
             Assets: results);
     }
 
@@ -235,6 +294,165 @@ public sealed class InteropExportService : IInteropExportService
             PackageSha256: packageSha);
     }
 
+    private static InteropContracts.InteropCompatibilityReceipt BuildExportCompatibilityReceipt(
+        string campaignId,
+        string? sessionId,
+        InteropContracts.InteropExportRequest request,
+        InteropContracts.InteropExportManifest manifest)
+    {
+        string formatId = sessionId is null
+            ? "chummer.portable-campaign.v1"
+            : "chummer.portable-campaign-session.v1";
+        string compatibilityState = sessionId is null
+            ? InteropContracts.InteropCompatibilityStates.CompatibleWithWarnings
+            : InteropContracts.InteropCompatibilityStates.Compatible;
+        string[] supportedExchangeFormats = sessionId is null
+            ? CampaignSupportedExchangeFormats
+            : SessionSupportedExchangeFormats;
+        string contextSummary = sessionId is null
+            ? $"Campaign {campaignId} is portable with governed dossier, prep, and aftermath truth, but the package does not yet pin a live session cutover."
+            : $"Campaign {campaignId} and session {sessionId} are pinned to the same portable exchange receipt.";
+        string receiptSummary = sessionId is null
+            ? "Portable dossier/campaign exchange is ready for inspect-only review or merge, while governed replace stays review-required until a live session export is pinned."
+            : "Portable dossier/campaign exchange is ready for inspect-only review, merge, or governed replace with a pinned session receipt.";
+        string nextSafeAction = sessionId is null
+            ? "Open inspect-only first or export again with a pinned session before you authorize governed replace on another surface."
+            : "Share the portable package or open inspect-only first if the receiving surface wants a no-mutation compatibility review.";
+
+        List<InteropContracts.InteropCompatibilityNote> notes =
+        [
+            new(
+                Code: "format-identity",
+                Severity: InteropContracts.InteropCompatibilityNoteSeverities.Info,
+                Summary: $"Package format {formatId} stays on {request.ContractFamily}/{request.SchemaVersion}."),
+            new(
+                Code: "asset-scope",
+                Severity: InteropContracts.InteropCompatibilityNoteSeverities.Info,
+                Summary: $"{manifest.TotalCount} portable asset(s) cover {DescribeManifest(manifest)}."),
+            new(
+                Code: "provenance-pointers",
+                Severity: InteropContracts.InteropCompatibilityNoteSeverities.Info,
+                Summary: "Every asset keeps payload-hash provenance, export identity, and campaign pointers on the same governed receipt.")
+        ];
+
+        if (sessionId is null)
+        {
+            notes.Add(new InteropContracts.InteropCompatibilityNote(
+                Code: "session-binding-required-for-replace",
+                Severity: InteropContracts.InteropCompatibilityNoteSeverities.Warning,
+                Summary: "No live session binding was requested, so replace should wait for a session-scoped export even though inspect-only and merge remain safe."));
+        }
+        else
+        {
+            notes.Add(new InteropContracts.InteropCompatibilityNote(
+                Code: "session-binding",
+                Severity: InteropContracts.InteropCompatibilityNoteSeverities.Info,
+                Summary: $"Session {sessionId} is pinned inside the portable package, so import and export can cite the same continuity-safe exchange receipt."));
+        }
+
+        return new InteropContracts.InteropCompatibilityReceipt(
+            FormatId: formatId,
+            CompatibilityState: compatibilityState,
+            ContextSummary: contextSummary,
+            ReceiptSummary: receiptSummary,
+            NextSafeAction: nextSafeAction,
+            SupportedExchangeFormats: supportedExchangeFormats,
+            Notes: notes);
+    }
+
+    private static InteropContracts.InteropCompatibilityReceipt BuildImportCompatibilityReceipt(
+        InteropContracts.InteropExportPackage package,
+        InteropContracts.InteropImportMode mode,
+        int importedCount,
+        int mutatedCount,
+        int rejectedCount)
+    {
+        List<InteropContracts.InteropCompatibilityNote> notes = package.Compatibility.Notes.ToList();
+        string compatibilityState = rejectedCount > 0
+            ? InteropContracts.InteropCompatibilityStates.Incompatible
+            : package.Compatibility.CompatibilityState;
+        string receiptSummary;
+        string nextSafeAction;
+
+        if (rejectedCount > 0)
+        {
+            notes.Add(new InteropContracts.InteropCompatibilityNote(
+                Code: "payload-integrity-mismatch",
+                Severity: InteropContracts.InteropCompatibilityNoteSeverities.Error,
+                Summary: $"{rejectedCount} portable asset(s) were rejected because the payload hash or provenance metadata no longer matched the export receipt."));
+            receiptSummary = $"{rejectedCount} portable asset(s) were rejected, so the package can no longer claim a clean ecosystem handoff.";
+            nextSafeAction = "Re-export the package from the source surface, then re-run inspect-only before you retry merge or replace.";
+        }
+        else if (mode == InteropContracts.InteropImportMode.InspectOnly)
+        {
+            notes.Add(new InteropContracts.InteropCompatibilityNote(
+                Code: "inspect-only",
+                Severity: InteropContracts.InteropCompatibilityNoteSeverities.Info,
+                Summary: $"Inspect-only validated {importedCount} portable asset(s) without mutating campaign truth."));
+            receiptSummary = $"Inspect-only validated {importedCount} portable asset(s) without mutating campaign truth.";
+            nextSafeAction = "Promote the inspected package to merge or keep the receipt attached as a governed compatibility note on the receiving surface.";
+        }
+        else if (mode == InteropContracts.InteropImportMode.Replace)
+        {
+            notes.Add(new InteropContracts.InteropCompatibilityNote(
+                Code: "governed-replace",
+                Severity: InteropContracts.InteropCompatibilityNoteSeverities.Warning,
+                Summary: $"Governed replace mutated {mutatedCount} portable asset(s) with an explicit cutover receipt instead of silent last-write-wins."));
+            receiptSummary = $"Governed replace cut over {mutatedCount} portable asset(s) with explicit provenance and compatibility receipts.";
+            nextSafeAction = "Record the cutover on the destination surface and keep the replace receipt attached to the same campaign lane.";
+        }
+        else
+        {
+            notes.Add(new InteropContracts.InteropCompatibilityNote(
+                Code: "merge-import",
+                Severity: InteropContracts.InteropCompatibilityNoteSeverities.Info,
+                Summary: $"Merge import accepted {importedCount} portable asset(s) while preserving governed identity and provenance history."));
+            receiptSummary = $"Merge import accepted {importedCount} portable asset(s) with provenance and compatibility intact.";
+            nextSafeAction = "Continue from the merged campaign lane or run inspect-only on a later package before the next governed replace.";
+        }
+
+        return new InteropContracts.InteropCompatibilityReceipt(
+            FormatId: package.Compatibility.FormatId,
+            CompatibilityState: compatibilityState,
+            ContextSummary: package.Compatibility.ContextSummary,
+            ReceiptSummary: receiptSummary,
+            NextSafeAction: nextSafeAction,
+            SupportedExchangeFormats: package.Compatibility.SupportedExchangeFormats,
+            Notes: notes);
+    }
+
+    private static string DescribeManifest(InteropContracts.InteropExportManifest manifest)
+    {
+        List<string> parts = [];
+
+        if (manifest.CharacterCount > 0)
+        {
+            parts.Add($"{manifest.CharacterCount} dossier(s)");
+        }
+
+        if (manifest.NpcCount > 0)
+        {
+            parts.Add($"{manifest.NpcCount} NPC(s)");
+        }
+
+        if (manifest.SessionCount > 0)
+        {
+            parts.Add($"{manifest.SessionCount} session bundle(s)");
+        }
+
+        if (manifest.EncounterCount > 0)
+        {
+            parts.Add($"{manifest.EncounterCount} encounter packet(s)");
+        }
+
+        if (manifest.PrepCount > 0)
+        {
+            parts.Add($"{manifest.PrepCount} governed prep packet(s)");
+        }
+
+        return parts.Count == 0 ? "no portable assets" : string.Join(", ", parts);
+    }
+
     private void EnsureSeedData(string campaignId, string? sessionId)
     {
         var resolvedSessionId = sessionId ?? "session_default";
@@ -280,7 +498,8 @@ public sealed class InteropExportService : IInteropExportService
                 SessionId = resolvedSessionId,
                 CampaignId = campaignId,
                 CollaborationMode = "local-first",
-                RuntimeBundleKind = "session-runtime-bundle"
+                RuntimeBundleKind = "session-runtime-bundle",
+                SupportedExchangeFormats = SessionSupportedExchangeFormats
             })));
 
         UpsertAsset(new StoredAsset(
