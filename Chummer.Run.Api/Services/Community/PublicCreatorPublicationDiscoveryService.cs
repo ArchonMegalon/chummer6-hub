@@ -44,6 +44,26 @@ public sealed class PublicCreatorPublicationDiscoveryService
             .ToArray();
     }
 
+    public CreatorPublicationProjection? GetDiscoverable(string publicationId)
+    {
+        if (string.IsNullOrWhiteSpace(publicationId))
+        {
+            return null;
+        }
+
+        HubPublishDraftReceipt? draft = _drafts.GetDraft(publicationId);
+        if (draft is null || !string.Equals(draft.State, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        CreatorPublicationProjection? publication = ResolvePublication(draft);
+        return publication is { Discoverable: true }
+            && string.Equals(publication.PublicationStatus, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase)
+            ? publication
+            : null;
+    }
+
     private CreatorPublicationProjection? ResolvePublication(HubPublishDraftReceipt draft)
     {
         HubUserDto? owner = _accounts.GetById(draft.OwnerId);

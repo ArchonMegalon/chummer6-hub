@@ -407,6 +407,13 @@ public sealed record FeatureDetailPageViewModel(
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
+public sealed record PublicCreatorPublicationPageViewModel(
+    SiteChromeViewModel Chrome,
+    CreatorPublicationProjection Publication,
+    string BackHref,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
 public sealed record LeaderboardsPageViewModel(
     SiteChromeViewModel Chrome,
     IReadOnlyList<LeaderboardRowDto> Individuals,
