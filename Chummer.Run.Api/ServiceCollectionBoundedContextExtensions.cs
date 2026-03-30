@@ -46,6 +46,7 @@ internal static class ServiceCollectionBoundedContextExtensions
     {
         services.AddSingleton<WorkspaceLifecyclePolicyService>();
         services.AddSingleton<CampaignArtifactRegistryBridge>();
+        services.AddSingleton<CreatorPublicationRegistryBridge>();
         services.AddSingleton<CampaignSpineService>();
         services.AddSingleton<CampaignWorkspaceServerPlaneService>();
         return services;

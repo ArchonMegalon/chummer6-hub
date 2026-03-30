@@ -3,6 +3,7 @@ using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
+using Chummer.Campaign.Contracts;
 using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,6 +23,7 @@ public sealed class AccountsController : Controller
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly CampaignSpineService _campaignSpine;
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
+    private readonly CreatorPublicationRegistryBridge _creatorPublicationRegistry;
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
     private readonly PublicReleaseManifestService _releases;
@@ -40,6 +42,7 @@ public sealed class AccountsController : Controller
         SupportCasePresentationService supportPresentation,
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
+        CreatorPublicationRegistryBridge creatorPublicationRegistry,
         HubPageChromeService chrome,
         HubGoogleAuthService google,
         PublicReleaseManifestService releases,
@@ -57,6 +60,7 @@ public sealed class AccountsController : Controller
         _supportPresentation = supportPresentation;
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
+        _creatorPublicationRegistry = creatorPublicationRegistry;
         _chrome = chrome;
         _google = google;
         _releases = releases;
@@ -122,6 +126,12 @@ public sealed class AccountsController : Controller
             var selectedBuildLabHandoff = FindById(campaignSpine.BuildLabHandoffs, handoffId, static item => item.HandoffId);
             var selectedRulesNavigatorAnswer = FindById(campaignSpine.RulesNavigator, entryId, static item => item.EntryId);
             var selectedCreatorPublication = FindById(campaignSpine.CreatorPublications, publicationId, static item => item.PublicationId);
+            var selectedCreatorPublicationWorkspace = selectedCreatorPublication is null
+                ? null
+                : campaignSpine.Workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, selectedCreatorPublication.CampaignId, StringComparison.OrdinalIgnoreCase));
+            var selectedCreatorPublicationRegistry = selectedCreatorPublication is null
+                ? null
+                : _creatorPublicationRegistry.GetOrCreatePublicationLane(user, selectedCreatorPublication, selectedCreatorPublicationWorkspace);
             var model = new AccountPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
                 CurrentSection: selectedSection,
@@ -146,6 +156,8 @@ public sealed class AccountsController : Controller
                 SelectedBuildLabHandoff: selectedBuildLabHandoff,
                 SelectedRulesNavigatorAnswer: selectedRulesNavigatorAnswer,
                 SelectedCreatorPublication: selectedCreatorPublication,
+                SelectedCreatorPublicationDraftDetail: selectedCreatorPublicationRegistry?.DraftDetail,
+                SelectedCreatorPublicationReceipt: selectedCreatorPublicationRegistry?.PublicationReceipt,
                 SignedInTrustStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience),
                 PrivacyBoundary: _privacyBoundaries.BuildPanel("account"));
             return View("~/Views/Accounts/Account.cshtml", model);
@@ -168,6 +180,45 @@ public sealed class AccountsController : Controller
                 SecondaryHref: "/home"));
         }
     }
+
+    [HttpPost("/account/work/publications/{publicationId}/submit")]
+    [ValidateAntiForgeryToken]
+    [Produces("text/html")]
+    public Task<IActionResult> SubmitCreatorPublication(
+        [FromRoute] string publicationId,
+        [FromForm] string? notes,
+        CancellationToken cancellationToken)
+        => MutateCreatorPublication(
+            publicationId,
+            notes,
+            cancellationToken,
+            static (bridge, user, publication, workspace, mutationNotes) => bridge.SubmitForReview(user, publication, workspace, mutationNotes));
+
+    [HttpPost("/account/work/publications/{publicationId}/approve")]
+    [ValidateAntiForgeryToken]
+    [Produces("text/html")]
+    public Task<IActionResult> ApproveCreatorPublication(
+        [FromRoute] string publicationId,
+        [FromForm] string? notes,
+        CancellationToken cancellationToken)
+        => MutateCreatorPublication(
+            publicationId,
+            notes,
+            cancellationToken,
+            static (bridge, user, publication, workspace, mutationNotes) => bridge.ApproveReview(user, publication, workspace, mutationNotes));
+
+    [HttpPost("/account/work/publications/{publicationId}/reject")]
+    [ValidateAntiForgeryToken]
+    [Produces("text/html")]
+    public Task<IActionResult> RejectCreatorPublication(
+        [FromRoute] string publicationId,
+        [FromForm] string? notes,
+        CancellationToken cancellationToken)
+        => MutateCreatorPublication(
+            publicationId,
+            notes,
+            cancellationToken,
+            static (bridge, user, publication, workspace, mutationNotes) => bridge.RejectReview(user, publication, workspace, mutationNotes));
 
     private static bool HasWorkSelection(
         string? workspaceId,
@@ -237,6 +288,45 @@ public sealed class AccountsController : Controller
         }
 
         return items.FirstOrDefault(item => string.Equals(keySelector(item), id, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task<IActionResult> MutateCreatorPublication(
+        string publicationId,
+        string? notes,
+        CancellationToken cancellationToken,
+        Func<CreatorPublicationRegistryBridge, HubUserDto, CreatorPublicationProjection, CampaignWorkspaceProjection?, string?, CreatorPublicationRegistryProjection> mutation)
+    {
+        string currentPath = $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
+            var publication = FindById(campaignSpine.CreatorPublications, publicationId, static item => item.PublicationId);
+            if (publication is null)
+            {
+                return NotFound();
+            }
+
+            var workspace = campaignSpine.Workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, publication.CampaignId, StringComparison.OrdinalIgnoreCase));
+            mutation(_creatorPublicationRegistry, user, publication, workspace, notes);
+            return Redirect(currentPath);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Creator publication account action could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        {
+            return Problem(statusCode: StatusCodes.Status409Conflict, detail: ex.Message);
+        }
     }
 
     private static string NormalizeAccountSection(string? section)

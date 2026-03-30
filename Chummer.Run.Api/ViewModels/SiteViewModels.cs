@@ -3,6 +3,7 @@ using Chummer.Run.Api.Contracts;
 using Chummer.Campaign.Contracts;
 using Chummer.Control.Contracts.Support;
 using Chummer.Run.Contracts.Community;
+using Chummer.Hub.Registry.Contracts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.Leaderboards;
 using Chummer.Run.Contracts.PublicSurface;
@@ -507,6 +508,8 @@ public sealed record AccountPageViewModel(
     BuildLabHandoffProjection? SelectedBuildLabHandoff = null,
     RulesNavigatorAnswerProjection? SelectedRulesNavigatorAnswer = null,
     CreatorPublicationProjection? SelectedCreatorPublication = null,
+    HubDraftDetailProjection? SelectedCreatorPublicationDraftDetail = null,
+    HubPublicationReceipt? SelectedCreatorPublicationReceipt = null,
     SignedInTrustStatusPanelViewModel? SignedInTrustStatus = null,
     PrivacyBoundaryPanelViewModel? PrivacyBoundary = null);
 
