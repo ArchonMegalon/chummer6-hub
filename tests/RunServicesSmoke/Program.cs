@@ -4432,13 +4432,30 @@ void VerifyInteropWorkflow()
     Assert(exported.Manifest.EncounterCount >= 1, "interop export should include encounter assets");
     Assert(exported.Manifest.PrepCount >= 1, "interop export should include prep assets");
     Assert(exported.Manifest.TotalCount == exported.Assets.Count, "interop export manifest total should match exported assets");
+    Assert(exported.Compatibility.FormatId == "chummer.portable-campaign-session.v1", "interop export should publish portable exchange format identity");
+    Assert(exported.Compatibility.CompatibilityState == InteropCompatibilityStates.Compatible, "session-scoped interop export should be fully compatible");
+    Assert(exported.Compatibility.SupportedExchangeFormats.Contains("foundry-vtt.scene-ledger.v1"), "interop export should advertise ecosystem exchange formats");
+    Assert(exported.Compatibility.Notes.Any(note => note.Summary.Contains("Session session_interop_smoke is pinned", StringComparison.Ordinal)), "interop export should explain pinned-session portability");
 
     var importResult = controller.Import(new InteropImportRequest(exported, ImportedBy: "gm.interop.smoke")).Result as OkObjectResult;
     var imported = importResult?.Value as InteropImportResult;
     Assert(imported is not null, "interop import endpoint should return an import payload");
     Assert(imported!.ImportedCount == exported.Manifest.TotalCount, "interop import should accept untampered exports");
+    Assert(imported.MutatedCount == exported.Manifest.TotalCount, "merge import should mutate every accepted asset");
     Assert(imported.RejectedCount == 0, "interop import should not reject untampered exports");
     Assert(imported.ProvenanceRoundTrip, "interop import should preserve provenance round-trip");
+    Assert(imported.Compatibility.ReceiptSummary.Contains("Merge import accepted", StringComparison.Ordinal), "interop import should emit a merge receipt");
+
+    var inspectOnlyResult = controller.Import(new InteropImportRequest(
+        exported,
+        ImportedBy: "gm.interop.smoke",
+        Mode: InteropImportMode.InspectOnly)).Result as OkObjectResult;
+    var inspectOnly = inspectOnlyResult?.Value as InteropImportResult;
+    Assert(inspectOnly is not null, "interop inspect-only should return an import payload");
+    Assert(inspectOnly!.ImportedCount == exported.Manifest.TotalCount, "inspect-only should validate every untampered asset");
+    Assert(inspectOnly.MutatedCount == 0, "inspect-only should not mutate campaign truth");
+    Assert(inspectOnly.Assets.All(item => item.Outcome == "inspected"), "inspect-only should label accepted assets as inspected");
+    Assert(inspectOnly.Compatibility.ReceiptSummary.Contains("Inspect-only validated", StringComparison.Ordinal), "inspect-only should emit a no-mutation receipt");
 
     var roundTripResult = controller.RoundTrip(new InteropRoundTripRequest(
         Export: new InteropExportRequest(
@@ -4459,6 +4476,16 @@ void VerifyInteropWorkflow()
     Assert(tamperedImport is not null, "interop import should still return a payload when detecting tampering");
     Assert(tamperedImport!.RejectedCount >= 1, "interop import should reject tampered assets");
     Assert(!tamperedImport.ProvenanceRoundTrip, "interop import should report failed provenance round-trip on tampering");
+    Assert(tamperedImport.Compatibility.CompatibilityState == InteropCompatibilityStates.Incompatible, "tampered import should surface incompatible receipts");
+
+    var tamperedReplaceResult = controller.Import(new InteropImportRequest(
+        tamperedPackage,
+        ImportedBy: "gm.interop.smoke",
+        Mode: InteropImportMode.Replace)).Result as OkObjectResult;
+    var tamperedReplace = tamperedReplaceResult?.Value as InteropImportResult;
+    Assert(tamperedReplace is not null, "interop replace should still return a payload when validation fails");
+    Assert(tamperedReplace!.MutatedCount == 0, "replace should not mutate campaign truth when any asset fails validation");
+    Assert(tamperedReplace.Assets.Any(item => item.Outcome == "blocked"), "replace should block partial cutover when validation fails");
 }
 
 async Task VerifyNewspaperGatewayRoutingAsync()

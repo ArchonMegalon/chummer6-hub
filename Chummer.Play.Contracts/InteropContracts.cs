@@ -9,6 +9,34 @@ public enum InteropAssetKind
     Prep
 }
 
+public static class InteropCompatibilityStates
+{
+    public const string Compatible = "compatible";
+    public const string CompatibleWithWarnings = "compatible-with-warnings";
+    public const string Incompatible = "incompatible";
+}
+
+public static class InteropCompatibilityNoteSeverities
+{
+    public const string Info = "info";
+    public const string Warning = "warning";
+    public const string Error = "error";
+}
+
+public sealed record InteropCompatibilityNote(
+    string Code,
+    string Severity,
+    string Summary);
+
+public sealed record InteropCompatibilityReceipt(
+    string FormatId,
+    string CompatibilityState,
+    string ContextSummary,
+    string ReceiptSummary,
+    string NextSafeAction,
+    IReadOnlyList<string> SupportedExchangeFormats,
+    IReadOnlyList<InteropCompatibilityNote> Notes);
+
 public sealed record InteropProvenancePointer(
     string Kind,
     string Reference,
@@ -59,10 +87,12 @@ public sealed record InteropExportPackage(
     DateTimeOffset ExportedAtUtc,
     string ExportedBy,
     InteropExportManifest Manifest,
+    InteropCompatibilityReceipt Compatibility,
     IReadOnlyList<InteropAssetDocument> Assets);
 
 public enum InteropImportMode
 {
+    InspectOnly,
     Merge,
     Replace
 }
@@ -86,9 +116,11 @@ public sealed record InteropImportResult(
     string ImportedBy,
     InteropImportMode Mode,
     int ImportedCount,
+    int MutatedCount,
     int RejectedCount,
     bool ProvenanceRoundTrip,
     DateTimeOffset ImportedAtUtc,
+    InteropCompatibilityReceipt Compatibility,
     IReadOnlyList<InteropImportAssetResult> Assets);
 
 public sealed record InteropRoundTripRequest(
