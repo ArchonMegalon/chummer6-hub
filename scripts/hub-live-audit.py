@@ -555,6 +555,34 @@ def verify_signed_in_work_audit(
     build_actions = [item for item in build_assistant.get("actions") or [] if isinstance(item, dict)]
     if not any(str(item.get("actionId") or "") == "open_work" for item in build_actions):
         raise AssertionError("support assistant did not route the signed-in build-handoff question back to /account/work")
+    assistant_rules_payload = json.dumps(
+        {
+            "query": "Why did the rule environment change for my campaign visibility posture?",
+            "installationId": claimed_installation_id,
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/support/cases/assistant",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=assistant_rules_payload,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/support/cases/assistant rules-truth check returned {status}: {body[:400]}")
+    rules_assistant = load_json_object(body, "/api/v1/support/cases/assistant")
+    rules_citations = [item for item in rules_assistant.get("citations") or [] if isinstance(item, dict)]
+    if not any(str(item.get("sourceKind") or "") == "rules_truth" for item in rules_citations):
+        raise AssertionError("support assistant did not surface rules-truth citations for the signed-in rule-environment question")
+    rules_actions = [item for item in rules_assistant.get("actions") or [] if isinstance(item, dict)]
+    if not any(str(item.get("actionId") or "") == "open_home" for item in rules_actions):
+        raise AssertionError("support assistant did not route the signed-in rule-environment question back to /home")
     support_case_payload = json.dumps(
         {
             "kind": "bug_report",
