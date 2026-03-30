@@ -91,6 +91,22 @@ public sealed class CreatorPublicationRegistryBridge
         return GetOrCreatePublicationLane(user, publication, workspace);
     }
 
+    public CreatorPublicationRegistryProjection Publish(
+        HubUserDto user,
+        CreatorPublicationProjection publication,
+        CampaignWorkspaceProjection? workspace,
+        string? notes = null)
+    {
+        GetOrCreatePublicationLane(user, publication, workspace);
+        _drafts.PublishProject(
+            publication.PublicationId,
+            user.UserId,
+            new HubPublishProjectRequest(
+                Notes: NormalizeOptional(notes),
+                PublisherId: user.UserId));
+        return GetOrCreatePublicationLane(user, publication, workspace);
+    }
+
     private static bool NeedsRefresh(HubDraftDetailProjection detail, HubPublishDraftRequest desired)
     {
         HubPublishDraftReceipt draft = detail.Draft;

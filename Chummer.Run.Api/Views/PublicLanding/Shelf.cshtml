@@ -12,6 +12,9 @@
     var signedInCreatorPublications = Model.SignedInCreatorPublications is { Count: > 0 }
         ? Model.SignedInCreatorPublications.Take(3).ToArray()
         : Array.Empty<CreatorPublicationProjection>();
+    var publicCreatorPublications = Model.PublicCreatorPublications is { Count: > 0 }
+        ? Model.PublicCreatorPublications.Take(3).ToArray()
+        : Array.Empty<CreatorPublicationProjection>();
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -239,6 +242,51 @@
         {
             <p class="muted-copy">No signed-in artifacts are mirrored into the @selectedArtifactViewTitle.ToLowerInvariant() yet.</p>
         }
+    }
+    @if (publicCreatorPublications.Length > 0)
+    {
+        <div class="editorial-block__lead" id="governed-creator-discovery">
+            <p class="eyebrow">Governed creator discovery</p>
+            <h2 class="editorial-title">Published creator packets</h2>
+            <p class="editorial-copy">These creator outputs are live because the same governed account rail carried them through review, publication, lineage, and trust posture instead of inventing a public shadow state.</p>
+        </div>
+        <div class="shelf-stack">
+            @foreach (var publication in publicCreatorPublications)
+            {
+                <article class="shelf-item">
+                    <span class="tag">Governed creator discovery</span>
+                    <h2>@publication.Title</h2>
+                    <p>@publication.Summary</p>
+                    <div class="trust-claim__microproof">
+                        <span>@HumanizeStatus(publication.PublicationStatus, "Published")</span>
+                        <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
+                        <span>@(publication.Discoverable ? "Eligible now" : "Still bounded")</span>
+                    </div>
+                    <p class="muted-copy"><strong>Provenance:</strong> @publication.ProvenanceSummary</p>
+                    <p class="muted-copy"><strong>Discovery:</strong> @publication.DiscoverySummary</p>
+                    @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
+                    {
+                        <p class="muted-copy"><strong>Trust:</strong> @publication.TrustSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
+                    {
+                        <p class="muted-copy"><strong>Compare by:</strong> @publication.ComparisonSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
+                    {
+                        <p class="muted-copy"><strong>Lineage:</strong> @publication.LineageSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
+                    {
+                        <p class="muted-copy"><strong>Moderation:</strong> @publication.ModerationSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
+                    {
+                        <p class="muted-copy"><strong>Next:</strong> @publication.NextSafeAction</p>
+                    }
+                </article>
+            }
+        </div>
     }
     @if (liveItems.Length > 0)
     {

@@ -49,6 +49,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<IHubPublicationDraftService, HubPublicationDraftService>();
         services.AddSingleton<CampaignArtifactRegistryBridge>();
         services.AddSingleton<CreatorPublicationRegistryBridge>();
+        services.AddSingleton<PublicCreatorPublicationDiscoveryService>();
         services.AddSingleton<CampaignSpineService>();
         services.AddSingleton<CampaignWorkspaceServerPlaneService>();
         return services;

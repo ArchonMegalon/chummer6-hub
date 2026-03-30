@@ -1598,6 +1598,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(shelfSource.Contains("@publication.TrustSummary", StringComparison.Ordinal), "artifact shelf should surface creator-publication trust reasoning directly on the signed-in creator cards.");
     Assert(shelfSource.Contains("@publication.ComparisonSummary", StringComparison.Ordinal), "artifact shelf should surface creator-publication comparison guidance directly on the signed-in creator cards.");
     Assert(shelfSource.Contains("@publication.ModerationSummary", StringComparison.Ordinal), "artifact shelf should surface creator-publication moderation posture directly on the signed-in creator cards.");
+    Assert(shelfSource.Contains("Governed creator discovery", StringComparison.Ordinal), "artifact shelf should expose a first-class public creator-discovery section once creator publication is live.");
+    Assert(shelfSource.Contains("Published creator packets", StringComparison.Ordinal), "artifact shelf should frame public creator discovery as a governed published shelf instead of teaser prose.");
+    Assert(shelfSource.Contains("HumanizeStatus(publication.PublicationStatus, \"Published\")", StringComparison.Ordinal), "artifact shelf should humanize publication state directly on the public creator-discovery cards.");
     Assert(shelfSource.Contains("HumanizeStatus(publication.Visibility, \"Shared\")", StringComparison.Ordinal), "artifact shelf should humanize creator-publication visibility directly on the signed-in shelf.");
     Assert(shelfSource.Contains("Open build path for @linkedPublication.Title", StringComparison.Ordinal), "artifact shelf should keep a direct route back to the linked creator-publication build path.");
     Assert(shelfSource.Contains("Open publication status", StringComparison.Ordinal), "artifact shelf should keep a direct publication-status route on the signed-in shelf.");
@@ -1868,6 +1871,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@selectedCreatorPublication.CampaignReturnSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication return truth directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.SupportClosureSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication support closure directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.ModerationSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication moderation posture directly from the shared projection.");
+    Assert(accountSource.Contains("/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/publish", StringComparison.Ordinal), "account publication detail should keep an explicit publish route on the same governed account rail.");
     Assert(accountSource.Contains("Open build path for @selectedCreatorPublication.Title", StringComparison.Ordinal), "account publication detail should give the customer a title-specific path back to the related build follow-through.");
     Assert(accountSource.Contains("@linkedPublication.DiscoverySummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication discovery posture instead of compressing it away.");
     Assert(accountSource.Contains("@linkedPublication.TrustSummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication trust reasoning instead of dropping it on the detail route.");
@@ -2082,14 +2086,15 @@ async Task VerifyPublicLandingProjectionAsync()
     var supportPresentation = new SupportCasePresentationService();
     var signedInTrustStatus = new SignedInTrustStatusService(installLinking, supportCases, supportPresentation, trustPulse);
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
-    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var publicCreatorDiscovery = new PublicCreatorPublicationDiscoveryService(accounts, campaignSpine, publicationDraftWorkflow);
+    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -3162,6 +3167,17 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(approvedPublicationDetailModel?.SelectedCreatorPublication?.PublicationStatus, "approved", StringComparison.Ordinal), "approved creator publications should replace synthetic preview status with the registry-backed approved posture on the shared projection.");
     Assert(approvedPublicationDetailModel?.SelectedCreatorPublication?.ModerationSummary?.Contains("Moderation cleared approval", StringComparison.OrdinalIgnoreCase) == true, "approved creator publications should carry approval-backed moderation summary on the shared projection.");
 
+    var publishPublicationResult = await accountController.PublishCreatorPublication(publicationId, "Publish the governed packet onto the creator shelf now that review cleared.", CancellationToken.None);
+    Assert(publishPublicationResult is RedirectResult { Url: not null }, "creator publication publish should redirect back to the publication detail route.");
+    var publishedPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: publicationId) as ViewResult;
+    var publishedPublicationDetailModel = publishedPublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(publishedPublicationDetailModel?.SelectedCreatorPublicationReceipt?.PublicationStatus, Chummer.Hub.Registry.Contracts.HubPublicationStates.Published, StringComparison.Ordinal), "published creator publications should surface the live published receipt posture on the account detail route.");
+    Assert(publishedPublicationDetailModel?.SelectedCreatorPublicationReceipt?.PublishedAtUtc is not null, "published creator publications should stamp the published timestamp on the account detail route.");
+    Assert(string.Equals(publishedPublicationDetailModel?.SelectedCreatorPublication?.PublicationStatus, "published", StringComparison.Ordinal), "published creator publications should project the live published posture on the shared creator-publication card.");
+    Assert(publishedPublicationDetailModel?.SelectedCreatorPublication?.Discoverable == true, "published creator publications should become discoverable once the creator shelf promotion lands.");
+    Assert(publishedPublicationDetailModel?.SelectedCreatorPublication?.TrustSummary?.Contains("live on governed discovery", StringComparison.OrdinalIgnoreCase) == true, "published creator publications should explain live governed discovery on the shared projection.");
+    Assert(publishedPublicationDetailModel?.SelectedCreatorPublication?.ModerationSummary?.Contains("active but clear", StringComparison.OrdinalIgnoreCase) == true, "published creator publications should carry moderation-watch posture once they are live.");
+
     var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
     Assert(authenticatedHomeModel is not null, "signed-in home page should render through the MVC view layer.");
@@ -3190,7 +3206,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "signed-in home should keep the active-scene summary attached to the shared campaign view.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].NextSafeAction), "signed-in home should keep the workspace next safe action attached to the shared campaign view.");
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Any(item => !string.IsNullOrWhiteSpace(item.FirstPlayableSession?.RuleReadySummary)), "signed-in home should keep legal-runner proof attached to at least one shared first-session projection.");
-    Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Any(item => string.Equals(item.PublicationStatus, "approved", StringComparison.Ordinal)), "signed-in home should carry registry-backed creator-publication approval posture once the governed review clears.");
+    Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Any(item => string.Equals(item.PublicationStatus, "published", StringComparison.Ordinal)), "signed-in home should carry registry-backed live creator-publication posture once the creator shelf promotion lands.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane is not null, "signed-in home should receive the bounded lead workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.LeadWorkspaceServerPlane!.WorkspaceState.Status), "signed-in home should surface one bounded workspace state on the what-changed card.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.WorkspaceState.EvidenceLines.Count >= 1, "signed-in home should surface workspace-state evidence on the what-changed card.");
@@ -3293,9 +3309,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(recapShelfPayload is not null, "home work route should surface the generated aftermath package on the richer recap-shelf projection.");
     Assert(recapShelfPayload?.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) == true, "home work route should mark the lead aftermath artifact as usable from the creator shelf as well as the campaign shelf.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.OwnershipSummary), "home work route should keep explicit artifact ownership posture attached to the recap shelf.");
-    Assert(string.Equals(recapShelfPayload?.PublicationState, "approved", StringComparison.Ordinal), "home work route should carry creator-publication state directly on the linked recap shelf entry.");
-    Assert(string.Equals(recapShelfPayload?.TrustBand, "approval-backed", StringComparison.Ordinal), "home work route should carry creator-publication trust ranking directly on the linked recap shelf entry.");
-    Assert(recapShelfPayload?.Discoverable == false, "home work route should keep preview-ready recap entries off discoverable surfaces until publication is live.");
+    Assert(string.Equals(recapShelfPayload?.PublicationState, "published", StringComparison.Ordinal), "home work route should carry creator-publication state directly on the linked recap shelf entry.");
+    Assert(string.Equals(recapShelfPayload?.TrustBand, "curated-live", StringComparison.Ordinal), "home work route should carry creator-publication trust ranking directly on the linked recap shelf entry.");
+    Assert(recapShelfPayload?.Discoverable == true, "home work route should keep recap entries discoverable once creator publication is live.");
     Assert(recapShelfPayload?.PublicationSummary?.Contains("creator shelf", StringComparison.OrdinalIgnoreCase) == true, "home work route should explain that the same artifact already feeds creator publication posture.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.CreatorPublicationId), "home work route should keep the linked creator-publication id attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.NextSafeAction), "home work route should keep the next safe shelf action attached to the recap shelf entry.");
@@ -3312,7 +3328,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].TrustBand), "home work route should keep publication trust ranking visible on the shared home projection.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].TrustSummary), "home work route should keep creator-publication trust reasoning visible on the shared home projection.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ComparisonSummary), "home work route should keep creator-publication comparison guidance visible on the shared home projection.");
-    Assert(workHomeModel.CampaignSpine.CreatorPublications[0].Discoverable == false, "home work route should keep preview-ready creator publications off discoverable surfaces until publication is live.");
+    Assert(workHomeModel.CampaignSpine.CreatorPublications[0].Discoverable == true, "home work route should carry discoverable creator-publication posture once publication is live.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].NextSafeAction), "home work route should keep creator-publication next-step truth visible on the shared home projection.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].CampaignReturnSummary), "home work route should keep creator-publication return truth visible on the shared home projection.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].SupportClosureSummary), "home work route should keep creator-publication support closure visible on the shared home projection.");
@@ -3479,11 +3495,19 @@ async Task VerifyPublicLandingProjectionAsync()
             && !string.Equals(card.Action.Href, "/artifacts", StringComparison.Ordinal)),
         "artifacts shelf should point teaser cards at deliberate related detail pages");
     Assert(artifactsModel!.TrustPulse is not null, "guest artifacts shelf should surface the weekly public trust pulse.");
+    Assert(artifactsModel.PublicCreatorPublications?.Count > 0, "guest artifacts shelf should surface governed public creator discovery once a creator packet is actually published.");
+    Assert(string.Equals(artifactsModel.PublicCreatorPublications?[0].PublicationStatus, "published", StringComparison.Ordinal), "guest artifacts shelf should carry live published creator-publication posture on the public discovery cards.");
+    Assert(artifactsModel.PublicCreatorPublications?[0].Discoverable == true, "guest artifacts shelf should keep public creator discovery limited to discoverable live packets.");
+    Assert(!string.IsNullOrWhiteSpace(artifactsModel.PublicCreatorPublications?[0].TrustSummary), "guest artifacts shelf should keep trust reasoning attached to public creator discovery.");
+    Assert(!string.IsNullOrWhiteSpace(artifactsModel.PublicCreatorPublications?[0].ComparisonSummary), "guest artifacts shelf should keep creator-comparison guidance attached to public creator discovery.");
+    Assert(!string.IsNullOrWhiteSpace(artifactsModel.PublicCreatorPublications?[0].LineageSummary), "guest artifacts shelf should keep lineage posture attached to public creator discovery.");
+    Assert(!string.IsNullOrWhiteSpace(artifactsModel.PublicCreatorPublications?[0].ModerationSummary), "guest artifacts shelf should keep moderation-watch posture attached to public creator discovery.");
     Assert(artifactsModel.SignedInStatus is null, "guest artifacts shelf should not project install-specific signed-in trust posture.");
     var authenticatedArtifactsView = await authenticatedLandingController.ArtifactsPage(CancellationToken.None) as ViewResult;
     var authenticatedArtifactsModel = authenticatedArtifactsView?.Model as ShelfPageViewModel;
     Assert(authenticatedArtifactsModel?.TrustPulse is not null, "authenticated artifacts shelf should keep the weekly public trust pulse visible.");
     Assert(authenticatedArtifactsModel?.SignedInStatus is not null, "authenticated artifacts shelf should project the shared signed-in trust status.");
+    Assert(authenticatedArtifactsModel?.PublicCreatorPublications?.Count > 0, "authenticated artifacts shelf should keep the same public creator-discovery rail visible above the signed-in overlays.");
     Assert(authenticatedArtifactsModel?.SignedInRecapShelf?.Count > 0, "authenticated artifacts shelf should expose a signed-in recap shelf overlay instead of staying public-only.");
     Assert(authenticatedArtifactsModel?.SignedInCreatorPublications?.Count > 0, "authenticated artifacts shelf should expose linked creator-publication posture instead of forcing a separate account detour.");
     var authenticatedRecapShelf = NotNull(authenticatedArtifactsModel!.SignedInRecapShelf, "authenticated artifacts shelf should expose a non-null recap shelf collection.");
@@ -3511,6 +3535,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var creatorArtifactsView = await authenticatedLandingController.ArtifactsPage(CancellationToken.None) as ViewResult;
     var creatorArtifactsModel = creatorArtifactsView?.Model as ShelfPageViewModel;
     Assert(string.Equals(creatorArtifactsModel?.SignedInArtifactView, "creator", StringComparison.Ordinal), "authenticated artifacts shelf should honor the explicit creator view filter.");
+    Assert(creatorArtifactsModel?.PublicCreatorPublications?.Count > 0, "creator artifact view should keep the public governed creator-discovery rail visible alongside the signed-in overlay.");
     Assert(creatorArtifactsModel?.SignedInCreatorPublications?.Count > 0, "creator artifact view should surface linked creator publications instead of staying empty.");
     Assert(!string.IsNullOrWhiteSpace(creatorArtifactsModel?.SignedInCreatorPublications?[0].TrustSummary), "creator artifact view should keep creator-publication trust reasoning visible.");
     Assert(!string.IsNullOrWhiteSpace(creatorArtifactsModel?.SignedInCreatorPublications?[0].ComparisonSummary), "creator artifact view should keep creator-publication comparison guidance visible.");
@@ -3577,7 +3602,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

@@ -207,6 +207,19 @@ public sealed class AccountsController : Controller
             cancellationToken,
             static (bridge, user, publication, workspace, mutationNotes) => bridge.ApproveReview(user, publication, workspace, mutationNotes));
 
+    [HttpPost("/account/work/publications/{publicationId}/publish")]
+    [ValidateAntiForgeryToken]
+    [Produces("text/html")]
+    public Task<IActionResult> PublishCreatorPublication(
+        [FromRoute] string publicationId,
+        [FromForm] string? notes,
+        CancellationToken cancellationToken)
+        => MutateCreatorPublication(
+            publicationId,
+            notes,
+            cancellationToken,
+            static (bridge, user, publication, workspace, mutationNotes) => bridge.Publish(user, publication, workspace, mutationNotes));
+
     [HttpPost("/account/work/publications/{publicationId}/reject")]
     [ValidateAntiForgeryToken]
     [Produces("text/html")]
