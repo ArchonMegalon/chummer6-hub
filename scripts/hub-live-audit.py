@@ -1867,10 +1867,36 @@ def main() -> int:
                 "Join beta waitlist"),
             expects_header_count=1),
         AuditRoute("/help", "Get help without guessing", required_texts=("Fallback:", "Support, survey, and assistant data stay on a bounded clock", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point"), expects_header_count=1),
-        AuditRoute("/faq", "Plain answers before you spend more time", expects_header_count=1),
+        AuditRoute(
+            "/faq",
+            "Plain answers before you spend more time",
+            required_texts=(
+                "Search the FAQ",
+                "Open downloads",
+                "Open support intake",
+                "See what works today",
+                "Still stuck? Open support"),
+            expects_header_count=1),
         AuditRoute("/contact", "Open the right support case", expects_header_count=1),
-        AuditRoute("/privacy", "What Chummer stores, and what it does not", required_texts=("Support, survey, and assistant data stay on a bounded clock",), expects_header_count=1),
-        AuditRoute("/terms", "Preview terms in plain language", expects_header_count=1),
+        AuditRoute(
+            "/privacy",
+            "What Chummer stores, and what it does not",
+            required_texts=(
+                "Support, survey, and assistant data stay on a bounded clock",
+                "What changed in this version",
+                "Weekly trust pulse",
+                "Open downloads",
+                "Open help"),
+            expects_header_count=1),
+        AuditRoute(
+            "/terms",
+            "Preview terms in plain language",
+            required_texts=(
+                "What changed in this version",
+                "Open downloads",
+                "Open help",
+                "Create account to get preview"),
+            expects_header_count=1),
         AuditRoute("/robots.txt", "Disallow: /"),
     ]
 

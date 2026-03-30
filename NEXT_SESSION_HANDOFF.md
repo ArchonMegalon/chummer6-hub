@@ -1,6 +1,18 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T10:50:58+02:00
+Updated: 2026-03-30T10:53:25+02:00
+
+## Handoff refresh (2026-03-30T10:53:25+02:00)
+
+- Public trust/legal surfaces now have browser-proof coverage instead of only raw-route checks:
+  - `scripts/hub-live-audit.py` now treats `/faq`, `/privacy`, and `/terms` as richer release surfaces. The public audit now requires the FAQ search/next-step rails plus the privacy/terms policy-delta and action-link rails instead of stopping at route headings.
+  - `scripts/e2e-hub-playwright.cjs` now visits `/faq`, `/privacy`, and `/terms` in the guest browser lane, verifies their customer-facing copy, and locks the critical action links (`/downloads`, `/help`, `/contact#support-intake`, `/now`) so those trust/legal surfaces can’t drift back to shallow or broken navigation.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T10:50:58+02:00)
 
