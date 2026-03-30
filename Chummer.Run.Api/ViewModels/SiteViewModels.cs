@@ -387,7 +387,9 @@ public sealed record FeatureDetailPageViewModel(
     string? Pain,
     string? Payoff,
     string? ProofNote,
-    IReadOnlyList<string> MicroProof);
+    IReadOnlyList<string> MicroProof,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record LeaderboardsPageViewModel(
     SiteChromeViewModel Chrome,

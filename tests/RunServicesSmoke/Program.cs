@@ -1964,6 +1964,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!publicLandingControllerSource.Contains("signed-in shell", StringComparison.Ordinal), "controller-built landing and support copy should avoid signed-in shell wording on customer-facing routes.");
     Assert(!featureDetailSource.Contains("story-guide-tail", StringComparison.Ordinal), "detail-family pages should not end with one generic shared tail after the family-specific sections.");
     Assert(!featureDetailSource.Contains("Get help with this surface", StringComparison.Ordinal), "detail-family pages should keep next-step help inside the family-specific route blocks.");
+    Assert(featureDetailSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "feature detail should reuse the shared signed-in trust panel instead of inventing a detail-only trust surface.");
+    Assert(featureDetailSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "feature detail should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
     Assert(!roadmapDetailSource.Contains("Audience impact", StringComparison.Ordinal), "roadmap detail should not repeat audience copy once the fact rail already states who should follow it.");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
@@ -2137,6 +2139,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(roadmapDetailModel is not null && !string.IsNullOrWhiteSpace(roadmapDetailModel.ProofNote), "roadmap detail pages should expose a verification note instead of a bare placeholder shell.");
     Assert(!string.Equals(roadmapDetailModel?.StatusEyebrow, "Current status", StringComparison.OrdinalIgnoreCase), "roadmap detail pages should project a roadmap-specific status frame.");
     Assert(roadmapDetailModel!.MicroProof.Count > 0, "roadmap detail pages should surface micro-proof markers.");
+    Assert(roadmapDetailModel.TrustPulse is not null, "guest roadmap detail should surface the weekly public trust pulse.");
+    Assert(roadmapDetailModel.SignedInStatus is null, "guest roadmap detail should not project install-specific signed-in trust posture.");
     Assert(roadmapDetailModel.SecondaryAction is not null, "roadmap detail pages should keep a single deeper brief action.");
     var roadmapSecondaryAction = roadmapDetailModel.SecondaryAction!;
     Assert(!string.Equals(
@@ -2148,6 +2152,16 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(artifactDetailModel is not null && !string.IsNullOrWhiteSpace(artifactDetailModel.Payoff), "artifact detail pages should carry explicit product payoff.");
     Assert(!string.Equals(artifactDetailModel?.StatusEyebrow, "Current status", StringComparison.OrdinalIgnoreCase), "artifact detail pages should project an availability-specific status frame.");
     Assert(!string.Equals(artifactDetailModel?.PrimaryAction.Label, "Read the linked detail", StringComparison.OrdinalIgnoreCase), "artifact detail pages should not fall back to a generic linked-detail label.");
+    Assert(artifactDetailModel!.TrustPulse is not null, "guest artifact detail should surface the weekly public trust pulse.");
+    Assert(artifactDetailModel.SignedInStatus is null, "guest artifact detail should not project install-specific signed-in trust posture.");
+    var authenticatedRoadmapDetailView = await authenticatedLandingController.RoadmapDetailPage("runsite", CancellationToken.None) as ViewResult;
+    var authenticatedRoadmapDetailModel = authenticatedRoadmapDetailView?.Model as FeatureDetailPageViewModel;
+    Assert(authenticatedRoadmapDetailModel?.TrustPulse is not null, "authenticated roadmap detail should keep the weekly public trust pulse visible.");
+    Assert(authenticatedRoadmapDetailModel?.SignedInStatus is not null, "authenticated roadmap detail should project the shared signed-in trust status.");
+    var authenticatedArtifactDetailView = await authenticatedLandingController.ArtifactDetailPage("current-preview-build", CancellationToken.None) as ViewResult;
+    var authenticatedArtifactDetailModel = authenticatedArtifactDetailView?.Model as FeatureDetailPageViewModel;
+    Assert(authenticatedArtifactDetailModel?.TrustPulse is not null, "authenticated artifact detail should keep the weekly public trust pulse visible.");
+    Assert(authenticatedArtifactDetailModel?.SignedInStatus is not null, "authenticated artifact detail should project the shared signed-in trust status.");
     var participateView = await controller.ParticipatePage(CancellationToken.None) as ViewResult;
     var participateModel = participateView?.Model as ParticipatePageViewModel;
     Assert(participateModel is not null, "participate page should render through the MVC view layer.");

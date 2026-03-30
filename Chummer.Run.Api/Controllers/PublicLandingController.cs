@@ -1741,6 +1741,8 @@ public sealed class PublicLandingController : Controller
 
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(chromeTitle, chromeDescription, currentPath, cancellationToken);
         var assets = new AssetCatalogViewModel(surface.Assets);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var primaryAction = _actions.ResolveDetailPrimaryAction(card, authenticated, currentPath);
         TrustPageActionViewModel? secondaryAction = null;
         if (!string.IsNullOrWhiteSpace(card.FallbackRoute)
@@ -1793,7 +1795,9 @@ public sealed class PublicLandingController : Controller
             Pain: card.Pain,
             Payoff: payoff,
             ProofNote: proofNote,
-            MicroProof: BuildFeatureDetailMicroProof(card));
+            MicroProof: BuildFeatureDetailMicroProof(card),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/FeatureDetail.cshtml", model);
     }
 
