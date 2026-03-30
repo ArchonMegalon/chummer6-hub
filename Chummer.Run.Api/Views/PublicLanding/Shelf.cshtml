@@ -6,6 +6,16 @@
     var previewItems = Model.Items.Except(liveItems).ToArray();
 }
 
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
 <section class="section-band">
     <div class="page-lead">
         <p class="eyebrow">@Model.Eyebrow</p>

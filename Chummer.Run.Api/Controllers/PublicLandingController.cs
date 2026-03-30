@@ -125,13 +125,18 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var model = new StoryPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("What Is Chummer?", surface.ProofLine, "/what-is-chummer", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
             Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/what-is-chummer"),
             TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),
-            Lanes: ResolveCards(_landing.CardsForBucket(surface, "choose_your_lane"), assetCatalog, authenticated: false, "/what-is-chummer"));
+            Lanes: ResolveCards(_landing.CardsForBucket(surface, "choose_your_lane"), assetCatalog, authenticated: false, "/what-is-chummer"),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/ProductStory.cshtml", model);
     }
 
@@ -167,11 +172,16 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var model = new HorizonsPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Coming Next", "The named horizons, their pain, and the payoff they are aiming for.", "/horizons", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
-            Horizons: ResolveCards(_landing.CardsForBucket(surface, "coming_next"), assetCatalog, authenticated: false, "/horizons"));
+            Horizons: ResolveCards(_landing.CardsForBucket(surface, "coming_next"), assetCatalog, authenticated: false, "/horizons"),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Horizons.cshtml", model);
     }
 
@@ -252,12 +262,16 @@ public sealed class PublicLandingController : Controller
         var surface = _landing.LoadSurface();
         var cards = _landing.CardsForBucket(surface, "participate");
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Participate", "Two clean lanes: public feedback and an optional signed-in guided contribution path.", "/participate", cancellationToken);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
         var model = new ParticipatePageViewModel(
             Chrome: chrome,
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             PublicLane: ResolveCards(cards.Where(card => !string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && !string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(), new AssetCatalogViewModel(surface.Assets), authenticated: false, "/participate"),
-            SignedInLane: ResolveCards(cards.Where(card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) || string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(), new AssetCatalogViewModel(surface.Assets), authenticated: chrome.Authenticated, "/participate"));
+            SignedInLane: ResolveCards(cards.Where(card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) || string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(), new AssetCatalogViewModel(surface.Assets), authenticated: chrome.Authenticated, "/participate"),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Participate.cshtml", model);
     }
 
@@ -271,6 +285,9 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var model = new ShelfPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Artifacts", "Proof surfaces, briefs, and grounded outputs connected to the current preview.", "/artifacts", cancellationToken),
             Surface: surface,
@@ -278,7 +295,9 @@ public sealed class PublicLandingController : Controller
             Eyebrow: "Artifacts",
             Heading: "Proof gallery",
             Intro: "Browse the packs, briefs, and proof surfaces that make the preview feel tangible.",
-            Items: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/artifacts"));
+            Items: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/artifacts"),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Shelf.cshtml", model);
     }
 
