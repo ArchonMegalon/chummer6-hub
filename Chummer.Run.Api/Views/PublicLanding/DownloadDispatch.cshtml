@@ -19,6 +19,16 @@
     </div>
 </section>
 
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
 <section class="recommended-download" id="signed-in-download">
     <article class="recommended-download__card">
         <div class="recommended-download__copy">

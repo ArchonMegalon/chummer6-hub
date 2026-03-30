@@ -200,6 +200,7 @@ public sealed class VerificationEntryPointTests
         string horizonsView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml"));
         string shelfView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml"));
         string featureDetailView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml"));
+        string downloadDispatchView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
         string homeView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"));
         string supportSubmittedView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
 
@@ -217,6 +218,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", horizonsView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", shelfView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", featureDetailView, StringComparison.Ordinal);
+        Assert.Contains("_SignedInTrustStatusPanel.cshtml", downloadDispatchView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", homeView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", supportSubmittedView, StringComparison.Ordinal);
     }

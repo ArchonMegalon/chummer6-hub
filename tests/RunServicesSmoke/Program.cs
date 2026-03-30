@@ -1792,6 +1792,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var downloadDispatchSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
     var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
+    Assert(downloadDispatchSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "download handoff should reuse the shared signed-in trust panel instead of inventing a handoff-only trust surface.");
+    Assert(downloadDispatchSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "download handoff should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
     Assert(!supportSubmittedSource.Contains("signed-in shell", StringComparison.Ordinal), "support confirmation should avoid signed-in shell wording.");
     Assert(supportSubmittedSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared signed-in trust panel instead of inventing a confirmation-only trust surface.");
     Assert(supportSubmittedSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
@@ -2256,6 +2258,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(dispatchModel?.Heading), "signed-in download handoff should expose a non-empty heading.");
     Assert(!string.IsNullOrWhiteSpace(dispatchModel?.Summary), "signed-in download handoff should expose a non-empty summary.");
     Assert(dispatchModel?.Steps.Count > 0, "signed-in download handoff should expose the signed-in install steps.");
+    Assert(dispatchModel?.TrustPulse is not null, "signed-in download handoff should keep the weekly public trust pulse visible.");
+    Assert(dispatchModel?.SignedInStatus is not null, "signed-in download handoff should project the shared signed-in trust status.");
     var publicContactPageMethod = typeof(PublicLandingController).GetMethods()
         .Single(static method =>
             string.Equals(method.Name, nameof(PublicLandingController.ContactPage), StringComparison.Ordinal)
