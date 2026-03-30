@@ -1,9 +1,44 @@
+@using Chummer.Campaign.Contracts
 @model ShelfPageViewModel
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     var liveItems = Model.Items.Where(card => PublicSurfaceStatus.IsAvailableToday(card.Card.Badge)).ToArray();
     var previewItems = Model.Items.Except(liveItems).ToArray();
+    var signedInRecapShelf = Model.SignedInRecapShelf is { Count: > 0 }
+        ? Model.SignedInRecapShelf.Take(4).ToArray()
+        : Array.Empty<RecapShelfEntry>();
+    var signedInCreatorPublications = Model.SignedInCreatorPublications is { Count: > 0 }
+        ? Model.SignedInCreatorPublications.Take(3).ToArray()
+        : Array.Empty<CreatorPublicationProjection>();
+
+    static string HumanizeStatus(string? value, string fallback = "Not connected")
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "active" => "Ready",
+            "linked" => "Ready",
+            "pending" => "Pending",
+            "pending_verification" => "Verification sent",
+            "verified" => "Verified",
+            "approved" => "Approved",
+            "self_service" => "Self-service",
+            "review" => "Needs review",
+            "warning" => "Needs attention",
+            "attention" => "Needs attention",
+            "ready" => "Ready",
+            "revoked" => "Revoked",
+            _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '))
+        };
+    }
+
+    static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
+    static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
 }
 
 @if (Model.SignedInStatus is not null)
@@ -33,6 +68,115 @@
         }
     </div>
     @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
+    @if (Model.Chrome.Authenticated && (signedInRecapShelf.Length > 0 || signedInCreatorPublications.Length > 0))
+    {
+        <div class="editorial-block__lead" id="linked-artifacts">
+            <p class="eyebrow">Signed-in artifact views</p>
+            <h2 class="editorial-title">The same artifact truth across personal, campaign, and creator rails</h2>
+            <p class="editorial-copy">When you are signed in, the artifact shelf keeps your live recap outputs and any linked creator publication on the same governed record instead of splitting them into separate artifact stories.</p>
+        </div>
+        <div class="shelf-stack">
+            @foreach (var item in signedInRecapShelf)
+            {
+                var linkedPublication = !string.IsNullOrWhiteSpace(item.CreatorPublicationId)
+                    ? signedInCreatorPublications.FirstOrDefault(publication => string.Equals(publication.PublicationId, item.CreatorPublicationId, StringComparison.OrdinalIgnoreCase))
+                    : null;
+                <article class="shelf-item">
+                    <span class="tag">Signed-in return shelf</span>
+                    <h2>@item.Label</h2>
+                    <p>@item.Summary</p>
+                    <div class="trust-claim__microproof">
+                        <span>@PublicSurfaceStatus.AudienceLabel(item.Audience)</span>
+                        @if (!string.IsNullOrWhiteSpace(item.PublicationState))
+                        {
+                            <span>@HumanizeStatus(item.PublicationState, "Ready")</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(item.TrustBand))
+                        {
+                            <span>@HumanizeStatus(item.TrustBand, "Draft")</span>
+                            <span>@(item.Discoverable ? "Eligible now" : "Still bounded")</span>
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(item.OwnershipSummary))
+                    {
+                        <p class="muted-copy"><strong>Ownership:</strong> @item.OwnershipSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
+                    {
+                        <p class="muted-copy"><strong>Publication:</strong> @item.PublicationSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.Visibility))
+                    {
+                        <p class="muted-copy"><strong>Visibility:</strong> @HumanizeStatus(linkedPublication.Visibility, "Shared")</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.DiscoverySummary))
+                    {
+                        <p class="muted-copy"><strong>Discovery:</strong> @linkedPublication.DiscoverySummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
+                    {
+                        <p class="muted-copy"><strong>Lineage:</strong> @linkedPublication.LineageSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.CampaignReturnSummary))
+                    {
+                        <p class="muted-copy"><strong>Return:</strong> @linkedPublication.CampaignReturnSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.SupportClosureSummary))
+                    {
+                        <p class="muted-copy"><strong>Support:</strong> @linkedPublication.SupportClosureSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
+                    {
+                        <p class="muted-copy"><strong>Next:</strong> @item.NextSafeAction</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.BuildHandoffId))
+                    {
+                        <a class="inline-link" href="@BuildHandoffDetailHref(linkedPublication.BuildHandoffId)">Open build path for @linkedPublication.Title</a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
+                    {
+                        <a class="inline-link" href="@PublicationDetailHref(item.CreatorPublicationId)">Open publication status</a>
+                    }
+                </article>
+            }
+            @foreach (var publication in signedInCreatorPublications)
+            {
+                <article class="shelf-item">
+                    <span class="tag">Creator publication</span>
+                    <h2>@publication.Title</h2>
+                    <p>@publication.Summary</p>
+                    <div class="trust-claim__microproof">
+                        <span>@HumanizeStatus(publication.Visibility, "Shared")</span>
+                        <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
+                        <span>@(publication.Discoverable ? "Eligible now" : "Still bounded")</span>
+                    </div>
+                    <p class="muted-copy"><strong>Provenance:</strong> @publication.ProvenanceSummary</p>
+                    <p class="muted-copy"><strong>Discovery:</strong> @publication.DiscoverySummary</p>
+                    @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
+                    {
+                        <p class="muted-copy"><strong>Lineage:</strong> @publication.LineageSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
+                    {
+                        <p class="muted-copy"><strong>Return:</strong> @publication.CampaignReturnSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.SupportClosureSummary))
+                    {
+                        <p class="muted-copy"><strong>Support:</strong> @publication.SupportClosureSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
+                    {
+                        <p class="muted-copy"><strong>Next:</strong> @publication.NextSafeAction</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
+                    {
+                        <a class="inline-link" href="@BuildHandoffDetailHref(publication.BuildHandoffId)">Open build path for @publication.Title</a>
+                    }
+                    <a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">Open publication status</a>
+                </article>
+            }
+        </div>
+    }
     @if (liveItems.Length > 0)
     {
         <div class="editorial-block__lead" id="live-artifacts">

@@ -290,6 +290,20 @@ public sealed class PublicLandingController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        IReadOnlyList<RecapShelfEntry> signedInRecapShelf = Array.Empty<RecapShelfEntry>();
+        IReadOnlyList<CreatorPublicationProjection> signedInCreatorPublications = Array.Empty<CreatorPublicationProjection>();
+        var subject = await TryGetOptionalPublicSurfaceSubjectAsync("/artifacts", cancellationToken);
+        if (subject is not null)
+        {
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
+            signedInRecapShelf = BuildSignedInArtifactShelfEntries(user, campaignSpine, installLinking);
+            signedInCreatorPublications = campaignSpine.CreatorPublications
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .Take(3)
+                .ToArray();
+        }
         var model = new ShelfPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Artifacts", "Proof surfaces, briefs, and grounded outputs connected to the current preview.", "/artifacts", cancellationToken),
             Surface: surface,
@@ -299,7 +313,9 @@ public sealed class PublicLandingController : Controller
             Intro: "Browse the packs, briefs, and proof surfaces that make the preview feel tangible.",
             Items: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/artifacts"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
+            SignedInRecapShelf: signedInRecapShelf,
+            SignedInCreatorPublications: signedInCreatorPublications);
         return View("~/Views/PublicLanding/Shelf.cshtml", model);
     }
 
@@ -693,6 +709,38 @@ public sealed class PublicLandingController : Controller
             "See what works today",
             "/now",
             "primary");
+    }
+
+    private IReadOnlyList<RecapShelfEntry> BuildSignedInArtifactShelfEntries(
+        HubUserDto user,
+        AccountCampaignSummary campaignSpine,
+        InstallLinkingSummaryDto installLinking)
+    {
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        return campaignSpine.Workspaces
+            .Take(3)
+            .Select(workspace => _workspaceServerPlane.GetWorkspaceServerPlane(user, workspace.WorkspaceId, installLinking))
+            .Where(static workspace => workspace is not null)
+            .SelectMany(static workspace => workspace!.RecapShelf)
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .Where(item => seen.Add(BuildArtifactShelfDedupeKey(item)))
+            .Take(4)
+            .ToArray();
+    }
+
+    private static string BuildArtifactShelfDedupeKey(RecapShelfEntry item)
+    {
+        if (!string.IsNullOrWhiteSpace(item.ArtifactId))
+        {
+            return $"artifact:{item.ArtifactId}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
+        {
+            return $"publication:{item.CreatorPublicationId}";
+        }
+
+        return $"entry:{item.EntryId}";
     }
 
     private static string NormalizeHomeSection(string? section)
