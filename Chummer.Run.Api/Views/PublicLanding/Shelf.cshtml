@@ -64,7 +64,7 @@
         };
 
     static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
-    static string PublicCreatorPublicationHref(string publicationId) => $"/artifacts/creator/{Uri.EscapeDataString(publicationId)}";
+    static string PublicCreatorPublicationHref(string publicationId) => $"/artifacts/publications/{Uri.EscapeDataString(publicationId)}";
     static string CreatorPublicationHref(CreatorPublicationProjection? publication, string publicationId)
         => IsDiscoverablePublicCreatorPublication(publication)
             ? PublicCreatorPublicationHref(publicationId)

@@ -1606,7 +1606,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(shelfSource.Contains("rankedPublicCreatorPublications", StringComparison.Ordinal), "artifact shelf should build a ranked public creator comparison set before rendering the compare-at-a-glance lane.");
     Assert(shelfSource.Contains("HumanizeStatus(publication.PublicationStatus, \"Published\")", StringComparison.Ordinal), "artifact shelf should humanize publication state directly on the public creator-discovery cards.");
     Assert(shelfSource.Contains("Open published creator packet", StringComparison.Ordinal), "artifact shelf should keep a direct public inspect route on the creator-discovery cards.");
-    Assert(shelfSource.Contains("/artifacts/creator/", StringComparison.Ordinal), "artifact shelf should deep-link public creator discovery into a dedicated public detail route.");
+    Assert(shelfSource.Contains("/artifacts/publications/", StringComparison.Ordinal), "artifact shelf should deep-link public creator discovery into the shared public publication detail route.");
     Assert(shelfSource.Contains("HumanizeStatus(publication.Visibility, \"Shared\")", StringComparison.Ordinal), "artifact shelf should humanize creator-publication visibility directly on the signed-in shelf.");
     Assert(shelfSource.Contains("static bool IsDiscoverablePublicCreatorPublication", StringComparison.Ordinal), "artifact shelf should decide when a signed-in creator packet is already live enough to stay on the governed public inspect rail.");
     Assert(shelfSource.Contains("CreatorPublicationHref(linkedPublication, item.CreatorPublicationId)", StringComparison.Ordinal), "artifact shelf should route linked signed-in recap items through the public creator packet once publication is live.");
@@ -1617,6 +1617,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(shelfSource.Contains("Open publication status", StringComparison.Ordinal), "artifact shelf should still preserve the private moderation route when a creator packet has not reached public discovery.");
     var publicCreatorSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "PublicCreatorPublication.cshtml"));
     Assert(publicCreatorSource.Contains("Why this packet is live", StringComparison.Ordinal), "public creator detail should explain the live governed packet posture on its own page.");
+    Assert(publicCreatorSource.Contains("Publication kind", StringComparison.Ordinal), "public creator detail should surface the shared publication kind instead of collapsing into creator-only framing.");
     Assert(publicCreatorSource.Contains("Compare by", StringComparison.Ordinal), "public creator detail should surface creator-comparison guidance on the public inspect route.");
     Assert(publicCreatorSource.Contains("Back to creator discovery", StringComparison.Ordinal), "public creator detail should keep an explicit route back to the public creator shelf.");
     var horizonsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml"));
@@ -1775,7 +1776,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Open published creator packet", StringComparison.Ordinal), "home work should keep a direct route into the public creator packet once discovery is live.");
     Assert(homeSource.Contains("Open build path for @publication.Title", StringComparison.Ordinal), "home work should keep a title-specific route from publication status back into the related build follow-through.");
     Assert(homeSource.Contains("Open build path for @leadAftermathCreatorPublication.Title", StringComparison.Ordinal), "home aftermath shelf should keep a direct route back to the linked creator-publication build path.");
-    Assert(homeSource.Contains("/artifacts/creator/", StringComparison.Ordinal), "home work should deep-link discoverable creator packets into the public creator detail route.");
+    Assert(homeSource.Contains("/artifacts/publications/", StringComparison.Ordinal), "home work should deep-link discoverable creator packets into the shared public publication detail route.");
     Assert(homeSource.Contains("Understandable return: @workspace.FirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "home work should surface understandable-return proof directly on the shared campaign card instead of compressing it away.");
     Assert(homeSource.Contains("Legal runner: @leadFirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "home work should carry legal-runner proof onto the calmer lead first-session card.");
     Assert(homeSource.Contains("Understandable return: @leadFirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "home work should carry understandable-return proof onto the calmer lead first-session card.");
@@ -1891,6 +1892,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/publish", StringComparison.Ordinal), "account publication detail should keep an explicit publish route on the same governed account rail.");
     Assert(accountSource.Contains("Open build path for @selectedCreatorPublication.Title", StringComparison.Ordinal), "account publication detail should give the customer a title-specific path back to the related build follow-through.");
     Assert(accountSource.Contains("Open public creator packet", StringComparison.Ordinal), "account publication detail should expose the public inspect route alongside private moderation status once the packet is live.");
+    Assert(accountSource.Contains("Publication kind", StringComparison.Ordinal), "account publication detail should surface the shared publication kind on the governed detail lane.");
+    Assert(accountSource.Contains("Draft kind", StringComparison.Ordinal), "account publication detail should surface the registry draft kind on the governed detail lane.");
     Assert(accountSource.Contains("@PublicCreatorPublicationHref(selectedCreatorPublication.PublicationId)", StringComparison.Ordinal), "account publication detail should deep-link live creator packets onto the public inspect route without hiding the private moderation lane.");
     Assert(accountSource.Contains("@linkedPublication.DiscoverySummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication discovery posture instead of compressing it away.");
     Assert(accountSource.Contains("@linkedPublication.TrustSummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication trust reasoning instead of dropping it on the detail route.");
@@ -3170,6 +3173,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(accountPublicationDetailModel?.SelectedCreatorPublication?.BuildHandoffId, handoffId, StringComparison.Ordinal), "account publication detail route should keep the related build handoff attached.");
     Assert(accountPublicationDetailModel?.SelectedCreatorPublicationDraftDetail is not null, "account publication detail route should project the registry-owned creator draft detail.");
     Assert(accountPublicationDetailModel?.SelectedCreatorPublicationReceipt is not null, "account publication detail route should project the registry-owned publication receipt.");
+    Assert(!string.IsNullOrWhiteSpace(accountPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Draft.ProjectKind)
+        && !string.Equals(accountPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Draft.ProjectKind, nameof(HubArtifactKind.BuildIdea), StringComparison.Ordinal),
+        "account publication detail route should preserve a concrete shared project kind through the registry draft bridge instead of collapsing back to the generic build-idea fallback.");
     Assert(string.Equals(accountPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.NotRequired, StringComparison.Ordinal), "fresh creator publication detail should begin outside the moderation queue.");
 
     var submitPublicationResult = await accountController.SubmitCreatorPublication(publicationId, "Ready for governed moderation and trust review.", CancellationToken.None);

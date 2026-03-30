@@ -205,7 +205,8 @@ def require_snippet(body: str, snippet: str, path: str) -> None:
 
 
 def is_public_creator_publication_path(path: str) -> bool:
-    return "/artifacts/creator/" in path.lower()
+    lowered = path.lower()
+    return "/artifacts/publications/" in lowered or "/artifacts/creator/" in lowered
 
 
 def require_creator_publication_body(body: str, path: str) -> None:
@@ -214,6 +215,7 @@ def require_creator_publication_body(body: str, path: str) -> None:
             "Governed creator discovery",
             "Public creator packet",
             "Why this packet is live",
+            "Publication kind",
             "Provenance",
             "Trust",
             "Discovery",
@@ -225,6 +227,7 @@ def require_creator_publication_body(body: str, path: str) -> None:
 
     for snippet in (
         "Publication status",
+        "Publication kind",
         "Trust",
         "Trust ranking",
         "Discovery",
@@ -1520,7 +1523,7 @@ def verify_signed_in_work_audit(
         "home rules detail link")
     home_publication_detail_path = extract_first_match(
         body,
-        r'href="([^"]*(?:/artifacts/creator/|/account/work/publications/)[^"]+)"',
+        r'href="([^"]*(?:/artifacts/(?:publications|creator)/|/account/work/publications/)[^"]+)"',
         "/home/work",
         "home publication detail link")
     home_next_session_path = extract_first_match(
@@ -1765,7 +1768,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Open build path for", publication_detail_path)
     public_creator_detail_path = extract_optional_match(
         body,
-        r'href="([^"]*/artifacts/creator/[^"]+)"')
+        r'href="([^"]*/artifacts/(?:publications|creator)/[^"]+)"')
     if public_creator_detail_path:
         status, public_creator_body, _, _ = fetch(
             base_url,
@@ -1995,7 +1998,7 @@ def main() -> int:
 
     public_creator_detail_path = extract_first_match(
         body,
-        r'href="([^"]*/artifacts/creator/[^"]+)"',
+        r'href="([^"]*/artifacts/(?:publications|creator)/[^"]+)"',
         "/artifacts",
         "public creator detail link")
     status, public_creator_body, _, _ = fetch(
