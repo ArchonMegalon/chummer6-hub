@@ -1,6 +1,18 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:06:16+02:00
+Updated: 2026-03-30T08:12:02+02:00
+
+## Handoff refresh (2026-03-30T08:12:02+02:00)
+
+- Signed-in work proof now walks the modeled account-work detail routes for run context and grounded rule answers instead of leaving them covered only by in-process smoke:
+  - `scripts/hub-live-audit.py` now extracts the first `/account/work/runs/{runId}` and `/account/work/rules/{entryId}` links from `/account/work`, opens both routes, and requires the run-context and grounded-rule detail cards to render their bounded evidence blocks.
+  - `scripts/e2e-hub-playwright.cjs` now captures those same rendered links from `/account/work` and asserts both detail routes in the browser lane before continuing through the rest of the signed-in journey.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:06:16+02:00)
 

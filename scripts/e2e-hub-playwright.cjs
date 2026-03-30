@@ -71,6 +71,17 @@ async function expandDetailsBySummary(page, summaryText, label) {
   }
 }
 
+async function readFirstHref(page, selector, label) {
+  const locator = page.locator(selector).first();
+  if (await locator.count() === 0) {
+    assert.fail(`${label} should render a link matching ${selector}.`);
+  }
+
+  const href = await locator.getAttribute('href');
+  assert.equal(Boolean(href), true, `${label} should expose a non-empty href for ${selector}.`);
+  return href;
+}
+
 function assertLoginRedirect(page, expectedNext, label) {
   const current = new URL(page.url());
   assert.equal(current.pathname, '/login', `${label} should redirect to /login.`);
@@ -104,6 +115,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   const page = await context.newPage();
   const pageErrors = [];
   const uniqueEmail = `hub-e2e-${Date.now()}@example.com`;
+  let runDetailPath;
+  let rulesDetailPath;
 
   page.on('pageerror', (error) => {
     pageErrors.push(error?.stack || error?.message || String(error));
@@ -310,6 +323,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectBodyText(page, 'Source:', '/account/work');
     await expandDetailsBySummary(page, 'Creator publication', '/account/work');
     await expectBodyText(page, 'Discovery:', '/account/work');
+    runDetailPath = await readFirstHref(page, 'a[href*="/account/work/runs/"]', '/account/work');
+    rulesDetailPath = await readFirstHref(page, 'a[href*="/account/work/rules/"]', '/account/work');
   });
 
   await Promise.all([
@@ -361,6 +376,25 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await expectBodyText(page, 'Planner coverage', '/account/work/build-handoffs detail');
   await assertNoBannedCopy(page, '/account/work/build-handoffs detail');
   await assertNoPageErrors(page, pageErrors, '/account/work/build-handoffs detail');
+
+  await gotoAndAssert(page, pageErrors, runDetailPath, async () => {
+    await expectBodyText(page, 'Run context', '/account/work/runs detail');
+    await expectBodyText(page, 'Status', '/account/work/runs detail');
+    await expectBodyText(page, 'Active scene', '/account/work/runs detail');
+    await expectBodyText(page, 'Objectives', '/account/work/runs detail');
+    await expectBodyText(page, 'Scenes', '/account/work/runs detail');
+    await expectBodyText(page, 'Continuity:', '/account/work/runs detail');
+    await assertNoBannedCopy(page, '/account/work/runs detail');
+  });
+
+  await gotoAndAssert(page, pageErrors, rulesDetailPath, async () => {
+    await expectBodyText(page, 'Grounded rule answer', '/account/work/rules detail');
+    await expectBodyText(page, 'Before', '/account/work/rules detail');
+    await expectBodyText(page, 'After', '/account/work/rules detail');
+    await expectBodyText(page, 'Provenance', '/account/work/rules detail');
+    await expectBodyText(page, 'Evidence:', '/account/work/rules detail');
+    await assertNoBannedCopy(page, '/account/work/rules detail');
+  });
 
   await gotoAndAssert(page, pageErrors, '/account/settings', async () => {
     await expectVisible(page, 'text=More settings');
