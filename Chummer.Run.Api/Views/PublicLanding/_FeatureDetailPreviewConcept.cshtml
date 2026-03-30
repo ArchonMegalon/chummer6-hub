@@ -73,4 +73,14 @@
         </div>
         <a class="inline-link" href="/artifacts">Open proof gallery</a>
     </article>
+    @if (Model.Chrome.Authenticated)
+    {
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>Check signed-in artifact continuity</h3>
+                <p>The signed-in artifact shelf keeps your personal, campaign, and creator-publication follow-through on one governed rail while this concept is still preview-only.</p>
+            </div>
+            <a class="inline-link" href="/artifacts#linked-artifacts">Open signed-in artifact shelf</a>
+        </article>
+    }
 </section>

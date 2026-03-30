@@ -73,4 +73,14 @@
         </div>
         <a class="inline-link" href="/contact#support-intake">Open support</a>
     </article>
+    @if (Model.Chrome.Authenticated)
+    {
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>Keep the same artifact truth signed in</h3>
+                <p>Use the signed-in artifact shelf when you want the same recap, campaign, and creator-publication record instead of jumping across separate detail pages.</p>
+            </div>
+            <a class="inline-link" href="/artifacts#linked-artifacts">Open signed-in artifact shelf</a>
+        </article>
+    }
 </section>
