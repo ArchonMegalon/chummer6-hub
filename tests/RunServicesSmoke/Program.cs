@@ -1549,6 +1549,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("Need the full picture?", StringComparison.Ordinal), "landing should route deeper proof evaluation through one quiet inline note instead of a second button stack.");
     Assert(landingSource.Contains("PublicSurfaceStatus.DisplayLabel", StringComparison.Ordinal), "landing should use the shared public status presenter instead of route-local badge labels.");
     Assert(landingSource.Contains("_PublicTrustPulseBody.cshtml", StringComparison.Ordinal), "landing should render weekly trust rows through the shared pulse body instead of duplicating the row template.");
+    Assert(landingSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "landing should reuse the shared signed-in trust panel instead of inventing a landing-only trust surface.");
+    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "landing should reuse the signed-in trust posture for live access guidance on the authenticated front door.");
     var trustPulseBodySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_PublicTrustPulseBody.cshtml"));
     Assert(trustPulseBodySource.Contains("@if (Model.TrendSamples.Count > 1)", StringComparison.Ordinal), "shared trust pulse body should render measured progress points directly on the weekly trust pulse.");
     Assert(trustPulseBodySource.Contains("trust-pulse-trend__point", StringComparison.Ordinal), "shared trust pulse body should carry the measured-trend rail.");
@@ -1908,7 +1910,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var trustCanonSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", ".codex-design", "product", "PUBLIC_TRUST_CONTENT.yaml"));
     Assert(!trustCanonSource.Contains("signed-in shell", StringComparison.Ordinal), "public trust canon should not leak signed-in-shell language into customer copy.");
     Assert(!trustCanonSource.Contains("stays canonical", StringComparison.Ordinal), "public trust canon should not use canonical jargon on public trust surfaces.");
-    Assert(trustCanonSource.Contains("The installer stays the same for everyone", StringComparison.Ordinal), "public trust canon should explain the installer relationship in customer language.");
+    Assert(trustCanonSource.Contains("The published package stays the same for everyone", StringComparison.Ordinal), "public trust canon should explain the package relationship in customer language.");
     var participateSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml"));
     Assert(!participateSource.Contains("story-guide-tail", StringComparison.Ordinal), "participate should open with a quieter route intro instead of a generic CTA band.");
     Assert(participateSource.Contains("Public feedback", StringComparison.Ordinal), "participate should keep the public lane explicit.");
@@ -1933,7 +1935,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "horizon_local_co_processor", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open the horizon page", StringComparison.Ordinal)), "local co-processor should route through its roadmap detail page instead of pretending the overview card is an install action.");
     var releaseExperienceSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", ".codex-design", "product", "PUBLIC_RELEASE_EXPERIENCE.yaml"));
     Assert(!releaseExperienceSource.Contains("canonical installer", StringComparison.OrdinalIgnoreCase), "release-experience canon should not leak canonical-installer wording into the signed-in handoff copy.");
-    Assert(releaseExperienceSource.Contains("same published installer", StringComparison.Ordinal), "release-experience canon should describe the signed-in handoff in customer-facing install language.");
+    Assert(releaseExperienceSource.Contains("same published download", StringComparison.Ordinal), "release-experience canon should describe the signed-in handoff in customer-facing download language.");
     var downloadsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"));
     var publicLandingControllerSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
     var featureDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml"));
@@ -1942,8 +1944,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!downloadsSource.Contains("What changed and what to expect", StringComparison.Ordinal), "downloads should not carry a second release explainer block under the primary install path.");
     Assert(downloadsSource.Contains("Release notes, known issues, and requirements", StringComparison.Ordinal), "downloads should tuck release education into one calmer drawer on the primary card.");
     Assert(!downloadsSource.Contains("<summary>Package details</summary>", StringComparison.Ordinal), "downloads should keep package details inside the existing release-information drawer instead of adding a second top-card drawer.");
-    Assert(downloadsSource.Contains("Install path", StringComparison.Ordinal), "downloads should move the technical install-path explanation under the release-information drawer.");
-    Assert(downloadsSource.Contains("Use the recommended installer first. Release detail, alternate packages, and manual paths stay collapsed underneath.", StringComparison.Ordinal), "downloads should keep the top card focused on the first install decision instead of technical support wording.");
+    Assert(downloadsSource.Contains("recommendedIsInstaller ? \"Install path\" : \"Download path\"", StringComparison.Ordinal), "downloads should keep the technical path label grounded in whether the current shelf item is an installer or a package.");
+    Assert(downloadsSource.Contains("recommendedIsInstaller", StringComparison.Ordinal), "downloads should keep the top card copy grounded in whether the current shelf item is an installer or a package.");
     Assert(!downloadsSource.Contains("<p>@release.Recommended.SupportLine</p>", StringComparison.Ordinal), "downloads should not surface the technical install-path line as the primary top-card copy.");
     Assert(downloadsSource.Contains("Open current release", StringComparison.Ordinal), "downloads should route broader release posture back to the dedicated current-release page instead of turning the install card into a second status page.");
     Assert(shelfSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Card.Audience)", StringComparison.Ordinal), "artifact shelf cards should humanize audience labels instead of leaking raw canon values.");
@@ -2104,6 +2106,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && ContainsLaunchReadinessSignal(row.Value)), "landing page should surface launch-readiness posture on the trust pulse.");
     Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Provider-route stewardship", StringComparison.Ordinal) && row.Value.Contains("Pilot defaults are governed", StringComparison.Ordinal)), "landing page should surface provider-route stewardship on the trust pulse.");
     Assert(landingModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("current longest pole", StringComparison.OrdinalIgnoreCase)), "landing page should surface the current caution lane from the weekly trust pulse.");
+    Assert(landingModel.SignedInStatus is null, "guest landing should not project install-specific signed-in trust posture.");
     Assert(landingModel.Workflows.Any(static card => string.Equals(card.Action.Href, "/downloads", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
     Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Create account to get preview", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "landing page chrome should expose the release-aware signup CTA beside sign in");
     Assert(landingModel.Lanes.Any(static card => string.Equals(card.Card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
@@ -2200,7 +2203,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(macDownloadsModel is not null, "downloads page should still render for a macOS user agent even when the platform is withheld.");
     Assert(string.Equals(macDownloadsModel!.ReleaseExperience.RequestedPlatformLabel, "macOS", StringComparison.Ordinal), "downloads page should detect the macOS user agent.");
     Assert(!string.IsNullOrWhiteSpace(macDownloadsModel.ReleaseExperience.PlatformShelfNoticeTitle), "downloads page should surface a shelf note when macOS is not publicly promoted.");
-    Assert(macDownloadsModel.ReleaseExperience.PlatformShelfNoticeSummary?.Contains("does not publish a promoted macOS installer yet", StringComparison.OrdinalIgnoreCase) == true, "downloads page should explain that the macOS build lane is not yet on the public shelf.");
+    Assert(
+        macDownloadsModel.ReleaseExperience.PlatformShelfNoticeSummary?.Contains("macOS", StringComparison.OrdinalIgnoreCase) == true
+        && macDownloadsModel.ReleaseExperience.PlatformShelfNoticeSummary.Contains("does not publish", StringComparison.OrdinalIgnoreCase),
+        "downloads page should explain that the macOS build lane is not yet on the public shelf.");
     var authenticatedDownloadResult = await downloadsController.DownloadArtifact("smoke-poc-linux-x64", CancellationToken.None);
     var authenticatedRedirect = authenticatedDownloadResult as RedirectResult;
     Assert(authenticatedRedirect is not null && string.Equals(authenticatedRedirect.Url, "/downloads/install/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in compatibility downloads should route through the install handoff.");
@@ -2968,6 +2974,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "signed-in home should surface who-can-get-it-now posture directly in the shared trust panel.");
     Assert(authenticatedHomeModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "signed-in home should surface a non-empty fix-availability row directly in the shared trust panel.");
     Assert(authenticatedHomeModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "signed-in home should surface a non-empty install-specific caution row directly in the shared trust panel.");
+    var authenticatedLandingView = await authenticatedLandingController.LandingPage(CancellationToken.None) as ViewResult;
+    var authenticatedLandingModel = authenticatedLandingView?.Model as LandingPageViewModel;
+    Assert(authenticatedLandingModel?.SignedInStatus is not null, "authenticated landing should project the shared signed-in trust status on the front door.");
+    Assert(authenticatedLandingModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "authenticated landing should surface who-can-get-it-now posture directly in the shared trust panel.");
+    Assert(authenticatedLandingModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "authenticated landing should surface a non-empty fix-availability row directly in the shared trust panel.");
     Assert(authenticatedHomeModel!.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "signed-in home should surface tracked support context.");
     Assert(authenticatedHomeModel.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && item.ClosureSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase)), "signed-in home access should surface release closure truth from the shared support presenter.");
     Assert(authenticatedHomeModel.CampaignSpine.Dossiers.Count >= 1, "signed-in home should surface living dossier continuity.");
@@ -3276,6 +3287,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLandingModel = unavailableLandingView?.Model as LandingPageViewModel;
     Assert(unavailableLandingModel?.Chrome.Authenticated == true, "public landing chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
     Assert(unavailableLandingModel!.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Sign out", StringComparison.Ordinal)), "authenticated public landing chrome should keep the signed-in actions during identity outages.");
+    Assert(unavailableLandingModel.SignedInStatus is null, "landing should suppress install-specific trust status when identity is temporarily unavailable.");
     var unavailableNowView = await unavailableLandingController.NowPage(CancellationToken.None) as ViewResult;
     var unavailableNowModel = unavailableNowView?.Model as NowPageViewModel;
     Assert(unavailableNowModel?.Chrome.Authenticated == true, "current-release chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
