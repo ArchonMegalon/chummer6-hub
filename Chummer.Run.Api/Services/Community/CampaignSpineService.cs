@@ -2985,7 +2985,7 @@ public sealed class CampaignSpineService
         }
 
         const string publicationState = "preview_ready";
-        var (trustBand, discoverable) = BuildCreatorPublicationTrustPosture(publicationState, campaign.Visibility);
+        var (trustBand, discoverable, _, _, _) = BuildCreatorPublicationTrustPosture(publicationState, campaign.Visibility);
         string creatorPublicationId = StableId("publication", workspaceId);
         string ownershipSummary = $"Shared {campaign.Visibility.Replace('_', ' ')} creator packet stays attached to {campaign.Name}.";
         string publicationSummary = "Preview-ready creator publication keeps recap-safe outputs reviewable before they become live.";
@@ -3619,7 +3619,7 @@ public sealed class CampaignSpineService
                     : DescribeCreatorPublicationSupportClosure(workspace);
                 var lineageSummary = DescribeCreatorPublicationLineage(artifact, leadHandoff, workspace);
                 const string publicationStatus = "preview_ready";
-                var (trustBand, discoverable) = BuildCreatorPublicationTrustPosture(publicationStatus, workspace.Visibility);
+                var (trustBand, discoverable, trustSummary, discoverySummary, moderationSummary) = BuildCreatorPublicationTrustPosture(publicationStatus, workspace.Visibility);
                 var watchouts = BuildCreatorPublicationWatchouts(workspace, leadHandoff);
                 return new CreatorPublicationProjection(
                     PublicationId: StableId("publication", workspace.WorkspaceId),
@@ -3632,7 +3632,7 @@ public sealed class CampaignSpineService
                     ProvenanceSummary: string.IsNullOrWhiteSpace(leadRecap?.ProvenanceSummary)
                         ? $"{workspace.RuleEnvironment.CompatibilityFingerprint} + recap-safe output shelf"
                         : $"{workspace.RuleEnvironment.CompatibilityFingerprint} + {leadRecap!.ProvenanceSummary}",
-                    DiscoverySummary: $"{workspace.Visibility} visibility with grounded provenance and one truthful next action.",
+                    DiscoverySummary: discoverySummary,
                     Visibility: workspace.Visibility,
                     PublicationStatus: publicationStatus,
                     TrustBand: trustBand,
@@ -3643,7 +3643,10 @@ public sealed class CampaignSpineService
                     SupportClosureSummary: supportClosureSummary,
                     BuildHandoffId: leadHandoff?.HandoffId,
                     Watchouts: watchouts,
-                    LineageSummary: lineageSummary);
+                    LineageSummary: lineageSummary,
+                    TrustSummary: trustSummary,
+                    ComparisonSummary: DescribeCreatorPublicationComparisonSummary(leadHandoff),
+                    ModerationSummary: moderationSummary);
             })
             .ToArray();
     }
@@ -3694,9 +3697,10 @@ public sealed class CampaignSpineService
             .ToArray();
     }
 
-    private static (string TrustBand, bool Discoverable) BuildCreatorPublicationTrustPosture(string publicationStatus, string visibility)
+    private static (string TrustBand, bool Discoverable, string TrustSummary, string DiscoverySummary, string ModerationSummary) BuildCreatorPublicationTrustPosture(string publicationStatus, string visibility)
     {
         var normalizedStatus = NormalizePublicationStatus(publicationStatus);
+        var normalizedVisibility = DescribePublicationVisibility(visibility);
         var discoverable = string.Equals(normalizedStatus, "published", StringComparison.Ordinal)
             && !string.Equals(visibility, "private", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(visibility, "local_only", StringComparison.OrdinalIgnoreCase);
@@ -3714,13 +3718,62 @@ public sealed class CampaignSpineService
             _ => "draft"
         };
 
-        return (trustBand, discoverable);
+        var trustSummary = normalizedStatus switch
+        {
+            "preview_ready" or "pending_review" => "Trust ranking is review-pending and stays anchored to governed provenance, rule fingerprint, and campaign continuity until approval clears.",
+            "approved" => "Trust ranking is approval-backed and ready for governed publication without popularity-based promotion.",
+            "rejected" => "Trust ranking is suspended until the creator revises the governed packet and resubmits it.",
+            "published" when discoverable => "Trust ranking is live on governed discovery and stays anchored to provenance, lineage, and campaign continuity instead of popularity fog.",
+            "published" => $"Trust ranking is live but discovery remains bounded to {normalizedVisibility} surfaces.",
+            "delisted" => "Trust ranking is in delisted caution and should only surface with explicit moderation context.",
+            "deprecated" => "Trust ranking stays retained only to steer discovery toward the governed successor.",
+            "superseded" => "Trust ranking is retained for audit and install history, not active recommendation.",
+            _ => "Trust ranking stays draft-scoped until governed review makes the packet comparable."
+        };
+
+        var discoverySummary = normalizedStatus switch
+        {
+            "preview_ready" or "pending_review" => "Keep this entry on creator, campaign, and moderation surfaces until approval completes.",
+            "approved" => "Ready for governed publication, but keep it off public discovery until it is actually published.",
+            "rejected" => "Hide from discovery until the creator revises and resubmits the packet.",
+            "published" when discoverable => "Eligible for governed discovery, creator comparison, and shelf projection.",
+            "published" => $"Keep discovery bounded to {normalizedVisibility} surfaces even though the publication is live.",
+            "delisted" => "Keep it out of normal discovery and surface it only with moderation context.",
+            "deprecated" => "Show successor-forward caution instead of ranking this as the preferred result.",
+            "superseded" => "Retain for install and audit history, not as the preferred discovery result.",
+            _ => "Draft publications stay off discovery surfaces."
+        };
+
+        var moderationSummary = normalizedStatus switch
+        {
+            "preview_ready" or "pending_review" => "Moderation is still waiting on approval review, so discovery stays bounded to creator, campaign, and operator surfaces.",
+            "approved" => "Moderation cleared approval; publish or annotate next so discovery and shelf posture stay honest.",
+            "rejected" => "Moderation requires revision before the packet can re-enter discovery or creator comparison.",
+            "published" when discoverable => "Moderation watch is active but clear, so the packet can stay on discoverable creator shelves until a later note changes its posture.",
+            "published" => $"Moderation is clear, but visibility still keeps discovery limited to {normalizedVisibility} surfaces.",
+            "delisted" => "Moderation removed this packet from normal discovery; only retained-history and explicit audit surfaces should surface it.",
+            "deprecated" => "Moderation retains this packet with successor-forward caution until a replacement fully takes over.",
+            "superseded" => "Moderation retains this packet as lineage-only history behind its successor.",
+            _ => "Moderation has not started; keep the packet on governed internal surfaces until review begins."
+        };
+
+        return (trustBand, discoverable, trustSummary, discoverySummary, moderationSummary);
     }
 
     private static string NormalizePublicationStatus(string publicationStatus)
         => string.IsNullOrWhiteSpace(publicationStatus)
             ? string.Empty
             : publicationStatus.Trim().Replace('-', '_').ToLowerInvariant();
+
+    private static string DescribePublicationVisibility(string visibility)
+        => string.IsNullOrWhiteSpace(visibility)
+            ? "shared"
+            : visibility.Trim().Replace('_', ' ').Replace('-', ' ').ToLowerInvariant();
+
+    private static string DescribeCreatorPublicationComparisonSummary(BuildLabHandoffProjection? leadHandoff)
+        => !string.IsNullOrWhiteSpace(leadHandoff?.Title)
+            ? $"Compare by provenance, visibility, trust ranking, lineage, {leadHandoff.Title} receipts, and campaign-return fit instead of popularity, install counts, or shelf age."
+            : "Compare by provenance, visibility, trust ranking, lineage, and campaign-return fit instead of popularity, install counts, or shelf age.";
 
     private static string DescribeCreatorPublicationLineage(
         string artifactId,

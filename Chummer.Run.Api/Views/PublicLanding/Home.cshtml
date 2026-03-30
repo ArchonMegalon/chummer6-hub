@@ -638,6 +638,14 @@
                                                                     {
                                                                         <span> Discovery: @leadAftermathCreatorPublication.DiscoverySummary</span>
                                                                     }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.TrustSummary))
+                                                                    {
+                                                                        <span> Trust: @leadAftermathCreatorPublication.TrustSummary</span>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.ComparisonSummary))
+                                                                    {
+                                                                        <span> Compare by: @leadAftermathCreatorPublication.ComparisonSummary</span>
+                                                                    }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.LineageSummary))
                                                                     {
                                                                         <span> Lineage: @leadAftermathCreatorPublication.LineageSummary</span>
@@ -649,6 +657,10 @@
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.SupportClosureSummary))
                                                                     {
                                                                         <span> Support: @leadAftermathCreatorPublication.SupportClosureSummary</span>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.ModerationSummary))
+                                                                    {
+                                                                        <span> Moderation: @leadAftermathCreatorPublication.ModerationSummary</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.NextSafeAction))
                                                                     {
@@ -963,10 +975,18 @@
                                                             <span>Provenance: @publication.ProvenanceSummary.</span>
                                                             <span>Visibility: @HumanizeStatus(publication.Visibility, "Shared").</span>
                                                             <span>Trust ranking: @HumanizeStatus(publication.TrustBand, "Draft").</span>
-                                                            <span>Discovery: @publication.DiscoverySummary.</span>
+                                                            <span>Discovery: @publication.DiscoverySummary</span>
+                                                            @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
+                                                            {
+                                                                <span> Trust: @publication.TrustSummary</span>
+                                                            }
+                                                            @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
+                                                            {
+                                                                <span> Compare by: @publication.ComparisonSummary</span>
+                                                            }
                                                             @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
                                                             {
-                                                                <span> Lineage: @publication.LineageSummary.</span>
+                                                                <span> Lineage: @publication.LineageSummary</span>
                                                             }
                                                             <span>Discoverable now: @(publication.Discoverable ? "Eligible now" : "Still bounded").</span>
                                                             <span>State: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
@@ -981,6 +1001,10 @@
                                                             @if (!string.IsNullOrWhiteSpace(publication.SupportClosureSummary))
                                                             {
                                                                 <span> Support: @publication.SupportClosureSummary.</span>
+                                                            }
+                                                            @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
+                                                            {
+                                                                <span> Moderation: @publication.ModerationSummary</span>
                                                             }
                                                         </p>
                                                     </div>
