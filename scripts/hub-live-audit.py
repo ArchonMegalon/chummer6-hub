@@ -462,6 +462,36 @@ def verify_signed_in_work_audit(
 
     status, body, _, _ = fetch(
         base_url,
+        "/home",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/home returned {status}, expected 200")
+    require_snippet(body, "Welcome back", "/home")
+    require_snippet(body, "Use the current preview", "/home")
+    require_snippet(body, "Keep this copy connected", "/home")
+    require_snippet(body, "Open current release", "/home")
+
+    status, body, _, _ = fetch(
+        base_url,
+        "/home/setup",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/home/setup returned {status}, expected 200")
+    require_snippet(body, "Finish the small setup flow, then come back to access and work", "/home/setup")
+    require_snippet(body, "Open account settings instead", "/home/setup")
+    require_snippet(body, "Finish the account basics", "/home/setup")
+    require_snippet(body, "Name and timezone", "/home/setup")
+    require_snippet(body, "What you want from Chummer", "/home/setup")
+    require_snippet(body, "Backup sign-in and updates", "/home/setup")
+
+    status, body, _, _ = fetch(
+        base_url,
         "/home/access",
         public_host=public_host,
         forwarded_proto=forwarded_proto,

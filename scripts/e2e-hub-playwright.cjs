@@ -273,6 +273,16 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   const contentDisposition = downloadResponse.headers()['content-disposition'] || '';
   assert(/avalonia.*(deb|appimage|rpm|tar)/i.test(contentDisposition), `Unexpected installer response headers: ${contentDisposition}`);
 
+  await gotoAndAssert(page, pageErrors, '/home', async () => {
+    await expectVisible(page, 'text=Welcome back');
+    await expectBodyText(page, 'Use the current preview', '/home');
+    await expectBodyText(page, 'Keep this copy connected', '/home');
+    await expandDetailsBySummary(page, 'Build, explain, and next step', '/home');
+    await expectBodyText(page, 'What changed for me', '/home');
+    await expectBodyText(page, 'Open shared campaign view', '/home');
+    await expectBodyText(page, 'Open current release', '/home');
+  });
+
   await gotoAndAssert(page, pageErrors, '/home/access', async () => {
     await expectVisible(page, 'text=Access and return');
     await expectVisible(page, 'text=Finish setup before you worry about devices and follow-up');
@@ -311,6 +321,24 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/home/setup', async () => {
     await expectVisible(page, 'text=Finish the small setup flow, then come back to access and work');
+    await expectVisible(page, '#openSetupButton');
+  });
+  await page.locator('#openSetupButton').click();
+  await expectVisible(page, '#home-onboarding');
+  await expectVisible(page, 'text=Finish the account basics');
+  await expectVisible(page, 'text=Name and timezone');
+  await page.locator('[data-onboarding-next]').click();
+  await expectVisible(page, 'text=What you want from Chummer');
+  await page.locator('[data-onboarding-next]').click();
+  await expectVisible(page, 'text=Backup sign-in and updates');
+  await expectVisible(page, '[data-onboarding-submit]');
+  await page.locator('[data-close-onboarding]').click();
+  await page.waitForSelector('#home-onboarding', { state: 'hidden' });
+  await assertNoBannedCopy(page, '/home/setup');
+  await assertNoPageErrors(page, pageErrors, '/home/setup');
+
+  await gotoAndAssert(page, pageErrors, '/home/setup', async () => {
+    await expectVisible(page, '#openSetupButton');
   });
 
   await gotoAndAssert(page, pageErrors, homeWorkspacePath, async () => {
