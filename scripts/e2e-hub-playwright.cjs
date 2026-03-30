@@ -43,6 +43,12 @@ async function assertTextCount(page, needle, expected, label) {
   assert.equal(matches.length, expected, `${label} should render "${needle}" ${expected} time(s), got ${matches.length}.`);
 }
 
+async function assertMinimumTextCount(page, needle, minimum, label) {
+  const text = await page.locator('body').innerText();
+  const matches = text.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || [];
+  assert.equal(matches.length >= minimum, true, `${label} should render "${needle}" at least ${minimum} time(s), got ${matches.length}.`);
+}
+
 async function expectBodyText(page, needle, label) {
   const text = await page.locator('body').innerText();
   assert.equal(
@@ -251,6 +257,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {
     await expectVisible(page, 'text=Recommended for this install');
     await expectVisible(page, 'text=Install posture');
+    await assertMinimumTextCount(page, 'Adoption health', 2, 'Signed-in /downloads');
     await expectMinimumCount(page, '.trust-pulse-trend__point', 2, 'Signed-in /downloads');
     await assertNoBannedCopy(page, 'Signed-in /downloads');
   });
@@ -258,6 +265,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/now', async () => {
     await expectVisible(page, 'text=Recommended for this install');
     await expectVisible(page, 'text=Install posture');
+    await assertMinimumTextCount(page, 'Adoption health', 2, 'Signed-in /now');
     await expectMinimumCount(page, '.trust-pulse-trend__point', 2, 'Signed-in /now');
     await assertNoBannedCopy(page, 'Signed-in /now');
   });
@@ -265,6 +273,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/help', async () => {
     await expectVisible(page, 'text=Recommended for this install');
     await expectVisible(page, 'text=Install posture');
+    await assertMinimumTextCount(page, 'Adoption health', 2, 'Signed-in /help');
     await expectMinimumCount(page, '.trust-pulse-trend__point', 2, 'Signed-in /help');
     await assertNoBannedCopy(page, 'Signed-in /help');
   });
@@ -338,6 +347,20 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await expectBodyText(page, 'Open build path for', '/account/work/publications detail');
   await assertNoBannedCopy(page, '/account/work/publications detail');
   await assertNoPageErrors(page, pageErrors, '/account/work/publications detail');
+
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.locator('a[href*="/account/work/build-handoffs/"]').first().click()
+  ]);
+  assert(/\/account\/work\/build-handoffs\//.test(page.url()), 'Build handoff detail route should open from the publication detail route.');
+  await expectBodyText(page, 'Build follow-through', '/account/work/build-handoffs detail');
+  await expectBodyText(page, 'Variant', '/account/work/build-handoffs detail');
+  await expectBodyText(page, 'Progression', '/account/work/build-handoffs detail');
+  await expectBodyText(page, 'Next safe action', '/account/work/build-handoffs detail');
+  await expectBodyText(page, 'Runtime', '/account/work/build-handoffs detail');
+  await expectBodyText(page, 'Planner coverage', '/account/work/build-handoffs detail');
+  await assertNoBannedCopy(page, '/account/work/build-handoffs detail');
+  await assertNoPageErrors(page, pageErrors, '/account/work/build-handoffs detail');
 
   await gotoAndAssert(page, pageErrors, '/account/settings', async () => {
     await expectVisible(page, 'text=More settings');

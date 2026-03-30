@@ -665,6 +665,8 @@ def verify_signed_in_work_audit(
         require_snippet(body, "Recommended for this install", signed_in_path)
         require_snippet(body, "Install posture", signed_in_path)
         require_snippet(body, "trust-pulse-trend__point", signed_in_path)
+        if body.count("Adoption health") < 2:
+            raise AssertionError(f"{signed_in_path} should surface adoption health in both the install-specific trust panel and the weekly trust pulse")
 
     status, body, _, _ = fetch(
         base_url,
@@ -1199,6 +1201,28 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Discovery", publication_detail_path)
     require_snippet(body, "Status", publication_detail_path)
     require_snippet(body, "Open build path for", publication_detail_path)
+    build_handoff_detail_path = extract_first_match(
+        body,
+        r'href="([^"]*/account/work/build-handoffs/[^"]+)"',
+        publication_detail_path,
+        "build handoff detail link")
+    status, body, _, _ = fetch(
+        base_url,
+        build_handoff_detail_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{build_handoff_detail_path} returned {status}, expected 200")
+    require_snippet(body, "Build follow-through", build_handoff_detail_path)
+    require_snippet(body, "Variant", build_handoff_detail_path)
+    require_snippet(body, "Progression", build_handoff_detail_path)
+    require_snippet(body, "Next safe action", build_handoff_detail_path)
+    require_snippet(body, "Runtime", build_handoff_detail_path)
+    require_snippet(body, "Return", build_handoff_detail_path)
+    require_snippet(body, "Support", build_handoff_detail_path)
+    require_snippet(body, "Planner coverage", build_handoff_detail_path)
     print(
         "ok signed-in /account/work -> "
         f"{final_url} workspace={workspace_id} install={claimed_installation_id} support_case={support_case_id} support_fix={support_fixed_version} join_code={join_code['code']} boost_code={boost_code['code']} sponsor_session={sponsor_session_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} downtime={downtime_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"

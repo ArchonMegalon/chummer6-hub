@@ -1,6 +1,21 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:00:33+02:00
+Updated: 2026-03-30T08:06:16+02:00
+
+## Handoff refresh (2026-03-30T08:06:16+02:00)
+
+- Signed-in trust proof now treats the install-specific `Adoption health` row as release-blocking on `/downloads`, `/now`, and `/help`:
+  - `scripts/hub-live-audit.py` now fails if those signed-in routes do not render `Adoption health` in both the install-specific trust panel and the weekly trust pulse.
+  - `scripts/e2e-hub-playwright.cjs` now enforces the same minimum-count check in the browser lane.
+- Creator-publication follow-through is now proven all the way into build-handoff detail instead of stopping at the publication page:
+  - `scripts/hub-live-audit.py` now opens the first `/account/work/build-handoffs/{handoffId}` link from the publication-detail route and requires the rendered build follow-through posture.
+  - `scripts/e2e-hub-playwright.cjs` now clicks through the same build-handoff link and asserts the destination route renders the expected follow-through card.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:00:33+02:00)
 
