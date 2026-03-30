@@ -49,6 +49,7 @@
         : $"/account/work#community-op-guidance-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
+    var leadPortableExchangeNotice = leadWorkspaceServerPlane?.DecisionNotices.FirstOrDefault(notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.OrdinalIgnoreCase));
     var leadFirstPlayableSession = leadWorkspaceServerPlane?.FirstPlayableSession;
     var leadFirstPlayableEvidence = leadFirstPlayableSession?.EvidenceLines.FirstOrDefault();
     var leadNextSessionCarryForward = leadWorkspaceServerPlane?.NextSessionCarryForward;
@@ -479,6 +480,10 @@
                                                                 {
                                                                     <span> Aftermath: @leadWorkspaceServerPlane.AftermathPackages.Count package(s).</span>
                                                                 }
+                                                                @if (leadPortableExchangeNotice is not null)
+                                                                {
+                                                                    <span> Portable exchange: @leadPortableExchangeNotice.Summary</span>
+                                                                }
                                                             }
                                                         </p>
                                                     </div>
@@ -515,7 +520,11 @@
                                                                 <span> Change: @leadWorkspaceServerPlane.ChangePackets[0].Summary</span>
                                                             }
                                                             <span> Next: @leadWorkspaceServerPlane.NextSafeAction.Summary</span>
-                                                            @if (leadWorkspaceServerPlane.DecisionNotices.Count > 0)
+                                                            @if (leadPortableExchangeNotice is not null)
+                                                            {
+                                                                <span> Portable exchange: @leadPortableExchangeNotice.Summary</span>
+                                                            }
+                                                            else if (leadWorkspaceServerPlane.DecisionNotices.Count > 0)
                                                             {
                                                                 <span> Notice: @leadWorkspaceServerPlane.DecisionNotices[0].Summary</span>
                                                             }

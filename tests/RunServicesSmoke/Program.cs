@@ -1629,6 +1629,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@workspace.FirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "home work should surface campaign-ready proof directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("What changed for me", StringComparison.Ordinal), "home work should keep the explicit what-changed-for-me packet on the signed-in route.");
     Assert(homeSource.Contains("leadWorkspaceState?.Label", StringComparison.Ordinal), "home work should surface the bounded workspace state directly from the server plane.");
+    Assert(homeSource.Contains("var leadPortableExchangeNotice =", StringComparison.Ordinal), "home work should derive a dedicated portable-exchange notice from the bounded workspace server plane.");
+    Assert(homeSource.Contains("Portable exchange:", StringComparison.Ordinal), "home work should surface portable exchange explicitly instead of hiding it inside a generic notice lane.");
     Assert(homeSource.Contains("Open first playable session proof", StringComparison.Ordinal), "home work should keep a direct route into the bounded first-session proof detail.");
     Assert(homeSource.Contains("@leadFirstPlayableSession.CampaignStartSummary", StringComparison.Ordinal), "home work should surface the first-session campaign-start summary directly from the server plane.");
     Assert(homeSource.Contains("@leadFirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "home work should surface legal-runner proof directly from the bounded first-session projection.");
@@ -1859,6 +1861,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Lead consequence", StringComparison.Ordinal), "account work should summarize the leading consequence directly on the selected campaign card.");
     Assert(!accountSource.Contains("Server-plane follow-through", StringComparison.Ordinal), "account work should avoid internal server-plane wording on the customer-facing route.");
     Assert(accountSource.Contains("What changed for me", StringComparison.Ordinal), "account work should keep the explicit what-changed-for-me packet on the selected campaign card.");
+    Assert(accountSource.Contains("var selectedWorkspacePortableExchangeNotice =", StringComparison.Ordinal), "account work should derive a dedicated portable-exchange notice from the selected workspace server plane.");
+    Assert(accountSource.Contains("@selectedWorkspacePortableExchangeNotice.Summary", StringComparison.Ordinal), "account work should surface portable exchange directly from the selected workspace decision notice.");
     Assert(accountSource.Contains("Next-session carry-forward", StringComparison.Ordinal), "account work should surface the shared next-session carry-forward projection on both the selected card and the workspace detail drawer.");
     Assert(accountSource.Contains("@selectedWorkspaceNextSessionCarryForward.Summary", StringComparison.Ordinal), "account work should surface the selected workspace carry-forward summary directly from the shared server-plane projection.");
     Assert(accountSource.Contains("Campaign memory", StringComparison.Ordinal), "account work should surface a first-class campaign-memory drawer on both selected and listed shared campaign views.");
@@ -2659,6 +2663,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.CampaignMemory!.EvidenceLines.Count >= 1, "campaign spine server plane api should attach bounded campaign-memory evidence.");
     Assert(workspaceServerPlanePayload.SupportClosures.Count >= 1, "campaign spine server plane api should expose install-aware support closure cues.");
     Assert(workspaceServerPlanePayload.DecisionNotices.Count >= 1, "campaign spine server plane api should expose bounded follow-through notices.");
+    Assert(workspaceServerPlanePayload.DecisionNotices.Any(item => string.Equals(item.Kind, "portable_exchange", StringComparison.Ordinal)), "campaign spine server plane api should surface a first-class portable exchange notice.");
     Assert(workspaceServerPlanePayload.CampaignSummary.RestoreSummary.Contains("Prefetch inventory:", StringComparison.Ordinal), "campaign spine server plane api should make restore prefetch inventory explicit.");
     Assert(workspaceServerPlanePayload.CampaignSummary.RestoreSummary.Contains("bounded offline use", StringComparison.Ordinal), "campaign spine server plane api should keep restore posture tied to bounded offline use.");
     Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.WorkspaceState.Status), "campaign spine server plane api should expose one bounded visible workspace state.");
@@ -3012,6 +3017,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.CampaignMemory is not null, "account workspace detail route should project the bounded campaign-memory packet through the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.SupportClosures.Count >= 1, "account workspace detail route should expose support-closure cues from the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.DecisionNotices.Count >= 1, "account workspace detail route should expose bounded decision notices from the workspace server plane.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.DecisionNotices.Any(item => string.Equals(item.Kind, "portable_exchange", StringComparison.Ordinal)) == true, "account workspace detail route should keep portable exchange visible on the bounded workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RuleEnvironmentHealth.Count >= 1, "account workspace detail route should expose rule-environment health cues from the workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.Label), "account workspace detail route should expose one bounded workspace-state label.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.EvidenceLines.Count >= 1, "account workspace detail route should expose evidence for the bounded workspace state.");
