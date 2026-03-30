@@ -441,6 +441,24 @@ def verify_signed_in_work_audit(
 
     status, body, _, _ = fetch(
         base_url,
+        "/account",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/account returned {status}, expected 200")
+    require_snippet(body, "Keep the visible identity clear, stable, and easy to recognize.", "/account")
+    require_snippet(body, "Display name", "/account")
+    require_snippet(body, "Handle", "/account")
+    require_snippet(body, "Timezone", "/account")
+    require_snippet(body, "Save profile", "/account")
+    require_snippet(body, "Primary sign-in", "/account")
+    require_snippet(body, "Recovery email", "/account")
+    require_snippet(body, "Start verification", "/account")
+
+    status, body, _, _ = fetch(
+        base_url,
         "/account/access",
         public_host=public_host,
         forwarded_proto=forwarded_proto,
@@ -1539,7 +1557,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Publication status", "Trust", "Discovery", "Status"),
+        required_texts=("Publication status", "Trust", "Trust ranking", "Discovery", "Discoverable now", "Status"),
     )
     fetch_fragment_target(
         base_url,
@@ -1690,7 +1708,9 @@ def verify_signed_in_work_audit(
         raise AssertionError(f"{publication_detail_path} returned {status}, expected 200")
     require_snippet(body, "Publication status", publication_detail_path)
     require_snippet(body, "Trust", publication_detail_path)
+    require_snippet(body, "Trust ranking", publication_detail_path)
     require_snippet(body, "Discovery", publication_detail_path)
+    require_snippet(body, "Discoverable now", publication_detail_path)
     require_snippet(body, "Status", publication_detail_path)
     require_snippet(body, "Open build path for", publication_detail_path)
     build_handoff_detail_path = extract_first_match(

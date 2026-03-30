@@ -91,6 +91,20 @@ async function readOptionalHref(page, selector) {
   return locator.getAttribute('href');
 }
 
+async function readDefinitionValue(page, label, path) {
+  const term = page.locator('dt').filter({ hasText: label }).first();
+  if (await term.count() === 0) {
+    assert.fail(`${path} should render a definition term containing "${label}".`);
+  }
+
+  const value = term.locator('xpath=following-sibling::dd[1]');
+  if (await value.count() === 0) {
+    assert.fail(`${path} should render a definition value for "${label}".`);
+  }
+
+  return (await value.innerText()).trim();
+}
+
 function assertLoginRedirect(page, expectedNext, label) {
   const current = new URL(page.url());
   assert.equal(current.pathname, '/login', `${label} should redirect to /login.`);
@@ -125,7 +139,11 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   const pageErrors = [];
   const uniqueRunId = Date.now();
   const uniqueEmail = `hub-e2e-${uniqueRunId}@example.com`;
+  const recoveryEmail = `hub-recovery-${uniqueRunId}@example.com`;
   const supportCaseTitle = `Playwright support case ${uniqueRunId}`;
+  const profileDisplayName = `Profile Runner ${uniqueRunId}`;
+  const profileHandle = `profile-runner-${uniqueRunId}`;
+  const profileTimezone = 'America/New_York';
   let homeWorkspacePath;
   let homeBuildHandoffPath;
   let homeRulesPath;
@@ -372,7 +390,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, homePublicationPath, async () => {
     await expectBodyText(page, 'Publication status', '/home/work -> publication detail');
     await expectBodyText(page, 'Trust', '/home/work -> publication detail');
+    await expectBodyText(page, 'Trust ranking', '/home/work -> publication detail');
     await expectBodyText(page, 'Discovery', '/home/work -> publication detail');
+    await expectBodyText(page, 'Discoverable now', '/home/work -> publication detail');
     await expectBodyText(page, 'Status', '/home/work -> publication detail');
     await assertNoBannedCopy(page, '/home/work -> publication detail');
   });
@@ -474,6 +494,38 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/account', async () => {
     await expectVisible(page, 'text=Profile');
+    await expectBodyText(page, 'Keep the visible identity clear, stable, and easy to recognize.', '/account');
+    await page.locator('#displayName').fill(profileDisplayName);
+    await page.locator('#handle').fill(profileHandle);
+    await page.locator('#timezone').fill(profileTimezone);
+    await Promise.all([
+      expectVisible(page, 'text=Profile saved.'),
+      page.locator('#profileForm button[type="submit"]').click()
+    ]);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await assertNoPageErrors(page, pageErrors, '/account reload');
+    assert.equal(await page.locator('#displayName').inputValue(), profileDisplayName, '/account should persist the saved display name.');
+    assert.equal(await page.locator('#handle').inputValue(), profileHandle, '/account should persist the saved handle.');
+    assert.equal(await page.locator('#timezone').inputValue(), profileTimezone, '/account should persist the saved timezone.');
+
+    await expandDetailsBySummary(page, 'Primary sign-in', '/account');
+    await expectBodyText(page, 'Keep the daily sign-in path visible here without turning the profile route into a second full settings page.', '/account');
+    await expectBodyText(page, 'Google', '/account');
+    await expectBodyText(page, 'Email', '/account');
+
+    await expandDetailsBySummary(page, 'Recovery email', '/account');
+    await expectBodyText(page, 'Add a verified backup path so one sign-in method is never the whole story.', '/account');
+    await page.locator('#recoveryEmail').fill(recoveryEmail);
+    const recoveryStartResponsePromise = page.waitForResponse((response) => response.url().includes('/api/v1/accounts/me/links/email/start') && response.request().method() === 'POST');
+    const recoveryPreviewNavigation = page.waitForURL((url) => new URL(url).pathname === '/auth/email/callback', { timeout: 10000 });
+    await page.locator('#recoveryForm button[type="submit"]').click();
+    const recoveryStartResponse = await recoveryStartResponsePromise;
+    const recoveryPayload = await recoveryStartResponse.json();
+    assert.equal(typeof recoveryPayload.previewHref === 'string' && recoveryPayload.previewHref.length > 0, true, '/account recovery flow should expose an inline preview verification link on the local proof lane.');
+    await recoveryPreviewNavigation;
+    await page.waitForURL((url) => new URL(url).pathname === '/account', { timeout: 10000 });
+    await expectBodyText(page, 'Profile', '/account recovery return');
+    await assertNoBannedCopy(page, '/account');
   });
 
   await gotoAndAssert(page, pageErrors, '/account/access', async () => {
@@ -575,7 +627,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   assert(/\/account\/work\/publications\//.test(page.url()), 'Publication detail route should open from the workspace artifact shelf.');
   await expectBodyText(page, 'Publication status', '/account/work/publications detail');
   await expectBodyText(page, 'Trust', '/account/work/publications detail');
+  await expectBodyText(page, 'Trust ranking', '/account/work/publications detail');
   await expectBodyText(page, 'Discovery', '/account/work/publications detail');
+  await expectBodyText(page, 'Discoverable now', '/account/work/publications detail');
   await expectBodyText(page, 'Status', '/account/work/publications detail');
   await expectBodyText(page, 'Open build path for', '/account/work/publications detail');
   await assertNoBannedCopy(page, '/account/work/publications detail');
@@ -656,6 +710,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectBodyText(page, 'Recovery posture', '/account/advanced');
     await expectBodyText(page, 'Follow horizons', '/account/advanced');
     await expectMinimumCount(page, '.detail-grid--account dd', 6, '/account/advanced detail values');
+    assert.equal(parseInt(await readDefinitionValue(page, 'Linked identities', '/account/advanced'), 10) >= 2, true, '/account/advanced should reflect the new recovery-email identity after the verified preview round trip.');
     await assertNoBannedCopy(page, '/account/advanced');
   });
 
