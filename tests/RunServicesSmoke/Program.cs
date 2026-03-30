@@ -1593,6 +1593,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@workspace.ActiveSceneSummary", StringComparison.Ordinal), "home work should surface active-scene change truth directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("@workspace.NextSafeAction", StringComparison.Ordinal), "home work should surface the next safe action directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("@workspace.FirstPlayableSession.CampaignStartSummary", StringComparison.Ordinal), "home work should surface first-session campaign-start proof directly on the calmer shared campaign card.");
+    Assert(homeSource.Contains("@workspace.FirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "home work should surface legal-runner proof directly on the calmer shared campaign card.");
+    Assert(homeSource.Contains("@workspace.FirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "home work should surface campaign-ready proof directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("What changed for me", StringComparison.Ordinal), "home work should keep the explicit what-changed-for-me packet on the signed-in route.");
     Assert(homeSource.Contains("leadWorkspaceState?.Label", StringComparison.Ordinal), "home work should surface the bounded workspace state directly from the server plane.");
     Assert(homeSource.Contains("Open first playable session proof", StringComparison.Ordinal), "home work should keep a direct route into the bounded first-session proof detail.");
@@ -1708,6 +1710,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("selectedWorkspaceFirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "account work should surface legal-runner proof directly on the selected shared campaign view.");
     Assert(accountSource.Contains("selectedWorkspaceFirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "account work should surface understandable-return proof directly on the selected shared campaign view.");
     Assert(accountSource.Contains("selectedWorkspaceFirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "account work should surface campaign-ready proof directly on the selected shared campaign view.");
+    Assert(accountSource.Contains("@workspace.FirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "account work should surface legal-runner proof directly on the broader shared campaign list.");
+    Assert(accountSource.Contains("@workspace.FirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "account work should surface understandable-return proof directly on the broader shared campaign list.");
+    Assert(accountSource.Contains("@workspace.FirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "account work should surface campaign-ready proof directly on the broader shared campaign list.");
     Assert(accountSource.Contains("Understandable return", StringComparison.Ordinal), "account work should label first-session return proof in customer-facing onboarding language.");
     Assert(!accountSource.Contains("Workspaces and continuity", StringComparison.Ordinal), "account should avoid workspace-heavy section titles on the customer-facing route.");
     Assert(!accountSource.Contains("Campaign continuity, work-return surfaces, and team posture", StringComparison.Ordinal), "account work copy should avoid internal continuity posture phrasing.");
