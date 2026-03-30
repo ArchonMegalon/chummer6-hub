@@ -618,6 +618,34 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/account/support', async () => {
     await expectVisible(page, 'text=Support');
   });
+  await expandDetailsBySummary(page, 'Need routing help first?', '/account/support');
+  await page.fill('#supportAssistantQuery', 'What is the safest build handoff before I export this dossier back into the campaign?');
+  await Promise.all([
+    expectVisible(page, '#supportAssistantAnswer', '/account/support build assistant answer'),
+    expectVisible(page, '#supportAssistantActions', '/account/support build assistant actions'),
+    expectVisible(page, '#supportAssistantCitations', '/account/support build assistant citations'),
+    page.getByRole('button', { name: /Check guidance/i }).click()
+  ]);
+  await expectVisible(page, 'text=Grounded guidance loaded');
+  await expectVisible(page, 'text=Open work');
+  const buildAssistantAnswer = await page.locator('#supportAssistantAnswer').innerText();
+  assert(
+    buildAssistantAnswer.includes('grounded build or campaign follow-through path in your signed-in workspace'),
+    `/account/support assistant should return grounded build-path guidance, got: ${buildAssistantAnswer}`
+  );
+  await expectMinimumCount(page, '#supportAssistantCitations .settings-summary-row', 1, '/account/support build assistant citations');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.locator('#supportAssistantActions a', { hasText: 'Open work' }).first().click()
+  ]);
+  assert.equal(new URL(page.url()).pathname, '/account/work', '/account/support assistant work action should route to /account/work.');
+  await expectBodyText(page, 'Grounded rule answers', '/account/work from support assistant');
+  await expectBodyText(page, 'Build follow-through', '/account/work from support assistant');
+  await assertNoBannedCopy(page, '/account/work from support assistant');
+  await assertNoPageErrors(page, pageErrors, '/account/work from support assistant');
+  await gotoAndAssert(page, pageErrors, '/account/support', async () => {
+    await expectVisible(page, 'text=Support');
+  });
 
   const supportCaseTitleField = page.locator('#supportCaseTitle');
   if (await supportCaseTitleField.count() === 0) {

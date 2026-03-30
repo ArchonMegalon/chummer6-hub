@@ -1,6 +1,17 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:52:33+02:00
+Updated: 2026-03-30T08:54:20+02:00
+
+## Handoff refresh (2026-03-30T08:54:20+02:00)
+
+- Signed-in support proof now enforces the assistant’s grounded bridge back into the campaign/build work surface instead of only checking install/update help:
+  - `scripts/hub-live-audit.py` now sends a signed-in support-assistant build-handoff query before case submission and fails unless the response carries at least one `build_truth` citation plus an `open_work` action.
+  - `scripts/e2e-hub-playwright.cjs` now asks the same build-handoff question inside the `Need routing help first?` drawer, requires the grounded answer/citations, follows `Open work` into `/account/work`, verifies the work surface renders `Grounded rule answers` and `Build follow-through`, then returns to `/account/support` before filing the tracked case.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:52:33+02:00)
 
