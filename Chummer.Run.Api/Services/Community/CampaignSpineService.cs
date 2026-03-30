@@ -1604,8 +1604,8 @@ public sealed class CampaignSpineService
             readinessCues.Add(new CampaignReadinessCue(
                 CueId: StableId("cue", $"{campaign.CampaignId}:aftermath"),
                 Severity: "ready",
-                Title: "Aftermath recap package is attached",
-                Summary: $"{workspaceAftermathPackages.Length} governed recap package(s) keep run aftermath and next-session return reviewable instead of falling back to prose alone."));
+                Title: "Aftermath package rail is attached",
+                Summary: $"{workspaceAftermathPackages.Length} governed aftermath package(s) keep return, replay review, and next-session carry-forward reviewable instead of falling back to prose alone."));
         }
 
         var recapShelf = workspaceAftermathPackages
@@ -1774,10 +1774,10 @@ public sealed class CampaignSpineService
         string carryForwardSummary = carryForwardCount == 0
             ? "next-session carry-forward is still pending"
             : $"{carryForwardCount} carry-forward lane(s) are already attached";
-        string recapSummary = recapPackageCount == 0
-            ? "recap packaging is still pending"
-            : $"{recapPackageCount} recap package(s) are already reviewable";
-        return $"{groupWorkspaces.Count} campaign return(s) keep the governed {railLabel} on the same account/control backbone; {liveRunSummary}, {carryForwardSummary}, and {recapSummary}.";
+        string aftermathSummary = recapPackageCount == 0
+            ? "aftermath packaging is still pending"
+            : $"{recapPackageCount} aftermath package(s) are already reviewable";
+        return $"{groupWorkspaces.Count} campaign return(s) keep the governed {railLabel} on the same account/control backbone; {liveRunSummary}, {carryForwardSummary}, and {aftermathSummary}.";
     }
 
     private static IReadOnlyList<string> BuildGroupRecentEventSummaries(IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
@@ -2631,7 +2631,9 @@ public sealed class CampaignSpineService
         }
         else if (leadAftermathPackage is not null)
         {
-            summary = $"{leadAftermathPackage.Title} is pinned as the recap-safe carry-forward packet for {campaign.Name}.";
+            summary = string.Equals(leadAftermathPackage.PackageKind, "replay_timeline", StringComparison.OrdinalIgnoreCase)
+                ? $"{leadAftermathPackage.Title} is pinned as the replay-safe carry-forward packet for {campaign.Name}."
+                : $"{leadAftermathPackage.Title} is pinned as the recap-safe carry-forward packet for {campaign.Name}.";
         }
         else if (leadConsequence is not null)
         {
@@ -2792,7 +2794,12 @@ public sealed class CampaignSpineService
 
         if (leadAftermathPackage is not null)
         {
-            anchors.Add("aftermath recap");
+            anchors.Add(leadAftermathPackage.PackageKind.Trim().ToLowerInvariant() switch
+            {
+                "replay_timeline" => "replay package",
+                "after_action_report" => "after-action report",
+                _ => "aftermath recap"
+            });
         }
 
         if (leadDowntimePackage is not null)

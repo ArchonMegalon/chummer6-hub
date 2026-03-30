@@ -1380,7 +1380,7 @@
                                     <strong>@(selectedWorkspaceTravelPrefetches.Count == 0 ? "No staged receipts yet" : $"{selectedWorkspaceTravelPrefetches.Count} staged")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Aftermath recap packages</span>
+                                    <span>Aftermath and replay packages</span>
                                     <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No governed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} packaged")</strong>
                                 </div>
                             </div>
@@ -1548,7 +1548,7 @@
                                         <strong>@selectedWorkspaceServerPlane.RecapShelf.Count</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Aftermath recap packages</span>
+                                        <span>Aftermath and replay packages</span>
                                         <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No governed packages yet" : $"{selectedWorkspaceAftermathPackages.Count} receipts")</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -1640,6 +1640,7 @@
                                             <label for="aftermathPackageKind">Package kind</label>
                                             <select id="aftermathPackageKind" required>
                                                 <option value="session_recap">Session recap</option>
+                                                <option value="replay_timeline">Replay timeline</option>
                                                 <option value="after_action_report">After-action report</option>
                                                 <option value="downtime_brief">Downtime brief</option>
                                             </select>
@@ -1650,21 +1651,21 @@
                                         </div>
                                         <div class="field">
                                             <label for="aftermathPackageNote">Operator note</label>
-                                            <textarea id="aftermathPackageNote" rows="3" placeholder="What aftermath or next-session follow-through should stay grounded in this package?"></textarea>
+                                            <textarea id="aftermathPackageNote" rows="3" placeholder="What aftermath, replay, or next-session follow-through should stay grounded in this package?"></textarea>
                                         </div>
                                         <div id="aftermathPackagePreview" class="settings-summary-list" hidden></div>
-                                        <button class="button-like button-like--secondary" type="submit">Generate aftermath recap package</button>
+                                        <button class="button-like button-like--secondary" type="submit">Generate aftermath or replay package</button>
                                         <p id="aftermathPackageStatusNotice" class="muted-copy" hidden></p>
                                     </form>
                                 }
                                 else
                                 {
-                                    <p class="muted-copy">Generate aftermath recap package becomes available once the workspace has a tracked run to pin into the return lane.</p>
+                                    <p class="muted-copy">Generate aftermath or replay packages becomes available once the workspace has a tracked run to pin into the return lane.</p>
                                 }
                                 @if (selectedWorkspaceAftermathPackages.Count > 0)
                                 {
                                     <details class="details-drawer" id="aftermath-packages">
-                                        <summary>Recent aftermath recap packages</summary>
+                                        <summary>Recent aftermath and replay packages</summary>
                                         <ul class="muted-copy">
                                             @foreach (var package in selectedWorkspaceAftermathPackages)
                                             {
@@ -2002,8 +2003,8 @@
                                     <strong>@(workspace.TravelPrefetches is { Count: > 0 } ? $"{workspace.TravelPrefetches.Count} receipts" : "No recent prefetches")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Aftermath recap audit</span>
-                                    <strong>@(workspace.AftermathPackages is { Count: > 0 } ? $"{workspace.AftermathPackages.Count} receipts" : "No recap packages")</strong>
+                                    <span>Aftermath and replay audit</span>
+                                    <strong>@(workspace.AftermathPackages is { Count: > 0 } ? $"{workspace.AftermathPackages.Count} receipts" : "No governed packages")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Downtime brief</span>
@@ -2078,7 +2079,7 @@
                             @if (workspace.AftermathPackages is { Count: > 0 })
                             {
                                 <details class="details-drawer">
-                                    <summary>Aftermath recap audit</summary>
+                                    <summary>Aftermath and replay audit</summary>
                                     <ul class="muted-copy">
                                         @foreach (var package in workspace.AftermathPackages)
                                         {
@@ -3169,12 +3170,28 @@
       : null;
     const scopeLabel = run?.Title || "Campaign";
     switch (kindSelect?.value) {
+      case "replay_timeline":
+        return `${scopeLabel} replay timeline`;
       case "after_action_report":
         return `${scopeLabel} after-action report`;
       case "downtime_brief":
         return `${scopeLabel} downtime brief`;
       default:
         return `${scopeLabel} session recap`;
+    }
+  };
+
+  const defaultAftermathPackagePosture = (run, packageKind) => {
+    const scopeLabel = run?.Title || "Campaign return";
+    switch (packageKind) {
+      case "replay_timeline":
+        return `${scopeLabel} keeps contested-turn review on the same governed replay lane.`;
+      case "after_action_report":
+        return `${scopeLabel} keeps after-action review and consequence follow-through on the shared return lane.`;
+      case "downtime_brief":
+        return `${scopeLabel} keeps downtime obligations and next-session readiness grounded on the shared return lane.`;
+      default:
+        return `${scopeLabel} keeps recap and next-session return on the same governed packet.`;
     }
   };
 
@@ -3196,9 +3213,9 @@
 
     const rows = [
       ["Run scope", run ? `${run.Title} · ${ui.humanizeStatus(run.Status, "Active")}` : "Campaign-wide aftermath"],
-      ["Package kind", ui.humanizeStatus(kindSelect.value.replaceAll("_", " "), "Session recap")],
+      ["Package kind", ui.humanizeStatus(kindSelect.value.replaceAll("_", " "), "Aftermath package")],
       ["Package title", titleInput.value.trim() || defaultAftermathTitle()],
-      ["Return posture", run?.Summary || "Pins the next-session return lane to a governed recap package."]
+      ["Package posture", defaultAftermathPackagePosture(run, kindSelect.value)]
     ];
 
     preview.hidden = false;
@@ -3550,7 +3567,7 @@
       });
       window.location.href = `${workspaceDetailHref(selectedWorkspaceId)}#aftermath-packages`;
     } catch (error) {
-      ui.setNotice(notice, ui.describeError(error, "Aftermath recap package could not be generated right now."), true);
+      ui.setNotice(notice, ui.describeError(error, "Aftermath or replay package could not be generated right now."), true);
     } finally {
       ui.setButtonBusy(button, false, "Packaging...");
     }

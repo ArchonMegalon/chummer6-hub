@@ -62,6 +62,19 @@
     var leadTravelPrefetch = leadWorkspaceServerPlane?.TravelPrefetches.FirstOrDefault();
     var leadAftermathPackage = leadWorkspaceServerPlane?.AftermathPackages
         .FirstOrDefault(item => !string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
+    var leadAftermathTag = leadAftermathPackage?.PackageKind?.Trim().ToLowerInvariant() switch
+    {
+        "replay_timeline" => "Replay timeline",
+        "after_action_report" => "After-action report",
+        "session_recap" => "Aftermath recap",
+        _ => "Aftermath package"
+    };
+    var leadAftermathRouteLabel = leadAftermathPackage?.PackageKind?.Trim().ToLowerInvariant() switch
+    {
+        "replay_timeline" => "Open replay and return",
+        "after_action_report" => "Open aftermath report",
+        _ => "Open aftermath and return"
+    };
     var leadDowntimePackage = leadWorkspaceServerPlane?.AftermathPackages
         .FirstOrDefault(item => string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
     var leadAftermathShelfEntry = leadWorkspaceServerPlane?.RecapShelf
@@ -579,7 +592,7 @@
                                                 @if (leadAftermathPackage is not null)
                                                 {
                                                     <article class="app-rail__item">
-                                                        <span class="tag">Aftermath recap</span>
+                                                        <span class="tag">@leadAftermathTag</span>
                                                         <div class="app-rail__copy">
                                                             <h3>@leadAftermathPackage.Title</h3>
                                                             <p>
@@ -644,7 +657,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#aftermath-packages")">Open aftermath and return</a>
+                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#aftermath-packages")">@leadAftermathRouteLabel</a>
                                                         @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.BuildHandoffId))
                                                         {
                                                             <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(leadAftermathCreatorPublication.BuildHandoffId)}")">Open build path for @leadAftermathCreatorPublication.Title</a>
