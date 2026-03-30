@@ -25,16 +25,6 @@
     var previewHighlight = Model.PreviewItems.FirstOrDefault();
     var release = Model.ReleaseExperience;
     var trustPulse = Model.TrustPulse;
-    var trustPulseRecommended = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Recommended now", StringComparison.Ordinal));
-    var trustPulseAccess = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal));
-    var trustPulseRelease = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Release proof", StringComparison.Ordinal));
-    var trustPulseLaunchReadiness = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal));
-    var trustPulseAdoption = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal));
-    var trustPulseClosure = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Closure health", StringComparison.Ordinal));
-    var trustPulseProgress = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Progress trend", StringComparison.Ordinal));
-    var trustPulseJourney = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Journey pulse", StringComparison.Ordinal));
-    var trustPulseProviderRoute = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Provider-route stewardship", StringComparison.Ordinal));
-    var trustPulseCaution = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal));
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
     var productProofSection = Section("product_proof");
@@ -111,46 +101,32 @@
                 }
             </div>
         }
-        @if (trustPulseRecommended is not null)
+        @if (trustPulse.TrendSamples.Count > 1)
         {
-            <p><strong>@trustPulseRecommended.Label:</strong> @trustPulseRecommended.Value</p>
+            <div class="trust-pulse-trend" aria-label="Measured progress points">
+                @foreach (var sample in trustPulse.TrendSamples)
+                {
+                    <article class="trust-pulse-trend__point@(sample.Current ? " trust-pulse-trend__point--current" : string.Empty)">
+                        <div class="trust-pulse-trend__meta">
+                            <strong>@sample.OverallProgressPercent%</strong>
+                            <span>@sample.AsOf</span>
+                        </div>
+                        <div class="trust-pulse-trend__bar" aria-hidden="true">
+                            <span style="width:@sample.OverallProgressPercent%"></span>
+                        </div>
+                    </article>
+                }
+            </div>
         }
-        @if (trustPulseAccess is not null)
-        {
-            <p><strong>@trustPulseAccess.Label:</strong> @trustPulseAccess.Value</p>
-        }
-        @if (trustPulseRelease is not null)
-        {
-            <p><strong>@trustPulseRelease.Label:</strong> @trustPulseRelease.Value</p>
-        }
-        @if (trustPulseLaunchReadiness is not null)
-        {
-            <p><strong>@trustPulseLaunchReadiness.Label:</strong> @trustPulseLaunchReadiness.Value</p>
-        }
-        @if (trustPulseAdoption is not null)
-        {
-            <p><strong>@trustPulseAdoption.Label:</strong> @trustPulseAdoption.Value</p>
-        }
-        @if (trustPulseClosure is not null)
-        {
-            <p><strong>@trustPulseClosure.Label:</strong> @trustPulseClosure.Value</p>
-        }
-        @if (trustPulseProgress is not null)
-        {
-            <p><strong>@trustPulseProgress.Label:</strong> @trustPulseProgress.Value</p>
-        }
-        @if (trustPulseJourney is not null)
-        {
-            <p><strong>@trustPulseJourney.Label:</strong> @trustPulseJourney.Value</p>
-        }
-        @if (trustPulseProviderRoute is not null)
-        {
-            <p><strong>@trustPulseProviderRoute.Label:</strong> @trustPulseProviderRoute.Value</p>
-        }
-        @if (trustPulseCaution is not null)
-        {
-            <p><strong>@trustPulseCaution.Label:</strong> @trustPulseCaution.Value</p>
-        }
+        <div class="settings-summary-list">
+            @foreach (var row in trustPulse.Rows)
+            {
+                <div class="settings-summary-row">
+                    <span>@row.Label</span>
+                    <strong>@row.Value</strong>
+                </div>
+            }
+        </div>
         <div class="stacked-actions">
             <a class="button-like button-like--secondary" href="/now">Open what works today</a>
             <a class="button-like button-like--ghost" href="/progress">Open progress</a>
