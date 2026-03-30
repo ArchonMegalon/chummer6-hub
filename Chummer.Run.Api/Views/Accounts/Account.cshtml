@@ -70,6 +70,7 @@
     var selectedSupportInstallationId = selectedSupportCase?.InstallationId;
     var selectedWorkspace = Model.SelectedWorkspace;
     var selectedWorkspaceServerPlane = Model.SelectedWorkspaceServerPlane;
+    var selectedWorkspacePortableExchangeNotice = selectedWorkspaceServerPlane?.DecisionNotices.FirstOrDefault(notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.OrdinalIgnoreCase));
     var selectedWorkspaceRosterTransferPlan = Model.SelectedWorkspaceRosterTransferPlan;
     var selectedWorkspacePrepLibrarySearch = Model.SelectedWorkspacePrepLibrarySearch;
     var selectedWorkspacePrepLibraryQuery = Model.SelectedWorkspacePrepLibraryQuery;
@@ -914,6 +915,10 @@
                                 <p><strong>GM prep:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
                                 <p><strong>Travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
                             }
+                            @if (selectedWorkspacePortableExchangeNotice is not null)
+                            {
+                                <p id="portable-exchange"><strong>Portable exchange:</strong> @selectedWorkspacePortableExchangeNotice.Summary</p>
+                            }
                             @if (selectedWorkspace.RecapShelf.Count > 0)
                             {
                                 <p><strong>Recent recap:</strong> @selectedWorkspace.RecapShelf[0].Summary</p>
@@ -972,6 +977,13 @@
                                         <span>Next safe action</span>
                                         <strong>@selectedWorkspaceServerPlane.NextSafeAction.Label · @selectedWorkspaceServerPlane.NextSafeAction.Summary</strong>
                                     </div>
+                                    @if (selectedWorkspacePortableExchangeNotice is not null)
+                                    {
+                                        <div class="settings-summary-row">
+                                            <span>Portable exchange</span>
+                                            <strong>@selectedWorkspacePortableExchangeNotice.Summary</strong>
+                                        </div>
+                                    }
                                     <div class="settings-summary-row">
                                         <span>First playable session</span>
                                         <strong>@(selectedWorkspaceFirstPlayableSession is null ? "Pending" : $"{selectedWorkspaceFirstPlayableSession.Label} · {selectedWorkspaceFirstPlayableSession.CampaignStartSummary}")</strong>

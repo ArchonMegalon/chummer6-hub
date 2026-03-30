@@ -75,7 +75,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<ContinuityConflictCue> continuityConflicts = BuildContinuityConflicts(context.Workspace, context.Restore);
         IReadOnlyList<SupportClosureCue> supportClosures = BuildSupportClosures(context.SupportDigests);
         IReadOnlyList<KnownIssueAffectingInstall> knownIssues = BuildKnownIssues(context.SupportDigests);
-        IReadOnlyList<DecisionNotice> decisionNotices = BuildDecisionNotices(context.Workspace, context.Digest, installLinking, context.SupportDigests);
+        IReadOnlyList<DecisionNotice> decisionNotices = BuildDecisionNotices(context.Workspace, context.Digest, installLinking, context.SupportDigests, prepLibrary, context.LeadRun);
         NextSafeActionCue nextSafeAction = BuildNextSafeActionCue(context.Workspace, installLinking, context.SupportDigests);
         WorkspaceStateSummary workspaceState = BuildWorkspaceStateSummary(
             context.Workspace,
@@ -845,7 +845,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         CampaignWorkspaceDigestProjection? digest,
         InstallLinkingSummaryDto? installLinking,
-        IReadOnlyList<SupportCaseDigestViewModel> supportDigests)
+        IReadOnlyList<SupportCaseDigestViewModel> supportDigests,
+        CampaignPrepLibrarySummary prepLibrary,
+        RunProjection? leadRun)
     {
         List<DecisionNotice> notices = [];
         ClaimedInstallationDto? installation = installLinking?.ClaimedInstallations?
@@ -869,6 +871,8 @@ public sealed class CampaignWorkspaceServerPlaneService
                 ActionLabel: "Open downloads",
                 ActionHref: "/downloads"));
         }
+
+        notices.Add(BuildPortableExchangeDecisionNotice(workspace, prepLibrary, leadRun));
 
         if ((digest?.Watchouts.Count ?? 0) > 0)
         {
@@ -895,6 +899,60 @@ public sealed class CampaignWorkspaceServerPlaneService
             .DistinctBy(static item => item.NoticeId, StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
+    }
+
+    private static DecisionNotice BuildPortableExchangeDecisionNotice(
+        CampaignWorkspaceProjection workspace,
+        CampaignPrepLibrarySummary prepLibrary,
+        RunProjection? leadRun)
+    {
+        bool hasPinnedRun = leadRun is not null && !string.IsNullOrWhiteSpace(leadRun.RunId);
+        string scopeSummary = BuildPortableExchangeScopeSummary(workspace, prepLibrary);
+        string formatSummary = hasPinnedRun
+            ? "Formats include chummer.portable-dossier.v1, chummer.portable-campaign.v1, session-runtime-bundle.v1, and foundry-vtt.scene-ledger.v1."
+            : "Formats include chummer.portable-dossier.v1 and chummer.portable-campaign.v1.";
+        string summary = hasPinnedRun
+            ? $"Portable exchange is ready for inspect-only, merge, or governed replace across {scopeSummary}; run {leadRun!.Title} stays pinned on the same receipt. {formatSummary}"
+            : $"Portable exchange is ready for inspect-only or merge across {scopeSummary}; governed replace stays review-required until a live run is pinned. {formatSummary}";
+
+        return new DecisionNotice(
+            NoticeId: $"portable-exchange:{workspace.WorkspaceId}",
+            Kind: "portable_exchange",
+            Summary: summary,
+            ActionLabel: "Review portable exchange",
+            ActionHref: $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#portable-exchange");
+    }
+
+    private static string BuildPortableExchangeScopeSummary(
+        CampaignWorkspaceProjection workspace,
+        CampaignPrepLibrarySummary prepLibrary)
+    {
+        List<string> parts = [];
+
+        if (workspace.Dossiers.Count > 0)
+        {
+            parts.Add($"{workspace.Dossiers.Count} dossier(s)");
+        }
+
+        if (prepLibrary.Packets.Count > 0)
+        {
+            parts.Add($"{prepLibrary.Packets.Count} prep packet(s)");
+        }
+
+        int aftermathPackageCount = workspace.AftermathPackages?.Count ?? 0;
+        if (aftermathPackageCount > 0)
+        {
+            parts.Add($"{aftermathPackageCount} aftermath package(s)");
+        }
+
+        if (workspace.Runs.Count > 0)
+        {
+            parts.Add($"{workspace.Runs.Count} run receipt(s)");
+        }
+
+        return parts.Count == 0
+            ? "the current shared campaign truth"
+            : string.Join(", ", parts);
     }
 
     private static NextSafeActionCue BuildNextSafeActionCue(
