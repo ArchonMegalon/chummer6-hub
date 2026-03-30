@@ -2918,15 +2918,21 @@ public sealed class CampaignSpineService
                 UpdatedAtUtc: travelPrefetch.StagedAtUtc));
         }
 
-        AftermathRecapPackageProjection? aftermathPackage = aftermathPackages.FirstOrDefault();
-        if (aftermathPackage is not null)
+        AftermathRecapPackageProjection? replayPackage = aftermathPackages
+            .FirstOrDefault(item => string.Equals(item.PackageKind, "replay_timeline", StringComparison.OrdinalIgnoreCase));
+        AftermathRecapPackageProjection? aftermathPackage = aftermathPackages
+            .FirstOrDefault(item => !string.Equals(item.PackageKind, "replay_timeline", StringComparison.OrdinalIgnoreCase));
+        foreach (AftermathRecapPackageProjection package in new[] { replayPackage, aftermathPackage }
+                     .Where(static item => item is not null)
+                     .Cast<AftermathRecapPackageProjection>()
+                     .DistinctBy(static item => item.PackageId, StringComparer.OrdinalIgnoreCase))
         {
             packets.Add(new WorkspaceChangePacketProjection(
-                PacketId: StableId("packet", $"{campaign.CampaignId}:aftermath:{aftermathPackage.PackageId}"),
-                Kind: "aftermath_recap",
-                Label: DescribeAftermathChangeLabel(aftermathPackage.PackageKind),
-                Summary: aftermathPackage.Summary,
-                UpdatedAtUtc: aftermathPackage.GeneratedAtUtc));
+                PacketId: StableId("packet", $"{campaign.CampaignId}:aftermath:{package.PackageId}"),
+                Kind: DescribeAftermathChangePacketKind(package.PackageKind),
+                Label: DescribeAftermathChangeLabel(package.PackageKind),
+                Summary: package.Summary,
+                UpdatedAtUtc: package.GeneratedAtUtc));
         }
 
         PublicationSafeProjection? recap = recapShelf.FirstOrDefault();
@@ -2942,7 +2948,7 @@ public sealed class CampaignSpineService
 
         return packets
             .OrderByDescending(static item => item.UpdatedAtUtc)
-            .Take(4)
+            .Take(6)
             .ToArray();
     }
 
@@ -3011,9 +3017,17 @@ public sealed class CampaignSpineService
     private static string DescribeAftermathChangeLabel(string packageKind)
         => packageKind.Trim().ToLowerInvariant() switch
         {
+            "replay_timeline" => "Replay timeline",
             "downtime_brief" => "Downtime brief",
             "after_action_report" => "After-action report",
             _ => "Aftermath recap package"
+        };
+
+    private static string DescribeAftermathChangePacketKind(string packageKind)
+        => packageKind.Trim().ToLowerInvariant() switch
+        {
+            "replay_timeline" => "replay_package",
+            _ => "aftermath_recap"
         };
 
     private static string BuildAftermathRecapProvenanceSummary(AftermathRecapPackageProjection package)
@@ -3719,7 +3733,8 @@ public sealed class CampaignSpineService
         var normalizedKind = item.Kind.Trim().ToLowerInvariant();
         return normalizedKind.Contains("recap", StringComparison.Ordinal)
             || normalizedKind.Contains("after", StringComparison.Ordinal)
-            || normalizedKind.Contains("downtime", StringComparison.Ordinal);
+            || normalizedKind.Contains("downtime", StringComparison.Ordinal)
+            || normalizedKind.Contains("replay", StringComparison.Ordinal);
     }
 
     private static string DescribeRecapShelfAudience(PublicationSafeProjection item, bool creatorLinked)
@@ -3754,6 +3769,11 @@ public sealed class CampaignSpineService
         if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
         {
             return $"{workspace.CampaignName} keeps this GM-facing packet on the shared campaign rail so organizer follow-through stays reviewable.";
+        }
+
+        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        {
+            return $"{workspace.CampaignName} keeps this replay-safe artifact pinned to the shared continuity lane so contested turns can be reviewed without forking campaign truth.";
         }
 
         return $"{workspace.CampaignName} keeps this recap-safe artifact pinned to the shared continuity lane for return, audit, and reuse.";
@@ -3801,6 +3821,11 @@ public sealed class CampaignSpineService
         if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
         {
             return "Campaign return and GM prep reuse the same packet before creator publication is opened.";
+        }
+
+        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        {
+            return "Campaign return and contested-turn review reuse the same replay-safe packet before creator publication is opened.";
         }
 
         return "Campaign return already trusts this recap-safe artifact, and creator publication can promote the same truth without rebuilding it.";
@@ -3855,6 +3880,11 @@ public sealed class CampaignSpineService
         if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
         {
             return "Keep prep, aftermath, and next-session follow-through on the shared campaign rail before you branch into another export lane.";
+        }
+
+        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        {
+            return "Keep contested-turn review on the shared campaign rail before you widen the replay artifact audience or publish another copy.";
         }
 
         if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
