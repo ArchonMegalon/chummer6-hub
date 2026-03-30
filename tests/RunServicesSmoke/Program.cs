@@ -1597,6 +1597,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("leadWorkspaceState?.Label", StringComparison.Ordinal), "home work should surface the bounded workspace state directly from the server plane.");
     Assert(homeSource.Contains("Open first playable session proof", StringComparison.Ordinal), "home work should keep a direct route into the bounded first-session proof detail.");
     Assert(homeSource.Contains("@leadFirstPlayableSession.CampaignStartSummary", StringComparison.Ordinal), "home work should surface the first-session campaign-start summary directly from the server plane.");
+    Assert(homeSource.Contains("@leadFirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "home work should surface legal-runner proof directly from the bounded first-session projection.");
+    Assert(homeSource.Contains("@leadFirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "home work should surface understandable-return proof directly from the bounded first-session projection.");
+    Assert(homeSource.Contains("@leadFirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "home work should surface campaign-ready proof directly from the bounded first-session projection.");
     Assert(homeSource.Contains("Next-session carry-forward", StringComparison.Ordinal), "home work should surface a dedicated next-session carry-forward card backed by the shared workspace projection.");
     Assert(homeSource.Contains("@leadNextSessionCarryForward.Summary", StringComparison.Ordinal), "home work should surface the next-session carry-forward summary directly from the server plane.");
     Assert(homeSource.Contains("@leadNextSessionCarryForward.ReturnSummary", StringComparison.Ordinal), "home work should keep return-lane truth attached to the calmer next-session card.");
@@ -1702,6 +1705,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("/api/v1/campaign-spine/me/workspaces/starter", StringComparison.Ordinal), "account work should reuse the campaign-spine starter endpoint instead of inventing a second onboarding API.");
     Assert(accountSource.Contains("selected-first-playable-session", StringComparison.Ordinal), "account work should keep a bounded first-session proof drawer on the selected shared campaign view.");
     Assert(accountSource.Contains("selectedWorkspaceFirstPlayableSession.CampaignStartSummary", StringComparison.Ordinal), "account work should surface first-session campaign-start proof directly on the selected shared campaign view.");
+    Assert(accountSource.Contains("selectedWorkspaceFirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "account work should surface legal-runner proof directly on the selected shared campaign view.");
+    Assert(accountSource.Contains("selectedWorkspaceFirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "account work should surface understandable-return proof directly on the selected shared campaign view.");
+    Assert(accountSource.Contains("selectedWorkspaceFirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "account work should surface campaign-ready proof directly on the selected shared campaign view.");
+    Assert(accountSource.Contains("Understandable return", StringComparison.Ordinal), "account work should label first-session return proof in customer-facing onboarding language.");
     Assert(!accountSource.Contains("Workspaces and continuity", StringComparison.Ordinal), "account should avoid workspace-heavy section titles on the customer-facing route.");
     Assert(!accountSource.Contains("Campaign continuity, work-return surfaces, and team posture", StringComparison.Ordinal), "account work copy should avoid internal continuity posture phrasing.");
     Assert(!accountSource.Contains("Advanced continuity and restore", StringComparison.Ordinal), "account access should avoid internal restore drawer wording.");
@@ -2434,6 +2441,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspacePayload.NextSessionCarryForward!.EvidenceLines.Count >= 1, "campaign spine workspace api should attach bounded next-session evidence lines.");
     Assert(workspacePayload.FirstPlayableSession is not null, "campaign spine workspace api should expose a first-class first playable session projection before governed follow-through moves beyond onboarding.");
     Assert(workspacePayload.FirstPlayableSession!.EvidenceLines.Count >= 1, "campaign spine workspace api should attach bounded first-session evidence lines.");
+    Assert(!string.IsNullOrWhiteSpace(workspacePayload.FirstPlayableSession.RuleReadySummary), "campaign spine workspace api should expose legal-runner proof on the first-session projection.");
+    Assert(!string.IsNullOrWhiteSpace(workspacePayload.FirstPlayableSession.ReturnLaneSummary), "campaign spine workspace api should expose understandable-return proof on the first-session projection.");
+    Assert(!string.IsNullOrWhiteSpace(workspacePayload.FirstPlayableSession.CampaignReadySummary), "campaign spine workspace api should expose campaign-ready proof on the first-session projection.");
     Assert(workspacePayload.CampaignMemory is not null, "campaign spine workspace api should expose a first-class campaign-memory projection.");
     Assert(workspacePayload.CampaignMemory!.EvidenceLines.Count >= 1, "campaign spine workspace api should attach bounded campaign-memory evidence lines.");
     Assert(!string.IsNullOrWhiteSpace(workspacePayload?.ActiveSceneSummary), "campaign spine workspace api should expose an active-scene summary.");
@@ -2461,6 +2471,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.Consequences.Any(item => string.Equals(item.Kind, "faction", StringComparison.Ordinal) && item.Receipts.Count >= 1), "campaign spine server plane api should keep grounded faction receipts visible.");
     Assert(workspaceServerPlanePayload.FirstPlayableSession is not null, "campaign spine server plane api should expose the bounded first playable session proof.");
     Assert(workspaceServerPlanePayload.FirstPlayableSession!.EvidenceLines.Count >= 1, "campaign spine server plane api should attach bounded first-session evidence.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.FirstPlayableSession.RuleReadySummary), "campaign spine server plane api should carry legal-runner proof on the bounded first-session projection.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.FirstPlayableSession.ReturnLaneSummary), "campaign spine server plane api should carry understandable-return proof on the bounded first-session projection.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.FirstPlayableSession.CampaignReadySummary), "campaign spine server plane api should carry campaign-ready proof on the bounded first-session projection.");
     Assert(workspaceServerPlanePayload.NextSessionCarryForward is not null, "campaign spine server plane api should expose the bounded next-session carry-forward projection.");
     Assert(workspaceServerPlanePayload.NextSessionCarryForward!.EvidenceLines.Count >= 1, "campaign spine server plane api should attach bounded next-session evidence lines.");
     Assert(workspaceServerPlanePayload.CampaignMemory is not null, "campaign spine server plane api should expose the bounded campaign-memory projection.");
@@ -2487,6 +2500,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var starterWorkspacePayload = (starterWorkspaceResult.Result as OkObjectResult)?.Value as CampaignWorkspaceProjection ?? starterWorkspaceResult.Value;
     Assert(starterWorkspacePayload is not null && !string.IsNullOrWhiteSpace(starterWorkspacePayload.WorkspaceId), "campaign spine starter api should return a starter workspace for first session onboarding.");
     Assert(starterWorkspacePayload!.FirstPlayableSession is not null, "campaign spine starter api should return first-session proof on the starter workspace payload.");
+    Assert(!string.IsNullOrWhiteSpace(starterWorkspacePayload.FirstPlayableSession!.RuleReadySummary), "campaign spine starter api should return legal-runner proof on the starter workspace payload.");
+    Assert(!string.IsNullOrWhiteSpace(starterWorkspacePayload.FirstPlayableSession.ReturnLaneSummary), "campaign spine starter api should return understandable-return proof on the starter workspace payload.");
+    Assert(!string.IsNullOrWhiteSpace(starterWorkspacePayload.FirstPlayableSession.CampaignReadySummary), "campaign spine starter api should return campaign-ready proof on the starter workspace payload.");
     var rosterTransferPlanResult = await campaignSpineController.GetMyCampaignWorkspaceRosterTransferPlan(workspaceId, CancellationToken.None);
     var rosterTransferPlanPayload = (rosterTransferPlanResult.Result as OkObjectResult)?.Value as RosterTransferPlannerProjection ?? rosterTransferPlanResult.Value;
     Assert(rosterTransferPlanPayload is not null && string.Equals(rosterTransferPlanPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine roster-transfer planner api should stay attached to the selected shared campaign view.");
@@ -2871,9 +2887,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces[0].CampaignMemory is not null, "signed-in home should keep the shared campaign-memory projection attached to the shared campaign view.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "signed-in home should keep the active-scene summary attached to the shared campaign view.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].NextSafeAction), "signed-in home should keep the workspace next safe action attached to the shared campaign view.");
+    Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Any(item => !string.IsNullOrWhiteSpace(item.FirstPlayableSession?.RuleReadySummary)), "signed-in home should keep legal-runner proof attached to at least one shared first-session projection.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane is not null, "signed-in home should receive the bounded lead workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.LeadWorkspaceServerPlane!.WorkspaceState.Status), "signed-in home should surface one bounded workspace state on the what-changed card.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.WorkspaceState.EvidenceLines.Count >= 1, "signed-in home should surface workspace-state evidence on the what-changed card.");
+    Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Any(item => !string.IsNullOrWhiteSpace(item.FirstPlayableSession?.ReturnLaneSummary)), "signed-in home should keep understandable-return proof attached to at least one shared first-session projection.");
+    Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Any(item => !string.IsNullOrWhiteSpace(item.FirstPlayableSession?.CampaignReadySummary)), "signed-in home should keep campaign-ready proof attached to at least one shared first-session projection.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane!.PrepLibrary.Packets.Count >= 3, "signed-in home should surface the governed GM prep library on the home cockpit.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.PrepLaunches.Any(item => string.Equals(item.LaunchId, prepLaunchPayload!.LaunchId, StringComparison.Ordinal)) == true, "signed-in home should surface the latest governed prep-launch receipt on the same workspace spine.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount >= 1, "signed-in home should surface safehouse/travel readiness on the home cockpit.");

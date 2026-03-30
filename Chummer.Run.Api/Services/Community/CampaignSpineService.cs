@@ -2449,6 +2449,9 @@ public sealed class CampaignSpineService
         string campaignStartSummary = leadObjective is null
             ? $"{activeScene.Title} is the live campaign-start scene on {leadRun.Title}."
             : $"{activeScene.Title} opens {leadRun.Title} while {leadObjective.Title} stays {leadObjective.Status} with {leadObjective.Pressure} pressure.";
+        string ruleReadySummary = BuildFirstPlayableRuleReadySummary(campaign.RuleEnvironment, workspaceDossiers);
+        string returnLaneSummary = BuildFirstPlayableReturnLaneSummary(campaign, claimedDevice, leadRun, activeScene);
+        string campaignReadySummary = BuildFirstPlayableCampaignReadySummary(workspaceDossiers.Count, crewMemberCount, leadRun, attentionCue);
         DateTimeOffset updatedAtUtc = new[]
             {
                 campaign.LatestContinuity?.CapturedAtUtc,
@@ -2468,6 +2471,9 @@ public sealed class CampaignSpineService
             Label: "First playable session",
             Summary: summary,
             CampaignStartSummary: campaignStartSummary,
+            RuleReadySummary: ruleReadySummary,
+            ReturnLaneSummary: returnLaneSummary,
+            CampaignReadySummary: campaignReadySummary,
             NextSafeAction: nextSafeAction,
             EvidenceLines: FinalizeLines(
             [
@@ -2480,6 +2486,67 @@ public sealed class CampaignSpineService
                 nextSafeAction
             ]),
             UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static string BuildFirstPlayableRuleReadySummary(
+        RuleEnvironmentRef ruleEnvironment,
+        IReadOnlyList<RunnerDossierProjection> dossiers)
+    {
+        int alignedCount = dossiers.Count(dossier =>
+            string.Equals(
+                dossier.RuleEnvironment.CompatibilityFingerprint,
+                ruleEnvironment.CompatibilityFingerprint,
+                StringComparison.OrdinalIgnoreCase));
+        int mismatchedCount = dossiers.Count - alignedCount;
+        string approvalState = HumanizePhrase(ruleEnvironment.ApprovalState, "review");
+
+        if (mismatchedCount == 0)
+        {
+            return $"{alignedCount} dossier(s) stay pinned to {ruleEnvironment.CompatibilityFingerprint} with {approvalState} {ruleEnvironment.OwnerScope} scope.";
+        }
+
+        return $"{alignedCount} dossier(s) already match {ruleEnvironment.CompatibilityFingerprint}, but {mismatchedCount} still need that {approvalState} {ruleEnvironment.OwnerScope} rule lane.";
+    }
+
+    private static string BuildFirstPlayableReturnLaneSummary(
+        CampaignProjection campaign,
+        ClaimedDeviceRestoreProjection? claimedDevice,
+        RunProjection leadRun,
+        SceneProjection activeScene)
+    {
+        string continuitySummary = campaign.LatestContinuity?.Summary
+            ?? $"{activeScene.Title} stays pinned as the shared return lane for {leadRun.Title}.";
+
+        if (claimedDevice is null)
+        {
+            return $"{continuitySummary} Claimed-install return will reopen the same kickoff lane when this account links a device.";
+        }
+
+        return $"{continuitySummary} {claimedDevice.RestoreSummary}";
+    }
+
+    private static string BuildFirstPlayableCampaignReadySummary(
+        int dossierCount,
+        int crewMemberCount,
+        RunProjection leadRun,
+        CampaignReadinessCue? attentionCue)
+    {
+        if (attentionCue is null)
+        {
+            return $"{dossierCount} dossier(s) and {crewMemberCount} crew member(s) already cover {leadRun.Title} with no blocking readiness cue.";
+        }
+
+        return $"{dossierCount} dossier(s) and {crewMemberCount} crew member(s) are attached, but {attentionCue.Summary}";
+    }
+
+    private static string HumanizePhrase(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return value.Trim().Replace('_', ' ');
     }
 
     private static NextSessionCarryForwardProjection? BuildNextSessionCarryForward(
