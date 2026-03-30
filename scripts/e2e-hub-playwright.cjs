@@ -205,6 +205,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   let homeInviteRailPath;
   let homeSponsorRailPath;
   let publicCreatorPublicationPath;
+  let accountPublicationBuildHandoffPath;
   let runDetailPath;
   let rulesDetailPath;
 
@@ -755,22 +756,24 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await expectBodyText(page, 'Discoverable now', '/account/work/publications detail');
   await expectBodyText(page, 'Status', '/account/work/publications detail');
   await expectBodyText(page, 'Open build path for', '/account/work/publications detail');
+  accountPublicationBuildHandoffPath = await readFirstHref(page, 'a[href*="/account/work/build-handoffs/"]', '/account/work/publications detail');
+  const accountPublicationPublicPath = await readOptionalHref(page, 'a[href*="/artifacts/creator/"]');
   await assertNoBannedCopy(page, '/account/work/publications detail');
   await assertNoPageErrors(page, pageErrors, '/account/work/publications detail');
+  if (accountPublicationPublicPath) {
+    await assertCreatorPublicationDetail(page, pageErrors, accountPublicationPublicPath, '/account/work/publications detail -> public creator packet');
+  }
 
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-    page.locator('a[href*="/account/work/build-handoffs/"]').first().click()
-  ]);
-  assert(/\/account\/work\/build-handoffs\//.test(page.url()), 'Build handoff detail route should open from the publication detail route.');
-  await expectBodyText(page, 'Build follow-through', '/account/work/build-handoffs detail');
-  await expectBodyText(page, 'Variant', '/account/work/build-handoffs detail');
-  await expectBodyText(page, 'Progression', '/account/work/build-handoffs detail');
-  await expectBodyText(page, 'Next safe action', '/account/work/build-handoffs detail');
-  await expectBodyText(page, 'Runtime', '/account/work/build-handoffs detail');
-  await expectBodyText(page, 'Planner coverage', '/account/work/build-handoffs detail');
-  await assertNoBannedCopy(page, '/account/work/build-handoffs detail');
-  await assertNoPageErrors(page, pageErrors, '/account/work/build-handoffs detail');
+  await gotoAndAssert(page, pageErrors, accountPublicationBuildHandoffPath, async () => {
+    assert(/\/account\/work\/build-handoffs\//.test(page.url()), 'Build handoff detail route should open from the publication detail route.');
+    await expectBodyText(page, 'Build follow-through', '/account/work/build-handoffs detail');
+    await expectBodyText(page, 'Variant', '/account/work/build-handoffs detail');
+    await expectBodyText(page, 'Progression', '/account/work/build-handoffs detail');
+    await expectBodyText(page, 'Next safe action', '/account/work/build-handoffs detail');
+    await expectBodyText(page, 'Runtime', '/account/work/build-handoffs detail');
+    await expectBodyText(page, 'Planner coverage', '/account/work/build-handoffs detail');
+    await assertNoBannedCopy(page, '/account/work/build-handoffs detail');
+  });
 
   await gotoAndAssert(page, pageErrors, runDetailPath, async () => {
     await expectBodyText(page, 'Run context', '/account/work/runs detail');

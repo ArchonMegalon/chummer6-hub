@@ -1763,6 +1763,20 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Discoverable now", publication_detail_path)
     require_snippet(body, "Status", publication_detail_path)
     require_snippet(body, "Open build path for", publication_detail_path)
+    public_creator_detail_path = extract_optional_match(
+        body,
+        r'href="([^"]*/artifacts/creator/[^"]+)"')
+    if public_creator_detail_path:
+        status, public_creator_body, _, _ = fetch(
+            base_url,
+            public_creator_detail_path,
+            public_host=public_host,
+            forwarded_proto=forwarded_proto,
+            request_headers={"Cookie": cookie_header},
+        )
+        if status != 200:
+            raise AssertionError(f"{public_creator_detail_path} returned {status}, expected 200")
+        require_creator_publication_body(public_creator_body, public_creator_detail_path)
     build_handoff_detail_path = extract_first_match(
         body,
         r'href="([^"]*/account/work/build-handoffs/[^"]+)"',

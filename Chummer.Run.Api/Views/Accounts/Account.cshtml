@@ -191,6 +191,11 @@
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
     static string RulesDetailHref(string entryId) => $"/account/work/rules/{Uri.EscapeDataString(entryId)}";
     static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
+    static string PublicCreatorPublicationHref(string publicationId) => $"/artifacts/creator/{Uri.EscapeDataString(publicationId)}";
+    static bool IsDiscoverablePublicCreatorPublication(Chummer.Campaign.Contracts.CreatorPublicationProjection? publication)
+        => publication is not null
+            && publication.Discoverable
+            && string.Equals(publication.PublicationStatus, "published", StringComparison.OrdinalIgnoreCase);
 
     static string TrustRowValue(
         SignedInTrustStatusPanelViewModel? panel,
@@ -1620,6 +1625,10 @@
                                                     @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
                                                     {
                                                         <a class="inline-link" href="@PublicationDetailHref(item.CreatorPublicationId)">Open publication status</a>
+                                                        @if (IsDiscoverablePublicCreatorPublication(linkedPublication))
+                                                        {
+                                                            <a class="inline-link" href="@PublicCreatorPublicationHref(item.CreatorPublicationId)">Open public creator packet</a>
+                                                        }
                                                     }
                                                 </li>
                                             }
@@ -2039,6 +2048,10 @@
                         {
                             <a class="inline-link" href="@BuildHandoffDetailHref(selectedCreatorPublication.BuildHandoffId)">Open build path for @selectedCreatorPublication.Title</a>
                         }
+                        @if (IsDiscoverablePublicCreatorPublication(selectedCreatorPublication))
+                        {
+                            <a class="inline-link" href="@PublicCreatorPublicationHref(selectedCreatorPublication.PublicationId)">Open public creator packet</a>
+                        }
                     </article>
                 }
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
@@ -2384,6 +2397,10 @@
                                                 @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
                                                 {
                                                     <a class="inline-link" href="@PublicationDetailHref(item.CreatorPublicationId)">Open publication status</a>
+                                                    @if (IsDiscoverablePublicCreatorPublication(linkedPublication))
+                                                    {
+                                                        <a class="inline-link" href="@PublicCreatorPublicationHref(item.CreatorPublicationId)">Open public creator packet</a>
+                                                    }
                                                 }
                                             </li>
                                         }
@@ -2577,6 +2594,10 @@
                                     @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
                                     {
                                         <a class="inline-link" href="@BuildHandoffDetailHref(publication.BuildHandoffId)">Open build path for @publication.Title</a>
+                                    }
+                                    @if (IsDiscoverablePublicCreatorPublication(publication))
+                                    {
+                                        <a class="inline-link" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open public creator packet</a>
                                     }
                                 </li>
                             }
