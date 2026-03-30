@@ -1175,6 +1175,11 @@ def verify_signed_in_work_audit(
     require_snippet(body, aftermath_package["title"], workspace_path)
     require_snippet(body, downtime_package["title"], workspace_path)
     require_snippet(body, "Downtime brief", workspace_path)
+    require_snippet(body, "Artifact shelf posture", workspace_path)
+    require_snippet(body, "Audience:", workspace_path)
+    require_snippet(body, "Ownership:", workspace_path)
+    require_snippet(body, "Publication:", workspace_path)
+    require_snippet(body, "Open publication status", workspace_path)
     print(
         "ok signed-in /account/work -> "
         f"{final_url} workspace={workspace_id} install={claimed_installation_id} support_case={support_case_id} support_fix={support_fixed_version} join_code={join_code['code']} boost_code={boost_code['code']} sponsor_session={sponsor_session_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} downtime={downtime_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"

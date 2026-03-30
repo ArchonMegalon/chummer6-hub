@@ -1,6 +1,22 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T07:25:00+02:00
+Updated: 2026-03-30T07:58:45+02:00
+
+## Handoff refresh (2026-03-30T07:58:45+02:00)
+
+- Signed-in hub proof now treats workspace artifact-shelf posture as release-blocking instead of only trusting the view source:
+  - `scripts/hub-live-audit.py` now verifies the workspace-detail route reached from the signed-in journey renders artifact-shelf audience, ownership, publication posture, and publication-status deep links.
+  - `scripts/e2e-hub-playwright.cjs` now expands the same workspace-detail artifact-shelf drawer in the browser lane and asserts the rendered ownership/publication posture there.
+  - `tests/RunServicesSmoke/Program.cs` now locks the richer workspace-detail server-plane recap-shelf contract so in-process smoke fails if ownership/publication/next-safe-action posture disappears from the bound model.
+- During this pass I explicitly confirmed that `/account/work` without a selected workspace does not hydrate `SelectedWorkspaceServerPlane`; the stable release-proof seam is `/account/work/workspaces/{workspaceId}`, and the hardened checks now target that route instead of the summary page.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `bash scripts/run_smoke.sh`
+  - `bash scripts/ai/run_services_smoke.sh`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T07:25:00+02:00)
 
