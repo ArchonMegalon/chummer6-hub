@@ -1906,6 +1906,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(faqSource.Contains("FaqActionFor", StringComparison.Ordinal), "faq should attach direct next-step routing under answers instead of stopping at a text-only sheet.");
     Assert(faqSource.Contains("Open downloads", StringComparison.Ordinal), "faq should expose a direct downloads route for install/update answers.");
     Assert(faqSource.Contains("Open support intake", StringComparison.Ordinal), "faq should expose a direct support route for help and bug-report answers.");
+    Assert(faqSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "faq should reuse the shared signed-in trust panel instead of inventing a faq-only trust surface.");
+    Assert(faqSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "faq should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
     Assert(!faqSource.Contains("story-guide-tail", StringComparison.Ordinal), "faq should end with a quieter footnote instead of a full landing-style CTA band.");
     var trustCanonSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", ".codex-design", "product", "PUBLIC_TRUST_CONTENT.yaml"));
     Assert(!trustCanonSource.Contains("signed-in shell", StringComparison.Ordinal), "public trust canon should not leak signed-in-shell language into customer copy.");
@@ -2158,6 +2160,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicContactModel?.TrustPulse is not null, "guest contact page should surface the weekly public trust pulse.");
     Assert(publicContactModel?.PrivacyBoundary is not null, "guest contact page should surface the same privacy-boundary panel before support intake.");
     Assert(publicContactModel?.SupportIntake is not null, "guest contact page should keep the first-party support intake available.");
+    var publicFaqView = await controller.FaqPage(CancellationToken.None) as ViewResult;
+    var publicFaqModel = publicFaqView?.Model as FaqPageViewModel;
+    Assert(publicFaqModel?.TrustPulse is not null, "guest faq should surface the weekly public trust pulse.");
+    Assert(publicFaqModel?.SignedInStatus is null, "guest faq should not project install-specific signed-in trust posture.");
 
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
@@ -2979,6 +2985,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedLandingModel?.SignedInStatus is not null, "authenticated landing should project the shared signed-in trust status on the front door.");
     Assert(authenticatedLandingModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "authenticated landing should surface who-can-get-it-now posture directly in the shared trust panel.");
     Assert(authenticatedLandingModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "authenticated landing should surface a non-empty fix-availability row directly in the shared trust panel.");
+    var authenticatedFaqPage = await authenticatedLandingController.FaqPage(CancellationToken.None) as ViewResult;
+    var authenticatedFaqModel = authenticatedFaqPage?.Model as FaqPageViewModel;
+    Assert(authenticatedFaqModel?.SignedInStatus is not null, "authenticated faq should project the shared signed-in trust status.");
+    Assert(authenticatedFaqModel?.TrustPulse is not null, "authenticated faq should keep the weekly public trust pulse visible.");
     Assert(authenticatedHomeModel!.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "signed-in home should surface tracked support context.");
     Assert(authenticatedHomeModel.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && item.ClosureSummary.Contains("closure notice", StringComparison.OrdinalIgnoreCase)), "signed-in home access should surface release closure truth from the shared support presenter.");
     Assert(authenticatedHomeModel.CampaignSpine.Dossiers.Count >= 1, "signed-in home should surface living dossier continuity.");
@@ -3304,6 +3314,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(unavailableHelpModel?.Chrome.Authenticated == true, "help chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
     Assert(unavailableHelpModel?.SignedInStatus is null, "help projection should suppress install-specific trust status when identity is temporarily unavailable.");
     Assert(unavailableHelpModel?.TrustPulse is not null, "help should keep the public trust pulse even when identity lookups are temporarily unavailable.");
+    var unavailableFaqView = await unavailableLandingController.FaqPage(CancellationToken.None) as ViewResult;
+    var unavailableFaqModel = unavailableFaqView?.Model as FaqPageViewModel;
+    Assert(unavailableFaqModel?.Chrome.Authenticated == true, "faq chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
+    Assert(unavailableFaqModel?.SignedInStatus is null, "faq should suppress install-specific trust status when identity is temporarily unavailable.");
+    Assert(unavailableFaqModel?.TrustPulse is not null, "faq should keep the public trust pulse even when identity lookups are temporarily unavailable.");
     var unavailableHomeResult = await unavailableLandingController.HomePage(null, CancellationToken.None);
     var unavailableHomeModel = (unavailableHomeResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableHomeModel?.Heading, "Home is unavailable right now", StringComparison.Ordinal), "home page should show an unavailable message when identity is down instead of redirecting to login.");

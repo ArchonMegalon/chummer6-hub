@@ -194,6 +194,7 @@ public sealed class VerificationEntryPointTests
         string viewModel = File.ReadAllText(viewModelPath);
         string accountView = File.ReadAllText(accountViewPath);
         string landingView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml"));
+        string faqView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Faq.cshtml"));
         string homeView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"));
         string supportSubmittedView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
 
@@ -205,6 +206,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("SignedInTrustStatusPanelViewModel? SignedInStatus", viewModel, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", accountView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", landingView, StringComparison.Ordinal);
+        Assert.Contains("_SignedInTrustStatusPanel.cshtml", faqView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", homeView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", supportSubmittedView, StringComparison.Ordinal);
     }
