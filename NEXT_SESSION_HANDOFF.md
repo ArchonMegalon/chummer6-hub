@@ -1,6 +1,18 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:22:24+02:00
+Updated: 2026-03-30T08:45:50+02:00
+
+## Handoff refresh (2026-03-30T08:45:50+02:00)
+
+- Signed-in access proof is now materially deeper instead of only checking route headings:
+  - `scripts/hub-live-audit.py` now requires real account-access recovery/install evidence (`Recent install handoffs`, `Advanced device recovery`, `Offline-ready return`, the live linked-install host/version, and no leaked installation access token), plus a post-verification `home/access` pass that proves the support-closure card carries the actual audit case title, fixed version, affected install, and `Open downloads` next action.
+  - `scripts/e2e-hub-playwright.cjs` now expands the `Release and device state` drawer on `/home/access`, verifies its release/device links, and expands the `Finish on another device`, `Advanced device recovery`, optional `Offline-ready return`, and `What stays on this device` drawers on `/account/access`.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:22:24+02:00)
 
