@@ -1746,8 +1746,16 @@
                                 <strong>@selectedCreatorPublication.ProvenanceSummary</strong>
                             </div>
                             <div class="settings-summary-row">
+                                <span>Trust ranking</span>
+                                <strong>@HumanizeStatus(selectedCreatorPublication.TrustBand, "Draft")</strong>
+                            </div>
+                            <div class="settings-summary-row">
                                 <span>Discovery</span>
                                 <strong>@selectedCreatorPublication.DiscoverySummary</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Discoverable now</span>
+                                <strong>@(selectedCreatorPublication.Discoverable ? "Eligible now" : "Still bounded")</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>Status</span>
@@ -2211,7 +2219,7 @@
                             {
                                 <li>
                                     <strong><a class="inline-link" href="@PublicationDetailHref(publication.PublicationId)">@publication.Title</a></strong>: @publication.Summary
-                                    <span> Source: @publication.ProvenanceSummary. Discovery: @publication.DiscoverySummary. Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
+                                    <span> Source: @publication.ProvenanceSummary. Trust ranking: @HumanizeStatus(publication.TrustBand, "Draft"). Discovery: @publication.DiscoverySummary. Discoverable: @(publication.Discoverable ? "Eligible now" : "Still bounded"). Status: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
                                     @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                                     {
                                         <span> Next: @publication.NextSafeAction.</span>

@@ -3289,6 +3289,8 @@ public sealed class CampaignSpineService
                 var supportClosureSummary = !string.IsNullOrWhiteSpace(leadHandoff?.SupportClosureSummary)
                     ? leadHandoff.SupportClosureSummary
                     : DescribeCreatorPublicationSupportClosure(workspace);
+                const string publicationStatus = "preview_ready";
+                var (trustBand, discoverable) = BuildCreatorPublicationTrustPosture(publicationStatus, workspace.Visibility);
                 var watchouts = BuildCreatorPublicationWatchouts(workspace, leadHandoff);
                 return new CreatorPublicationProjection(
                     PublicationId: StableId("publication", workspace.WorkspaceId),
@@ -3301,7 +3303,9 @@ public sealed class CampaignSpineService
                     ProvenanceSummary: $"{workspace.RuleEnvironment.CompatibilityFingerprint} + recap-safe output shelf",
                     DiscoverySummary: $"{workspace.Visibility} visibility with grounded provenance and one truthful next action.",
                     Visibility: workspace.Visibility,
-                    PublicationStatus: "preview_ready",
+                    PublicationStatus: publicationStatus,
+                    TrustBand: trustBand,
+                    Discoverable: discoverable,
                     UpdatedAtUtc: workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow,
                     NextSafeAction: nextSafeAction,
                     CampaignReturnSummary: campaignReturnSummary,
@@ -3312,6 +3316,34 @@ public sealed class CampaignSpineService
             .Take(3)
             .ToArray();
     }
+
+    private static (string TrustBand, bool Discoverable) BuildCreatorPublicationTrustPosture(string publicationStatus, string visibility)
+    {
+        var normalizedStatus = NormalizePublicationStatus(publicationStatus);
+        var discoverable = string.Equals(normalizedStatus, "published", StringComparison.Ordinal)
+            && !string.Equals(visibility, "private", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(visibility, "local_only", StringComparison.OrdinalIgnoreCase);
+
+        var trustBand = normalizedStatus switch
+        {
+            "preview_ready" or "pending_review" => "review-pending",
+            "approved" => "approval-backed",
+            "rejected" => "needs-revision",
+            "published" when discoverable => "curated-live",
+            "published" => "restricted-live",
+            "delisted" => "delisted-caution",
+            "deprecated" => "replacement-advised",
+            "superseded" => "retained-history",
+            _ => "draft"
+        };
+
+        return (trustBand, discoverable);
+    }
+
+    private static string NormalizePublicationStatus(string publicationStatus)
+        => string.IsNullOrWhiteSpace(publicationStatus)
+            ? string.Empty
+            : publicationStatus.Trim().Replace('-', '_').ToLowerInvariant();
 
     private static string DescribeCreatorPublicationSupportClosure(CampaignWorkspaceProjection workspace)
     {
