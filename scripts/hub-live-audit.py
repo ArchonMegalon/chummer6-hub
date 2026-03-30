@@ -100,6 +100,15 @@ def fetch(
                 body_text = response.read().decode("utf-8", errors="replace")
                 response_headers = {key.lower(): value for key, value in response.headers.items()}
                 final_url = response.geturl()
+        except TimeoutError:
+            if attempt >= max_retries:
+                raise
+
+            attempt += 1
+            delay_seconds = retry_delay_seconds * (2 ** (attempt - 1))
+            print(f"timed out on {path}; retrying in {delay_seconds:.1f}s ({attempt}/{max_retries})")
+            time.sleep(delay_seconds)
+            continue
         except HTTPError as exc:  # pragma: no cover - exercised via operational probes
             status = exc.code
             body_text = exc.read().decode("utf-8", errors="replace")
@@ -201,6 +210,43 @@ def extract_first_match(body: str, pattern: str, path: str, label: str) -> str:
         raise AssertionError(f"{path} missing {label}")
 
     return unescape(match.group(1)).strip()
+
+
+def split_fragment_path(path: str) -> tuple[str, str | None]:
+    if "#" not in path:
+        return path, None
+
+    base_path, fragment = path.split("#", 1)
+    return base_path, fragment or None
+
+
+def fetch_fragment_target(
+    base_url: str,
+    path: str,
+    *,
+    public_host: str | None,
+    forwarded_proto: str | None,
+    cookie_header: str,
+    required_texts: tuple[str, ...],
+) -> str:
+    base_path, fragment = split_fragment_path(path)
+    status, body, _, _ = fetch(
+        base_url,
+        base_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{path} returned {status}, expected 200")
+
+    if fragment:
+        require_snippet(body, f'id="{fragment}"', path)
+
+    for snippet in required_texts:
+        require_snippet(body, snippet, path)
+
+    return body
 
 
 def extract_antiforgery_token(body: str, path: str) -> str:
@@ -1189,56 +1235,116 @@ def verify_signed_in_work_audit(
         r'href="([^"]*/account/work/publications/[^"]+)"',
         "/home/work",
         "home publication detail link")
-    status, body, _, _ = fetch(
+    home_next_session_path = extract_first_match(
+        body,
+        r'href="([^"]*#selected-next-session-carry-forward)"',
+        "/home/work",
+        "home next-session return link")
+    home_aftermath_path = extract_first_match(
+        body,
+        r'href="([^"]*#aftermath-packages)"',
+        "/home/work",
+        "home aftermath return link")
+    home_downtime_path = extract_first_match(
+        body,
+        r'href="([^"]*#selected-downtime-brief)"',
+        "/home/work",
+        "home downtime brief link")
+    home_campaign_memory_path = extract_first_match(
+        body,
+        r'href="([^"]*#selected-campaign-memory)"',
+        "/home/work",
+        "home campaign-memory link")
+    home_roster_moves_path = extract_first_match(
+        body,
+        r'href="([^"]*/account/work#community-ops)"',
+        "/home/work",
+        "home governed roster-moves link")
+    home_member_guidance_path = extract_first_match(
+        body,
+        r'href="([^"]*#community-op-guidance-[^"]+)"',
+        "/home/work",
+        "home member-guidance link")
+    fetch_fragment_target(
         base_url,
         home_workspace_path,
         public_host=public_host,
         forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
+        cookie_header=cookie_header,
+        required_texts=("What changed for me", "Support follow-through", "Artifact shelf posture"),
     )
-    if status != 200:
-        raise AssertionError(f"{home_workspace_path} returned {status}, expected 200")
-    require_snippet(body, "What changed for me", home_workspace_path)
-    require_snippet(body, "Support follow-through", home_workspace_path)
-    require_snippet(body, "Artifact shelf posture", home_workspace_path)
-    status, body, _, _ = fetch(
+    fetch_fragment_target(
         base_url,
         home_build_handoff_path,
         public_host=public_host,
         forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
+        cookie_header=cookie_header,
+        required_texts=("Build follow-through", "Variant", "Progression"),
     )
-    if status != 200:
-        raise AssertionError(f"{home_build_handoff_path} returned {status}, expected 200")
-    require_snippet(body, "Build follow-through", home_build_handoff_path)
-    require_snippet(body, "Variant", home_build_handoff_path)
-    require_snippet(body, "Progression", home_build_handoff_path)
-    status, body, _, _ = fetch(
+    fetch_fragment_target(
         base_url,
         home_rules_detail_path,
         public_host=public_host,
         forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
+        cookie_header=cookie_header,
+        required_texts=("Grounded rule answer", "Before", "After", "Provenance"),
     )
-    if status != 200:
-        raise AssertionError(f"{home_rules_detail_path} returned {status}, expected 200")
-    require_snippet(body, "Grounded rule answer", home_rules_detail_path)
-    require_snippet(body, "Before", home_rules_detail_path)
-    require_snippet(body, "After", home_rules_detail_path)
-    require_snippet(body, "Provenance", home_rules_detail_path)
-    status, body, _, _ = fetch(
+    fetch_fragment_target(
         base_url,
         home_publication_detail_path,
         public_host=public_host,
         forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
+        cookie_header=cookie_header,
+        required_texts=("Publication status", "Trust", "Discovery", "Status"),
     )
-    if status != 200:
-        raise AssertionError(f"{home_publication_detail_path} returned {status}, expected 200")
-    require_snippet(body, "Publication status", home_publication_detail_path)
-    require_snippet(body, "Trust", home_publication_detail_path)
-    require_snippet(body, "Discovery", home_publication_detail_path)
-    require_snippet(body, "Status", home_publication_detail_path)
+    fetch_fragment_target(
+        base_url,
+        home_next_session_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        cookie_header=cookie_header,
+        required_texts=("Next-session carry-forward", "Carry-forward summary"),
+    )
+    fetch_fragment_target(
+        base_url,
+        home_aftermath_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        cookie_header=cookie_header,
+        required_texts=("Aftermath and recap", "Recent aftermath recap packages"),
+    )
+    fetch_fragment_target(
+        base_url,
+        home_downtime_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        cookie_header=cookie_header,
+        required_texts=("Downtime brief", "Next-session return"),
+    )
+    fetch_fragment_target(
+        base_url,
+        home_campaign_memory_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        cookie_header=cookie_header,
+        required_texts=("Campaign memory", "Return lane"),
+    )
+    fetch_fragment_target(
+        base_url,
+        home_roster_moves_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        cookie_header=cookie_header,
+        required_texts=("Teams &amp; permissions", "Recent governed roster moves"),
+    )
+    fetch_fragment_target(
+        base_url,
+        home_member_guidance_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        cookie_header=cookie_header,
+        required_texts=("Member guidance rail", "Current preview posture"),
+    )
     status, body, _, _ = fetch(
         base_url,
         workspace_path,
