@@ -4,6 +4,7 @@ using Chummer.Run.AI.Services.Booster;
 using Chummer.Run.AI.Services.Creative;
 using Chummer.Run.AI.Services.Lore;
 using Chummer.Run.AI.Services.Session;
+using Chummer.Run.AI.Services.Observation;
 using Chummer.Run.AI.Services.Interop;
 using Chummer.Run.AI.Services.Ops;
 using Chummer.Run.AI.Services.Spider;
