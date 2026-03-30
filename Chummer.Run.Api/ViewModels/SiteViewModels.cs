@@ -341,7 +341,9 @@ public sealed record FaqPageViewModel(
     string Heading,
     string Intro,
     IReadOnlyList<FaqSectionViewModel> Sections,
-    IReadOnlyList<TrustPageActionViewModel> Actions);
+    IReadOnlyList<TrustPageActionViewModel> Actions,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record ParticipatePageViewModel(
     SiteChromeViewModel Chrome,

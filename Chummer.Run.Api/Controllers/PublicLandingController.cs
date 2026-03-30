@@ -304,7 +304,15 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> FaqPage(CancellationToken cancellationToken)
     {
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("FAQ", "Plain answers about preview status, participation, privacy, and what is already usable.", "/faq", cancellationToken);
-        return View("~/Views/PublicLanding/Faq.cshtml", _trustContent.BuildFaqPage(chrome));
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        return View(
+            "~/Views/PublicLanding/Faq.cshtml",
+            _trustContent.BuildFaqPage(chrome) with
+            {
+                TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
+                SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken)
+            });
     }
 
     [HttpGet("/privacy")]
