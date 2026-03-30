@@ -1192,10 +1192,31 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Ownership:", workspace_path)
     require_snippet(body, "Publication:", workspace_path)
     require_snippet(body, "Open publication status", workspace_path)
+    workspace_search_path = f"{workspace_path}?prepQuery=opposition"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_search_path)
+    require_snippet(body, 'match(es) for "opposition"', workspace_search_path)
+    require_snippet(body, "Recent governed prep launches", workspace_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_search_path)
+    require_snippet(body, "Recent travel prefetch receipts", workspace_search_path)
+    require_snippet(body, travel_prefetch["deviceRole"], workspace_search_path)
+    require_snippet(body, "Recent aftermath recap packages", workspace_search_path)
+    require_snippet(body, aftermath_package["title"], workspace_search_path)
+    require_snippet(body, "Next-session carry-forward", workspace_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_search_path} should return at least one governed prep packet for the opposition query")
     publication_detail_path = extract_first_match(
         body,
         r'href="([^"]*/account/work/publications/[^"]+)"',
-        workspace_path,
+        workspace_search_path,
         "publication status link")
     status, body, _, _ = fetch(
         base_url,

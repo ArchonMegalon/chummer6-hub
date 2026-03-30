@@ -1,6 +1,18 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:12:02+02:00
+Updated: 2026-03-30T08:13:34+02:00
+
+## Handoff refresh (2026-03-30T08:13:34+02:00)
+
+- Signed-in workspace-detail proof now exercises the governed prep-library search route instead of only checking the base workspace detail page:
+  - `scripts/hub-live-audit.py` now opens `/account/work/workspaces/{workspaceId}?prepQuery=opposition`, requires non-empty search results, and confirms the prep-launch, travel-prefetch, aftermath, and carry-forward evidence remain visible after the query is applied.
+  - `scripts/e2e-hub-playwright.cjs` now submits the `Search governed prep packets` form on the workspace detail page, verifies the normalized query stays in the route, and asserts the same evidence survives in the browser lane.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:12:02+02:00)
 
