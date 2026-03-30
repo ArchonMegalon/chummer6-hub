@@ -110,6 +110,19 @@ await VerifyCreativeWorkflowAsync();
 
 Console.WriteLine("run-services in-process smoke passed");
 
+static bool ContainsLaunchReadinessSignal(string value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return false;
+    }
+
+    return value.Contains("route-canary validation", StringComparison.OrdinalIgnoreCase)
+        || value.Contains("ready to progress this wave", StringComparison.OrdinalIgnoreCase)
+        || value.Contains("launch posture follows current governance signals", StringComparison.OrdinalIgnoreCase)
+        || value.Contains("hold launch expansion", StringComparison.OrdinalIgnoreCase);
+}
+
 async Task VerifyPublicationWorkflowAsync()
 {
     var workflow = new PublicationWorkflowService();
@@ -2007,7 +2020,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Closure health", StringComparison.Ordinal) && row.Value.Contains("waiting closure", StringComparison.OrdinalIgnoreCase)), "landing page should surface closure-health follow-through on the trust pulse.");
     Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Progress trend", StringComparison.Ordinal) && row.Value.Contains("Trend sparkline", StringComparison.OrdinalIgnoreCase)), "landing page should surface progress trend sparkline on the trust pulse.");
     Assert(landingModel.TrustPulse.TrendSamples.Count > 1, "landing page should surface measured progress points alongside the trust pulse summary.");
-    Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && row.Value.Contains("route-canary validation", StringComparison.OrdinalIgnoreCase)), "landing page should surface launch-readiness posture on the trust pulse.");
+    Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && ContainsLaunchReadinessSignal(row.Value)), "landing page should surface launch-readiness posture on the trust pulse.");
     Assert(landingModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Provider-route stewardship", StringComparison.Ordinal) && row.Value.Contains("Pilot defaults are governed", StringComparison.Ordinal)), "landing page should surface provider-route stewardship on the trust pulse.");
     Assert(landingModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("current longest pole", StringComparison.OrdinalIgnoreCase)), "landing page should surface the current caution lane from the weekly trust pulse.");
     Assert(landingModel.Workflows.Any(static card => string.Equals(card.Action.Href, "/downloads", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
@@ -2593,7 +2606,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Install posture", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "signed-in downloads should surface the install-specific posture from the support readiness summary.");
     Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "downloads should explain the current access posture beside the release shelf.");
     Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof passed", StringComparison.Ordinal)), "downloads should surface current adoption evidence beside the release shelf.");
-    Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && row.Value.Contains("route-canary validation", StringComparison.OrdinalIgnoreCase)), "downloads should surface launch-readiness posture beside the release shelf.");
+    Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && ContainsLaunchReadinessSignal(row.Value)), "downloads should surface launch-readiness posture beside the release shelf.");
     Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("current longest pole", StringComparison.OrdinalIgnoreCase)), "downloads should surface the weekly caution lane from the trust pulse.");
     var authenticatedHelpPage = await authenticatedLandingController.HelpPage(CancellationToken.None) as ViewResult;
     var authenticatedHelpModel = authenticatedHelpPage?.Model as TrustPageViewModel;
@@ -2614,7 +2627,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Closure health", StringComparison.Ordinal) && row.Value.Contains("waiting closure", StringComparison.OrdinalIgnoreCase)), "current-release should surface closure-health follow-through in the weekly trust pulse.");
     Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Progress trend", StringComparison.Ordinal) && row.Value.Contains("Trend window", StringComparison.OrdinalIgnoreCase)), "current-release should surface trend window movement in the weekly trust pulse.");
     Assert(authenticatedNowModel.TrustPulse.TrendSamples.Count > 1, "current-release should surface measured progress points alongside the weekly pulse summary.");
-    Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && row.Value.Contains("route-canary validation", StringComparison.OrdinalIgnoreCase)), "current-release should surface launch-readiness posture on the weekly trust pulse.");
+    Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && ContainsLaunchReadinessSignal(row.Value)), "current-release should surface launch-readiness posture on the weekly trust pulse.");
     Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Provider-route stewardship", StringComparison.Ordinal) && row.Value.Contains("Pilot defaults are governed", StringComparison.Ordinal)), "current-release should surface provider-route stewardship on the weekly trust pulse.");
     var fixedReadyRefreshResult = installLinkingController.RefreshGrant(new RefreshInstallationGrantRequestDto(
         InstallationId: redeemPayload.Installation.InstallationId,

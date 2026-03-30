@@ -1,6 +1,21 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T06:49:05+02:00
+Updated: 2026-03-30T07:18:59+02:00
+
+## Handoff refresh (2026-03-30T07:18:59+02:00)
+
+- The public-edge compose lane now mounts Fleet’s published artifact canon directly into the live portal container at `/fleet-artifacts` and sets `CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT=/fleet-artifacts`, so `/api/public/weekly-pulse` on `chummer.run` reflects current Fleet readiness instead of stale baked-in mirror data.
+- `tests/RunServicesSmoke/Program.cs` now accepts the governed launch-readiness variants that can legitimately appear once journey proof is ready, rather than hard-coding only the older `route-canary validation` wording.
+- Re-verified clean with:
+  - `bash scripts/ai/run_services_smoke.sh`
+  - `bash scripts/run_smoke.sh`
+  - `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
+  - `bash scripts/audit-compliance.sh`
+- Live proof after the mount fix: `/api/public/weekly-pulse` now reports `journey proof is ready` on the rebuilt local `chummer.run` edge.
 
 ## Handoff refresh (2026-03-30T06:49:05+02:00)
 
