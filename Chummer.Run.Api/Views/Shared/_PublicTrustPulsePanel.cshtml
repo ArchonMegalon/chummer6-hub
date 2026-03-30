@@ -4,42 +4,7 @@
     <article class="app-action-card">
         <span class="tag">@Model.Eyebrow</span>
         <h2>@Model.Heading</h2>
-        <p>@Model.Summary</p>
-        @if (Model.MicroProof.Count > 0)
-        {
-            <div class="trust-claim__microproof">
-                @foreach (var item in Model.MicroProof)
-                {
-                    <span>@item</span>
-                }
-            </div>
-        }
-        @if (Model.TrendSamples.Count > 1)
-        {
-            <div class="trust-pulse-trend" aria-label="Measured progress points">
-                @foreach (var sample in Model.TrendSamples)
-                {
-                    <article class="trust-pulse-trend__point@(sample.Current ? " trust-pulse-trend__point--current" : string.Empty)">
-                        <div class="trust-pulse-trend__meta">
-                            <strong>@sample.OverallProgressPercent%</strong>
-                            <span>@sample.AsOf</span>
-                        </div>
-                        <div class="trust-pulse-trend__bar" aria-hidden="true">
-                            <span style="width:@sample.OverallProgressPercent%"></span>
-                        </div>
-                    </article>
-                }
-            </div>
-        }
-        <div class="settings-summary-list">
-            @foreach (var row in Model.Rows)
-            {
-                <div class="settings-summary-row">
-                    <span>@row.Label</span>
-                    <strong>@row.Value</strong>
-                </div>
-            }
-        </div>
+        @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulseBody.cshtml", Model)
         <div class="stacked-actions">
             <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
             @if (Model.SecondaryAction is not null)
