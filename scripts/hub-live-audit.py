@@ -462,6 +462,40 @@ def verify_signed_in_work_audit(
 
     status, body, _, _ = fetch(
         base_url,
+        "/account/settings",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/account/settings returned {status}, expected 200")
+    require_snippet(body, "Choose what stays visible while deeper identifiers remain tucked away.", "/account/settings")
+    require_snippet(body, "Visibility", "/account/settings")
+    require_snippet(body, "Recovery posture", "/account/settings")
+    require_snippet(body, "Provider-backed help", "/account/settings")
+    require_snippet(body, "Open help", "/account/settings")
+    require_snippet(body, "Read privacy", "/account/settings")
+    require_snippet(body, "Read terms", "/account/settings")
+    require_snippet(body, "Contact Chummer", "/account/settings")
+
+    status, body, _, _ = fetch(
+        base_url,
+        "/account/advanced",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"/account/advanced returned {status}, expected 200")
+    require_snippet(body, "Hub account id", "/account/advanced")
+    require_snippet(body, "Primary auth", "/account/advanced")
+    require_snippet(body, "Linked identities", "/account/advanced")
+    require_snippet(body, "Linked channels", "/account/advanced")
+    require_snippet(body, "Recovery posture", "/account/advanced")
+    require_snippet(body, "Follow horizons", "/account/advanced")
+
+    status, body, _, _ = fetch(
+        base_url,
         "/home",
         public_host=public_host,
         forwarded_proto=forwarded_proto,
