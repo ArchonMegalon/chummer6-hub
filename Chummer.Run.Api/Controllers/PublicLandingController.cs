@@ -860,6 +860,12 @@ public sealed class PublicLandingController : Controller
             new(
                 "Install posture",
                 BuildSignedInInstallPostureSummary(manifest, latestInstallation, followThrough)),
+            new(
+                "Fix availability",
+                BuildSignedInFixAvailabilitySummary(manifest, releaseExperience, latestInstallation, followThrough)),
+            new(
+                "Current caution",
+                BuildSignedInInstallCautionSummary(manifest, latestInstallation, followThrough)),
             new("Release proof", BuildReleaseProofSummary(manifest)),
             new(
                 "Support follow-through",
@@ -1225,6 +1231,91 @@ public sealed class PublicLandingController : Controller
         return installation is null
             ? "No linked install is attached yet, so Chummer cannot compare this account against the current shelf or fix lane."
             : "No extra install-specific posture warning is published right now.";
+    }
+
+    private static string BuildSignedInFixAvailabilitySummary(
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience,
+        ClaimedInstallationDto? installation,
+        SupportCasePresentationViewModel? followThrough)
+    {
+        if (followThrough is not null && !string.IsNullOrWhiteSpace(followThrough.FixedReleaseLabel))
+        {
+            string fixedReleaseLabel = followThrough.FixedReleaseLabel!;
+            if (followThrough.CanVerifyFix && installation is not null)
+            {
+                return $"{ResolveInstallationDisplayLabel(installation)} can verify {fixedReleaseLabel} on this linked install now.";
+            }
+
+            if (followThrough.NeedsInstallUpdate && installation is not null)
+            {
+                PublicReleaseArtifactDto? artifact = FindPublishedArtifactForInstallation(manifest, installation);
+                return artifact is null
+                    ? $"{fixedReleaseLabel} is the tracked fix target, but this linked install still needs a support-directed update before it can verify."
+                    : $"{fixedReleaseLabel} is the tracked fix target. The promoted shelf for this install is {BuildPublishedArtifactSummary(manifest, releaseExperience, artifact)}.";
+            }
+
+            return $"{fixedReleaseLabel} is the tracked fix target for this account right now.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.FixAvailabilitySummary))
+        {
+            return manifest.FixAvailabilitySummary!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.SupportabilitySummary))
+        {
+            return manifest.SupportabilitySummary!;
+        }
+
+        return installation is null
+            ? "No linked install is attached yet, so Chummer cannot tie this account to a fix-ready shelf."
+            : "No fix-specific availability note is published for this linked install right now.";
+    }
+
+    private static string BuildSignedInInstallCautionSummary(
+        PublicReleaseManifestDto manifest,
+        ClaimedInstallationDto? installation,
+        SupportCasePresentationViewModel? followThrough)
+    {
+        if (followThrough?.NeedsLinkedInstall == true)
+        {
+            return followThrough.InstallReadinessSummary;
+        }
+
+        if (followThrough?.NeedsInstallUpdate == true)
+        {
+            return followThrough.InstallReadinessSummary;
+        }
+
+        if (followThrough?.ReporterActionNeeded == true)
+        {
+            return followThrough.NextSafeAction;
+        }
+
+        if (followThrough?.CanVerifyFix == true)
+        {
+            return "No extra caution is published for this linked install right now; use the verification lane to confirm the fix on this device.";
+        }
+
+        if (installation is not null && FindPublishedArtifactForInstallation(manifest, installation) is null)
+        {
+            return $"{ResolveInstallationDisplayLabel(installation)} is outside the promoted public shelf right now, so keep it on the support-directed lane until a matching build lands.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.KnownIssueSummary))
+        {
+            return manifest.KnownIssueSummary!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.RolloutReason))
+        {
+            return manifest.RolloutReason!;
+        }
+
+        return installation is null
+            ? "No linked install is attached yet, so Chummer cannot publish install-specific caution for this account."
+            : "No extra caution is published for this linked install right now.";
     }
 
     private static PublicReleaseArtifactDto? FindPublishedArtifactForInstallation(
