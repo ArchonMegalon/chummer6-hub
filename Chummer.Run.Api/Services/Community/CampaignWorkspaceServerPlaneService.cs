@@ -353,7 +353,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             CampaignId: workspace.CampaignId,
             CampaignName: workspace.CampaignName,
             RuleEnvironmentSummary: digest?.RuleEnvironmentSummary
-                ?? $"{workspace.RuleEnvironment.OwnerScope} · {workspace.RuleEnvironment.ApprovalState} · {workspace.RuleEnvironment.CompatibilityFingerprint}",
+                ?? $"{workspace.RuleEnvironment.OwnerScope} · {DescribeRuleEnvironmentLifecycleStage(workspace.RuleEnvironment)} · {workspace.RuleEnvironment.CompatibilityFingerprint}",
             SessionReadinessSummary: attentionCue is null
                 ? workspace.FirstPlayableSession?.Summary
                   ?? "Session return is green across the current roster, active scene, and claimed-install restore posture."
@@ -568,9 +568,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         [
             new(
                 EnvironmentId: workspace.RuleEnvironment.EnvironmentId,
-                Severity: string.Equals(workspace.RuleEnvironment.ApprovalState, "approved", StringComparison.OrdinalIgnoreCase) ? "ready" : "review",
+                Severity: IsGovernedRuleEnvironmentReady(workspace.RuleEnvironment) ? "ready" : "review",
                 Title: "Campaign rule environment",
-                Summary: $"{workspace.RuleEnvironment.OwnerScope} scope is {workspace.RuleEnvironment.ApprovalState} on {workspace.RuleEnvironment.CompatibilityFingerprint}.")
+                Summary: $"{workspace.RuleEnvironment.OwnerScope} scope is on the {DescribeRuleEnvironmentLifecycleStage(workspace.RuleEnvironment).ToLowerInvariant()} rail for {workspace.RuleEnvironment.CompatibilityFingerprint}.")
         ];
 
         bool restoreMatches = restore.RecentRuleEnvironments.Any(env =>
@@ -595,6 +595,23 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return cues;
+    }
+
+    private static bool IsGovernedRuleEnvironmentReady(RuleEnvironmentRef environment)
+    {
+        return string.Equals(environment.ApprovalState, "approved", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(environment.ApprovalState, "published", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string DescribeRuleEnvironmentLifecycleStage(RuleEnvironmentRef environment)
+    {
+        return environment.ApprovalState.Trim().ToLowerInvariant() switch
+        {
+            "published" => "Published",
+            "approved" => "Campaign-approved",
+            "self_service" => "Sandbox",
+            _ => environment.ApprovalState
+        };
     }
 
     private static RunboardSummary? BuildRunboardSummary(CampaignWorkspaceProjection workspace, RunProjection? leadRun)

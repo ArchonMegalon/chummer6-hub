@@ -137,8 +137,14 @@
             "pending" => "Pending",
             "pending_verification" => "Verification sent",
             "verified" => "Verified",
+            "published" => "Published",
+            "campaign_approved" => "Campaign-approved",
+            "sandbox" => "Sandbox",
             "approved" => "Approved",
             "self_service" => "Self-service",
+            "current" => "Current",
+            "next" => "Next",
+            "completed" => "Completed",
             "review" => "Needs review",
             "warning" => "Needs attention",
             "attention" => "Needs attention",
@@ -148,8 +154,17 @@
         };
     }
 
+    static string RuleEnvironmentLifecycleLabel(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
+        => environment.ApprovalState.Trim().ToLowerInvariant() switch
+        {
+            "published" => "Published",
+            "approved" => "Campaign-approved",
+            "self_service" => "Sandbox",
+            _ => HumanizeStatus(environment.ApprovalState, "Review")
+        };
+
     static string RuleEnvironmentSummary(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
-        => $"{environment.OwnerScope} scope · {environment.CompatibilityFingerprint} · {HumanizeStatus(environment.ApprovalState, "Review")}";
+        => $"{environment.OwnerScope} scope · {environment.CompatibilityFingerprint} · {RuleEnvironmentLifecycleLabel(environment)}";
 
     static string TrustRowValue(
         SignedInTrustStatusPanelViewModel? panel,
@@ -856,6 +871,11 @@
                                                                 @if (answer.EvidenceLines.Count > 0)
                                                                 {
                                                                     <span> Evidence: @answer.EvidenceLines[0]</span>
+                                                                }
+                                                                @if (answer.Studio is not null)
+                                                                {
+                                                                    <span> Lifecycle: @answer.Studio.CurrentStageLabel -> @answer.Studio.PromotionTargetLabel.</span>
+                                                                    <span> Rollback: @answer.Studio.RollbackSummary.</span>
                                                                 }
                                                                 @if (answer.Diffs is { Count: > 0 })
                                                                 {

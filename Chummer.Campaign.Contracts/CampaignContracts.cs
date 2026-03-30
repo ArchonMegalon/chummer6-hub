@@ -587,7 +587,39 @@ public sealed record RulesNavigatorAnswerProjection(
     string ProvenanceLabel,
     IReadOnlyList<string> EvidenceLines,
     IReadOnlyList<string> SupportReuseHints,
-    IReadOnlyList<RulesetEnvironmentDiffProjection>? Diffs = null);
+    IReadOnlyList<RulesetEnvironmentDiffProjection>? Diffs = null,
+    RuleEnvironmentStudioProjection? Studio = null);
+
+public static class RuleEnvironmentLifecycleStages
+{
+    public const string Sandbox = "sandbox";
+    public const string CampaignApproved = "campaign_approved";
+    public const string Published = "published";
+}
+
+public static class RuleEnvironmentLifecycleStepStatuses
+{
+    public const string Completed = "completed";
+    public const string Current = "current";
+    public const string Next = "next";
+    public const string Pending = "pending";
+}
+
+public sealed record RuleEnvironmentLifecycleStepProjection(
+    string StageId,
+    string Label,
+    string Status,
+    string Summary);
+
+public sealed record RuleEnvironmentStudioProjection(
+    string CurrentStage,
+    string CurrentStageLabel,
+    string PromotionTargetStage,
+    string PromotionTargetLabel,
+    string PromotionSummary,
+    string RollbackSummary,
+    string LineageSummary,
+    IReadOnlyList<RuleEnvironmentLifecycleStepProjection> Stages);
 
 public sealed record LegacyMigrationFieldProjection(
     string FieldId,
