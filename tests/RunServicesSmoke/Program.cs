@@ -1604,8 +1604,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(shelfSource.Contains("Open published creator packet", StringComparison.Ordinal), "artifact shelf should keep a direct public inspect route on the creator-discovery cards.");
     Assert(shelfSource.Contains("/artifacts/creator/", StringComparison.Ordinal), "artifact shelf should deep-link public creator discovery into a dedicated public detail route.");
     Assert(shelfSource.Contains("HumanizeStatus(publication.Visibility, \"Shared\")", StringComparison.Ordinal), "artifact shelf should humanize creator-publication visibility directly on the signed-in shelf.");
+    Assert(shelfSource.Contains("static bool IsDiscoverablePublicCreatorPublication", StringComparison.Ordinal), "artifact shelf should decide when a signed-in creator packet is already live enough to stay on the governed public inspect rail.");
+    Assert(shelfSource.Contains("CreatorPublicationHref(linkedPublication, item.CreatorPublicationId)", StringComparison.Ordinal), "artifact shelf should route linked signed-in recap items through the public creator packet once publication is live.");
+    Assert(shelfSource.Contains("CreatorPublicationHref(publication, publication.PublicationId)", StringComparison.Ordinal), "artifact shelf should route signed-in creator cards through the public creator packet once publication is live.");
+    Assert(shelfSource.Contains("CreatorPublicationLinkLabel(linkedPublication)", StringComparison.Ordinal), "artifact shelf should label linked recap creator routes by live public versus private moderation posture.");
+    Assert(shelfSource.Contains("CreatorPublicationLinkLabel(publication)", StringComparison.Ordinal), "artifact shelf should label signed-in creator-card routes by live public versus private moderation posture.");
     Assert(shelfSource.Contains("Open build path for @linkedPublication.Title", StringComparison.Ordinal), "artifact shelf should keep a direct route back to the linked creator-publication build path.");
-    Assert(shelfSource.Contains("Open publication status", StringComparison.Ordinal), "artifact shelf should keep a direct publication-status route on the signed-in shelf.");
+    Assert(shelfSource.Contains("Open publication status", StringComparison.Ordinal), "artifact shelf should still preserve the private moderation route when a creator packet has not reached public discovery.");
     var publicCreatorSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "PublicCreatorPublication.cshtml"));
     Assert(publicCreatorSource.Contains("Why this packet is live", StringComparison.Ordinal), "public creator detail should explain the live governed packet posture on its own page.");
     Assert(publicCreatorSource.Contains("Compare by", StringComparison.Ordinal), "public creator detail should surface creator-comparison guidance on the public inspect route.");

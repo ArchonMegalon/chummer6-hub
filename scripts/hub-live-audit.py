@@ -204,6 +204,37 @@ def require_snippet(body: str, snippet: str, path: str) -> None:
         raise AssertionError(f"{path} missing required text: {snippet}")
 
 
+def is_public_creator_publication_path(path: str) -> bool:
+    return "/artifacts/creator/" in path.lower()
+
+
+def require_creator_publication_body(body: str, path: str) -> None:
+    if is_public_creator_publication_path(path):
+        for snippet in (
+            "Governed creator discovery",
+            "Public creator packet",
+            "Why this packet is live",
+            "Provenance",
+            "Trust",
+            "Discovery",
+            "Back to creator discovery",
+            "Open artifacts shelf",
+        ):
+            require_snippet(body, snippet, path)
+        return
+
+    for snippet in (
+        "Publication status",
+        "Trust",
+        "Trust ranking",
+        "Discovery",
+        "Discoverable now",
+        "Status",
+        "Open build path for",
+    ):
+        require_snippet(body, snippet, path)
+
+
 def extract_first_match(body: str, pattern: str, path: str, label: str) -> str:
     match = re.search(pattern, body, re.IGNORECASE)
     if not match:
@@ -1489,7 +1520,7 @@ def verify_signed_in_work_audit(
         "home rules detail link")
     home_publication_detail_path = extract_first_match(
         body,
-        r'href="([^"]*/account/work/publications/[^"]+)"',
+        r'href="([^"]*(?:/artifacts/creator/|/account/work/publications/)[^"]+)"',
         "/home/work",
         "home publication detail link")
     home_next_session_path = extract_first_match(
@@ -1567,14 +1598,17 @@ def verify_signed_in_work_audit(
         cookie_header=cookie_header,
         required_texts=("Grounded rule answer", "Before", "After", "Provenance"),
     )
-    fetch_fragment_target(
+    home_publication_base_path, _ = split_fragment_path(home_publication_detail_path)
+    status, home_publication_body, _, _ = fetch(
         base_url,
-        home_publication_detail_path,
+        home_publication_base_path,
         public_host=public_host,
         forwarded_proto=forwarded_proto,
-        cookie_header=cookie_header,
-        required_texts=("Publication status", "Trust", "Trust ranking", "Discovery", "Discoverable now", "Status"),
+        request_headers={"Cookie": cookie_header},
     )
+    if status != 200:
+        raise AssertionError(f"{home_publication_detail_path} returned {status}, expected 200")
+    require_creator_publication_body(home_publication_body, home_publication_detail_path)
     fetch_fragment_target(
         base_url,
         home_next_session_path,
@@ -1849,7 +1883,7 @@ def main() -> int:
             forbidden_texts=("Package details",),
             expects_header_count=1),
         AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Status guide"), forbidden_texts=("Research tracks",), expects_header_count=1),
-        AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Preview in progress", "Status guide", "Anyone evaluating the preview"), expects_header_count=1),
+        AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Preview in progress", "Status guide", "Anyone evaluating the preview", "Governed creator discovery", "Published creator packets", "Open published creator packet"), expects_header_count=1),
         AuditRoute("/artifacts/current-preview-build", "Current preview build", required_texts=("Anyone evaluating the preview", "Use and verify this proof", "What this live artifact shows, who it helps, and what to check next", "Start from the live surface", "Open current release", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", required_texts=("Anyone evaluating the preview", "Why this horizon matters now", "Current pain, expected unlock, and the live proof you should compare first", "Compare with current proof", "Need a decision instead?", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute(
@@ -1935,6 +1969,31 @@ def main() -> int:
                 if parser_.count != route.expects_header_count:
                     raise AssertionError(f"{route.path} rendered {parser_.count} site headers, expected {route.expects_header_count}")
         print(f"ok {route.path} -> {final_url}")
+
+    status, body, _, _ = fetch(
+        args.base_url,
+        "/artifacts",
+        public_host=args.public_host,
+        forwarded_proto=args.forwarded_proto,
+    )
+    if status != 200:
+        raise AssertionError("/artifacts returned a non-200 response while extracting the public creator detail link")
+
+    public_creator_detail_path = extract_first_match(
+        body,
+        r'href="([^"]*/artifacts/creator/[^"]+)"',
+        "/artifacts",
+        "public creator detail link")
+    status, public_creator_body, _, _ = fetch(
+        args.base_url,
+        public_creator_detail_path,
+        public_host=args.public_host,
+        forwarded_proto=args.forwarded_proto,
+    )
+    if status != 200:
+        raise AssertionError(f"{public_creator_detail_path} returned {status}, expected 200")
+    require_creator_publication_body(public_creator_body, public_creator_detail_path)
+    print(f"ok {public_creator_detail_path}")
 
     status, _, _, final_url = fetch(
         args.base_url,
