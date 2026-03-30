@@ -1673,6 +1673,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Migration return", StringComparison.Ordinal), "home work should surface migration return instead of leaving legacy carry-forward buried in the deeper work route.");
     Assert(homeSource.Contains("Open migration return", StringComparison.Ordinal), "home work should keep a direct route back into migration return.");
     Assert(homeSource.Contains("Publication status", StringComparison.Ordinal), "home work should surface creator-publication status instead of leaving publication trust buried in the deeper account route.");
+    Assert(homeSource.Contains("@publication.DiscoverySummary", StringComparison.Ordinal), "home work should surface creator-publication discovery posture directly from the shared projection.");
+    Assert(homeSource.Contains("HumanizeStatus(publication.PublicationStatus, \"Published\")", StringComparison.Ordinal), "home work should humanize creator-publication state directly on the signed-in home route.");
     Assert(homeSource.Contains("@publication.NextSafeAction", StringComparison.Ordinal), "home work should surface the publication next step directly from the shared creator-publication projection.");
     Assert(homeSource.Contains("@publication.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface creator-publication return truth directly from the shared projection.");
     Assert(homeSource.Contains("@publication.SupportClosureSummary", StringComparison.Ordinal), "home work should surface creator-publication support closure directly from the shared projection.");
