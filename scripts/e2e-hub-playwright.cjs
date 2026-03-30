@@ -115,6 +115,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   const page = await context.newPage();
   const pageErrors = [];
   const uniqueEmail = `hub-e2e-${Date.now()}@example.com`;
+  let homeWorkspacePath;
+  let homeBuildHandoffPath;
+  let homeRulesPath;
+  let homePublicationPath;
   let runDetailPath;
   let rulesDetailPath;
 
@@ -261,10 +265,44 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectBodyText(page, 'Aftermath recap', '/home/work');
     await expectBodyText(page, 'Safehouse / travel mode', '/home/work');
     await expectBodyText(page, 'GM prep', '/home/work');
+    homeWorkspacePath = await readFirstHref(page, 'a[href*="/account/work/workspaces/"]', '/home/work');
+    homeBuildHandoffPath = await readFirstHref(page, 'a[href*="/account/work/build-handoffs/"]', '/home/work');
+    homeRulesPath = await readFirstHref(page, 'a[href*="/account/work/rules/"]', '/home/work');
+    homePublicationPath = await readFirstHref(page, 'a[href*="/account/work/publications/"]', '/home/work');
   });
 
   await gotoAndAssert(page, pageErrors, '/home/setup', async () => {
     await expectVisible(page, 'text=Finish the small setup flow, then come back to access and work');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeWorkspacePath, async () => {
+    await expectBodyText(page, 'What changed for me', '/home/work -> workspace detail');
+    await expectBodyText(page, 'Support follow-through', '/home/work -> workspace detail');
+    await expectBodyText(page, 'Artifact shelf posture', '/home/work -> workspace detail');
+    await assertNoBannedCopy(page, '/home/work -> workspace detail');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeBuildHandoffPath, async () => {
+    await expectBodyText(page, 'Build follow-through', '/home/work -> build detail');
+    await expectBodyText(page, 'Variant', '/home/work -> build detail');
+    await expectBodyText(page, 'Progression', '/home/work -> build detail');
+    await assertNoBannedCopy(page, '/home/work -> build detail');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeRulesPath, async () => {
+    await expectBodyText(page, 'Grounded rule answer', '/home/work -> rules detail');
+    await expectBodyText(page, 'Before', '/home/work -> rules detail');
+    await expectBodyText(page, 'After', '/home/work -> rules detail');
+    await expectBodyText(page, 'Provenance', '/home/work -> rules detail');
+    await assertNoBannedCopy(page, '/home/work -> rules detail');
+  });
+
+  await gotoAndAssert(page, pageErrors, homePublicationPath, async () => {
+    await expectBodyText(page, 'Publication status', '/home/work -> publication detail');
+    await expectBodyText(page, 'Trust', '/home/work -> publication detail');
+    await expectBodyText(page, 'Discovery', '/home/work -> publication detail');
+    await expectBodyText(page, 'Status', '/home/work -> publication detail');
+    await assertNoBannedCopy(page, '/home/work -> publication detail');
   });
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {

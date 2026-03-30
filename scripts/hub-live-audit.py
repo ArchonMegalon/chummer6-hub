@@ -1169,6 +1169,76 @@ def verify_signed_in_work_audit(
     require_snippet(body, travel_prefetch["deviceRole"], "/home/work")
     require_snippet(body, post_transfer_operation["leagueOperationsSummary"], "/home/work")
     require_snippet(body, refreshed_sponsor_session["campaignName"], "/home/work")
+    home_workspace_path = extract_first_match(
+        body,
+        r'href="([^"]*/account/work/workspaces/[^"#?]+)"',
+        "/home/work",
+        "home workspace detail link")
+    home_build_handoff_path = extract_first_match(
+        body,
+        r'href="([^"]*/account/work/build-handoffs/[^"]+)"',
+        "/home/work",
+        "home build handoff detail link")
+    home_rules_detail_path = extract_first_match(
+        body,
+        r'href="([^"]*/account/work/rules/[^"]+)"',
+        "/home/work",
+        "home rules detail link")
+    home_publication_detail_path = extract_first_match(
+        body,
+        r'href="([^"]*/account/work/publications/[^"]+)"',
+        "/home/work",
+        "home publication detail link")
+    status, body, _, _ = fetch(
+        base_url,
+        home_workspace_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{home_workspace_path} returned {status}, expected 200")
+    require_snippet(body, "What changed for me", home_workspace_path)
+    require_snippet(body, "Support follow-through", home_workspace_path)
+    require_snippet(body, "Artifact shelf posture", home_workspace_path)
+    status, body, _, _ = fetch(
+        base_url,
+        home_build_handoff_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{home_build_handoff_path} returned {status}, expected 200")
+    require_snippet(body, "Build follow-through", home_build_handoff_path)
+    require_snippet(body, "Variant", home_build_handoff_path)
+    require_snippet(body, "Progression", home_build_handoff_path)
+    status, body, _, _ = fetch(
+        base_url,
+        home_rules_detail_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{home_rules_detail_path} returned {status}, expected 200")
+    require_snippet(body, "Grounded rule answer", home_rules_detail_path)
+    require_snippet(body, "Before", home_rules_detail_path)
+    require_snippet(body, "After", home_rules_detail_path)
+    require_snippet(body, "Provenance", home_rules_detail_path)
+    status, body, _, _ = fetch(
+        base_url,
+        home_publication_detail_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{home_publication_detail_path} returned {status}, expected 200")
+    require_snippet(body, "Publication status", home_publication_detail_path)
+    require_snippet(body, "Trust", home_publication_detail_path)
+    require_snippet(body, "Discovery", home_publication_detail_path)
+    require_snippet(body, "Status", home_publication_detail_path)
     status, body, _, _ = fetch(
         base_url,
         workspace_path,
