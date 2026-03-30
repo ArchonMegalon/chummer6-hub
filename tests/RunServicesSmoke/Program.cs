@@ -535,8 +535,9 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var supportAttachments = new SupportAttachmentStorageService(configuration);
     var installLinking = new InstallLinkingService(installLinkingStore);
     var supportCases = new SupportCaseService(supportStore, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
-    var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(store));
-    var creatorPublicationRegistry = new CreatorPublicationRegistryBridge(new HubPublicationDraftService());
+    var publicationDraftWorkflow = new HubPublicationDraftService();
+    var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(store), publicationDraftWorkflow);
+    var creatorPublicationRegistry = new CreatorPublicationRegistryBridge(publicationDraftWorkflow);
     var accounts = new AccountService(store);
     var groups = new GroupService(store, accounts);
     var rewards = new RewardService(store);
@@ -2044,8 +2045,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!roadmapDetailSource.Contains("Audience impact", StringComparison.Ordinal), "roadmap detail should not repeat audience copy once the fact rail already states who should follow it.");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
-    var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(store));
-    var creatorPublicationRegistry = new CreatorPublicationRegistryBridge(new HubPublicationDraftService());
+    var publicationDraftWorkflow = new HubPublicationDraftService();
+    var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(store), publicationDraftWorkflow);
+    var creatorPublicationRegistry = new CreatorPublicationRegistryBridge(publicationDraftWorkflow);
     var accounts = new AccountService(store);
     var identityLinks = new IdentityLinkService(store, accounts);
     var experience = new UserExperienceService(store, accounts);
@@ -3157,6 +3159,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var approvedPublicationDetailModel = approvedPublicationDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(approvedPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Approved, StringComparison.Ordinal), "approved creator publications should surface approved review posture on the account detail route.");
     Assert(approvedPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.LatestModerationNotes?.Contains("governed account rail", StringComparison.OrdinalIgnoreCase) == true, "approved creator publications should retain the latest moderation note on the account detail route.");
+    Assert(string.Equals(approvedPublicationDetailModel?.SelectedCreatorPublication?.PublicationStatus, "approved", StringComparison.Ordinal), "approved creator publications should replace synthetic preview status with the registry-backed approved posture on the shared projection.");
+    Assert(approvedPublicationDetailModel?.SelectedCreatorPublication?.ModerationSummary?.Contains("Moderation cleared approval", StringComparison.OrdinalIgnoreCase) == true, "approved creator publications should carry approval-backed moderation summary on the shared projection.");
 
     var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
@@ -3186,6 +3190,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "signed-in home should keep the active-scene summary attached to the shared campaign view.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].NextSafeAction), "signed-in home should keep the workspace next safe action attached to the shared campaign view.");
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Any(item => !string.IsNullOrWhiteSpace(item.FirstPlayableSession?.RuleReadySummary)), "signed-in home should keep legal-runner proof attached to at least one shared first-session projection.");
+    Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Any(item => string.Equals(item.PublicationStatus, "approved", StringComparison.Ordinal)), "signed-in home should carry registry-backed creator-publication approval posture once the governed review clears.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane is not null, "signed-in home should receive the bounded lead workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.LeadWorkspaceServerPlane!.WorkspaceState.Status), "signed-in home should surface one bounded workspace state on the what-changed card.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.WorkspaceState.EvidenceLines.Count >= 1, "signed-in home should surface workspace-state evidence on the what-changed card.");
@@ -3288,8 +3293,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(recapShelfPayload is not null, "home work route should surface the generated aftermath package on the richer recap-shelf projection.");
     Assert(recapShelfPayload?.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) == true, "home work route should mark the lead aftermath artifact as usable from the creator shelf as well as the campaign shelf.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.OwnershipSummary), "home work route should keep explicit artifact ownership posture attached to the recap shelf.");
-    Assert(string.Equals(recapShelfPayload?.PublicationState, "preview_ready", StringComparison.Ordinal), "home work route should carry creator-publication state directly on the linked recap shelf entry.");
-    Assert(string.Equals(recapShelfPayload?.TrustBand, "review-pending", StringComparison.Ordinal), "home work route should carry creator-publication trust ranking directly on the linked recap shelf entry.");
+    Assert(string.Equals(recapShelfPayload?.PublicationState, "approved", StringComparison.Ordinal), "home work route should carry creator-publication state directly on the linked recap shelf entry.");
+    Assert(string.Equals(recapShelfPayload?.TrustBand, "approval-backed", StringComparison.Ordinal), "home work route should carry creator-publication trust ranking directly on the linked recap shelf entry.");
     Assert(recapShelfPayload?.Discoverable == false, "home work route should keep preview-ready recap entries off discoverable surfaces until publication is live.");
     Assert(recapShelfPayload?.PublicationSummary?.Contains("creator shelf", StringComparison.OrdinalIgnoreCase) == true, "home work route should explain that the same artifact already feeds creator publication posture.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.CreatorPublicationId), "home work route should keep the linked creator-publication id attached to the recap shelf entry.");
