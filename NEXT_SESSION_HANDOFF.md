@@ -1,6 +1,25 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T07:18:59+02:00
+Updated: 2026-03-30T07:25:00+02:00
+
+## Handoff refresh (2026-03-30T07:25:00+02:00)
+
+- The live audit now fails if `/api/public/weekly-pulse` stops reflecting Fleet-backed ready-state journey proof. It asserts:
+  - `journey_gate_health.state == ready`
+  - `journey_gate_health.blocked_count == 0`
+  - presence of `supporting_signals.closure_health`, `adoption_health`, `progress_trend`, `provider_route_stewardship`, and `launch_readiness`
+- The local public-edge compose lane now keeps a higher local write budget plus a small limiter queue (`CHUMMER_API_WRITE_RATE_LIMIT_PER_MINUTE=120`, `CHUMMER_API_RATE_LIMIT_QUEUE=16`) so signed-in audit and E2E traffic stops tripping avoidable local 429 backoff.
+- `scripts/e2e-hub.sh` now uses explicit compose project names for both the edge stack and the Playwright runner, which removes the symlink-derived compose naming drift and isolates the browser lane from the edge project.
+- The signed-in home aftermath card now surfaces recap-shelf ownership and publication state directly on `/home/work`, and smoke coverage now locks the new ownership/state shelf posture into both the home projection and registry preview/search checks.
+- Re-verified clean with:
+  - `bash scripts/ai/run_services_smoke.sh`
+  - `bash scripts/run_smoke.sh`
+  - `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build`
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T07:18:59+02:00)
 

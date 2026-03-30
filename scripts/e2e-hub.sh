@@ -2,6 +2,8 @@
 set -euo pipefail
 
 HUB_EDGE_COMPOSE_FILE="${HUB_EDGE_COMPOSE_FILE:-docker-compose.public-edge.yml}"
+HUB_EDGE_PROJECT_NAME="${CHUMMER_HUB_EDGE_PROJECT_NAME:-chummer6-hub}"
+HUB_PLAYWRIGHT_PROJECT_NAME="${CHUMMER_HUB_PLAYWRIGHT_COMPOSE_PROJECT_NAME:-chummer6-hub-playwright}"
 HUB_PLAYWRIGHT_TIMEOUT_SECONDS="${CHUMMER_HUB_E2E_TIMEOUT_SECONDS:-300}"
 HUB_BASE_URL="${CHUMMER_HUB_PLAYWRIGHT_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
 HUB_PUBLIC_HOST="${CHUMMER_HUB_PUBLIC_HOST:-chummer.run}"
@@ -53,7 +55,7 @@ wait_for_hub_edge() {
 }
 
 resolve_hub_internal_token() {
-  docker compose -f "$HUB_EDGE_COMPOSE_FILE" ps -q chummer-portal \
+  docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" ps -q chummer-portal \
     | head -n 1 \
     | xargs -r docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' \
     | grep '^FLEET_INTERNAL_API_TOKEN=' \
@@ -90,7 +92,7 @@ if [[ "$HUB_SKIP_EDGE_REBUILD" == "1" || "$HUB_SKIP_EDGE_REBUILD" == "true" || "
 else
   compose_rm_log="$(mktemp)"
   set +e
-  docker compose -f "$HUB_EDGE_COMPOSE_FILE" rm -fsv chummer-run-identity chummer-portal 2>&1 | tee "$compose_rm_log"
+  docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" rm -fsv chummer-run-identity chummer-portal 2>&1 | tee "$compose_rm_log"
   compose_rm_status=${PIPESTATUS[0]}
   set -e
   if [[ "$compose_rm_status" -ne 0 ]]; then
@@ -107,7 +109,7 @@ else
 
   compose_up_log="$(mktemp)"
   set +e
-  docker compose -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"
+  docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"
   compose_up_status=${PIPESTATUS[0]}
   set -e
   if [[ "$compose_up_status" -ne 0 ]]; then
@@ -142,7 +144,7 @@ if [[ "$RUN_HUB_PLAYWRIGHT" == "1" ]]; then
   fi
   export CHUMMER_RUN_CF_TUNNEL_TOKEN="${CHUMMER_RUN_CF_TUNNEL_TOKEN:-disabled-for-local-hub-e2e}"
   set +e
-  timeout "${HUB_PLAYWRIGHT_TIMEOUT_SECONDS}"s docker compose -f legacy/tooling/docker/docker-compose.yml --profile test run --build --rm \
+  timeout "${HUB_PLAYWRIGHT_TIMEOUT_SECONDS}"s docker compose -p "$HUB_PLAYWRIGHT_PROJECT_NAME" -f legacy/tooling/docker/docker-compose.yml --profile test run --build --rm \
     -e CHUMMER_HUB_PLAYWRIGHT_BASE_URL="$playwright_base_url" \
     -e CHUMMER_HUB_PLAYWRIGHT_FORWARDED_PROTO="https" \
     chummer-playwright-hub 2>&1 | tee "$playwright_log"
