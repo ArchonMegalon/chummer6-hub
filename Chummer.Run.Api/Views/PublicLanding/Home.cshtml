@@ -585,9 +585,25 @@
                                                                     {
                                                                         <span> Publication: @leadAftermathShelfEntry.PublicationSummary</span>
                                                                     }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.Visibility))
+                                                                    {
+                                                                        <span> Visibility: @HumanizeStatus(leadAftermathCreatorPublication.Visibility, "Shared").</span>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.DiscoverySummary))
+                                                                    {
+                                                                        <span> Discovery: @leadAftermathCreatorPublication.DiscoverySummary</span>
+                                                                    }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.LineageSummary))
                                                                     {
                                                                         <span> Lineage: @leadAftermathCreatorPublication.LineageSummary</span>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.CampaignReturnSummary))
+                                                                    {
+                                                                        <span> Return: @leadAftermathCreatorPublication.CampaignReturnSummary</span>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.SupportClosureSummary))
+                                                                    {
+                                                                        <span> Support: @leadAftermathCreatorPublication.SupportClosureSummary</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.NextSafeAction))
                                                                     {
@@ -597,6 +613,10 @@
                                                             </p>
                                                         </div>
                                                         <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#aftermath-packages")">Open aftermath and return</a>
+                                                        @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.BuildHandoffId))
+                                                        {
+                                                            <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(leadAftermathCreatorPublication.BuildHandoffId)}")">Open build path for @leadAftermathCreatorPublication.Title</a>
+                                                        }
                                                         @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry?.CreatorPublicationId))
                                                         {
                                                             <a class="inline-link" href="@($"/account/work/publications/{Uri.EscapeDataString(leadAftermathShelfEntry.CreatorPublicationId)}")">Open publication status</a>

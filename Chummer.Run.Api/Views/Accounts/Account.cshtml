@@ -1548,13 +1548,33 @@
                                                     {
                                                         <span> @item.PublicationSummary</span>
                                                     }
+                                                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.Visibility))
+                                                    {
+                                                        <span> Visibility: @HumanizeStatus(linkedPublication.Visibility, "Shared").</span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.DiscoverySummary))
+                                                    {
+                                                        <span> Discovery: @linkedPublication.DiscoverySummary</span>
+                                                    }
                                                     @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
                                                     {
                                                         <span> Lineage: @linkedPublication.LineageSummary</span>
                                                     }
+                                                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.CampaignReturnSummary))
+                                                    {
+                                                        <span> Return: @linkedPublication.CampaignReturnSummary</span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.SupportClosureSummary))
+                                                    {
+                                                        <span> Support: @linkedPublication.SupportClosureSummary</span>
+                                                    }
                                                     @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
                                                     {
                                                         <span> Next: @item.NextSafeAction</span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.BuildHandoffId))
+                                                    {
+                                                        <a class="inline-link" href="@BuildHandoffDetailHref(linkedPublication.BuildHandoffId)">Open build path for @linkedPublication.Title</a>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
                                                     {
@@ -2115,9 +2135,25 @@
                                                 {
                                                     <span> @item.PublicationSummary</span>
                                                 }
+                                                @if (!string.IsNullOrWhiteSpace(linkedPublication?.Visibility))
+                                                {
+                                                    <span> Visibility: @HumanizeStatus(linkedPublication.Visibility, "Shared").</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(linkedPublication?.DiscoverySummary))
+                                                {
+                                                    <span> Discovery: @linkedPublication.DiscoverySummary</span>
+                                                }
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
                                                 {
                                                     <span> Lineage: @linkedPublication.LineageSummary</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(linkedPublication?.CampaignReturnSummary))
+                                                {
+                                                    <span> Return: @linkedPublication.CampaignReturnSummary</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(linkedPublication?.SupportClosureSummary))
+                                                {
+                                                    <span> Support: @linkedPublication.SupportClosureSummary</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
                                                 {
@@ -2126,6 +2162,10 @@
                                                 @if (!string.IsNullOrWhiteSpace(item.ArtifactId))
                                                 {
                                                     <span> (@item.ArtifactId)</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(linkedPublication?.BuildHandoffId))
+                                                {
+                                                    <a class="inline-link" href="@BuildHandoffDetailHref(linkedPublication.BuildHandoffId)">Open build path for @linkedPublication.Title</a>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
                                                 {
