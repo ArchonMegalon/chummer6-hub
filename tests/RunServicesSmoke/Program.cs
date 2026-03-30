@@ -1728,6 +1728,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Grounded rule answers", StringComparison.Ordinal), "account should describe Rules Navigator follow-through as grounded rule answers.");
     Assert(accountSource.Contains("Model.SignedInTrustStatus", StringComparison.Ordinal), "account should project the signed-in trust panel directly on the account surface.");
     Assert(accountSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "account should reuse the shared signed-in trust panel instead of a link-only trust rail.");
+    Assert(accountSource.Contains("Signed-in trust snapshot", StringComparison.Ordinal), "account teams and permissions should give organizers a bounded signed-in trust snapshot on the member-guidance rail.");
+    Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Who can get it now\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for current access guidance.");
+    Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Recommended for this install\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for the promoted install path.");
+    Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Release proof\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for current proof.");
+    Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Current caution\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for the caution lane.");
+    Assert(accountSource.Contains("#signed-in-trust-status", StringComparison.Ordinal), "account member guidance should deep-link back to the shared signed-in trust panel instead of inventing a second trust page.");
     Assert(accountSource.Contains("Start first playable session", StringComparison.Ordinal), "account work should offer starter-lane follow-through when the shared campaign view is still empty.");
     Assert(accountSource.Contains("seedStarterWorkspaceFromAccount", StringComparison.Ordinal), "account work should wire the starter-lane button on the empty-state route.");
     Assert(accountSource.Contains("starterWorkspaceAccountNotice", StringComparison.Ordinal), "account work should surface starter-lane feedback on the empty-state route.");
