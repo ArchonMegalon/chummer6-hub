@@ -239,6 +239,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Work');
     await expectVisible(page, 'text=Finish setup before the work surfaces try to carry too much');
     await expectBodyText(page, 'What changed for me', '/home/work');
+    await expectBodyText(page, 'Aftermath recap', '/home/work');
     await expectBodyText(page, 'Safehouse / travel mode', '/home/work');
     await expectBodyText(page, 'GM prep', '/home/work');
   });
@@ -317,6 +318,11 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await expectBodyText(page, 'GM prep library and travel mode', '/account/work/workspaces detail');
   await expectBodyText(page, 'Safehouse / travel mode', '/account/work/workspaces detail');
   await expectBodyText(page, 'Support follow-through', '/account/work/workspaces detail');
+  await expandDetailsBySummary(page, 'Artifact shelf posture', '/account/work/workspaces detail');
+  await expectBodyText(page, 'Audience:', '/account/work/workspaces detail');
+  await expectBodyText(page, 'Ownership:', '/account/work/workspaces detail');
+  await expectBodyText(page, 'Publication:', '/account/work/workspaces detail');
+  await expectBodyText(page, 'Open publication status', '/account/work/workspaces detail');
   await assertNoBannedCopy(page, '/account/work/workspaces detail');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail');
 
