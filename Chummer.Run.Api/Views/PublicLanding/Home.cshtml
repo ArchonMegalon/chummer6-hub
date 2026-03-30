@@ -562,6 +562,11 @@
                                                                     {
                                                                         <span> State: @HumanizeStatus(leadAftermathShelfEntry.PublicationState, "Ready").</span>
                                                                     }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.TrustBand))
+                                                                    {
+                                                                        <span> Trust ranking: @HumanizeStatus(leadAftermathShelfEntry.TrustBand, "Draft").</span>
+                                                                        <span> Discoverable now: @(leadAftermathShelfEntry.Discoverable ? "Eligible now" : "Still bounded").</span>
+                                                                    }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationSummary))
                                                                     {
                                                                         <span> Publication: @leadAftermathShelfEntry.PublicationSummary</span>
@@ -574,6 +579,10 @@
                                                             </p>
                                                         </div>
                                                         <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#aftermath-packages")">Open aftermath and return</a>
+                                                        @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry?.CreatorPublicationId))
+                                                        {
+                                                            <a class="inline-link" href="@($"/account/work/publications/{Uri.EscapeDataString(leadAftermathShelfEntry.CreatorPublicationId)}")">Open publication status</a>
+                                                        }
                                                     </article>
                                                 }
 

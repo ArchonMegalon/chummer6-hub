@@ -247,12 +247,13 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         var cards = _landing.CardsForBucket(surface, "participate");
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Participate", "Two clean lanes: public feedback and an optional signed-in guided contribution path.", "/participate", cancellationToken);
         var model = new ParticipatePageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Participate", "Two clean lanes: public feedback and an optional signed-in guided contribution path.", "/participate", cancellationToken),
+            Chrome: chrome,
             Surface: surface,
             Assets: new AssetCatalogViewModel(surface.Assets),
             PublicLane: ResolveCards(cards.Where(card => !string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && !string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(), new AssetCatalogViewModel(surface.Assets), authenticated: false, "/participate"),
-            SignedInLane: ResolveCards(cards.Where(card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) || string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(), new AssetCatalogViewModel(surface.Assets), authenticated: true, "/participate"));
+            SignedInLane: ResolveCards(cards.Where(card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) || string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(), new AssetCatalogViewModel(surface.Assets), authenticated: chrome.Authenticated, "/participate"));
         return View("~/Views/PublicLanding/Participate.cshtml", model);
     }
 

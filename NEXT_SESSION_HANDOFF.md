@@ -1,6 +1,27 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T10:43:28+02:00
+Updated: 2026-03-30T10:50:58+02:00
+
+## Handoff refresh (2026-03-30T10:50:58+02:00)
+
+- Guest participation routing is now canon-correct and release-blocking:
+  - `Chummer.Run.Api/Controllers/PublicLandingController.cs` now resolves the signed-in participation lane on `/participate` through the actual current auth state instead of always forcing the authenticated route set. Guests now get the intended `/login?next=/participate/codex` and `/signup?next=/account/settings` handoffs, while signed-in users still keep the direct `/participate/codex` and `/account/settings` routes.
+  - `scripts/hub-live-audit.py` and `scripts/e2e-hub-playwright.cjs` now treat `/what-is-chummer` and `/participate` as richer public release surfaces. The browser/live proof now requires the public story explainer rails plus the guest participation lane copy and guest-safe action hrefs.
+  - `tests/RunServicesSmoke/Program.cs` now locks both participate states: guest routes must use login/signup-first handoffs, and authenticated routes must keep the direct participation/account paths.
+- Integrated concurrent recap-shelf publication-trust view changes and repaired the broken contract so the repo stays green:
+  - `Chummer.Run.Api/Views/Accounts/Account.cshtml` and `Chummer.Run.Api/Views/PublicLanding/Home.cshtml` were already carrying richer publication trust/discoverability rows on recap-shelf entries.
+  - `Chummer.Campaign.Contracts/CampaignContracts.cs` now extends `PublicationSafeProjection` with the optional publication-trust fields those views already consume (`Audience`, `OwnershipSummary`, `PublicationState`, `TrustBand`, `Discoverable`, `PublicationSummary`, `CreatorPublicationId`, `NextSafeAction`), which clears the compile break that was failing `scripts/ai/run_services_smoke.sh` and `bash scripts/audit-compliance.sh`.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "RunServicesSmoke|PublicTrustPulseServiceTests|WeeklyProductPulseArtifactServiceTests"`
+  - `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build`
+  - `bash scripts/run_smoke.sh`
+  - `bash scripts/ai/run_services_smoke.sh`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
+  - `bash scripts/audit-compliance.sh`
 
 ## Handoff refresh (2026-03-30T10:43:28+02:00)
 

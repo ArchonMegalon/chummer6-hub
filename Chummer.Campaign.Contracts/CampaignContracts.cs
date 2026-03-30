@@ -48,7 +48,15 @@ public sealed record PublicationSafeProjection(
     string Kind,
     string Label,
     string Summary,
-    string? ArtifactId = null);
+    string? ArtifactId = null,
+    string Audience = "campaign",
+    string? OwnershipSummary = null,
+    string? PublicationState = null,
+    string? TrustBand = null,
+    bool Discoverable = false,
+    string? PublicationSummary = null,
+    string? CreatorPublicationId = null,
+    string? NextSafeAction = null);
 
 public sealed record CampaignConsequenceReceipt(
     string ReceiptId,

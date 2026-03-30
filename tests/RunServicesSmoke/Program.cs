@@ -1630,8 +1630,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("PublicSurfaceStatus.AudienceLabel(leadAftermathShelfEntry.Audience)", StringComparison.Ordinal), "home work should humanize artifact shelf audience directly on the aftermath card.");
     Assert(homeSource.Contains("@leadAftermathShelfEntry.OwnershipSummary", StringComparison.Ordinal), "home work should surface artifact shelf ownership posture directly on the aftermath card.");
     Assert(homeSource.Contains("HumanizeStatus(leadAftermathShelfEntry.PublicationState, \"Ready\")", StringComparison.Ordinal), "home work should humanize artifact publication state directly on the aftermath card.");
+    Assert(homeSource.Contains("HumanizeStatus(leadAftermathShelfEntry.TrustBand, \"Draft\")", StringComparison.Ordinal), "home work should humanize artifact trust ranking directly on the aftermath card.");
+    Assert(homeSource.Contains("leadAftermathShelfEntry.Discoverable ? \"Eligible now\" : \"Still bounded\"", StringComparison.Ordinal), "home work should surface artifact discoverability posture directly on the aftermath card.");
     Assert(homeSource.Contains("@leadAftermathShelfEntry.PublicationSummary", StringComparison.Ordinal), "home work should surface artifact publication posture directly from the recap-shelf projection on the aftermath card.");
     Assert(homeSource.Contains("@leadAftermathShelfEntry.NextSafeAction", StringComparison.Ordinal), "home work should surface the next artifact-shelf step directly from the recap-shelf projection on the aftermath card.");
+    Assert(homeSource.Contains("leadAftermathShelfEntry.CreatorPublicationId", StringComparison.Ordinal), "home work should keep a direct route from the aftermath card into creator publication status when the recap shelf is already linked.");
     Assert(homeSource.Contains("Roster move", StringComparison.Ordinal), "home work should surface a dedicated roster-move card instead of collapsing operator actions into one-line campaign summaries.");
     Assert(homeSource.Contains("@leadRosterTransfer.RunnerHandle", StringComparison.Ordinal), "home work should surface the moved runner handle directly from the governed transfer receipt.");
     Assert(homeSource.Contains("Open governed roster moves", StringComparison.Ordinal), "home work should keep a direct route back to the governed roster-move operator rail.");
@@ -2092,8 +2095,13 @@ async Task VerifyPublicLandingProjectionAsync()
     var participateView = await controller.ParticipatePage(CancellationToken.None) as ViewResult;
     var participateModel = participateView?.Model as ParticipatePageViewModel;
     Assert(participateModel is not null, "participate page should render through the MVC view layer.");
-    Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Open guided contribution", StringComparison.Ordinal)), "participate page should render an explicit guided-contribution label.");
-    Assert(participateModel.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Join beta waitlist", StringComparison.Ordinal)), "participate page should render an explicit beta-waitlist label.");
+    Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Open guided contribution", StringComparison.Ordinal) && string.Equals(card.Action.Href, "/login?next=/participate/codex", StringComparison.Ordinal)), "guest participate page should route guided contribution through login first.");
+    Assert(participateModel.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Join beta waitlist", StringComparison.Ordinal) && string.Equals(card.Action.Href, "/signup?next=/account/settings", StringComparison.Ordinal)), "guest participate page should route beta follow-up through signup first.");
+    var authenticatedParticipateView = await authenticatedLandingController.ParticipatePage(CancellationToken.None) as ViewResult;
+    var authenticatedParticipateModel = authenticatedParticipateView?.Model as ParticipatePageViewModel;
+    Assert(authenticatedParticipateModel is not null, "authenticated participate page should render through the MVC view layer.");
+    Assert(authenticatedParticipateModel!.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Open guided contribution", StringComparison.Ordinal) && string.Equals(card.Action.Href, "/participate/codex", StringComparison.Ordinal)), "signed-in participate page should keep the direct guided-contribution route.");
+    Assert(authenticatedParticipateModel.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Join beta waitlist", StringComparison.Ordinal) && string.Equals(card.Action.Href, "/account/settings", StringComparison.Ordinal)), "signed-in participate page should keep the direct beta waitlist route.");
     var privacyPage = trustContent.BuildPrivacyPage(chrome.BuildPublicChrome("Privacy", "What Chummer stores, and what it does not.", "/privacy"));
     Assert(privacyPage.Actions.Any(static action => string.Equals(action.Label, "Create account", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "privacy page should adapt account-only actions into signup-first actions for guests.");
     var publicPrivacyView = await controller.PrivacyPage(CancellationToken.None) as ViewResult;
@@ -2870,6 +2878,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RecapShelf.Count >= 1, "account workspace detail route should project the richer recap shelf through the workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RecapShelf[0].OwnershipSummary), "account workspace detail route should surface explicit ownership posture on recap-shelf entries.");
     Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RecapShelf[0].PublicationState), "account workspace detail route should surface publication-state posture on recap-shelf entries.");
+    Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RecapShelf[0].TrustBand), "account workspace detail route should surface trust-ranking posture on recap-shelf entries when creator publication is already linked.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RecapShelf[0].Discoverable == false, "account workspace detail route should keep preview-ready recap entries bounded until publication is actually live.");
     Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RecapShelf[0].PublicationSummary), "account workspace detail route should surface publication-summary posture on recap-shelf entries.");
     Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RecapShelf[0].NextSafeAction), "account workspace detail route should surface next-safe-action posture on recap-shelf entries.");
     var searchableWorkspaceDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, workspaceId: workspaceId, prepQuery: "opposition") as ViewResult;
