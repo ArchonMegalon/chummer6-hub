@@ -15,6 +15,10 @@
     var publicCreatorPublications = Model.PublicCreatorPublications is { Count: > 0 }
         ? Model.PublicCreatorPublications.Take(3).ToArray()
         : Array.Empty<CreatorPublicationProjection>();
+    var rankedPublicCreatorPublications = publicCreatorPublications
+        .OrderByDescending(publication => CreatorPublicationTrustRank(publication.TrustBand))
+        .ThenBy(publication => publication.Title, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -45,6 +49,19 @@
         => publication is not null
             && publication.Discoverable
             && string.Equals(publication.PublicationStatus, "published", StringComparison.OrdinalIgnoreCase);
+
+    static int CreatorPublicationTrustRank(string? trustBand)
+        => trustBand?.Trim().ToLowerInvariant() switch
+        {
+            "curated-live" => 6,
+            "restricted-live" => 5,
+            "approval-backed" => 4,
+            "review-pending" => 3,
+            "needs-revision" => 2,
+            "retained-history" => 1,
+            "delisted-caution" => 0,
+            _ => -1
+        };
 
     static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
     static string PublicCreatorPublicationHref(string publicationId) => $"/artifacts/creator/{Uri.EscapeDataString(publicationId)}";
@@ -264,8 +281,46 @@
             <h2 class="editorial-title">Published creator packets</h2>
             <p class="editorial-copy">These creator outputs are live because the same governed account rail carried them through review, publication, lineage, and trust posture instead of inventing a public shadow state.</p>
         </div>
+        <section class="trust-rail-section" id="creator-packet-comparison">
+            <div class="editorial-block__lead">
+                <p class="eyebrow">Compare at a glance</p>
+                <h2 class="editorial-title">How live creator packets differ</h2>
+                <p class="editorial-copy">Compare provenance, trust ranking, lineage, moderation, and return posture here before you open every detail page one by one.</p>
+            </div>
+            <div class="trust-rail-list">
+                @foreach (var publication in rankedPublicCreatorPublications)
+                {
+                    <article class="trust-rail">
+                        <span class="tag">@HumanizeStatus(publication.TrustBand, "Draft")</span>
+                        <p><strong>@publication.Title</strong></p>
+                        <p>Provenance: @publication.ProvenanceSummary</p>
+                        @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
+                        {
+                            <p>Trust: @publication.TrustSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
+                        {
+                            <p>Compare by: @publication.ComparisonSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
+                        {
+                            <p>Lineage: @publication.LineageSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
+                        {
+                            <p>Moderation: @publication.ModerationSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
+                        {
+                            <p>Return: @publication.CampaignReturnSummary</p>
+                        }
+                        <a class="inline-link" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open published creator packet</a>
+                    </article>
+                }
+            </div>
+        </section>
         <div class="shelf-stack">
-            @foreach (var publication in publicCreatorPublications)
+            @foreach (var publication in rankedPublicCreatorPublications)
             {
                 <article class="shelf-item">
                     <span class="tag">Governed creator discovery</span>

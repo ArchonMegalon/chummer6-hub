@@ -1600,6 +1600,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(shelfSource.Contains("@publication.ModerationSummary", StringComparison.Ordinal), "artifact shelf should surface creator-publication moderation posture directly on the signed-in creator cards.");
     Assert(shelfSource.Contains("Governed creator discovery", StringComparison.Ordinal), "artifact shelf should expose a first-class public creator-discovery section once creator publication is live.");
     Assert(shelfSource.Contains("Published creator packets", StringComparison.Ordinal), "artifact shelf should frame public creator discovery as a governed published shelf instead of teaser prose.");
+    Assert(shelfSource.Contains("Compare at a glance", StringComparison.Ordinal), "artifact shelf should add a real compare-at-a-glance rail for public creator discovery instead of forcing card-by-card comparison.");
+    Assert(shelfSource.Contains("How live creator packets differ", StringComparison.Ordinal), "artifact shelf should explain the public creator comparison lane in customer-facing terms.");
+    Assert(shelfSource.Contains("CreatorPublicationTrustRank", StringComparison.Ordinal), "artifact shelf should order the public creator comparison lane with explicit governed trust posture instead of ad hoc card order.");
+    Assert(shelfSource.Contains("rankedPublicCreatorPublications", StringComparison.Ordinal), "artifact shelf should build a ranked public creator comparison set before rendering the compare-at-a-glance lane.");
     Assert(shelfSource.Contains("HumanizeStatus(publication.PublicationStatus, \"Published\")", StringComparison.Ordinal), "artifact shelf should humanize publication state directly on the public creator-discovery cards.");
     Assert(shelfSource.Contains("Open published creator packet", StringComparison.Ordinal), "artifact shelf should keep a direct public inspect route on the creator-discovery cards.");
     Assert(shelfSource.Contains("/artifacts/creator/", StringComparison.Ordinal), "artifact shelf should deep-link public creator discovery into a dedicated public detail route.");

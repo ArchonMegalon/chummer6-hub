@@ -379,6 +379,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Status guide');
     await expectVisible(page, 'text=Governed creator discovery');
     await expectVisible(page, 'text=Published creator packets');
+    await expectVisible(page, 'text=Compare at a glance');
+    await expectVisible(page, 'text=How live creator packets differ');
     await expectVisible(page, 'text=Open published creator packet');
     publicCreatorPublicationPath = await readFirstHref(page, 'a[href*="/artifacts/creator/"]', '/artifacts');
     await assertNoBannedCopy(page, 'Artifacts');
