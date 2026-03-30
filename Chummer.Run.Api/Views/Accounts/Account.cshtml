@@ -826,6 +826,21 @@
                                 <span>First playable session</span>
                                 <strong>@(selectedWorkspaceFirstPlayableSession is null ? "Pending" : selectedWorkspaceFirstPlayableSession.CampaignStartSummary)</strong>
                             </div>
+                            @if (selectedWorkspaceFirstPlayableSession is not null)
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Legal runner</span>
+                                    <strong>@selectedWorkspaceFirstPlayableSession.RuleReadySummary</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Understandable return</span>
+                                    <strong>@selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Campaign-ready lane</span>
+                                    <strong>@selectedWorkspaceFirstPlayableSession.CampaignReadySummary</strong>
+                                </div>
+                            }
                             <div class="settings-summary-row">
                                 <span>Support follow-through</span>
                                 <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support follow-through stays attached to the linked install and release lane that reopen this shared campaign view.")</strong>
@@ -864,6 +879,9 @@
                             @if (selectedWorkspaceFirstPlayableSession is not null)
                             {
                                 <p><strong>First playable session:</strong> @selectedWorkspaceFirstPlayableSession.Summary</p>
+                                <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
+                                <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
+                                <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
                             }
                             @if (selectedWorkspaceServerPlane is not null)
                             {
@@ -932,6 +950,21 @@
                                         <span>First playable session</span>
                                         <strong>@(selectedWorkspaceFirstPlayableSession is null ? "Pending" : $"{selectedWorkspaceFirstPlayableSession.Label} · {selectedWorkspaceFirstPlayableSession.CampaignStartSummary}")</strong>
                                     </div>
+                                    @if (selectedWorkspaceFirstPlayableSession is not null)
+                                    {
+                                        <div class="settings-summary-row">
+                                            <span>Legal runner</span>
+                                            <strong>@selectedWorkspaceFirstPlayableSession.RuleReadySummary</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Understandable return</span>
+                                            <strong>@selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Campaign-ready lane</span>
+                                            <strong>@selectedWorkspaceFirstPlayableSession.CampaignReadySummary</strong>
+                                        </div>
+                                    }
                                     <div class="settings-summary-row">
                                         <span>Next-session carry-forward</span>
                                         <strong>@(selectedWorkspaceNextSessionCarryForward is null ? "Pending" : $"{selectedWorkspaceNextSessionCarryForward.Label} · {selectedWorkspaceNextSessionCarryForward.Summary}")</strong>
