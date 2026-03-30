@@ -1121,6 +1121,16 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Open downloads", "/account/work")
     require_snippet(body, "Open help and trust", "/account/work")
     require_snippet(body, "Open support closure", "/account/work")
+    run_detail_path = extract_first_match(
+        body,
+        r'href="([^"]*/account/work/runs/[^"]+)"',
+        "/account/work",
+        "run detail link")
+    rules_detail_path = extract_first_match(
+        body,
+        r'href="([^"]*/account/work/rules/[^"]+)"',
+        "/account/work",
+        "rules detail link")
     status, body, _, _ = fetch(
         base_url,
         "/home/work",
@@ -1223,6 +1233,35 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Return", build_handoff_detail_path)
     require_snippet(body, "Support", build_handoff_detail_path)
     require_snippet(body, "Planner coverage", build_handoff_detail_path)
+    status, body, _, _ = fetch(
+        base_url,
+        run_detail_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{run_detail_path} returned {status}, expected 200")
+    require_snippet(body, "Run context", run_detail_path)
+    require_snippet(body, "Status", run_detail_path)
+    require_snippet(body, "Active scene", run_detail_path)
+    require_snippet(body, "Objectives", run_detail_path)
+    require_snippet(body, "Scenes", run_detail_path)
+    require_snippet(body, "Continuity:", run_detail_path)
+    status, body, _, _ = fetch(
+        base_url,
+        rules_detail_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{rules_detail_path} returned {status}, expected 200")
+    require_snippet(body, "Grounded rule answer", rules_detail_path)
+    require_snippet(body, "Before", rules_detail_path)
+    require_snippet(body, "After", rules_detail_path)
+    require_snippet(body, "Provenance", rules_detail_path)
+    require_snippet(body, "Evidence:", rules_detail_path)
     print(
         "ok signed-in /account/work -> "
         f"{final_url} workspace={workspace_id} install={claimed_installation_id} support_case={support_case_id} support_fix={support_fixed_version} join_code={join_code['code']} boost_code={boost_code['code']} sponsor_session={sponsor_session_id} prep_launch={prep_launch['launchId']} travel_prefetch={travel_prefetch['receiptId']} aftermath={aftermath_package['packageId']} downtime={downtime_package['packageId']} transfer={transfer['transferId']} runner={transfer['runnerHandle']}"
