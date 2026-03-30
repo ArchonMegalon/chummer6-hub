@@ -411,7 +411,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await gotoAndAssert(page, pageErrors, homeFirstPlayablePath, async () => {
       assert.equal(new URL(page.url()).hash, '#selected-first-playable-session', '/home/work first-playable link should preserve the target anchor.');
       await expectBodyText(page, 'First playable session', '/home/work -> first playable');
-      await expectBodyText(page, 'Session summary', '/home/work -> first playable');
+      await expectBodyText(page, 'Playable kickoff', '/home/work -> first playable');
+      await expectBodyText(page, 'Legal runner', '/home/work -> first playable');
+      await expectBodyText(page, 'Understandable return', '/home/work -> first playable');
+      await expectBodyText(page, 'Campaign-ready lane', '/home/work -> first playable');
     });
   }
 

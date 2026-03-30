@@ -1,6 +1,19 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:59:57+02:00
+Updated: 2026-03-30T09:03:40+02:00
+
+## Handoff refresh (2026-03-30T09:03:40+02:00)
+
+- Integrated the concurrent first-playable-session proof expansion and brought the mirror/proof lane back to green:
+  - `Chummer.Campaign.Contracts/CampaignContracts.cs`, `Chummer.Run.Api/Services/Community/CampaignSpineService.cs`, `Chummer.Run.Api/Views/PublicLanding/Home.cshtml`, `Chummer.Run.Api/Views/Accounts/Account.cshtml`, and `tests/RunServicesSmoke/Program.cs` now carry explicit first-session `RuleReadySummary`, `ReturnLaneSummary`, and `CampaignReadySummary` fields with customer-facing labels (`Legal runner`, `Understandable return`, `Campaign-ready lane`) on both the signed-in home and account work surfaces.
+  - `scripts/hub-live-audit.py` and `scripts/e2e-hub-playwright.cjs` now require those new rows on the anchored first-playable-session route, so the shared first-session proof cannot drift out of the live/browser verification lane.
+  - The mirrored [.codex-design/product/WEEKLY_PRODUCT_PULSE.generated.json](/docker/chummercomplete/chummer.run-services/.codex-design/product/WEEKLY_PRODUCT_PULSE.generated.json) was refreshed to restore `closure_health`, `adoption_health`, and `progress_trend` so the design mirror matches the live weekly pulse again.
+- Re-verified clean with:
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "RunServicesSmoke|DesignMirrorExecutionPlanTests|PublicTrustPulseServiceTests|WeeklyProductPulseArtifactServiceTests"`
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:59:57+02:00)
 
