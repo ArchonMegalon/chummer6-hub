@@ -1,6 +1,15 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T10:53:25+02:00
+Updated: 2026-03-30T11:00:07+02:00
+
+## Handoff refresh (2026-03-30T11:00:07+02:00)
+
+- Guest `/help` is now part of the browser-proof lane instead of only the raw-route audit:
+  - `scripts/e2e-hub-playwright.cjs` now visits `/help` in the guest browser flow, requires the stable help hero/fallback/privacy-boundary copy, and locks the live next-step links to `/downloads`, `/faq`, `/contact#support-intake`, and `/now`.
+- Re-verified clean with:
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
 
 ## Handoff refresh (2026-03-30T10:53:25+02:00)
 
