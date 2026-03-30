@@ -1543,6 +1543,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("Preview in progress:", StringComparison.Ordinal), "landing should demote preview-in-progress copy to a quieter shelf note instead of a full third state card.");
     Assert(landingSource.Contains("Need the full picture?", StringComparison.Ordinal), "landing should route deeper proof evaluation through one quiet inline note instead of a second button stack.");
     Assert(landingSource.Contains("PublicSurfaceStatus.DisplayLabel", StringComparison.Ordinal), "landing should use the shared public status presenter instead of route-local badge labels.");
+    Assert(landingSource.Contains("var trustPulseAdoption = trustPulse?.Rows.FirstOrDefault", StringComparison.Ordinal), "landing should bind adoption health directly from the shared trust pulse.");
+    Assert(landingSource.Contains("<p><strong>@trustPulseAdoption.Label:</strong> @trustPulseAdoption.Value</p>", StringComparison.Ordinal), "landing should render adoption health directly on the public trust pulse instead of leaving it model-only.");
     var storySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml"));
     Assert(!storySource.Contains("One path from install to session return", StringComparison.Ordinal), "product story should not drift back into a second install/support explainer.");
     Assert(!storySource.Contains("From first install to next session", StringComparison.Ordinal), "product story should stay focused on differentiation instead of retelling the install path.");

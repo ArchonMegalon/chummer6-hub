@@ -26,6 +26,7 @@
     var release = Model.ReleaseExperience;
     var trustPulse = Model.TrustPulse;
     var trustPulseRecommended = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Recommended now", StringComparison.Ordinal));
+    var trustPulseAdoption = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal));
     var trustPulseCaution = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal));
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
@@ -106,6 +107,10 @@
         @if (trustPulseRecommended is not null)
         {
             <p><strong>@trustPulseRecommended.Label:</strong> @trustPulseRecommended.Value</p>
+        }
+        @if (trustPulseAdoption is not null)
+        {
+            <p><strong>@trustPulseAdoption.Label:</strong> @trustPulseAdoption.Value</p>
         }
         @if (trustPulseCaution is not null)
         {
