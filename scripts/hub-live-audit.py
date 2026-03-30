@@ -527,6 +527,34 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Submit support case", support_index_path)
     require_snippet(body, "Open or active cases", support_index_path)
     require_snippet(body, "Total recent cases", support_index_path)
+    assistant_build_payload = json.dumps(
+        {
+            "query": "What is the safest build handoff before I export this dossier back into the campaign?",
+            "installationId": claimed_installation_id,
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/support/cases/assistant",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=assistant_build_payload,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/support/cases/assistant build-truth check returned {status}: {body[:400]}")
+    build_assistant = load_json_object(body, "/api/v1/support/cases/assistant")
+    build_citations = [item for item in build_assistant.get("citations") or [] if isinstance(item, dict)]
+    if not any(str(item.get("sourceKind") or "") == "build_truth" for item in build_citations):
+        raise AssertionError("support assistant did not surface build-truth citations for the signed-in build-handoff question")
+    build_actions = [item for item in build_assistant.get("actions") or [] if isinstance(item, dict)]
+    if not any(str(item.get("actionId") or "") == "open_work" for item in build_actions):
+        raise AssertionError("support assistant did not route the signed-in build-handoff question back to /account/work")
     support_case_payload = json.dumps(
         {
             "kind": "bug_report",
