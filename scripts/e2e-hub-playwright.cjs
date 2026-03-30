@@ -256,6 +256,17 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await assertNoBannedCopy(page, '/terms');
   });
 
+  await gotoAndAssert(page, pageErrors, '/help', async () => {
+    await expectVisible(page, 'text=Get help without guessing');
+    await expectVisible(page, 'text=Fallback:');
+    await expectVisible(page, 'text=Support, survey, and assistant data stay on a bounded clock');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/downloads"]', '/help downloads link'), '/downloads');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/faq"]', '/help faq link'), '/faq');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/help support link'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/help now link'), '/now');
+    await assertNoBannedCopy(page, '/help');
+  });
+
   await page.goto(`${baseUrl}/home/access`, { waitUntil: 'domcontentloaded' });
   assertLoginRedirect(page, '/home/access', 'Signed-out /home/access');
   await assertNoPageErrors(page, pageErrors, 'Signed-out /home/access redirect');
