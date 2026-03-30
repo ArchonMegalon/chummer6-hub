@@ -44,7 +44,7 @@ internal static class WorkspaceLifecycleRetentionVerification
             CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
             AccountService accounts = new(store);
             WorkspaceLifecyclePolicyService lifecycle = new(configuration);
-            CampaignSpineService campaignSpine = new(store, lifecycle);
+            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store));
 
             HubUserDto activeUser = accounts.EnsureUser("subject.retention", "Retention Runner", "runner@example.invalid");
 

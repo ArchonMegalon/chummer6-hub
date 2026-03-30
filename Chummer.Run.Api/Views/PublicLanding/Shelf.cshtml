@@ -128,6 +128,14 @@
                     {
                         <p class="muted-copy"><strong>Ownership:</strong> @item.OwnershipSummary</p>
                     }
+                    @if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
+                    {
+                        <p class="muted-copy"><strong>Provenance:</strong> @item.ProvenanceSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(item.AuditSummary))
+                    {
+                        <p class="muted-copy"><strong>Audit:</strong> @item.AuditSummary</p>
+                    }
                     @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
                     {
                         <p class="muted-copy"><strong>Publication:</strong> @item.PublicationSummary</p>

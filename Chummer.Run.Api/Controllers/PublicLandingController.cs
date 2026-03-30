@@ -761,6 +761,10 @@ public sealed class PublicLandingController : Controller
                 string continuitySummary = string.IsNullOrWhiteSpace(dossier.LatestContinuity?.Summary)
                     ? $"{campaignName} can reopen this runner from the same governed dossier artifact."
                     : dossier.LatestContinuity!.Summary;
+                string provenanceSummary = $"{dossier.RuleEnvironment.CompatibilityFingerprint} + {continuitySummary}";
+                string auditSummary = dossier.LatestContinuity is null
+                    ? "No governed continuity snapshot is attached yet."
+                    : $"Continuity snapshot {dossier.LatestContinuity.SnapshotId} was captured at {dossier.LatestContinuity.CapturedAtUtc:yyyy-MM-dd HH:mm} UTC.";
                 return new RecapShelfEntry(
                     EntryId: $"dossier:{dossier.DossierId}",
                     Kind: "dossier_projection",
@@ -775,7 +779,9 @@ public sealed class PublicLandingController : Controller
                     Discoverable: false,
                     PublicationSummary: $"Personal and campaign views already share this {campaignName} artifact without requiring a second export lane.",
                     CreatorPublicationId: null,
-                    NextSafeAction: "Reopen the shared campaign view before you move this runner artifact into another campaign, shelf, or publication step.");
+                    NextSafeAction: "Reopen the shared campaign view before you move this runner artifact into another campaign, shelf, or publication step.",
+                    ProvenanceSummary: provenanceSummary,
+                    AuditSummary: auditSummary);
             })
             .ToArray();
     }

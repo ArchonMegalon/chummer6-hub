@@ -596,6 +596,14 @@
                                                                     {
                                                                         <span> Ownership: @leadAftermathShelfEntry.OwnershipSummary</span>
                                                                     }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.ProvenanceSummary))
+                                                                    {
+                                                                        <span> Provenance: @leadAftermathShelfEntry.ProvenanceSummary</span>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.AuditSummary))
+                                                                    {
+                                                                        <span> Audit: @leadAftermathShelfEntry.AuditSummary</span>
+                                                                    }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationState))
                                                                     {
                                                                         <span> State: @HumanizeStatus(leadAftermathShelfEntry.PublicationState, "Ready").</span>
