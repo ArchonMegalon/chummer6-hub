@@ -1747,6 +1747,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@selectedCreatorPublication.SupportClosureSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication support closure directly from the shared projection.");
     Assert(accountSource.Contains("Open build path for @selectedCreatorPublication.Title", StringComparison.Ordinal), "account publication detail should give the customer a title-specific path back to the related build follow-through.");
     Assert(accountSource.Contains("HumanizeStatus(publication.PublicationStatus, \"Published\")", StringComparison.Ordinal), "account publication list should humanize creator-publication state directly from the shared projection.");
+    Assert(accountSource.Contains("Open build path for @publication.Title", StringComparison.Ordinal), "account publication list should keep a title-specific route back to the related build follow-through.");
     Assert(accountSource.Contains("@publication.NextSafeAction", StringComparison.Ordinal), "account publication list should surface the next creator-publication step directly from the shared projection.");
     Assert(accountSource.Contains("Recent change packets", StringComparison.Ordinal), "account work should surface recent change packets for the shared campaign view.");
     Assert(accountSource.Contains("Consequence ledger", StringComparison.Ordinal), "account work should surface the governed consequence ledger for the shared campaign view.");

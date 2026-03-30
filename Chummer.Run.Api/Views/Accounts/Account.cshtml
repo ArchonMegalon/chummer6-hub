@@ -2164,6 +2164,10 @@
                                     {
                                         <span> Support: @publication.SupportClosureSummary.</span>
                                     }
+                                    @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
+                                    {
+                                        <a class="inline-link" href="@BuildHandoffDetailHref(publication.BuildHandoffId)">Open build path for @publication.Title</a>
+                                    }
                                 </li>
                             }
                         </ul>
