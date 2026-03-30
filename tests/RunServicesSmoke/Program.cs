@@ -1965,6 +1965,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(releaseExperienceSource.Contains("same published download", StringComparison.Ordinal), "release-experience canon should describe the signed-in handoff in customer-facing download language.");
     var downloadsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"));
     var publicLandingControllerSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+    var statusSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml"));
     var featureDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml"));
     var liveProofDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailLiveProof.cshtml"));
     var previewDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailPreviewConcept.cshtml"));
@@ -1982,6 +1983,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicLandingControllerSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Audience)", StringComparison.Ordinal), "detail-page facts should humanize audience labels before projecting them.");
     Assert(publicLandingControllerSource.Contains("\"Who should use this now\"", StringComparison.Ordinal), "live proof details should use customer-facing audience copy.");
     Assert(!publicLandingControllerSource.Contains("signed-in shell", StringComparison.Ordinal), "controller-built landing and support copy should avoid signed-in shell wording on customer-facing routes.");
+    Assert(!publicLandingControllerSource.Contains("Redirect(\"/now\")", StringComparison.Ordinal), "status should be a first-class public surface instead of redirecting to the current-release page.");
+    Assert(statusSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "status should reuse the shared public trust pulse instead of inventing a second pulse renderer.");
+    Assert(statusSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "status should reuse the shared signed-in trust panel instead of inventing another install-specific rail.");
+    Assert(statusSource.Contains("/api/public/progress-poster.svg", StringComparison.Ordinal), "status should surface the public progress poster directly from the hosted poster route.");
+    Assert(statusSource.Contains("Open progress", StringComparison.Ordinal), "status should keep a direct route to the deeper weighted delivery report.");
     Assert(!featureDetailSource.Contains("story-guide-tail", StringComparison.Ordinal), "detail-family pages should not end with one generic shared tail after the family-specific sections.");
     Assert(!featureDetailSource.Contains("Get help with this surface", StringComparison.Ordinal), "detail-family pages should keep next-step help inside the family-specific route blocks.");
     Assert(liveProofDetailSource.Contains("Model.Chrome.Authenticated", StringComparison.Ordinal), "live proof detail should conditionally surface signed-in artifact continuity instead of treating all visitors the same.");
@@ -3326,6 +3332,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedArtifactsModel?.SignedInRecapShelf?.Count > 0, "authenticated artifacts shelf should expose a signed-in recap shelf overlay instead of staying public-only.");
     Assert(authenticatedArtifactsModel?.SignedInCreatorPublications?.Count > 0, "authenticated artifacts shelf should expose linked creator-publication posture instead of forcing a separate account detour.");
     Assert(authenticatedArtifactsModel!.SignedInRecapShelf!.GroupBy(static item => string.IsNullOrWhiteSpace(item.ArtifactId) ? item.EntryId : item.ArtifactId, StringComparer.OrdinalIgnoreCase).All(group => group.Count() == 1), "authenticated artifacts shelf should dedupe recap artifacts by governed artifact identity.");
+    var statusView = await controller.StatusPage(CancellationToken.None) as ViewResult;
+    var statusModel = statusView?.Model as StatusPageViewModel;
+    Assert(statusModel?.TrustPulse is not null, "guest status page should surface the weekly public trust pulse.");
+    Assert(statusModel?.SignedInStatus is null, "guest status page should not project install-specific signed-in trust posture.");
+    Assert(statusModel?.CampaignOsProof is not null, "status page should surface the mirrored campaign-OS local proof.");
+    var authenticatedStatusView = await authenticatedLandingController.StatusPage(CancellationToken.None) as ViewResult;
+    var authenticatedStatusModel = authenticatedStatusView?.Model as StatusPageViewModel;
+    Assert(authenticatedStatusModel?.TrustPulse is not null, "authenticated status page should keep the weekly public trust pulse visible.");
+    Assert(authenticatedStatusModel?.SignedInStatus is not null, "authenticated status page should project the shared signed-in trust status.");
     var horizonsView = await controller.HorizonsPage(CancellationToken.None) as ViewResult;
     var horizonsModel = horizonsView?.Model as HorizonsPageViewModel;
     Assert(horizonsModel?.TrustPulse is not null, "guest horizons page should surface the weekly public trust pulse.");
@@ -3413,6 +3428,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(unavailableTermsModel?.Chrome.Authenticated == true, "terms chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
     Assert(unavailableTermsModel?.SignedInStatus is null, "terms should suppress install-specific trust status when identity is temporarily unavailable.");
     Assert(unavailableTermsModel?.TrustPulse is not null, "terms should keep the public trust pulse even when identity lookups are temporarily unavailable.");
+    var unavailableStatusView = await unavailableLandingController.StatusPage(CancellationToken.None) as ViewResult;
+    var unavailableStatusModel = unavailableStatusView?.Model as StatusPageViewModel;
+    Assert(unavailableStatusModel?.Chrome.Authenticated == true, "status chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
+    Assert(unavailableStatusModel?.SignedInStatus is null, "status should suppress install-specific trust status when identity is temporarily unavailable.");
+    Assert(unavailableStatusModel?.TrustPulse is not null, "status should keep the public trust pulse even when identity lookups are temporarily unavailable.");
     var unavailableHomeResult = await unavailableLandingController.HomePage(null, CancellationToken.None);
     var unavailableHomeModel = (unavailableHomeResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableHomeModel?.Heading, "Home is unavailable right now", StringComparison.Ordinal), "home page should show an unavailable message when identity is down instead of redirecting to login.");
