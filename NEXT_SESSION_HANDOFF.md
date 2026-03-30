@@ -1,6 +1,18 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T06:34:49+02:00
+Updated: 2026-03-30T06:39:23+02:00
+
+## Handoff refresh (2026-03-30T06:39:23+02:00)
+
+- Commit `4dacd824` (`test: harden live trust surface verification`) is on `main` and matches `origin/main`.
+- `scripts/hub-live-audit.py` now requires the rendered trust-trend rail on `/`, `/downloads`, `/help`, and `/now`, and it also verifies that signed-in `/downloads`, `/now`, and `/help` expose `Recommended for this install`, `Install posture`, and the fix-ready trust state after the linked install is refreshed.
+- `scripts/e2e-hub-playwright.cjs` now asserts the same signed-in trust rows and the rendered `.trust-pulse-trend__point` rail on `/downloads`, `/now`, and `/help`, so the browser proof catches missing trust-surface rendering rather than only route availability.
+- Re-verified clean on the current local edge with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T06:34:49+02:00)
 
