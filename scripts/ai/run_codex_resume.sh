@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "/docker/chummercomplete/chummer.run-services"
 source "./scripts/ai/_env.sh"
+/docker/chummercomplete/scripts/codex_context_guard.sh "$(pwd)"
 
 BOOT_FILE=".codex.resume.boot.txt"
 {

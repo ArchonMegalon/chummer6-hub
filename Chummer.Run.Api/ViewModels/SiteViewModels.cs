@@ -477,6 +477,7 @@ public sealed record AccountPageViewModel(
     BuildLabHandoffProjection? SelectedBuildLabHandoff = null,
     RulesNavigatorAnswerProjection? SelectedRulesNavigatorAnswer = null,
     CreatorPublicationProjection? SelectedCreatorPublication = null,
+    SignedInTrustStatusPanelViewModel? SignedInTrustStatus = null,
     PrivacyBoundaryPanelViewModel? PrivacyBoundary = null);
 
 public sealed record AuthPageViewModel(
