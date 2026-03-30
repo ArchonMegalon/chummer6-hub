@@ -109,8 +109,14 @@
             "pending" => "Pending",
             "pending_verification" => "Verification sent",
             "verified" => "Verified",
+            "published" => "Published",
+            "campaign_approved" => "Campaign-approved",
+            "sandbox" => "Sandbox",
             "approved" => "Approved",
             "self_service" => "Self-service",
+            "current" => "Current",
+            "next" => "Next",
+            "completed" => "Completed",
             "review" => "Needs review",
             "warning" => "Needs attention",
             "attention" => "Needs attention",
@@ -120,8 +126,17 @@
         };
     }
 
+    static string RuleEnvironmentLifecycleLabel(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
+        => environment.ApprovalState.Trim().ToLowerInvariant() switch
+        {
+            "published" => "Published",
+            "approved" => "Campaign-approved",
+            "self_service" => "Sandbox",
+            _ => HumanizeStatus(environment.ApprovalState, "Review")
+        };
+
     static string RuleEnvironmentSummary(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
-        => $"{environment.OwnerScope} scope · {environment.CompatibilityFingerprint} · {HumanizeStatus(environment.ApprovalState, "Review")}";
+        => $"{environment.OwnerScope} scope · {environment.CompatibilityFingerprint} · {RuleEnvironmentLifecycleLabel(environment)}";
 
     static string InstallationLabelFor(
         IReadOnlyList<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>? installations,
@@ -1770,6 +1785,34 @@
                                 <strong>@selectedRulesNavigatorAnswer.ProvenanceLabel</strong>
                             </div>
                         </div>
+                        @if (selectedRulesNavigatorAnswer.Studio is not null)
+                        {
+                            <div class="settings-summary-list">
+                                <div class="settings-summary-row">
+                                    <span>Current stage</span>
+                                    <strong>@selectedRulesNavigatorAnswer.Studio.CurrentStageLabel</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Promote to</span>
+                                    <strong>@selectedRulesNavigatorAnswer.Studio.PromotionTargetLabel</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Rollback</span>
+                                    <strong>@selectedRulesNavigatorAnswer.Studio.RollbackSummary</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Lineage</span>
+                                    <strong>@selectedRulesNavigatorAnswer.Studio.LineageSummary</strong>
+                                </div>
+                            </div>
+                            <p><strong>Promotion:</strong> @selectedRulesNavigatorAnswer.Studio.PromotionSummary</p>
+                            <ul class="muted-copy">
+                                @foreach (var stage in selectedRulesNavigatorAnswer.Studio.Stages)
+                                {
+                                    <li><strong>@stage.Label</strong>: @HumanizeStatus(stage.Status, "Pending"). @stage.Summary</li>
+                                }
+                            </ul>
+                        }
                         @if (selectedRulesNavigatorAnswer.EvidenceLines.Count > 0)
                         {
                             <p><strong>Evidence:</strong> @string.Join(" ", selectedRulesNavigatorAnswer.EvidenceLines.Take(3))</p>
@@ -2301,6 +2344,11 @@
                                     <strong><a class="inline-link" href="@RulesDetailHref(answer.EntryId)">@answer.Question</a></strong>: @answer.ShortAnswer
                                     <span> Before: @answer.BeforeSummary. After: @answer.AfterSummary.</span>
                                     <span> Source: @answer.ProvenanceLabel.</span>
+                                    @if (answer.Studio is not null)
+                                    {
+                                        <span> Lifecycle: @answer.Studio.CurrentStageLabel -> @answer.Studio.PromotionTargetLabel.</span>
+                                        <span> Rollback: @answer.Studio.RollbackSummary.</span>
+                                    }
                                     @if (answer.EvidenceLines.Count > 0)
                                     {
                                         <span> Evidence: @answer.EvidenceLines[0].</span>

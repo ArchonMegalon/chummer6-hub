@@ -2537,6 +2537,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].ProgressionOutcomes[1].Contains("recap follow-through", StringComparison.Ordinal), "account page should receive export and recap follow-through posture on the build-path handoff.");
     Assert(accountModel.CampaignSpine.BuildLabHandoffs[0].PlannerCoverageLines![0].Contains("Campaign continuity:", StringComparison.Ordinal), "account page should receive campaign continuity planner coverage on the build-path handoff.");
     Assert(accountModel.CampaignSpine.RulesNavigator.Count >= 1, "account page should surface first-class rules navigator answers.");
+    Assert(accountModel.CampaignSpine.RulesNavigator[0].Studio is not null, "account page should surface explicit rule-environment studio lifecycle posture.");
+    Assert(string.Equals(accountModel.CampaignSpine.RulesNavigator[0].Studio!.CurrentStage, RuleEnvironmentLifecycleStages.CampaignApproved, StringComparison.Ordinal), "account page should keep the current rules studio stage on the campaign-approved rail.");
+    Assert(string.Equals(accountModel.CampaignSpine.RulesNavigator[0].Studio!.PromotionTargetStage, RuleEnvironmentLifecycleStages.Published, StringComparison.Ordinal), "account page should keep the next rules studio stage on the published rail.");
+    Assert(accountModel.CampaignSpine.RulesNavigator[0].Studio!.Stages.Count == 3, "account page should keep the full sandbox-to-published studio flow attached to rules answers.");
     Assert(accountModel.CampaignSpine.MigrationReceipts.Count >= 1, "account page should surface legacy migration receipts.");
     Assert(accountModel.CampaignSpine.CreatorPublications.Count >= 1, "account page should surface creator publication posture.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].TrustBand), "account page should keep creator-publication trust ranking attached.");
@@ -2766,6 +2770,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(rulesPayload is not null && rulesPayload.EvidenceLines.Count >= 1, "campaign spine api should expose grounded rule-environment evidence.");
     Assert(rulesPayload?.Diffs?.Count >= 2, "campaign spine api should expose grounded before-and-after rule-environment diffs.");
     Assert(rulesPayload?.Diffs?[0].AfterSummary.Contains(rulesPayload.ProvenanceLabel.Split(" · ").Last(), StringComparison.Ordinal) == true, "campaign spine api should keep the active compatibility fingerprint visible in the first rules diff.");
+    Assert(rulesPayload?.Studio is not null, "campaign spine api should expose a first-class rule-environment studio projection.");
+    Assert(string.Equals(rulesPayload?.Studio?.CurrentStage, RuleEnvironmentLifecycleStages.CampaignApproved, StringComparison.Ordinal), "campaign spine api should mark workspace rules as campaign-approved before broader promotion.");
+    Assert(string.Equals(rulesPayload?.Studio?.PromotionTargetStage, RuleEnvironmentLifecycleStages.Published, StringComparison.Ordinal), "campaign spine api should keep the next workspace rules promotion on the published rail.");
+    Assert(rulesPayload?.Studio?.RollbackSummary.Contains(rulesPayload.ProvenanceLabel.Split(" · ").Last(), StringComparison.Ordinal) == true, "campaign spine api should keep rollback posture tied to the same grounded compatibility fingerprint.");
     var publicationResult = await campaignSpineController.GetMyCreatorPublication(publicationId, CancellationToken.None);
     var publicationPayload = (publicationResult.Result as OkObjectResult)?.Value as CreatorPublicationProjection ?? publicationResult.Value;
     Assert(publicationPayload is not null && string.Equals(publicationPayload.PublicationId, publicationId, StringComparison.Ordinal), "campaign spine api should expose creator-publication posture from the same campaign truth.");

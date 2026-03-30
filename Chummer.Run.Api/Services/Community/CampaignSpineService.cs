@@ -1412,7 +1412,7 @@ public sealed class CampaignSpineService
 
         if (ruleEnvironments.Count > 0)
         {
-            segments.Add($"rules {string.Join(", ", ruleEnvironments.Take(3).Select(static environment => $"{environment.CompatibilityFingerprint} [{environment.ApprovalState}]"))}");
+            segments.Add($"rules {string.Join(", ", ruleEnvironments.Take(3).Select(environment => $"{environment.CompatibilityFingerprint} [{DescribeRuleEnvironmentLifecycleStage(ResolveRuleEnvironmentLifecycleStage(environment)).ToLowerInvariant()}]"))}");
         }
 
         if (recentArtifacts.Count > 0)
@@ -1487,21 +1487,23 @@ public sealed class CampaignSpineService
                 Summary: restore.ConflictSummaries[0]));
         }
 
-        if (!string.Equals(campaign.RuleEnvironment.ApprovalState, "approved", StringComparison.OrdinalIgnoreCase))
+        string lifecycleStage = DescribeRuleEnvironmentLifecycleStage(ResolveRuleEnvironmentLifecycleStage(campaign.RuleEnvironment));
+        if (!string.Equals(lifecycleStage, "Campaign-approved", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(lifecycleStage, "Published", StringComparison.OrdinalIgnoreCase))
         {
             readinessCues.Add(new CampaignReadinessCue(
                 CueId: StableId("cue", $"{campaign.CampaignId}:ruleenv"),
                 Severity: "review",
                 Title: "Rule environment needs explicit review",
-                Summary: $"{campaign.RuleEnvironment.OwnerScope} scope is {campaign.RuleEnvironment.ApprovalState} on {campaign.RuleEnvironment.CompatibilityFingerprint}."));
+                Summary: $"{campaign.RuleEnvironment.OwnerScope} scope is on the {lifecycleStage.ToLowerInvariant()} rail for {campaign.RuleEnvironment.CompatibilityFingerprint}."));
         }
         else
         {
             readinessCues.Add(new CampaignReadinessCue(
                 CueId: StableId("cue", $"{campaign.CampaignId}:ruleenv"),
                 Severity: "ready",
-                Title: "Rule environment is approved",
-                Summary: $"{campaign.RuleEnvironment.OwnerScope} scope is pinned to {campaign.RuleEnvironment.CompatibilityFingerprint}."));
+                Title: $"Rule environment is {lifecycleStage}",
+                Summary: $"{campaign.RuleEnvironment.OwnerScope} scope is pinned to {campaign.RuleEnvironment.CompatibilityFingerprint} on the {lifecycleStage.ToLowerInvariant()} rail."));
         }
 
         var openObjectives = workspaceRuns.SelectMany(static item => item.Objectives)
@@ -2500,14 +2502,14 @@ public sealed class CampaignSpineService
                 ruleEnvironment.CompatibilityFingerprint,
                 StringComparison.OrdinalIgnoreCase));
         int mismatchedCount = dossiers.Count - alignedCount;
-        string approvalState = HumanizePhrase(ruleEnvironment.ApprovalState, "review");
+        string lifecycleStage = DescribeRuleEnvironmentLifecycleStage(ResolveRuleEnvironmentLifecycleStage(ruleEnvironment)).ToLowerInvariant();
 
         if (mismatchedCount == 0)
         {
-            return $"{alignedCount} dossier(s) stay pinned to {ruleEnvironment.CompatibilityFingerprint} with {approvalState} {ruleEnvironment.OwnerScope} scope.";
+            return $"{alignedCount} dossier(s) stay pinned to {ruleEnvironment.CompatibilityFingerprint} with the {lifecycleStage} {ruleEnvironment.OwnerScope} rail.";
         }
 
-        return $"{alignedCount} dossier(s) already match {ruleEnvironment.CompatibilityFingerprint}, but {mismatchedCount} still need that {approvalState} {ruleEnvironment.OwnerScope} rule lane.";
+        return $"{alignedCount} dossier(s) already match {ruleEnvironment.CompatibilityFingerprint}, but {mismatchedCount} still need that {lifecycleStage} {ruleEnvironment.OwnerScope} rule lane.";
     }
 
     private static string BuildFirstPlayableReturnLaneSummary(
@@ -3186,7 +3188,7 @@ public sealed class CampaignSpineService
             entries.Add(new RulesNavigatorAnswerProjection(
                 EntryId: StableId("rules", workspace.WorkspaceId),
                 Question: "Why is this campaign return pinned to the current rule environment?",
-                ShortAnswer: "Because campaign continuity and support closure both follow the same approved compatibility fingerprint.",
+                ShortAnswer: "Because campaign continuity and support closure both follow the same campaign-approved compatibility fingerprint.",
                 BeforeSummary: diffs[0].BeforeSummary,
                 AfterSummary: diffs[0].AfterSummary,
                 ExplainEntryId: $"rules.navigator.{workspace.WorkspaceId}",
@@ -3202,7 +3204,12 @@ public sealed class CampaignSpineService
                     "Support can reuse this answer when a case asks which rules posture is live on the current channel.",
                     "Operator review can link the same evidence when deciding whether to freeze or reroute a campaign change."
                 ],
-                Diffs: diffs));
+                Diffs: diffs,
+                Studio: BuildRuleEnvironmentStudio(
+                    workspace.RuleEnvironment,
+                    workspace.CampaignName,
+                    $"{workspace.CampaignName} workspace",
+                    $"{workspace.CampaignName} keeps {workspace.RuleEnvironment.CompatibilityFingerprint} as the governed campaign answer until the next promoted fingerprint replaces it.")));
         }
 
         if (operation is not null)
@@ -3211,7 +3218,7 @@ public sealed class CampaignSpineService
             entries.Add(new RulesNavigatorAnswerProjection(
                 EntryId: StableId("rules", operation.GroupId),
                 Question: "How does group visibility change the campaign operator posture?",
-                ShortAnswer: "Operator permissions stay subordinate to campaign visibility and the approved rule environment.",
+                ShortAnswer: "Operator permissions stay subordinate to campaign visibility and the campaign-approved rule environment.",
                 BeforeSummary: diffs[0].BeforeSummary,
                 AfterSummary: diffs[0].AfterSummary,
                 ExplainEntryId: $"rules.navigator.group.{operation.GroupId}",
@@ -3227,7 +3234,12 @@ public sealed class CampaignSpineService
                     "Support can reuse this answer for permissions or campaign-visibility questions.",
                     "Hub can cite the same operator posture in account and organizer surfaces."
                 ],
-                Diffs: diffs));
+                Diffs: diffs,
+                Studio: BuildRuleEnvironmentStudio(
+                    operation.RuleEnvironment,
+                    operation.GroupName,
+                    $"{operation.GroupName} organizer rail",
+                    $"{operation.GroupName} keeps {operation.RuleEnvironment.CompatibilityFingerprint} as the lineage anchor while governed operator decisions stay on one backbone.")));
         }
 
         return entries;
@@ -3245,15 +3257,15 @@ public sealed class CampaignSpineService
             new RulesetEnvironmentDiffProjection(
                 DiffId: StableId("rules-diff", $"{workspace.WorkspaceId}:campaign-return"),
                 Label: "Campaign return",
-                BeforeSummary: "Before approval, restore posture is review-heavy and support has to caveat the answer path.",
-                AfterSummary: $"After approval, {workspace.RuleEnvironment.CompatibilityFingerprint} becomes the grounded answer path for build, play, and support.",
+                BeforeSummary: "Before the sandbox rail is promoted, restore posture is review-heavy and support has to caveat the answer path.",
+                AfterSummary: $"After campaign approval, {workspace.RuleEnvironment.CompatibilityFingerprint} becomes the grounded answer path for build, play, and support.",
                 ReasonSummary: workspace.ReturnSummary,
                 ExplainEntryId: $"{explainRoot}:campaign-return"),
             new RulesetEnvironmentDiffProjection(
                 DiffId: StableId("rules-diff", $"{workspace.WorkspaceId}:readiness"),
                 Label: "Campaign readiness",
                 BeforeSummary: "Before the rule environment is explicit, readiness cues can drift away from the live return path.",
-                AfterSummary: $"After approval, {workspace.ReadinessCues.Count} readiness cue(s) stay tied to {workspace.RuleEnvironment.CompatibilityFingerprint} instead of a side calculation.",
+                AfterSummary: $"After campaign approval, {workspace.ReadinessCues.Count} readiness cue(s) stay tied to {workspace.RuleEnvironment.CompatibilityFingerprint} instead of a side calculation.",
                 ReasonSummary: readinessReason,
                 ExplainEntryId: $"{explainRoot}:readiness")
         ];
@@ -3279,10 +3291,142 @@ public sealed class CampaignSpineService
                 DiffId: StableId("rules-diff", $"{operation.GroupId}:rule-environment"),
                 Label: "Group rule environment",
                 BeforeSummary: "Before the group rule environment is explicit, campaign operator decisions can drift into one-off interpretation.",
-                AfterSummary: $"After the rule environment is explicit, {operation.RuleEnvironment.CompatibilityFingerprint} anchors {operation.ActiveCampaignCount} active campaign(s) on the same operator rail.",
+                AfterSummary: $"After campaign approval, {operation.RuleEnvironment.CompatibilityFingerprint} anchors {operation.ActiveCampaignCount} active campaign(s) on the same operator rail.",
                 ReasonSummary: returnReason,
                 ExplainEntryId: $"{explainRoot}:rule-environment")
         ];
+    }
+
+    private static RuleEnvironmentStudioProjection BuildRuleEnvironmentStudio(
+        RuleEnvironmentRef environment,
+        string scopeLabel,
+        string rollbackScope,
+        string lineageSummary)
+    {
+        string currentStage = ResolveRuleEnvironmentLifecycleStage(environment);
+        string promotionTargetStage = ResolveRuleEnvironmentPromotionTargetStage(currentStage);
+        string currentStageLabel = DescribeRuleEnvironmentLifecycleStage(currentStage);
+        string promotionTargetLabel = DescribeRuleEnvironmentLifecycleStage(promotionTargetStage);
+        string lifecycleLabelLower = currentStageLabel.ToLowerInvariant();
+
+        string promotionSummary = currentStage switch
+        {
+            RuleEnvironmentLifecycleStages.Sandbox => $"Promote {environment.CompatibilityFingerprint} from the sandbox rail into campaign-approved truth once {scopeLabel} is ready to make one governed answer path live.",
+            RuleEnvironmentLifecycleStages.CampaignApproved => $"Promote {environment.CompatibilityFingerprint} from the campaign-approved rail to the published rail only when broader governed reuse should stay visible outside {scopeLabel}.",
+            RuleEnvironmentLifecycleStages.Published => $"{environment.CompatibilityFingerprint} is already on the published rail and ready for broader governed reuse.",
+            _ => $"{environment.CompatibilityFingerprint} stays on the {lifecycleLabelLower} rail until the next governed promotion is explicit."
+        };
+
+        string rollbackSummary = currentStage switch
+        {
+            RuleEnvironmentLifecycleStages.Sandbox => $"Rollback keeps {environment.CompatibilityFingerprint} bounded to the sandbox rail for {rollbackScope} while validation and compatibility review continue.",
+            _ => $"Rollback can re-pin {environment.CompatibilityFingerprint} on {rollbackScope} while the next promotion is reviewed."
+        };
+
+        return new RuleEnvironmentStudioProjection(
+            CurrentStage: currentStage,
+            CurrentStageLabel: currentStageLabel,
+            PromotionTargetStage: promotionTargetStage,
+            PromotionTargetLabel: promotionTargetLabel,
+            PromotionSummary: promotionSummary,
+            RollbackSummary: rollbackSummary,
+            LineageSummary: lineageSummary,
+            Stages: BuildRuleEnvironmentLifecycleSteps(environment, scopeLabel, currentStage, promotionTargetStage));
+    }
+
+    private static IReadOnlyList<RuleEnvironmentLifecycleStepProjection> BuildRuleEnvironmentLifecycleSteps(
+        RuleEnvironmentRef environment,
+        string scopeLabel,
+        string currentStage,
+        string promotionTargetStage)
+    {
+        return
+        [
+            BuildRuleEnvironmentLifecycleStep(
+                RuleEnvironmentLifecycleStages.Sandbox,
+                "Sandbox",
+                $"Keep {environment.CompatibilityFingerprint} bounded while {scopeLabel} validates the next governed rules posture.",
+                currentStage,
+                promotionTargetStage),
+            BuildRuleEnvironmentLifecycleStep(
+                RuleEnvironmentLifecycleStages.CampaignApproved,
+                "Campaign-approved",
+                $"{scopeLabel} binds {environment.CompatibilityFingerprint} to build, play, support, and return on one governed rail.",
+                currentStage,
+                promotionTargetStage),
+            BuildRuleEnvironmentLifecycleStep(
+                RuleEnvironmentLifecycleStages.Published,
+                "Published",
+                $"{scopeLabel} promotes {environment.CompatibilityFingerprint} for broader governed reuse without minting a shadow rule environment.",
+                currentStage,
+                promotionTargetStage)
+        ];
+    }
+
+    private static RuleEnvironmentLifecycleStepProjection BuildRuleEnvironmentLifecycleStep(
+        string stageId,
+        string label,
+        string summary,
+        string currentStage,
+        string promotionTargetStage)
+    {
+        string status = string.Equals(stageId, currentStage, StringComparison.Ordinal)
+            ? RuleEnvironmentLifecycleStepStatuses.Current
+            : string.Equals(stageId, promotionTargetStage, StringComparison.Ordinal)
+                ? RuleEnvironmentLifecycleStepStatuses.Next
+                : GetRuleEnvironmentLifecycleStageOrder(stageId) < GetRuleEnvironmentLifecycleStageOrder(currentStage)
+                    ? RuleEnvironmentLifecycleStepStatuses.Completed
+                    : RuleEnvironmentLifecycleStepStatuses.Pending;
+
+        return new RuleEnvironmentLifecycleStepProjection(stageId, label, status, summary);
+    }
+
+    private static string ResolveRuleEnvironmentLifecycleStage(RuleEnvironmentRef environment)
+    {
+        if (string.Equals(environment.ApprovalState, "published", StringComparison.OrdinalIgnoreCase))
+        {
+            return RuleEnvironmentLifecycleStages.Published;
+        }
+
+        if (string.Equals(environment.ApprovalState, "approved", StringComparison.OrdinalIgnoreCase))
+        {
+            return RuleEnvironmentLifecycleStages.CampaignApproved;
+        }
+
+        return RuleEnvironmentLifecycleStages.Sandbox;
+    }
+
+    private static string ResolveRuleEnvironmentPromotionTargetStage(string currentStage)
+    {
+        return currentStage switch
+        {
+            RuleEnvironmentLifecycleStages.Sandbox => RuleEnvironmentLifecycleStages.CampaignApproved,
+            RuleEnvironmentLifecycleStages.CampaignApproved => RuleEnvironmentLifecycleStages.Published,
+            RuleEnvironmentLifecycleStages.Published => RuleEnvironmentLifecycleStages.Published,
+            _ => RuleEnvironmentLifecycleStages.CampaignApproved
+        };
+    }
+
+    private static string DescribeRuleEnvironmentLifecycleStage(string stageId)
+    {
+        return stageId switch
+        {
+            RuleEnvironmentLifecycleStages.Sandbox => "Sandbox",
+            RuleEnvironmentLifecycleStages.CampaignApproved => "Campaign-approved",
+            RuleEnvironmentLifecycleStages.Published => "Published",
+            _ => HumanizePhrase(stageId, "Review")
+        };
+    }
+
+    private static int GetRuleEnvironmentLifecycleStageOrder(string stageId)
+    {
+        return stageId switch
+        {
+            RuleEnvironmentLifecycleStages.Sandbox => 0,
+            RuleEnvironmentLifecycleStages.CampaignApproved => 1,
+            RuleEnvironmentLifecycleStages.Published => 2,
+            _ => -1
+        };
     }
 
     private static IReadOnlyList<LegacyMigrationReceiptProjection> BuildMigrationReceipts(

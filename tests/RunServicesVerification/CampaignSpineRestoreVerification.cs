@@ -131,7 +131,7 @@ internal static class CampaignSpineRestoreVerification
             VerificationAssert.True(tablet.RestoreSummary.Contains("Exact set:", StringComparison.Ordinal), "Claimed-device restore summary should name the exact prefetch set for the play tablet lane.");
             VerificationAssert.True(tablet.RestoreSummary.Contains("Rook dossier", StringComparison.Ordinal), "Claimed-device restore summary should name the grounded dossier.");
             VerificationAssert.True(tablet.RestoreSummary.Contains("Rook preview campaign", StringComparison.Ordinal), "Claimed-device restore summary should name the grounded campaign.");
-            VerificationAssert.True(tablet.RestoreSummary.Contains("sr6.preview.v1 [approved]", StringComparison.Ordinal), "Claimed-device restore summary should name the grounded rule environment.");
+            VerificationAssert.True(tablet.RestoreSummary.Contains("sr6.preview.v1 [campaign-approved]", StringComparison.Ordinal), "Claimed-device restore summary should name the grounded rule environment.");
             VerificationAssert.True(tablet.RestoreSummary.Contains("Android travel kit (artifact-travel-kit)", StringComparison.Ordinal), "Claimed-device restore summary should name the grounded reconnectable artifact set.");
             VerificationAssert.True(safehouse.DeviceRole == "travel_cache", "Offline stable safehouse installs should project as travel-cache restore lanes.");
             VerificationAssert.True(safehouse.RestoreSummary.Contains("Travel-safe cache keeps", StringComparison.Ordinal), "Travel-cache restore summaries should stay explicit about safehouse posture.");
