@@ -90,6 +90,8 @@
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
     var selectedCreatorPublication = Model.SelectedCreatorPublication;
+    var selectedCreatorPublicationDraftDetail = Model.SelectedCreatorPublicationDraftDetail;
+    var selectedCreatorPublicationReceipt = Model.SelectedCreatorPublicationReceipt;
     var openCampaignDetailSection = selectedWorkspace is not null
         || selectedRun is not null
         || selectedBuildLabHandoff is not null
@@ -1929,6 +1931,89 @@
                         @if (selectedCreatorPublication.Watchouts is { Count: > 0 })
                         {
                             <p><strong>Watchouts:</strong> @string.Join(" ", selectedCreatorPublication.Watchouts.Take(3))</p>
+                        }
+                        @if (selectedCreatorPublicationDraftDetail is not null)
+                        {
+                            <div class="settings-summary-list">
+                                <div class="settings-summary-row">
+                                    <span>Registry draft</span>
+                                    <strong>@selectedCreatorPublicationDraftDetail.Draft.DraftId</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Draft rail</span>
+                                    <strong>@HumanizeStatus(selectedCreatorPublicationDraftDetail.Draft.State, "Draft")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Review rail</span>
+                                    <strong>@HumanizeStatus(selectedCreatorPublicationReceipt?.ReviewState, "Not required")</strong>
+                                </div>
+                                @if (selectedCreatorPublicationDraftDetail.Moderation is not null)
+                                {
+                                    <div class="settings-summary-row">
+                                        <span>Moderation case</span>
+                                        <strong>@selectedCreatorPublicationDraftDetail.Moderation.CaseId</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Moderation status</span>
+                                        <strong>@HumanizeStatus(selectedCreatorPublicationDraftDetail.Moderation.State, "Pending review")</strong>
+                                    </div>
+                                }
+                                @if (selectedCreatorPublicationReceipt is not null)
+                                {
+                                    <div class="settings-summary-row">
+                                        <span>Registry status</span>
+                                        <strong>@HumanizeStatus(selectedCreatorPublicationReceipt.PublicationStatus, "Draft")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Receipt visibility</span>
+                                        <strong>@HumanizeStatus(selectedCreatorPublicationReceipt.Visibility, "Campaign-shared")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Artifact receipt</span>
+                                        <strong>@selectedCreatorPublicationReceipt.Artifact.Kind · @selectedCreatorPublicationReceipt.Artifact.ArtifactId · @selectedCreatorPublicationReceipt.Artifact.Version</strong>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(selectedCreatorPublicationDraftDetail.LatestModerationNotes))
+                                {
+                                    <div class="settings-summary-row">
+                                        <span>Latest moderation note</span>
+                                        <strong>@selectedCreatorPublicationDraftDetail.LatestModerationNotes</strong>
+                                    </div>
+                                }
+                            </div>
+                            @if (!string.Equals(selectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.PendingReview, StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(selectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Approved, StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(selectedCreatorPublicationDraftDetail.Draft.State, Chummer.Hub.Registry.Contracts.HubPublicationStates.Archived, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <form class="settings-form" method="post" action="/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/submit">
+                                    @Html.AntiForgeryToken()
+                                    <label for="creatorPublicationSubmitNotes">Submission notes</label>
+                                    <textarea id="creatorPublicationSubmitNotes" name="notes" rows="3" placeholder="Ground why this creator packet is ready for governed moderation."></textarea>
+                                    <div class="stacked-actions">
+                                        <button class="button-like button-like--primary" type="submit">Submit for review</button>
+                                    </div>
+                                </form>
+                            }
+                            @if (selectedCreatorPublicationDraftDetail.Moderation is not null
+                                && string.Equals(selectedCreatorPublicationDraftDetail.Moderation.State, Chummer.Hub.Registry.Contracts.HubModerationStates.PendingReview, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <form class="settings-form" method="post" action="/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/approve">
+                                    @Html.AntiForgeryToken()
+                                    <label for="creatorPublicationApproveNotes">Approval notes</label>
+                                    <textarea id="creatorPublicationApproveNotes" name="notes" rows="3" placeholder="Record the provenance, lineage, and trust evidence that makes this safe to advance."></textarea>
+                                    <div class="stacked-actions">
+                                        <button class="button-like button-like--primary" type="submit">Approve review</button>
+                                    </div>
+                                </form>
+                                <form class="settings-form" method="post" action="/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/reject">
+                                    @Html.AntiForgeryToken()
+                                    <label for="creatorPublicationRejectNotes">Revision notes</label>
+                                    <textarea id="creatorPublicationRejectNotes" name="notes" rows="3" placeholder="State what needs to change before this draft can re-enter governed review."></textarea>
+                                    <div class="stacked-actions">
+                                        <button class="button-like button-like--secondary" type="submit">Request changes</button>
+                                    </div>
+                                </form>
+                            }
                         }
                         @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.BuildHandoffId))
                         {

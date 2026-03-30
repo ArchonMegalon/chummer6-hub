@@ -536,6 +536,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var installLinking = new InstallLinkingService(installLinkingStore);
     var supportCases = new SupportCaseService(supportStore, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
     var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(store));
+    var creatorPublicationRegistry = new CreatorPublicationRegistryBridge(new HubPublicationDraftService());
     var accounts = new AccountService(store);
     var groups = new GroupService(store, accounts);
     var rewards = new RewardService(store);
@@ -584,7 +585,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var supportPresentation = new SupportCasePresentationService();
     var signedInTrustStatus = new SignedInTrustStatusService(installLinking, supportCases, supportPresentation, trustPulse);
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
-    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, loggerFactory.CreateLogger<AccountsController>())
+    var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, creatorPublicationRegistry, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2044,6 +2045,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(store));
+    var creatorPublicationRegistry = new CreatorPublicationRegistryBridge(new HubPublicationDraftService());
     var accounts = new AccountService(store);
     var identityLinks = new IdentityLinkService(store, accounts);
     var experience = new UserExperienceService(store, accounts);
@@ -2139,6 +2141,7 @@ async Task VerifyPublicLandingProjectionAsync()
         supportPresentation,
         campaignSpine,
         workspaceServerPlane,
+        creatorPublicationRegistry,
         chrome,
         google,
         releases,
@@ -3137,6 +3140,23 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(accountPublicationDetailModel?.SelectedCreatorPublication?.SupportClosureSummary), "account publication detail route should keep creator-publication support closure visible.");
     Assert(!string.IsNullOrWhiteSpace(accountPublicationDetailModel?.SelectedCreatorPublication?.ModerationSummary), "account publication detail route should keep creator-publication moderation posture visible.");
     Assert(string.Equals(accountPublicationDetailModel?.SelectedCreatorPublication?.BuildHandoffId, handoffId, StringComparison.Ordinal), "account publication detail route should keep the related build handoff attached.");
+    Assert(accountPublicationDetailModel?.SelectedCreatorPublicationDraftDetail is not null, "account publication detail route should project the registry-owned creator draft detail.");
+    Assert(accountPublicationDetailModel?.SelectedCreatorPublicationReceipt is not null, "account publication detail route should project the registry-owned publication receipt.");
+    Assert(string.Equals(accountPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.NotRequired, StringComparison.Ordinal), "fresh creator publication detail should begin outside the moderation queue.");
+
+    var submitPublicationResult = await accountController.SubmitCreatorPublication(publicationId, "Ready for governed moderation and trust review.", CancellationToken.None);
+    Assert(submitPublicationResult is RedirectResult { Url: not null }, "creator publication submission should redirect back to the publication detail route.");
+    var submittedPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: publicationId) as ViewResult;
+    var submittedPublicationDetailModel = submittedPublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(submittedPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.PendingReview, StringComparison.Ordinal), "submitted creator publications should enter the registry moderation queue.");
+    Assert(string.Equals(submittedPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Moderation?.State, Chummer.Hub.Registry.Contracts.HubModerationStates.PendingReview, StringComparison.Ordinal), "submitted creator publications should surface the pending moderation case on the account detail route.");
+
+    var approvePublicationResult = await accountController.ApproveCreatorPublication(publicationId, "Provenance and lineage verified on the governed account rail.", CancellationToken.None);
+    Assert(approvePublicationResult is RedirectResult { Url: not null }, "creator publication approval should redirect back to the publication detail route.");
+    var approvedPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: publicationId) as ViewResult;
+    var approvedPublicationDetailModel = approvedPublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(approvedPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Approved, StringComparison.Ordinal), "approved creator publications should surface approved review posture on the account detail route.");
+    Assert(approvedPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.LatestModerationNotes?.Contains("governed account rail", StringComparison.OrdinalIgnoreCase) == true, "approved creator publications should retain the latest moderation note on the account detail route.");
 
     var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
@@ -3611,7 +3631,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
     Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
-    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, loggerFactory.CreateLogger<AccountsController>())
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, creatorPublicationRegistry, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
