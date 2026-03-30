@@ -91,41 +91,8 @@
     <section class="release-footnote">
         <p class="eyebrow">What changed this week</p>
         <h2 class="editorial-title">@trustPulse.Heading</h2>
-        <p class="editorial-copy">@trustPulse.Summary</p>
-        @if (trustPulse.MicroProof.Count > 0)
-        {
-            <div class="trust-claim__microproof">
-                @foreach (var item in trustPulse.MicroProof)
-                {
-                    <span>@item</span>
-                }
-            </div>
-        }
-        @if (trustPulse.TrendSamples.Count > 1)
-        {
-            <div class="trust-pulse-trend" aria-label="Measured progress points">
-                @foreach (var sample in trustPulse.TrendSamples)
-                {
-                    <article class="trust-pulse-trend__point@(sample.Current ? " trust-pulse-trend__point--current" : string.Empty)">
-                        <div class="trust-pulse-trend__meta">
-                            <strong>@sample.OverallProgressPercent%</strong>
-                            <span>@sample.AsOf</span>
-                        </div>
-                        <div class="trust-pulse-trend__bar" aria-hidden="true">
-                            <span style="width:@sample.OverallProgressPercent%"></span>
-                        </div>
-                    </article>
-                }
-            </div>
-        }
-        <div class="settings-summary-list">
-            @foreach (var row in trustPulse.Rows)
-            {
-                <div class="settings-summary-row">
-                    <span>@row.Label</span>
-                    <strong>@row.Value</strong>
-                </div>
-            }
+        <div class="editorial-copy">
+            @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulseBody.cshtml", trustPulse)
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--secondary" href="/now">Open what works today</a>

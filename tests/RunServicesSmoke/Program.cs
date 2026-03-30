@@ -1543,11 +1543,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("Preview in progress:", StringComparison.Ordinal), "landing should demote preview-in-progress copy to a quieter shelf note instead of a full third state card.");
     Assert(landingSource.Contains("Need the full picture?", StringComparison.Ordinal), "landing should route deeper proof evaluation through one quiet inline note instead of a second button stack.");
     Assert(landingSource.Contains("PublicSurfaceStatus.DisplayLabel", StringComparison.Ordinal), "landing should use the shared public status presenter instead of route-local badge labels.");
-    Assert(landingSource.Contains("@if (trustPulse.TrendSamples.Count > 1)", StringComparison.Ordinal), "landing should render measured progress points directly on the weekly trust pulse.");
-    Assert(landingSource.Contains("trust-pulse-trend__point", StringComparison.Ordinal), "landing should carry the shared measured-trend rail on the front-door trust pulse.");
-    Assert(landingSource.Contains("@foreach (var row in trustPulse.Rows)", StringComparison.Ordinal), "landing should render every weekly trust row from the shared pulse instead of binding a brittle subset.");
-    Assert(landingSource.Contains("<span>@row.Label</span>", StringComparison.Ordinal), "landing should project the shared weekly trust labels directly in the front-door pulse.");
-    Assert(landingSource.Contains("<strong>@row.Value</strong>", StringComparison.Ordinal), "landing should project the shared weekly trust values directly in the front-door pulse.");
+    Assert(landingSource.Contains("_PublicTrustPulseBody.cshtml", StringComparison.Ordinal), "landing should render weekly trust rows through the shared pulse body instead of duplicating the row template.");
+    var trustPulseBodySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_PublicTrustPulseBody.cshtml"));
+    Assert(trustPulseBodySource.Contains("@if (Model.TrendSamples.Count > 1)", StringComparison.Ordinal), "shared trust pulse body should render measured progress points directly on the weekly trust pulse.");
+    Assert(trustPulseBodySource.Contains("trust-pulse-trend__point", StringComparison.Ordinal), "shared trust pulse body should carry the measured-trend rail.");
+    Assert(trustPulseBodySource.Contains("@foreach (var row in Model.Rows)", StringComparison.Ordinal), "shared trust pulse body should render every weekly trust row instead of binding a brittle subset.");
+    Assert(trustPulseBodySource.Contains("<span>@row.Label</span>", StringComparison.Ordinal), "shared trust pulse body should project the shared weekly trust labels directly.");
+    Assert(trustPulseBodySource.Contains("<strong>@row.Value</strong>", StringComparison.Ordinal), "shared trust pulse body should project the shared weekly trust values directly.");
     var storySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml"));
     Assert(!storySource.Contains("One path from install to session return", StringComparison.Ordinal), "product story should not drift back into a second install/support explainer.");
     Assert(!storySource.Contains("From first install to next session", StringComparison.Ordinal), "product story should stay focused on differentiation instead of retelling the install path.");
