@@ -82,6 +82,15 @@ async function readFirstHref(page, selector, label) {
   return href;
 }
 
+async function readOptionalHref(page, selector) {
+  const locator = page.locator(selector).first();
+  if (await locator.count() === 0) {
+    return null;
+  }
+
+  return locator.getAttribute('href');
+}
+
 function assertLoginRedirect(page, expectedNext, label) {
   const current = new URL(page.url());
   assert.equal(current.pathname, '/login', `${label} should redirect to /login.`);
@@ -125,6 +134,11 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   let homeCampaignMemoryPath;
   let homeRosterMovesPath;
   let homeMemberGuidancePath;
+  let homeFirstPlayablePath;
+  let homeLeagueRailPath;
+  let homeSeasonBoardPath;
+  let homeInviteRailPath;
+  let homeSponsorRailPath;
   let runDetailPath;
   let rulesDetailPath;
 
@@ -281,6 +295,11 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     homeCampaignMemoryPath = await readFirstHref(page, 'a[href*="#selected-campaign-memory"]', '/home/work');
     homeRosterMovesPath = await readFirstHref(page, 'a[href="/account/work#community-ops"]', '/home/work');
     homeMemberGuidancePath = await readFirstHref(page, 'a[href*="#community-op-guidance-"]', '/home/work');
+    homeFirstPlayablePath = await readOptionalHref(page, 'a[href*="#selected-first-playable-session"]');
+    homeLeagueRailPath = await readFirstHref(page, 'a[href*="#community-op-league-"]', '/home/work');
+    homeSeasonBoardPath = await readFirstHref(page, 'a[href*="#community-op-board-"]', '/home/work');
+    homeInviteRailPath = await readFirstHref(page, 'a[href*="#community-op-invites-"]', '/home/work');
+    homeSponsorRailPath = await readFirstHref(page, 'a[href*="#community-op-sponsor-sessions-"]', '/home/work');
   });
 
   await gotoAndAssert(page, pageErrors, '/home/setup', async () => {
@@ -351,6 +370,38 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     assert.equal(new URL(page.url()).hash.startsWith('#community-op-guidance-'), true, '/home/work member-guidance link should preserve the target anchor.');
     await expectBodyText(page, 'Member guidance rail', '/home/work -> member guidance');
     await expectBodyText(page, 'Current preview posture', '/home/work -> member guidance');
+  });
+
+  if (homeFirstPlayablePath) {
+    await gotoAndAssert(page, pageErrors, homeFirstPlayablePath, async () => {
+      assert.equal(new URL(page.url()).hash, '#selected-first-playable-session', '/home/work first-playable link should preserve the target anchor.');
+      await expectBodyText(page, 'First playable session', '/home/work -> first playable');
+      await expectBodyText(page, 'Session summary', '/home/work -> first playable');
+    });
+  }
+
+  await gotoAndAssert(page, pageErrors, homeLeagueRailPath, async () => {
+    assert.equal(new URL(page.url()).hash.startsWith('#community-op-league-'), true, '/home/work league-rail link should preserve the target anchor.');
+    await expectBodyText(page, 'League / season operations', '/home/work -> league rail');
+    await expectBodyText(page, 'Campaign return pulse', '/home/work -> league rail');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeSeasonBoardPath, async () => {
+    assert.equal(new URL(page.url()).hash.startsWith('#community-op-board-'), true, '/home/work season-board link should preserve the target anchor.');
+    await expectBodyText(page, 'Season board', '/home/work -> season board');
+    await expectBodyText(page, 'Open shared campaign view', '/home/work -> season board');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeInviteRailPath, async () => {
+    assert.equal(new URL(page.url()).hash.startsWith('#community-op-invites-'), true, '/home/work invite-rail link should preserve the target anchor.');
+    await expectBodyText(page, 'Invite & sponsorship rail', '/home/work -> invite rail');
+    await expectBodyText(page, 'Issue governed join code', '/home/work -> invite rail');
+    await expectBodyText(page, 'Issue governed boost code', '/home/work -> invite rail');
+  });
+
+  await gotoAndAssert(page, pageErrors, homeSponsorRailPath, async () => {
+    assert.equal(new URL(page.url()).hash.startsWith('#community-op-sponsor-sessions-'), true, '/home/work sponsor-rail link should preserve the target anchor.');
+    await expectBodyText(page, 'Recent sponsor sessions', '/home/work -> sponsor rail');
   });
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {

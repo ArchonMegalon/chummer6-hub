@@ -212,6 +212,14 @@ def extract_first_match(body: str, pattern: str, path: str, label: str) -> str:
     return unescape(match.group(1)).strip()
 
 
+def extract_optional_match(body: str, pattern: str) -> str | None:
+    match = re.search(pattern, body, re.IGNORECASE)
+    if not match:
+        return None
+
+    return unescape(match.group(1)).strip()
+
+
 def split_fragment_path(path: str) -> tuple[str, str | None]:
     if "#" not in path:
         return path, None
@@ -1240,6 +1248,7 @@ def verify_signed_in_work_audit(
         r'href="([^"]*#selected-next-session-carry-forward)"',
         "/home/work",
         "home next-session return link")
+    home_first_playable_path = extract_optional_match(body, r'href="([^"]*#selected-first-playable-session)"')
     home_aftermath_path = extract_first_match(
         body,
         r'href="([^"]*#aftermath-packages)"',
@@ -1265,6 +1274,26 @@ def verify_signed_in_work_audit(
         r'href="([^"]*#community-op-guidance-[^"]+)"',
         "/home/work",
         "home member-guidance link")
+    home_league_rail_path = extract_first_match(
+        body,
+        r'href="([^"]*#community-op-league-[^"]+)"',
+        "/home/work",
+        "home league-rail link")
+    home_season_board_path = extract_first_match(
+        body,
+        r'href="([^"]*#community-op-board-[^"]+)"',
+        "/home/work",
+        "home season-board link")
+    home_invite_rail_path = extract_first_match(
+        body,
+        r'href="([^"]*#community-op-invites-[^"]+)"',
+        "/home/work",
+        "home invite-rail link")
+    home_sponsor_rail_path = extract_first_match(
+        body,
+        r'href="([^"]*#community-op-sponsor-sessions-[^"]+)"',
+        "/home/work",
+        "home sponsor-rail link")
     fetch_fragment_target(
         base_url,
         home_workspace_path,
@@ -1305,6 +1334,15 @@ def verify_signed_in_work_audit(
         cookie_header=cookie_header,
         required_texts=("Next-session carry-forward", "Carry-forward summary"),
     )
+    if home_first_playable_path:
+        fetch_fragment_target(
+            base_url,
+            home_first_playable_path,
+            public_host=public_host,
+            forwarded_proto=forwarded_proto,
+            cookie_header=cookie_header,
+            required_texts=("First playable session", "Session summary"),
+        )
     fetch_fragment_target(
         base_url,
         home_aftermath_path,
@@ -1344,6 +1382,38 @@ def verify_signed_in_work_audit(
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
         required_texts=("Member guidance rail", "Current preview posture"),
+    )
+    fetch_fragment_target(
+        base_url,
+        home_league_rail_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        cookie_header=cookie_header,
+        required_texts=("League / season operations", "Campaign return pulse"),
+    )
+    fetch_fragment_target(
+        base_url,
+        home_season_board_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        cookie_header=cookie_header,
+        required_texts=("Season board", "Open shared campaign view"),
+    )
+    fetch_fragment_target(
+        base_url,
+        home_invite_rail_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        cookie_header=cookie_header,
+        required_texts=("Invite &amp; sponsorship rail", "Issue governed join code", "Issue governed boost code"),
+    )
+    fetch_fragment_target(
+        base_url,
+        home_sponsor_rail_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        cookie_header=cookie_header,
+        required_texts=("Recent sponsor sessions",),
     )
     status, body, _, _ = fetch(
         base_url,

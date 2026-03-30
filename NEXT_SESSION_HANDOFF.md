@@ -1,6 +1,18 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:19:55+02:00
+Updated: 2026-03-30T08:22:24+02:00
+
+## Handoff refresh (2026-03-30T08:22:24+02:00)
+
+- The anchored `home/work` operator rail now carries the rest of the modeled guided links as verified navigation instead of unproven CTA copy:
+  - `scripts/hub-live-audit.py` now resolves and verifies the home-surface links for first playable session proof when present, plus the league rail, season board, invite rail, and sponsor rail. The new checks remain tolerant of the optional first-playable card while still enforcing the operator-anchor sections when they are rendered.
+  - `scripts/e2e-hub-playwright.cjs` now navigates those same anchored routes in the browser lane, verifies the URL hash survives, and asserts the expected bounded section content on each destination surface.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:19:55+02:00)
 
