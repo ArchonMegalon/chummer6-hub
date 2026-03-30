@@ -178,6 +178,11 @@
 
 <section class="home-dashboard home-dashboard--focus">
     <div class="home-dashboard__main">
+        @if (Model.SignedInStatus is not null)
+        {
+            @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+        }
+
         @if (showOverviewSection)
         {
             <div class="home-action-grid">
@@ -207,11 +212,6 @@
                     <a class="button-like button-like--ghost" href="/account/access">Open Devices &amp; access</a>
                 </article>
             </div>
-
-            @if (Model.SignedInStatus is not null)
-            {
-                @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-            }
         }
 
         @if (showAccessSection && (!showOnboarding || accessSurfaceReady))
