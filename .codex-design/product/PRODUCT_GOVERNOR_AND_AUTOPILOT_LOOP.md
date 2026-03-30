@@ -169,8 +169,12 @@ The minimum weekly pulse publishes:
 * release-health status
 * open blocker age posture
 * support and feedback closure posture
+* provider-route stewardship and canary posture
+* measured adoption health and history summary
+* launch and expansion posture for the active trail
 * design-drift count
 * public-promise drift count
+* progress trend direction and delta
 * top freeze or reroute decisions
 * the next checkpoint question
 
