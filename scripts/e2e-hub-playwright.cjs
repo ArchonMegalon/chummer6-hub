@@ -17,6 +17,11 @@ async function expectVisible(page, selector, message) {
   assert.equal(visible, true, message || `Expected ${selector} to be visible.`);
 }
 
+async function expectMinimumCount(page, selector, minimum, label) {
+  const count = await page.locator(selector).count();
+  assert.equal(count >= minimum, true, `${label} should render at least ${minimum} match(es) for ${selector}, got ${count}.`);
+}
+
 async function assertNoPageErrors(page, pageErrors, label) {
   await page.waitForTimeout(50);
   if (pageErrors.length === 0) {
@@ -240,6 +245,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/home/setup', async () => {
     await expectVisible(page, 'text=Finish the small setup flow, then come back to access and work');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/downloads', async () => {
+    await expectVisible(page, 'text=Recommended for this install');
+    await expectVisible(page, 'text=Install posture');
+    await expectMinimumCount(page, '.trust-pulse-trend__point', 2, 'Signed-in /downloads');
+    await assertNoBannedCopy(page, 'Signed-in /downloads');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/now', async () => {
+    await expectVisible(page, 'text=Recommended for this install');
+    await expectVisible(page, 'text=Install posture');
+    await expectMinimumCount(page, '.trust-pulse-trend__point', 2, 'Signed-in /now');
+    await assertNoBannedCopy(page, 'Signed-in /now');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/help', async () => {
+    await expectVisible(page, 'text=Recommended for this install');
+    await expectVisible(page, 'text=Install posture');
+    await expectMinimumCount(page, '.trust-pulse-trend__point', 2, 'Signed-in /help');
+    await assertNoBannedCopy(page, 'Signed-in /help');
   });
 
   await gotoAndAssert(page, pageErrors, '/account', async () => {
