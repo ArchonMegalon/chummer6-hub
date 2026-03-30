@@ -852,6 +852,12 @@ public sealed class PublicLandingController : Controller
                 latestInstallation is null
                     ? "No linked build yet"
                     : $"{ResolveInstallationDisplayLabel(latestInstallation)} · {latestInstallation.Version} on {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}"),
+            new(
+                "Recommended for this install",
+                BuildSignedInInstallRecommendationSummary(manifest, releaseExperience, latestInstallation, followThrough)),
+            new(
+                "Install posture",
+                BuildSignedInInstallPostureSummary(manifest, latestInstallation, followThrough)),
             new("Release proof", BuildReleaseProofSummary(manifest)),
             new(
                 "Support follow-through",
@@ -1128,6 +1134,238 @@ public sealed class PublicLandingController : Controller
 
         return proof;
     }
+
+    private static string BuildSignedInInstallRecommendationSummary(
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience,
+        ClaimedInstallationDto? installation,
+        SupportCasePresentationViewModel? followThrough)
+    {
+        if (installation is null)
+        {
+            return manifest.Downloads.Count == 0 || releaseExperience.Recommended is null
+                ? "Link the current preview first so Chummer can compare this account against the published shelf."
+                : $"Link the current preview first so Chummer can compare this account against {BuildPublishedArtifactSummary(manifest, releaseExperience, releaseExperience.Recommended.Artifact)}.";
+        }
+
+        string installationLabel = ResolveInstallationDisplayLabel(installation);
+        if (!string.IsNullOrWhiteSpace(followThrough?.FixedReleaseLabel))
+        {
+            if (followThrough.NeedsInstallUpdate)
+            {
+                PublicReleaseArtifactDto? publishedArtifact = FindPublishedArtifactForInstallation(manifest, installation);
+                return publishedArtifact is null
+                    ? $"Support is tracking {followThrough.FixedReleaseLabel} for {installationLabel}. Keep this linked copy on the support-directed lane until the promoted shelf catches up."
+                    : $"Support is tracking {followThrough.FixedReleaseLabel} for {installationLabel}. The current public shelf still shows {BuildPublishedArtifactSummary(manifest, releaseExperience, publishedArtifact)}.";
+            }
+
+            if (followThrough.CanVerifyFix)
+            {
+                return $"{installationLabel} is already on {followThrough.FixedReleaseLabel}, so this linked copy is the right one to verify now.";
+            }
+        }
+
+        PublicReleaseArtifactDto? artifact = FindPublishedArtifactForInstallation(manifest, installation);
+        if (artifact is null)
+        {
+            return $"No promoted public-shelf match is published right now for {installationLabel}. Keep this copy linked and use a support-directed lane before moving it.";
+        }
+
+        string publishedSummary = BuildPublishedArtifactSummary(manifest, releaseExperience, artifact);
+        if (InstallationMatchesPublishedShelf(manifest, installation, artifact))
+        {
+            return $"{installationLabel} already matches the promoted {publishedSummary}.";
+        }
+
+        return $"{installationLabel} reports {installation.Version} on {ResolveChannelLabel(installation.Channel, manifest, releaseExperience)}. The promoted shelf for this install is {publishedSummary}.";
+    }
+
+    private static string BuildSignedInInstallPostureSummary(
+        PublicReleaseManifestDto manifest,
+        ClaimedInstallationDto? installation,
+        SupportCasePresentationViewModel? followThrough)
+    {
+        if (followThrough?.NeedsLinkedInstall == true || followThrough?.NeedsInstallUpdate == true)
+        {
+            return followThrough.InstallReadinessSummary;
+        }
+
+        if (followThrough?.CanVerifyFix == true)
+        {
+            return followThrough.VerificationSummary;
+        }
+
+        if (installation is not null && FindPublishedArtifactForInstallation(manifest, installation) is null)
+        {
+            return $"{ResolveInstallationDisplayLabel(installation)} is linked on {BuildInstallationFootprintSummary(installation)}, and that lane is not on the promoted public shelf right now.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.KnownIssueSummary))
+        {
+            return manifest.KnownIssueSummary!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.FixAvailabilitySummary))
+        {
+            return manifest.FixAvailabilitySummary!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.RolloutReason))
+        {
+            return manifest.RolloutReason!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.SupportabilitySummary))
+        {
+            return manifest.SupportabilitySummary!;
+        }
+
+        return installation is null
+            ? "No linked install is attached yet, so Chummer cannot compare this account against the current shelf or fix lane."
+            : "No extra install-specific posture warning is published right now.";
+    }
+
+    private static PublicReleaseArtifactDto? FindPublishedArtifactForInstallation(
+        PublicReleaseManifestDto manifest,
+        ClaimedInstallationDto installation)
+    {
+        string? installationPlatform = NormalizePlatformFamily(installation.Platform);
+        string? installationHead = NormalizeHeadId(installation.HeadId);
+
+        if (!string.IsNullOrWhiteSpace(installationPlatform) && !string.IsNullOrWhiteSpace(installationHead))
+        {
+            var exactMatch = manifest.Downloads.FirstOrDefault(item =>
+                string.Equals(NormalizeArtifactPlatformFamily(item), installationPlatform, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NormalizeHeadId(item.Head), installationHead, StringComparison.OrdinalIgnoreCase));
+            if (exactMatch is not null)
+            {
+                return exactMatch;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(installationPlatform))
+        {
+            var platformMatch = manifest.Downloads.FirstOrDefault(item =>
+                string.Equals(NormalizeArtifactPlatformFamily(item), installationPlatform, StringComparison.OrdinalIgnoreCase));
+            if (platformMatch is not null)
+            {
+                return platformMatch;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(installationHead))
+        {
+            return manifest.Downloads.FirstOrDefault(item =>
+                string.Equals(NormalizeHeadId(item.Head), installationHead, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return null;
+    }
+
+    private static bool InstallationMatchesPublishedShelf(
+        PublicReleaseManifestDto manifest,
+        ClaimedInstallationDto installation,
+        PublicReleaseArtifactDto artifact)
+    {
+        if (!string.Equals(installation.Channel, manifest.Channel, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(installation.Version, manifest.Version, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string? installationPlatform = NormalizePlatformFamily(installation.Platform);
+        string? artifactPlatform = NormalizeArtifactPlatformFamily(artifact);
+        if (!string.IsNullOrWhiteSpace(installationPlatform)
+            && !string.IsNullOrWhiteSpace(artifactPlatform)
+            && !string.Equals(installationPlatform, artifactPlatform, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string? installationHead = NormalizeHeadId(installation.HeadId);
+        string? artifactHead = NormalizeHeadId(artifact.Head);
+        return string.IsNullOrWhiteSpace(installationHead)
+            || string.IsNullOrWhiteSpace(artifactHead)
+            || string.Equals(installationHead, artifactHead, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildPublishedArtifactSummary(
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience,
+        PublicReleaseArtifactDto artifact)
+        => $"{BuildPublishedArtifactLabel(artifact)} on {ResolveChannelLabel(manifest.Channel, manifest, releaseExperience)} {manifest.Version}";
+
+    private static string BuildPublishedArtifactLabel(PublicReleaseArtifactDto artifact)
+    {
+        string platform = BuildPlatformDisplayLabel(artifact.Platform, artifact.Arch);
+        return NormalizeHeadId(artifact.Head) switch
+        {
+            "avalonia" => $"the recommended desktop build for {platform}",
+            "blazor-desktop" => $"the alternative desktop build for {platform}",
+            _ => $"the published build for {platform}"
+        };
+    }
+
+    private static string BuildInstallationFootprintSummary(ClaimedInstallationDto installation)
+    {
+        string platform = BuildPlatformDisplayLabel(installation.Platform, installation.Arch);
+        return NormalizeHeadId(installation.HeadId) switch
+        {
+            "avalonia" => $"the recommended desktop lane on {platform}",
+            "blazor-desktop" => $"the alternative desktop lane on {platform}",
+            _ => platform
+        };
+    }
+
+    private static string BuildPlatformDisplayLabel(string? platform, string? arch)
+    {
+        string platformLabel = NormalizePlatformFamily(platform) switch
+        {
+            "windows" => "Windows",
+            "linux" => "Linux",
+            "macos" => "macOS",
+            _ when !string.IsNullOrWhiteSpace(platform) => HumanizeToken(platform, "current platform"),
+            _ => "the current platform"
+        };
+
+        return string.IsNullOrWhiteSpace(arch)
+            ? platformLabel
+            : $"{platformLabel} {arch}";
+    }
+
+    private static string? NormalizeArtifactPlatformFamily(PublicReleaseArtifactDto artifact)
+        => NormalizePlatformFamily(!string.IsNullOrWhiteSpace(artifact.PlatformId) ? artifact.PlatformId : artifact.Platform);
+
+    private static string? NormalizePlatformFamily(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string normalized = value.Trim().ToLowerInvariant();
+        if (normalized.Contains("win", StringComparison.OrdinalIgnoreCase))
+        {
+            return "windows";
+        }
+
+        if (normalized.Contains("linux", StringComparison.OrdinalIgnoreCase))
+        {
+            return "linux";
+        }
+
+        if (normalized.Contains("osx", StringComparison.OrdinalIgnoreCase) || normalized.Contains("mac", StringComparison.OrdinalIgnoreCase))
+        {
+            return "macos";
+        }
+
+        return normalized;
+    }
+
+    private static string? NormalizeHeadId(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim().ToLowerInvariant();
 
     private static string BuildTrustPulseRecommendedSummary(
         PublicReleaseManifestDto manifest,

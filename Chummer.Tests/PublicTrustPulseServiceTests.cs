@@ -83,6 +83,30 @@ public sealed class PublicTrustPulseServiceTests
         Assert.Contains("waiting closure", snapshot.ClosureHealthSummary, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void LoadSnapshotPrefersSynthesizedPulseSignalsWhenFallbackArtifactsAreMissing()
+    {
+        using var fixture = new PublicTrustPulseFixture();
+        fixture.WritePulseWithSynthesizedSignals("chummer.weekly_product_pulse");
+
+        var snapshot = fixture.CreateService().LoadSnapshot();
+
+        Assert.NotNull(snapshot);
+        Assert.Equal(6, snapshot!.HistorySnapshotCount);
+        Assert.Equal(6, snapshot.ProgressHistorySnapshotCount);
+        Assert.Equal("up", snapshot.ProgressTrendDirection);
+        Assert.Equal(9, snapshot.ProgressTrendDeltaPercent);
+        Assert.Equal("2026-03-24", snapshot.ProgressTrendFromAsOf);
+        Assert.Equal("2026-03-30", snapshot.ProgressTrendToAsOf);
+        Assert.NotNull(snapshot.ProgressTrendSamples);
+        Assert.Equal(3, snapshot.ProgressTrendSamples.Count);
+        Assert.Equal("2026-03-24", snapshot.ProgressTrendSamples[0].AsOf);
+        Assert.Equal(72, snapshot.ProgressTrendSamples[0].OverallProgressPercent);
+        Assert.Equal("passed", snapshot.LocalReleaseProofStatus);
+        Assert.Equal(4, snapshot.ProvenJourneyCount);
+        Assert.Equal(6, snapshot.ProvenRouteCount);
+    }
+
     private sealed class PublicTrustPulseFixture : IDisposable
     {
         private readonly string _root;
@@ -104,7 +128,10 @@ public sealed class PublicTrustPulseServiceTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["CHUMMER_PUBLIC_CANON_ROOT"] = _canonRoot,
-                    ["CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT"] = _fleetArtifactsRoot
+                    ["CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT"] = _fleetArtifactsRoot,
+                    ["CHUMMER_PUBLIC_PROGRESS_REPORT_FILE"] = Path.Combine(_canonRoot, ".codex-design", "product", "PROGRESS_REPORT.generated.json"),
+                    ["CHUMMER_PUBLIC_PROGRESS_HISTORY_FILE"] = Path.Combine(_canonRoot, ".codex-design", "product", "PROGRESS_HISTORY.generated.json"),
+                    ["CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE"] = Path.Combine(_canonRoot, ".codex-studio", "published", "HUB_LOCAL_RELEASE_PROOF.generated.json")
                 })
                 .Build();
 
@@ -114,8 +141,84 @@ public sealed class PublicTrustPulseServiceTests
 
         public void WritePulse(string contractName)
         {
+            WritePulse(contractName, extraSupportingSignals: null);
+        }
+
+        public void WritePulseWithSynthesizedSignals(string contractName)
+        {
+            WritePulse(
+                contractName,
+                new Dictionary<string, object?>
+                {
+                    ["history_snapshot_count"] = 6,
+                    ["adoption_health"] = new Dictionary<string, object?>
+                    {
+                        ["state"] = "clear",
+                        ["local_release_proof_status"] = "passed",
+                        ["proven_journey_count"] = 4,
+                        ["proven_route_count"] = 6,
+                        ["history_snapshot_count"] = 6,
+                        ["summary"] = "Current local edge proof passed with multi-route evidence."
+                    },
+                    ["progress_trend"] = new Dictionary<string, object?>
+                    {
+                        ["state"] = "moving",
+                        ["direction"] = "up",
+                        ["delta_percent"] = 9,
+                        ["from_as_of"] = "2026-03-24",
+                        ["to_as_of"] = "2026-03-30",
+                        ["sample_count"] = 3,
+                        ["summary"] = "Upward momentum across the last three measured snapshots.",
+                        ["samples"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["as_of"] = "2026-03-24",
+                                ["overall_progress_percent"] = 72
+                            },
+                            new Dictionary<string, object?>
+                            {
+                                ["as_of"] = "2026-03-27",
+                                ["overall_progress_percent"] = 77
+                            },
+                            new Dictionary<string, object?>
+                            {
+                                ["as_of"] = "2026-03-30",
+                                ["overall_progress_percent"] = 81
+                            }
+                        }
+                    }
+                });
+        }
+
+        private void WritePulse(string contractName, Dictionary<string, object?>? extraSupportingSignals)
+        {
             var pulseDir = Path.Combine(_canonRoot, ".codex-design", "product");
             Directory.CreateDirectory(pulseDir);
+            var supportingSignals = new Dictionary<string, object?>
+            {
+                ["overall_progress_percent"] = 73,
+                ["phase_label"] = "Scale & stabilize",
+                ["history_snapshot_count"] = 4,
+                ["longest_pole"] = "Cloud & Publishing",
+                ["launch_readiness"] = "Hold launch expansion pending route-canary validation.",
+                ["provider_route_stewardship"] = new Dictionary<string, object?>
+                {
+                    ["default_status"] = "Pilot defaults are governed",
+                    ["canary_status"] = "Canary green on all active lanes",
+                    ["review_due"] = "2026-06-01",
+                    ["next_decision"] = "Promote once support fallout remains stable."
+                }
+            };
+
+            if (extraSupportingSignals is not null)
+            {
+                foreach ((string key, object? value) in extraSupportingSignals)
+                {
+                    supportingSignals[key] = value;
+                }
+            }
+
             File.WriteAllText(
                 Path.Combine(pulseDir, "WEEKLY_PRODUCT_PULSE.generated.json"),
                 JsonSerializer.Serialize(new Dictionary<string, object?>
@@ -141,21 +244,7 @@ public sealed class PublicTrustPulseServiceTests
                             ["reason"] = "No red blockers are open."
                         }
                     },
-                    ["supporting_signals"] = new Dictionary<string, object?>
-                    {
-                        ["overall_progress_percent"] = 73,
-                        ["phase_label"] = "Scale & stabilize",
-                        ["history_snapshot_count"] = 4,
-                        ["longest_pole"] = "Cloud & Publishing",
-                        ["launch_readiness"] = "Hold launch expansion pending route-canary validation.",
-                        ["provider_route_stewardship"] = new Dictionary<string, object?>
-                        {
-                            ["default_status"] = "Pilot defaults are governed",
-                            ["canary_status"] = "Canary green on all active lanes",
-                            ["review_due"] = "2026-06-01",
-                            ["next_decision"] = "Promote once support fallout remains stable."
-                        }
-                    }
+                    ["supporting_signals"] = supportingSignals
                 }));
         }
 
