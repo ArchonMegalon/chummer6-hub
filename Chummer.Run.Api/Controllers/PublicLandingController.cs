@@ -346,6 +346,10 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/artifacts/creator/{publicationId}")]
+    public IActionResult CreatorPublicationDetailCompatibilityRedirect([FromRoute] string publicationId)
+        => LocalRedirect($"/artifacts/publications/{Uri.EscapeDataString(publicationId)}");
+
+    [HttpGet("/artifacts/publications/{publicationId}")]
     [Produces("text/html")]
     public async Task<IActionResult> CreatorPublicationDetailPage([FromRoute] string publicationId, CancellationToken cancellationToken)
     {
@@ -355,7 +359,7 @@ public sealed class PublicLandingController : Controller
             return NotFound();
         }
 
-        var currentPath = $"/artifacts/creator/{Uri.EscapeDataString(publicationId)}";
+        var currentPath = $"/artifacts/publications/{Uri.EscapeDataString(publicationId)}";
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);

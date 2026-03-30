@@ -193,7 +193,7 @@
 
     static string CreatorPublicationHref(Chummer.Campaign.Contracts.CreatorPublicationProjection? publication, string publicationId)
         => IsDiscoverablePublicCreatorPublication(publication)
-            ? $"/artifacts/creator/{Uri.EscapeDataString(publicationId)}"
+            ? $"/artifacts/publications/{Uri.EscapeDataString(publicationId)}"
             : $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
 
     static string CreatorPublicationLinkLabel(Chummer.Campaign.Contracts.CreatorPublicationProjection? publication)

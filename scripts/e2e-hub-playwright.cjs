@@ -59,17 +59,18 @@ async function expectBodyText(page, needle, label) {
 }
 
 function isPublicCreatorPublicationPath(path) {
-  return /\/artifacts\/creator\//.test(path || '');
+  return /\/artifacts\/(?:publications|creator)\//.test(path || '');
 }
 
 async function assertCreatorPublicationDetail(page, pageErrors, path, label) {
   await gotoAndAssert(page, pageErrors, path, async () => {
     const currentPath = new URL(page.url()).pathname;
     if (isPublicCreatorPublicationPath(path)) {
-      assert(/\/artifacts\/creator\//.test(currentPath), `${label} should open the public creator packet route.`);
+      assert(/\/artifacts\/publications\//.test(currentPath), `${label} should open the shared public publication route.`);
       await expectBodyText(page, 'Governed creator discovery', label);
       await expectBodyText(page, 'Public creator packet', label);
       await expectBodyText(page, 'Why this packet is live', label);
+      await expectBodyText(page, 'Publication kind', label);
       await expectBodyText(page, 'Provenance', label);
       await expectBodyText(page, 'Trust', label);
       await expectBodyText(page, 'Discovery', label);
@@ -80,6 +81,7 @@ async function assertCreatorPublicationDetail(page, pageErrors, path, label) {
       await expectBodyText(page, 'Publication status', label);
       await expectBodyText(page, 'Trust', label);
       await expectBodyText(page, 'Trust ranking', label);
+      await expectBodyText(page, 'Publication kind', label);
       await expectBodyText(page, 'Discovery', label);
       await expectBodyText(page, 'Discoverable now', label);
       await expectBodyText(page, 'Status', label);
@@ -382,7 +384,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Compare at a glance');
     await expectVisible(page, 'text=How live creator packets differ');
     await expectVisible(page, 'text=Open published creator packet');
-    publicCreatorPublicationPath = await readFirstHref(page, 'a[href*="/artifacts/creator/"]', '/artifacts');
+    publicCreatorPublicationPath = await readFirstHref(page, 'a[href*="/artifacts/publications/"]', '/artifacts');
     await assertNoBannedCopy(page, 'Artifacts');
   });
   await assertCreatorPublicationDetail(page, pageErrors, publicCreatorPublicationPath, '/artifacts -> public creator packet');
@@ -457,7 +459,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     homeWorkspacePath = await readFirstHref(page, 'a[href*="/account/work/workspaces/"]', '/home/work');
     homeBuildHandoffPath = await readFirstHref(page, 'a[href*="/account/work/build-handoffs/"]', '/home/work');
     homeRulesPath = await readFirstHref(page, 'a[href*="/account/work/rules/"]', '/home/work');
-    homePublicationPath = await readFirstHref(page, 'a[href*="/artifacts/creator/"], a[href*="/account/work/publications/"]', '/home/work');
+    homePublicationPath = await readFirstHref(page, 'a[href*="/artifacts/publications/"], a[href*="/account/work/publications/"]', '/home/work');
     homeNextSessionPath = await readFirstHref(page, 'a[href*="#selected-next-session-carry-forward"]', '/home/work');
     homeAftermathPath = await readFirstHref(page, 'a[href*="#aftermath-packages"]', '/home/work');
     homeDowntimePath = await readFirstHref(page, 'a[href*="#selected-downtime-brief"]', '/home/work');
@@ -759,7 +761,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await expectBodyText(page, 'Status', '/account/work/publications detail');
   await expectBodyText(page, 'Open build path for', '/account/work/publications detail');
   accountPublicationBuildHandoffPath = await readFirstHref(page, 'a[href*="/account/work/build-handoffs/"]', '/account/work/publications detail');
-  const accountPublicationPublicPath = await readOptionalHref(page, 'a[href*="/artifacts/creator/"]');
+  const accountPublicationPublicPath = await readOptionalHref(page, 'a[href*="/artifacts/publications/"]');
   await assertNoBannedCopy(page, '/account/work/publications detail');
   await assertNoPageErrors(page, pageErrors, '/account/work/publications detail');
   if (accountPublicationPublicPath) {

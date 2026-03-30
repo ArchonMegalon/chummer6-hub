@@ -191,7 +191,7 @@
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
     static string RulesDetailHref(string entryId) => $"/account/work/rules/{Uri.EscapeDataString(entryId)}";
     static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
-    static string PublicCreatorPublicationHref(string publicationId) => $"/artifacts/creator/{Uri.EscapeDataString(publicationId)}";
+    static string PublicCreatorPublicationHref(string publicationId) => $"/artifacts/publications/{Uri.EscapeDataString(publicationId)}";
     static bool IsDiscoverablePublicCreatorPublication(Chummer.Campaign.Contracts.CreatorPublicationProjection? publication)
         => publication is not null
             && publication.Discoverable
@@ -1864,6 +1864,10 @@
                         <p>@selectedCreatorPublication.Summary</p>
                         <div class="settings-summary-list">
                             <div class="settings-summary-row">
+                                <span>Publication kind</span>
+                                <strong>@HumanizeStatus(selectedCreatorPublication.Kind, "Publication packet")</strong>
+                            </div>
+                            <div class="settings-summary-row">
                                 <span>Provenance</span>
                                 <strong>@selectedCreatorPublication.ProvenanceSummary</strong>
                             </div>
@@ -1951,6 +1955,10 @@
                                 <div class="settings-summary-row">
                                     <span>Draft rail</span>
                                     <strong>@HumanizeStatus(selectedCreatorPublicationDraftDetail.Draft.State, "Draft")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Draft kind</span>
+                                    <strong>@HumanizeStatus(selectedCreatorPublicationDraftDetail.Draft.ProjectKind, "Publication packet")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Review rail</span>
