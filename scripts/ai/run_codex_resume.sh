@@ -4,6 +4,9 @@ cd "/docker/chummercomplete/chummer.run-services"
 source "./scripts/ai/_env.sh"
 /docker/chummercomplete/scripts/codex_context_guard.sh "$(pwd)"
 
+CODEX_SANDBOX="${CODEX_SANDBOX:-danger-full-access}"
+CODEX_APPROVAL="${CODEX_APPROVAL:-never}"
+
 BOOT_FILE=".codex.resume.boot.txt"
 {
   printf 'SYSTEM RE-ENTRY\n'
@@ -29,10 +32,10 @@ BOOT_FILE=".codex.resume.boot.txt"
 } > "$BOOT_FILE"
 
 HELP_OUT="$(codex --help 2>&1 || true)"
-if printf '%s' "$HELP_OUT" | grep -q -- '--full-auto'; then
-  exec codex --full-auto "$(cat "$BOOT_FILE")"
-elif printf '%s' "$HELP_OUT" | grep -Eq '(^|[[:space:]])exec([[:space:]]|$)'; then
-  exec codex exec "$(cat "$BOOT_FILE")"
+SHIM_ARGS=(--sandbox "$CODEX_SANDBOX" -a "$CODEX_APPROVAL")
+
+if printf '%s' "$HELP_OUT" | grep -Eq '(^|[[:space:]])exec([[:space:]]|$)'; then
+  exec codex exec "${SHIM_ARGS[@]}" "$(cat "$BOOT_FILE")"
 else
-  exec codex "$(cat "$BOOT_FILE")"
+  exec codex "${SHIM_ARGS[@]}" "$(cat "$BOOT_FILE")"
 fi
