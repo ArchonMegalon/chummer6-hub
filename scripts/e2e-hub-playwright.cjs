@@ -123,7 +123,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
   const page = await context.newPage();
   const pageErrors = [];
-  const uniqueEmail = `hub-e2e-${Date.now()}@example.com`;
+  const uniqueRunId = Date.now();
+  const uniqueEmail = `hub-e2e-${uniqueRunId}@example.com`;
+  const supportCaseTitle = `Playwright support case ${uniqueRunId}`;
   let homeWorkspacePath;
   let homeBuildHandoffPath;
   let homeRulesPath;
@@ -587,6 +589,36 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Support');
   });
 
+  await expandDetailsBySummary(page, 'Need routing help first?', '/account/support');
+  await page.fill('#supportAssistantQuery', 'How do I install or update the preview build?');
+  await Promise.all([
+    expectVisible(page, '#supportAssistantAnswer', '/account/support assistant answer'),
+    expectVisible(page, '#supportAssistantActions', '/account/support assistant actions'),
+    expectVisible(page, '#supportAssistantCitations', '/account/support assistant citations'),
+    page.getByRole('button', { name: /Check guidance/i }).click()
+  ]);
+  await expectVisible(page, 'text=Grounded guidance loaded');
+  await expectVisible(page, 'text=Open downloads');
+  await expectVisible(page, 'text=Open support case');
+  const assistantAnswer = await page.locator('#supportAssistantAnswer').innerText();
+  assert(
+    assistantAnswer.includes('first-party release and update docs match your question')
+      || assistantAnswer.includes('first-party install and downloads docs cover this path'),
+    `/account/support assistant should return grounded install/update guidance, got: ${assistantAnswer}`
+  );
+  await expectMinimumCount(page, '#supportAssistantCitations .settings-summary-row', 1, '/account/support assistant citations');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.locator('#supportAssistantActions a', { hasText: 'Open downloads' }).first().click()
+  ]);
+  assert.equal(new URL(page.url()).pathname, '/downloads', '/account/support assistant downloads action should route to /downloads.');
+  await expectVisible(page, 'text=Advanced download options');
+  await assertNoBannedCopy(page, '/downloads from support assistant');
+  await assertNoPageErrors(page, pageErrors, '/downloads from support assistant');
+  await gotoAndAssert(page, pageErrors, '/account/support', async () => {
+    await expectVisible(page, 'text=Support');
+  });
+
   const supportCaseTitleField = page.locator('#supportCaseTitle');
   if (await supportCaseTitleField.count() === 0) {
     const currentUrl = page.url();
@@ -600,7 +632,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, '#supportCaseContextPreview');
   }
 
-  await supportCaseTitleField.fill('Playwright support case');
+  await supportCaseTitleField.fill(supportCaseTitle);
   await page.fill('#supportCaseSummary', 'Tracked support submission with attachment');
   await page.fill('#supportCaseDetail', 'Browser harness is validating tracked support submission, attachment persistence, and the signed-in return path.');
   await page.setInputFiles('#supportCaseAttachments', {
@@ -615,6 +647,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   ]);
 
   assert(/\/account\/support\/support_case_/i.test(page.url()), 'Support form should redirect to a tracked case route.');
+  const trackedSupportCasePath = new URL(page.url()).pathname;
   await expectVisible(page, 'text=Tracked case');
   await expectVisible(page, 'text=Next safe action');
   await expectVisible(page, 'text=Closure');
@@ -633,6 +666,22 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   assert(/playwright-support\.log$/i.test(attachmentDownload.suggestedFilename()), 'Tracked support case should download the uploaded attachment.');
 
   await assertNoBannedCopy(page, 'Tracked support case');
+
+  await gotoAndAssert(page, pageErrors, '/account/support', async () => {
+    await expectVisible(page, `text=${supportCaseTitle}`);
+    await expectVisible(page, 'text=Need routing help first?');
+  });
+  const supportHistorySelector = `a[href="${trackedSupportCasePath}"]`;
+  const supportHistoryHref = await readFirstHref(page, supportHistorySelector, '/account/support history');
+  assert.equal(supportHistoryHref, trackedSupportCasePath, '/account/support history should keep the tracked case detail href.');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.locator(supportHistorySelector).first().click()
+  ]);
+  assert.equal(new URL(page.url()).pathname, trackedSupportCasePath, '/account/support history link should reopen the tracked case detail route.');
+  await expectVisible(page, `text=${supportCaseTitle}`);
+  await expectVisible(page, 'text=Next safe action');
+  await assertNoBannedCopy(page, '/account/support history');
 
   await gotoAndAssert(page, pageErrors, '/participate/codex', async () => {
     await expectVisible(page, 'text=Authorize in ChatGPT');

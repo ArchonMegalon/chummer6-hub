@@ -512,6 +512,21 @@ def verify_signed_in_work_audit(
 
     workspace_token = extract_antiforgery_token(body, workspace_path)
     subject_id = extract_subject_id(body, workspace_path)
+    support_index_path = "/account/support"
+    status, body, _, _ = fetch(
+        base_url,
+        support_index_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{support_index_path} returned {status}, expected 200")
+    require_snippet(body, "Need routing help first?", support_index_path)
+    require_snippet(body, "Ask the grounded support assistant", support_index_path)
+    require_snippet(body, "Submit support case", support_index_path)
+    require_snippet(body, "Open or active cases", support_index_path)
+    require_snippet(body, "Total recent cases", support_index_path)
     support_case_payload = json.dumps(
         {
             "kind": "bug_report",
@@ -626,6 +641,19 @@ def verify_signed_in_work_audit(
     notified_case = load_json_object(body, f"/api/v1/support/cases/{support_case_id}/notify")
     if notified_case.get("status") != "user_notified":
         raise AssertionError("support case did not enter user_notified")
+
+    status, body, _, _ = fetch(
+        base_url,
+        support_index_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{support_index_path} returned {status}, expected 200 after support-case notify")
+    require_snippet(body, SUPPORT_AUDIT_TITLE, support_index_path)
+    require_snippet(body, support_detail_path, support_index_path)
+    require_snippet(body, "Need routing help first?", support_index_path)
 
     status, body, _, _ = fetch(
         base_url,
@@ -780,6 +808,20 @@ def verify_signed_in_work_audit(
         raise AssertionError(f"{support_detail_path} returned {status}, expected 200 after reporter verification")
     require_snippet(body, "Closed and confirmed", support_detail_path)
     require_snippet(body, support_fixed_version, support_detail_path)
+
+    status, body, _, _ = fetch(
+        base_url,
+        support_index_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{support_index_path} returned {status}, expected 200 after reporter verification")
+    require_snippet(body, SUPPORT_AUDIT_TITLE, support_index_path)
+    require_snippet(body, support_detail_path, support_index_path)
+    require_snippet(body, "Total recent cases", support_index_path)
+    require_snippet(body, "Need routing help first?", support_index_path)
 
     status, body, _, _ = fetch(
         base_url,

@@ -1,6 +1,18 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:45:50+02:00
+Updated: 2026-03-30T08:52:33+02:00
+
+## Handoff refresh (2026-03-30T08:52:33+02:00)
+
+- Signed-in support proof now covers the calmer assistant rail and the rendered history loop instead of stopping at raw API assertions and the initial form redirect:
+  - `scripts/hub-live-audit.py` now requires `/account/support` to render the assistant/form shell before case submission, then proves the tracked case title and detail link stay visible in the signed-in support history after notification and after reporter verification.
+  - `scripts/e2e-hub-playwright.cjs` now opens the `Need routing help first?` drawer, submits a grounded install/update assistant query, follows the returned `Open downloads` action into the signed-in downloads surface, files a uniquely titled support case, returns to `/account/support`, and reopens the exact tracked case through the rendered history link.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:45:50+02:00)
 
