@@ -27,11 +27,16 @@ public sealed class CampaignSpineService
 
     private readonly CommunityStore _store;
     private readonly WorkspaceLifecyclePolicyService _lifecyclePolicy;
+    private readonly CampaignArtifactRegistryBridge _artifactRegistry;
 
-    public CampaignSpineService(CommunityStore store, WorkspaceLifecyclePolicyService lifecyclePolicy)
+    public CampaignSpineService(
+        CommunityStore store,
+        WorkspaceLifecyclePolicyService lifecyclePolicy,
+        CampaignArtifactRegistryBridge artifactRegistry)
     {
         _store = store;
         _lifecyclePolicy = lifecyclePolicy;
+        _artifactRegistry = artifactRegistry;
     }
 
     public AccountCampaignSummary GetAccountSummary(HubUserDto user, InstallLinkingSummaryDto? installLinking = null)
@@ -330,8 +335,26 @@ public sealed class CampaignSpineService
         lock (_store.Gate)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
+            string packageId = StableId("aftermath", $"{workspace.WorkspaceId}:{run?.RunId ?? "campaign"}:{normalizedPackageKind}:{now.ToUnixTimeMilliseconds()}");
+            string rulesetId = ResolveArtifactRulesetId(workspace.RuleEnvironment);
+            IReadOnlyList<string> finalizedEvidenceLines = FinalizeLines(evidenceLines);
+            CampaignArtifactRegistration artifact = _artifactRegistry.RegisterAftermathPackage(new AftermathArtifactRegistrationRequest(
+                PackageId: packageId,
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignId: workspace.CampaignId,
+                CampaignName: workspace.CampaignName,
+                RunId: run?.RunId,
+                RunTitle: run?.Title,
+                PackageKind: normalizedPackageKind,
+                Title: normalizedTitle,
+                Summary: normalizedSummary,
+                OwnerUserId: user.UserId,
+                RulesetId: rulesetId,
+                RuleEnvironmentFingerprint: workspace.RuleEnvironment.CompatibilityFingerprint,
+                GeneratedAtUtc: now,
+                EvidenceLines: finalizedEvidenceLines));
             var package = new AftermathRecapPackageProjection(
-                PackageId: StableId("aftermath", $"{workspace.WorkspaceId}:{run?.RunId ?? "campaign"}:{normalizedPackageKind}:{now.ToUnixTimeMilliseconds()}"),
+                PackageId: packageId,
                 WorkspaceId: workspace.WorkspaceId,
                 CampaignId: workspace.CampaignId,
                 RunId: run?.RunId,
@@ -339,10 +362,22 @@ public sealed class CampaignSpineService
                 PackageKind: normalizedPackageKind,
                 Title: normalizedTitle,
                 Summary: normalizedSummary,
-                ArtifactId: StableId("artifact", $"{workspace.WorkspaceId}:{normalizedPackageKind}:{now.ToUnixTimeMilliseconds()}"),
-                EvidenceLines: FinalizeLines(evidenceLines),
+                ArtifactId: artifact.ArtifactId,
+                EvidenceLines: finalizedEvidenceLines
+                    .Concat(
+                    [
+                        $"Registry artifact: {artifact.ArtifactId} ({artifact.ArtifactKind} {artifact.ArtifactVersion}, {artifact.ArtifactVisibility}, {artifact.ArtifactTrustTier}, {artifact.ArtifactRulesetId})."
+                    ])
+                    .ToArray(),
                 InitiatedByUserId: user.UserId,
-                GeneratedAtUtc: now);
+                GeneratedAtUtc: now,
+                ArtifactKind: artifact.ArtifactKind,
+                ArtifactVersion: artifact.ArtifactVersion,
+                ArtifactVisibility: artifact.ArtifactVisibility,
+                ArtifactTrustTier: artifact.ArtifactTrustTier,
+                ArtifactRulesetId: artifact.ArtifactRulesetId,
+                ProvenanceSummary: artifact.ProvenanceSummary,
+                AuditSummary: artifact.AuditSummary);
 
             _store.AftermathPackages.Add(package);
             if (_store.AftermathPackages.Count > 64)
@@ -2917,7 +2952,13 @@ public sealed class CampaignSpineService
             Kind: package.PackageKind,
             Label: package.Title,
             Summary: package.Summary,
-            ArtifactId: package.ArtifactId);
+            ArtifactId: package.ArtifactId,
+            ProvenanceSummary: string.IsNullOrWhiteSpace(package.ProvenanceSummary)
+                ? BuildAftermathRecapProvenanceSummary(package)
+                : package.ProvenanceSummary,
+            AuditSummary: string.IsNullOrWhiteSpace(package.AuditSummary)
+                ? BuildAftermathRecapAuditSummary(package)
+                : package.AuditSummary);
 
     private static IReadOnlyList<PublicationSafeProjection> EnrichWorkspaceRecapShelf(
         CampaignProjection campaign,
@@ -2960,7 +3001,9 @@ public sealed class CampaignSpineService
                     : item.CreatorPublicationId,
                 NextSafeAction = string.IsNullOrWhiteSpace(item.NextSafeAction)
                     ? nextSafeAction
-                    : item.NextSafeAction
+                    : item.NextSafeAction,
+                ProvenanceSummary = item.ProvenanceSummary,
+                AuditSummary = item.AuditSummary
             })
             .ToArray();
     }
@@ -2972,6 +3015,77 @@ public sealed class CampaignSpineService
             "after_action_report" => "After-action report",
             _ => "Aftermath recap package"
         };
+
+    private static string BuildAftermathRecapProvenanceSummary(AftermathRecapPackageProjection package)
+    {
+        if (!string.IsNullOrWhiteSpace(package.ProvenanceSummary))
+        {
+            return package.ProvenanceSummary!;
+        }
+
+        string runScope = package.EvidenceLines.FirstOrDefault(static line => line.StartsWith("Run scope:", StringComparison.OrdinalIgnoreCase))
+            ?? (string.IsNullOrWhiteSpace(package.RunTitle)
+                ? "Run scope: campaign-wide aftermath."
+                : $"Run scope: {package.RunTitle}.");
+        string continuity = package.EvidenceLines.FirstOrDefault(static line => line.StartsWith("Continuity:", StringComparison.OrdinalIgnoreCase))
+            ?? "Continuity: governed return lane remains attached to the same campaign spine.";
+        string artifactDescriptor = BuildAftermathArtifactDescriptor(package);
+        return $"{runScope} {continuity} {artifactDescriptor} stays attached to package {package.PackageId}.";
+    }
+
+    private static string BuildAftermathRecapAuditSummary(AftermathRecapPackageProjection package)
+    {
+        if (!string.IsNullOrWhiteSpace(package.AuditSummary))
+        {
+            return package.AuditSummary!;
+        }
+
+        string packageKind = package.EvidenceLines.FirstOrDefault(static line => line.StartsWith("Package kind:", StringComparison.OrdinalIgnoreCase))
+            ?? $"Package kind: {package.PackageKind}.";
+        string activeScene = package.EvidenceLines.FirstOrDefault(static line => line.StartsWith("Active scene:", StringComparison.OrdinalIgnoreCase))
+            ?? "Active scene: no pinned scene.";
+        return $"Generated {package.GeneratedAtUtc:yyyy-MM-dd HH:mm} UTC by {package.InitiatedByUserId}. {packageKind} {activeScene} {BuildAftermathArtifactDescriptor(package)}";
+    }
+
+    private static string BuildAftermathArtifactDescriptor(AftermathRecapPackageProjection package)
+    {
+        if (string.IsNullOrWhiteSpace(package.ArtifactKind)
+            && string.IsNullOrWhiteSpace(package.ArtifactVersion)
+            && string.IsNullOrWhiteSpace(package.ArtifactVisibility)
+            && string.IsNullOrWhiteSpace(package.ArtifactTrustTier)
+            && string.IsNullOrWhiteSpace(package.ArtifactRulesetId))
+        {
+            return $"Artifact {package.ArtifactId}";
+        }
+
+        return $"Artifact {package.ArtifactId} ({package.ArtifactKind ?? "artifact"} {package.ArtifactVersion ?? "current"}, {package.ArtifactVisibility ?? "shared"}, {package.ArtifactTrustTier ?? "curated"}, {package.ArtifactRulesetId ?? "sr5"})";
+    }
+
+    private static string ResolveArtifactRulesetId(RuleEnvironmentRef ruleEnvironment)
+    {
+        string candidate = ruleEnvironment.CompatibilityFingerprint;
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            candidate = ruleEnvironment.EnvironmentId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(candidate))
+        {
+            string[] separators = [".", ":", "/", "-", "_"];
+            foreach (string separator in separators)
+            {
+                int index = candidate.IndexOf(separator, StringComparison.Ordinal);
+                if (index > 0)
+                {
+                    return candidate[..index].Trim();
+                }
+            }
+
+            return candidate.Trim();
+        }
+
+        return "sr5";
+    }
 
     private static string DescribePrepLaunchSummary(
         CampaignWorkspaceProjection workspace,
@@ -3466,7 +3580,8 @@ public sealed class CampaignSpineService
             .Select(workspace =>
             {
                 var dossier = dossiers.FirstOrDefault(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase));
-                var artifact = workspace.RecapShelf.FirstOrDefault()?.ArtifactId ?? StableId("artifact", workspace.WorkspaceId);
+                var leadRecap = workspace.RecapShelf.FirstOrDefault();
+                var artifact = leadRecap?.ArtifactId ?? StableId("artifact", workspace.WorkspaceId);
                 var leadHandoff = buildLabHandoffs
                     .Where(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
                     .OrderByDescending(static item => item.UpdatedAtUtc)
@@ -3493,7 +3608,9 @@ public sealed class CampaignSpineService
                     CampaignId: workspace.CampaignId,
                     DossierId: dossier?.DossierId,
                     ArtifactId: artifact,
-                    ProvenanceSummary: $"{workspace.RuleEnvironment.CompatibilityFingerprint} + recap-safe output shelf",
+                    ProvenanceSummary: string.IsNullOrWhiteSpace(leadRecap?.ProvenanceSummary)
+                        ? $"{workspace.RuleEnvironment.CompatibilityFingerprint} + recap-safe output shelf"
+                        : $"{workspace.RuleEnvironment.CompatibilityFingerprint} + {leadRecap!.ProvenanceSummary}",
                     DiscoverySummary: $"{workspace.Visibility} visibility with grounded provenance and one truthful next action.",
                     Visibility: workspace.Visibility,
                     PublicationStatus: publicationStatus,
@@ -3544,7 +3661,9 @@ public sealed class CampaignSpineService
                             CreatorPublicationId = creatorLinked ? creatorPublication.PublicationId : item.CreatorPublicationId,
                             NextSafeAction = creatorLinked
                                 ? creatorPublication.NextSafeAction ?? workspace.NextSafeAction
-                                : DescribeRecapShelfNextSafeAction(workspace, item)
+                                : DescribeRecapShelfNextSafeAction(workspace, item),
+                            ProvenanceSummary = DescribeRecapShelfProvenanceSummary(workspace, item, creatorPublication, creatorLinked),
+                            AuditSummary = DescribeRecapShelfAuditSummary(workspace, item, creatorPublication, creatorLinked)
                         };
                     })
                     .ToArray();
@@ -3685,6 +3804,47 @@ public sealed class CampaignSpineService
         }
 
         return "Campaign return already trusts this recap-safe artifact, and creator publication can promote the same truth without rebuilding it.";
+    }
+
+    private static string DescribeRecapShelfProvenanceSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item,
+        CreatorPublicationProjection creatorPublication,
+        bool creatorLinked)
+    {
+        if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
+        {
+            return item.ProvenanceSummary!;
+        }
+
+        if (creatorLinked && !string.IsNullOrWhiteSpace(creatorPublication.ProvenanceSummary))
+        {
+            return creatorPublication.ProvenanceSummary;
+        }
+
+        return $"{workspace.RuleEnvironment.CompatibilityFingerprint} keeps {item.Label} attached to {workspace.CampaignName} without a shadow export lane.";
+    }
+
+    private static string DescribeRecapShelfAuditSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item,
+        CreatorPublicationProjection creatorPublication,
+        bool creatorLinked)
+    {
+        if (!string.IsNullOrWhiteSpace(item.AuditSummary))
+        {
+            return item.AuditSummary!;
+        }
+
+        DateTimeOffset updatedAtUtc = creatorLinked
+            ? creatorPublication.UpdatedAtUtc
+            : workspace.LatestContinuity?.CapturedAtUtc
+                ?? workspace.AftermathPackages?.FirstOrDefault()?.GeneratedAtUtc
+                ?? DateTimeOffset.UtcNow;
+        string auditSource = creatorLinked
+            ? "creator review and campaign return"
+            : "campaign return";
+        return $"Updated {updatedAtUtc:yyyy-MM-dd HH:mm} UTC on the governed {auditSource} lane for {workspace.CampaignName}.";
     }
 
     private static string DescribeRecapShelfNextSafeAction(

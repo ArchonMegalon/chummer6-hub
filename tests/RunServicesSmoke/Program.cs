@@ -535,7 +535,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var supportAttachments = new SupportAttachmentStorageService(configuration);
     var installLinking = new InstallLinkingService(installLinkingStore);
     var supportCases = new SupportCaseService(supportStore, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
-    var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration));
+    var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(store));
     var accounts = new AccountService(store);
     var groups = new GroupService(store, accounts);
     var rewards = new RewardService(store);
@@ -1587,6 +1587,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(shelfSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "artifact shelf should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
     Assert(shelfSource.Contains("All views", StringComparison.Ordinal) && shelfSource.Contains("Personal view", StringComparison.Ordinal) && shelfSource.Contains("Campaign view", StringComparison.Ordinal) && shelfSource.Contains("Creator view", StringComparison.Ordinal), "artifact shelf should expose first-class signed-in shelf views instead of one blended overlay title.");
     Assert(shelfSource.Contains("@item.OwnershipSummary", StringComparison.Ordinal), "artifact shelf should surface signed-in artifact ownership posture directly from the shared recap shelf projection.");
+    Assert(shelfSource.Contains("@item.ProvenanceSummary", StringComparison.Ordinal), "artifact shelf should surface signed-in artifact provenance directly from the shared recap shelf projection.");
+    Assert(shelfSource.Contains("@item.AuditSummary", StringComparison.Ordinal), "artifact shelf should surface signed-in artifact audit posture directly from the shared recap shelf projection.");
     Assert(shelfSource.Contains("@linkedPublication.DiscoverySummary", StringComparison.Ordinal), "artifact shelf should surface linked creator-publication discovery posture on the signed-in shelf.");
     Assert(shelfSource.Contains("HumanizeStatus(publication.Visibility, \"Shared\")", StringComparison.Ordinal), "artifact shelf should humanize creator-publication visibility directly on the signed-in shelf.");
     Assert(shelfSource.Contains("Open build path for @linkedPublication.Title", StringComparison.Ordinal), "artifact shelf should keep a direct route back to the linked creator-publication build path.");
@@ -1656,6 +1658,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Open downtime brief", StringComparison.Ordinal), "home work should keep a direct route into the downtime brief detail.");
     Assert(homeSource.Contains("PublicSurfaceStatus.AudienceLabel(leadAftermathShelfEntry.Audience)", StringComparison.Ordinal), "home work should humanize artifact shelf audience directly on the aftermath card.");
     Assert(homeSource.Contains("@leadAftermathShelfEntry.OwnershipSummary", StringComparison.Ordinal), "home work should surface artifact shelf ownership posture directly on the aftermath card.");
+    Assert(homeSource.Contains("@leadAftermathShelfEntry.ProvenanceSummary", StringComparison.Ordinal), "home work should surface artifact shelf provenance directly on the aftermath card.");
+    Assert(homeSource.Contains("@leadAftermathShelfEntry.AuditSummary", StringComparison.Ordinal), "home work should surface artifact shelf audit posture directly on the aftermath card.");
     Assert(homeSource.Contains("HumanizeStatus(leadAftermathShelfEntry.PublicationState, \"Ready\")", StringComparison.Ordinal), "home work should humanize artifact publication state directly on the aftermath card.");
     Assert(homeSource.Contains("HumanizeStatus(leadAftermathShelfEntry.TrustBand, \"Draft\")", StringComparison.Ordinal), "home work should humanize artifact trust ranking directly on the aftermath card.");
     Assert(homeSource.Contains("leadAftermathShelfEntry.Discoverable ? \"Eligible now\" : \"Still bounded\"", StringComparison.Ordinal), "home work should surface artifact discoverability posture directly on the aftermath card.");
@@ -1800,6 +1804,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Artifact shelf posture", StringComparison.Ordinal), "account work should give the selected campaign card a first-class artifact shelf posture drawer.");
     Assert(accountSource.Contains("PublicSurfaceStatus.AudienceLabel(item.Audience)", StringComparison.Ordinal), "account work should humanize artifact shelf audiences directly on the selected campaign card.");
     Assert(accountSource.Contains("@item.OwnershipSummary", StringComparison.Ordinal), "account work should surface artifact ownership posture directly from the shared recap-shelf projection.");
+    Assert(accountSource.Contains("@item.ProvenanceSummary", StringComparison.Ordinal), "account work should surface artifact provenance directly from the shared recap-shelf projection.");
+    Assert(accountSource.Contains("@item.AuditSummary", StringComparison.Ordinal), "account work should surface artifact audit posture directly from the shared recap-shelf projection.");
     Assert(accountSource.Contains("@HumanizeStatus(item.PublicationState, \"Ready\")", StringComparison.Ordinal), "account work should surface artifact publication state directly from the shared recap-shelf projection.");
     Assert(accountSource.Contains("@item.PublicationSummary", StringComparison.Ordinal), "account work should surface artifact publication posture directly from the shared recap-shelf projection.");
     Assert(accountSource.Contains("@item.NextSafeAction", StringComparison.Ordinal), "account work should surface the next artifact-shelf step directly from the shared recap-shelf projection.");
@@ -2012,7 +2018,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!roadmapDetailSource.Contains("Audience impact", StringComparison.Ordinal), "roadmap detail should not repeat audience copy once the fact rail already states who should follow it.");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
-    var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration));
+    var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(store));
     var accounts = new AccountService(store);
     var identityLinks = new IdentityLinkService(store, accounts);
     var experience = new UserExperienceService(store, accounts);
@@ -2733,6 +2739,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(aftermathPackagePayload is not null && string.Equals(aftermathPackagePayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine aftermath recap api should record a governed recap package against the selected workspace.");
     Assert(aftermathPackagePayload!.Summary.Contains("session recap package", StringComparison.OrdinalIgnoreCase), "campaign spine aftermath recap api should describe the governed recap package it generated.");
     Assert(aftermathPackagePayload.EvidenceLines.Any(item => item.Contains("Continuity:", StringComparison.OrdinalIgnoreCase)), "campaign spine aftermath recap api should carry bounded continuity evidence lines.");
+    Assert(string.Equals(aftermathPackagePayload.ArtifactKind, "RecapPackage", StringComparison.Ordinal), "campaign spine aftermath recap api should register governed recap artifacts on the durable registry seam.");
+    Assert(string.Equals(aftermathPackagePayload.ArtifactVisibility, "campaign-shared", StringComparison.Ordinal), "campaign spine aftermath recap api should keep campaign-shared visibility attached to recap artifacts.");
+    Assert(string.Equals(aftermathPackagePayload.ArtifactTrustTier, "curated", StringComparison.Ordinal), "campaign spine aftermath recap api should keep curated trust posture attached to recap artifacts.");
+    Assert(!string.IsNullOrWhiteSpace(aftermathPackagePayload.ProvenanceSummary), "campaign spine aftermath recap api should preserve artifact provenance on the generated package.");
+    Assert(!string.IsNullOrWhiteSpace(aftermathPackagePayload.AuditSummary), "campaign spine aftermath recap api should preserve artifact audit posture on the generated package.");
+    Assert(aftermathPackagePayload.EvidenceLines.Any(item => item.StartsWith("Registry artifact:", StringComparison.OrdinalIgnoreCase)), "campaign spine aftermath recap api should attach the durable registry artifact evidence line.");
     var downtimeBriefResult = await campaignSpineController.GenerateMyCampaignWorkspaceAftermathRecapPackage(
         workspaceId,
         new AftermathRecapPackageRequest(
@@ -2745,6 +2757,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(downtimeBriefPayload is not null && string.Equals(downtimeBriefPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine downtime brief api should record a governed downtime packet against the selected workspace.");
     Assert(downtimeBriefPayload!.Summary.Contains("downtime brief", StringComparison.OrdinalIgnoreCase), "campaign spine downtime brief api should describe the governed downtime packet it generated.");
     Assert(downtimeBriefPayload.EvidenceLines.Any(item => item.Contains("Continuity:", StringComparison.OrdinalIgnoreCase)), "campaign spine downtime brief api should carry bounded continuity evidence lines.");
+    Assert(string.Equals(downtimeBriefPayload.ArtifactKind, "RecapPackage", StringComparison.Ordinal), "campaign spine downtime brief api should register durable recap artifacts on the same registry seam.");
     var refreshedWorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
     var refreshedWorkspaceServerPlanePayload = (refreshedWorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? refreshedWorkspaceServerPlaneResult.Value;
     Assert(refreshedWorkspaceServerPlanePayload?.PrepLaunches.Any(item => string.Equals(item.LaunchId, prepLaunchPayload.LaunchId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project governed prep-launch receipts after launch.");
@@ -3198,6 +3211,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(recapShelfPayload?.PublicationSummary?.Contains("creator shelf", StringComparison.OrdinalIgnoreCase) == true, "home work route should explain that the same artifact already feeds creator publication posture.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.CreatorPublicationId), "home work route should keep the linked creator-publication id attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.NextSafeAction), "home work route should keep the next safe shelf action attached to the recap shelf entry.");
+    Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.ProvenanceSummary), "home work route should keep explicit provenance attached to the recap shelf entry.");
+    Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.AuditSummary), "home work route should keep explicit audit posture attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary), "home work route should keep publication trust visible on the shared home projection.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].TrustBand), "home work route should keep publication trust ranking visible on the shared home projection.");
@@ -3225,6 +3240,15 @@ async Task VerifyPublicLandingProjectionAsync()
     var retainedWorkHomePage = await authenticatedLandingController.HomePage("work", CancellationToken.None) as ViewResult;
     var retainedWorkHomeModel = retainedWorkHomePage?.Model as HomePageViewModel;
     Assert(retainedWorkHomeModel?.LeadWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, retainedAftermathPayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the newest aftermath recap package visible after the retention cap is exceeded.");
+    var reloadedCampaignStore = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
+    var reloadedCampaignSpine = new CampaignSpineService(reloadedCampaignStore, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(reloadedCampaignStore));
+    var reloadedWorkspace = reloadedCampaignSpine.GetWorkspace(linkedUser, workspaceId);
+    var reloadedAftermathPackage = NotNull(
+        reloadedWorkspace?.AftermathPackages?.FirstOrDefault(item => string.Equals(item.PackageId, retainedAftermathPayload!.PackageId, StringComparison.Ordinal)),
+        "campaign spine aftermath packages should survive a community-store reload.");
+    Assert(string.Equals(reloadedAftermathPackage.ArtifactId, retainedAftermathPayload!.ArtifactId, StringComparison.Ordinal), "campaign spine aftermath packages should preserve the durable artifact id across reload.");
+    Assert(!string.IsNullOrWhiteSpace(reloadedAftermathPackage.ProvenanceSummary), "campaign spine aftermath packages should preserve artifact provenance across reload.");
+    Assert(!string.IsNullOrWhiteSpace(reloadedAftermathPackage.AuditSummary), "campaign spine aftermath packages should preserve artifact audit posture across reload.");
 
     var transferTargetUser = accounts.EnsureUser("subject.outsider", "Outsider Demo");
     var transferGroup = groups.CreateGroup(new CreateGroupRequest(
@@ -3355,7 +3379,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedArtifactsModel?.SignedInStatus is not null, "authenticated artifacts shelf should project the shared signed-in trust status.");
     Assert(authenticatedArtifactsModel?.SignedInRecapShelf?.Count > 0, "authenticated artifacts shelf should expose a signed-in recap shelf overlay instead of staying public-only.");
     Assert(authenticatedArtifactsModel?.SignedInCreatorPublications?.Count > 0, "authenticated artifacts shelf should expose linked creator-publication posture instead of forcing a separate account detour.");
-    Assert(authenticatedArtifactsModel!.SignedInRecapShelf!.GroupBy(static item => string.IsNullOrWhiteSpace(item.ArtifactId) ? item.EntryId : item.ArtifactId, StringComparer.OrdinalIgnoreCase).All(group => group.Count() == 1), "authenticated artifacts shelf should dedupe recap artifacts by governed artifact identity.");
+    var authenticatedRecapShelf = NotNull(authenticatedArtifactsModel!.SignedInRecapShelf, "authenticated artifacts shelf should expose a non-null recap shelf collection.");
+    Assert(authenticatedRecapShelf.GroupBy(static item => string.IsNullOrWhiteSpace(item.ArtifactId) ? item.EntryId : item.ArtifactId, StringComparer.OrdinalIgnoreCase).All(group => group.Count() == 1), "authenticated artifacts shelf should dedupe recap artifacts by governed artifact identity.");
+    Assert(authenticatedRecapShelf.All(static item => !string.IsNullOrWhiteSpace(item.ProvenanceSummary)), "authenticated artifacts shelf should keep provenance attached to every signed-in recap artifact.");
+    Assert(authenticatedRecapShelf.All(static item => !string.IsNullOrWhiteSpace(item.AuditSummary)), "authenticated artifacts shelf should keep audit posture attached to every signed-in recap artifact.");
     authenticatedLandingController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?view=personal");
     var personalArtifactsView = await authenticatedLandingController.ArtifactsPage(CancellationToken.None) as ViewResult;
     var personalArtifactsModel = personalArtifactsView?.Model as ShelfPageViewModel;

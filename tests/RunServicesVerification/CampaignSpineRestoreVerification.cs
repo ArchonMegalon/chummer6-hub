@@ -13,6 +13,7 @@ internal static class CampaignSpineRestoreVerification
     public static Task RunAsync()
     {
         VerifyClaimedDeviceRestoreSummariesNameExactPrefetchSet();
+        VerifyAftermathArtifactMetadataSurvivesReload();
         return Task.CompletedTask;
     }
 
@@ -34,7 +35,7 @@ internal static class CampaignSpineRestoreVerification
             CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
             AccountService accounts = new(store);
             WorkspaceLifecyclePolicyService lifecycle = new(configuration);
-            CampaignSpineService campaignSpine = new(store, lifecycle);
+            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store));
 
             HubUserDto user = accounts.EnsureUser("subject.restore", "Rook", "rook@example.invalid");
             DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -136,6 +137,68 @@ internal static class CampaignSpineRestoreVerification
             VerificationAssert.True(safehouse.DeviceRole == "travel_cache", "Offline stable safehouse installs should project as travel-cache restore lanes.");
             VerificationAssert.True(safehouse.RestoreSummary.Contains("Travel-safe cache keeps", StringComparison.Ordinal), "Travel-cache restore summaries should stay explicit about safehouse posture.");
             VerificationAssert.True(safehouse.RestoreSummary.Contains("Exact set:", StringComparison.Ordinal), "Travel-cache restore summaries should also name the exact prefetch set.");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    private static void VerifyAftermathArtifactMetadataSurvivesReload()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "run-services-verification", "campaign-spine-aftermath-registry", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json"),
+                    ["CHUMMER_WORKSPACE_RESTORE_RETENTION_DAYS"] = "30"
+                })
+                .Build();
+
+            CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            WorkspaceLifecyclePolicyService lifecycle = new(configuration);
+            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store));
+            HubUserDto user = accounts.EnsureUser("subject.aftermath", "Switch", "switch@example.invalid");
+
+            CampaignWorkspaceProjection workspace = campaignSpine.GetStarterWorkspace(user)
+                ?? throw new InvalidOperationException("Expected a starter workspace.");
+            RunProjection? run = workspace.Runs.FirstOrDefault();
+            AftermathRecapPackageProjection package = campaignSpine.RecordAftermathRecapPackage(
+                user,
+                workspace,
+                run,
+                "session_recap",
+                "Reload recap",
+                "Governed recap package for reload proof.",
+                [
+                    $"Run scope: {run?.Title ?? workspace.CampaignName}.",
+                    "Continuity: governed return lane remains attached to the same campaign spine.",
+                    "Package kind: session_recap.",
+                    "Active scene: no pinned scene."
+                ]);
+
+            CommunityStore reloadedStore = new(configuration, NullLogger<CommunityStore>.Instance);
+            CampaignSpineService reloadedCampaignSpine = new(reloadedStore, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(reloadedStore));
+            CampaignWorkspaceProjection reloadedWorkspace = reloadedCampaignSpine.GetStarterWorkspace(user)
+                ?? throw new InvalidOperationException("Expected a reloaded starter workspace.");
+            AftermathRecapPackageProjection reloadedPackage = reloadedWorkspace.AftermathPackages?.FirstOrDefault(item => string.Equals(item.PackageId, package.PackageId, StringComparison.Ordinal))
+                ?? throw new InvalidOperationException("Expected a reloaded aftermath package.");
+
+            VerificationAssert.Equal(package.ArtifactId, reloadedPackage.ArtifactId, "Reloaded aftermath packages should preserve the registered artifact id.");
+            VerificationAssert.True(string.Equals(reloadedPackage.ArtifactKind, "RecapPackage", StringComparison.Ordinal), "Reloaded aftermath packages should preserve the recap artifact kind.");
+            VerificationAssert.True(string.Equals(reloadedPackage.ArtifactVisibility, "campaign-shared", StringComparison.Ordinal), "Reloaded aftermath packages should preserve campaign-shared visibility.");
+            VerificationAssert.True(string.Equals(reloadedPackage.ArtifactTrustTier, "curated", StringComparison.Ordinal), "Reloaded aftermath packages should preserve curated trust posture.");
+            VerificationAssert.True(!string.IsNullOrWhiteSpace(reloadedPackage.ProvenanceSummary), "Reloaded aftermath packages should preserve provenance summaries.");
+            VerificationAssert.True(!string.IsNullOrWhiteSpace(reloadedPackage.AuditSummary), "Reloaded aftermath packages should preserve audit summaries.");
+            VerificationAssert.True(reloadedPackage.EvidenceLines.Any(item => item.StartsWith("Registry artifact:", StringComparison.OrdinalIgnoreCase)), "Reloaded aftermath packages should preserve registry artifact evidence.");
         }
         finally
         {

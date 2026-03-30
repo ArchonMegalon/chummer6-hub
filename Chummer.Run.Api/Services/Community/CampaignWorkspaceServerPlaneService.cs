@@ -700,7 +700,11 @@ public sealed class CampaignWorkspaceServerPlaneService
                     CreatorPublicationId: creatorLinked ? creatorPublication!.PublicationId : null,
                     NextSafeAction: creatorLinked
                         ? creatorPublication!.NextSafeAction ?? workspace.NextSafeAction
-                        : DescribeRecapShelfNextSafeAction(workspace, item));
+                        : DescribeRecapShelfNextSafeAction(workspace, item),
+                    ProvenanceSummary: string.IsNullOrWhiteSpace(item.ProvenanceSummary) && creatorLinked
+                        ? creatorPublication!.ProvenanceSummary
+                        : item.ProvenanceSummary,
+                    AuditSummary: item.AuditSummary);
             })
             .ToArray();
     }

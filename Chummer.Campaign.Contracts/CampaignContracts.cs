@@ -56,7 +56,9 @@ public sealed record PublicationSafeProjection(
     bool Discoverable = false,
     string? PublicationSummary = null,
     string? CreatorPublicationId = null,
-    string? NextSafeAction = null);
+    string? NextSafeAction = null,
+    string? ProvenanceSummary = null,
+    string? AuditSummary = null);
 
 public sealed record CampaignConsequenceReceipt(
     string ReceiptId,
@@ -196,7 +198,14 @@ public sealed record AftermathRecapPackageProjection(
     string ArtifactId,
     IReadOnlyList<string> EvidenceLines,
     string InitiatedByUserId,
-    DateTimeOffset GeneratedAtUtc);
+    DateTimeOffset GeneratedAtUtc,
+    string? ArtifactKind = null,
+    string? ArtifactVersion = null,
+    string? ArtifactVisibility = null,
+    string? ArtifactTrustTier = null,
+    string? ArtifactRulesetId = null,
+    string? ProvenanceSummary = null,
+    string? AuditSummary = null);
 
 public sealed record RunnerDossierProjection(
     string DossierId,
@@ -530,7 +539,9 @@ public sealed record RecapShelfEntry(
     bool Discoverable = false,
     string? PublicationSummary = null,
     string? CreatorPublicationId = null,
-    string? NextSafeAction = null);
+    string? NextSafeAction = null,
+    string? ProvenanceSummary = null,
+    string? AuditSummary = null);
 
 public sealed record RestoreArtifactProjection(
     string ArtifactId,

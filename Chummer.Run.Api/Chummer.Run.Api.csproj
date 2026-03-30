@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\chummer-core-engine\Chummer.Contracts\Chummer.Contracts.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Run.Registry\Chummer.Run.Registry.csproj" />
     <ProjectReference Include="..\Chummer.Campaign.Contracts\Chummer.Campaign.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Control.Contracts\Chummer.Control.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Run.Contracts\Chummer.Run.Contracts.csproj" />
