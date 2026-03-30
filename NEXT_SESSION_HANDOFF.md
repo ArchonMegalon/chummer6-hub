@@ -1,6 +1,18 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:13:34+02:00
+Updated: 2026-03-30T08:15:57+02:00
+
+## Handoff refresh (2026-03-30T08:15:57+02:00)
+
+- Signed-in `home/work` proof now follows the advertised deep links instead of only asserting that the cards mention them:
+  - `scripts/hub-live-audit.py` now extracts the rendered home-surface links for workspace detail, build follow-through, grounded rule answer, and publication status, then opens each route and requires the bounded detail cards to render.
+  - `scripts/e2e-hub-playwright.cjs` now captures those same `home/work` links in the browser lane and asserts they land on the expected signed-in detail surfaces before continuing through the rest of the journey.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:13:34+02:00)
 
