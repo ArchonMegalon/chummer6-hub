@@ -185,6 +185,21 @@
         string label,
         string fallback)
         => panel?.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))?.Value ?? fallback;
+
+    static bool IsDiscoverablePublicCreatorPublication(Chummer.Campaign.Contracts.CreatorPublicationProjection? publication)
+        => publication is not null
+            && publication.Discoverable
+            && string.Equals(publication.PublicationStatus, "published", StringComparison.OrdinalIgnoreCase);
+
+    static string CreatorPublicationHref(Chummer.Campaign.Contracts.CreatorPublicationProjection? publication, string publicationId)
+        => IsDiscoverablePublicCreatorPublication(publication)
+            ? $"/artifacts/creator/{Uri.EscapeDataString(publicationId)}"
+            : $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
+
+    static string CreatorPublicationLinkLabel(Chummer.Campaign.Contracts.CreatorPublicationProjection? publication)
+        => IsDiscoverablePublicCreatorPublication(publication)
+            ? "Open published creator packet"
+            : "Open publication status";
 }
 
 <section class="home-command">
@@ -676,7 +691,7 @@
                                                         }
                                                         @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry?.CreatorPublicationId))
                                                         {
-                                                            <a class="inline-link" href="@($"/account/work/publications/{Uri.EscapeDataString(leadAftermathShelfEntry.CreatorPublicationId)}")">Open publication status</a>
+                                                            <a class="inline-link" href="@CreatorPublicationHref(leadAftermathCreatorPublication, leadAftermathShelfEntry.CreatorPublicationId)">@CreatorPublicationLinkLabel(leadAftermathCreatorPublication)</a>
                                                         }
                                                     </article>
                                                 }
@@ -1008,7 +1023,7 @@
                                                             }
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="@($"/account/work/publications/{Uri.EscapeDataString(publication.PublicationId)}")">Open publication status</a>
+                                                    <a class="inline-link" href="@CreatorPublicationHref(publication, publication.PublicationId)">@CreatorPublicationLinkLabel(publication)</a>
                                                     @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
                                                     {
                                                         <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(publication.BuildHandoffId)}")">Open build path for @publication.Title</a>
