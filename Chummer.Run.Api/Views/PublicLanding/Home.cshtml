@@ -497,13 +497,16 @@
                                                             <h3>@leadFirstPlayableSession.Label</h3>
                                                             <p>
                                                                 @leadFirstPlayableSession.Summary
-                                                                <span> Start: @leadFirstPlayableSession.CampaignStartSummary</span>
+                                                                <span> Playable kickoff: @leadFirstPlayableSession.CampaignStartSummary</span>
                                                                 <span> Next: @leadFirstPlayableSession.NextSafeAction</span>
-                                                                @if (!string.IsNullOrWhiteSpace(leadFirstPlayableEvidence))
-                                                                {
-                                                                    <span> Evidence: @leadFirstPlayableEvidence</span>
-                                                                }
                                                             </p>
+                                                            <p class="muted-copy">Legal runner: @leadFirstPlayableSession.RuleReadySummary</p>
+                                                            <p class="muted-copy">Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</p>
+                                                            <p class="muted-copy">Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary</p>
+                                                            @if (!string.IsNullOrWhiteSpace(leadFirstPlayableEvidence))
+                                                            {
+                                                                <p class="muted-copy">Evidence: @leadFirstPlayableEvidence</p>
+                                                            }
                                                         </div>
                                                         <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-first-playable-session")">Open first playable session proof</a>
                                                     </article>

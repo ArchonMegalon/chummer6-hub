@@ -385,6 +385,9 @@ public sealed record FirstPlayableSessionProjection(
     string Label,
     string Summary,
     string CampaignStartSummary,
+    string RuleReadySummary,
+    string ReturnLaneSummary,
+    string CampaignReadySummary,
     string NextSafeAction,
     IReadOnlyList<string> EvidenceLines,
     DateTimeOffset UpdatedAtUtc);
