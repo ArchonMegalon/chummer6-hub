@@ -2382,6 +2382,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.Workspaces.Count >= 1, "account page should surface a first-class campaign workspace.");
     Assert(accountModel.CampaignSpine.Workspaces[0].ReadinessCues.Count >= 1, "campaign workspace should surface readiness cues.");
     Assert(accountModel.CampaignSpine.Workspaces[0].RecapShelf.Count >= 1, "campaign workspace should surface recap or publication-safe continuity outputs.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.Workspaces[0].RecapShelf[0].TrustBand), "campaign workspace should keep creator-publication trust ranking attached to the calmer recap shelf.");
+    Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.Workspaces[0].RecapShelf[0].CreatorPublicationId), "campaign workspace should keep a direct creator-publication link attached to the calmer recap shelf.");
     Assert(accountModel.CampaignSpine.Workspaces[0].Consequences?.Count >= 4, "campaign workspace should surface the governed consequence ledger directly on the shared campaign view.");
     Assert(accountModel.CampaignSpine.Workspaces[0].Consequences!.Any(item => string.Equals(item.Kind, "contact", StringComparison.Ordinal) && item.EvidenceLines.Count >= 1), "campaign workspace should keep receipt-backed contact evidence attached to the shared consequence ledger.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "campaign workspace should surface an explicit active-scene summary.");

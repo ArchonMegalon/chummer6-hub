@@ -159,6 +159,7 @@ public sealed class CampaignSpineService
             var rulesNavigator = BuildRulesNavigatorEntries(workspaces, operations);
             var migrationReceipts = BuildMigrationReceipts(dossiers, campaigns);
             var creatorPublications = BuildCreatorPublications(workspaces, dossiers, buildLabHandoffs);
+            workspaces = AttachCreatorPublicationPosture(workspaces, creatorPublications).ToArray();
 
             return new AccountCampaignSummary(
                 dossiers,
@@ -1587,10 +1588,11 @@ public sealed class CampaignSpineService
                 && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase));
         var activeSceneSummary = DescribeActiveSceneSummary(leadRun, activeScene, leadObjective);
         var nextSafeAction = ResolveWorkspaceNextSafeAction(campaign, restore, recapShelf, readinessCues, leadRun, activeScene, leadObjective);
+        var enrichedRecapShelf = EnrichWorkspaceRecapShelf(campaign, workspaceId, recapShelf, nextSafeAction);
         var firstPlayableSession = BuildFirstPlayableSession(campaign, restore, readinessCues, workspaceCrews, workspaceDossiers, leadRun, activeScene, leadObjective, nextSafeAction, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages);
         var nextSessionCarryForward = BuildNextSessionCarryForward(campaign, nextSafeAction, leadRun, activeScene, leadObjective, consequences, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages);
         var campaignMemory = BuildCampaignMemory(campaign, nextSafeAction, leadRun, activeScene, leadObjective, consequences, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages, nextSessionCarryForward);
-        var changePackets = BuildWorkspaceChangePackets(campaign, recapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages, nextSessionCarryForward);
+        var changePackets = BuildWorkspaceChangePackets(campaign, enrichedRecapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages, nextSessionCarryForward);
 
         return new CampaignWorkspaceProjection(
             WorkspaceId: workspaceId,
@@ -1601,7 +1603,7 @@ public sealed class CampaignSpineService
             Crews: workspaceCrews,
             Dossiers: workspaceDossiers,
             Runs: workspaceRuns,
-            RecapShelf: recapShelf,
+            RecapShelf: enrichedRecapShelf,
             ReadinessCues: readinessCues,
             LatestContinuity: campaign.LatestContinuity,
             ReturnSummary: campaign.LatestContinuity?.Summary ?? campaign.Summary,
@@ -2915,6 +2917,52 @@ public sealed class CampaignSpineService
             Summary: package.Summary,
             ArtifactId: package.ArtifactId);
 
+    private static IReadOnlyList<PublicationSafeProjection> EnrichWorkspaceRecapShelf(
+        CampaignProjection campaign,
+        string workspaceId,
+        IReadOnlyList<PublicationSafeProjection> recapShelf,
+        string nextSafeAction)
+    {
+        if (recapShelf.Count == 0)
+        {
+            return recapShelf;
+        }
+
+        const string publicationState = "preview_ready";
+        var (trustBand, discoverable) = BuildCreatorPublicationTrustPosture(publicationState, campaign.Visibility);
+        string creatorPublicationId = StableId("publication", workspaceId);
+        string ownershipSummary = $"Shared {campaign.Visibility.Replace('_', ' ')} creator packet stays attached to {campaign.Name}.";
+        string publicationSummary = "Preview-ready creator publication keeps recap-safe outputs reviewable before they become live.";
+
+        return recapShelf
+            .Select(item => item with
+            {
+                Audience = string.IsNullOrWhiteSpace(item.Audience)
+                    ? "campaign"
+                    : item.Audience,
+                OwnershipSummary = string.IsNullOrWhiteSpace(item.OwnershipSummary)
+                    ? ownershipSummary
+                    : item.OwnershipSummary,
+                PublicationState = string.IsNullOrWhiteSpace(item.PublicationState)
+                    ? publicationState
+                    : item.PublicationState,
+                TrustBand = string.IsNullOrWhiteSpace(item.TrustBand)
+                    ? trustBand
+                    : item.TrustBand,
+                Discoverable = item.Discoverable || discoverable,
+                PublicationSummary = string.IsNullOrWhiteSpace(item.PublicationSummary)
+                    ? publicationSummary
+                    : item.PublicationSummary,
+                CreatorPublicationId = string.IsNullOrWhiteSpace(item.CreatorPublicationId)
+                    ? creatorPublicationId
+                    : item.CreatorPublicationId,
+                NextSafeAction = string.IsNullOrWhiteSpace(item.NextSafeAction)
+                    ? nextSafeAction
+                    : item.NextSafeAction
+            })
+            .ToArray();
+    }
+
     private static string DescribeAftermathChangeLabel(string packageKind)
         => packageKind.Trim().ToLowerInvariant() switch
         {
@@ -3316,6 +3364,50 @@ public sealed class CampaignSpineService
             .ToArray();
     }
 
+    private static IReadOnlyList<CampaignWorkspaceProjection> AttachCreatorPublicationPosture(
+        IReadOnlyList<CampaignWorkspaceProjection> workspaces,
+        IReadOnlyList<CreatorPublicationProjection> creatorPublications)
+    {
+        return workspaces
+            .Select(workspace =>
+            {
+                var creatorPublication = creatorPublications
+                    .FirstOrDefault(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase));
+                if (creatorPublication is null)
+                {
+                    return workspace;
+                }
+
+                var recapShelf = workspace.RecapShelf
+                    .Select(item =>
+                    {
+                        bool creatorLinked = (!string.IsNullOrWhiteSpace(item.ArtifactId)
+                                && string.Equals(item.ArtifactId, creatorPublication.ArtifactId, StringComparison.OrdinalIgnoreCase))
+                            || SupportsCreatorShelfProjection(item);
+
+                        return item with
+                        {
+                            Audience = DescribeRecapShelfAudience(item, creatorLinked),
+                            OwnershipSummary = DescribeRecapShelfOwnershipSummary(workspace, item),
+                            PublicationState = creatorLinked
+                                ? creatorPublication.PublicationStatus
+                                : DescribeRecapShelfPublicationState(item),
+                            TrustBand = creatorLinked ? creatorPublication.TrustBand : item.TrustBand,
+                            Discoverable = creatorLinked && creatorPublication.Discoverable,
+                            PublicationSummary = DescribeRecapShelfPublicationSummary(workspace, item, creatorPublication, creatorLinked),
+                            CreatorPublicationId = creatorLinked ? creatorPublication.PublicationId : item.CreatorPublicationId,
+                            NextSafeAction = creatorLinked
+                                ? creatorPublication.NextSafeAction ?? workspace.NextSafeAction
+                                : DescribeRecapShelfNextSafeAction(workspace, item)
+                        };
+                    })
+                    .ToArray();
+
+                return workspace with { RecapShelf = recapShelf };
+            })
+            .ToArray();
+    }
+
     private static (string TrustBand, bool Discoverable) BuildCreatorPublicationTrustPosture(string publicationStatus, string visibility)
     {
         var normalizedStatus = NormalizePublicationStatus(publicationStatus);
@@ -3343,6 +3435,117 @@ public sealed class CampaignSpineService
         => string.IsNullOrWhiteSpace(publicationStatus)
             ? string.Empty
             : publicationStatus.Trim().Replace('-', '_').ToLowerInvariant();
+
+    private static bool SupportsCreatorShelfProjection(PublicationSafeProjection item)
+    {
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        return normalizedKind.Contains("recap", StringComparison.Ordinal)
+            || normalizedKind.Contains("after", StringComparison.Ordinal)
+            || normalizedKind.Contains("downtime", StringComparison.Ordinal);
+    }
+
+    private static string DescribeRecapShelfAudience(PublicationSafeProjection item, bool creatorLinked)
+    {
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (creatorLinked)
+        {
+            return normalizedKind.Contains("dossier", StringComparison.Ordinal)
+                ? "personal,campaign,creator"
+                : "campaign,creator";
+        }
+
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal)
+            || normalizedKind.Contains("campaign_recap", StringComparison.Ordinal))
+        {
+            return "personal,campaign";
+        }
+
+        return "campaign";
+    }
+
+    private static string DescribeRecapShelfOwnershipSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item)
+    {
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        {
+            return $"{workspace.CampaignName} reuses the same governed dossier artifact on the signed-in account path instead of forking a shadow copy.";
+        }
+
+        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        {
+            return $"{workspace.CampaignName} keeps this GM-facing packet on the shared campaign rail so organizer follow-through stays reviewable.";
+        }
+
+        return $"{workspace.CampaignName} keeps this recap-safe artifact pinned to the shared continuity lane for return, audit, and reuse.";
+    }
+
+    private static string DescribeRecapShelfPublicationState(PublicationSafeProjection item)
+    {
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        {
+            return "personal_ready";
+        }
+
+        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        {
+            return "campaign_ready";
+        }
+
+        return "publication_safe";
+    }
+
+    private static string DescribeRecapShelfPublicationSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item,
+        CreatorPublicationProjection creatorPublication,
+        bool creatorLinked)
+    {
+        if (creatorLinked)
+        {
+            var visibility = string.IsNullOrWhiteSpace(creatorPublication.Visibility)
+                ? "shared"
+                : creatorPublication.Visibility;
+            var nextSafeAction = string.IsNullOrWhiteSpace(creatorPublication.NextSafeAction)
+                ? "Open publication status before you widen the audience."
+                : creatorPublication.NextSafeAction!;
+            return $"{creatorPublication.Title} is already attached on the creator shelf with {visibility} visibility. {nextSafeAction}";
+        }
+
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        {
+            return $"Personal and campaign views already share this {workspace.CampaignName} artifact without requiring a second export lane.";
+        }
+
+        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        {
+            return "Campaign return and GM prep reuse the same packet before creator publication is opened.";
+        }
+
+        return "Campaign return already trusts this recap-safe artifact, and creator publication can promote the same truth without rebuilding it.";
+    }
+
+    private static string DescribeRecapShelfNextSafeAction(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item)
+    {
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        {
+            return "Keep prep, aftermath, and next-session follow-through on the shared campaign rail before you branch into another export lane.";
+        }
+
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        {
+            return "Reopen the shared campaign view before you move this runner artifact into another campaign, shelf, or publication step.";
+        }
+
+        return workspace.NextSafeAction
+            ?? "Open the shared campaign view before you widen the artifact audience or trust a second copy.";
+    }
 
     private static string DescribeCreatorPublicationSupportClosure(CampaignWorkspaceProjection workspace)
     {
