@@ -199,6 +199,31 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await assertNoBannedCopy(page, 'Landing');
   });
 
+  await gotoAndAssert(page, pageErrors, '/what-is-chummer', async () => {
+    await expectVisible(page, 'text=One product for rules truth, living dossiers, and session return.');
+    await expectVisible(page, 'text=The short answer');
+    await expectVisible(page, 'text=A Shadowrun companion with one front door');
+    await expectVisible(page, 'text=Between build truth and table continuity');
+    await expectVisible(page, 'text=Proof, release, and help stay attached');
+    await expectVisible(page, 'text=Players, GMs, and creators on one rules truth');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/what-is-chummer now link'), '/now');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/downloads"]', '/what-is-chummer downloads link'), '/downloads');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/help"]', '/what-is-chummer help link'), '/help');
+    await assertNoBannedCopy(page, '/what-is-chummer');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/participate', async () => {
+    await expectVisible(page, 'text=Choose how to participate');
+    await expectVisible(page, 'text=Public feedback');
+    await expectVisible(page, 'text=Signed-in participation');
+    await expectBodyText(page, 'Report a problem without an account, then stop there unless you want tracked follow-up.', '/participate');
+    await expectBodyText(page, 'Use the signed-in path when you want a tracked suggestion, beta follow-up, or a bounded contribution flow.', '/participate');
+    assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/contact#support-intake"]', '/participate support intake'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/login?next=/participate/codex"]', '/participate guided contribution guest handoff'), '/login?next=/participate/codex');
+    assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/signup?next=/account/settings"]', '/participate beta signup handoff'), '/signup?next=/account/settings');
+    await assertNoBannedCopy(page, '/participate');
+  });
+
   await page.goto(`${baseUrl}/home/access`, { waitUntil: 'domcontentloaded' });
   assertLoginRedirect(page, '/home/access', 'Signed-out /home/access');
   await assertNoPageErrors(page, pageErrors, 'Signed-out /home/access redirect');
