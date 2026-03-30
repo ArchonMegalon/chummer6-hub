@@ -545,6 +545,14 @@
                                                                 {
                                                                     <span> Return shelf: @leadAftermathShelfEntry.Label.</span>
                                                                     <span> Audience: @PublicSurfaceStatus.AudienceLabel(leadAftermathShelfEntry.Audience).</span>
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.OwnershipSummary))
+                                                                    {
+                                                                        <span> Ownership: @leadAftermathShelfEntry.OwnershipSummary</span>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationState))
+                                                                    {
+                                                                        <span> State: @HumanizeStatus(leadAftermathShelfEntry.PublicationState, "Ready").</span>
+                                                                    }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationSummary))
                                                                     {
                                                                         <span> Publication: @leadAftermathShelfEntry.PublicationSummary</span>
