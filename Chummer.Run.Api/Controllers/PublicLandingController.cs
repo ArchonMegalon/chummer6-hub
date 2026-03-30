@@ -303,6 +303,7 @@ public sealed class PublicLandingController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var signedInArtifactView = NormalizeSignedInArtifactView(Request.Query["view"].ToString());
         IReadOnlyList<RecapShelfEntry> signedInRecapShelf = Array.Empty<RecapShelfEntry>();
         IReadOnlyList<CreatorPublicationProjection> signedInCreatorPublications = Array.Empty<CreatorPublicationProjection>();
         var subject = await TryGetOptionalPublicSurfaceSubjectAsync("/artifacts", cancellationToken);
@@ -311,11 +312,16 @@ public sealed class PublicLandingController : Controller
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
-            signedInRecapShelf = BuildSignedInArtifactShelfEntries(user, campaignSpine, installLinking);
-            signedInCreatorPublications = campaignSpine.CreatorPublications
+            signedInRecapShelf = FilterSignedInArtifactShelfEntries(
+                MergeSignedInArtifactShelfEntries(
+                    BuildSignedInArtifactShelfEntries(user, campaignSpine, installLinking),
+                    BuildSignedInPersonalArtifactShelfEntries(campaignSpine)),
+                signedInArtifactView);
+            signedInCreatorPublications = FilterSignedInCreatorPublications(
+                campaignSpine.CreatorPublications
                 .OrderByDescending(static item => item.UpdatedAtUtc)
-                .Take(3)
-                .ToArray();
+                .ToArray(),
+                signedInArtifactView);
         }
         var model = new ShelfPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Artifacts", "Proof surfaces, briefs, and grounded outputs connected to the current preview.", "/artifacts", cancellationToken),
@@ -328,7 +334,8 @@ public sealed class PublicLandingController : Controller
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
             SignedInRecapShelf: signedInRecapShelf,
-            SignedInCreatorPublications: signedInCreatorPublications);
+            SignedInCreatorPublications: signedInCreatorPublications,
+            SignedInArtifactView: signedInArtifactView);
         return View("~/Views/PublicLanding/Shelf.cshtml", model);
     }
 
@@ -737,8 +744,76 @@ public sealed class PublicLandingController : Controller
             .SelectMany(static workspace => workspace!.RecapShelf)
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .Where(item => seen.Add(BuildArtifactShelfDedupeKey(item)))
-            .Take(4)
             .ToArray();
+    }
+
+    private static IReadOnlyList<RecapShelfEntry> BuildSignedInPersonalArtifactShelfEntries(AccountCampaignSummary campaignSpine)
+    {
+        var campaignsById = campaignSpine.Campaigns.ToDictionary(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase);
+        return campaignSpine.Dossiers
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .Take(6)
+            .Select(dossier =>
+            {
+                campaignsById.TryGetValue(dossier.CampaignId ?? string.Empty, out CampaignProjection? campaign);
+                string campaignName = campaign?.Name ?? "your account";
+                string continuitySummary = string.IsNullOrWhiteSpace(dossier.LatestContinuity?.Summary)
+                    ? $"{campaignName} can reopen this runner from the same governed dossier artifact."
+                    : dossier.LatestContinuity!.Summary;
+                return new RecapShelfEntry(
+                    EntryId: $"dossier:{dossier.DossierId}",
+                    Kind: "dossier_projection",
+                    Label: $"{dossier.DisplayName} dossier",
+                    Summary: continuitySummary,
+                    ArtifactId: dossier.DossierId,
+                    UpdatedAtUtc: dossier.UpdatedAtUtc,
+                    Audience: "personal,campaign",
+                    OwnershipSummary: $"{campaignName} reuses the same governed dossier artifact on the signed-in account path instead of forking a shadow copy.",
+                    PublicationState: "personal_ready",
+                    TrustBand: null,
+                    Discoverable: false,
+                    PublicationSummary: $"Personal and campaign views already share this {campaignName} artifact without requiring a second export lane.",
+                    CreatorPublicationId: null,
+                    NextSafeAction: "Reopen the shared campaign view before you move this runner artifact into another campaign, shelf, or publication step.");
+            })
+            .ToArray();
+    }
+
+    private static IReadOnlyList<RecapShelfEntry> MergeSignedInArtifactShelfEntries(
+        params IReadOnlyList<RecapShelfEntry>[] shelves)
+    {
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        return shelves
+            .SelectMany(static item => item)
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .Where(item => seen.Add(BuildArtifactShelfDedupeKey(item)))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<RecapShelfEntry> FilterSignedInArtifactShelfEntries(
+        IReadOnlyList<RecapShelfEntry> items,
+        string signedInArtifactView)
+    {
+        if (string.Equals(signedInArtifactView, "all", StringComparison.Ordinal))
+        {
+            return items;
+        }
+
+        return items
+            .Where(item => MatchesSignedInArtifactView(item, signedInArtifactView))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<CreatorPublicationProjection> FilterSignedInCreatorPublications(
+        IReadOnlyList<CreatorPublicationProjection> items,
+        string signedInArtifactView)
+    {
+        return signedInArtifactView switch
+        {
+            "all" => items,
+            "creator" => items,
+            _ => Array.Empty<CreatorPublicationProjection>()
+        };
     }
 
     private static string BuildArtifactShelfDedupeKey(RecapShelfEntry item)
@@ -754,6 +829,41 @@ public sealed class PublicLandingController : Controller
         }
 
         return $"entry:{item.EntryId}";
+    }
+
+    private static string NormalizeSignedInArtifactView(string? rawView)
+        => string.IsNullOrWhiteSpace(rawView)
+            ? "all"
+            : rawView.Trim().ToLowerInvariant() switch
+            {
+                "all" => "all",
+                "personal" => "personal",
+                "campaign" => "campaign",
+                "creator" => "creator",
+                _ => "all"
+            };
+
+    private static bool MatchesSignedInArtifactView(RecapShelfEntry item, string signedInArtifactView)
+    {
+        if (string.Equals(signedInArtifactView, "creator", StringComparison.Ordinal))
+        {
+            return AudienceContains(item.Audience, "creator")
+                || !string.IsNullOrWhiteSpace(item.CreatorPublicationId);
+        }
+
+        return AudienceContains(item.Audience, signedInArtifactView);
+    }
+
+    private static bool AudienceContains(string? audience, string needle)
+    {
+        if (string.IsNullOrWhiteSpace(audience))
+        {
+            return false;
+        }
+
+        return audience
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(token => string.Equals(token, needle, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string NormalizeHomeSection(string? section)

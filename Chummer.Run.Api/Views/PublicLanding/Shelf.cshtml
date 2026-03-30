@@ -5,6 +5,7 @@
     ViewData["Chrome"] = Model.Chrome;
     var liveItems = Model.Items.Where(card => PublicSurfaceStatus.IsAvailableToday(card.Card.Badge)).ToArray();
     var previewItems = Model.Items.Except(liveItems).ToArray();
+    var selectedSignedInArtifactView = Model.SignedInArtifactView;
     var signedInRecapShelf = Model.SignedInRecapShelf is { Count: > 0 }
         ? Model.SignedInRecapShelf.Take(4).ToArray()
         : Array.Empty<RecapShelfEntry>();
@@ -39,6 +40,24 @@
 
     static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
+    static string ArtifactViewHref(string view)
+        => string.Equals(view, "all", StringComparison.Ordinal)
+            ? "/artifacts#linked-artifacts"
+            : $"/artifacts?view={Uri.EscapeDataString(view)}#linked-artifacts";
+    static string ArtifactViewTitle(string view) => view switch
+    {
+        "personal" => "Personal view",
+        "campaign" => "Campaign view",
+        "creator" => "Creator view",
+        _ => "All views"
+    };
+    static string ArtifactViewSummary(string view) => view switch
+    {
+        "personal" => "Keep the account-side runner and return artifacts visible without losing the shared record they already ride on.",
+        "campaign" => "Stay on the shared crew and continuity rail for campaign-owned artifacts, prep packets, and recap-safe follow-through.",
+        "creator" => "Inspect only the creator-linked lineage, trust ranking, discoverability, and next-step posture for published or publication-ready artifacts.",
+        _ => "When you are signed in, the artifact shelf keeps your live recap outputs and any linked creator publication on the same governed record instead of splitting them into separate artifact stories."
+    };
 }
 
 @if (Model.SignedInStatus is not null)
@@ -70,10 +89,18 @@
     @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
     @if (Model.Chrome.Authenticated && (signedInRecapShelf.Length > 0 || signedInCreatorPublications.Length > 0))
     {
+        var selectedArtifactViewTitle = ArtifactViewTitle(selectedSignedInArtifactView);
         <div class="editorial-block__lead" id="linked-artifacts">
             <p class="eyebrow">Signed-in artifact views</p>
-            <h2 class="editorial-title">The same artifact truth across personal, campaign, and creator rails</h2>
-            <p class="editorial-copy">When you are signed in, the artifact shelf keeps your live recap outputs and any linked creator publication on the same governed record instead of splitting them into separate artifact stories.</p>
+            <h2 class="editorial-title">@selectedArtifactViewTitle</h2>
+            <p class="editorial-copy">@ArtifactViewSummary(selectedSignedInArtifactView)</p>
+        </div>
+        <div class="stacked-actions">
+            @foreach (var view in new[] { "all", "personal", "campaign", "creator" })
+            {
+                var selected = string.Equals(selectedSignedInArtifactView, view, StringComparison.Ordinal);
+                <a class="button-like @(selected ? "button-like--primary" : "button-like--ghost")" href="@ArtifactViewHref(view)">@ArtifactViewTitle(view)</a>
+            }
         </div>
         <div class="shelf-stack">
             @foreach (var item in signedInRecapShelf)
@@ -176,6 +203,10 @@
                 </article>
             }
         </div>
+        @if (signedInRecapShelf.Length == 0 && signedInCreatorPublications.Length == 0)
+        {
+            <p class="muted-copy">No signed-in artifacts are mirrored into the @selectedArtifactViewTitle.ToLowerInvariant() yet.</p>
+        }
     }
     @if (liveItems.Length > 0)
     {

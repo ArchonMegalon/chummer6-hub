@@ -179,7 +179,8 @@ public sealed record ShelfPageViewModel(
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null,
     IReadOnlyList<RecapShelfEntry>? SignedInRecapShelf = null,
-    IReadOnlyList<CreatorPublicationProjection>? SignedInCreatorPublications = null);
+    IReadOnlyList<CreatorPublicationProjection>? SignedInCreatorPublications = null,
+    string SignedInArtifactView = "all");
 
 public sealed record DownloadsPageViewModel(
     SiteChromeViewModel Chrome,
