@@ -14,6 +14,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection Workspace,
         CampaignWorkspaceDigestProjection? Digest,
         WorkspaceRestoreProjection Restore,
+        CreatorPublicationProjection? CreatorPublication,
         RunProjection? LeadRun,
         IReadOnlyList<SupportCaseDigestViewModel> SupportDigests,
         DateTimeOffset GeneratedAtUtc);
@@ -98,7 +99,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             RuleEnvironmentHealth: ruleEnvironmentHealth,
             Runboard: BuildRunboardSummary(context.Workspace, context.LeadRun),
             ContinuityConflicts: continuityConflicts,
-            RecapShelf: BuildRecapShelf(context.Workspace),
+            RecapShelf: BuildRecapShelf(context.Workspace, context.CreatorPublication),
             SupportClosures: supportClosures,
             KnownIssues: knownIssues,
             DecisionNotices: decisionNotices,
@@ -258,6 +259,13 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
+        CreatorPublicationProjection? creatorPublication = accountSummary.CreatorPublications
+            .Where(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrWhiteSpace(item.ArtifactId)
+                    && workspace.RecapShelf.Any(recap => string.Equals(recap.ArtifactId, item.ArtifactId, StringComparison.OrdinalIgnoreCase))))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+
         CampaignWorkspaceDigestProjection? digest = _campaignSpine.GetWorkspaceDigests(user, installLinking)
             .FirstOrDefault(item => string.Equals(item.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase));
         RunProjection? leadRun = workspace.Runs
@@ -278,6 +286,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 workspace.TravelPrefetches?.FirstOrDefault()?.StagedAtUtc,
                 workspace.AftermathPackages?.FirstOrDefault()?.GeneratedAtUtc,
                 workspace.NextSessionCarryForward?.UpdatedAtUtc,
+                creatorPublication?.UpdatedAtUtc,
                 leadRun?.UpdatedAtUtc
             }
             .Concat(relevantCases.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
@@ -290,6 +299,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             Workspace: workspace,
             Digest: digest,
             Restore: accountSummary.Restore,
+            CreatorPublication: creatorPublication,
             LeadRun: leadRun,
             SupportDigests: supportDigests,
             GeneratedAtUtc: generatedAtUtc);
@@ -638,23 +648,153 @@ public sealed class CampaignWorkspaceServerPlaneService
         return cues.Take(6).ToArray();
     }
 
-    private static IReadOnlyList<RecapShelfEntry> BuildRecapShelf(CampaignWorkspaceProjection workspace)
+    private static IReadOnlyList<RecapShelfEntry> BuildRecapShelf(
+        CampaignWorkspaceProjection workspace,
+        CreatorPublicationProjection? creatorPublication)
     {
         Dictionary<string, DateTimeOffset> aftermathTimes = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
             .ToDictionary(static item => item.PackageId, static item => item.GeneratedAtUtc, StringComparer.OrdinalIgnoreCase);
         DateTimeOffset defaultUpdatedAtUtc = workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow;
         return workspace.RecapShelf
             .Take(6)
-            .Select(item => new RecapShelfEntry(
-                EntryId: item.ProjectionId,
-                Kind: item.Kind,
-                Label: item.Label,
-                Summary: item.Summary,
-                ArtifactId: item.ArtifactId,
-                UpdatedAtUtc: aftermathTimes.TryGetValue(item.ProjectionId, out DateTimeOffset updatedAtUtc)
-                    ? updatedAtUtc
-                    : defaultUpdatedAtUtc))
+            .Select(item =>
+            {
+                bool creatorLinked = creatorPublication is not null
+                    && (!string.IsNullOrWhiteSpace(item.ArtifactId)
+                        && string.Equals(item.ArtifactId, creatorPublication.ArtifactId, StringComparison.OrdinalIgnoreCase)
+                        || SupportsCreatorShelfProjection(item));
+                return new RecapShelfEntry(
+                    EntryId: item.ProjectionId,
+                    Kind: item.Kind,
+                    Label: item.Label,
+                    Summary: item.Summary,
+                    ArtifactId: item.ArtifactId,
+                    UpdatedAtUtc: aftermathTimes.TryGetValue(item.ProjectionId, out DateTimeOffset updatedAtUtc)
+                        ? updatedAtUtc
+                        : defaultUpdatedAtUtc,
+                    Audience: DescribeRecapShelfAudience(item, creatorLinked),
+                    OwnershipSummary: DescribeRecapShelfOwnershipSummary(workspace, item),
+                    PublicationState: creatorLinked
+                        ? creatorPublication!.PublicationStatus
+                        : DescribeRecapShelfPublicationState(item),
+                    PublicationSummary: DescribeRecapShelfPublicationSummary(workspace, item, creatorPublication, creatorLinked),
+                    CreatorPublicationId: creatorLinked ? creatorPublication!.PublicationId : null,
+                    NextSafeAction: creatorLinked
+                        ? creatorPublication!.NextSafeAction ?? workspace.NextSafeAction
+                        : DescribeRecapShelfNextSafeAction(workspace, item));
+            })
             .ToArray();
+    }
+
+    private static bool SupportsCreatorShelfProjection(PublicationSafeProjection item)
+    {
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        return normalizedKind.Contains("recap", StringComparison.Ordinal)
+            || normalizedKind.Contains("after", StringComparison.Ordinal)
+            || normalizedKind.Contains("downtime", StringComparison.Ordinal);
+    }
+
+    private static string DescribeRecapShelfAudience(PublicationSafeProjection item, bool creatorLinked)
+    {
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (creatorLinked)
+        {
+            return normalizedKind.Contains("dossier", StringComparison.Ordinal)
+                ? "personal,campaign,creator"
+                : "campaign,creator";
+        }
+
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal)
+            || normalizedKind.Contains("campaign_recap", StringComparison.Ordinal))
+        {
+            return "personal,campaign";
+        }
+
+        return "campaign";
+    }
+
+    private static string DescribeRecapShelfOwnershipSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item)
+    {
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        {
+            return $"{workspace.CampaignName} reuses the same governed dossier artifact on the signed-in account path instead of forking a shadow copy.";
+        }
+
+        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        {
+            return $"{workspace.CampaignName} keeps this GM-facing packet on the shared campaign rail so organizer follow-through stays reviewable.";
+        }
+
+        return $"{workspace.CampaignName} keeps this recap-safe artifact pinned to the shared continuity lane for return, audit, and reuse.";
+    }
+
+    private static string DescribeRecapShelfPublicationState(PublicationSafeProjection item)
+    {
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        {
+            return "personal_ready";
+        }
+
+        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        {
+            return "campaign_ready";
+        }
+
+        return "publication_safe";
+    }
+
+    private static string DescribeRecapShelfPublicationSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item,
+        CreatorPublicationProjection? creatorPublication,
+        bool creatorLinked)
+    {
+        if (creatorLinked && creatorPublication is not null)
+        {
+            var visibility = string.IsNullOrWhiteSpace(creatorPublication.Visibility)
+                ? "shared"
+                : creatorPublication.Visibility;
+            var nextSafeAction = string.IsNullOrWhiteSpace(creatorPublication.NextSafeAction)
+                ? "Open publication status before you widen the audience."
+                : creatorPublication.NextSafeAction!;
+            return $"{creatorPublication.Title} is already attached on the creator shelf with {visibility} visibility. {nextSafeAction}";
+        }
+
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        {
+            return $"Personal and campaign views already share this {workspace.CampaignName} artifact without requiring a second export lane.";
+        }
+
+        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        {
+            return "Campaign return and GM prep reuse the same packet before creator publication is opened.";
+        }
+
+        return "Campaign return already trusts this recap-safe artifact, and creator publication can promote the same truth without rebuilding it.";
+    }
+
+    private static string DescribeRecapShelfNextSafeAction(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item)
+    {
+        var normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        {
+            return "Keep prep, aftermath, and next-session follow-through on the shared campaign rail before you branch into another export lane.";
+        }
+
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        {
+            return "Reopen the shared campaign view before you move this runner artifact into another campaign, shelf, or publication step.";
+        }
+
+        return workspace.NextSafeAction
+            ?? "Open the shared campaign view before you widen the artifact audience or trust a second copy.";
     }
 
     private static IReadOnlyList<SupportClosureCue> BuildSupportClosures(IReadOnlyList<SupportCaseDigestViewModel> digests)
