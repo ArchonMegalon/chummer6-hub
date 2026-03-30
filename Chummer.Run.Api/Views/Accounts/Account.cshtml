@@ -1514,6 +1514,9 @@
                                         <ul class="muted-copy">
                                             @foreach (var item in selectedWorkspaceServerPlane.RecapShelf)
                                             {
+                                                var linkedPublication = !string.IsNullOrWhiteSpace(item.CreatorPublicationId)
+                                                    ? Model.CampaignSpine.CreatorPublications.FirstOrDefault(publication => string.Equals(publication.PublicationId, item.CreatorPublicationId, StringComparison.OrdinalIgnoreCase))
+                                                    : null;
                                                 <li>
                                                     <strong>@item.Label</strong>: @item.Summary
                                                     <span> Audience: @PublicSurfaceStatus.AudienceLabel(item.Audience).</span>
@@ -1533,6 +1536,10 @@
                                                     @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
                                                     {
                                                         <span> @item.PublicationSummary</span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
+                                                    {
+                                                        <span> Lineage: @linkedPublication.LineageSummary</span>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
                                                     {
@@ -2074,6 +2081,9 @@
                                     <ul class="muted-copy">
                                         @foreach (var item in workspace.RecapShelf)
                                         {
+                                            var linkedPublication = !string.IsNullOrWhiteSpace(item.CreatorPublicationId)
+                                                ? Model.CampaignSpine.CreatorPublications.FirstOrDefault(publication => string.Equals(publication.PublicationId, item.CreatorPublicationId, StringComparison.OrdinalIgnoreCase))
+                                                : null;
                                             <li>
                                                 <strong>@item.Label</strong>: @item.Summary
                                                 <span> Audience: @PublicSurfaceStatus.AudienceLabel(item.Audience).</span>
@@ -2093,6 +2103,10 @@
                                                 @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
                                                 {
                                                     <span> @item.PublicationSummary</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
+                                                {
+                                                    <span> Lineage: @linkedPublication.LineageSummary</span>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
                                                 {

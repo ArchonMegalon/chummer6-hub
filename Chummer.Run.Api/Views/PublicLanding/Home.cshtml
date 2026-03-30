@@ -66,6 +66,9 @@
     var leadAftermathShelfEntry = leadWorkspaceServerPlane?.RecapShelf
         .FirstOrDefault(item => string.Equals(item.EntryId, leadAftermathPackage?.PackageId, StringComparison.OrdinalIgnoreCase))
         ?? leadWorkspaceServerPlane?.RecapShelf.FirstOrDefault();
+    var leadAftermathCreatorPublication = !string.IsNullOrWhiteSpace(leadAftermathShelfEntry?.CreatorPublicationId)
+        ? Model.CampaignSpine.CreatorPublications.FirstOrDefault(publication => string.Equals(publication.PublicationId, leadAftermathShelfEntry.CreatorPublicationId, StringComparison.OrdinalIgnoreCase))
+        : null;
     var leadAftermathEvidence = leadAftermathPackage?.EvidenceLines.FirstOrDefault();
     var leadDowntimeEvidence = leadDowntimePackage?.EvidenceLines.FirstOrDefault();
     var leadCampaignMemory = leadWorkspaceServerPlane?.CampaignMemory;
@@ -570,6 +573,10 @@
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationSummary))
                                                                     {
                                                                         <span> Publication: @leadAftermathShelfEntry.PublicationSummary</span>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.LineageSummary))
+                                                                    {
+                                                                        <span> Lineage: @leadAftermathCreatorPublication.LineageSummary</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.NextSafeAction))
                                                                     {
