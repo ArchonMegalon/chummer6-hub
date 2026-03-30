@@ -1,6 +1,22 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T09:54:53+02:00
+Updated: 2026-03-30T10:06:34+02:00
+
+## Handoff refresh (2026-03-30T10:06:34+02:00)
+
+- Signed-in profile and publication follow-through are now materially deeper and the publication deep-link instability is fixed:
+  - `scripts/hub-live-audit.py` now treats `/account` as a release-blocking signed-in surface (`Display name`, `Handle`, `Timezone`, `Save profile`, `Primary sign-in`, `Recovery email`, `Start verification`) and it now requires creator-publication detail routes reached from both `home/work` and `account/work` to render the richer `Trust ranking` and `Discoverable now` rows.
+  - `scripts/e2e-hub-playwright.cjs` now saves the signed-in profile with new values and proves they survive reload, opens the recovery-email drawer, completes the local preview verification round trip, and then requires `/account/advanced` to reflect the additional linked identity. The browser lane also now treats the creator-publication detail routes as release-blocking on the new trust/discoverability rows.
+  - `Chummer.Campaign.Contracts/CampaignContracts.cs`, `Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs`, and `tests/RunServicesSmoke/Program.cs` now carry/lock `TrustBand` and `Discoverable` on recap-shelf entries so the shared home/work creator shelf can project the same trust posture into smoke and runtime proof.
+  - `Chummer.Run.Api/Services/Community/CampaignSpineService.cs` no longer truncates creator-publication projections to the first three workspaces. That fixes the real runtime bug where workspace recap-shelf deep links could point at a publication that disappeared on the next request, which was why the selected publication detail route kept falling back out of the richer detail card.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build`
+  - `bash scripts/run_smoke.sh`
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "RunServicesSmoke"` (build/test discovery completed cleanly; the filter matched no individual test cases in `Chummer.Tests`)
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T09:54:53+02:00)
 
