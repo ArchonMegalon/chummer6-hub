@@ -309,6 +309,7 @@ public sealed record SupportSubmittedPageViewModel(
     IReadOnlyList<TrustPageActionViewModel> Actions,
     IReadOnlyList<SupportCaseAttachmentProjection> Attachments,
     SupportCasePresentationViewModel? TrackedCaseSummary = null,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record TrustPageViewModel(

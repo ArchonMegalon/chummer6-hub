@@ -34,6 +34,11 @@
     @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
 }
 
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
         <p class="eyebrow">What happens next</p>
