@@ -418,6 +418,7 @@ public sealed class PublicLandingController : Controller
             Actions: actions,
             Attachments: trackedCase?.Attachments ?? Array.Empty<SupportCaseAttachmentProjection>(),
             TrackedCaseSummary: trackedCase is null ? null : _supportPresentation.Build(trackedCase),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience)));
     }
 

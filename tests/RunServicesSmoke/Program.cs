@@ -1788,6 +1788,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
     Assert(!supportSubmittedSource.Contains("signed-in shell", StringComparison.Ordinal), "support confirmation should avoid signed-in shell wording.");
     Assert(supportSubmittedSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared signed-in trust panel instead of inventing a confirmation-only trust surface.");
+    Assert(supportSubmittedSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
     Assert(supportSubmittedSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "support confirmation should surface who-can-get-it-now posture directly on the confirmation rail.");
     Assert(supportSubmittedSource.Contains("@Model.TrackedCaseSummary.InstallReadinessSummary", StringComparison.Ordinal), "support confirmation should surface the linked-install readiness summary directly from the tracked case.");
     Assert(supportSubmittedSource.Contains("@Model.TrackedCaseSummary.VerificationSummary", StringComparison.Ordinal), "support confirmation should surface fix-verification guidance directly from the tracked case.");
@@ -3059,6 +3060,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(contactSubmittedModel.TrackedCaseSummary is not null && contactSubmittedModel.TrackedCaseSummary.NextSafeAction.Contains("Update", StringComparison.OrdinalIgnoreCase), "contact confirmation should keep the next safe support action visible for signed-in reporters.");
     Assert(contactSubmittedModel.TrackedCaseSummary!.FollowUpLaneSummary.Contains("Account > Support", StringComparison.Ordinal), "contact confirmation should surface the signed-in follow-up lane.");
     Assert(contactSubmittedModel.TrackedCaseSummary.AffectedInstallSummary?.Contains("install-smoke-001", StringComparison.Ordinal) == true, "contact confirmation should keep the affected install attached to the tracked case.");
+    Assert(contactSubmittedModel.TrustPulse is not null, "contact confirmation should keep the weekly public trust pulse visible after support intake.");
     Assert(contactSubmittedModel.SignedInStatus is not null, "contact confirmation should keep the shared signed-in trust status visible after support intake.");
     Assert(contactSubmittedModel.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "contact confirmation should keep the signed-in access posture attached to the submitted case.");
     Assert(authenticatedHomeModel.CampaignSpine.RulesNavigator.Count >= 1, "signed-in home should surface grounded rules navigator answers.");
