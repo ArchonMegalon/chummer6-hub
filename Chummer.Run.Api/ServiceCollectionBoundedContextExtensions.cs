@@ -2,6 +2,7 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
+using Chummer.Run.Registry.Services;
 
 namespace Chummer.Run.Api;
 
@@ -45,6 +46,7 @@ internal static class ServiceCollectionBoundedContextExtensions
     public static IServiceCollection AddHubCampaignSpineContext(this IServiceCollection services)
     {
         services.AddSingleton<WorkspaceLifecyclePolicyService>();
+        services.AddSingleton<IHubPublicationDraftService, HubPublicationDraftService>();
         services.AddSingleton<CampaignArtifactRegistryBridge>();
         services.AddSingleton<CreatorPublicationRegistryBridge>();
         services.AddSingleton<CampaignSpineService>();
