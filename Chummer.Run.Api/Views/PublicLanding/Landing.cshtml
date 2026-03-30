@@ -28,6 +28,7 @@
     var trustPulseRecommended = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Recommended now", StringComparison.Ordinal));
     var trustPulseAccess = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal));
     var trustPulseRelease = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Release proof", StringComparison.Ordinal));
+    var trustPulseLaunchReadiness = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal));
     var trustPulseAdoption = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal));
     var trustPulseCaution = trustPulse?.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal));
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
@@ -117,6 +118,10 @@
         @if (trustPulseRelease is not null)
         {
             <p><strong>@trustPulseRelease.Label:</strong> @trustPulseRelease.Value</p>
+        }
+        @if (trustPulseLaunchReadiness is not null)
+        {
+            <p><strong>@trustPulseLaunchReadiness.Label:</strong> @trustPulseLaunchReadiness.Value</p>
         }
         @if (trustPulseAdoption is not null)
         {
