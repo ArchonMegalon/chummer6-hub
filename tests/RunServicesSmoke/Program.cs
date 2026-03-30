@@ -1966,6 +1966,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var downloadsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"));
     var publicLandingControllerSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
     var featureDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml"));
+    var liveProofDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailLiveProof.cshtml"));
+    var previewDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailPreviewConcept.cshtml"));
     var roadmapDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailRoadmap.cshtml"));
     Assert(downloadsSource.Contains("Advanced download options", StringComparison.Ordinal), "downloads should group advanced distribution paths under one calmer disclosure.");
     Assert(!downloadsSource.Contains("What changed and what to expect", StringComparison.Ordinal), "downloads should not carry a second release explainer block under the primary install path.");
@@ -1982,6 +1984,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!publicLandingControllerSource.Contains("signed-in shell", StringComparison.Ordinal), "controller-built landing and support copy should avoid signed-in shell wording on customer-facing routes.");
     Assert(!featureDetailSource.Contains("story-guide-tail", StringComparison.Ordinal), "detail-family pages should not end with one generic shared tail after the family-specific sections.");
     Assert(!featureDetailSource.Contains("Get help with this surface", StringComparison.Ordinal), "detail-family pages should keep next-step help inside the family-specific route blocks.");
+    Assert(liveProofDetailSource.Contains("Model.Chrome.Authenticated", StringComparison.Ordinal), "live proof detail should conditionally surface signed-in artifact continuity instead of treating all visitors the same.");
+    Assert(previewDetailSource.Contains("/artifacts#linked-artifacts", StringComparison.Ordinal), "preview concept detail should point signed-in users back to the signed-in artifact shelf.");
+    Assert(roadmapDetailSource.Contains("/artifacts#linked-artifacts", StringComparison.Ordinal), "roadmap detail should point signed-in users back to the signed-in artifact shelf.");
     Assert(featureDetailSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "feature detail should reuse the shared signed-in trust panel instead of inventing a detail-only trust surface.");
     Assert(featureDetailSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "feature detail should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
     Assert(!roadmapDetailSource.Contains("Audience impact", StringComparison.Ordinal), "roadmap detail should not repeat audience copy once the fact rail already states who should follow it.");

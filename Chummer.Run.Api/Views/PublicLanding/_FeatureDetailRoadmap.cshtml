@@ -71,4 +71,14 @@
         </div>
         <a class="inline-link" href="/contact#support-intake">Open support</a>
     </article>
+    @if (Model.Chrome.Authenticated)
+    {
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>Compare against your signed-in artifact shelf</h3>
+                <p>Use the signed-in artifact shelf to compare this horizon with the same governed recap and creator-publication record you already have on your account.</p>
+            </div>
+            <a class="inline-link" href="/artifacts#linked-artifacts">Open signed-in artifact shelf</a>
+        </article>
+    }
 </section>
