@@ -869,6 +869,10 @@
                                                         </p>
                                                     </div>
                                                     <a class="inline-link" href="@($"/account/work/publications/{Uri.EscapeDataString(publication.PublicationId)}")">Open publication status</a>
+                                                    @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
+                                                    {
+                                                        <a class="inline-link" href="@($"/account/work/build-handoffs/{Uri.EscapeDataString(publication.BuildHandoffId)}")">Open build path for @publication.Title</a>
+                                                    }
                                                 </article>
                                             }
                                             @if (restoreDevices.Length > 0)

@@ -1679,6 +1679,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@publication.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface creator-publication return truth directly from the shared projection.");
     Assert(homeSource.Contains("@publication.SupportClosureSummary", StringComparison.Ordinal), "home work should surface creator-publication support closure directly from the shared projection.");
     Assert(homeSource.Contains("Open publication status", StringComparison.Ordinal), "home work should keep a direct route into publication status.");
+    Assert(homeSource.Contains("Open build path for @publication.Title", StringComparison.Ordinal), "home work should keep a title-specific route from publication status back into the related build follow-through.");
     Assert(homeSource.Contains("/account/work/publications/", StringComparison.Ordinal), "home work should deep-link publication follow-through into the signed-in work detail route.");
     Assert(homeSource.Contains("Device return", StringComparison.Ordinal), "home work should surface the calmer device-return card for claimed-device continuity.");
     Assert(homeSource.Contains("Open device return", StringComparison.Ordinal), "home work should keep a direct route into the device-return lane when claimed-device continuity already exists.");
