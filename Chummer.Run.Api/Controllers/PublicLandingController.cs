@@ -736,6 +736,7 @@ public sealed class PublicLandingController : Controller
         {
             PrivacyBoundary = _privacyBoundaries.BuildPanel("contact"),
             TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
             SupportIntake = BuildSupportIntakeModel(
                 authenticated: chrome.Authenticated,
                 submissionNotice: null,
