@@ -1616,6 +1616,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@leadDowntimeEvidence", StringComparison.Ordinal), "home work should surface one bounded downtime evidence line on the signed-in home route.");
     Assert(homeSource.Contains("Open downtime brief", StringComparison.Ordinal), "home work should keep a direct route into the downtime brief detail.");
     Assert(homeSource.Contains("PublicSurfaceStatus.AudienceLabel(leadAftermathShelfEntry.Audience)", StringComparison.Ordinal), "home work should humanize artifact shelf audience directly on the aftermath card.");
+    Assert(homeSource.Contains("@leadAftermathShelfEntry.OwnershipSummary", StringComparison.Ordinal), "home work should surface artifact shelf ownership posture directly on the aftermath card.");
+    Assert(homeSource.Contains("HumanizeStatus(leadAftermathShelfEntry.PublicationState, \"Ready\")", StringComparison.Ordinal), "home work should humanize artifact publication state directly on the aftermath card.");
     Assert(homeSource.Contains("@leadAftermathShelfEntry.PublicationSummary", StringComparison.Ordinal), "home work should surface artifact publication posture directly from the recap-shelf projection on the aftermath card.");
     Assert(homeSource.Contains("@leadAftermathShelfEntry.NextSafeAction", StringComparison.Ordinal), "home work should surface the next artifact-shelf step directly from the recap-shelf projection on the aftermath card.");
     Assert(homeSource.Contains("Roster move", StringComparison.Ordinal), "home work should surface a dedicated roster-move card instead of collapsing operator actions into one-line campaign summaries.");
@@ -3423,11 +3425,13 @@ void VerifyRegistryControllerHardening()
     Assert(searchPayload?.Items[0].TrustTier == ArtifactTrustTiers.LocalOnly, "registry search should surface artifact trust tier");
     Assert(searchPayload?.Items[0].ShelfAudience == "owner-only", "local-only artifacts should project owner-only shelf posture");
     Assert(searchPayload?.Items[0].ShelfSummary?.Contains("owner-controlled", StringComparison.OrdinalIgnoreCase) == true, "registry search should explain owner-only shelf posture");
+    Assert(searchPayload?.Items[0].ShelfOwnershipSummary?.Contains("originating account or install", StringComparison.OrdinalIgnoreCase) == true, "registry search should explain owner-only ownership posture");
 
     var preview = controller.GetPreview(created!.Id).Result as OkObjectResult;
     var previewPayload = preview?.Value as RegistryPreviewResponse;
     Assert(previewPayload?.ShelfAudience == "owner-only", "registry preview should project owner-only shelf posture");
     Assert(previewPayload?.ShelfSummary?.Contains("owner-controlled", StringComparison.OrdinalIgnoreCase) == true, "registry preview should explain owner-only shelf posture");
+    Assert(previewPayload?.ShelfOwnershipSummary?.Contains("originating account or install", StringComparison.OrdinalIgnoreCase) == true, "registry preview should explain owner-only ownership posture");
 
     var submitted = workflow.Submit(new PublicationSubmissionRequest(
         ArtifactId: created.Id,
@@ -3450,6 +3454,18 @@ void VerifyRegistryControllerHardening()
         new PublicationModerationRequest("controller.moderator", "deprecate", Reason: "controller replacement path"),
         published.ConcurrencyToken).Publication;
     Assert(deprecated is not null, "registry controller hardening should be able to deprecate the published artifact");
+
+    var publishedSearch = controller.SearchArtifacts(query: "Projection", kind: "RuntimeBundle", state: "Active", page: 1, pageSize: 10).Result as OkObjectResult;
+    var publishedSearchPayload = publishedSearch?.Value as RegistrySearchResponse;
+    Assert(publishedSearchPayload?.Items[0].LatestPublicationState == PublicationState.Deprecated.ToString(), "registry search should surface the latest publication state");
+    Assert(publishedSearchPayload?.Items[0].PublicationTrustBand == "replacement-advised", "registry search should surface the latest publication trust band");
+    Assert(publishedSearchPayload?.Items[0].PublicationNextSafeActionSummary?.Contains("replacement artifact", StringComparison.OrdinalIgnoreCase) == true, "registry search should surface the latest publication next-safe action");
+
+    var publishedPreview = controller.GetPreview(created.Id).Result as OkObjectResult;
+    var publishedPreviewPayload = publishedPreview?.Value as RegistryPreviewResponse;
+    Assert(publishedPreviewPayload?.LatestPublicationState == PublicationState.Deprecated.ToString(), "registry preview should surface the latest publication state");
+    Assert(publishedPreviewPayload?.PublicationTrustBand == "replacement-advised", "registry preview should surface the latest publication trust band");
+    Assert(publishedPreviewPayload?.PublicationNextSafeActionSummary?.Contains("replacement artifact", StringComparison.OrdinalIgnoreCase) == true, "registry preview should surface the latest publication next-safe action");
 
     controller.RegisterInstall(created!.Id, new RegistryHubInstallEvent(
         ArtifactId: created.Id,
