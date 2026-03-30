@@ -646,6 +646,30 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/account/support', async () => {
     await expectVisible(page, 'text=Support');
   });
+  await expandDetailsBySummary(page, 'Need routing help first?', '/account/support');
+  await page.fill('#supportAssistantQuery', 'Why did the rule environment change for my campaign visibility posture?');
+  await Promise.all([
+    expectVisible(page, '#supportAssistantAnswer', '/account/support rules assistant answer'),
+    expectVisible(page, '#supportAssistantActions', '/account/support rules assistant actions'),
+    expectVisible(page, '#supportAssistantCitations', '/account/support rules assistant citations'),
+    page.getByRole('button', { name: /Check guidance/i }).click()
+  ]);
+  await expectVisible(page, 'text=Grounded guidance loaded');
+  await expectVisible(page, 'text=Open home');
+  await expectMinimumCount(page, '#supportAssistantCitations .settings-summary-row', 1, '/account/support rules assistant citations');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.locator('#supportAssistantActions a', { hasText: 'Open home' }).first().click()
+  ]);
+  assert.equal(new URL(page.url()).pathname, '/home', '/account/support assistant home action should route to /home.');
+  await expectBodyText(page, 'Welcome back', '/home from support assistant');
+  await expectBodyText(page, 'Build, explain, and next step', '/home from support assistant');
+  await expectBodyText(page, 'What changed for me', '/home from support assistant');
+  await assertNoBannedCopy(page, '/home from support assistant');
+  await assertNoPageErrors(page, pageErrors, '/home from support assistant');
+  await gotoAndAssert(page, pageErrors, '/account/support', async () => {
+    await expectVisible(page, 'text=Support');
+  });
 
   const supportCaseTitleField = page.locator('#supportCaseTitle');
   if (await supportCaseTitleField.count() === 0) {

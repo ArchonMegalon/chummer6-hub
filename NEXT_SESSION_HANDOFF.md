@@ -1,6 +1,17 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T08:55:46+02:00
+Updated: 2026-03-30T08:57:15+02:00
+
+## Handoff refresh (2026-03-30T08:57:15+02:00)
+
+- Signed-in support proof now covers every grounded assistant handoff the drawer is supposed to surface on the customer-visible route:
+  - `scripts/hub-live-audit.py` now sends a signed-in rule-environment assistant query and fails unless the reply carries a `rules_truth` citation plus an `open_home` action, alongside the already-landed `build_truth`, `support_case`, `open_work`, and `open_account_support` checks.
+  - `scripts/e2e-hub-playwright.cjs` now asks the same rule-environment question inside the `Need routing help first?` drawer, follows `Open home` into `/home`, and verifies the signed-in home overview renders `Welcome back`, `Build, explain, and next step`, and `What changed for me` before returning to the support route.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T08:55:46+02:00)
 
