@@ -518,6 +518,8 @@ public sealed record RecapShelfEntry(
     string Audience = "campaign",
     string? OwnershipSummary = null,
     string? PublicationState = null,
+    string? TrustBand = null,
+    bool Discoverable = false,
     string? PublicationSummary = null,
     string? CreatorPublicationId = null,
     string? NextSafeAction = null);
