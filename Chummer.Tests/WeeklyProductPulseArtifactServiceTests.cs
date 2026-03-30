@@ -30,6 +30,8 @@ public sealed class WeeklyProductPulseArtifactServiceTests
         Assert.Equal("Core Engine", document.RootElement.GetProperty("supporting_signals").GetProperty("longest_pole").GetString());
         Assert.Contains("route-canary validation", document.RootElement.GetProperty("supporting_signals").GetProperty("launch_readiness").GetString(), StringComparison.OrdinalIgnoreCase);
         Assert.Equal("Pilot defaults are governed", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("default_status").GetString());
+        Assert.Equal("2026-04-12", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("review_due").GetString());
+        Assert.Equal("Promote once canaries stay green and support fallout remains clear through the next route review.", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("next_decision").GetString());
         Assert.Equal("clear", document.RootElement.GetProperty("supporting_signals").GetProperty("closure_health").GetProperty("state").GetString());
         Assert.Equal(0, document.RootElement.GetProperty("supporting_signals").GetProperty("closure_health").GetProperty("waiting_closure_count").GetInt32());
         Assert.Equal("clear", document.RootElement.GetProperty("supporting_signals").GetProperty("adoption_health").GetProperty("state").GetString());
@@ -37,6 +39,25 @@ public sealed class WeeklyProductPulseArtifactServiceTests
         Assert.Equal("moving", document.RootElement.GetProperty("supporting_signals").GetProperty("progress_trend").GetProperty("state").GetString());
         Assert.Equal("up", document.RootElement.GetProperty("supporting_signals").GetProperty("progress_trend").GetProperty("direction").GetString());
         Assert.Equal(2, document.RootElement.GetProperty("supporting_signals").GetProperty("progress_trend").GetProperty("delta_percent").GetInt32());
+    }
+
+    [Fact]
+    public void LoadWeeklyPulseJsonHoldsProviderPromotionUntilLocalProofPasses()
+    {
+        using var fixture = new WeeklyPulseFixture();
+        fixture.WriteBasePulse();
+        fixture.WriteProgressReport();
+        fixture.WriteProgressHistory();
+        fixture.WriteJourneyGates();
+        fixture.WriteSupportPackets();
+        fixture.WriteStatusPlane();
+        fixture.WriteLocalReleaseProof(status: "failed");
+
+        string json = fixture.CreateService().LoadWeeklyPulseJson();
+        using JsonDocument document = JsonDocument.Parse(json);
+
+        Assert.Equal("2026-04-12", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("review_due").GetString());
+        Assert.Equal("Hold broad promotion until fresh local release proof passes on the public edge.", document.RootElement.GetProperty("supporting_signals").GetProperty("provider_route_stewardship").GetProperty("next_decision").GetString());
     }
 
     private sealed class WeeklyPulseFixture : IDisposable
@@ -232,7 +253,7 @@ projects:
 """);
         }
 
-        public void WriteLocalReleaseProof()
+        public void WriteLocalReleaseProof(string status = "passed")
         {
             File.WriteAllText(
                 Path.Combine(_canonRoot, ".codex-studio", "published", "HUB_LOCAL_RELEASE_PROOF.generated.json"),
@@ -240,7 +261,7 @@ projects:
                 {
                     ["contract_name"] = "chummer6-hub.local_release_proof",
                     ["generated_at"] = "2026-03-29T08:40:12Z",
-                    ["status"] = "passed",
+                    ["status"] = status,
                     ["journeys_passed"] = new[] { "install_claim_restore_continue", "build_explain_publish" },
                     ["proof_routes"] = new[] { "/", "/downloads", "/help" }
                 }));
