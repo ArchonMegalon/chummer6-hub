@@ -1579,6 +1579,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!shelfSource.Contains("static string DisplayStatus", StringComparison.Ordinal), "artifact shelf should use the shared public status presenter instead of a local badge mapper.");
     Assert(shelfSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "artifact shelf should reuse the shared signed-in trust panel instead of inventing a shelf-only trust surface.");
     Assert(shelfSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "artifact shelf should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
+    Assert(shelfSource.Contains("The same artifact truth across personal, campaign, and creator rails", StringComparison.Ordinal), "artifact shelf should explain the signed-in cross-shelf continuity goal instead of staying a public-only teaser wall.");
+    Assert(shelfSource.Contains("@item.OwnershipSummary", StringComparison.Ordinal), "artifact shelf should surface signed-in artifact ownership posture directly from the shared recap shelf projection.");
+    Assert(shelfSource.Contains("@linkedPublication.DiscoverySummary", StringComparison.Ordinal), "artifact shelf should surface linked creator-publication discovery posture on the signed-in shelf.");
+    Assert(shelfSource.Contains("HumanizeStatus(publication.Visibility, \"Shared\")", StringComparison.Ordinal), "artifact shelf should humanize creator-publication visibility directly on the signed-in shelf.");
+    Assert(shelfSource.Contains("Open build path for @linkedPublication.Title", StringComparison.Ordinal), "artifact shelf should keep a direct route back to the linked creator-publication build path.");
+    Assert(shelfSource.Contains("Open publication status", StringComparison.Ordinal), "artifact shelf should keep a direct publication-status route on the signed-in shelf.");
     var horizonsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml"));
     Assert(horizonsSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "horizons should include the unified public status guide.");
     Assert(horizonsSource.Contains("PublicSurfaceStatus.ResearchTrack", StringComparison.Ordinal), "roadmap should use the shared public status presenter for its visible maturity language.");
@@ -3312,6 +3318,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var authenticatedArtifactsModel = authenticatedArtifactsView?.Model as ShelfPageViewModel;
     Assert(authenticatedArtifactsModel?.TrustPulse is not null, "authenticated artifacts shelf should keep the weekly public trust pulse visible.");
     Assert(authenticatedArtifactsModel?.SignedInStatus is not null, "authenticated artifacts shelf should project the shared signed-in trust status.");
+    Assert(authenticatedArtifactsModel?.SignedInRecapShelf?.Count > 0, "authenticated artifacts shelf should expose a signed-in recap shelf overlay instead of staying public-only.");
+    Assert(authenticatedArtifactsModel?.SignedInCreatorPublications?.Count > 0, "authenticated artifacts shelf should expose linked creator-publication posture instead of forcing a separate account detour.");
+    Assert(authenticatedArtifactsModel!.SignedInRecapShelf!.GroupBy(static item => string.IsNullOrWhiteSpace(item.ArtifactId) ? item.EntryId : item.ArtifactId, StringComparer.OrdinalIgnoreCase).All(group => group.Count() == 1), "authenticated artifacts shelf should dedupe recap artifacts by governed artifact identity.");
     var horizonsView = await controller.HorizonsPage(CancellationToken.None) as ViewResult;
     var horizonsModel = horizonsView?.Model as HorizonsPageViewModel;
     Assert(horizonsModel?.TrustPulse is not null, "guest horizons page should surface the weekly public trust pulse.");
