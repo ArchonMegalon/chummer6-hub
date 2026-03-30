@@ -1,6 +1,17 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T10:06:34+02:00
+Updated: 2026-03-30T10:09:44+02:00
+
+## Handoff refresh (2026-03-30T10:09:44+02:00)
+
+- Signed-in participation is now part of the release-proof lane instead of only checking that `/participate/codex` exists:
+  - `scripts/hub-live-audit.py` now treats the signed-in participation surface as release-blocking and requires the stable hero/journey/wizard contract (`Help Chummer show its work.`, `I want to participate`, `One decision, one code, one clean handoff`, `Generate fresh code`, `Open a fresh contribution lane`, `Technical details and controls`).
+  - `scripts/e2e-hub-playwright.cjs` now opens the participation wizard and proves the real runtime state the local execution lane returns. It accepts the honest unavailable/complete branches, and on the actionable authorize-or-queued path it now requires the technical details rail, the one-time-code or queued-slot copy, and a clean stop path back to the `stopped` state.
+- Re-verified clean with:
+  - `python3 -m py_compile scripts/hub-live-audit.py`
+  - `node --check scripts/e2e-hub-playwright.cjs`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T10:06:34+02:00)
 
