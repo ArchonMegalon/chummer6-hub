@@ -1,6 +1,21 @@
 # Next Session Handoff
 
-Updated: 2026-03-30T06:39:23+02:00
+Updated: 2026-03-30T06:49:05+02:00
+
+## Handoff refresh (2026-03-30T06:49:05+02:00)
+
+- Commit `e3a34688` (`Refine provider route weekly pulse decisions`) is on `main` and matches `origin/main`.
+- `WeeklyProductPulseArtifactService` now derives provider-route `review_due` from generated evidence timestamps instead of only mirroring the seed date, and it makes the provider-route `next_decision` evidence-aware when live proof and support-closure posture are available.
+- The mirrored [WEEKLY_PRODUCT_PULSE.generated.json](/docker/chummercomplete/chummer6-hub/.codex-design/product/WEEKLY_PRODUCT_PULSE.generated.json) was refreshed so the design mirror again carries `closure_health`, `adoption_health`, and `progress_trend` blocks alongside provider-route stewardship.
+- Added/updated weekly-pulse artifact tests covering the derived provider-route review date and the hold-on-proof-failure decision path.
+- Re-verified clean with:
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "WeeklyProductPulseArtifactServiceTests|PublicTrustPulseServiceTests|VerificationEntryPointTests|DesignMirrorExecutionPlanTests"`
+  - `bash scripts/ai/run_services_smoke.sh`
+  - `bash scripts/run_smoke.sh`
+  - `docker compose -f docker-compose.public-edge.yml up -d --build`
+  - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
+  - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
 
 ## Handoff refresh (2026-03-30T06:39:23+02:00)
 
