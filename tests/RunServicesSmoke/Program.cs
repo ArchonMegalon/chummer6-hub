@@ -2998,6 +2998,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(recapShelfPayload?.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) == true, "home work route should mark the lead aftermath artifact as usable from the creator shelf as well as the campaign shelf.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.OwnershipSummary), "home work route should keep explicit artifact ownership posture attached to the recap shelf.");
     Assert(string.Equals(recapShelfPayload?.PublicationState, "preview_ready", StringComparison.Ordinal), "home work route should carry creator-publication state directly on the linked recap shelf entry.");
+    Assert(string.Equals(recapShelfPayload?.TrustBand, "review-pending", StringComparison.Ordinal), "home work route should carry creator-publication trust ranking directly on the linked recap shelf entry.");
+    Assert(recapShelfPayload?.Discoverable == false, "home work route should keep preview-ready recap entries off discoverable surfaces until publication is live.");
     Assert(recapShelfPayload?.PublicationSummary?.Contains("creator shelf", StringComparison.OrdinalIgnoreCase) == true, "home work route should explain that the same artifact already feeds creator publication posture.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.CreatorPublicationId), "home work route should keep the linked creator-publication id attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.NextSafeAction), "home work route should keep the next safe shelf action attached to the recap shelf entry.");

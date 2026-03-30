@@ -677,6 +677,8 @@ public sealed class CampaignWorkspaceServerPlaneService
                     PublicationState: creatorLinked
                         ? creatorPublication!.PublicationStatus
                         : DescribeRecapShelfPublicationState(item),
+                    TrustBand: creatorLinked ? creatorPublication!.TrustBand : null,
+                    Discoverable: creatorLinked && creatorPublication!.Discoverable,
                     PublicationSummary: DescribeRecapShelfPublicationSummary(workspace, item, creatorPublication, creatorLinked),
                     CreatorPublicationId: creatorLinked ? creatorPublication!.PublicationId : null,
                     NextSafeAction: creatorLinked

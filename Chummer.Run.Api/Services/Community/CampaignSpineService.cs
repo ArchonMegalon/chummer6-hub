@@ -3313,7 +3313,6 @@ public sealed class CampaignSpineService
                     BuildHandoffId: leadHandoff?.HandoffId,
                     Watchouts: watchouts);
             })
-            .Take(3)
             .ToArray();
     }
 
