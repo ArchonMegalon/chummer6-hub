@@ -832,6 +832,7 @@ public sealed class PublicLandingController : Controller
         var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
         var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
         var supportSummaries = _supportPresentation.BuildList(_supportCases.ListForReporter(user.UserId, subject.SubjectId).Items, installLinking);
+        var pulse = _trustPulse.LoadSnapshot();
         var latestInstallation = installLinking.ClaimedInstallations?
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .FirstOrDefault();
@@ -866,6 +867,11 @@ public sealed class PublicLandingController : Controller
             new(
                 "Current caution",
                 BuildSignedInInstallCautionSummary(manifest, latestInstallation, followThrough)),
+            new(
+                "Adoption health",
+                pulse is null
+                    ? BuildReleaseProofSummary(manifest)
+                    : BuildTrustPulseAdoptionSummary(pulse)),
             new("Release proof", BuildReleaseProofSummary(manifest)),
             new(
                 "Support follow-through",
