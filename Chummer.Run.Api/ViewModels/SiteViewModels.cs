@@ -230,11 +230,17 @@ public sealed record PublicTrustPulseRowViewModel(
     string Label,
     string Value);
 
+public sealed record PublicTrustPulseTrendPointViewModel(
+    string AsOf,
+    int OverallProgressPercent,
+    bool Current = false);
+
 public sealed record PublicTrustPulsePanelViewModel(
     string Eyebrow,
     string Heading,
     string Summary,
     IReadOnlyList<string> MicroProof,
+    IReadOnlyList<PublicTrustPulseTrendPointViewModel> TrendSamples,
     IReadOnlyList<PublicTrustPulseRowViewModel> Rows,
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel? SecondaryAction = null);

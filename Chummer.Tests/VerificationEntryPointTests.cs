@@ -166,11 +166,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("WEEKLY_PRODUCT_PULSE.generated.json", pulseArtifactService, StringComparison.Ordinal);
         Assert.Contains("BuildPublicTrustPulsePanel", controller, StringComparison.Ordinal);
         Assert.Contains("PublicTrustPulsePanelViewModel? TrustPulse", viewModel, StringComparison.Ordinal);
+        Assert.Contains("PublicTrustPulseTrendPointViewModel", viewModel, StringComparison.Ordinal);
         Assert.Contains("Weekly trust pulse", partial, StringComparison.Ordinal);
+        Assert.Contains("trust-pulse-trend", partial, StringComparison.Ordinal);
         Assert.Contains("Current caution", controller, StringComparison.Ordinal);
         Assert.Contains("Closure health", controller, StringComparison.Ordinal);
         Assert.Contains("Progress trend", controller, StringComparison.Ordinal);
         Assert.Contains("BuildTrustPulseProgressTrendSummary", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildTrustPulseTrendSamples", controller, StringComparison.Ordinal);
         Assert.Contains("BuildTrustPulseClosureHealthSummary", controller, StringComparison.Ordinal);
     }
 

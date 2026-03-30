@@ -2632,6 +2632,57 @@ td {
   font-size: 0.78rem;
 }
 
+.trust-pulse-trend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 0.65rem;
+}
+
+.trust-pulse-trend__point {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 39, 74, 0.08);
+  background: rgba(15, 39, 74, 0.04);
+}
+
+.trust-pulse-trend__point--current {
+  border-color: rgba(15, 39, 74, 0.16);
+  background: rgba(219, 242, 255, 0.82);
+}
+
+.trust-pulse-trend__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.trust-pulse-trend__meta strong {
+  color: var(--ink-strong);
+  font-size: 0.95rem;
+}
+
+.trust-pulse-trend__meta span {
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+}
+
+.trust-pulse-trend__bar {
+  height: 0.38rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(15, 39, 74, 0.09);
+}
+
+.trust-pulse-trend__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0b7e6b 0%, #2a6cff 100%);
+}
+
 .works-matrix__columns,
 .artifact-gallery__grid {
   display: grid;
