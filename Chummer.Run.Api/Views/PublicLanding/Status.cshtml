@@ -1,0 +1,100 @@
+@model StatusPageViewModel
+@{
+    ViewData["Title"] = "Status";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-status";
+}
+
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
+<section class="section-band">
+    <div class="page-lead">
+        <p class="eyebrow">Current status</p>
+        <h1 class="page-title">Weekly pulse, release posture, and the current longest pole</h1>
+        <p class="page-copy">Use this route when you want the honest customer-facing status surface: what is working, what still needs caution, and which proof lane should move next.</p>
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="/now">Open current release</a>
+        <a class="button-like button-like--ghost" href="/progress">Open progress</a>
+    </div>
+    @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
+    <div class="settings-summary-list">
+        <div class="settings-summary-row">
+            <span>Channel</span>
+            <strong>@Model.Manifest.Channel</strong>
+        </div>
+        <div class="settings-summary-row">
+            <span>Version</span>
+            <strong>@Model.Manifest.Version</strong>
+        </div>
+        <div class="settings-summary-row">
+            <span>Release proof</span>
+            <strong>@(string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus) ? "Not mirrored" : Model.Manifest.ProofStatus)</strong>
+        </div>
+        <div class="settings-summary-row">
+            <span>Update posture</span>
+            <strong>@Model.ReleaseExperience.UpdatePostureSummary</strong>
+        </div>
+        @if (Model.CampaignOsProof is not null)
+        {
+            <div class="settings-summary-row">
+                <span>Campaign OS proof</span>
+                <strong>@Model.CampaignOsProof.Status</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>Journey gates</span>
+                <strong>@(Model.CampaignOsProof.JourneysPassed.Count == 0 ? "No mirrored journeys yet" : string.Join(", ", Model.CampaignOsProof.JourneysPassed))</strong>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="compact-rail">
+    <article class="compact-rail__item">
+        <div class="compact-rail__copy">
+            <h3>Release posture</h3>
+            <p>@(Model.Manifest.SupportabilitySummary ?? Model.Manifest.Message ?? "The current release shelf, proof route, and support path should read like one honest record.")</p>
+        </div>
+        <a class="inline-link" href="/downloads">Open downloads</a>
+    </article>
+    <article class="compact-rail__item">
+        <div class="compact-rail__copy">
+            <h3>Current caution</h3>
+            <p>@(Model.Manifest.KnownIssueSummary ?? Model.ReleaseExperience.KnownIssuesLabel)</p>
+        </div>
+        <a class="inline-link" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
+    </article>
+    <article class="compact-rail__item">
+        <div class="compact-rail__copy">
+            <h3>Fix and closure follow-through</h3>
+            <p>@(Model.Manifest.FixAvailabilitySummary ?? "Use support only when the release shelf and proof route stop being enough to move forward.")</p>
+        </div>
+        <a class="inline-link" href="/contact#support-intake">Open support</a>
+    </article>
+    <article class="compact-rail__item">
+        <div class="compact-rail__copy">
+            <h3>Weighted delivery report</h3>
+            <p>The deeper weighted program report stays separate from the customer-facing status route so status can stay honest without turning into delivery cargo.</p>
+        </div>
+        <a class="inline-link" href="/progress">Open progress</a>
+    </article>
+</section>
+
+<section class="trust-rail-section">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Status poster</p>
+        <h2 class="editorial-title">One public visual for the current weighted program read</h2>
+        <p class="editorial-copy">The poster is the lighter public companion to the deeper progress report. It should agree with the weekly pulse and current release posture.</p>
+    </div>
+    <div class="story-cinematic__media">
+        <img src="/api/public/progress-poster.svg" alt="Current public progress poster" loading="lazy" />
+    </div>
+</section>

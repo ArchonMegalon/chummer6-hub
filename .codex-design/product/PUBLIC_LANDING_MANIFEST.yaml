@@ -66,6 +66,15 @@ public_routes:
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: proof shelf honesty only
+  - path: /status
+    title: Status
+    audience: public
+    purpose: status_surface
+    requires_auth: false
+    guest_fallback: /status
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: weekly pulse, release posture, and current caution only
   - path: /horizons
     title: Roadmap
     audience: public

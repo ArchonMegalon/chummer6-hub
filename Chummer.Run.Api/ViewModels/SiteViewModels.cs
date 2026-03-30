@@ -190,6 +190,14 @@ public sealed record DownloadsPageViewModel(
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
+public sealed record StatusPageViewModel(
+    SiteChromeViewModel Chrome,
+    PublicReleaseManifestDto Manifest,
+    ReleaseExperienceViewModel ReleaseExperience,
+    CampaignOsLocalProofSnapshot? CampaignOsProof = null,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
 public sealed record DownloadDispatchPageViewModel(
     SiteChromeViewModel Chrome,
     string Heading,

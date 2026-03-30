@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using SubmitObservationRequest = Chummer.Run.Contracts.Gateway.SubmitObservationRequest;
+using SubmitObservationResponse = Chummer.Run.Contracts.Gateway.SubmitObservationResponse;
 
 namespace Chummer.Run.AI.Controllers;
 

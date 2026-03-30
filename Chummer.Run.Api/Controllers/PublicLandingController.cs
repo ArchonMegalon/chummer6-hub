@@ -279,7 +279,20 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/status")]
     [Produces("text/html")]
-    public IActionResult StatusPage() => Redirect("/now");
+    public async Task<IActionResult> StatusPage(CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var model = new StatusPageViewModel(
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Weekly pulse, release posture, and the current longest pole on one calmer route.", "/status", cancellationToken),
+            Manifest: manifest,
+            ReleaseExperience: releaseExperience,
+            CampaignOsProof: _campaignOsProof.LoadProof(),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+        return View("~/Views/PublicLanding/Status.cshtml", model);
+    }
 
     [HttpGet("/artifacts")]
     [Produces("text/html")]
