@@ -1600,6 +1600,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(shelfSource.Contains("@publication.ModerationSummary", StringComparison.Ordinal), "artifact shelf should surface creator-publication moderation posture directly on the signed-in creator cards.");
     Assert(shelfSource.Contains("Governed publication discovery", StringComparison.Ordinal), "artifact shelf should expose a first-class public publication-discovery section once shared publication is live.");
     Assert(shelfSource.Contains("Published shared publications", StringComparison.Ordinal), "artifact shelf should frame public publication discovery as a governed published shelf instead of creator-only teaser prose.");
+    Assert(shelfSource.Contains("campaign, primer, dossier, recap, replay, and run-module outputs", StringComparison.Ordinal), "artifact shelf should describe primer outputs as part of the same governed shared-publication lane.");
     Assert(shelfSource.Contains("Compare at a glance", StringComparison.Ordinal), "artifact shelf should add a real compare-at-a-glance rail for public creator discovery instead of forcing card-by-card comparison.");
     Assert(shelfSource.Contains("How live publications differ", StringComparison.Ordinal), "artifact shelf should explain the public publication comparison lane in customer-facing terms.");
     Assert(shelfSource.Contains("CreatorPublicationTrustRank", StringComparison.Ordinal), "artifact shelf should order the public creator comparison lane with explicit governed trust posture instead of ad hoc card order.");
@@ -1621,6 +1622,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicCreatorSource.Contains("Compare by", StringComparison.Ordinal), "public creator detail should surface creator-comparison guidance on the public inspect route.");
     Assert(publicCreatorSource.Contains("Back to publication discovery", StringComparison.Ordinal), "public publication detail should keep an explicit route back to the public discovery shelf.");
     Assert(publicCreatorSource.Contains("Public shared publication", StringComparison.Ordinal), "public publication detail should present the public route as a shared publication lane instead of a creator-only packet.");
+    var campaignSpineServiceSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Services", "Community", "CampaignSpineService.cs"));
+    Assert(campaignSpineServiceSource.Contains("return \"primer\";", StringComparison.Ordinal), "campaign spine service should normalize primer-like publication kinds onto a first-class shared-publication kind.");
+    Assert(campaignSpineServiceSource.Contains("\"primer\" => $\"{workspace.CampaignName} campaign primer\"", StringComparison.Ordinal), "campaign spine service should give primer publications a first-class title instead of generic fallback labeling.");
+    Assert(campaignSpineServiceSource.Contains("\"primer\" => \"Primer-safe onboarding, campaign continuity, and governed publication detail stay attached to one shared artifact lane.\"", StringComparison.Ordinal), "campaign spine service should give primer publications first-class shared-publication summary posture.");
     var horizonsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml"));
     Assert(horizonsSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "horizons should include the unified public status guide.");
     Assert(horizonsSource.Contains("PublicSurfaceStatus.ResearchTrack", StringComparison.Ordinal), "roadmap should use the shared public status presenter for its visible maturity language.");

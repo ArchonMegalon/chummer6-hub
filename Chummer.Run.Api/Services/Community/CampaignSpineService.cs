@@ -4142,6 +4142,13 @@ public sealed class CampaignSpineService
             return 3;
         }
 
+        if (normalizedKind.Contains("primer", StringComparison.Ordinal)
+            || normalizedKind.Contains("handbook", StringComparison.Ordinal)
+            || normalizedKind.Contains("guide", StringComparison.Ordinal))
+        {
+            return 3;
+        }
+
         if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
         {
             return 2;
@@ -4169,6 +4176,13 @@ public sealed class CampaignSpineService
             return "dossier";
         }
 
+        if (normalizedKind.Contains("primer", StringComparison.Ordinal)
+            || normalizedKind.Contains("handbook", StringComparison.Ordinal)
+            || normalizedKind.Contains("guide", StringComparison.Ordinal))
+        {
+            return "primer";
+        }
+
         if (normalizedKind.Contains("campaign", StringComparison.Ordinal))
         {
             return "campaign";
@@ -4187,6 +4201,7 @@ public sealed class CampaignSpineService
         return normalizedKind switch
         {
             "dossier" => $"{dossier?.DisplayName ?? workspace.CampaignName} dossier packet",
+            "primer" => $"{workspace.CampaignName} campaign primer",
             "run_module" => $"{workspace.CampaignName} run module packet",
             "campaign" => $"{workspace.CampaignName} campaign packet",
             _ when normalizedKind.Contains("replay", StringComparison.Ordinal) => $"{workspace.CampaignName} replay timeline",
@@ -4213,6 +4228,7 @@ public sealed class CampaignSpineService
         return normalizedKind switch
         {
             "dossier" => "Living dossier truth, campaign continuity, and governed publication detail stay attached to one shared artifact lane.",
+            "primer" => "Primer-safe onboarding, campaign continuity, and governed publication detail stay attached to one shared artifact lane.",
             "run_module" => "Run-module prep, GM continuity, and governed publication detail stay attached to one shared artifact lane.",
             "campaign" => "Campaign recap, return cues, and governed publication detail stay attached to one shared artifact lane.",
             _ when normalizedKind.Contains("replay", StringComparison.Ordinal) => "Replay-safe turn review and governed publication detail stay attached to one shared artifact lane.",
