@@ -2690,6 +2690,11 @@ async Task VerifyPublicLandingProjectionAsync()
     string handoffId = campaignSummaryPayload.BuildLabHandoffs
         .First(item => string.Equals(item.CampaignId, workspacePayload.CampaignId, StringComparison.OrdinalIgnoreCase))
         .HandoffId;
+    string primerPublicationId = campaignSummaryPayload.CreatorPublications
+        .First(item =>
+            string.Equals(item.CampaignId, workspacePayload.CampaignId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Kind, "primer", StringComparison.Ordinal))
+        .PublicationId;
     string publicationId = campaignSummaryPayload.CreatorPublications
         .First(item => string.Equals(item.CampaignId, workspacePayload.CampaignId, StringComparison.OrdinalIgnoreCase))
         .PublicationId;
@@ -3215,6 +3220,40 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publishedPublicationDetailModel?.SelectedCreatorPublication?.TrustSummary?.Contains("live on governed discovery", StringComparison.OrdinalIgnoreCase) == true, "published creator publications should explain live governed discovery on the shared projection.");
     Assert(publishedPublicationDetailModel?.SelectedCreatorPublication?.ModerationSummary?.Contains("active but clear", StringComparison.OrdinalIgnoreCase) == true, "published creator publications should carry moderation-watch posture once they are live.");
 
+    var primerPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: primerPublicationId) as ViewResult;
+    var primerPublicationDetailModel = primerPublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(primerPublicationDetailModel?.SelectedCreatorPublication?.PublicationId, primerPublicationId, StringComparison.Ordinal), "account publication detail route should load the selected primer publication on the shared lane.");
+    Assert(string.Equals(primerPublicationDetailModel?.SelectedCreatorPublication?.Kind, "primer", StringComparison.Ordinal), "account publication detail route should preserve the primer publication kind.");
+    Assert(primerPublicationDetailModel?.SelectedCreatorPublication?.Title.Contains("campaign primer", StringComparison.OrdinalIgnoreCase) == true, "account publication detail route should give primer publications a first-class title.");
+    Assert(string.Equals(primerPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Draft.ProjectKind, "Primer", StringComparison.Ordinal), "account publication detail route should keep primer drafts on the shared registry primer kind instead of a fallback project kind.");
+    Assert(primerPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Description?.Contains("Publication kind: Primer", StringComparison.Ordinal) == true, "account publication detail route should carry primer-specific publication kind evidence into the draft description.");
+
+    var submitPrimerPublicationResult = await accountController.SubmitCreatorPublication(primerPublicationId, "Primer packet is grounded enough for governed moderation.", CancellationToken.None);
+    Assert(submitPrimerPublicationResult is RedirectResult { Url: not null }, "primer publication submission should redirect back to the publication detail route.");
+    var submittedPrimerPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: primerPublicationId) as ViewResult;
+    var submittedPrimerPublicationDetailModel = submittedPrimerPublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(submittedPrimerPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.PendingReview, StringComparison.Ordinal), "submitted primer publications should enter the registry moderation queue.");
+    Assert(string.Equals(submittedPrimerPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Moderation?.State, Chummer.Hub.Registry.Contracts.HubModerationStates.PendingReview, StringComparison.Ordinal), "submitted primer publications should surface the pending moderation case on the account detail route.");
+
+    var approvePrimerPublicationResult = await accountController.ApproveCreatorPublication(primerPublicationId, "Primer lineage and onboarding trust stayed grounded on the governed publication lane.", CancellationToken.None);
+    Assert(approvePrimerPublicationResult is RedirectResult { Url: not null }, "primer publication approval should redirect back to the publication detail route.");
+    var approvedPrimerPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: primerPublicationId) as ViewResult;
+    var approvedPrimerPublicationDetailModel = approvedPrimerPublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(approvedPrimerPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Approved, StringComparison.Ordinal), "approved primer publications should surface approved review posture on the account detail route.");
+    Assert(string.Equals(approvedPrimerPublicationDetailModel?.SelectedCreatorPublication?.PublicationStatus, "approved", StringComparison.Ordinal), "approved primer publications should replace synthetic preview status with the registry-backed approved posture on the shared projection.");
+    Assert(approvedPrimerPublicationDetailModel?.SelectedCreatorPublication?.ModerationSummary?.Contains("Moderation cleared approval", StringComparison.OrdinalIgnoreCase) == true, "approved primer publications should carry approval-backed moderation summary on the shared projection.");
+
+    var publishPrimerPublicationResult = await accountController.PublishCreatorPublication(primerPublicationId, "Publish the campaign primer on governed public discovery now that review cleared.", CancellationToken.None);
+    Assert(publishPrimerPublicationResult is RedirectResult { Url: not null }, "primer publication publish should redirect back to the publication detail route.");
+    var publishedPrimerPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: primerPublicationId) as ViewResult;
+    var publishedPrimerPublicationDetailModel = publishedPrimerPublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(publishedPrimerPublicationDetailModel?.SelectedCreatorPublicationReceipt?.PublicationStatus, Chummer.Hub.Registry.Contracts.HubPublicationStates.Published, StringComparison.Ordinal), "published primer publications should surface the live published receipt posture on the account detail route.");
+    Assert(publishedPrimerPublicationDetailModel?.SelectedCreatorPublicationReceipt?.PublishedAtUtc is not null, "published primer publications should stamp the published timestamp on the account detail route.");
+    Assert(string.Equals(publishedPrimerPublicationDetailModel?.SelectedCreatorPublication?.PublicationStatus, "published", StringComparison.Ordinal), "published primer publications should project the live published posture on the shared creator-publication card.");
+    Assert(string.Equals(publishedPrimerPublicationDetailModel?.SelectedCreatorPublication?.Kind, "primer", StringComparison.Ordinal), "published primer publications should stay typed as primer on the shared projection.");
+    Assert(publishedPrimerPublicationDetailModel?.SelectedCreatorPublication?.Discoverable == true, "published primer publications should become discoverable once the governed public shelf promotion lands.");
+    Assert(publishedPrimerPublicationDetailModel?.SelectedCreatorPublication?.TrustSummary?.Contains("live on governed discovery", StringComparison.OrdinalIgnoreCase) == true, "published primer publications should explain live governed discovery on the shared projection.");
+
     var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
     Assert(authenticatedHomeModel is not null, "signed-in home page should render through the MVC view layer.");
@@ -3247,6 +3286,12 @@ async Task VerifyPublicLandingProjectionAsync()
     var publishedHomePublication = authenticatedHomeModel.CampaignSpine.CreatorPublications
         .FirstOrDefault(item => string.Equals(item.PublicationId, publicationId, StringComparison.Ordinal));
     Assert(publishedHomePublication is not null, "signed-in home should keep the explicitly published creator publication on the shared home projection.");
+    var publishedHomePrimerPublication = authenticatedHomeModel.CampaignSpine.CreatorPublications
+        .FirstOrDefault(item => string.Equals(item.PublicationId, primerPublicationId, StringComparison.Ordinal));
+    Assert(publishedHomePrimerPublication is not null, "signed-in home should keep the explicitly published primer publication on the shared home projection.");
+    Assert(string.Equals(publishedHomePrimerPublication?.PublicationStatus, "published", StringComparison.Ordinal), "signed-in home should carry the live published primer posture.");
+    Assert(string.Equals(publishedHomePrimerPublication?.Kind, "primer", StringComparison.Ordinal), "signed-in home should preserve the primer publication kind.");
+    Assert(publishedHomePrimerPublication?.Discoverable == true, "signed-in home should carry discoverable primer publication posture once publication is live.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane is not null, "signed-in home should receive the bounded lead workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.LeadWorkspaceServerPlane!.WorkspaceState.Status), "signed-in home should surface one bounded workspace state on the what-changed card.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.WorkspaceState.EvidenceLines.Count >= 1, "signed-in home should surface workspace-state evidence on the what-changed card.");
@@ -3358,6 +3403,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(publishedRecapShelfPayload?.PublicationState, "published", StringComparison.Ordinal), "home work route should carry published shared-publication state on the recap entry linked to the live publication.");
     Assert(string.Equals(publishedRecapShelfPayload?.TrustBand, "curated-live", StringComparison.Ordinal), "home work route should carry live trust ranking on the recap entry linked to the published shared publication.");
     Assert(publishedRecapShelfPayload?.Discoverable == true, "home work route should keep the recap entry linked to the live publication discoverable.");
+    var publishedPrimerShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
+        .FirstOrDefault(item => string.Equals(item.CreatorPublicationId, primerPublicationId, StringComparison.Ordinal));
+    Assert(publishedPrimerShelfPayload is not null, "home work route should keep the primer entry linked to the published shared publication on the bounded return shelf.");
+    Assert(string.Equals(publishedPrimerShelfPayload?.PublicationState, "published", StringComparison.Ordinal), "home work route should carry published shared-publication state on the primer entry linked to the live publication.");
+    Assert(publishedPrimerShelfPayload?.Discoverable == true, "home work route should keep the primer entry linked to the live publication discoverable.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the replay package attached to the bounded return shelf.");
     var replayWorkHomeShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
         .FirstOrDefault(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal));
@@ -3379,6 +3429,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(publishedWorkHomePublication?.CampaignReturnSummary), "home work route should keep creator-publication return truth visible on the shared home projection.");
     Assert(!string.IsNullOrWhiteSpace(publishedWorkHomePublication?.SupportClosureSummary), "home work route should keep creator-publication support closure visible on the shared home projection.");
     Assert(!string.IsNullOrWhiteSpace(publishedWorkHomePublication?.ModerationSummary), "home work route should keep creator-publication moderation posture visible on the shared home projection.");
+    var publishedPrimerWorkHomePublication = workHomeModel.CampaignSpine.CreatorPublications
+        .FirstOrDefault(item => string.Equals(item.PublicationId, primerPublicationId, StringComparison.Ordinal));
+    Assert(publishedPrimerWorkHomePublication is not null, "home work route should keep the explicitly published primer publication visible on the shared home projection.");
+    Assert(string.Equals(publishedPrimerWorkHomePublication?.Kind, "primer", StringComparison.Ordinal), "home work route should preserve the primer publication kind.");
+    Assert(publishedPrimerWorkHomePublication?.Discoverable == true, "home work route should carry discoverable primer publication posture once publication is live.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1, "home work route should keep the claimed-device return packet visible on the shared home projection.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Any(item => item.RestoreSummary.Contains("bounded offline use", StringComparison.Ordinal)), "home work route should surface bounded offline prefetch on the claimed-device return card.");
 
@@ -3548,6 +3603,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(artifactsModel.PublicCreatorPublications?[0].ComparisonSummary), "guest artifacts shelf should keep creator-comparison guidance attached to public creator discovery.");
     Assert(!string.IsNullOrWhiteSpace(artifactsModel.PublicCreatorPublications?[0].LineageSummary), "guest artifacts shelf should keep lineage posture attached to public creator discovery.");
     Assert(!string.IsNullOrWhiteSpace(artifactsModel.PublicCreatorPublications?[0].ModerationSummary), "guest artifacts shelf should keep moderation-watch posture attached to public creator discovery.");
+    var publicPrimerPublication = artifactsModel.PublicCreatorPublications?.FirstOrDefault(item => string.Equals(item.PublicationId, primerPublicationId, StringComparison.Ordinal));
+    Assert(publicPrimerPublication is not null, "guest artifacts shelf should surface the published primer on governed public discovery.");
+    Assert(string.Equals(publicPrimerPublication?.Kind, "primer", StringComparison.Ordinal), "guest artifacts shelf should preserve the primer publication kind on the public discovery rail.");
+    Assert(publicPrimerPublication?.Discoverable == true, "guest artifacts shelf should keep the published primer discoverable on the public discovery rail.");
     var publicCreatorDetailView = await controller.CreatorPublicationDetailPage(publicationId, CancellationToken.None) as ViewResult;
     var publicCreatorDetailModel = publicCreatorDetailView?.Model as PublicCreatorPublicationPageViewModel;
     Assert(publicCreatorDetailModel is not null, "guest creator-publication detail should render through the MVC view layer.");
@@ -3558,6 +3617,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(publicCreatorDetailModel.Publication.ModerationSummary), "guest creator-publication detail should keep moderation-watch posture visible.");
     Assert(publicCreatorDetailModel.TrustPulse is not null, "guest creator-publication detail should surface the shared public trust pulse.");
     Assert(publicCreatorDetailModel.SignedInStatus is null, "guest creator-publication detail should not project install-specific signed-in trust posture.");
+    var publicPrimerDetailView = await controller.CreatorPublicationDetailPage(primerPublicationId, CancellationToken.None) as ViewResult;
+    var publicPrimerDetailModel = publicPrimerDetailView?.Model as PublicCreatorPublicationPageViewModel;
+    Assert(publicPrimerDetailModel is not null, "guest primer publication detail should render through the MVC view layer.");
+    Assert(string.Equals(publicPrimerDetailModel!.Publication.PublicationId, primerPublicationId, StringComparison.Ordinal), "guest primer publication detail should load the published primer from the governed discovery rail.");
+    Assert(string.Equals(publicPrimerDetailModel.Publication.Kind, "primer", StringComparison.Ordinal), "guest primer publication detail should preserve the primer publication kind.");
+    Assert(string.Equals(publicPrimerDetailModel.Publication.PublicationStatus, "published", StringComparison.Ordinal), "guest primer publication detail should keep the live published posture.");
     Assert(artifactsModel.SignedInStatus is null, "guest artifacts shelf should not project install-specific signed-in trust posture.");
     var authenticatedArtifactsView = await authenticatedLandingController.ArtifactsPage(CancellationToken.None) as ViewResult;
     var authenticatedArtifactsModel = authenticatedArtifactsView?.Model as ShelfPageViewModel;

@@ -252,7 +252,21 @@ public sealed class CreatorPublicationRegistryBridge
     private static string ResolvePublicationKindLabel(
         CreatorPublicationProjection publication,
         PublicationSafeProjection? linkedShelfEntry)
-        => HumanizeValue(linkedShelfEntry?.Kind ?? publication.Kind, "Publication");
+    {
+        string normalizedPublicationKind = (publication.Kind ?? string.Empty).Trim().ToLowerInvariant();
+        return normalizedPublicationKind switch
+        {
+            "campaign" => "Campaign packet",
+            "dossier" => "Dossier",
+            "primer" => "Primer",
+            "run_module" => "Run Module",
+            _ when normalizedPublicationKind.Contains("replay", StringComparison.Ordinal) => "Replay timeline",
+            _ when normalizedPublicationKind.Contains("recap", StringComparison.Ordinal)
+                || normalizedPublicationKind.Contains("after", StringComparison.Ordinal)
+                || normalizedPublicationKind.Contains("downtime", StringComparison.Ordinal) => "Recap package",
+            _ => HumanizeValue(linkedShelfEntry?.Kind ?? publication.Kind, "Publication")
+        };
+    }
 
     private static string HumanizeValue(string? value, string fallback)
     {

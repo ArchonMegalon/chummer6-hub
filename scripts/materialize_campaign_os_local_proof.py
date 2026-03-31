@@ -36,7 +36,7 @@ REQUIRED_MARKERS = {
         'campaignSpineController.GetMyBuildLabHandoff',
         'campaignSpineController.GetMyRulesNavigatorAnswer',
         'campaignSpineController.GetMyCreatorPublication',
-        'workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary',
+        'publishedWorkHomePublication?.ProvenanceSummary',
     ],
     "campaign_session_recover_recap": [
         'accountModel.CampaignSpine.Workspaces.Count >= 1',
