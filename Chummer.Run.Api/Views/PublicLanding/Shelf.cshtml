@@ -71,7 +71,7 @@
             : PublicationDetailHref(publicationId);
     static string CreatorPublicationLinkLabel(CreatorPublicationProjection? publication)
         => IsDiscoverablePublicCreatorPublication(publication)
-            ? "Open published creator packet"
+            ? "Open public publication"
             : "Open publication status";
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
     static string ArtifactViewHref(string view)
@@ -223,7 +223,7 @@
             @foreach (var publication in signedInCreatorPublications)
             {
                 <article class="shelf-item">
-                    <span class="tag">Creator publication</span>
+                    <span class="tag">Shared publication</span>
                     <h2>@publication.Title</h2>
                     <p>@publication.Summary</p>
                     <div class="trust-claim__microproof">
@@ -277,14 +277,14 @@
     @if (publicCreatorPublications.Length > 0)
     {
         <div class="editorial-block__lead" id="governed-creator-discovery">
-            <p class="eyebrow">Governed creator discovery</p>
-            <h2 class="editorial-title">Published creator packets</h2>
-            <p class="editorial-copy">These creator outputs are live because the same governed account rail carried them through review, publication, lineage, and trust posture instead of inventing a public shadow state.</p>
+            <p class="eyebrow">Governed publication discovery</p>
+            <h2 class="editorial-title">Published shared publications</h2>
+            <p class="editorial-copy">These campaign, dossier, recap, replay, and run-module outputs are live because the same governed account rail carried them through review, publication, lineage, and trust posture instead of inventing a public shadow state.</p>
         </div>
         <section class="trust-rail-section" id="creator-packet-comparison">
             <div class="editorial-block__lead">
                 <p class="eyebrow">Compare at a glance</p>
-                <h2 class="editorial-title">How live creator packets differ</h2>
+                <h2 class="editorial-title">How live publications differ</h2>
                 <p class="editorial-copy">Compare provenance, trust ranking, lineage, moderation, and return posture here before you open every detail page one by one.</p>
             </div>
             <div class="trust-rail-list">
@@ -314,7 +314,7 @@
                         {
                             <p>Return: @publication.CampaignReturnSummary</p>
                         }
-                        <a class="inline-link" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open published creator packet</a>
+                        <a class="inline-link" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open public publication</a>
                     </article>
                 }
             </div>
@@ -323,7 +323,7 @@
             @foreach (var publication in rankedPublicCreatorPublications)
             {
                 <article class="shelf-item">
-                    <span class="tag">Governed creator discovery</span>
+                    <span class="tag">Governed publication discovery</span>
                     <h2>@publication.Title</h2>
                     <p>@publication.Summary</p>
                     <div class="trust-claim__microproof">
@@ -353,7 +353,7 @@
                     {
                         <p class="muted-copy"><strong>Next:</strong> @publication.NextSafeAction</p>
                     }
-                    <a class="inline-link" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open published creator packet</a>
+                    <a class="inline-link" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open public publication</a>
                 </article>
             }
         </div>
