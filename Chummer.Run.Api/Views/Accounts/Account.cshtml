@@ -196,6 +196,10 @@
         => publication is not null
             && publication.Discoverable
             && string.Equals(publication.PublicationStatus, "published", StringComparison.OrdinalIgnoreCase);
+    static string CreatorPublicationLinkLabel(Chummer.Campaign.Contracts.CreatorPublicationProjection? publication)
+        => IsDiscoverablePublicCreatorPublication(publication)
+            ? "Open public publication"
+            : "Open publication status";
 
     static string TrustRowValue(
         SignedInTrustStatusPanelViewModel? panel,
@@ -1627,7 +1631,7 @@
                                                         <a class="inline-link" href="@PublicationDetailHref(item.CreatorPublicationId)">Open publication status</a>
                                                         @if (IsDiscoverablePublicCreatorPublication(linkedPublication))
                                                         {
-                                                            <a class="inline-link" href="@PublicCreatorPublicationHref(item.CreatorPublicationId)">Open public creator packet</a>
+                                                            <a class="inline-link" href="@PublicCreatorPublicationHref(item.CreatorPublicationId)">@CreatorPublicationLinkLabel(linkedPublication)</a>
                                                         }
                                                     }
                                                 </li>
@@ -2012,7 +2016,7 @@
                                 <form class="settings-form" method="post" action="/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/submit">
                                     @Html.AntiForgeryToken()
                                     <label for="creatorPublicationSubmitNotes">Submission notes</label>
-                                    <textarea id="creatorPublicationSubmitNotes" name="notes" rows="3" placeholder="Ground why this creator packet is ready for governed moderation."></textarea>
+                                    <textarea id="creatorPublicationSubmitNotes" name="notes" rows="3" placeholder="Ground why this publication is ready for governed moderation."></textarea>
                                     <div class="stacked-actions">
                                         <button class="button-like button-like--primary" type="submit">Submit for review</button>
                                     </div>
@@ -2045,9 +2049,9 @@
                                 <form class="settings-form" method="post" action="/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/publish">
                                     @Html.AntiForgeryToken()
                                     <label for="creatorPublicationPublishNotes">Publish notes</label>
-                                    <textarea id="creatorPublicationPublishNotes" name="notes" rows="3" placeholder="State why this packet is ready for governed creator discovery and public shelf follow-through."></textarea>
+                                    <textarea id="creatorPublicationPublishNotes" name="notes" rows="3" placeholder="State why this publication is ready for governed public discovery and shared-shelf follow-through."></textarea>
                                     <div class="stacked-actions">
-                                        <button class="button-like button-like--primary" type="submit">Publish on creator shelf</button>
+                                        <button class="button-like button-like--primary" type="submit">Publish on public shelf</button>
                                     </div>
                                 </form>
                             }
@@ -2058,7 +2062,7 @@
                         }
                         @if (IsDiscoverablePublicCreatorPublication(selectedCreatorPublication))
                         {
-                            <a class="inline-link" href="@PublicCreatorPublicationHref(selectedCreatorPublication.PublicationId)">Open public creator packet</a>
+                            <a class="inline-link" href="@PublicCreatorPublicationHref(selectedCreatorPublication.PublicationId)">@CreatorPublicationLinkLabel(selectedCreatorPublication)</a>
                         }
                     </article>
                 }
@@ -2407,7 +2411,7 @@
                                                     <a class="inline-link" href="@PublicationDetailHref(item.CreatorPublicationId)">Open publication status</a>
                                                     @if (IsDiscoverablePublicCreatorPublication(linkedPublication))
                                                     {
-                                                        <a class="inline-link" href="@PublicCreatorPublicationHref(item.CreatorPublicationId)">Open public creator packet</a>
+                                                        <a class="inline-link" href="@PublicCreatorPublicationHref(item.CreatorPublicationId)">@CreatorPublicationLinkLabel(linkedPublication)</a>
                                                     }
                                                 }
                                             </li>
@@ -2564,7 +2568,7 @@
                 @if (Model.CampaignSpine.CreatorPublications.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Creator publication</summary>
+                        <summary>Shared publications</summary>
                         <ul class="muted-copy">
                             @foreach (var publication in Model.CampaignSpine.CreatorPublications)
                             {
@@ -2605,7 +2609,7 @@
                                     }
                                     @if (IsDiscoverablePublicCreatorPublication(publication))
                                     {
-                                        <a class="inline-link" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open public creator packet</a>
+                                        <a class="inline-link" href="@PublicCreatorPublicationHref(publication.PublicationId)">@CreatorPublicationLinkLabel(publication)</a>
                                     }
                                 </li>
                             }
