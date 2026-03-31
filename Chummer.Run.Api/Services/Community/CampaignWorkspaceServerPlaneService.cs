@@ -684,8 +684,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                     .OrderByDescending(static item => item.UpdatedAtUtc)
                     .First(),
                 StringComparer.OrdinalIgnoreCase);
-        return workspace.RecapShelf
-            .Take(6)
+        return SelectBoundedRecapShelfItems(workspace.RecapShelf, aftermathTimes, defaultUpdatedAtUtc)
             .Select(item =>
             {
                 CreatorPublicationProjection? creatorPublication = ResolveCreatorPublicationForRecapItem(item, publicationsById, publicationsByArtifactId);
@@ -732,6 +731,121 @@ public sealed class CampaignWorkspaceServerPlaneService
             })
             .ToArray();
     }
+
+    private static IReadOnlyList<PublicationSafeProjection> SelectBoundedRecapShelfItems(
+        IReadOnlyList<PublicationSafeProjection> items,
+        IReadOnlyDictionary<string, DateTimeOffset> aftermathTimes,
+        DateTimeOffset defaultUpdatedAtUtc)
+    {
+        var rankedItems = items
+            .Select(item => new
+            {
+                Item = item,
+                Category = BoundedRecapShelfCategory(item),
+                UpdatedAtUtc = ResolveBoundedRecapShelfUpdatedAt(item, aftermathTimes, defaultUpdatedAtUtc)
+            })
+            .ToArray();
+
+        var selected = rankedItems
+            .GroupBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(group => BoundedRecapShelfCategoryPriority(group.Key))
+            .ThenByDescending(group => group.Max(item => item.UpdatedAtUtc))
+            .Select(group => group
+                .OrderByDescending(item => item.UpdatedAtUtc)
+                .ThenBy(item => item.Item.Label, StringComparer.OrdinalIgnoreCase)
+                .First())
+            .Take(6)
+            .ToList();
+
+        if (selected.Count < 6)
+        {
+            HashSet<string> selectedIds = selected
+                .Select(item => item.Item.ProjectionId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            selected.AddRange(rankedItems
+                .Where(item => selectedIds.Add(item.Item.ProjectionId))
+                .OrderByDescending(item => BoundedRecapShelfPriority(item.Item))
+                .ThenByDescending(item => item.UpdatedAtUtc)
+                .ThenBy(item => item.Item.Label, StringComparer.OrdinalIgnoreCase)
+                .Take(6 - selected.Count));
+        }
+
+        return selected
+            .OrderByDescending(item => BoundedRecapShelfCategoryPriority(item.Category))
+            .ThenByDescending(item => item.UpdatedAtUtc)
+            .ThenBy(item => item.Item.Label, StringComparer.OrdinalIgnoreCase)
+            .Select(item => item.Item)
+            .ToArray();
+    }
+
+    private static DateTimeOffset ResolveBoundedRecapShelfUpdatedAt(
+        PublicationSafeProjection item,
+        IReadOnlyDictionary<string, DateTimeOffset> aftermathTimes,
+        DateTimeOffset defaultUpdatedAtUtc)
+        => aftermathTimes.TryGetValue(item.ProjectionId, out DateTimeOffset updatedAtUtc)
+            ? updatedAtUtc
+            : defaultUpdatedAtUtc;
+
+    private static string BoundedRecapShelfCategory(PublicationSafeProjection item)
+    {
+        string normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (normalizedKind.Contains("campaign_recap", StringComparison.Ordinal)
+            || normalizedKind == "campaign")
+        {
+            return "campaign";
+        }
+
+        if (normalizedKind.Contains("primer", StringComparison.Ordinal))
+        {
+            return "primer";
+        }
+
+        if (normalizedKind.Contains("runboard", StringComparison.Ordinal)
+            || normalizedKind.Contains("module", StringComparison.Ordinal))
+        {
+            return "run_module";
+        }
+
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        {
+            return "dossier";
+        }
+
+        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        {
+            return "replay";
+        }
+
+        if (normalizedKind.Contains("session_recap", StringComparison.Ordinal)
+            || normalizedKind.Contains("after_action", StringComparison.Ordinal)
+            || normalizedKind.Contains("recap", StringComparison.Ordinal))
+        {
+            return "aftermath";
+        }
+
+        if (normalizedKind.Contains("downtime", StringComparison.Ordinal))
+        {
+            return "downtime";
+        }
+
+        return "other";
+    }
+
+    private static int BoundedRecapShelfCategoryPriority(string category)
+        => category switch
+        {
+            "campaign" => 6,
+            "primer" => 5,
+            "run_module" => 4,
+            "dossier" => 3,
+            "replay" => 2,
+            "aftermath" => 1,
+            "downtime" => 0,
+            _ => -1
+        };
+
+    private static int BoundedRecapShelfPriority(PublicationSafeProjection item)
+        => BoundedRecapShelfCategoryPriority(BoundedRecapShelfCategory(item));
 
     private static bool SupportsCreatorShelfProjection(PublicationSafeProjection item)
     {

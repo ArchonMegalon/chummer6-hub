@@ -628,6 +628,12 @@ public sealed class CampaignSpineService
                         Summary: "This runner can move through build, play, recap, and return without losing identity.",
                         ArtifactId: continuity.RecapArtifactId),
                     new PublicationSafeProjection(
+                        ProjectionId: StableId("projection", $"{currentOwnerUserId}:{targetCampaign.CampaignId}:dossier"),
+                        Kind: "dossier_card",
+                        Label: "Living dossier packet",
+                        Summary: "Living dossier truth, campaign continuity, and governed publication detail stay attached to one shared artifact lane.",
+                        ArtifactId: dossier.DossierId),
+                    new PublicationSafeProjection(
                         ProjectionId: StableId("projection", $"{currentOwnerUserId}:{targetCampaign.CampaignId}:ops"),
                         Kind: "runboard_packet",
                         Label: "Runboard continuity packet",
@@ -1241,8 +1247,9 @@ public sealed class CampaignSpineService
 
         if (existing is null)
         {
+            string newDossierId = AccountService.NewId("dos");
             existing = new RunnerDossierProjection(
-                DossierId: AccountService.NewId("dos"),
+                DossierId: newDossierId,
                 RunnerHandle: user.Handle,
                 DisplayName: $"{user.DisplayName} dossier",
                 Status: DossierStatuses.Active,
@@ -1263,6 +1270,12 @@ public sealed class CampaignSpineService
                         Label: "Campaign-ready dossier",
                         Summary: "This runner can move through build, play, recap, and return without losing identity.",
                         ArtifactId: continuity.RecapArtifactId),
+                    new PublicationSafeProjection(
+                        ProjectionId: StableId("projection", $"{user.UserId}:{campaignId}:dossier"),
+                        Kind: "dossier_card",
+                        Label: "Living dossier packet",
+                        Summary: "Living dossier truth, campaign continuity, and governed publication detail stay attached to one shared artifact lane.",
+                        ArtifactId: newDossierId),
                     new PublicationSafeProjection(
                         ProjectionId: StableId("projection", $"{user.UserId}:{campaignId}:ops"),
                         Kind: "runboard_packet",
@@ -1297,6 +1310,12 @@ public sealed class CampaignSpineService
                         Label: "Campaign-ready dossier",
                         Summary: "This runner can move through build, play, recap, and return without losing identity.",
                         ArtifactId: continuity.RecapArtifactId),
+                    new PublicationSafeProjection(
+                        ProjectionId: StableId("projection", $"{user.UserId}:{campaignId}:dossier"),
+                        Kind: "dossier_card",
+                        Label: "Living dossier packet",
+                        Summary: "Living dossier truth, campaign continuity, and governed publication detail stay attached to one shared artifact lane.",
+                        ArtifactId: existing.DossierId),
                     new PublicationSafeProjection(
                         ProjectionId: StableId("projection", $"{user.UserId}:{campaignId}:ops"),
                         Kind: "runboard_packet",
