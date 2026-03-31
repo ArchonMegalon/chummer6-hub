@@ -67,14 +67,14 @@ async function assertCreatorPublicationDetail(page, pageErrors, path, label) {
     const currentPath = new URL(page.url()).pathname;
     if (isPublicCreatorPublicationPath(path)) {
       assert(/\/artifacts\/publications\//.test(currentPath), `${label} should open the shared public publication route.`);
-      await expectBodyText(page, 'Governed creator discovery', label);
-      await expectBodyText(page, 'Public creator packet', label);
-      await expectBodyText(page, 'Why this packet is live', label);
+      await expectBodyText(page, 'Governed publication discovery', label);
+      await expectBodyText(page, 'Public shared publication', label);
+      await expectBodyText(page, 'Why this publication is live', label);
       await expectBodyText(page, 'Publication kind', label);
       await expectBodyText(page, 'Provenance', label);
       await expectBodyText(page, 'Trust', label);
       await expectBodyText(page, 'Discovery', label);
-      await expectBodyText(page, 'Back to creator discovery', label);
+      await expectBodyText(page, 'Back to publication discovery', label);
       await expectBodyText(page, 'Open artifacts shelf', label);
     } else {
       assert(/\/account\/work\/publications\//.test(currentPath), `${label} should open the signed-in publication detail route.`);
@@ -379,15 +379,15 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Current proof surfaces');
     await expectVisible(page, 'text=Preview in progress');
     await expectVisible(page, 'text=Status guide');
-    await expectVisible(page, 'text=Governed creator discovery');
-    await expectVisible(page, 'text=Published creator packets');
+    await expectVisible(page, 'text=Governed publication discovery');
+    await expectVisible(page, 'text=Published shared publications');
     await expectVisible(page, 'text=Compare at a glance');
-    await expectVisible(page, 'text=How live creator packets differ');
-    await expectVisible(page, 'text=Open published creator packet');
+    await expectVisible(page, 'text=How live publications differ');
+    await expectVisible(page, 'text=Open public publication');
     publicCreatorPublicationPath = await readFirstHref(page, 'a[href*="/artifacts/publications/"]', '/artifacts');
     await assertNoBannedCopy(page, 'Artifacts');
   });
-  await assertCreatorPublicationDetail(page, pageErrors, publicCreatorPublicationPath, '/artifacts -> public creator packet');
+  await assertCreatorPublicationDetail(page, pageErrors, publicCreatorPublicationPath, '/artifacts -> public publication');
 
   await page.goto(`${baseUrl}/signup?next=${encodeURIComponent(signupNext)}`, { waitUntil: 'domcontentloaded' });
   await expectVisible(page, 'input[name="email"]');
@@ -765,7 +765,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/publications detail');
   await assertNoPageErrors(page, pageErrors, '/account/work/publications detail');
   if (accountPublicationPublicPath) {
-    await assertCreatorPublicationDetail(page, pageErrors, accountPublicationPublicPath, '/account/work/publications detail -> public creator packet');
+    await assertCreatorPublicationDetail(page, pageErrors, accountPublicationPublicPath, '/account/work/publications detail -> public publication');
   }
 
   await gotoAndAssert(page, pageErrors, accountPublicationBuildHandoffPath, async () => {
