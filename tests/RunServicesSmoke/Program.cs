@@ -2695,6 +2695,11 @@ async Task VerifyPublicLandingProjectionAsync()
             string.Equals(item.CampaignId, workspacePayload.CampaignId, StringComparison.OrdinalIgnoreCase)
             && string.Equals(item.Kind, "primer", StringComparison.Ordinal))
         .PublicationId;
+    string runModulePublicationId = campaignSummaryPayload.CreatorPublications
+        .First(item =>
+            string.Equals(item.CampaignId, workspacePayload.CampaignId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Kind, "run_module", StringComparison.Ordinal))
+        .PublicationId;
     string publicationId = campaignSummaryPayload.CreatorPublications
         .First(item => string.Equals(item.CampaignId, workspacePayload.CampaignId, StringComparison.OrdinalIgnoreCase))
         .PublicationId;
@@ -3254,6 +3259,40 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publishedPrimerPublicationDetailModel?.SelectedCreatorPublication?.Discoverable == true, "published primer publications should become discoverable once the governed public shelf promotion lands.");
     Assert(publishedPrimerPublicationDetailModel?.SelectedCreatorPublication?.TrustSummary?.Contains("live on governed discovery", StringComparison.OrdinalIgnoreCase) == true, "published primer publications should explain live governed discovery on the shared projection.");
 
+    var runModulePublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: runModulePublicationId) as ViewResult;
+    var runModulePublicationDetailModel = runModulePublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(runModulePublicationDetailModel?.SelectedCreatorPublication?.PublicationId, runModulePublicationId, StringComparison.Ordinal), "account publication detail route should load the selected run-module publication on the shared lane.");
+    Assert(string.Equals(runModulePublicationDetailModel?.SelectedCreatorPublication?.Kind, "run_module", StringComparison.Ordinal), "account publication detail route should preserve the run-module publication kind.");
+    Assert(runModulePublicationDetailModel?.SelectedCreatorPublication?.Title.Contains("run module", StringComparison.OrdinalIgnoreCase) == true, "account publication detail route should give run-module publications a first-class title.");
+    Assert(string.Equals(runModulePublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Draft.ProjectKind, "RunModule", StringComparison.Ordinal), "account publication detail route should keep run-module drafts on the shared registry run-module kind instead of a fallback project kind.");
+    Assert(runModulePublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Description?.Contains("Publication kind: Run Module", StringComparison.Ordinal) == true, "account publication detail route should carry run-module publication kind evidence into the draft description.");
+
+    var submitRunModulePublicationResult = await accountController.SubmitCreatorPublication(runModulePublicationId, "Run-module packet is grounded enough for governed moderation.", CancellationToken.None);
+    Assert(submitRunModulePublicationResult is RedirectResult { Url: not null }, "run-module publication submission should redirect back to the publication detail route.");
+    var submittedRunModulePublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: runModulePublicationId) as ViewResult;
+    var submittedRunModulePublicationDetailModel = submittedRunModulePublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(submittedRunModulePublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.PendingReview, StringComparison.Ordinal), "submitted run-module publications should enter the registry moderation queue.");
+    Assert(string.Equals(submittedRunModulePublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Moderation?.State, Chummer.Hub.Registry.Contracts.HubModerationStates.PendingReview, StringComparison.Ordinal), "submitted run-module publications should surface the pending moderation case on the account detail route.");
+
+    var approveRunModulePublicationResult = await accountController.ApproveCreatorPublication(runModulePublicationId, "Run-module lineage and GM continuity stayed grounded on the governed publication lane.", CancellationToken.None);
+    Assert(approveRunModulePublicationResult is RedirectResult { Url: not null }, "run-module publication approval should redirect back to the publication detail route.");
+    var approvedRunModulePublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: runModulePublicationId) as ViewResult;
+    var approvedRunModulePublicationDetailModel = approvedRunModulePublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(approvedRunModulePublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Approved, StringComparison.Ordinal), "approved run-module publications should surface approved review posture on the account detail route.");
+    Assert(string.Equals(approvedRunModulePublicationDetailModel?.SelectedCreatorPublication?.PublicationStatus, "approved", StringComparison.Ordinal), "approved run-module publications should replace synthetic preview status with the registry-backed approved posture on the shared projection.");
+    Assert(approvedRunModulePublicationDetailModel?.SelectedCreatorPublication?.ModerationSummary?.Contains("Moderation cleared approval", StringComparison.OrdinalIgnoreCase) == true, "approved run-module publications should carry approval-backed moderation summary on the shared projection.");
+
+    var publishRunModulePublicationResult = await accountController.PublishCreatorPublication(runModulePublicationId, "Publish the run module on governed public discovery now that review cleared.", CancellationToken.None);
+    Assert(publishRunModulePublicationResult is RedirectResult { Url: not null }, "run-module publication publish should redirect back to the publication detail route.");
+    var publishedRunModulePublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: runModulePublicationId) as ViewResult;
+    var publishedRunModulePublicationDetailModel = publishedRunModulePublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(publishedRunModulePublicationDetailModel?.SelectedCreatorPublicationReceipt?.PublicationStatus, Chummer.Hub.Registry.Contracts.HubPublicationStates.Published, StringComparison.Ordinal), "published run-module publications should surface the live published receipt posture on the account detail route.");
+    Assert(publishedRunModulePublicationDetailModel?.SelectedCreatorPublicationReceipt?.PublishedAtUtc is not null, "published run-module publications should stamp the published timestamp on the account detail route.");
+    Assert(string.Equals(publishedRunModulePublicationDetailModel?.SelectedCreatorPublication?.PublicationStatus, "published", StringComparison.Ordinal), "published run-module publications should project the live published posture on the shared creator-publication card.");
+    Assert(string.Equals(publishedRunModulePublicationDetailModel?.SelectedCreatorPublication?.Kind, "run_module", StringComparison.Ordinal), "published run-module publications should stay typed as run-module on the shared projection.");
+    Assert(publishedRunModulePublicationDetailModel?.SelectedCreatorPublication?.Discoverable == true, "published run-module publications should become discoverable once the governed public shelf promotion lands.");
+    Assert(publishedRunModulePublicationDetailModel?.SelectedCreatorPublication?.TrustSummary?.Contains("live on governed discovery", StringComparison.OrdinalIgnoreCase) == true, "published run-module publications should explain live governed discovery on the shared projection.");
+
     var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
     Assert(authenticatedHomeModel is not null, "signed-in home page should render through the MVC view layer.");
@@ -3292,6 +3331,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(publishedHomePrimerPublication?.PublicationStatus, "published", StringComparison.Ordinal), "signed-in home should carry the live published primer posture.");
     Assert(string.Equals(publishedHomePrimerPublication?.Kind, "primer", StringComparison.Ordinal), "signed-in home should preserve the primer publication kind.");
     Assert(publishedHomePrimerPublication?.Discoverable == true, "signed-in home should carry discoverable primer publication posture once publication is live.");
+    var publishedHomeRunModulePublication = authenticatedHomeModel.CampaignSpine.CreatorPublications
+        .FirstOrDefault(item => string.Equals(item.PublicationId, runModulePublicationId, StringComparison.Ordinal));
+    Assert(publishedHomeRunModulePublication is not null, "signed-in home should keep the explicitly published run-module publication on the shared home projection.");
+    Assert(string.Equals(publishedHomeRunModulePublication?.PublicationStatus, "published", StringComparison.Ordinal), "signed-in home should carry the live published run-module posture.");
+    Assert(string.Equals(publishedHomeRunModulePublication?.Kind, "run_module", StringComparison.Ordinal), "signed-in home should preserve the run-module publication kind.");
+    Assert(publishedHomeRunModulePublication?.Discoverable == true, "signed-in home should carry discoverable run-module publication posture once publication is live.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane is not null, "signed-in home should receive the bounded lead workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.LeadWorkspaceServerPlane!.WorkspaceState.Status), "signed-in home should surface one bounded workspace state on the what-changed card.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.WorkspaceState.EvidenceLines.Count >= 1, "signed-in home should surface workspace-state evidence on the what-changed card.");
@@ -3408,6 +3453,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publishedPrimerShelfPayload is not null, "home work route should keep the primer entry linked to the published shared publication on the bounded return shelf.");
     Assert(string.Equals(publishedPrimerShelfPayload?.PublicationState, "published", StringComparison.Ordinal), "home work route should carry published shared-publication state on the primer entry linked to the live publication.");
     Assert(publishedPrimerShelfPayload?.Discoverable == true, "home work route should keep the primer entry linked to the live publication discoverable.");
+    var publishedRunModuleShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
+        .FirstOrDefault(item => string.Equals(item.CreatorPublicationId, runModulePublicationId, StringComparison.Ordinal));
+    Assert(publishedRunModuleShelfPayload is not null, "home work route should keep the run-module entry linked to the published shared publication on the bounded return shelf.");
+    Assert(string.Equals(publishedRunModuleShelfPayload?.PublicationState, "published", StringComparison.Ordinal), "home work route should carry published shared-publication state on the run-module entry linked to the live publication.");
+    Assert(publishedRunModuleShelfPayload?.Discoverable == true, "home work route should keep the run-module entry linked to the live publication discoverable.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the replay package attached to the bounded return shelf.");
     var replayWorkHomeShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
         .FirstOrDefault(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal));
@@ -3434,6 +3484,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publishedPrimerWorkHomePublication is not null, "home work route should keep the explicitly published primer publication visible on the shared home projection.");
     Assert(string.Equals(publishedPrimerWorkHomePublication?.Kind, "primer", StringComparison.Ordinal), "home work route should preserve the primer publication kind.");
     Assert(publishedPrimerWorkHomePublication?.Discoverable == true, "home work route should carry discoverable primer publication posture once publication is live.");
+    var publishedRunModuleWorkHomePublication = workHomeModel.CampaignSpine.CreatorPublications
+        .FirstOrDefault(item => string.Equals(item.PublicationId, runModulePublicationId, StringComparison.Ordinal));
+    Assert(publishedRunModuleWorkHomePublication is not null, "home work route should keep the explicitly published run-module publication visible on the shared home projection.");
+    Assert(string.Equals(publishedRunModuleWorkHomePublication?.Kind, "run_module", StringComparison.Ordinal), "home work route should preserve the run-module publication kind.");
+    Assert(publishedRunModuleWorkHomePublication?.Discoverable == true, "home work route should carry discoverable run-module publication posture once publication is live.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1, "home work route should keep the claimed-device return packet visible on the shared home projection.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Any(item => item.RestoreSummary.Contains("bounded offline use", StringComparison.Ordinal)), "home work route should surface bounded offline prefetch on the claimed-device return card.");
 
@@ -3607,6 +3662,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicPrimerPublication is not null, "guest artifacts shelf should surface the published primer on governed public discovery.");
     Assert(string.Equals(publicPrimerPublication?.Kind, "primer", StringComparison.Ordinal), "guest artifacts shelf should preserve the primer publication kind on the public discovery rail.");
     Assert(publicPrimerPublication?.Discoverable == true, "guest artifacts shelf should keep the published primer discoverable on the public discovery rail.");
+    var publicRunModulePublication = artifactsModel.PublicCreatorPublications?.FirstOrDefault(item => string.Equals(item.PublicationId, runModulePublicationId, StringComparison.Ordinal));
+    Assert(publicRunModulePublication is not null, "guest artifacts shelf should surface the published run module on governed public discovery.");
+    Assert(string.Equals(publicRunModulePublication?.Kind, "run_module", StringComparison.Ordinal), "guest artifacts shelf should preserve the run-module publication kind on the public discovery rail.");
+    Assert(publicRunModulePublication?.Discoverable == true, "guest artifacts shelf should keep the published run module discoverable on the public discovery rail.");
     var publicCreatorDetailView = await controller.CreatorPublicationDetailPage(publicationId, CancellationToken.None) as ViewResult;
     var publicCreatorDetailModel = publicCreatorDetailView?.Model as PublicCreatorPublicationPageViewModel;
     Assert(publicCreatorDetailModel is not null, "guest creator-publication detail should render through the MVC view layer.");
@@ -3623,6 +3682,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(publicPrimerDetailModel!.Publication.PublicationId, primerPublicationId, StringComparison.Ordinal), "guest primer publication detail should load the published primer from the governed discovery rail.");
     Assert(string.Equals(publicPrimerDetailModel.Publication.Kind, "primer", StringComparison.Ordinal), "guest primer publication detail should preserve the primer publication kind.");
     Assert(string.Equals(publicPrimerDetailModel.Publication.PublicationStatus, "published", StringComparison.Ordinal), "guest primer publication detail should keep the live published posture.");
+    var publicRunModuleDetailView = await controller.CreatorPublicationDetailPage(runModulePublicationId, CancellationToken.None) as ViewResult;
+    var publicRunModuleDetailModel = publicRunModuleDetailView?.Model as PublicCreatorPublicationPageViewModel;
+    Assert(publicRunModuleDetailModel is not null, "guest run-module publication detail should render through the MVC view layer.");
+    Assert(string.Equals(publicRunModuleDetailModel!.Publication.PublicationId, runModulePublicationId, StringComparison.Ordinal), "guest run-module publication detail should load the published run module from the governed discovery rail.");
+    Assert(string.Equals(publicRunModuleDetailModel.Publication.Kind, "run_module", StringComparison.Ordinal), "guest run-module publication detail should preserve the run-module publication kind.");
+    Assert(string.Equals(publicRunModuleDetailModel.Publication.PublicationStatus, "published", StringComparison.Ordinal), "guest run-module publication detail should keep the live published posture.");
     Assert(artifactsModel.SignedInStatus is null, "guest artifacts shelf should not project install-specific signed-in trust posture.");
     var authenticatedArtifactsView = await authenticatedLandingController.ArtifactsPage(CancellationToken.None) as ViewResult;
     var authenticatedArtifactsModel = authenticatedArtifactsView?.Model as ShelfPageViewModel;
