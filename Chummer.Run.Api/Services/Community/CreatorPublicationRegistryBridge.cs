@@ -61,7 +61,7 @@ public sealed class CreatorPublicationRegistryBridge
         _drafts.SubmitProject(
             publication.PublicationId,
             user.UserId,
-            new HubSubmitProjectRequest(Notes: NormalizeOptional(notes)));
+            new HubSubmitProjectRequest(Notes: NormalizeOptional(notes) ?? $"{publication.Title} entered governed shared-publication review."));
         return GetOrCreatePublicationLane(user, publication, workspace);
     }
 
@@ -74,7 +74,10 @@ public sealed class CreatorPublicationRegistryBridge
         CreatorPublicationRegistryProjection current = GetOrCreatePublicationLane(user, publication, workspace);
         string caseId = current.DraftDetail.Moderation?.CaseId
             ?? throw new InvalidOperationException("There is no pending moderation case to approve.");
-        _drafts.ApproveModerationCase(caseId, user.UserId, new HubModerationDecisionRequest(NormalizeOptional(notes)));
+        _drafts.ApproveModerationCase(
+            caseId,
+            user.UserId,
+            new HubModerationDecisionRequest(NormalizeOptional(notes) ?? $"{publication.Title} cleared governed shared-publication review."));
         return GetOrCreatePublicationLane(user, publication, workspace);
     }
 
@@ -87,7 +90,10 @@ public sealed class CreatorPublicationRegistryBridge
         CreatorPublicationRegistryProjection current = GetOrCreatePublicationLane(user, publication, workspace);
         string caseId = current.DraftDetail.Moderation?.CaseId
             ?? throw new InvalidOperationException("There is no pending moderation case to reject.");
-        _drafts.RejectModerationCase(caseId, user.UserId, new HubModerationDecisionRequest(NormalizeOptional(notes)));
+        _drafts.RejectModerationCase(
+            caseId,
+            user.UserId,
+            new HubModerationDecisionRequest(NormalizeOptional(notes) ?? $"{publication.Title} needs revision before governed shared-publication review can continue."));
         return GetOrCreatePublicationLane(user, publication, workspace);
     }
 
@@ -102,7 +108,7 @@ public sealed class CreatorPublicationRegistryBridge
             publication.PublicationId,
             user.UserId,
             new HubPublishProjectRequest(
-                Notes: NormalizeOptional(notes),
+                Notes: NormalizeOptional(notes) ?? $"{publication.Title} is live on governed shared-publication discovery.",
                 PublisherId: user.UserId));
         return GetOrCreatePublicationLane(user, publication, workspace);
     }
@@ -128,11 +134,7 @@ public sealed class CreatorPublicationRegistryBridge
         CreatorPublicationProjection publication,
         CampaignWorkspaceProjection? workspace)
     {
-        PublicationSafeProjection? linkedShelfEntry = workspace?.RecapShelf
-            .FirstOrDefault(item =>
-                string.Equals(item.CreatorPublicationId, publication.PublicationId, StringComparison.OrdinalIgnoreCase)
-                || (!string.IsNullOrWhiteSpace(publication.ArtifactId)
-                    && string.Equals(item.ArtifactId, publication.ArtifactId, StringComparison.OrdinalIgnoreCase)));
+        PublicationSafeProjection? linkedShelfEntry = ResolveLinkedShelfEntry(publication, workspace);
         return new HubPublishDraftRequest(
             ProjectKind: ResolveProjectKind(publication, linkedShelfEntry),
             ProjectId: string.IsNullOrWhiteSpace(publication.ArtifactId) ? publication.PublicationId : publication.ArtifactId,
@@ -198,7 +200,18 @@ public sealed class CreatorPublicationRegistryBridge
         CampaignWorkspaceProjection? workspace,
         PublicationSafeProjection? linkedShelfEntry)
     {
-        List<string> lines = [publication.Summary];
+        List<string> lines =
+        [
+            publication.Summary,
+            $"Publication kind: {ResolvePublicationKindLabel(publication, linkedShelfEntry)}",
+            $"Status: {HumanizeValue(publication.PublicationStatus, "Preview ready")}",
+            $"Visibility: {HumanizeValue(publication.Visibility, "Shared")}"
+        ];
+
+        if (!string.IsNullOrWhiteSpace(publication.DiscoverySummary))
+        {
+            lines.Add($"Discovery: {publication.DiscoverySummary}");
+        }
 
         if (!string.IsNullOrWhiteSpace(publication.ProvenanceSummary))
         {
@@ -226,6 +239,30 @@ public sealed class CreatorPublicationRegistryBridge
         }
 
         return string.Join(" ", lines.Where(static line => !string.IsNullOrWhiteSpace(line)));
+    }
+
+    private static PublicationSafeProjection? ResolveLinkedShelfEntry(
+        CreatorPublicationProjection publication,
+        CampaignWorkspaceProjection? workspace)
+        => workspace?.RecapShelf.FirstOrDefault(item =>
+            string.Equals(item.CreatorPublicationId, publication.PublicationId, StringComparison.OrdinalIgnoreCase)
+            || (!string.IsNullOrWhiteSpace(publication.ArtifactId)
+                && string.Equals(item.ArtifactId, publication.ArtifactId, StringComparison.OrdinalIgnoreCase)));
+
+    private static string ResolvePublicationKindLabel(
+        CreatorPublicationProjection publication,
+        PublicationSafeProjection? linkedShelfEntry)
+        => HumanizeValue(linkedShelfEntry?.Kind ?? publication.Kind, "Publication");
+
+    private static string HumanizeValue(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(
+            value.Trim().Replace('_', ' ').Replace('-', ' '));
     }
 
     private static string? NormalizeOptional(string? value)
