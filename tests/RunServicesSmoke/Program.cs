@@ -3177,6 +3177,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(accountPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Draft.ProjectKind)
         && !string.Equals(accountPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Draft.ProjectKind, nameof(HubArtifactKind.BuildIdea), StringComparison.Ordinal),
         "account publication detail route should preserve a concrete shared project kind through the registry draft bridge instead of collapsing back to the generic build-idea fallback.");
+    Assert(accountPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Description?.Contains("Publication kind:", StringComparison.Ordinal) == true, "account publication detail route should carry publication-kind evidence into the registry draft description.");
+    Assert(accountPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Description?.Contains("Status:", StringComparison.Ordinal) == true, "account publication detail route should carry publication-status evidence into the registry draft description.");
     Assert(string.Equals(accountPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.NotRequired, StringComparison.Ordinal), "fresh creator publication detail should begin outside the moderation queue.");
 
     var submitPublicationResult = await accountController.SubmitCreatorPublication(publicationId, "Ready for governed moderation and trust review.", CancellationToken.None);
@@ -3195,7 +3197,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(approvedPublicationDetailModel?.SelectedCreatorPublication?.PublicationStatus, "approved", StringComparison.Ordinal), "approved creator publications should replace synthetic preview status with the registry-backed approved posture on the shared projection.");
     Assert(approvedPublicationDetailModel?.SelectedCreatorPublication?.ModerationSummary?.Contains("Moderation cleared approval", StringComparison.OrdinalIgnoreCase) == true, "approved creator publications should carry approval-backed moderation summary on the shared projection.");
 
-    var publishPublicationResult = await accountController.PublishCreatorPublication(publicationId, "Publish the governed packet onto the creator shelf now that review cleared.", CancellationToken.None);
+    var publishPublicationResult = await accountController.PublishCreatorPublication(publicationId, "Publish the governed publication onto public discovery now that review cleared.", CancellationToken.None);
     Assert(publishPublicationResult is RedirectResult { Url: not null }, "creator publication publish should redirect back to the publication detail route.");
     var publishedPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: publicationId) as ViewResult;
     var publishedPublicationDetailModel = publishedPublicationDetailPage?.Model as AccountPageViewModel;
