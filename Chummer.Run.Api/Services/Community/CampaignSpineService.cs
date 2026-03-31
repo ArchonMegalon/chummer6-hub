@@ -632,7 +632,13 @@ public sealed class CampaignSpineService
                         Kind: "runboard_packet",
                         Label: "Runboard continuity packet",
                         Summary: "GM-facing continuity and recap-safe state for the active campaign return.",
-                        ArtifactId: StableId("ops", targetCampaign.CampaignId))
+                        ArtifactId: StableId("ops", targetCampaign.CampaignId)),
+                    new PublicationSafeProjection(
+                        ProjectionId: StableId("projection", $"{currentOwnerUserId}:{targetCampaign.CampaignId}:primer"),
+                        Kind: "player_primer",
+                        Label: "Campaign primer",
+                        Summary: "Session-zero onboarding and table-start guidance stay attached to the same governed campaign truth.",
+                        ArtifactId: StableId("primer", targetCampaign.CampaignId))
                 ],
                 SnapshotIds = dossier.SnapshotIds.Concat([continuity.SnapshotId]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
                 UpdatedAtUtc = now
@@ -1262,7 +1268,13 @@ public sealed class CampaignSpineService
                         Kind: "runboard_packet",
                         Label: "Runboard continuity packet",
                         Summary: "GM-facing continuity and recap-safe state for the active campaign return.",
-                        ArtifactId: StableId("ops", campaignId))
+                        ArtifactId: StableId("ops", campaignId)),
+                    new PublicationSafeProjection(
+                        ProjectionId: StableId("projection", $"{user.UserId}:{campaignId}:primer"),
+                        Kind: "player_primer",
+                        Label: "Campaign primer",
+                        Summary: "Session-zero onboarding and table-start guidance stay attached to the same governed campaign truth.",
+                        ArtifactId: StableId("primer", campaignId))
                 ],
                 CreatedAtUtc: now,
                 UpdatedAtUtc: now);
@@ -1290,7 +1302,13 @@ public sealed class CampaignSpineService
                         Kind: "runboard_packet",
                         Label: "Runboard continuity packet",
                         Summary: "GM-facing continuity and recap-safe state for the active campaign return.",
-                        ArtifactId: StableId("ops", campaignId))
+                        ArtifactId: StableId("ops", campaignId)),
+                    new PublicationSafeProjection(
+                        ProjectionId: StableId("projection", $"{user.UserId}:{campaignId}:primer"),
+                        Kind: "player_primer",
+                        Label: "Campaign primer",
+                        Summary: "Session-zero onboarding and table-start guidance stay attached to the same governed campaign truth.",
+                        ArtifactId: StableId("primer", campaignId))
                 ],
                 SnapshotIds = existing.SnapshotIds.Concat(new[] { continuity.SnapshotId }).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
                 UpdatedAtUtc = existing.UpdatedAtUtc
@@ -1619,6 +1637,7 @@ public sealed class CampaignSpineService
             .SelectMany(static item => item.Projections)
             .Where(item => item.Kind.Contains("recap", StringComparison.OrdinalIgnoreCase)
                 || item.Kind.Contains("runboard", StringComparison.OrdinalIgnoreCase)
+                || item.Kind.Contains("primer", StringComparison.OrdinalIgnoreCase)
                 || item.Kind.Contains("dossier", StringComparison.OrdinalIgnoreCase)))
             .Distinct()
             .ToArray();

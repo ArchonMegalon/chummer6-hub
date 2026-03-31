@@ -2595,6 +2595,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.Workspaces[0].RecapShelf.Count >= 1, "campaign workspace should surface recap or publication-safe continuity outputs.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.Workspaces[0].RecapShelf[0].TrustBand), "campaign workspace should keep creator-publication trust ranking attached to the calmer recap shelf.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.Workspaces[0].RecapShelf[0].CreatorPublicationId), "campaign workspace should keep a direct creator-publication link attached to the calmer recap shelf.");
+    Assert(accountModel.CampaignSpine.Workspaces[0].RecapShelf.Any(item => item.Kind.Contains("primer", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(item.CreatorPublicationId)), "campaign workspace should project a primer-safe recap shelf entry on the same governed publication lane.");
     Assert(accountModel.CampaignSpine.Workspaces[0].Consequences?.Count >= 4, "campaign workspace should surface the governed consequence ledger directly on the shared campaign view.");
     Assert(accountModel.CampaignSpine.Workspaces[0].Consequences!.Any(item => string.Equals(item.Kind, "contact", StringComparison.Ordinal) && item.EvidenceLines.Count >= 1), "campaign workspace should keep receipt-backed contact evidence attached to the shared consequence ledger.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.Workspaces[0].ActiveSceneSummary), "campaign workspace should surface an explicit active-scene summary.");
@@ -2618,6 +2619,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.RulesNavigator[0].Studio!.Stages.Count == 3, "account page should keep the full sandbox-to-published studio flow attached to rules answers.");
     Assert(accountModel.CampaignSpine.MigrationReceipts.Count >= 1, "account page should surface legacy migration receipts.");
     Assert(accountModel.CampaignSpine.CreatorPublications.Count >= 1, "account page should surface creator publication posture.");
+    Assert(accountModel.CampaignSpine.CreatorPublications.Any(item => string.Equals(item.Kind, "primer", StringComparison.Ordinal) && item.Title.Contains("campaign primer", StringComparison.OrdinalIgnoreCase)), "account page should surface a first-class primer publication alongside the existing shared publication lanes.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].TrustBand), "account page should keep creator-publication trust ranking attached.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].TrustSummary), "account page should keep creator-publication trust reasoning attached.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].ComparisonSummary), "account page should keep creator-publication comparison guidance attached.");
