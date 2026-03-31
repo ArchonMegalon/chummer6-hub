@@ -236,7 +236,7 @@ milestones:
       - chummer6-hub
       - chummer6-ui
       - chummer6-design
-    status: in_progress
+    status: complete
     exit_criteria:
       - Campaigns, primers, dossiers, and run modules publish through one coherent governed path.
       - Publication flow reuses shared artifact truth instead of branching into one-off creator-only lanes.
