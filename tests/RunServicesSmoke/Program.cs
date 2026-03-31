@@ -2620,6 +2620,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel.CampaignSpine.MigrationReceipts.Count >= 1, "account page should surface legacy migration receipts.");
     Assert(accountModel.CampaignSpine.CreatorPublications.Count >= 1, "account page should surface creator publication posture.");
     Assert(accountModel.CampaignSpine.CreatorPublications.Any(item => string.Equals(item.Kind, "primer", StringComparison.Ordinal) && item.Title.Contains("campaign primer", StringComparison.OrdinalIgnoreCase)), "account page should surface a first-class primer publication alongside the existing shared publication lanes.");
+    Assert(accountModel.CampaignSpine.CreatorPublications.Any(item => string.Equals(item.Kind, "dossier", StringComparison.Ordinal) && item.Title.Contains("dossier", StringComparison.OrdinalIgnoreCase)), "account page should surface a first-class dossier publication alongside the shared publication lanes.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].TrustBand), "account page should keep creator-publication trust ranking attached.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].TrustSummary), "account page should keep creator-publication trust reasoning attached.");
     Assert(!string.IsNullOrWhiteSpace(accountModel.CampaignSpine.CreatorPublications[0].ComparisonSummary), "account page should keep creator-publication comparison guidance attached.");
@@ -2699,6 +2700,11 @@ async Task VerifyPublicLandingProjectionAsync()
         .First(item =>
             string.Equals(item.CampaignId, workspacePayload.CampaignId, StringComparison.OrdinalIgnoreCase)
             && string.Equals(item.Kind, "run_module", StringComparison.Ordinal))
+        .PublicationId;
+    string dossierPublicationId = campaignSummaryPayload.CreatorPublications
+        .First(item =>
+            string.Equals(item.CampaignId, workspacePayload.CampaignId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Kind, "dossier", StringComparison.Ordinal))
         .PublicationId;
     string publicationId = campaignSummaryPayload.CreatorPublications
         .First(item => string.Equals(item.CampaignId, workspacePayload.CampaignId, StringComparison.OrdinalIgnoreCase))
@@ -3293,6 +3299,40 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publishedRunModulePublicationDetailModel?.SelectedCreatorPublication?.Discoverable == true, "published run-module publications should become discoverable once the governed public shelf promotion lands.");
     Assert(publishedRunModulePublicationDetailModel?.SelectedCreatorPublication?.TrustSummary?.Contains("live on governed discovery", StringComparison.OrdinalIgnoreCase) == true, "published run-module publications should explain live governed discovery on the shared projection.");
 
+    var dossierPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: dossierPublicationId) as ViewResult;
+    var dossierPublicationDetailModel = dossierPublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(dossierPublicationDetailModel?.SelectedCreatorPublication?.PublicationId, dossierPublicationId, StringComparison.Ordinal), "account publication detail route should load the selected dossier publication on the shared lane.");
+    Assert(string.Equals(dossierPublicationDetailModel?.SelectedCreatorPublication?.Kind, "dossier", StringComparison.Ordinal), "account publication detail route should preserve the dossier publication kind.");
+    Assert(dossierPublicationDetailModel?.SelectedCreatorPublication?.Title.Contains("dossier", StringComparison.OrdinalIgnoreCase) == true, "account publication detail route should give dossier publications a first-class title.");
+    Assert(string.Equals(dossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Draft.ProjectKind, "Dossier", StringComparison.Ordinal), "account publication detail route should keep dossier drafts on the shared registry dossier kind instead of a fallback project kind.");
+    Assert(dossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Description?.Contains("Publication kind: Dossier", StringComparison.Ordinal) == true, "account publication detail route should carry dossier publication kind evidence into the draft description.");
+
+    var submitDossierPublicationResult = await accountController.SubmitCreatorPublication(dossierPublicationId, "Dossier packet is grounded enough for governed moderation.", CancellationToken.None);
+    Assert(submitDossierPublicationResult is RedirectResult { Url: not null }, "dossier publication submission should redirect back to the publication detail route.");
+    var submittedDossierPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: dossierPublicationId) as ViewResult;
+    var submittedDossierPublicationDetailModel = submittedDossierPublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(submittedDossierPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.PendingReview, StringComparison.Ordinal), "submitted dossier publications should enter the registry moderation queue.");
+    Assert(string.Equals(submittedDossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Moderation?.State, Chummer.Hub.Registry.Contracts.HubModerationStates.PendingReview, StringComparison.Ordinal), "submitted dossier publications should surface the pending moderation case on the account detail route.");
+
+    var approveDossierPublicationResult = await accountController.ApproveCreatorPublication(dossierPublicationId, "Dossier lineage and living identity stayed grounded on the governed publication lane.", CancellationToken.None);
+    Assert(approveDossierPublicationResult is RedirectResult { Url: not null }, "dossier publication approval should redirect back to the publication detail route.");
+    var approvedDossierPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: dossierPublicationId) as ViewResult;
+    var approvedDossierPublicationDetailModel = approvedDossierPublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(approvedDossierPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Approved, StringComparison.Ordinal), "approved dossier publications should surface approved review posture on the account detail route.");
+    Assert(string.Equals(approvedDossierPublicationDetailModel?.SelectedCreatorPublication?.PublicationStatus, "approved", StringComparison.Ordinal), "approved dossier publications should replace synthetic preview status with the registry-backed approved posture on the shared projection.");
+    Assert(approvedDossierPublicationDetailModel?.SelectedCreatorPublication?.ModerationSummary?.Contains("Moderation cleared approval", StringComparison.OrdinalIgnoreCase) == true, "approved dossier publications should carry approval-backed moderation summary on the shared projection.");
+
+    var publishDossierPublicationResult = await accountController.PublishCreatorPublication(dossierPublicationId, "Publish the dossier on governed public discovery now that review cleared.", CancellationToken.None);
+    Assert(publishDossierPublicationResult is RedirectResult { Url: not null }, "dossier publication publish should redirect back to the publication detail route.");
+    var publishedDossierPublicationDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, publicationId: dossierPublicationId) as ViewResult;
+    var publishedDossierPublicationDetailModel = publishedDossierPublicationDetailPage?.Model as AccountPageViewModel;
+    Assert(string.Equals(publishedDossierPublicationDetailModel?.SelectedCreatorPublicationReceipt?.PublicationStatus, Chummer.Hub.Registry.Contracts.HubPublicationStates.Published, StringComparison.Ordinal), "published dossier publications should surface the live published receipt posture on the account detail route.");
+    Assert(publishedDossierPublicationDetailModel?.SelectedCreatorPublicationReceipt?.PublishedAtUtc is not null, "published dossier publications should stamp the published timestamp on the account detail route.");
+    Assert(string.Equals(publishedDossierPublicationDetailModel?.SelectedCreatorPublication?.PublicationStatus, "published", StringComparison.Ordinal), "published dossier publications should project the live published posture on the shared creator-publication card.");
+    Assert(string.Equals(publishedDossierPublicationDetailModel?.SelectedCreatorPublication?.Kind, "dossier", StringComparison.Ordinal), "published dossier publications should stay typed as dossier on the shared projection.");
+    Assert(publishedDossierPublicationDetailModel?.SelectedCreatorPublication?.Discoverable == true, "published dossier publications should become discoverable once the governed public shelf promotion lands.");
+    Assert(publishedDossierPublicationDetailModel?.SelectedCreatorPublication?.TrustSummary?.Contains("live on governed discovery", StringComparison.OrdinalIgnoreCase) == true, "published dossier publications should explain live governed discovery on the shared projection.");
+
     var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
     Assert(authenticatedHomeModel is not null, "signed-in home page should render through the MVC view layer.");
@@ -3337,6 +3377,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(publishedHomeRunModulePublication?.PublicationStatus, "published", StringComparison.Ordinal), "signed-in home should carry the live published run-module posture.");
     Assert(string.Equals(publishedHomeRunModulePublication?.Kind, "run_module", StringComparison.Ordinal), "signed-in home should preserve the run-module publication kind.");
     Assert(publishedHomeRunModulePublication?.Discoverable == true, "signed-in home should carry discoverable run-module publication posture once publication is live.");
+    var publishedHomeDossierPublication = authenticatedHomeModel.CampaignSpine.CreatorPublications
+        .FirstOrDefault(item => string.Equals(item.PublicationId, dossierPublicationId, StringComparison.Ordinal));
+    Assert(publishedHomeDossierPublication is not null, "signed-in home should keep the explicitly published dossier publication on the shared home projection.");
+    Assert(string.Equals(publishedHomeDossierPublication?.PublicationStatus, "published", StringComparison.Ordinal), "signed-in home should carry the live published dossier posture.");
+    Assert(string.Equals(publishedHomeDossierPublication?.Kind, "dossier", StringComparison.Ordinal), "signed-in home should preserve the dossier publication kind.");
+    Assert(publishedHomeDossierPublication?.Discoverable == true, "signed-in home should carry discoverable dossier publication posture once publication is live.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane is not null, "signed-in home should receive the bounded lead workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.LeadWorkspaceServerPlane!.WorkspaceState.Status), "signed-in home should surface one bounded workspace state on the what-changed card.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.WorkspaceState.EvidenceLines.Count >= 1, "signed-in home should surface workspace-state evidence on the what-changed card.");
@@ -3458,6 +3504,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publishedRunModuleShelfPayload is not null, "home work route should keep the run-module entry linked to the published shared publication on the bounded return shelf.");
     Assert(string.Equals(publishedRunModuleShelfPayload?.PublicationState, "published", StringComparison.Ordinal), "home work route should carry published shared-publication state on the run-module entry linked to the live publication.");
     Assert(publishedRunModuleShelfPayload?.Discoverable == true, "home work route should keep the run-module entry linked to the live publication discoverable.");
+    var publishedDossierShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
+        .FirstOrDefault(item => string.Equals(item.CreatorPublicationId, dossierPublicationId, StringComparison.Ordinal));
+    Assert(publishedDossierShelfPayload is not null, "home work route should keep the dossier entry linked to the published shared publication on the bounded return shelf.");
+    Assert(string.Equals(publishedDossierShelfPayload?.PublicationState, "published", StringComparison.Ordinal), "home work route should carry published shared-publication state on the dossier entry linked to the live publication.");
+    Assert(publishedDossierShelfPayload?.Discoverable == true, "home work route should keep the dossier entry linked to the live publication discoverable.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the replay package attached to the bounded return shelf.");
     var replayWorkHomeShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
         .FirstOrDefault(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal));
@@ -3489,6 +3540,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publishedRunModuleWorkHomePublication is not null, "home work route should keep the explicitly published run-module publication visible on the shared home projection.");
     Assert(string.Equals(publishedRunModuleWorkHomePublication?.Kind, "run_module", StringComparison.Ordinal), "home work route should preserve the run-module publication kind.");
     Assert(publishedRunModuleWorkHomePublication?.Discoverable == true, "home work route should carry discoverable run-module publication posture once publication is live.");
+    var publishedDossierWorkHomePublication = workHomeModel.CampaignSpine.CreatorPublications
+        .FirstOrDefault(item => string.Equals(item.PublicationId, dossierPublicationId, StringComparison.Ordinal));
+    Assert(publishedDossierWorkHomePublication is not null, "home work route should keep the explicitly published dossier publication visible on the shared home projection.");
+    Assert(string.Equals(publishedDossierWorkHomePublication?.Kind, "dossier", StringComparison.Ordinal), "home work route should preserve the dossier publication kind.");
+    Assert(publishedDossierWorkHomePublication?.Discoverable == true, "home work route should carry discoverable dossier publication posture once publication is live.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1, "home work route should keep the claimed-device return packet visible on the shared home projection.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Any(item => item.RestoreSummary.Contains("bounded offline use", StringComparison.Ordinal)), "home work route should surface bounded offline prefetch on the claimed-device return card.");
 
@@ -3666,6 +3722,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicRunModulePublication is not null, "guest artifacts shelf should surface the published run module on governed public discovery.");
     Assert(string.Equals(publicRunModulePublication?.Kind, "run_module", StringComparison.Ordinal), "guest artifacts shelf should preserve the run-module publication kind on the public discovery rail.");
     Assert(publicRunModulePublication?.Discoverable == true, "guest artifacts shelf should keep the published run module discoverable on the public discovery rail.");
+    var publicDossierPublication = artifactsModel.PublicCreatorPublications?.FirstOrDefault(item => string.Equals(item.PublicationId, dossierPublicationId, StringComparison.Ordinal));
+    Assert(publicDossierPublication is not null, "guest artifacts shelf should surface the published dossier on governed public discovery.");
+    Assert(string.Equals(publicDossierPublication?.Kind, "dossier", StringComparison.Ordinal), "guest artifacts shelf should preserve the dossier publication kind on the public discovery rail.");
+    Assert(publicDossierPublication?.Discoverable == true, "guest artifacts shelf should keep the published dossier discoverable on the public discovery rail.");
     var publicCreatorDetailView = await controller.CreatorPublicationDetailPage(publicationId, CancellationToken.None) as ViewResult;
     var publicCreatorDetailModel = publicCreatorDetailView?.Model as PublicCreatorPublicationPageViewModel;
     Assert(publicCreatorDetailModel is not null, "guest creator-publication detail should render through the MVC view layer.");
@@ -3688,6 +3748,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(publicRunModuleDetailModel!.Publication.PublicationId, runModulePublicationId, StringComparison.Ordinal), "guest run-module publication detail should load the published run module from the governed discovery rail.");
     Assert(string.Equals(publicRunModuleDetailModel.Publication.Kind, "run_module", StringComparison.Ordinal), "guest run-module publication detail should preserve the run-module publication kind.");
     Assert(string.Equals(publicRunModuleDetailModel.Publication.PublicationStatus, "published", StringComparison.Ordinal), "guest run-module publication detail should keep the live published posture.");
+    var publicDossierDetailView = await controller.CreatorPublicationDetailPage(dossierPublicationId, CancellationToken.None) as ViewResult;
+    var publicDossierDetailModel = publicDossierDetailView?.Model as PublicCreatorPublicationPageViewModel;
+    Assert(publicDossierDetailModel is not null, "guest dossier publication detail should render through the MVC view layer.");
+    Assert(string.Equals(publicDossierDetailModel!.Publication.PublicationId, dossierPublicationId, StringComparison.Ordinal), "guest dossier publication detail should load the published dossier from the governed discovery rail.");
+    Assert(string.Equals(publicDossierDetailModel.Publication.Kind, "dossier", StringComparison.Ordinal), "guest dossier publication detail should preserve the dossier publication kind.");
+    Assert(string.Equals(publicDossierDetailModel.Publication.PublicationStatus, "published", StringComparison.Ordinal), "guest dossier publication detail should keep the live published posture.");
     Assert(artifactsModel.SignedInStatus is null, "guest artifacts shelf should not project install-specific signed-in trust posture.");
     var authenticatedArtifactsView = await authenticatedLandingController.ArtifactsPage(CancellationToken.None) as ViewResult;
     var authenticatedArtifactsModel = authenticatedArtifactsView?.Model as ShelfPageViewModel;
