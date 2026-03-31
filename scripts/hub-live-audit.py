@@ -212,14 +212,14 @@ def is_public_creator_publication_path(path: str) -> bool:
 def require_creator_publication_body(body: str, path: str) -> None:
     if is_public_creator_publication_path(path):
         for snippet in (
-            "Governed creator discovery",
-            "Public creator packet",
-            "Why this packet is live",
+            "Governed publication discovery",
+            "Public shared publication",
+            "Why this publication is live",
             "Publication kind",
             "Provenance",
             "Trust",
             "Discovery",
-            "Back to creator discovery",
+            "Back to publication discovery",
             "Open artifacts shelf",
         ):
             require_snippet(body, snippet, path)
@@ -1900,7 +1900,7 @@ def main() -> int:
             forbidden_texts=("Package details",),
             expects_header_count=1),
         AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Status guide"), forbidden_texts=("Research tracks",), expects_header_count=1),
-        AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Preview in progress", "Status guide", "Anyone evaluating the preview", "Governed creator discovery", "Published creator packets", "Compare at a glance", "How live creator packets differ", "Open published creator packet"), expects_header_count=1),
+        AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Preview in progress", "Status guide", "Anyone evaluating the preview", "Governed publication discovery", "Published shared publications", "Compare at a glance", "How live publications differ", "Open public publication"), expects_header_count=1),
         AuditRoute("/artifacts/current-preview-build", "Current preview build", required_texts=("Anyone evaluating the preview", "Use and verify this proof", "What this live artifact shows, who it helps, and what to check next", "Start from the live surface", "Open current release", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", required_texts=("Anyone evaluating the preview", "Why this horizon matters now", "Current pain, expected unlock, and the live proof you should compare first", "Compare with current proof", "Need a decision instead?", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute(

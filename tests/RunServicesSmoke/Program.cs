@@ -1616,7 +1616,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(shelfSource.Contains("Open build path for @linkedPublication.Title", StringComparison.Ordinal), "artifact shelf should keep a direct route back to the linked creator-publication build path.");
     Assert(shelfSource.Contains("Open publication status", StringComparison.Ordinal), "artifact shelf should still preserve the private moderation route when a creator packet has not reached public discovery.");
     var publicCreatorSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "PublicCreatorPublication.cshtml"));
-    Assert(publicCreatorSource.Contains("Why this packet is live", StringComparison.Ordinal), "public creator detail should explain the live governed packet posture on its own page.");
+    Assert(publicCreatorSource.Contains("Why this publication is live", StringComparison.Ordinal), "public creator detail should explain the live governed publication posture on its own page.");
     Assert(publicCreatorSource.Contains("Publication kind", StringComparison.Ordinal), "public creator detail should surface the shared publication kind instead of collapsing into creator-only framing.");
     Assert(publicCreatorSource.Contains("Compare by", StringComparison.Ordinal), "public creator detail should surface creator-comparison guidance on the public inspect route.");
     Assert(publicCreatorSource.Contains("Back to publication discovery", StringComparison.Ordinal), "public publication detail should keep an explicit route back to the public discovery shelf.");
@@ -3237,6 +3237,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.Workspaces[0].NextSafeAction), "signed-in home should keep the workspace next safe action attached to the shared campaign view.");
     Assert(authenticatedHomeModel.CampaignSpine.Workspaces.Any(item => !string.IsNullOrWhiteSpace(item.FirstPlayableSession?.RuleReadySummary)), "signed-in home should keep legal-runner proof attached to at least one shared first-session projection.");
     Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Any(item => string.Equals(item.PublicationStatus, "published", StringComparison.Ordinal)), "signed-in home should carry registry-backed live creator-publication posture once the creator shelf promotion lands.");
+    var publishedHomePublication = authenticatedHomeModel.CampaignSpine.CreatorPublications
+        .FirstOrDefault(item => string.Equals(item.PublicationId, publicationId, StringComparison.Ordinal));
+    Assert(publishedHomePublication is not null, "signed-in home should keep the explicitly published creator publication on the shared home projection.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane is not null, "signed-in home should receive the bounded lead workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.LeadWorkspaceServerPlane!.WorkspaceState.Status), "signed-in home should surface one bounded workspace state on the what-changed card.");
     Assert(authenticatedHomeModel.LeadWorkspaceServerPlane.WorkspaceState.EvidenceLines.Count >= 1, "signed-in home should surface workspace-state evidence on the what-changed card.");
@@ -3302,13 +3305,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(contactSubmittedModel.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "contact confirmation should keep the signed-in access posture attached to the submitted case.");
     Assert(authenticatedHomeModel.CampaignSpine.RulesNavigator.Count >= 1, "signed-in home should surface grounded rules navigator answers.");
     Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Count >= 1, "signed-in home should surface creator publication posture.");
-    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CreatorPublications[0].TrustSummary), "signed-in home should keep creator-publication trust reasoning attached.");
-    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CreatorPublications[0].ComparisonSummary), "signed-in home should keep creator-publication comparison guidance attached.");
-    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CreatorPublications[0].NextSafeAction), "signed-in home should keep creator-publication next-step truth attached.");
-    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CreatorPublications[0].CampaignReturnSummary), "signed-in home should keep creator-publication return truth attached.");
-    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CreatorPublications[0].SupportClosureSummary), "signed-in home should keep creator-publication support closure attached.");
-    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CreatorPublications[0].ModerationSummary), "signed-in home should keep creator-publication moderation posture attached.");
-    Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.CreatorPublications[0].BuildHandoffId), "signed-in home should keep the related build handoff attached to creator publication follow-through.");
+    Assert(!string.IsNullOrWhiteSpace(publishedHomePublication?.TrustSummary), "signed-in home should keep creator-publication trust reasoning attached.");
+    Assert(!string.IsNullOrWhiteSpace(publishedHomePublication?.ComparisonSummary), "signed-in home should keep creator-publication comparison guidance attached.");
+    Assert(!string.IsNullOrWhiteSpace(publishedHomePublication?.NextSafeAction), "signed-in home should keep creator-publication next-step truth attached.");
+    Assert(!string.IsNullOrWhiteSpace(publishedHomePublication?.CampaignReturnSummary), "signed-in home should keep creator-publication return truth attached.");
+    Assert(!string.IsNullOrWhiteSpace(publishedHomePublication?.SupportClosureSummary), "signed-in home should keep creator-publication support closure attached.");
+    Assert(!string.IsNullOrWhiteSpace(publishedHomePublication?.ModerationSummary), "signed-in home should keep creator-publication moderation posture attached.");
+    Assert(!string.IsNullOrWhiteSpace(publishedHomePublication?.BuildHandoffId), "signed-in home should keep the related build handoff attached to creator publication follow-through.");
     Assert(authenticatedHomeModel.CampaignSpine.MigrationReceipts.Count >= 1, "signed-in home should surface migration receipt truth.");
     Assert(authenticatedHomeModel.InstallLinking.ClaimedInstallations?.Any(static item => string.Equals(item.Platform, "linux", StringComparison.OrdinalIgnoreCase)) == true, "signed-in home should surface claimed install posture.");
     var accessHomePage = await authenticatedLandingController.HomePage("access", CancellationToken.None) as ViewResult;
@@ -3339,12 +3342,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(recapShelfPayload is not null, "home work route should surface the generated aftermath package on the richer recap-shelf projection.");
     Assert(recapShelfPayload?.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) == true, "home work route should mark the lead aftermath artifact as usable from the creator shelf as well as the campaign shelf.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.OwnershipSummary), "home work route should keep explicit artifact ownership posture attached to the recap shelf.");
-    Assert(string.Equals(recapShelfPayload?.PublicationState, "published", StringComparison.Ordinal), "home work route should carry creator-publication state directly on the linked recap shelf entry.");
-    Assert(string.Equals(recapShelfPayload?.TrustBand, "curated-live", StringComparison.Ordinal), "home work route should carry creator-publication trust ranking directly on the linked recap shelf entry.");
-    Assert(recapShelfPayload?.Discoverable == true, "home work route should keep recap entries discoverable once creator publication is live.");
     Assert(recapShelfPayload?.PublicationSummary?.Contains("publication shelf", StringComparison.OrdinalIgnoreCase) == true, "home work route should explain that the same artifact already feeds shared publication posture.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.CreatorPublicationId), "home work route should keep the linked creator-publication id attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.NextSafeAction), "home work route should keep the next safe shelf action attached to the recap shelf entry.");
+    var publishedRecapShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
+        .FirstOrDefault(item => string.Equals(item.CreatorPublicationId, publicationId, StringComparison.Ordinal));
+    Assert(publishedRecapShelfPayload is not null, "home work route should keep the recap entry linked to the published shared publication on the bounded return shelf.");
+    Assert(string.Equals(publishedRecapShelfPayload?.PublicationState, "published", StringComparison.Ordinal), "home work route should carry published shared-publication state on the recap entry linked to the live publication.");
+    Assert(string.Equals(publishedRecapShelfPayload?.TrustBand, "curated-live", StringComparison.Ordinal), "home work route should carry live trust ranking on the recap entry linked to the published shared publication.");
+    Assert(publishedRecapShelfPayload?.Discoverable == true, "home work route should keep the recap entry linked to the live publication discoverable.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the replay package attached to the bounded return shelf.");
     var replayWorkHomeShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
         .FirstOrDefault(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal));
@@ -3354,15 +3360,18 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.ProvenanceSummary), "home work route should keep explicit provenance attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.AuditSummary), "home work route should keep explicit audit posture attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary), "home work route should keep the shared campaign view tied to a real return summary.");
-    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ProvenanceSummary), "home work route should keep publication trust visible on the shared home projection.");
-    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].TrustBand), "home work route should keep publication trust ranking visible on the shared home projection.");
-    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].TrustSummary), "home work route should keep creator-publication trust reasoning visible on the shared home projection.");
-    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ComparisonSummary), "home work route should keep creator-publication comparison guidance visible on the shared home projection.");
-    Assert(workHomeModel.CampaignSpine.CreatorPublications[0].Discoverable == true, "home work route should carry discoverable creator-publication posture once publication is live.");
-    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].NextSafeAction), "home work route should keep creator-publication next-step truth visible on the shared home projection.");
-    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].CampaignReturnSummary), "home work route should keep creator-publication return truth visible on the shared home projection.");
-    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].SupportClosureSummary), "home work route should keep creator-publication support closure visible on the shared home projection.");
-    Assert(!string.IsNullOrWhiteSpace(workHomeModel.CampaignSpine.CreatorPublications[0].ModerationSummary), "home work route should keep creator-publication moderation posture visible on the shared home projection.");
+    var publishedWorkHomePublication = workHomeModel.CampaignSpine.CreatorPublications
+        .FirstOrDefault(item => string.Equals(item.PublicationId, publicationId, StringComparison.Ordinal));
+    Assert(publishedWorkHomePublication is not null, "home work route should keep the explicitly published creator publication visible on the shared home projection.");
+    Assert(!string.IsNullOrWhiteSpace(publishedWorkHomePublication?.ProvenanceSummary), "home work route should keep publication trust visible on the shared home projection.");
+    Assert(!string.IsNullOrWhiteSpace(publishedWorkHomePublication?.TrustBand), "home work route should keep publication trust ranking visible on the shared home projection.");
+    Assert(!string.IsNullOrWhiteSpace(publishedWorkHomePublication?.TrustSummary), "home work route should keep creator-publication trust reasoning visible on the shared home projection.");
+    Assert(!string.IsNullOrWhiteSpace(publishedWorkHomePublication?.ComparisonSummary), "home work route should keep creator-publication comparison guidance visible on the shared home projection.");
+    Assert(publishedWorkHomePublication?.Discoverable == true, "home work route should carry discoverable creator-publication posture once publication is live.");
+    Assert(!string.IsNullOrWhiteSpace(publishedWorkHomePublication?.NextSafeAction), "home work route should keep creator-publication next-step truth visible on the shared home projection.");
+    Assert(!string.IsNullOrWhiteSpace(publishedWorkHomePublication?.CampaignReturnSummary), "home work route should keep creator-publication return truth visible on the shared home projection.");
+    Assert(!string.IsNullOrWhiteSpace(publishedWorkHomePublication?.SupportClosureSummary), "home work route should keep creator-publication support closure visible on the shared home projection.");
+    Assert(!string.IsNullOrWhiteSpace(publishedWorkHomePublication?.ModerationSummary), "home work route should keep creator-publication moderation posture visible on the shared home projection.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1, "home work route should keep the claimed-device return packet visible on the shared home projection.");
     Assert(workHomeModel.CampaignSpine.Restore.ClaimedDevices.Any(item => item.RestoreSummary.Contains("bounded offline use", StringComparison.Ordinal)), "home work route should surface bounded offline prefetch on the claimed-device return card.");
 
