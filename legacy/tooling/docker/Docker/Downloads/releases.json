@@ -1,25 +1,27 @@
 {
-  "version": "unpublished",
-  "channel": "docker",
-  "publishedAt": "2026-03-25T14:40:15Z",
+  "version": "run-20260325-081445",
+  "channel": "preview",
+  "publishedAt": "2026-03-25T08:16:56Z",
   "downloads": [
     {
       "id": "avalonia-linux-x64-installer",
       "platform": "Avalonia Desktop Linux X64 Installer",
       "url": "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
-      "sha256": "c61d176def02a0ea5ef9d06df691e39dc1dd8bb07313b7490fbce01ea384b817",
-      "sizeBytes": 7960268,
+      "sha256": "75081156011dc38457694bb33f1b1c1eacc38b3691fa14dafd3b77cb8c0bd0a7",
+      "sizeBytes": 33987294,
       "format": "deb",
-      "flavor": "installer"
+      "flavor": "installer",
+      "kind": "installer"
     },
     {
       "id": "blazor-desktop-linux-x64-installer",
       "platform": "Blazor Desktop Linux X64 Installer",
       "url": "/downloads/files/chummer-blazor-desktop-linux-x64-installer.deb",
-      "sha256": "2893da622ededca373cb2171ea85d2da8f523e38b266a2cd0e1612234abb6999",
-      "sizeBytes": 1272354,
+      "sha256": "b36624a7b8a5a1b4e06cac6ead3040d86db542dd8dfe5694252d3b5cc54e6f56",
+      "sizeBytes": 36411366,
       "format": "deb",
-      "flavor": "installer"
+      "flavor": "installer",
+      "kind": "installer"
     },
     {
       "id": "avalonia-win-x64-installer",
@@ -28,7 +30,8 @@
       "sha256": "dcb609cbfc32e795bbd9880a8b15538ae965ce347a99a8cb44170f6731b0f4c2",
       "sizeBytes": 51645826,
       "format": "exe",
-      "flavor": "installer"
+      "flavor": "installer",
+      "kind": "installer"
     },
     {
       "id": "blazor-desktop-win-x64-installer",
@@ -37,10 +40,36 @@
       "sha256": "bc960d8d8081bd3e661b6f7ac281ee08879a5eeb007d45ec0bdfb9a98f188499",
       "sizeBytes": 51645872,
       "format": "exe",
-      "flavor": "installer"
+      "flavor": "installer",
+      "kind": "installer"
     }
   ],
   "source": "registry",
   "status": "published",
-  "message": null
+  "message": null,
+  "rolloutState": "local_docker_preview",
+  "rolloutReason": "Current release shelf was exercised by the local docker release proof harness before publication.",
+  "supportabilityState": "local_docker_proven",
+  "supportabilitySummary": "Local release proof passed for: install_claim_restore_continue, build_explain_publish, campaign_session_recover_recap, report_cluster_release_notify. Claimed-device restore and bounded offline prefetch stayed grounded on the current shelf.",
+  "knownIssueSummary": "Preview caveats still apply, but the current shelf has recent install, claimed-device recovery, bounded offline prefetch, and support proof instead of only manifest presence.",
+  "fixAvailabilitySummary": "Only send fixed notices after the affected install can receive the published channel artifact now on the shelf.",
+  "releaseProof": {
+    "status": "passed",
+    "generatedAt": "2026-03-29T09:48:56Z",
+    "baseUrl": "https://chummer.run",
+    "journeysPassed": [
+      "install_claim_restore_continue",
+      "build_explain_publish",
+      "campaign_session_recover_recap",
+      "report_cluster_release_notify"
+    ],
+    "proofRoutes": [
+      "/downloads/install/avalonia-linux-x64-installer",
+      "/home/access",
+      "/home/work",
+      "/account/work",
+      "/account/support",
+      "/contact"
+    ]
+  }
 }
