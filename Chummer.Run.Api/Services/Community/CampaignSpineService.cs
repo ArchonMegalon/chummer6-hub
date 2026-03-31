@@ -2991,7 +2991,6 @@ public sealed class CampaignSpineService
 
         const string publicationState = "preview_ready";
         var (trustBand, discoverable, _, _, _) = BuildCreatorPublicationTrustPosture(publicationState, campaign.Visibility);
-        string creatorPublicationId = StableId("publication", workspaceId);
         string ownershipSummary = $"Shared {campaign.Visibility.Replace('_', ' ')} creator packet stays attached to {campaign.Name}.";
         string publicationSummary = "Preview-ready creator publication keeps recap-safe outputs reviewable before they become live.";
 
@@ -3015,7 +3014,7 @@ public sealed class CampaignSpineService
                     ? publicationSummary
                     : item.PublicationSummary,
                 CreatorPublicationId = string.IsNullOrWhiteSpace(item.CreatorPublicationId)
-                    ? creatorPublicationId
+                    ? StableId("publication", $"{workspaceId}:{item.ProjectionId}")
                     : item.CreatorPublicationId,
                 NextSafeAction = string.IsNullOrWhiteSpace(item.NextSafeAction)
                     ? nextSafeAction
@@ -3603,56 +3602,63 @@ public sealed class CampaignSpineService
         IReadOnlyList<BuildLabHandoffProjection> buildLabHandoffs)
     {
         return workspaces
-            .Select(workspace =>
+            .SelectMany(workspace =>
             {
                 var dossier = dossiers.FirstOrDefault(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase));
-                var leadRecap = workspace.RecapShelf.FirstOrDefault();
-                var artifact = leadRecap?.ArtifactId ?? StableId("artifact", workspace.WorkspaceId);
                 var leadHandoff = buildLabHandoffs
                     .Where(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
                     .OrderByDescending(static item => item.UpdatedAtUtc)
                     .FirstOrDefault();
-                var nextSafeAction = !string.IsNullOrWhiteSpace(leadHandoff?.NextSafeAction)
-                    ? leadHandoff.NextSafeAction
-                    : workspace.NextSafeAction
-                        ?? "Review the grounded creator packet, then return through the shared campaign view before you publish or export it further.";
-                var campaignReturnSummary = !string.IsNullOrWhiteSpace(leadHandoff?.CampaignReturnSummary)
-                    ? leadHandoff.CampaignReturnSummary
-                    : workspace.ReturnSummary;
-                var supportClosureSummary = !string.IsNullOrWhiteSpace(leadHandoff?.SupportClosureSummary)
-                    ? leadHandoff.SupportClosureSummary
-                    : DescribeCreatorPublicationSupportClosure(workspace);
-                var lineageSummary = DescribeCreatorPublicationLineage(artifact, leadHandoff, workspace);
                 const string publicationStatus = "preview_ready";
                 var (trustBand, discoverable, trustSummary, discoverySummary, moderationSummary) = BuildCreatorPublicationTrustPosture(publicationStatus, workspace.Visibility);
                 var watchouts = BuildCreatorPublicationWatchouts(workspace, leadHandoff);
-                return new CreatorPublicationProjection(
-                    PublicationId: StableId("publication", workspace.WorkspaceId),
-                    Title: $"{workspace.CampaignName} creator packet",
-                    Kind: "campaign_packet",
-                    Summary: "Campaign recap, dossier-safe briefings, and creator-ready outputs now share one governed publication posture.",
-                    CampaignId: workspace.CampaignId,
-                    DossierId: dossier?.DossierId,
-                    ArtifactId: artifact,
-                    ProvenanceSummary: string.IsNullOrWhiteSpace(leadRecap?.ProvenanceSummary)
-                        ? $"{workspace.RuleEnvironment.CompatibilityFingerprint} + recap-safe output shelf"
-                        : $"{workspace.RuleEnvironment.CompatibilityFingerprint} + {leadRecap!.ProvenanceSummary}",
-                    DiscoverySummary: discoverySummary,
-                    Visibility: workspace.Visibility,
-                    PublicationStatus: publicationStatus,
-                    TrustBand: trustBand,
-                    Discoverable: discoverable,
-                    UpdatedAtUtc: workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow,
-                    NextSafeAction: nextSafeAction,
-                    CampaignReturnSummary: campaignReturnSummary,
-                    SupportClosureSummary: supportClosureSummary,
-                    BuildHandoffId: leadHandoff?.HandoffId,
-                    Watchouts: watchouts,
-                    LineageSummary: lineageSummary,
-                    TrustSummary: trustSummary,
-                    ComparisonSummary: DescribeCreatorPublicationComparisonSummary(leadHandoff),
-                    ModerationSummary: moderationSummary);
+                return workspace.RecapShelf
+                    .Where(item => !string.IsNullOrWhiteSpace(item.CreatorPublicationId))
+                    .Select(item =>
+                    {
+                        string artifact = item.ArtifactId ?? StableId("artifact", $"{workspace.WorkspaceId}:{item.ProjectionId}");
+                        string publicationKind = NormalizeCreatorPublicationKind(item.Kind);
+                        string nextSafeAction = !string.IsNullOrWhiteSpace(item.NextSafeAction)
+                            ? item.NextSafeAction!
+                            : !string.IsNullOrWhiteSpace(leadHandoff?.NextSafeAction)
+                                ? leadHandoff.NextSafeAction
+                                : workspace.NextSafeAction
+                                    ?? "Review the grounded creator packet, then return through the shared campaign view before you publish or export it further.";
+                        string campaignReturnSummary = DescribeSharedPublicationSummary(workspace, item);
+                        string supportClosureSummary = !string.IsNullOrWhiteSpace(leadHandoff?.SupportClosureSummary)
+                            ? leadHandoff.SupportClosureSummary
+                            : DescribeCreatorPublicationSupportClosure(workspace);
+                        return new CreatorPublicationProjection(
+                            PublicationId: item.CreatorPublicationId!,
+                            Title: BuildCreatorPublicationTitle(workspace, dossier, item, publicationKind),
+                            Kind: publicationKind,
+                            Summary: BuildCreatorPublicationSummary(workspace, item, publicationKind),
+                            CampaignId: workspace.CampaignId,
+                            DossierId: dossier?.DossierId,
+                            ArtifactId: artifact,
+                            ProvenanceSummary: string.IsNullOrWhiteSpace(item.ProvenanceSummary)
+                                ? $"{workspace.RuleEnvironment.CompatibilityFingerprint} + {item.Label}"
+                                : item.ProvenanceSummary!,
+                            DiscoverySummary: discoverySummary,
+                            Visibility: workspace.Visibility,
+                            PublicationStatus: publicationStatus,
+                            TrustBand: trustBand,
+                            Discoverable: discoverable,
+                            UpdatedAtUtc: workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow,
+                            NextSafeAction: nextSafeAction,
+                            CampaignReturnSummary: campaignReturnSummary,
+                            SupportClosureSummary: supportClosureSummary,
+                            BuildHandoffId: leadHandoff?.HandoffId,
+                            Watchouts: watchouts,
+                            LineageSummary: DescribeCreatorPublicationLineage(artifact, leadHandoff, workspace),
+                            TrustSummary: trustSummary,
+                            ComparisonSummary: DescribeCreatorPublicationComparisonSummary(leadHandoff),
+                            ModerationSummary: moderationSummary);
+                    });
             })
+            .OrderByDescending(publication => CreatorPublicationProjectionPriority(publication.Kind))
+            .ThenByDescending(static publication => publication.UpdatedAtUtc)
+            .ThenBy(publication => publication.Title, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
 
@@ -3660,12 +3666,20 @@ public sealed class CampaignSpineService
         IReadOnlyList<CampaignWorkspaceProjection> workspaces,
         IReadOnlyList<CreatorPublicationProjection> creatorPublications)
     {
+        var publicationsById = creatorPublications.ToDictionary(static item => item.PublicationId, StringComparer.OrdinalIgnoreCase);
+        var publicationsByArtifactId = creatorPublications
+            .Where(item => !string.IsNullOrWhiteSpace(item.ArtifactId))
+            .GroupBy(item => item.ArtifactId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group
+                    .OrderByDescending(static item => item.UpdatedAtUtc)
+                    .First(),
+                StringComparer.OrdinalIgnoreCase);
         return workspaces
             .Select(workspace =>
             {
-                var creatorPublication = creatorPublications
-                    .FirstOrDefault(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase));
-                if (creatorPublication is null)
+                if (creatorPublications.Count == 0)
                 {
                     return workspace;
                 }
@@ -3673,24 +3687,39 @@ public sealed class CampaignSpineService
                 var recapShelf = workspace.RecapShelf
                     .Select(item =>
                     {
-                        bool creatorLinked = (!string.IsNullOrWhiteSpace(item.ArtifactId)
-                                && string.Equals(item.ArtifactId, creatorPublication.ArtifactId, StringComparison.OrdinalIgnoreCase))
-                            || SupportsCreatorShelfProjection(item);
+                        CreatorPublicationProjection? creatorPublication = ResolveCreatorPublicationForRecapItem(item, publicationsById, publicationsByArtifactId);
+                        bool creatorLinked = creatorPublication is not null;
 
                         return item with
                         {
-                            Audience = DescribeRecapShelfAudience(item, creatorLinked),
-                            OwnershipSummary = DescribeRecapShelfOwnershipSummary(workspace, item),
+                            Audience = creatorLinked
+                                ? DescribeRecapShelfAudience(item, creatorLinked)
+                                : string.IsNullOrWhiteSpace(item.Audience)
+                                    ? DescribeRecapShelfAudience(item, creatorLinked)
+                                    : item.Audience,
+                            OwnershipSummary = creatorLinked
+                                ? DescribeRecapShelfOwnershipSummary(workspace, item)
+                                : string.IsNullOrWhiteSpace(item.OwnershipSummary)
+                                    ? DescribeRecapShelfOwnershipSummary(workspace, item)
+                                    : item.OwnershipSummary,
                             PublicationState = creatorLinked
-                                ? creatorPublication.PublicationStatus
-                                : DescribeRecapShelfPublicationState(item),
-                            TrustBand = creatorLinked ? creatorPublication.TrustBand : item.TrustBand,
-                            Discoverable = creatorLinked && creatorPublication.Discoverable,
-                            PublicationSummary = DescribeRecapShelfPublicationSummary(workspace, item, creatorPublication, creatorLinked),
-                            CreatorPublicationId = creatorLinked ? creatorPublication.PublicationId : item.CreatorPublicationId,
+                                ? creatorPublication!.PublicationStatus
+                                : string.IsNullOrWhiteSpace(item.PublicationState)
+                                    ? DescribeRecapShelfPublicationState(item)
+                                    : item.PublicationState,
+                            TrustBand = creatorLinked ? creatorPublication!.TrustBand : item.TrustBand,
+                            Discoverable = creatorLinked ? creatorPublication!.Discoverable : item.Discoverable,
+                            PublicationSummary = creatorLinked
+                                ? DescribeRecapShelfPublicationSummary(workspace, item, creatorPublication!, true)
+                                : string.IsNullOrWhiteSpace(item.PublicationSummary)
+                                    ? DescribeSharedPublicationSummary(workspace, item)
+                                    : item.PublicationSummary,
+                            CreatorPublicationId = creatorLinked ? creatorPublication!.PublicationId : item.CreatorPublicationId,
                             NextSafeAction = creatorLinked
-                                ? creatorPublication.NextSafeAction ?? workspace.NextSafeAction
-                                : DescribeRecapShelfNextSafeAction(workspace, item),
+                                ? creatorPublication!.NextSafeAction ?? workspace.NextSafeAction
+                                : string.IsNullOrWhiteSpace(item.NextSafeAction)
+                                    ? DescribeRecapShelfNextSafeAction(workspace, item)
+                                    : item.NextSafeAction,
                             ProvenanceSummary = DescribeRecapShelfProvenanceSummary(workspace, item, creatorPublication, creatorLinked),
                             AuditSummary = DescribeRecapShelfAuditSummary(workspace, item, creatorPublication, creatorLinked)
                         };
@@ -3867,7 +3896,30 @@ public sealed class CampaignSpineService
         return normalizedKind.Contains("recap", StringComparison.Ordinal)
             || normalizedKind.Contains("after", StringComparison.Ordinal)
             || normalizedKind.Contains("downtime", StringComparison.Ordinal)
-            || normalizedKind.Contains("replay", StringComparison.Ordinal);
+            || normalizedKind.Contains("replay", StringComparison.Ordinal)
+            || normalizedKind.Contains("dossier", StringComparison.Ordinal)
+            || normalizedKind.Contains("runboard", StringComparison.Ordinal)
+            || normalizedKind.Contains("campaign", StringComparison.Ordinal);
+    }
+
+    private static CreatorPublicationProjection? ResolveCreatorPublicationForRecapItem(
+        PublicationSafeProjection item,
+        IReadOnlyDictionary<string, CreatorPublicationProjection> publicationsById,
+        IReadOnlyDictionary<string, CreatorPublicationProjection> publicationsByArtifactId)
+    {
+        if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId)
+            && publicationsById.TryGetValue(item.CreatorPublicationId, out CreatorPublicationProjection? creatorPublicationById))
+        {
+            return creatorPublicationById;
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.ArtifactId)
+            && publicationsByArtifactId.TryGetValue(item.ArtifactId, out CreatorPublicationProjection? creatorPublicationByArtifact))
+        {
+            return creatorPublicationByArtifact;
+        }
+
+        return null;
     }
 
     private static string DescribeRecapShelfAudience(PublicationSafeProjection item, bool creatorLinked)
@@ -3945,6 +3997,13 @@ public sealed class CampaignSpineService
             return $"{creatorPublication.Title} is already attached on the creator shelf with {visibility} visibility. {nextSafeAction}";
         }
 
+        return DescribeSharedPublicationSummary(workspace, item);
+    }
+
+    private static string DescribeSharedPublicationSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item)
+    {
         var normalizedKind = item.Kind.Trim().ToLowerInvariant();
         if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
         {
@@ -3967,7 +4026,7 @@ public sealed class CampaignSpineService
     private static string DescribeRecapShelfProvenanceSummary(
         CampaignWorkspaceProjection workspace,
         PublicationSafeProjection item,
-        CreatorPublicationProjection creatorPublication,
+        CreatorPublicationProjection? creatorPublication,
         bool creatorLinked)
     {
         if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
@@ -3986,7 +4045,7 @@ public sealed class CampaignSpineService
     private static string DescribeRecapShelfAuditSummary(
         CampaignWorkspaceProjection workspace,
         PublicationSafeProjection item,
-        CreatorPublicationProjection creatorPublication,
+        CreatorPublicationProjection? creatorPublication,
         bool creatorLinked)
     {
         if (!string.IsNullOrWhiteSpace(item.AuditSummary))
@@ -4063,6 +4122,102 @@ public sealed class CampaignSpineService
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static int CreatorPublicationProjectionPriority(string kind)
+    {
+        string normalizedKind = kind.Trim().ToLowerInvariant();
+        if (normalizedKind.Contains("campaign", StringComparison.Ordinal)
+            || normalizedKind.Contains("after", StringComparison.Ordinal)
+            || normalizedKind.Contains("recap", StringComparison.Ordinal)
+            || normalizedKind.Contains("downtime", StringComparison.Ordinal))
+        {
+            return 4;
+        }
+
+        if (normalizedKind.Contains("run_module", StringComparison.Ordinal)
+            || normalizedKind.Contains("runboard", StringComparison.Ordinal)
+            || normalizedKind.Contains("module", StringComparison.Ordinal))
+        {
+            return 3;
+        }
+
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        {
+            return 2;
+        }
+
+        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    private static string NormalizeCreatorPublicationKind(string kind)
+    {
+        string normalizedKind = kind.Trim().ToLowerInvariant();
+        if (normalizedKind.Contains("runboard", StringComparison.Ordinal)
+            || normalizedKind.Contains("module", StringComparison.Ordinal))
+        {
+            return "run_module";
+        }
+
+        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        {
+            return "dossier";
+        }
+
+        if (normalizedKind.Contains("campaign", StringComparison.Ordinal))
+        {
+            return "campaign";
+        }
+
+        return normalizedKind;
+    }
+
+    private static string BuildCreatorPublicationTitle(
+        CampaignWorkspaceProjection workspace,
+        RunnerDossierProjection? dossier,
+        PublicationSafeProjection item,
+        string publicationKind)
+    {
+        string normalizedKind = publicationKind.Trim().ToLowerInvariant();
+        return normalizedKind switch
+        {
+            "dossier" => $"{dossier?.DisplayName ?? workspace.CampaignName} dossier packet",
+            "run_module" => $"{workspace.CampaignName} run module packet",
+            "campaign" => $"{workspace.CampaignName} campaign packet",
+            _ when normalizedKind.Contains("replay", StringComparison.Ordinal) => $"{workspace.CampaignName} replay timeline",
+            _ when normalizedKind.Contains("after", StringComparison.Ordinal) => $"{workspace.CampaignName} after-action report",
+            _ when normalizedKind.Contains("downtime", StringComparison.Ordinal) => $"{workspace.CampaignName} downtime brief",
+            _ when normalizedKind.Contains("recap", StringComparison.Ordinal) => $"{workspace.CampaignName} session recap",
+            _ => string.IsNullOrWhiteSpace(item.Label)
+                ? $"{workspace.CampaignName} publication packet"
+                : $"{workspace.CampaignName} {item.Label}"
+        };
+    }
+
+    private static string BuildCreatorPublicationSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item,
+        string publicationKind)
+    {
+        if (!string.IsNullOrWhiteSpace(item.Summary))
+        {
+            return item.Summary;
+        }
+
+        string normalizedKind = publicationKind.Trim().ToLowerInvariant();
+        return normalizedKind switch
+        {
+            "dossier" => "Living dossier truth, campaign continuity, and governed publication detail stay attached to one shared artifact lane.",
+            "run_module" => "Run-module prep, GM continuity, and governed publication detail stay attached to one shared artifact lane.",
+            "campaign" => "Campaign recap, return cues, and governed publication detail stay attached to one shared artifact lane.",
+            _ when normalizedKind.Contains("replay", StringComparison.Ordinal) => "Replay-safe turn review and governed publication detail stay attached to one shared artifact lane.",
+            _ => $"{workspace.CampaignName} keeps this publication on one shared artifact lane."
+        };
     }
 
     private static string ResolveDeviceRole(ClaimedInstallationDto installation)

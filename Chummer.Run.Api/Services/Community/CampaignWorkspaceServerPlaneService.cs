@@ -14,7 +14,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection Workspace,
         CampaignWorkspaceDigestProjection? Digest,
         WorkspaceRestoreProjection Restore,
-        CreatorPublicationProjection? CreatorPublication,
+        IReadOnlyList<CreatorPublicationProjection> CreatorPublications,
         RunProjection? LeadRun,
         IReadOnlyList<SupportCaseDigestViewModel> SupportDigests,
         DateTimeOffset GeneratedAtUtc);
@@ -99,7 +99,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             RuleEnvironmentHealth: ruleEnvironmentHealth,
             Runboard: BuildRunboardSummary(context.Workspace, context.LeadRun),
             ContinuityConflicts: continuityConflicts,
-            RecapShelf: BuildRecapShelf(context.Workspace, context.CreatorPublication),
+            RecapShelf: BuildRecapShelf(context.Workspace, context.CreatorPublications),
             SupportClosures: supportClosures,
             KnownIssues: knownIssues,
             DecisionNotices: decisionNotices,
@@ -259,12 +259,14 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
-        CreatorPublicationProjection? creatorPublication = accountSummary.CreatorPublications
+        IReadOnlyList<CreatorPublicationProjection> creatorPublications = accountSummary.CreatorPublications
             .Where(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase)
                 || (!string.IsNullOrWhiteSpace(item.ArtifactId)
-                    && workspace.RecapShelf.Any(recap => string.Equals(recap.ArtifactId, item.ArtifactId, StringComparison.OrdinalIgnoreCase))))
+                    && workspace.RecapShelf.Any(recap => string.Equals(recap.ArtifactId, item.ArtifactId, StringComparison.OrdinalIgnoreCase)))
+                || (!string.IsNullOrWhiteSpace(item.PublicationId)
+                    && workspace.RecapShelf.Any(recap => string.Equals(recap.CreatorPublicationId, item.PublicationId, StringComparison.OrdinalIgnoreCase))))
             .OrderByDescending(static item => item.UpdatedAtUtc)
-            .FirstOrDefault();
+            .ToArray();
 
         CampaignWorkspaceDigestProjection? digest = _campaignSpine.GetWorkspaceDigests(user, installLinking)
             .FirstOrDefault(item => string.Equals(item.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase));
@@ -286,7 +288,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 workspace.TravelPrefetches?.FirstOrDefault()?.StagedAtUtc,
                 workspace.AftermathPackages?.FirstOrDefault()?.GeneratedAtUtc,
                 workspace.NextSessionCarryForward?.UpdatedAtUtc,
-                creatorPublication?.UpdatedAtUtc,
+                creatorPublications.FirstOrDefault()?.UpdatedAtUtc,
                 leadRun?.UpdatedAtUtc
             }
             .Concat(relevantCases.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
@@ -299,7 +301,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             Workspace: workspace,
             Digest: digest,
             Restore: accountSummary.Restore,
-            CreatorPublication: creatorPublication,
+            CreatorPublications: creatorPublications,
             LeadRun: leadRun,
             SupportDigests: supportDigests,
             GeneratedAtUtc: generatedAtUtc);
@@ -667,19 +669,27 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static IReadOnlyList<RecapShelfEntry> BuildRecapShelf(
         CampaignWorkspaceProjection workspace,
-        CreatorPublicationProjection? creatorPublication)
+        IReadOnlyList<CreatorPublicationProjection> creatorPublications)
     {
         Dictionary<string, DateTimeOffset> aftermathTimes = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
             .ToDictionary(static item => item.PackageId, static item => item.GeneratedAtUtc, StringComparer.OrdinalIgnoreCase);
         DateTimeOffset defaultUpdatedAtUtc = workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow;
+        var publicationsById = creatorPublications.ToDictionary(static item => item.PublicationId, StringComparer.OrdinalIgnoreCase);
+        var publicationsByArtifactId = creatorPublications
+            .Where(item => !string.IsNullOrWhiteSpace(item.ArtifactId))
+            .GroupBy(item => item.ArtifactId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group
+                    .OrderByDescending(static item => item.UpdatedAtUtc)
+                    .First(),
+                StringComparer.OrdinalIgnoreCase);
         return workspace.RecapShelf
             .Take(6)
             .Select(item =>
             {
-                bool creatorLinked = creatorPublication is not null
-                    && (!string.IsNullOrWhiteSpace(item.ArtifactId)
-                        && string.Equals(item.ArtifactId, creatorPublication.ArtifactId, StringComparison.OrdinalIgnoreCase)
-                        || SupportsCreatorShelfProjection(item));
+                CreatorPublicationProjection? creatorPublication = ResolveCreatorPublicationForRecapItem(item, publicationsById, publicationsByArtifactId);
+                bool creatorLinked = creatorPublication is not null;
                 return new RecapShelfEntry(
                     EntryId: item.ProjectionId,
                     Kind: item.Kind,
@@ -689,22 +699,36 @@ public sealed class CampaignWorkspaceServerPlaneService
                     UpdatedAtUtc: aftermathTimes.TryGetValue(item.ProjectionId, out DateTimeOffset updatedAtUtc)
                         ? updatedAtUtc
                         : defaultUpdatedAtUtc,
-                    Audience: DescribeRecapShelfAudience(item, creatorLinked),
-                    OwnershipSummary: DescribeRecapShelfOwnershipSummary(workspace, item),
+                    Audience: creatorLinked
+                        ? DescribeRecapShelfAudience(item, creatorLinked)
+                        : string.IsNullOrWhiteSpace(item.Audience)
+                            ? DescribeRecapShelfAudience(item, creatorLinked)
+                            : item.Audience,
+                    OwnershipSummary: creatorLinked
+                        ? DescribeRecapShelfOwnershipSummary(workspace, item)
+                        : string.IsNullOrWhiteSpace(item.OwnershipSummary)
+                            ? DescribeRecapShelfOwnershipSummary(workspace, item)
+                            : item.OwnershipSummary,
                     PublicationState: creatorLinked
                         ? creatorPublication!.PublicationStatus
-                        : DescribeRecapShelfPublicationState(item),
-                    TrustBand: creatorLinked ? creatorPublication!.TrustBand : null,
-                    Discoverable: creatorLinked && creatorPublication!.Discoverable,
-                    PublicationSummary: DescribeRecapShelfPublicationSummary(workspace, item, creatorPublication, creatorLinked),
-                    CreatorPublicationId: creatorLinked ? creatorPublication!.PublicationId : null,
+                        : string.IsNullOrWhiteSpace(item.PublicationState)
+                            ? DescribeRecapShelfPublicationState(item)
+                            : item.PublicationState,
+                    TrustBand: creatorLinked ? creatorPublication!.TrustBand : item.TrustBand,
+                    Discoverable: creatorLinked ? creatorPublication!.Discoverable : item.Discoverable,
+                    PublicationSummary: creatorLinked
+                        ? DescribeRecapShelfPublicationSummary(workspace, item, creatorPublication!, true)
+                        : string.IsNullOrWhiteSpace(item.PublicationSummary)
+                            ? DescribeSharedPublicationSummary(workspace, item)
+                            : item.PublicationSummary,
+                    CreatorPublicationId: creatorLinked ? creatorPublication!.PublicationId : item.CreatorPublicationId,
                     NextSafeAction: creatorLinked
                         ? creatorPublication!.NextSafeAction ?? workspace.NextSafeAction
-                        : DescribeRecapShelfNextSafeAction(workspace, item),
-                    ProvenanceSummary: string.IsNullOrWhiteSpace(item.ProvenanceSummary) && creatorLinked
-                        ? creatorPublication!.ProvenanceSummary
-                        : item.ProvenanceSummary,
-                    AuditSummary: item.AuditSummary);
+                        : string.IsNullOrWhiteSpace(item.NextSafeAction)
+                            ? DescribeRecapShelfNextSafeAction(workspace, item)
+                            : item.NextSafeAction,
+                    ProvenanceSummary: DescribeRecapShelfProvenanceSummary(workspace, item, creatorPublication, creatorLinked),
+                    AuditSummary: DescribeRecapShelfAuditSummary(workspace, item, creatorPublication, creatorLinked));
             })
             .ToArray();
     }
@@ -715,7 +739,30 @@ public sealed class CampaignWorkspaceServerPlaneService
         return normalizedKind.Contains("recap", StringComparison.Ordinal)
             || normalizedKind.Contains("after", StringComparison.Ordinal)
             || normalizedKind.Contains("downtime", StringComparison.Ordinal)
-            || normalizedKind.Contains("replay", StringComparison.Ordinal);
+            || normalizedKind.Contains("replay", StringComparison.Ordinal)
+            || normalizedKind.Contains("dossier", StringComparison.Ordinal)
+            || normalizedKind.Contains("runboard", StringComparison.Ordinal)
+            || normalizedKind.Contains("campaign", StringComparison.Ordinal);
+    }
+
+    private static CreatorPublicationProjection? ResolveCreatorPublicationForRecapItem(
+        PublicationSafeProjection item,
+        IReadOnlyDictionary<string, CreatorPublicationProjection> publicationsById,
+        IReadOnlyDictionary<string, CreatorPublicationProjection> publicationsByArtifactId)
+    {
+        if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId)
+            && publicationsById.TryGetValue(item.CreatorPublicationId, out CreatorPublicationProjection? creatorPublicationById))
+        {
+            return creatorPublicationById;
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.ArtifactId)
+            && publicationsByArtifactId.TryGetValue(item.ArtifactId, out CreatorPublicationProjection? creatorPublicationByArtifact))
+        {
+            return creatorPublicationByArtifact;
+        }
+
+        return null;
     }
 
     private static string DescribeRecapShelfAudience(PublicationSafeProjection item, bool creatorLinked)
@@ -793,6 +840,54 @@ public sealed class CampaignWorkspaceServerPlaneService
             return $"{creatorPublication.Title} is already attached on the creator shelf with {visibility} visibility. {nextSafeAction}";
         }
 
+        return DescribeSharedPublicationSummary(workspace, item);
+    }
+
+    private static string DescribeRecapShelfProvenanceSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item,
+        CreatorPublicationProjection? creatorPublication,
+        bool creatorLinked)
+    {
+        if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
+        {
+            return item.ProvenanceSummary!;
+        }
+
+        if (creatorLinked && !string.IsNullOrWhiteSpace(creatorPublication?.ProvenanceSummary))
+        {
+            return creatorPublication.ProvenanceSummary;
+        }
+
+        return $"{workspace.RuleEnvironment.CompatibilityFingerprint} keeps {item.Label} attached to {workspace.CampaignName} without a shadow export lane.";
+    }
+
+    private static string DescribeRecapShelfAuditSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item,
+        CreatorPublicationProjection? creatorPublication,
+        bool creatorLinked)
+    {
+        if (!string.IsNullOrWhiteSpace(item.AuditSummary))
+        {
+            return item.AuditSummary!;
+        }
+
+        DateTimeOffset updatedAtUtc = creatorLinked
+            ? creatorPublication?.UpdatedAtUtc ?? DateTimeOffset.UtcNow
+            : workspace.LatestContinuity?.CapturedAtUtc
+                ?? workspace.AftermathPackages?.FirstOrDefault()?.GeneratedAtUtc
+                ?? DateTimeOffset.UtcNow;
+        string auditSource = creatorLinked
+            ? "creator review and campaign return"
+            : "campaign return";
+        return $"Updated {updatedAtUtc:yyyy-MM-dd HH:mm} UTC on the governed {auditSource} lane for {workspace.CampaignName}.";
+    }
+
+    private static string DescribeSharedPublicationSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item)
+    {
         var normalizedKind = item.Kind.Trim().ToLowerInvariant();
         if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
         {
