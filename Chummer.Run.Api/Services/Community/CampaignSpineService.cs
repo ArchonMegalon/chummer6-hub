@@ -2991,8 +2991,8 @@ public sealed class CampaignSpineService
 
         const string publicationState = "preview_ready";
         var (trustBand, discoverable, _, _, _) = BuildCreatorPublicationTrustPosture(publicationState, campaign.Visibility);
-        string ownershipSummary = $"Shared {campaign.Visibility.Replace('_', ' ')} creator packet stays attached to {campaign.Name}.";
-        string publicationSummary = "Preview-ready creator publication keeps recap-safe outputs reviewable before they become live.";
+        string ownershipSummary = $"Shared {campaign.Visibility.Replace('_', ' ')} publication lane stays attached to {campaign.Name}.";
+        string publicationSummary = "Preview-ready shared publication keeps recap-safe outputs reviewable before they become live.";
 
         return recapShelf
             .Select(item => item with
@@ -3623,7 +3623,7 @@ public sealed class CampaignSpineService
                             : !string.IsNullOrWhiteSpace(leadHandoff?.NextSafeAction)
                                 ? leadHandoff.NextSafeAction
                                 : workspace.NextSafeAction
-                                    ?? "Review the grounded creator packet, then return through the shared campaign view before you publish or export it further.";
+                                    ?? "Review the grounded publication lane, then return through the shared campaign view before you publish or export it further.";
                         string campaignReturnSummary = DescribeSharedPublicationSummary(workspace, item);
                         string supportClosureSummary = !string.IsNullOrWhiteSpace(leadHandoff?.SupportClosureSummary)
                             ? leadHandoff.SupportClosureSummary
@@ -3784,17 +3784,17 @@ public sealed class CampaignSpineService
         if (string.Equals(receipt.PublicationStatus, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase)
             || receipt.PublishedAtUtc is not null)
         {
-            return "Keep the governed packet live on creator discovery, lineage, and shelf surfaces while provenance and support posture stay current.";
+            return "Keep the governed publication live on public discovery, lineage, and shelf surfaces while provenance and support posture stay current.";
         }
 
         return receipt.ReviewState switch
         {
             var state when string.Equals(state, HubReviewStates.PendingReview, StringComparison.OrdinalIgnoreCase)
-                => "Hold the creator packet on governed creator, campaign, and moderation surfaces until the registry review resolves.",
+                => "Hold this publication on governed publication, campaign, and moderation surfaces until the registry review resolves.",
             var state when string.Equals(state, HubReviewStates.Approved, StringComparison.OrdinalIgnoreCase)
-                => "Approval is in. Publish or annotate the governed packet next so discovery and shelf posture stay honest.",
+                => "Approval is in. Publish or annotate this governed publication next so discovery and shelf posture stay honest.",
             var state when string.Equals(state, HubReviewStates.Rejected, StringComparison.OrdinalIgnoreCase)
-                => "Revise the governed packet and resubmit it before you widen discovery or creator comparison.",
+                => "Revise this governed publication and resubmit it before you widen discovery or publication comparison.",
             _ => existing
         };
     }
@@ -3835,10 +3835,10 @@ public sealed class CampaignSpineService
 
         var discoverySummary = normalizedStatus switch
         {
-            "preview_ready" or "pending_review" => "Keep this entry on creator, campaign, and moderation surfaces until approval completes.",
+            "preview_ready" or "pending_review" => "Keep this entry on publication, campaign, and moderation surfaces until approval completes.",
             "approved" => "Ready for governed publication, but keep it off public discovery until it is actually published.",
             "rejected" => "Hide from discovery until the creator revises and resubmits the packet.",
-            "published" when discoverable => "Eligible for governed discovery, creator comparison, and shelf projection.",
+            "published" when discoverable => "Eligible for governed discovery, publication comparison, and shelf projection.",
             "published" => $"Keep discovery bounded to {normalizedVisibility} surfaces even though the publication is live.",
             "delisted" => "Keep it out of normal discovery and surface it only with moderation context.",
             "deprecated" => "Show successor-forward caution instead of ranking this as the preferred result.",
@@ -3848,15 +3848,15 @@ public sealed class CampaignSpineService
 
         var moderationSummary = normalizedStatus switch
         {
-            "preview_ready" or "pending_review" => "Moderation is still waiting on approval review, so discovery stays bounded to creator, campaign, and operator surfaces.",
+            "preview_ready" or "pending_review" => "Moderation is still waiting on approval review, so discovery stays bounded to publication, campaign, and operator surfaces.",
             "approved" => "Moderation cleared approval; publish or annotate next so discovery and shelf posture stay honest.",
-            "rejected" => "Moderation requires revision before the packet can re-enter discovery or creator comparison.",
-            "published" when discoverable => "Moderation watch is active but clear, so the packet can stay on discoverable creator shelves until a later note changes its posture.",
+            "rejected" => "Moderation requires revision before this publication can re-enter discovery or publication comparison.",
+            "published" when discoverable => "Moderation watch is active but clear, so this publication can stay on discoverable public shelves until a later note changes its posture.",
             "published" => $"Moderation is clear, but visibility still keeps discovery limited to {normalizedVisibility} surfaces.",
             "delisted" => "Moderation removed this packet from normal discovery; only retained-history and explicit audit surfaces should surface it.",
             "deprecated" => "Moderation retains this packet with successor-forward caution until a replacement fully takes over.",
             "superseded" => "Moderation retains this packet as lineage-only history behind its successor.",
-            _ => "Moderation has not started; keep the packet on governed internal surfaces until review begins."
+            _ => "Moderation has not started; keep this publication on governed internal surfaces until review begins."
         };
 
         return (trustBand, discoverable, trustSummary, discoverySummary, moderationSummary);
@@ -3994,7 +3994,7 @@ public sealed class CampaignSpineService
             var nextSafeAction = string.IsNullOrWhiteSpace(creatorPublication.NextSafeAction)
                 ? "Open publication status before you widen the audience."
                 : creatorPublication.NextSafeAction!;
-            return $"{creatorPublication.Title} is already attached on the creator shelf with {visibility} visibility. {nextSafeAction}";
+            return $"{creatorPublication.Title} is already attached on the publication shelf with {visibility} visibility. {nextSafeAction}";
         }
 
         return DescribeSharedPublicationSummary(workspace, item);
@@ -4012,15 +4012,15 @@ public sealed class CampaignSpineService
 
         if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
         {
-            return "Campaign return and GM prep reuse the same packet before creator publication is opened.";
+            return "Campaign return and GM prep reuse the same packet before shared publication opens.";
         }
 
         if (normalizedKind.Contains("replay", StringComparison.Ordinal))
         {
-            return "Campaign return and contested-turn review reuse the same replay-safe packet before creator publication is opened.";
+            return "Campaign return and contested-turn review reuse the same replay-safe packet before shared publication opens.";
         }
 
-        return "Campaign return already trusts this recap-safe artifact, and creator publication can promote the same truth without rebuilding it.";
+        return "Campaign return already trusts this recap-safe artifact, and shared publication can promote the same truth without rebuilding it.";
     }
 
     private static string DescribeRecapShelfProvenanceSummary(
@@ -4034,7 +4034,7 @@ public sealed class CampaignSpineService
             return item.ProvenanceSummary!;
         }
 
-        if (creatorLinked && !string.IsNullOrWhiteSpace(creatorPublication.ProvenanceSummary))
+        if (creatorLinked && !string.IsNullOrWhiteSpace(creatorPublication?.ProvenanceSummary))
         {
             return creatorPublication.ProvenanceSummary;
         }
@@ -4054,12 +4054,12 @@ public sealed class CampaignSpineService
         }
 
         DateTimeOffset updatedAtUtc = creatorLinked
-            ? creatorPublication.UpdatedAtUtc
+            ? creatorPublication?.UpdatedAtUtc ?? DateTimeOffset.UtcNow
             : workspace.LatestContinuity?.CapturedAtUtc
                 ?? workspace.AftermathPackages?.FirstOrDefault()?.GeneratedAtUtc
                 ?? DateTimeOffset.UtcNow;
         string auditSource = creatorLinked
-            ? "creator review and campaign return"
+            ? "publication review and campaign return"
             : "campaign return";
         return $"Updated {updatedAtUtc:yyyy-MM-dd HH:mm} UTC on the governed {auditSource} lane for {workspace.CampaignName}.";
     }
@@ -4092,10 +4092,10 @@ public sealed class CampaignSpineService
     {
         if (workspace.ReadinessCues.Any(item => string.Equals(item.Severity, "warning", StringComparison.OrdinalIgnoreCase)))
         {
-            return $"{workspace.RuleEnvironment.CompatibilityFingerprint} is grounded, but workspace readiness still needs review before this creator packet becomes the support-safe answer.";
+            return $"{workspace.RuleEnvironment.CompatibilityFingerprint} is grounded, but workspace readiness still needs review before this publication becomes the support-safe answer.";
         }
 
-        return $"{workspace.RuleEnvironment.CompatibilityFingerprint} stays pinned across the creator packet, shared return lane, and support follow-through.";
+        return $"{workspace.RuleEnvironment.CompatibilityFingerprint} stays pinned across this publication, the shared return lane, and support follow-through.";
     }
 
     private static IReadOnlyList<string> BuildCreatorPublicationWatchouts(
@@ -4106,12 +4106,12 @@ public sealed class CampaignSpineService
 
         if (leadHandoff is null)
         {
-            watchouts.Add("No build handoff is attached yet, so creator publication still relies on workspace return truth alone.");
+            watchouts.Add("No build handoff is attached yet, so shared publication still relies on workspace return truth alone.");
         }
 
         if (workspace.RecapShelf.Count == 0)
         {
-            watchouts.Add("No recap-safe output is attached yet, so creator publication still depends on the live workspace summary.");
+            watchouts.Add("No recap-safe output is attached yet, so shared publication still depends on the live workspace summary.");
         }
 
         watchouts.AddRange(workspace.ReadinessCues

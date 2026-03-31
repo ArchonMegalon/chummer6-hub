@@ -837,7 +837,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             var nextSafeAction = string.IsNullOrWhiteSpace(creatorPublication.NextSafeAction)
                 ? "Open publication status before you widen the audience."
                 : creatorPublication.NextSafeAction!;
-            return $"{creatorPublication.Title} is already attached on the creator shelf with {visibility} visibility. {nextSafeAction}";
+            return $"{creatorPublication.Title} is already attached on the publication shelf with {visibility} visibility. {nextSafeAction}";
         }
 
         return DescribeSharedPublicationSummary(workspace, item);
@@ -879,7 +879,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 ?? workspace.AftermathPackages?.FirstOrDefault()?.GeneratedAtUtc
                 ?? DateTimeOffset.UtcNow;
         string auditSource = creatorLinked
-            ? "creator review and campaign return"
+            ? "publication review and campaign return"
             : "campaign return";
         return $"Updated {updatedAtUtc:yyyy-MM-dd HH:mm} UTC on the governed {auditSource} lane for {workspace.CampaignName}.";
     }
@@ -896,15 +896,15 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
         {
-            return "Campaign return and GM prep reuse the same packet before creator publication is opened.";
+            return "Campaign return and GM prep reuse the same packet before shared publication opens.";
         }
 
         if (normalizedKind.Contains("replay", StringComparison.Ordinal))
         {
-            return "Campaign return and contested-turn review reuse the same replay-safe packet before creator publication is opened.";
+            return "Campaign return and contested-turn review reuse the same replay-safe packet before shared publication opens.";
         }
 
-        return "Campaign return already trusts this recap-safe artifact, and creator publication can promote the same truth without rebuilding it.";
+        return "Campaign return already trusts this recap-safe artifact, and shared publication can promote the same truth without rebuilding it.";
     }
 
     private static string DescribeRecapShelfNextSafeAction(

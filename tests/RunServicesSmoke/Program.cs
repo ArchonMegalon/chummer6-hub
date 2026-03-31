@@ -3342,7 +3342,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(recapShelfPayload?.PublicationState, "published", StringComparison.Ordinal), "home work route should carry creator-publication state directly on the linked recap shelf entry.");
     Assert(string.Equals(recapShelfPayload?.TrustBand, "curated-live", StringComparison.Ordinal), "home work route should carry creator-publication trust ranking directly on the linked recap shelf entry.");
     Assert(recapShelfPayload?.Discoverable == true, "home work route should keep recap entries discoverable once creator publication is live.");
-    Assert(recapShelfPayload?.PublicationSummary?.Contains("creator shelf", StringComparison.OrdinalIgnoreCase) == true, "home work route should explain that the same artifact already feeds creator publication posture.");
+    Assert(recapShelfPayload?.PublicationSummary?.Contains("publication shelf", StringComparison.OrdinalIgnoreCase) == true, "home work route should explain that the same artifact already feeds shared publication posture.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.CreatorPublicationId), "home work route should keep the linked creator-publication id attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.NextSafeAction), "home work route should keep the next safe shelf action attached to the recap shelf entry.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, replayTimelinePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the replay package attached to the bounded return shelf.");
