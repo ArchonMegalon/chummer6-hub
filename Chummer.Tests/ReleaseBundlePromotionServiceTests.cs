@@ -97,6 +97,35 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.Contains("public-promotion.json", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task PromoteAsyncAllowsUnsignedMacPreviewArtifactWhenEvidenceMarksSkippedPreview()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260401-221500",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-dmg",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-preview"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ]);
+
+        ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
+
+        Assert.Equal("run-20260401-221500", result.Version);
+        Assert.Contains("avalonia-osx-arm64-dmg", result.PromotedArtifactIds);
+        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", "chummer-avalonia-osx-arm64-installer.dmg")));
+    }
+
     private sealed class ReleaseBundlePromotionFixture : IDisposable
     {
         private readonly string _root;
@@ -246,8 +275,8 @@ public sealed class ReleaseBundlePromotionServiceTests
                     Platform: artifact.Platform,
                     PromotionStatus: "pass",
                     StartupSmokeStatus: "pass",
-                    SigningStatus: artifact.RequiresSigning ? "pass" : null,
-                    NotarizationStatus: artifact.RequiresNotarization ? "pass" : null));
+                    SigningStatus: artifact.SigningStatusOverride ?? (artifact.RequiresSigning ? "pass" : null),
+                    NotarizationStatus: artifact.NotarizationStatusOverride ?? (artifact.RequiresNotarization ? "pass" : null)));
             }
 
             WriteCompatibilityManifest(
@@ -336,7 +365,9 @@ public sealed class ReleaseBundlePromotionServiceTests
         string FileName,
         byte[] Bytes,
         bool RequiresSigning,
-        bool RequiresNotarization);
+        bool RequiresNotarization,
+        string? SigningStatusOverride = null,
+        string? NotarizationStatusOverride = null);
 
     private sealed record CompatibilityArtifact(
         string Id,
