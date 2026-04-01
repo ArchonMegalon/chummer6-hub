@@ -75,6 +75,14 @@ The first-class sponsor/consent/device-auth/lane/receipt lifecycle is defined ce
 The first-class linked-identity and channel-linking posture is defined centrally in `products/chummer/IDENTITY_AND_CHANNEL_LINKING_MODEL.md`.
 Desktop download and install guidance may live here, but the public update feed and promoted desktop head truth stay in `chummer6-hub-registry`.
 
+## Flagship-grade bar
+
+`chummer6-hub` is not flagship grade until:
+
+* `chummer.run` feels like one coherent front door across landing, account, downloads, support, status, and proof surfaces
+* support and control views are honest enough that operators and paying users see the same release reality
+* campaign, community, and public-trust surfaces feel intentionally connected rather than accumulated as separate admin utilities
+
 ## Bounded-context rule
 
 Hub currently carries three adjacent but distinct bounded contexts:
