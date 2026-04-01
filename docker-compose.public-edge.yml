@@ -59,7 +59,7 @@ services:
       - chummer-run-api-state:/app/state
       - ./:/repo:ro
       - /docker/fleet/.codex-studio/published:/fleet-artifacts:ro
-      - /docker/chummer5a/Docker/Downloads:/downloads-source:ro
+      - /docker/chummer5a/Docker/Downloads:/downloads-source
     ports:
       - "${CHUMMER_PUBLIC_EDGE_PORT:-8091}:8080"
     networks:

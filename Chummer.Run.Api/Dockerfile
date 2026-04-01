@@ -7,6 +7,7 @@ COPY chummercomplete/chummer.run-services/Chummer.Run.Contracts/Chummer.Run.Cont
 COPY chummercomplete/chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj chummercomplete/chummer.run-services/Chummer.Play.Contracts/
 COPY chummercomplete/chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj chummercomplete/chummer-core-engine/Chummer.Contracts/
 COPY chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/
+COPY chummercomplete/chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj chummercomplete/chummer-hub-registry/Chummer.Run.Registry/
 COPY fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 RUN dotnet restore chummercomplete/chummer.run-services/Chummer.Run.Api/Chummer.Run.Api.csproj
 COPY chummercomplete/chummer.run-services/Chummer.Run.Api/ chummercomplete/chummer.run-services/Chummer.Run.Api/
@@ -17,11 +18,13 @@ COPY chummercomplete/chummer.run-services/.codex-design/ chummercomplete/chummer
 COPY chummercomplete/chummer.run-services/Chummer.Play.Contracts/ chummercomplete/chummer.run-services/Chummer.Play.Contracts/
 COPY chummercomplete/chummer-core-engine/Chummer.Contracts/ chummercomplete/chummer-core-engine/Chummer.Contracts/
 COPY chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/ chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/
+COPY chummercomplete/chummer-hub-registry/Chummer.Run.Registry/ chummercomplete/chummer-hub-registry/Chummer.Run.Registry/
 COPY fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/ fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 WORKDIR /src/chummercomplete/chummer.run-services/Chummer.Run.Api
 RUN dotnet build /src/chummercomplete/chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj -c Release --nologo \
  && dotnet build /src/chummercomplete/chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj -c Release --nologo \
  && dotnet build /src/chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj -c Release --nologo \
+ && dotnet build /src/chummercomplete/chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj -c Release --nologo \
  && dotnet build /src/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj -c Release --nologo
 RUN dotnet publish -c Release -o /app/publish
 

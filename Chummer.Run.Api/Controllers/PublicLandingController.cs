@@ -1,3 +1,4 @@
+using System.Text;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
@@ -10,6 +11,8 @@ using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Control.Contracts.Support;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Hosting;
 
 namespace Chummer.Run.Api.Controllers;
 
@@ -37,6 +40,8 @@ public sealed class PublicLandingController : Controller
     private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
+    private readonly ReleaseUploadTicketService _releaseUploadTickets;
+    private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly ILogger<PublicLandingController> _logger;
 
     public PublicLandingController(
@@ -60,6 +65,8 @@ public sealed class PublicLandingController : Controller
         SignedInTrustStatusService signedInTrustStatus,
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
+        ReleaseUploadTicketService releaseUploadTickets,
+        IWebHostEnvironment webHostEnvironment,
         ILogger<PublicLandingController> logger)
     {
         _landing = landing;
@@ -82,6 +89,8 @@ public sealed class PublicLandingController : Controller
         _signedInTrustStatus = signedInTrustStatus;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
+        _releaseUploadTickets = releaseUploadTickets;
+        _webHostEnvironment = webHostEnvironment;
         _logger = logger;
     }
 
@@ -206,6 +215,73 @@ public sealed class PublicLandingController : Controller
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Downloads.cshtml", model);
+    }
+
+    [HttpGet("/downloads/release-upload")]
+    [Produces("text/html")]
+    public async Task<IActionResult> ReleaseUploadPage(CancellationToken cancellationToken)
+    {
+        const string currentPath = "/downloads/release-upload";
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var ticket = _releaseUploadTickets.Issue(subject);
+            var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
+            string bootstrapUrl = BuildAbsoluteUrl(
+                "/downloads/release-upload/bootstrap.sh",
+                QueryString.Create("ticket", ticket.Ticket));
+            string command = $"bash <(curl -fsSL {SingleQuoteShellValue(bootstrapUrl)})";
+            var model = new ReleaseUploadPageViewModel(
+                Chrome: _chrome.BuildAuthenticatedChrome(
+                    "Release upload handoff",
+                    "Mint a short-lived upload ticket and hand a zero-touch bootstrap command to the Mac or Windows release runner.",
+                    currentPath,
+                    user.DisplayName),
+                Heading: "Signed-in release upload handoff",
+                Summary: "This page mints a short-lived upload ticket, bakes it into the bootstrap command, and lets the release runner promote the artifact directly onto the live downloads shelf without a manual server copy step.",
+                Command: command,
+                BootstrapUrl: bootstrapUrl,
+                TicketExpiresAtUtc: ticket.Claims.ExpiresAtUtc,
+                UploadUrl: BuildAbsoluteUrl("/api/internal/releases/bundles"),
+                ReadmeUrl: BuildAbsoluteUrl("/artifacts/mac-codex-release-pipeline/readme.md"),
+                VerifyUrl: BuildAbsoluteUrl("/downloads/releases.json"),
+                WindowsUploadNote: "Windows bundles use the same upload endpoint and the same signed-in claim-code return path once the signed installer, startup-smoke receipts, and promotion evidence are present.",
+                TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+                SignedInStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience));
+            return View("~/Views/PublicLanding/ReleaseUpload.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Release upload handoff could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("/downloads/release-upload/bootstrap.sh")]
+    [Produces("text/plain")]
+    public IActionResult ReleaseUploadBootstrapScript([FromQuery] string? ticket)
+    {
+        if (!_releaseUploadTickets.TryValidate(ticket, out _))
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "release upload ticket is missing, expired, or invalid.");
+        }
+
+        string webRoot = _webHostEnvironment.WebRootPath
+            ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+        string templatePath = Path.Combine(webRoot, "artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
+        if (!System.IO.File.Exists(templatePath))
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
+        }
+
+        string rendered = RenderReleaseUploadBootstrapScript(System.IO.File.ReadAllText(templatePath), ticket!);
+        return Content(rendered, "text/x-shellscript; charset=utf-8", Encoding.UTF8);
     }
 
     [HttpGet("/downloads/install/{artifactId}")]
@@ -2175,4 +2251,33 @@ public sealed class PublicLandingController : Controller
             return _chrome.BuildPublicChrome(title, description, currentPath);
         }
     }
+
+    private string BuildAbsoluteUrl(string path, QueryString query = default)
+        => UriHelper.BuildAbsolute(
+            Request.Scheme,
+            Request.Host,
+            Request.PathBase,
+            path,
+            query);
+
+    private static string RenderReleaseUploadBootstrapScript(string template, string ticket)
+    {
+        string scriptBody = template.StartsWith("#!/usr/bin/env bash", StringComparison.Ordinal)
+            ? template["#!/usr/bin/env bash".Length..].TrimStart('\r', '\n')
+            : template;
+        StringBuilder builder = new();
+        builder.AppendLine("#!/usr/bin/env bash");
+        builder.Append("export CHUMMER_RELEASE_UPLOAD_TOKEN='")
+            .Append(SingleQuoteShellLiteral(ticket))
+            .AppendLine("'");
+        builder.AppendLine("export CHUMMER_RELEASE_UPLOAD_URL=\"https://chummer.run/api/internal/releases/bundles\"");
+        builder.AppendLine(scriptBody);
+        return builder.ToString();
+    }
+
+    private static string SingleQuoteShellValue(string value)
+        => $"'{SingleQuoteShellLiteral(value)}'";
+
+    private static string SingleQuoteShellLiteral(string value)
+        => value.Replace("'", "'\"'\"'", StringComparison.Ordinal);
 }

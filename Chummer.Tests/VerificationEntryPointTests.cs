@@ -37,6 +37,29 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void SignedInReleaseUploadHandoffIsPublishedFromPortal()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "ReleaseUpload.cshtml");
+        string bootstrapPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
+
+        string controller = File.ReadAllText(controllerPath);
+        string viewModel = File.ReadAllText(viewModelPath);
+        string view = File.ReadAllText(viewPath);
+        string bootstrap = File.ReadAllText(bootstrapPath);
+
+        Assert.Contains("/downloads/release-upload", controller, StringComparison.Ordinal);
+        Assert.Contains("/downloads/release-upload/bootstrap.sh", controller, StringComparison.Ordinal);
+        Assert.Contains("ReleaseUploadTicketService", controller, StringComparison.Ordinal);
+        Assert.Contains("ReleaseUploadPageViewModel", viewModel, StringComparison.Ordinal);
+        Assert.Contains("Signed-in release upload", view, StringComparison.Ordinal);
+        Assert.Contains("claim code", view, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CHUMMER_RELEASE_UPLOAD_TOKEN", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_UPLOAD_URL", bootstrap, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PublicEdgeComposePinsHttpsPortForLocalChummerRunRedirects()
     {
         string composePath = RepoPaths.FromRoot("docker-compose.public-edge.yml");
@@ -152,6 +175,7 @@ public sealed class VerificationEntryPointTests
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
         string partialPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PublicTrustPulsePanel.cshtml");
+        string bodyPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PublicTrustPulseBody.cshtml");
 
         string serviceCollection = File.ReadAllText(serviceCollectionPath);
         string service = File.ReadAllText(servicePath);
@@ -159,6 +183,7 @@ public sealed class VerificationEntryPointTests
         string controller = File.ReadAllText(controllerPath);
         string viewModel = File.ReadAllText(viewModelPath);
         string partial = File.ReadAllText(partialPath);
+        string body = File.ReadAllText(bodyPath);
 
         Assert.Contains("PublicTrustPulseService", serviceCollection, StringComparison.Ordinal);
         Assert.Contains("WeeklyProductPulseArtifactService", serviceCollection, StringComparison.Ordinal);
@@ -168,7 +193,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("PublicTrustPulsePanelViewModel? TrustPulse", viewModel, StringComparison.Ordinal);
         Assert.Contains("PublicTrustPulseTrendPointViewModel", viewModel, StringComparison.Ordinal);
         Assert.Contains("Weekly trust pulse", partial, StringComparison.Ordinal);
-        Assert.Contains("trust-pulse-trend", partial, StringComparison.Ordinal);
+        Assert.Contains("trust-pulse-trend", body, StringComparison.Ordinal);
         Assert.Contains("Current caution", controller, StringComparison.Ordinal);
         Assert.Contains("Closure health", controller, StringComparison.Ordinal);
         Assert.Contains("Progress trend", controller, StringComparison.Ordinal);
