@@ -251,9 +251,12 @@ internal sealed class PublicReleaseExperienceDocument
     public int Version { get; init; }
     public List<string>? GuestReadableChannels { get; init; }
     public string ReleaseNotesSummary { get; init; } = string.Empty;
+    public string? FlagshipGradeSummary { get; init; }
+    public string? FlagshipAcceptanceSource { get; init; }
     public string? DesktopFlagshipHead { get; init; }
     public string? DesktopFallbackHead { get; init; }
     public string? DesktopCutSummary { get; init; }
+    public List<string>? FlagshipReleaseRules { get; init; }
     public List<string>? SupportedLocaleTargets { get; init; }
     public string KnownIssuesLabel { get; init; } = string.Empty;
     public string KnownIssuesHref { get; init; } = string.Empty;

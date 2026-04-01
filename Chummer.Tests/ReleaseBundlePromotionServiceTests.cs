@@ -1,0 +1,374 @@
+using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text.Json;
+using Chummer.Run.Api.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Xunit;
+
+namespace Chummer.Tests;
+
+public sealed class ReleaseBundlePromotionServiceTests
+{
+    private static readonly JsonSerializerOptions TestJsonOptions = new(JsonSerializerDefaults.Web);
+
+    [Fact]
+    public async Task PromoteAsyncMergesNewArtifactWithoutDroppingExistingShelf()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        fixture.WriteLiveArtifact(
+            artifactId: "avalonia-linux-x64-installer",
+            fileName: "chummer-avalonia-linux-x64-installer.deb",
+            platform: "linux",
+            arch: "x64",
+            kind: "installer",
+            bytes: "linux-live");
+
+        string macFileName = "chummer-avalonia-osx-arm64-installer.dmg";
+        byte[] macBytes = "mac-live"u8.ToArray();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260401-215500",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-dmg",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: macFileName,
+                    Bytes: macBytes,
+                    RequiresSigning: true,
+                    RequiresNotarization: true)
+            ]);
+
+        ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
+
+        Assert.Equal("run-20260401-215500", result.Version);
+        Assert.Contains("avalonia-osx-arm64-dmg", result.PromotedArtifactIds);
+        Assert.Contains("https://chummer.run/downloads/install/avalonia-osx-arm64-dmg", result.InstallDispatchUrls);
+
+        JsonDocument compatibility = fixture.ReadCompatibilityManifest();
+        string[] downloadIds = compatibility.RootElement.GetProperty("downloads")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("id").GetString()!)
+            .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        Assert.Equal(
+            ["avalonia-linux-x64-installer", "avalonia-osx-arm64-dmg"],
+            downloadIds);
+
+        JsonDocument canonical = fixture.ReadCanonicalManifest();
+        string[] canonicalIds = canonical.RootElement.GetProperty("artifacts")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("artifactId").GetString()!)
+            .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        Assert.Equal(
+            ["avalonia-linux-x64-installer", "avalonia-osx-arm64-dmg"],
+            canonicalIds);
+
+        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", "chummer-avalonia-linux-x64-installer.deb")));
+        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", macFileName)));
+    }
+
+    [Fact]
+    public async Task PromoteAsyncRejectsMacArtifactWithoutPromotionEvidence()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260401-220500",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-dmg",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-live"u8.ToArray(),
+                    RequiresSigning: true,
+                    RequiresNotarization: true)
+            ],
+            includePromotionEvidence: false);
+
+        InvalidDataException ex = await Assert.ThrowsAsync<InvalidDataException>(() => fixture.PromoteAsync(bundlePath));
+        Assert.Contains("public-promotion.json", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed class ReleaseBundlePromotionFixture : IDisposable
+    {
+        private readonly string _root;
+        private readonly string _downloadsRoot;
+
+        public ReleaseBundlePromotionFixture()
+        {
+            _root = Path.Combine(Path.GetTempPath(), "release-bundle-promotion-tests", Guid.NewGuid().ToString("N"));
+            _downloadsRoot = Path.Combine(_root, "downloads");
+            Directory.CreateDirectory(Path.Combine(_downloadsRoot, "files"));
+        }
+
+        public string DownloadsRoot => _downloadsRoot;
+
+        public async Task<ReleaseBundlePromotionResult> PromoteAsync(string bundlePath)
+        {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = _downloadsRoot,
+                    ["GOOGLE_OIDC_REDIRECT_URI"] = "https://chummer.run/auth/google/callback"
+                })
+                .Build();
+
+            var service = new ReleaseBundlePromotionService(
+                configuration,
+                NullLogger<ReleaseBundlePromotionService>.Instance);
+
+            await using FileStream stream = File.OpenRead(bundlePath);
+            return await service.PromoteAsync(Path.GetFileName(bundlePath), stream, CancellationToken.None);
+        }
+
+        public void WriteLiveArtifact(
+            string artifactId,
+            string fileName,
+            string platform,
+            string arch,
+            string kind,
+            string bytes)
+        {
+            string path = Path.Combine(_downloadsRoot, "files", fileName);
+            File.WriteAllText(path, bytes);
+            string sha = Sha256For(path);
+            long size = new FileInfo(path).Length;
+
+            WriteCompatibilityManifest(
+                Path.Combine(_downloadsRoot, "releases.json"),
+                version: "run-20260401-200000",
+                downloads:
+                [
+                    new CompatibilityArtifact(
+                        Id: artifactId,
+                        Platform: $"Avalonia Desktop {platform} {arch}",
+                        Url: $"/downloads/files/{fileName}",
+                        Sha256: sha,
+                        SizeBytes: size,
+                        Head: "avalonia",
+                        PlatformId: $"{platform}-{arch}",
+                        Arch: arch,
+                        Kind: kind,
+                        FileName: fileName,
+                        InstallAccessClass: "account_required")
+                ]);
+
+            WriteCanonicalManifest(
+                Path.Combine(_downloadsRoot, "RELEASE_CHANNEL.generated.json"),
+                version: "run-20260401-200000",
+                artifacts:
+                [
+                    new CanonicalArtifact(
+                        ArtifactId: artifactId,
+                        Head: "avalonia",
+                        Platform: platform,
+                        Arch: arch,
+                        Kind: kind,
+                        FileName: fileName,
+                        DownloadUrl: $"/downloads/files/{fileName}",
+                        Sha256: sha,
+                        SizeBytes: size,
+                        PlatformLabel: $"Avalonia Desktop {platform} {arch}")
+                ]);
+        }
+
+        public string CreateBundle(
+            string version,
+            IReadOnlyList<BundleArtifact> artifacts,
+            bool includePromotionEvidence = true)
+        {
+            string bundleRoot = Path.Combine(_root, "bundle-" + Guid.NewGuid().ToString("N"));
+            string filesRoot = Path.Combine(bundleRoot, "files");
+            string smokeRoot = Path.Combine(bundleRoot, "startup-smoke");
+            string evidenceRoot = Path.Combine(bundleRoot, "release-evidence");
+            Directory.CreateDirectory(filesRoot);
+            Directory.CreateDirectory(smokeRoot);
+            Directory.CreateDirectory(evidenceRoot);
+
+            List<CompatibilityArtifact> compatibilityArtifacts = new(artifacts.Count);
+            List<CanonicalArtifact> canonicalArtifacts = new(artifacts.Count);
+            List<PromotionEvidenceArtifact> evidenceArtifacts = new(artifacts.Count);
+
+            foreach (BundleArtifact artifact in artifacts)
+            {
+                string filePath = Path.Combine(filesRoot, artifact.FileName);
+                File.WriteAllBytes(filePath, artifact.Bytes);
+                string sha = Sha256For(filePath);
+                long size = new FileInfo(filePath).Length;
+                string downloadUrl = $"/downloads/files/{artifact.FileName}";
+
+                compatibilityArtifacts.Add(new CompatibilityArtifact(
+                    Id: artifact.ArtifactId,
+                    Platform: $"Avalonia Desktop {artifact.Platform} {artifact.Arch}",
+                    Url: downloadUrl,
+                    Sha256: sha,
+                    SizeBytes: size,
+                    Head: artifact.Head,
+                    PlatformId: $"{artifact.Platform}-{artifact.Arch}",
+                    Arch: artifact.Arch,
+                    Kind: artifact.Kind,
+                    FileName: artifact.FileName,
+                    InstallAccessClass: "account_required"));
+
+                canonicalArtifacts.Add(new CanonicalArtifact(
+                    ArtifactId: artifact.ArtifactId,
+                    Head: artifact.Head,
+                    Platform: artifact.Platform,
+                    Arch: artifact.Arch,
+                    Kind: artifact.Kind,
+                    FileName: artifact.FileName,
+                    DownloadUrl: downloadUrl,
+                    Sha256: sha,
+                    SizeBytes: size,
+                    PlatformLabel: $"Avalonia Desktop {artifact.Platform} {artifact.Arch}"));
+
+                File.WriteAllText(
+                    Path.Combine(smokeRoot, $"startup-smoke-{artifact.Head}-{artifact.Platform}-{artifact.Arch}.receipt.json"),
+                    JsonSerializer.Serialize(new
+                    {
+                        headId = artifact.Head,
+                        platform = artifact.Platform,
+                        arch = artifact.Arch,
+                        artifactDigest = $"sha256:{sha}"
+                    }, TestJsonOptions));
+
+                evidenceArtifacts.Add(new PromotionEvidenceArtifact(
+                    ArtifactId: artifact.ArtifactId,
+                    FileName: artifact.FileName,
+                    Platform: artifact.Platform,
+                    PromotionStatus: "pass",
+                    StartupSmokeStatus: "pass",
+                    SigningStatus: artifact.RequiresSigning ? "pass" : null,
+                    NotarizationStatus: artifact.RequiresNotarization ? "pass" : null));
+            }
+
+            WriteCompatibilityManifest(
+                Path.Combine(bundleRoot, "releases.json"),
+                version,
+                compatibilityArtifacts);
+            WriteCanonicalManifest(
+                Path.Combine(bundleRoot, "RELEASE_CHANNEL.generated.json"),
+                version,
+                canonicalArtifacts);
+
+            if (includePromotionEvidence)
+            {
+                File.WriteAllText(
+                    Path.Combine(evidenceRoot, "public-promotion.json"),
+                    JsonSerializer.Serialize(new
+                    {
+                        contractName = "chummer.run.desktop_release_publication",
+                        generatedAt = "2026-04-01T21:55:00Z",
+                        artifacts = evidenceArtifacts
+                    }, TestJsonOptions));
+            }
+
+            string zipPath = Path.Combine(_root, $"{Path.GetFileName(bundleRoot)}.zip");
+            ZipFile.CreateFromDirectory(bundleRoot, zipPath);
+            return zipPath;
+        }
+
+        public JsonDocument ReadCompatibilityManifest()
+            => JsonDocument.Parse(File.ReadAllText(Path.Combine(_downloadsRoot, "releases.json")));
+
+        public JsonDocument ReadCanonicalManifest()
+            => JsonDocument.Parse(File.ReadAllText(Path.Combine(_downloadsRoot, "RELEASE_CHANNEL.generated.json")));
+
+        public void Dispose()
+        {
+            if (Directory.Exists(_root))
+            {
+                Directory.Delete(_root, recursive: true);
+            }
+        }
+
+        private static void WriteCompatibilityManifest(string path, string version, IReadOnlyList<CompatibilityArtifact> downloads)
+        {
+            File.WriteAllText(
+                path,
+                JsonSerializer.Serialize(new
+                {
+                    version,
+                    channel = "preview",
+                    publishedAt = "2026-04-01T20:00:00Z",
+                    downloads
+                }, TestJsonOptions));
+        }
+
+        private static void WriteCanonicalManifest(string path, string version, IReadOnlyList<CanonicalArtifact> artifacts)
+        {
+            File.WriteAllText(
+                path,
+                JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    product = "chummer",
+                    channelId = "preview",
+                    version,
+                    publishedAt = "2026-04-01T20:00:00Z",
+                    status = "published",
+                    artifacts
+                }, TestJsonOptions));
+        }
+
+        private static string Sha256For(string path)
+        {
+            using var sha = SHA256.Create();
+            using FileStream stream = File.OpenRead(path);
+            return Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant();
+        }
+    }
+
+    private sealed record BundleArtifact(
+        string ArtifactId,
+        string Head,
+        string Platform,
+        string Arch,
+        string Kind,
+        string FileName,
+        byte[] Bytes,
+        bool RequiresSigning,
+        bool RequiresNotarization);
+
+    private sealed record CompatibilityArtifact(
+        string Id,
+        string Platform,
+        string Url,
+        string Sha256,
+        long SizeBytes,
+        string Head,
+        string PlatformId,
+        string Arch,
+        string Kind,
+        string FileName,
+        string InstallAccessClass);
+
+    private sealed record CanonicalArtifact(
+        string ArtifactId,
+        string Head,
+        string Platform,
+        string Arch,
+        string Kind,
+        string FileName,
+        string DownloadUrl,
+        string Sha256,
+        long SizeBytes,
+        string PlatformLabel);
+
+    private sealed record PromotionEvidenceArtifact(
+        string ArtifactId,
+        string FileName,
+        string Platform,
+        string PromotionStatus,
+        string StartupSmokeStatus,
+        string? SigningStatus,
+        string? NotarizationStatus);
+}

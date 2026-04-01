@@ -11,7 +11,7 @@ public static class HubApiGuardrailPolicy
 
     public static string ResolveRateLimitBucket(HttpRequest request)
     {
-        if (IsFileTransferPath(request.Path))
+        if (IsFileTransferPath(request.Path) || IsReleaseBundleUploadPath(request.Path))
         {
             return FileTransferBucket;
         }
@@ -31,7 +31,9 @@ public static class HubApiGuardrailPolicy
 
         return IsBodylessMethod(request.Method)
             ? null
-            : IsMultipartSupportPath(request.Path)
+            : IsReleaseBundleUploadPath(request.Path)
+                ? options.MaxReleaseBundleBodyBytes
+                : IsMultipartSupportPath(request.Path)
                 ? options.MaxMultipartBodyBytes
                 : options.MaxJsonBodyBytes;
     }
@@ -41,7 +43,9 @@ public static class HubApiGuardrailPolicy
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(options);
 
-        return IsExtendedTimeoutPath(request.Path)
+        return IsReleaseBundleUploadPath(request.Path)
+            ? options.ReleaseBundleTimeout
+            : IsExtendedTimeoutPath(request.Path)
             ? options.ExtendedRequestTimeout
             : options.DefaultRequestTimeout;
     }
@@ -49,6 +53,9 @@ public static class HubApiGuardrailPolicy
     public static bool IsExtendedTimeoutPath(PathString path)
         => IsMultipartSupportPath(path)
            || IsFileTransferPath(path);
+
+    public static bool IsReleaseBundleUploadPath(PathString path)
+        => path.StartsWithSegments("/api/internal/releases/bundles", StringComparison.OrdinalIgnoreCase);
 
     public static bool IsMultipartSupportPath(PathString path)
         => path.StartsWithSegments("/api/v1/support/cases/form", StringComparison.OrdinalIgnoreCase)

@@ -194,6 +194,20 @@ public sealed record DownloadsPageViewModel(
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
+public sealed record ReleaseUploadPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Summary,
+    string Command,
+    string BootstrapUrl,
+    DateTimeOffset TicketExpiresAtUtc,
+    string UploadUrl,
+    string ReadmeUrl,
+    string VerifyUrl,
+    string WindowsUploadNote,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
 public sealed record StatusPageViewModel(
     SiteChromeViewModel Chrome,
     PublicReleaseManifestDto Manifest,
