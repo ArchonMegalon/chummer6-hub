@@ -393,7 +393,7 @@ public sealed class ReleaseBundlePromotionService
         foreach (CanonicalArtifactRecord artifact in installerArtifacts)
         {
             ValidateStartupSmokeReceipt(artifact, startupSmokeReceipts);
-            ValidatePromotionEvidence(artifact, promotionEvidence);
+            ValidatePromotionEvidence(artifact, promotionEvidence, compatibilityManifest.Channel);
         }
     }
 
@@ -466,7 +466,7 @@ public sealed class ReleaseBundlePromotionService
         }
     }
 
-    private static void ValidatePromotionEvidence(CanonicalArtifactRecord artifact, PromotionEvidenceDocument evidence)
+    private static void ValidatePromotionEvidence(CanonicalArtifactRecord artifact, PromotionEvidenceDocument evidence, string? channel)
     {
         PromotionArtifactEvidence? artifactEvidence = evidence.Artifacts.FirstOrDefault(item =>
             string.Equals(item.ArtifactId, artifact.ArtifactId, StringComparison.OrdinalIgnoreCase)
@@ -495,6 +495,16 @@ public sealed class ReleaseBundlePromotionService
 
         if (string.Equals(platform, "macos", StringComparison.OrdinalIgnoreCase))
         {
+            bool previewUnsignedAllowed =
+                string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(artifactEvidence.SigningStatus, "skipped_preview", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(artifactEvidence.NotarizationStatus, "skipped_preview", StringComparison.OrdinalIgnoreCase);
+
+            if (previewUnsignedAllowed)
+            {
+                return;
+            }
+
             if (!string.Equals(artifactEvidence.SigningStatus, "pass", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException($"macOS promotion requires signing proof for {artifact.ArtifactId}.");
