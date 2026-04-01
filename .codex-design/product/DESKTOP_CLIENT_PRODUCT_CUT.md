@@ -31,6 +31,7 @@ The current minimum preview includes:
 * update check and release posture visibility
 * crash, bug, and feedback entry points
 * home/workspace continuity surfaces that let a claimed install continue where the user left off
+* rule-environment activation, preset selection, and amend-package diff preview with proof of activation
 * ruleset-authored builder and explain cues where SR4, SR5, and SR6 materially diverge
 
 The preview cut must not present multiple desktop heads as equally primary to normal users.
@@ -45,6 +46,7 @@ It must prove:
 * startup, install, update, crash-recovery, and support flows that feel boring on the promoted path
 * dense-data builder, compare, and explain flows that stay fast and readable under expert use
 * authored SR4, SR5, and SR6 interactions where edition differences materially change the user's reasoning
+* active ruleset, preset, and amend-package state that never turns rule drift into mystery local cargo
 * import, claim, feedback, and release-help surfaces that agree with the public shelf and support truth
 
 ## Platform posture
