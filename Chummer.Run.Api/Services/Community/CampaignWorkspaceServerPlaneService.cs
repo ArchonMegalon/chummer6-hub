@@ -33,8 +33,6 @@ public sealed class CampaignWorkspaceServerPlaneService
         "delta",
         "lane",
         "window",
-        "state",
-        "status",
         "fallout",
         "cooldown",
         "cooling",
