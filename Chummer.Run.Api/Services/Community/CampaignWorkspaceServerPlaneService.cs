@@ -1671,7 +1671,34 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return IsContinuitySignalKind(normalizedKind)
+            || IsDiarySignalKind(normalizedKind)
             || IsCampaignRelationshipSignalKind(normalizedKind);
+    }
+
+    private static bool IsDiarySignalKind(string? kind)
+    {
+        string normalizedKind = kind?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+        {
+            return false;
+        }
+
+        if (string.Equals(normalizedKind, "diary_update", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "journal_update", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "session_log_update", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        bool hasDiaryToken = normalizedKind.Contains("diary", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("journal", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("session_log", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("sessionlog", StringComparison.OrdinalIgnoreCase);
+        bool hasMutationToken = normalizedKind.Contains("update", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("change", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("entry", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("note", StringComparison.OrdinalIgnoreCase);
+        return hasDiaryToken && hasMutationToken;
     }
 
     private static bool IsCampaignRelationshipSignalKind(string? kind)
