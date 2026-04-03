@@ -2498,7 +2498,6 @@ public sealed class CampaignWorkspaceServerPlaneService
         return value.Contains("event", StringComparison.OrdinalIgnoreCase)
             || value.Contains("season", StringComparison.OrdinalIgnoreCase)
             || value.Contains("timeline", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("window", StringComparison.OrdinalIgnoreCase)
             || value.Contains("operation", StringComparison.OrdinalIgnoreCase)
             || value.Contains("checkpoint", StringComparison.OrdinalIgnoreCase);
     }
