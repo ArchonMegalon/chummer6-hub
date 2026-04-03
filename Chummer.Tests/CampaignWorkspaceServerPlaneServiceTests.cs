@@ -2237,6 +2237,32 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RosterMovementPacketFallsBackToRosterConsequenceLabelWhenConsequenceKindIsSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterConsequenceLabelOnlyAndSparseKind();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("roster movement consequence label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketFallsBackToRosterConsequenceLabelWhenConsequenceKindIsSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterConsequenceLabelOnlyAndSparseKind();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("roster movement consequence label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void RosterMovementPacketKeepsSignalKindFallbackWhenTransferEvidenceIsVerbose()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterTransfersSparseAndVerboseOpsEvidence();
@@ -7102,6 +7128,48 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ConsequenceId: "consequence-1",
             Kind: "roster_assignment",
             Label: "",
+            State: "active",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [rosterConsequence],
+            RosterTransfers: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithRosterConsequenceLabelOnlyAndSparseKind()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        CampaignConsequenceProjection rosterConsequence = new(
+            ConsequenceId: "consequence-1",
+            Kind: "",
+            Label: "Roster movement consequence label",
             State: "active",
             Summary: "",
             EvidenceLines: [],
