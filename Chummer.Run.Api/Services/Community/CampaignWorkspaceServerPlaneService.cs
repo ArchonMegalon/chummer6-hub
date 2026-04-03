@@ -1732,7 +1732,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         bool hasMutationToken = normalizedKind.Contains("update", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("change", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("shift", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("delta", StringComparison.OrdinalIgnoreCase);
+            || normalizedKind.Contains("delta", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("pressure", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("lane", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("window", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("state", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("status", StringComparison.OrdinalIgnoreCase);
         return hasRelationshipToken && hasMutationToken;
     }
 
