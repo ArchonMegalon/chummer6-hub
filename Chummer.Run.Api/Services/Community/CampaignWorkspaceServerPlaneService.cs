@@ -1563,10 +1563,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         CampaignConsequenceProjection[] relationshipConsequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
-            .Where(static consequence => string.Equals(consequence.Kind, "contact", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(consequence.Kind, "heat", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(consequence.Kind, "reputation", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(consequence.Kind, "faction", StringComparison.OrdinalIgnoreCase))
+            .Where(static consequence => IsCampaignRelationshipConsequenceKind(consequence.Kind))
             .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
             .Take(4)
             .ToArray();
@@ -1737,6 +1734,25 @@ public sealed class CampaignWorkspaceServerPlaneService
             || normalizedKind.Contains("shift", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("delta", StringComparison.OrdinalIgnoreCase);
         return hasRelationshipToken && hasMutationToken;
+    }
+
+    private static bool IsCampaignRelationshipConsequenceKind(string? kind)
+    {
+        string normalizedKind = kind?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+        {
+            return false;
+        }
+
+        if (IsCampaignRelationshipSignalKind(normalizedKind))
+        {
+            return true;
+        }
+
+        return normalizedKind.Contains("contact", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("heat", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("reputation", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("faction", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildRosterMovementPrepPacket(
@@ -2065,10 +2081,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         CampaignConsequenceProjection[] consequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
-            .Where(static consequence => string.Equals(consequence.Kind, "heat", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(consequence.Kind, "contact", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(consequence.Kind, "reputation", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(consequence.Kind, "faction", StringComparison.OrdinalIgnoreCase))
+            .Where(static consequence => IsCampaignRelationshipConsequenceKind(consequence.Kind))
             .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
             .Take(3)
             .ToArray();
