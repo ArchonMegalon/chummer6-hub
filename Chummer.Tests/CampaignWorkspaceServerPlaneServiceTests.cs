@@ -178,6 +178,22 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("roster-change packets", packet.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void PrepLaunchPacketFallsBackToChangeSignalsWhenLaunchReceiptsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchChangeSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("prep", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("launch", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("change packets", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -597,6 +613,64 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [rosterChange],
             Consequences: [],
             NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchChangeSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-1",
+            Title: "Prep launch validation",
+            Status: "open",
+            Pressure: "medium",
+            Summary: "Prep launch evidence is pending final receipt ingestion.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "Current run remains active.",
+            ActiveSceneId: null,
+            Objectives: [objective],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        WorkspaceChangePacketProjection prepLaunchChange = new(
+            PacketId: "packet-1",
+            Kind: "prep_launch",
+            Label: "Scene prep launch",
+            Summary: "Prep launch packet was staged on the governed campaign lane.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [prepLaunchChange],
+            Consequences: [],
+            PrepLaunches: []);
     }
 
     private static WorkspaceRestoreProjection BuildEmptyRestore()
