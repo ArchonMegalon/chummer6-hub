@@ -680,6 +680,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketCountsRelationshipSignalsFromCarryForwardEvidenceWhenOtherFamiliesAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnCarryForwardEvidenceSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void CampaignReturnPacketIncludesKindFallbacksWhenLabelsAndSummariesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnKindsOnly();
