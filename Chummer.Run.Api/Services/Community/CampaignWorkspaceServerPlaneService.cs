@@ -1560,11 +1560,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] returnChanges = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => string.Equals(packet.Kind, "next_session_carry_forward", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(packet.Kind, "after_action_report", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(packet.Kind, "downtime_brief", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(packet.Kind, "continuity", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(packet.Kind, "contact_update", StringComparison.OrdinalIgnoreCase))
+            .Where(static packet => IsCampaignReturnSignalKind(packet.Kind))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
@@ -1646,6 +1642,45 @@ public sealed class CampaignWorkspaceServerPlaneService
                 relationshipConsequences.Select(static item => item.State)),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsCampaignReturnSignalKind(string? kind)
+    {
+        string normalizedKind = kind?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+        {
+            return false;
+        }
+
+        return IsContinuitySignalKind(normalizedKind)
+            || IsCampaignRelationshipSignalKind(normalizedKind);
+    }
+
+    private static bool IsCampaignRelationshipSignalKind(string? kind)
+    {
+        string normalizedKind = kind?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+        {
+            return false;
+        }
+
+        if (string.Equals(normalizedKind, "contact_update", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "heat_update", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "reputation_update", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "faction_update", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        bool hasRelationshipToken = normalizedKind.Contains("contact", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("heat", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("reputation", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("faction", StringComparison.OrdinalIgnoreCase);
+        bool hasMutationToken = normalizedKind.Contains("update", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("change", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("shift", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("delta", StringComparison.OrdinalIgnoreCase);
+        return hasRelationshipToken && hasMutationToken;
     }
 
     private static GovernedPrepPacketSummary? BuildRosterMovementPrepPacket(
