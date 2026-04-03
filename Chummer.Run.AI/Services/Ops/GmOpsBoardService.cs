@@ -576,20 +576,34 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
 
     private static GmPrepAssetGovernedProjectReference? NormalizeGovernedProject(OfflineSyncPrepGovernedProjectReference? governedProject)
     {
-        if (governedProject is null
-            || string.IsNullOrWhiteSpace(governedProject.ProjectKind)
-            || string.IsNullOrWhiteSpace(governedProject.ProjectId))
+        if (governedProject is null)
+        {
+            return null;
+        }
+
+        string? projectKind = NormalizeOptional(governedProject.ProjectKind);
+        string? projectId = NormalizeOptional(governedProject.ProjectId);
+        string? title = NormalizeOptional(governedProject.Title);
+        string? rulesetId = NormalizeOptional(governedProject.RulesetId);
+        string? linkTarget = NormalizeOptional(governedProject.LinkTarget);
+        string? trustTier = NormalizeOptional(governedProject.TrustTier);
+        if (projectKind is null
+            || projectId is null
+            || title is null
+            || rulesetId is null
+            || linkTarget is null
+            || trustTier is null)
         {
             return null;
         }
 
         return new GmPrepAssetGovernedProjectReference(
-            ProjectKind: governedProject.ProjectKind.Trim(),
-            ProjectId: governedProject.ProjectId.Trim(),
-            Title: governedProject.Title.Trim(),
-            RulesetId: governedProject.RulesetId.Trim(),
-            LinkTarget: governedProject.LinkTarget.Trim(),
-            TrustTier: governedProject.TrustTier.Trim(),
+            ProjectKind: projectKind,
+            ProjectId: projectId,
+            Title: title,
+            RulesetId: rulesetId,
+            LinkTarget: linkTarget,
+            TrustTier: trustTier,
             RuntimeFingerprint: NormalizeOptional(governedProject.RuntimeFingerprint));
     }
 
