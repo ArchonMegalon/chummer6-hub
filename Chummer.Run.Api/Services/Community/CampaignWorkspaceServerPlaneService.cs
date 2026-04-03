@@ -2130,6 +2130,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "event",
                 "season",
                 "control",
+                "opposition",
                 "return",
                 "operations",
                 "roster",
@@ -2166,7 +2167,10 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static bool IsEventControlObjectiveSignal(string? title, string? summary)
     {
-        return ContainsEventControlToken(title) || ContainsEventControlToken(summary);
+        return ContainsEventControlToken(title)
+            || ContainsEventControlToken(summary)
+            || ContainsOppositionToken(title)
+            || ContainsOppositionToken(summary);
     }
 
     private static bool ContainsEventControlToken(string? value)
@@ -2182,6 +2186,41 @@ public sealed class CampaignWorkspaceServerPlaneService
             || value.Contains("window", StringComparison.OrdinalIgnoreCase)
             || value.Contains("operation", StringComparison.OrdinalIgnoreCase)
             || value.Contains("checkpoint", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsOppositionToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Contains("opposition", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("hostile", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("adversary", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("threat", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsOppositionSignalKind(string? kind)
+    {
+        string normalizedKind = kind?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+        {
+            return false;
+        }
+
+        if (string.Equals(normalizedKind, "opposition", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "opposition_window", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "opposition_control", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "threat_window", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return normalizedKind.Contains("opposition", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("threat", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("hostile", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("adversary", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsEventControlSignalKind(string? kind)
@@ -2204,7 +2243,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             || IsRosterMovementSignalKind(normalizedKind)
             || IsPrepLaunchSignalKind(normalizedKind)
             || IsTravelPrefetchSignalKind(normalizedKind)
-            || IsCampaignRelationshipSignalKind(normalizedKind);
+            || IsCampaignRelationshipSignalKind(normalizedKind)
+            || IsOppositionSignalKind(normalizedKind);
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrefetchOpsPacket(
