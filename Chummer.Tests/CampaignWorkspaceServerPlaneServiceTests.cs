@@ -159,6 +159,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void TravelPrefetchPacketFallsBackToChangeSignalsWhenReceiptsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithTravelPrefetchChangeSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("travel", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("prefetch", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("change packets", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void EventControlPacketIncludesOpsReceiptsWhenPrepLaunchAndTravelPrefetchExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
@@ -618,6 +633,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Return lane summary",
             PrepLaunches: [prepLaunch],
             TravelPrefetches: [prefetch]);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithTravelPrefetchChangeSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection prefetchChange = new(
+            PacketId: "packet-1",
+            Kind: "travel_prefetch",
+            Label: "Travel prefetch signal",
+            Summary: "Travel prefetch change packet staged bounded offline inventory for the next return loop.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [prefetchChange],
+            Consequences: [],
+            TravelPrefetches: []);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithRunPressureSignalsOnly()
