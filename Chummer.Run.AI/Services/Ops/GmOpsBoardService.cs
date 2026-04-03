@@ -557,6 +557,17 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 continue;
             }
 
+            if (!HasConsistentPortableAssetRevealStatus(asset, out string? revealStatusReason))
+            {
+                skipped++;
+                conflicts.Add(new OfflineSyncConflict(
+                    Surface: "ops-prep",
+                    EntityId: normalizedAssetId,
+                    Reason: revealStatusReason ?? "invalid-asset-reveal-status",
+                    Resolution: "skipped-invalid"));
+                continue;
+            }
+
             if (_assets.TryGetValue(normalizedAssetId, out var local))
             {
                 lock (local)
@@ -722,6 +733,23 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         if (!Enum.TryParse<GmPrepAssetAudience>(asset.Audience, ignoreCase: true, out _))
         {
             reason = "invalid-asset-audience";
+            return false;
+        }
+
+        reason = null;
+        return true;
+    }
+
+    private static bool HasConsistentPortableAssetRevealStatus(OfflineSyncPrepAsset asset, out string? reason)
+    {
+        string normalizedStatus = NormalizePortableAssetStatus(asset.Status);
+        bool hasRevealTimestamp = asset.LastRevealedAtUtc.HasValue;
+        bool hasRevealChannel = !string.IsNullOrWhiteSpace(asset.LastRevealChannel);
+        bool hasRevealProof = asset.RevealCount > 0 && hasRevealTimestamp && hasRevealChannel;
+
+        if (string.Equals(normalizedStatus, "revealed", StringComparison.OrdinalIgnoreCase) && !hasRevealProof)
+        {
+            reason = "invalid-asset-reveal-status";
             return false;
         }
 

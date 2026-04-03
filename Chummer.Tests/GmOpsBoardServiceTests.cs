@@ -357,7 +357,10 @@ public sealed class GmOpsBoardServiceTests
             assetId: "prep_status_normalized",
             now: now) with
         {
-            Status = " ReVeAled "
+            Status = " ReVeAled ",
+            RevealCount = 1,
+            LastRevealedAtUtc = now.AddSeconds(-5),
+            LastRevealChannel = "gm-ops"
         };
 
         OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([asset]);
@@ -443,6 +446,32 @@ public sealed class GmOpsBoardServiceTests
         Assert.Null(service.GetPrepAsset("prep_invalid_reveal_state_no_count"));
         Assert.Null(service.GetPrepAsset("prep_invalid_reveal_state_no_timestamp"));
         Assert.Null(service.GetPrepAsset("prep_invalid_reveal_state_no_channel"));
+    }
+
+    [Fact]
+    public void ReconcilePortableAssets_SkipsAssets_WhenRevealedStatusLacksRevealProvenance()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        var revealedWithoutProof = BuildPortableAsset(
+            assetId: "prep_revealed_without_proof",
+            now: now) with
+        {
+            Status = "revealed",
+            RevealCount = 0,
+            LastRevealedAtUtc = null,
+            LastRevealChannel = null
+        };
+
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([revealedWithoutProof]);
+
+        Assert.Equal(0, result.ImportedCount);
+        Assert.Equal(1, result.SkippedCount);
+        OfflineSyncConflict conflict = Assert.Single(result.Conflicts);
+        Assert.Equal("prep_revealed_without_proof", conflict.EntityId);
+        Assert.Equal("invalid-asset-reveal-status", conflict.Reason);
+        Assert.Equal("skipped-invalid", conflict.Resolution);
+        Assert.Null(service.GetPrepAsset("prep_revealed_without_proof"));
     }
 
     private static GmOpsBoardService CreateService()
