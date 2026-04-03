@@ -1829,27 +1829,22 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
-        IReadOnlyList<string> evidence = transfers
-            .Select(DescribeRosterTransferEvidence)
-            .Concat(transfers.SelectMany(static item => item.AuditLines))
-            .Concat(rosterChangeSignals.Select(static packet => packet.Summary))
-            .Concat(rosterChangeSignals.Select(static packet => packet.Label))
-            .Concat(rosterChangeSignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "roster movement signal")))
-            .Concat(rosterObjectives.Select(static objective => objective.Summary))
-            .Concat(rosterObjectives.Select(static objective => objective.Title))
-            .Concat(rosterObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."))
-            .Concat(
-                carryForwardRosterSignal
-                    ? BuildEvidenceLines(
-                        workspace.NextSessionCarryForward?.Label,
-                        workspace.NextSessionCarryForward?.Summary,
-                        workspace.NextSessionCarryForward?.ReturnSummary,
-                        workspace.NextSessionCarryForward?.NextSafeAction)
-                    : Array.Empty<string>())
-            .Where(static item => !string.IsNullOrWhiteSpace(item))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
-            .ToArray();
+        IReadOnlyList<string> evidence = BuildEvidenceLines(
+            rosterChangeSignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "roster movement signal")),
+            transfers.Select(DescribeRosterTransferEvidence),
+            carryForwardRosterSignal
+                ? BuildEvidenceLines(
+                    workspace.NextSessionCarryForward?.Label,
+                    workspace.NextSessionCarryForward?.Summary,
+                    workspace.NextSessionCarryForward?.ReturnSummary,
+                    workspace.NextSessionCarryForward?.NextSafeAction)
+                : Array.Empty<string>(),
+            rosterObjectives.Select(static objective => DescribeSignalLabel(objective.Title, objective.Status, "roster objective")),
+            rosterChangeSignals.Select(static packet => packet.Summary),
+            rosterChangeSignals.Select(static packet => packet.Label),
+            rosterObjectives.Select(static objective => objective.Summary),
+            rosterObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."),
+            transfers.SelectMany(static item => item.AuditLines));
         int signalCount = transfers.Length + rosterChangeSignals.Length + rosterObjectives.Length + (carryForwardRosterSignal ? 1 : 0);
         string summary = transfers.Length > 0
             ? $"{signalCount} roster movement signal(s) keep ownership and campaign movement on the same governed lane."
@@ -2193,6 +2188,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             : string.Empty;
         IReadOnlyList<string> evidence = BuildEvidenceLines(
             consequences.Select(static consequence => DescribeSignalLabel(consequence.Label, consequence.Kind, consequence.State)),
+            rosterTransfers.Select(DescribeRosterTransferEvidence),
             consequences.Select(static consequence => consequence.Summary),
             consequences.Select(static consequence => consequence.Label),
             consequences.SelectMany(static consequence => consequence.EvidenceLines),
@@ -2203,7 +2199,6 @@ public sealed class CampaignWorkspaceServerPlaneService
             eventObjectives.Select(static objective => objective.Summary),
             eventObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."),
             sceneSignal ? activeScene?.Summary : null,
-            rosterTransfers.Select(DescribeRosterTransferEvidence),
             rosterTransfers.SelectMany(static transfer => transfer.AuditLines),
             prepLaunches.Select(DescribePrepLaunchEvidence),
             prepLaunches.SelectMany(static launch => launch.AuditLines),
