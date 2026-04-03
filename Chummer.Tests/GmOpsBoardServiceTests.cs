@@ -154,6 +154,71 @@ public sealed class GmOpsBoardServiceTests
         Assert.Equal("prep_whitespace_id", listed.Items[0].AssetId);
     }
 
+    [Fact]
+    public void ReconcilePortableAssets_SkipsAssets_WhenKindOrAudienceIsInvalid()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        var invalidKind = BuildPortableAsset(
+            assetId: "prep_invalid_kind",
+            now: now) with
+        {
+            Kind = "not-a-kind"
+        };
+        var invalidAudience = BuildPortableAsset(
+            assetId: "prep_invalid_audience",
+            now: now.AddMinutes(1)) with
+        {
+            Audience = "not-an-audience"
+        };
+
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([invalidKind, invalidAudience]);
+
+        Assert.Equal(0, result.ImportedCount);
+        Assert.Equal(2, result.SkippedCount);
+        Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_kind" && conflict.Reason == "invalid-asset-kind");
+        Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_audience" && conflict.Reason == "invalid-asset-audience");
+        Assert.Null(service.GetPrepAsset("prep_invalid_kind"));
+        Assert.Null(service.GetPrepAsset("prep_invalid_audience"));
+    }
+
+    [Fact]
+    public void ReconcilePortableAssets_SkipsAssets_WhenTimelineIsInvalid()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        var updatedBeforeCreated = BuildPortableAsset(
+            assetId: "prep_invalid_timeline",
+            now: now) with
+        {
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now.AddMinutes(-1)
+        };
+        var revealAfterUpdated = BuildPortableAsset(
+            assetId: "prep_invalid_reveal_time",
+            now: now.AddMinutes(5)) with
+        {
+            LastRevealedAtUtc = now.AddMinutes(6)
+        };
+        var negativeRevealCount = BuildPortableAsset(
+            assetId: "prep_invalid_reveal_count",
+            now: now.AddMinutes(8)) with
+        {
+            RevealCount = -1
+        };
+
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([updatedBeforeCreated, revealAfterUpdated, negativeRevealCount]);
+
+        Assert.Equal(0, result.ImportedCount);
+        Assert.Equal(3, result.SkippedCount);
+        Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_timeline" && conflict.Reason == "invalid-asset-timeline");
+        Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_reveal_time" && conflict.Reason == "invalid-asset-reveal-timestamp");
+        Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_reveal_count" && conflict.Reason == "invalid-asset-reveal-count");
+        Assert.Null(service.GetPrepAsset("prep_invalid_timeline"));
+        Assert.Null(service.GetPrepAsset("prep_invalid_reveal_time"));
+        Assert.Null(service.GetPrepAsset("prep_invalid_reveal_count"));
+    }
+
     private static GmOpsBoardService CreateService()
     {
         var ledger = new SessionLedgerService();
