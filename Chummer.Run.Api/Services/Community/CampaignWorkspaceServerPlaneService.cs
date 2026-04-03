@@ -2055,14 +2055,37 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static bool ContainsCampaignRelationshipSplitTokenSignal(string? kind, string? label, string? summary)
     {
-        string combined = string.Join(' ', new[] { kind, label, summary }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+        string[] candidates = [kind ?? string.Empty, label ?? string.Empty, summary ?? string.Empty];
+        string combined = string.Join(' ', candidates.Where(static value => !string.IsNullOrWhiteSpace(value)));
         if (string.IsNullOrWhiteSpace(combined))
         {
             return false;
         }
 
-        return ContainsCampaignRelationshipToken(combined)
-            && ContainsCampaignRelationshipMutationToken(combined);
+        if (!ContainsCampaignRelationshipToken(combined))
+        {
+            return false;
+        }
+
+        if (ContainsAnyWordToken(combined, CampaignRelationshipStrongMutationWordTokens))
+        {
+            return true;
+        }
+
+        bool hasContextMutationToken = ContainsAnyWordToken(combined, CampaignRelationshipContextMutationWordTokens);
+        if (!hasContextMutationToken)
+        {
+            return false;
+        }
+
+        bool hasStructuredRelationshipContextField = candidates.Any(static value =>
+            !string.IsNullOrWhiteSpace(value)
+            && IsStructuredSignalKind(value)
+            && ContainsAnyWordToken(value, CampaignRelationshipContextMutationWordTokens)
+            && (ContainsCampaignRelationshipToken(value)
+                || ContainsAnyWordToken(value, ["relationship"])));
+
+        return hasStructuredRelationshipContextField;
     }
 
     private static bool ContainsCampaignRelationshipToken(string? value)
