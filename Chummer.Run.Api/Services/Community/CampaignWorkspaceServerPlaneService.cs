@@ -1624,6 +1624,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             workspace.NextSessionCarryForward?.ReturnSummary,
             workspace.NextSessionCarryForward?.NextSafeAction,
             diaryRecaps.Select(static item => item.Summary),
+            diaryRecaps.Select(static item => item.Label),
+            diaryRecaps.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "diary signal")),
             aftermathPackages.Select(static item => item.Summary),
             aftermathPackages.SelectMany(static item => item.EvidenceLines),
             returnChanges.Select(static item => item.Summary),
