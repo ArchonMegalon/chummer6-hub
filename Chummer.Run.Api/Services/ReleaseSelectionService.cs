@@ -33,13 +33,22 @@ public sealed class ReleaseSelectionService
     public bool RequiresAccount(PublicReleaseArtifactDto artifact)
         => string.Equals(NormalizeInstallAccessClass(artifact.InstallAccessClass), InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase);
 
+    public bool UsesMacBootstrapScript(PublicReleaseArtifactDto artifact)
+        => UsesMacBootstrapFlow(artifact);
+
+    public bool UsesGuidedBootstrapScript(PublicReleaseArtifactDto artifact)
+        => UsesGuidedBootstrapFlow(artifact);
+
     public ReleaseExperienceViewModel BuildExperience(PublicReleaseManifestDto manifest, string userAgent, bool authenticated)
     {
         var experience = LoadExperience();
         var platformAcceptance = LoadPlatformAcceptance();
         manifest = ApplyAccessPolicy(manifest, experience, platformAcceptance);
         var requestedPlatform = DetectPreferredPlatform(userAgent);
+        var requestedPlatformHasPublicDownload = string.IsNullOrWhiteSpace(requestedPlatform)
+            || manifest.Downloads.Any(download => string.Equals(PlatformFamily(download), requestedPlatform, StringComparison.OrdinalIgnoreCase));
         var shelfNotice = BuildPlatformShelfNotice(manifest, platformAcceptance, requestedPlatform);
+        var platformAvailability = BuildPlatformAvailability(manifest, platformAcceptance, requestedPlatform);
 
         var installers = manifest.Downloads.Where(IsInstaller).ToArray();
         var manualDownloads = manifest.Downloads.Where(download => !IsInstaller(download)).ToArray();
@@ -62,12 +71,18 @@ public sealed class ReleaseSelectionService
         var installSteps = recommendedRequiresAccount
             ? (experience.AccountRequiredInstallSteps?.Count > 0 ? experience.AccountRequiredInstallSteps : experience.InstallSteps) ?? new List<string>()
             : experience.InstallSteps ?? new List<string>();
+        var recommendedUsesMacBootstrap = recommended is not null && UsesMacBootstrapFlow(recommended);
         var guestGateArtifactHref = recommended is null
             ? "/downloads"
             : BuildSignupDispatchHref(recommended);
         var guestGateSignInHref = recommended is null
             ? "/login?next=/downloads"
-            : BuildLoginDispatchHref(recommended);
+            : recommendedUsesMacBootstrap && !authenticated
+                ? BuildGoogleDispatchHref(recommended)
+                : BuildLoginDispatchHref(recommended);
+        var guestGateSecondaryLabel = recommendedUsesMacBootstrap && !authenticated
+            ? "Continue with Google"
+            : experience.GuestGateSecondaryLabel;
 
         return new ReleaseExperienceViewModel(
             Display: BuildDisplay(manifest, experience),
@@ -83,14 +98,16 @@ public sealed class ReleaseSelectionService
             UpdatePostureSummary: experience.UpdatePostureSummary,
             GuestDownloadAvailable: manifest.Downloads.Any(static artifact =>
                 !string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)),
+            RequestedPlatformHasPublicDownload: requestedPlatformHasPublicDownload,
             PlatformShelfNoticeTitle: shelfNotice?.Title,
             PlatformShelfNoticeSummary: shelfNotice?.Summary,
             RequestedPlatformLabel: RequestedPlatformLabel(requestedPlatform),
+            PlatformAvailability: platformAvailability,
             GuestGateHeading: experience.GuestGateHeading,
             GuestGateSummary: experience.GuestGateSummary,
             GuestGatePrimaryLabel: experience.GuestGatePrimaryLabel,
             GuestGatePrimaryHref: guestGateArtifactHref,
-            GuestGateSecondaryLabel: experience.GuestGateSecondaryLabel,
+            GuestGateSecondaryLabel: guestGateSecondaryLabel,
             GuestGateSecondaryHref: guestGateSignInHref,
             PublicPreviewPrimaryLabel: experience.PublicPreviewPrimaryLabel,
             PublicPreviewPrimaryHref: experience.PublicPreviewPrimaryHref,
@@ -125,7 +142,7 @@ public sealed class ReleaseSelectionService
         var normalized = manifest.Downloads.FirstOrDefault(item => string.Equals(item.Id, download.Id, StringComparison.OrdinalIgnoreCase))
             ?? download with
             {
-                InstallAccessClass = ResolveInstallAccessClass(manifest.Channel, download.InstallAccessClass, LoadExperience())
+                InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, download, LoadExperience())
             };
         return BuildNormalizedOption(normalized, authenticated, recommended);
     }
@@ -143,10 +160,10 @@ public sealed class ReleaseSelectionService
         => manifest with
         {
             Downloads = manifest.Downloads
-                .Where(download => IsPublicShelfVisible(download, platformAcceptance))
+                .Where(download => IsPublicShelfVisible(download, manifest, experience, platformAcceptance))
                 .Select(download => download with
                 {
-                    InstallAccessClass = ResolveInstallAccessClass(manifest.Channel, download.InstallAccessClass, experience)
+                    InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, download, experience)
                 })
                 .ToArray()
         };
@@ -157,11 +174,16 @@ public sealed class ReleaseSelectionService
         var requiresAccount = string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase);
         var guestDownloadAllowed = !requiresAccount;
         var artifactId = Uri.EscapeDataString(download.Id);
+        var usesMacBootstrap = UsesMacBootstrapFlow(download);
         var dispatchHref = authenticated
             ? $"/downloads/install/{artifactId}"
-            : requiresAccount
-                ? BuildSignupDispatchHref(download)
-                : $"/downloads/get/{artifactId}";
+            : usesMacBootstrap
+                ? requiresAccount
+                    ? BuildSignupDispatchHref(download)
+                    : BuildLoginDispatchHref(download)
+                : requiresAccount
+                    ? BuildSignupDispatchHref(download)
+                    : $"/downloads/get/{artifactId}";
 
         return new ReleaseOptionViewModel(
             Artifact: download with { InstallAccessClass = accessClass },
@@ -233,6 +255,9 @@ public sealed class ReleaseSelectionService
     private static string BuildLoginDispatchHref(PublicReleaseArtifactDto artifact)
         => $"/login?next={Uri.EscapeDataString($"/downloads/install/{Uri.EscapeDataString(artifact.Id)}")}";
 
+    private static string BuildGoogleDispatchHref(PublicReleaseArtifactDto artifact)
+        => $"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{Uri.EscapeDataString(artifact.Id)}")}";
+
     private static string ResolveInstallAccessClass(string channel, string? rawAccessClass, PublicReleaseExperienceDocument experience)
     {
         var guestReadableChannels = ResolveGuestReadableChannels(experience);
@@ -249,6 +274,14 @@ public sealed class ReleaseSelectionService
             ? InstallAccessClasses.OpenPublic
             : InstallAccessClasses.AccountRequired;
     }
+
+    private static string ResolveEffectiveInstallAccessClass(
+        string channel,
+        PublicReleaseArtifactDto download,
+        PublicReleaseExperienceDocument experience)
+        => UsesMacBootstrapFlow(download)
+            ? InstallAccessClasses.AccountRequired
+            : ResolveInstallAccessClass(channel, download.InstallAccessClass, experience);
 
     private static HashSet<string> ResolveGuestReadableChannels(PublicReleaseExperienceDocument experience)
         => (experience.GuestReadableChannels ?? new List<string> { DefaultGuestReadableChannel })
@@ -282,6 +315,7 @@ public sealed class ReleaseSelectionService
         }
 
         string? preferredPlatform = DetectPreferredPlatform(userAgent);
+        string? preferredArch = DetectPreferredArchitecture(userAgent);
 
         var pool = preferredPlatform is null
             ? candidates
@@ -294,6 +328,7 @@ public sealed class ReleaseSelectionService
 
         return pool
             .OrderByDescending(IsInstaller)
+            .ThenBy(download => ArchitecturePriority(download, preferredArch))
             .ThenBy(HeadPriority)
             .ThenBy(PlatformPriority)
             .FirstOrDefault();
@@ -318,6 +353,29 @@ public sealed class ReleaseSelectionService
                || download.Id.Contains("installer", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool UsesMacBootstrapFlow(PublicReleaseArtifactDto download)
+        => string.Equals(PlatformFamily(download), "macos", StringComparison.OrdinalIgnoreCase)
+           && ((download.Kind ?? string.Empty).Trim().Equals("dmg", StringComparison.OrdinalIgnoreCase)
+               || download.Url.EndsWith(".dmg", StringComparison.OrdinalIgnoreCase)
+               || (download.FileName ?? string.Empty).EndsWith(".dmg", StringComparison.OrdinalIgnoreCase));
+
+    private static bool UsesWindowsBootstrapFlow(PublicReleaseArtifactDto download)
+        => string.Equals(PlatformFamily(download), "windows", StringComparison.OrdinalIgnoreCase)
+           && ((download.Kind ?? string.Empty).Trim().Equals("installer", StringComparison.OrdinalIgnoreCase)
+               || download.Url.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+               || (download.FileName ?? string.Empty).EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+
+    private static bool UsesLinuxBootstrapFlow(PublicReleaseArtifactDto download)
+        => string.Equals(PlatformFamily(download), "linux", StringComparison.OrdinalIgnoreCase)
+           && ((download.Kind ?? string.Empty).Trim().Equals("installer", StringComparison.OrdinalIgnoreCase)
+               || download.Url.EndsWith(".deb", StringComparison.OrdinalIgnoreCase)
+               || (download.FileName ?? string.Empty).EndsWith(".deb", StringComparison.OrdinalIgnoreCase));
+
+    private static bool UsesGuidedBootstrapFlow(PublicReleaseArtifactDto download)
+        => UsesMacBootstrapFlow(download)
+           || UsesWindowsBootstrapFlow(download)
+           || UsesLinuxBootstrapFlow(download);
+
     private static string RecommendedSupport(PublicReleaseArtifactDto download)
         => IsInstaller(download)
             ? $"This is the default recommended installer for {PlatformLabel(download)}."
@@ -330,6 +388,25 @@ public sealed class ReleaseSelectionService
 
     private static string SupportLine(PublicReleaseArtifactDto download, bool authenticated, string accessClass, bool recommended)
     {
+        if (authenticated && UsesWindowsBootstrapFlow(download))
+        {
+            return "Open the Windows install handoff. It gives you a short-lived PowerShell command that offers Auto select for the matching Windows desktop builds, lets you choose which Chummer apps to install, where to place them, whether quick access should stay in the Start menu or add Desktop links, verifies the published installer digest, and confirms the selected apps wrote a linked install receipt successfully.";
+        }
+
+        if (authenticated && UsesLinuxBootstrapFlow(download))
+        {
+            return "Open the Linux install handoff. It gives you a short-lived shell command that offers Auto select for the matching Linux desktop builds, lets you choose which Chummer apps to install, where to place them, whether quick access should stay in the applications menu or add Desktop links, verifies the published package digest, and confirms the selected apps wrote a linked install receipt successfully.";
+        }
+
+        if (UsesMacBootstrapFlow(download))
+        {
+            return authenticated
+                ? "Open the Mac install handoff. It gives you a Terminal command that starts a guided Mac setup assistant, offers Auto select for the matching Apple Silicon or Intel builds on this Mac, lets you choose which Chummer apps to install and where to put them, verifies the published DMG digest, and confirms the selected apps wrote a linked install receipt successfully."
+                : string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
+                    ? "Create an account for the Mac install command. The signed-in handoff gives you a short-lived Terminal command that starts a guided Mac setup assistant, offers Auto select for the matching Apple Silicon or Intel builds on this Mac, carries a short-lived install ticket, verifies the DMG, and installs the selected Chummer apps."
+                    : "Sign in for the Mac install command. The signed-in handoff gives you a short-lived Terminal command that starts a guided Mac setup assistant, offers Auto select for the matching Apple Silicon or Intel builds on this Mac, carries a short-lived install ticket, verifies the DMG, and installs the selected Chummer apps.";
+        }
+
         if (authenticated)
         {
             return "Signed-in download: the same published artifact plus recovery, support, and any optional device-linking help tied back to your account.";
@@ -350,6 +427,28 @@ public sealed class ReleaseSelectionService
 
     private static string ActionLabel(PublicReleaseArtifactDto download, bool authenticated, string accessClass, bool recommended)
     {
+        if (authenticated && UsesWindowsBootstrapFlow(download))
+        {
+            return "Open Windows install command";
+        }
+
+        if (authenticated && UsesLinuxBootstrapFlow(download))
+        {
+            return "Open Linux install command";
+        }
+
+        if (UsesMacBootstrapFlow(download))
+        {
+            if (authenticated)
+            {
+                return "Open Mac install command";
+            }
+
+            return string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
+                ? "Create account for Mac install command"
+                : "Sign in for Mac install command";
+        }
+
         if (authenticated)
         {
             return "Start signed-in download";
@@ -464,7 +563,48 @@ public sealed class ReleaseSelectionService
         return null;
     }
 
-    private static bool IsPublicShelfVisible(PublicReleaseArtifactDto download, DesktopPlatformAcceptanceDocument platformAcceptance)
+    private static string? DetectPreferredArchitecture(string userAgent)
+    {
+        if (userAgent.Contains("arm64", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("aarch64", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("Apple Silicon", StringComparison.OrdinalIgnoreCase))
+        {
+            return "arm64";
+        }
+
+        if (userAgent.Contains("x86_64", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("Win64", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("x64", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("amd64", StringComparison.OrdinalIgnoreCase)
+            || userAgent.Contains("Intel", StringComparison.OrdinalIgnoreCase))
+        {
+            return "x64";
+        }
+
+        return null;
+    }
+
+    private static int ArchitecturePriority(PublicReleaseArtifactDto download, string? preferredArch)
+    {
+        if (string.IsNullOrWhiteSpace(preferredArch))
+        {
+            return 0;
+        }
+
+        var arch = (download.Arch ?? string.Empty).Trim();
+        if (arch.Length == 0)
+        {
+            return 1;
+        }
+
+        return string.Equals(arch, preferredArch, StringComparison.OrdinalIgnoreCase) ? 0 : 1;
+    }
+
+    private static bool IsPublicShelfVisible(
+        PublicReleaseArtifactDto download,
+        PublicReleaseManifestDto manifest,
+        PublicReleaseExperienceDocument experience,
+        DesktopPlatformAcceptanceDocument platformAcceptance)
     {
         var platform = ResolvePlatformAcceptance(platformAcceptance, PlatformFamily(download));
         if (platform is null)
@@ -472,7 +612,53 @@ public sealed class ReleaseSelectionService
             return true;
         }
 
-        return !string.Equals(platform.PublicShelfStatus, "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase);
+        if (string.Equals(platform.PublicShelfStatus, "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (string.Equals(platform.PublicManifestVisibility, "visible_as_account_gated_setup_script_preview", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(manifest.Status, "published", StringComparison.OrdinalIgnoreCase)
+                   && UsesMacBootstrapFlow(download)
+                   && string.Equals(
+                       ResolveEffectiveInstallAccessClass(manifest.Channel, download, experience),
+                       InstallAccessClasses.AccountRequired,
+                       StringComparison.OrdinalIgnoreCase)
+                   && HasExplicitArtifactProof(manifest, download);
+        }
+
+        if (string.Equals(platform.PublicManifestVisibility, "visible_after_signed_notarized_promotion", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(manifest.ProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
+                && HasExplicitArtifactProof(manifest, download);
+        }
+
+        return true;
+    }
+
+    private static bool HasExplicitArtifactProof(PublicReleaseManifestDto manifest, PublicReleaseArtifactDto download)
+    {
+        if (manifest.ProofRoutes is null || manifest.ProofRoutes.Count == 0)
+        {
+            return false;
+        }
+
+        var artifactId = download.Id.Trim();
+        var fileName = (download.FileName ?? string.Empty).Trim();
+
+        return manifest.ProofRoutes.Any(route =>
+        {
+            if (string.IsNullOrWhiteSpace(route))
+            {
+                return false;
+            }
+
+            return route.Contains($"/downloads/install/{artifactId}", StringComparison.OrdinalIgnoreCase)
+                   || route.Contains($"/downloads/file/{artifactId}", StringComparison.OrdinalIgnoreCase)
+                   || route.Contains(artifactId, StringComparison.OrdinalIgnoreCase)
+                   || (!string.IsNullOrWhiteSpace(fileName) && route.Contains(fileName, StringComparison.OrdinalIgnoreCase));
+        });
     }
 
     private static DesktopPlatformAcceptancePlatformDocument? ResolvePlatformAcceptance(DesktopPlatformAcceptanceDocument platformAcceptance, string? platformFamily)
@@ -537,9 +723,122 @@ public sealed class ReleaseSelectionService
 
     private sealed record PlatformShelfNoticeViewModel(string Title, string Summary);
 
+    private static IReadOnlyList<ReleasePlatformAvailabilityViewModel> BuildPlatformAvailability(
+        PublicReleaseManifestDto manifest,
+        DesktopPlatformAcceptanceDocument platformAcceptance,
+        string? requestedPlatform)
+    {
+        var platformIds = (platformAcceptance.Platforms ?? new List<DesktopPlatformAcceptancePlatformDocument>())
+            .Select(static item => NormalizePlatformId(item.Id))
+            .Concat(manifest.Downloads.Select(PlatformFamily))
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(static item => PlatformSortKey(item))
+            .ThenBy(static item => item, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return platformIds.Select(platformId =>
+        {
+            var platform = ResolvePlatformAcceptance(platformAcceptance, platformId);
+            var currentDevice = string.Equals(platformId, requestedPlatform, StringComparison.OrdinalIgnoreCase);
+            var publishedDownloads = manifest.Downloads
+                .Where(download => string.Equals(PlatformFamily(download), platformId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(IsInstaller)
+                .ThenBy(HeadPriority)
+                .ToArray();
+            var promotedDownload = publishedDownloads.FirstOrDefault();
+            var publiclyAvailable = promotedDownload is not null;
+            var label = RequestedPlatformLabel(platformId) ?? platformId;
+
+            return new ReleasePlatformAvailabilityViewModel(
+                PlatformId: platformId,
+                PlatformLabel: label,
+                StatusLabel: publiclyAvailable ? (currentDevice ? "Available on this device" : "Available now") : "Not on public shelf",
+                Summary: publiclyAvailable
+                    ? BuildAvailablePlatformSummary(promotedDownload!, platform)
+                    : BuildUnavailablePlatformSummary(label, platform),
+                PrimaryPackageLabel: $"Primary package: {PrimaryPackageLabel(platform)}",
+                SupportabilityLabel: $"Support posture: {SupportabilityLabel(platform)}",
+                PubliclyAvailable: publiclyAvailable,
+                CurrentDevice: currentDevice);
+        }).ToArray();
+    }
+
+    private static string BuildAvailablePlatformSummary(
+        PublicReleaseArtifactDto promotedDownload,
+        DesktopPlatformAcceptancePlatformDocument? platform)
+    {
+        if (UsesMacBootstrapFlow(promotedDownload) && string.Equals(NormalizeInstallAccessClass(promotedDownload.InstallAccessClass), InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
+        {
+            return "The current public shelf publishes a signed-in Mac install handoff as the live install path. It gives you a Terminal command that starts a guided Mac setup assistant, installs the selected Chummer apps, and carries a short-lived install ticket.";
+        }
+
+        var packageKind = PackageKindLabel(promotedDownload.Kind);
+        var supportability = SupportabilityLabel(platform);
+        return $"The current public shelf publishes {promotedDownload.Platform} as the live {packageKind} path. Support posture is {supportability}.";
+    }
+
+    private static string BuildUnavailablePlatformSummary(
+        string platformLabel,
+        DesktopPlatformAcceptancePlatformDocument? platform)
+    {
+        if (platform is null)
+        {
+            return $"The current public shelf does not publish a {platformLabel} artifact right now. Use the release-truth and install-help surfaces before assuming support on this platform.";
+        }
+
+        return NormalizePlatformId(platform.Id) switch
+        {
+            "macos" => "The current public shelf does not publish the signed-in Mac setup-script preview right now. Treat macOS as unavailable until that preview lane is promoted again.",
+            "windows" => $"The desktop contract expects a promoted Windows preview, but the current public shelf does not publish a Windows artifact yet. Treat Windows as unavailable on /downloads until startup smoke and promoted release proof land together.",
+            "linux" => $"The current public shelf does not publish the Linux package right now. Treat Linux as unavailable until the support-directed package lane is promoted again.",
+            _ => $"The current public shelf does not publish a {platformLabel} artifact right now. Use the release-truth and install-help surfaces before assuming support on this platform."
+        };
+    }
+
+    private static string PrimaryPackageLabel(DesktopPlatformAcceptancePlatformDocument? platform)
+        => PackageKindLabel(platform?.PrimaryPackageKind);
+
+    private static string PackageKindLabel(string? packageKind)
+        => (packageKind ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "deb" => "DEB package",
+            "dmg" => "DMG installer",
+            "pkg" => "PKG installer",
+            "setup_script" => "setup script",
+            "installer" => "installer",
+            "portable_exe" => "portable EXE",
+            "archive" => "archive package",
+            "none" => "no public fallback",
+            _ => string.IsNullOrWhiteSpace(packageKind) ? "package not specified" : packageKind.Replace('_', ' ')
+        };
+
+    private static string SupportabilityLabel(DesktopPlatformAcceptancePlatformDocument? platform)
+        => (platform?.Supportability ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "primary" => "primary",
+            "secondary" => "secondary",
+            "account_gated_setup_script_preview" => "account-gated setup-script preview",
+            "signed_notarized_preview" => "signed and notarized preview",
+            _ => string.IsNullOrWhiteSpace(platform?.Supportability) ? "not specified" : platform!.Supportability.Replace('_', ' ')
+        };
+
+    private static int PlatformSortKey(string? platformId)
+        => (platformId ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "windows" => 0,
+            "linux" => 1,
+            "macos" => 2,
+            _ => 9
+        };
+
     private static string PlatformLabel(PublicReleaseArtifactDto download)
         => PlatformFamily(download) switch
         {
+            "macos" when string.Equals((download.Arch ?? string.Empty).Trim(), "arm64", StringComparison.OrdinalIgnoreCase)
+                => "macOS (Apple Silicon)",
+            "macos" when string.Equals((download.Arch ?? string.Empty).Trim(), "x64", StringComparison.OrdinalIgnoreCase)
+                => "macOS (Intel)",
             "windows" => "Windows",
             "linux" => "Linux",
             "macos" => "macOS",

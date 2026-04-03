@@ -2224,6 +2224,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
         Assert.Contains("opposition", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("packet", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("opposition", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("threat", StringComparison.OrdinalIgnoreCase));
     }
@@ -2238,6 +2239,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
+        Assert.True(packet.SearchTerms.Count >= 3);
         Assert.Contains("opposition", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
     }
 

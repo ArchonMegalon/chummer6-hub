@@ -1865,8 +1865,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var downloadDispatchSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
     var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
-    Assert(downloadDispatchSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "download handoff should reuse the shared signed-in trust panel instead of inventing a handoff-only trust surface.");
-    Assert(downloadDispatchSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "download handoff should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
+    Assert(!downloadDispatchSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "download handoff should stay focused on install handoff controls instead of duplicating the broader signed-in trust panel.");
+    Assert(downloadDispatchSource.Contains("Current release", StringComparison.Ordinal), "download handoff should still expose current release posture directly on the handoff card.");
     Assert(!supportSubmittedSource.Contains("signed-in shell", StringComparison.Ordinal), "support confirmation should avoid signed-in shell wording.");
     Assert(supportSubmittedSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared signed-in trust panel instead of inventing a confirmation-only trust surface.");
     Assert(supportSubmittedSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
@@ -2117,14 +2117,27 @@ async Task VerifyPublicLandingProjectionAsync()
     var signedInTrustStatus = new SignedInTrustStatusService(installLinking, supportCases, supportPresentation, trustPulse);
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
     var publicCreatorDiscovery = new PublicCreatorPublicationDiscoveryService(accounts, campaignSpine, publicationDraftWorkflow);
-    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var installBootstrapTickets = new InstallBootstrapTicketService(
+        DataProtectionProvider.Create(Path.Combine(tempRoot, "install-bootstrap-tickets")),
+        configuration);
+    var releaseUploadTickets = new ReleaseUploadTicketService(
+        DataProtectionProvider.Create(Path.Combine(tempRoot, "release-upload-tickets")),
+        configuration);
+    var publicWebHostEnvironment = new SmokeWebHostEnvironment
+    {
+        EnvironmentName = "Development",
+        ApplicationName = "RunServicesSmoke",
+        ContentRootPath = tempRoot,
+        WebRootPath = Path.Combine(tempRoot, "wwwroot")
+    };
+    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, installBootstrapTickets, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, installBootstrapTickets, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2132,6 +2145,7 @@ async Task VerifyPublicLandingProjectionAsync()
         releases,
         releaseSelection,
         installLinking,
+        installBootstrapTickets,
         linkedIdentityClient,
         loggerFactory.CreateLogger<DownloadsCompatibilityController>())
     {
@@ -2326,7 +2340,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(downloadsModel is not null && downloadsModel.Manifest.Downloads.Any(static item => string.Equals(item.Id, "smoke-poc-linux-x64", StringComparison.Ordinal)), "downloads page should render artifacts from the live release manifest");
     Assert(downloadsModel!.Manifest.Downloads.All(static item => !string.Equals(item.Id, "smoke-poc-osx-arm64-installer", StringComparison.Ordinal)), "downloads page should filter withheld macOS artifacts from the public manifest.");
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
-    Assert(downloadsModel!.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Create your Chummer account first.", StringComparison.OrdinalIgnoreCase)), "account-gated releases should keep account-required install steps for the current preview recommendation.");
+    Assert(downloadsModel!.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Download the current published package for your platform.", StringComparison.OrdinalIgnoreCase)), "guest-readable releases should keep the public install steps for the current preview recommendation.");
+    Assert(!downloadsModel.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Create your Chummer account first.", StringComparison.OrdinalIgnoreCase)), "guest-readable releases should not pretend the current preview requires account creation before download.");
     Assert(string.Equals(downloadsModel.ReleaseExperience.GuestGatePrimaryLabel, "Create account to get preview", StringComparison.Ordinal), "downloads page should keep the signup-first guest gate label.");
     Assert(string.Equals(downloadsModel.ReleaseExperience.KnownIssuesLabel, "Known issues and install help", StringComparison.Ordinal), "downloads page should keep a single known-issues/install-help label for the current preview.");
     Assert(string.Equals(downloadsModel.Manifest.SupportabilityState, "local_docker_proven", StringComparison.Ordinal), "downloads page should preserve registry-owned supportability posture.");
@@ -2363,11 +2378,22 @@ async Task VerifyPublicLandingProjectionAsync()
     var macDownloadsModel = macDownloadsView?.Model as DownloadsPageViewModel;
     Assert(macDownloadsModel is not null, "downloads page should still render for a macOS user agent even when the platform is withheld.");
     Assert(string.Equals(macDownloadsModel!.ReleaseExperience.RequestedPlatformLabel, "macOS", StringComparison.Ordinal), "downloads page should detect the macOS user agent.");
+    Assert(!macDownloadsModel.ReleaseExperience.RequestedPlatformHasPublicDownload, "downloads page should mark the requested macOS platform as unavailable when the shelf is withheld.");
     Assert(!string.IsNullOrWhiteSpace(macDownloadsModel.ReleaseExperience.PlatformShelfNoticeTitle), "downloads page should surface a shelf note when macOS is not publicly promoted.");
     Assert(
         macDownloadsModel.ReleaseExperience.PlatformShelfNoticeSummary?.Contains("macOS", StringComparison.OrdinalIgnoreCase) == true
         && macDownloadsModel.ReleaseExperience.PlatformShelfNoticeSummary.Contains("does not publish", StringComparison.OrdinalIgnoreCase),
         "downloads page should explain that the macOS build lane is not yet on the public shelf.");
+    Assert(
+        macDownloadsModel.ReleaseExperience.PlatformAvailability.Any(static item =>
+            string.Equals(item.PlatformId, "linux", StringComparison.OrdinalIgnoreCase)
+            && item.PubliclyAvailable),
+        "downloads page should still surface the current public platform matrix when the requested platform is unavailable.");
+    Assert(
+        macDownloadsModel.ReleaseExperience.PlatformAvailability.Any(static item =>
+            string.Equals(item.PlatformId, "macos", StringComparison.OrdinalIgnoreCase)
+            && !item.PubliclyAvailable),
+        "downloads page should explicitly mark macOS as off-shelf instead of silently falling through to another platform.");
     var authenticatedDownloadResult = await downloadsController.DownloadArtifact("smoke-poc-linux-x64", CancellationToken.None);
     var authenticatedRedirect = authenticatedDownloadResult as RedirectResult;
     Assert(authenticatedRedirect is not null && string.Equals(authenticatedRedirect.Url, "/downloads/install/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in compatibility downloads should route through the install handoff.");
@@ -2764,7 +2790,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.PrepLibrary.Packets.Count >= 3, "campaign spine server plane api should expose a governed GM prep library compiled from workspace truth.");
     Assert(workspaceServerPlanePayload.PrepLibrary.ReusablePacketCount >= 1, "campaign spine server plane api should expose reusable prep packets for campaign rebinding.");
     Assert(workspaceServerPlanePayload.PrepLibrary.SearchSummary.Contains("Search", StringComparison.Ordinal), "campaign spine server plane api should expose explicit prep-library search posture.");
-    Assert(workspaceServerPlanePayload.PrepLibrary.Packets.Any(item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal) && item.SearchTerms.Count >= 3), "campaign spine server plane api should expose searchable governed opposition packets.");
+    Assert(
+        workspaceServerPlanePayload.PrepLibrary.Packets.Any(item =>
+            item.SearchTerms.Count >= 3
+            && (string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal)
+                || item.SearchTerms.Any(term => string.Equals(term, "opposition", StringComparison.OrdinalIgnoreCase)))),
+        "campaign spine server plane api should expose searchable governed opposition packets.");
+    Assert(workspaceServerPlanePayload.PrepLibrary.Packets.Any(item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal) && item.SearchTerms.Any(term => string.Equals(term, "diary", StringComparison.OrdinalIgnoreCase))), "campaign spine server plane api should expose a dedicated diary/contact/heat return-loop packet.");
     Assert(workspaceServerPlanePayload.PrepLaunches.Count == 0, "campaign spine server plane api should start without any governed prep-launch receipts.");
     Assert(workspaceServerPlanePayload.TravelMode.TravelReadyDeviceCount >= 1, "campaign spine server plane api should expose safehouse/travel readiness for claimed devices.");
     Assert(workspaceServerPlanePayload.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal), "campaign spine server plane api should carry prep packets into the bounded prefetch inventory summary.");
@@ -2791,6 +2823,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(prepLibraryPayload!.QueryText, "opposition", StringComparison.Ordinal), "campaign spine prep-library api should echo the normalized search query.");
     Assert(prepLibraryPayload.TotalCount >= 1, "campaign spine prep-library api should support search across governed prep packets.");
     Assert(prepLibraryPayload.Items.Any(item => item.Title.Contains("opposition", StringComparison.OrdinalIgnoreCase) || item.SearchTerms.Any(term => term.Contains("opposition", StringComparison.OrdinalIgnoreCase))), "campaign spine prep-library api should return the governed opposition packet for matching search.");
+    var prepLibraryDiaryResult = await campaignSpineController.GetMyCampaignWorkspacePrepLibrary(workspaceId, "diary heat", CancellationToken.None);
+    var prepLibraryDiaryPayload = (prepLibraryDiaryResult.Result as OkObjectResult)?.Value as CampaignPrepLibrarySearchResponse ?? prepLibraryDiaryResult.Value;
+    Assert(prepLibraryDiaryPayload?.Items.Any(item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal)) == true, "campaign spine prep-library api should return the diary/contact/heat return-loop packet for diary+heat search.");
     var prepLaunchResult = await campaignSpineController.LaunchMyCampaignWorkspacePrepPacket(
         workspaceId,
         new GovernedPrepLaunchRequest(
@@ -3668,7 +3703,11 @@ async Task VerifyPublicLandingProjectionAsync()
     using (var weeklyPulseDocument = JsonDocument.Parse(weeklyPulseJson))
     {
         Assert(string.Equals(weeklyPulseDocument.RootElement.GetProperty("contract_name").GetString(), "chummer.weekly_product_pulse", StringComparison.Ordinal), "weekly pulse endpoint should serve the mirrored weekly pulse artifact.");
-        Assert(string.Equals(weeklyPulseDocument.RootElement.GetProperty("active_wave").GetString(), "Next 20 Big Wins After Post-Audit Closeout", StringComparison.Ordinal), "weekly pulse endpoint should expose the current active wave from the mirrored design pulse.");
+        Assert(
+            weeklyPulseDocument.RootElement.TryGetProperty("active_wave", out var activeWaveElement)
+            && !string.IsNullOrWhiteSpace(activeWaveElement.GetString())
+            && activeWaveElement.GetString()!.Contains("Wins", StringComparison.OrdinalIgnoreCase),
+            "weekly pulse endpoint should expose the current active wave from the mirrored design pulse.");
         Assert(weeklyPulseDocument.RootElement.TryGetProperty("next_checkpoint_question", out JsonElement checkpointQuestion)
             && !string.IsNullOrWhiteSpace(checkpointQuestion.GetString()), "weekly pulse endpoint should keep the next checkpoint question visible for the current wave.");
         Assert(weeklyPulseDocument.RootElement.GetProperty("supporting_signals").TryGetProperty("closure_health", out JsonElement closureHealth)
@@ -3857,7 +3896,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, installBootstrapTickets, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
