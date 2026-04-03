@@ -288,6 +288,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
         Assert.Contains("event", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("2 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("heat pressure", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("faction pressure", StringComparison.OrdinalIgnoreCase));
     }

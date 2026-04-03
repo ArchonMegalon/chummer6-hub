@@ -2121,6 +2121,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         int eventCount = eventPackets.Length
+            + consequences.Length
             + rosterTransfers.Length
             + prepLaunches.Length
             + travelPrefetches.Length
