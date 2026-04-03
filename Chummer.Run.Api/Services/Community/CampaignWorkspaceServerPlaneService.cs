@@ -2016,6 +2016,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
             .Take(3)
             .ToArray();
+        RosterTransferProjection[] rosterTransfers = (workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
+            .OrderByDescending(static transfer => transfer.TransferredAtUtc)
+            .Take(3)
+            .ToArray();
         GovernedPrepLaunchProjection[] prepLaunches = (workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>())
             .OrderByDescending(static launch => launch.LaunchedAtUtc)
             .Take(3)
@@ -2037,6 +2041,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
         if (eventPackets.Length == 0
             && consequences.Length == 0
+            && rosterTransfers.Length == 0
             && prepLaunches.Length == 0
             && travelPrefetches.Length == 0
             && eventObjectives.Length == 0
@@ -2047,6 +2052,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         int eventCount = eventPackets.Length
+            + rosterTransfers.Length
             + prepLaunches.Length
             + travelPrefetches.Length
             + eventObjectives.Length
@@ -2069,6 +2075,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             eventObjectives.Select(static objective => objective.Summary),
             eventObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."),
             sceneSignal ? activeScene?.Summary : null,
+            rosterTransfers.Select(static transfer => transfer.Summary),
+            rosterTransfers.SelectMany(static transfer => transfer.AuditLines),
             prepLaunches.Select(static launch => launch.Summary),
             prepLaunches.SelectMany(static launch => launch.AuditLines),
             travelPrefetches.Select(static receipt => receipt.PrefetchSummary),
@@ -2082,6 +2090,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 sceneSignal ? activeScene?.UpdatedAtUtc : null
             }
             .Concat(eventPackets.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
+            .Concat(rosterTransfers.Select(static transfer => (DateTimeOffset?)transfer.TransferredAtUtc))
             .Concat(prepLaunches.Select(static launch => (DateTimeOffset?)launch.LaunchedAtUtc))
             .Concat(travelPrefetches.Select(static receipt => (DateTimeOffset?)receipt.StagedAtUtc))
             .Concat(consequences.Select(static consequence => (DateTimeOffset?)consequence.UpdatedAtUtc))
@@ -2105,11 +2114,17 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "control",
                 "return",
                 "operations",
+                "roster",
                 leadRun?.Title,
                 carryForward?.Label,
                 carryForward?.Summary,
                 eventPackets.Select(static packet => packet.Kind),
                 eventPackets.Select(static packet => packet.Label),
+                rosterTransfers.Select(static transfer => transfer.RunnerHandle),
+                rosterTransfers.Select(static transfer => transfer.SourceCampaignName),
+                rosterTransfers.Select(static transfer => transfer.TargetCampaignName),
+                rosterTransfers.Select(static transfer => transfer.SourceCrewName),
+                rosterTransfers.Select(static transfer => transfer.TargetCrewName),
                 eventObjectives.Select(static objective => objective.Title),
                 eventObjectives.Select(static objective => objective.Status),
                 eventObjectives.Select(static objective => objective.Pressure),
