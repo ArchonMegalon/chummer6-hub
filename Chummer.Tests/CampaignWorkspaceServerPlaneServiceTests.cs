@@ -97,6 +97,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void ScenePacketBindingFallsBackWhenRunAndSceneTitlesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithSparseRunAndSceneTitles();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "scene_packet", StringComparison.Ordinal));
+        Assert.Contains("Bound to active run / Active scene on sr6-mainline.", packet.BindingSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Active scene scene packet", packet.Title);
+    }
+
+    [Fact]
     public void AftermathPacketFallsBackToChangeSignalsWhenPackagesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathChangeSignalsOnly();
@@ -1603,6 +1617,57 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Summary: "",
             ActiveSceneId: "scene-1",
             Objectives: [objective],
+            Scenes: [scene],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [],
+            Consequences: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithSparseRunAndSceneTitles()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        SceneProjection scene = new(
+            SceneId: "scene-1",
+            RunId: "run-1",
+            Title: "",
+            Revision: "r3",
+            Status: "active",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "",
+            Status: "active",
+            Summary: "",
+            ActiveSceneId: "scene-1",
+            Objectives: [],
             Scenes: [scene],
             LatestContinuity: null,
             CreatedAtUtc: now.AddDays(-1),
