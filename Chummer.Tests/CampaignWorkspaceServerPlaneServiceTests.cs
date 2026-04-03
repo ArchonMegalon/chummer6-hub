@@ -2480,6 +2480,34 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLaunchPacketActivatesFromCarryForwardSplitTokensWhenReceiptsLag()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchCarryForwardSplitTokensOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("prep lane note", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("launch the queued packet", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void PrepLaunchPacketActivatesFromCarryForwardEvidenceLinesWhenPrimaryFieldsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchCarryForwardEvidenceSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("launch", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("prep launch remains queued", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void ContinuityPacketFallsBackToCarryForwardAndContinuityChangeSignals()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuitySignalsOnly();
@@ -6882,6 +6910,46 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "",
             NextSafeAction: "Launch the queued packet before table return.",
             EvidenceLines: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchCarryForwardEvidenceSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "Operator ledger note",
+            Summary: "Reconcile queue receipts before publishing.",
+            ReturnSummary: "Campaign return handoff remains tracked.",
+            NextSafeAction: "Review operator checklist.",
+            EvidenceLines: ["Scene prep launch remains queued while launch receipts hydrate."],
             UpdatedAtUtc: now.AddMinutes(2));
 
         return new CampaignWorkspaceProjection(
