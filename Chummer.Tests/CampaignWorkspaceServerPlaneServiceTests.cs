@@ -1826,6 +1826,34 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketActivatesFromCarryForwardSignalsWhenOtherFamiliesLag()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathCarryForwardSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("aftermath lane carry-forward", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("review aftermath board", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void AftermathPacketActivatesFromCarryForwardEvidenceLinesWhenPrimaryFieldsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathCarryForwardEvidenceSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("aftermath", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("aftermath downtime brief", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void EventControlPacketSummaryFallsBackToConsequenceKindsWhenConsequenceLabelsAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlConsequenceKindsOnly();
@@ -6734,6 +6762,86 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Campaign return handoff remains tracked.",
             NextSafeAction: "Review operator checklist.",
             EvidenceLines: ["Opposition window remains active while event controls are reopened."],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathCarryForwardSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "Aftermath lane carry-forward",
+            Summary: "",
+            ReturnSummary: "Downtime brief remains attached to the return lane.",
+            NextSafeAction: "Review aftermath board before table return.",
+            EvidenceLines: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathCarryForwardEvidenceSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "Operator ledger note",
+            Summary: "Reconcile queue receipts before publishing.",
+            ReturnSummary: "Campaign return handoff remains tracked.",
+            NextSafeAction: "Review operator checklist.",
+            EvidenceLines: ["Aftermath downtime brief remains active while return lane is reopened."],
             UpdatedAtUtc: now.AddMinutes(2));
 
         return new CampaignWorkspaceProjection(
