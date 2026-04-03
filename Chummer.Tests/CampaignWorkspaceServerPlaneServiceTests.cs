@@ -235,6 +235,23 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketFallsBackToRunPressureSignalsWhenReceiptsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlRunPressureSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("event", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("season", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("event window", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("event control board", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void OppositionPacketFallsBackToRunPressureWhenConsequencesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRunPressureSignalsOnly();
@@ -967,6 +984,67 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [rosterChange],
             Consequences: [],
             NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlRunPressureSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-1",
+            Title: "Season event window lock",
+            Status: "open",
+            Pressure: "high",
+            Summary: "Event window remains open until organizer controls are reconciled.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        SceneProjection scene = new(
+            SceneId: "scene-1",
+            RunId: "run-1",
+            Title: "Season-control checkpoint",
+            Revision: "r4",
+            Status: "active",
+            Summary: "Event control board stays active while the return lane is validated.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "Current run remains active under season-control pressure.",
+            ActiveSceneId: "scene-1",
+            Objectives: [objective],
+            Scenes: [scene],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchChangeSignalsOnly()
