@@ -1376,24 +1376,41 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .Take(3)
             .ToArray();
-        if (consequences.Length == 0)
+        ObjectiveProjection[] objectiveSignals = (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
+            .Where(static item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .Take(3)
+            .ToArray();
+        SceneProjection? activeScene = leadRun?.Scenes
+            .FirstOrDefault(item => string.Equals(item.SceneId, leadRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
+            ?? leadRun?.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
+        if (consequences.Length == 0
+            && objectiveSignals.Length == 0
+            && string.IsNullOrWhiteSpace(activeScene?.Summary))
         {
             return null;
         }
 
-        string labels = string.Join(", ", consequences.Select(static item => item.Label));
-        IReadOnlyList<string> evidence = consequences
-            .SelectMany(static item => item.EvidenceLines.Concat(item.Receipts.Select(static receipt => receipt.Summary)))
-            .Where(static item => !string.IsNullOrWhiteSpace(item))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
-            .ToArray();
+        string labels = string.Join(", ",
+            consequences.Select(static item => item.Label)
+                .Concat(objectiveSignals.Select(static item => item.Title))
+                .Distinct(StringComparer.OrdinalIgnoreCase));
+        int signalCount = consequences.Length + objectiveSignals.Length + (string.IsNullOrWhiteSpace(activeScene?.Summary) ? 0 : 1);
+        string summary = consequences.Length > 0
+            ? $"{signalCount} governed opposition signal(s) are active: {labels}."
+            : $"{signalCount} governed opposition signal(s) are active from run pressure and active-scene cues: {labels}.";
+        IReadOnlyList<string> evidence = BuildEvidenceLines(
+            consequences.SelectMany(static item => item.EvidenceLines.Concat(item.Receipts.Select(static receipt => receipt.Summary))),
+            objectiveSignals.Select(static item => item.Summary),
+            objectiveSignals.Select(static item => $"{item.Title} stays {item.Status} with {item.Pressure} pressure."),
+            activeScene?.Summary);
 
         return new GovernedPrepPacketSummary(
             PacketId: $"opposition:{workspace.WorkspaceId}",
             Kind: "opposition_packet",
             Title: $"{workspace.CampaignName} opposition packet",
-            Summary: $"{consequences.Length} governed opposition signal(s) are active: {labels}.",
+            Summary: summary,
             BindingSummary: leadRun is null
                 ? "Reusable across the campaign so the next scene can bind real opposition truth without local shadow packet models."
                 : $"Reusable across {workspace.CampaignName}; currently bound to {leadRun.Title} and the active return lane.",
@@ -1404,10 +1421,25 @@ public sealed class CampaignWorkspaceServerPlaneService
                 consequences.Select(static item => item.Kind),
                 consequences.Select(static item => item.State),
                 consequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.SourceKind)),
+                objectiveSignals.Select(static item => item.Title),
+                objectiveSignals.Select(static item => item.Status),
+                objectiveSignals.Select(static item => item.Pressure),
+                activeScene?.Title,
+                activeScene?.Summary,
                 leadRun?.Title,
                 leadRun?.Objectives.Select(static item => item.Title)),
             EvidenceLines: evidence,
-            UpdatedAtUtc: consequences.Max(static item => item.UpdatedAtUtc));
+            UpdatedAtUtc: new[]
+                {
+                    activeScene?.UpdatedAtUtc,
+                    leadRun?.UpdatedAtUtc
+                }
+                .Concat(consequences.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
+                .Concat(objectiveSignals.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
+                .Where(static item => item.HasValue)
+                .Select(static item => item!.Value)
+                .DefaultIfEmpty(DateTimeOffset.UtcNow)
+                .Max());
     }
 
     private static GovernedPrepPacketSummary? BuildContinuityPrepPacket(CampaignWorkspaceProjection workspace)

@@ -145,6 +145,23 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("event-control receipt", packet.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void OppositionPacketFallsBackToRunPressureWhenConsequencesAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRunPressureSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("opposition", packet.PacketId, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("hostile", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("high", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("run pressure", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -166,12 +183,18 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     private static IReadOnlyList<GovernedPrepPacketSummary> InvokeBuildPrepPackets(
         CampaignWorkspaceProjection workspace,
         WorkspaceRestoreProjection restore)
+        => InvokeBuildPrepPackets(workspace, restore, null);
+
+    private static IReadOnlyList<GovernedPrepPacketSummary> InvokeBuildPrepPackets(
+        CampaignWorkspaceProjection workspace,
+        WorkspaceRestoreProjection restore,
+        RunProjection? leadRun)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
             .GetMethod("BuildPrepPackets", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException("BuildPrepPackets was not found.");
 
-        return Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepPacketSummary>>(method.Invoke(null, [workspace, restore, null]));
+        return Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepPacketSummary>>(method.Invoke(null, [workspace, restore, leadRun]));
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithRosterAndAftermath()
@@ -432,6 +455,65 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Return lane summary",
             PrepLaunches: [prepLaunch],
             TravelPrefetches: [prefetch]);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithRunPressureSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-1",
+            Title: "Hostile extraction team",
+            Status: "open",
+            Pressure: "high",
+            Summary: "An extraction team remains active and pushes immediate opposition risk.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        SceneProjection scene = new(
+            SceneId: "scene-1",
+            RunId: "run-1",
+            Title: "Dockyard checkpoint",
+            Revision: "r3",
+            Status: "active",
+            Summary: "Opposition remains active around the dockyard perimeter.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "Current run remains under hostile pressure.",
+            ActiveSceneId: "scene-1",
+            Objectives: [objective],
+            Scenes: [scene],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [],
+            Consequences: []);
     }
 
     private static WorkspaceRestoreProjection BuildEmptyRestore()
