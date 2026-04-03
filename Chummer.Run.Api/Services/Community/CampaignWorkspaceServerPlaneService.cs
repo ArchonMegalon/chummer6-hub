@@ -84,8 +84,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         "diary",
         "downtime",
         "recap",
-        "career",
-        "log"
+        "career"
     ];
 
     private static readonly string[] ReturnWordTokens =
@@ -1941,6 +1940,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         string kind = item.Kind.Trim();
         if (ContainsAnyWordToken(kind, CampaignReturnRecapWordTokens)
+            || ContainsSessionLogTokenPair(kind)
             || ContainsAfterActionTokenPair(kind))
         {
             return true;
@@ -1958,6 +1958,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(value, CampaignReturnRecapWordTokens)
+            || ContainsSessionLogTokenPair(value)
             || ContainsAfterActionTokenPair(value);
     }
 
@@ -2782,6 +2783,17 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return ContainsAnyWordToken(value, ["after"])
             && ContainsAnyWordToken(value, ["action"]);
+    }
+
+    private static bool ContainsSessionLogTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, SessionWordTokens)
+            && ContainsAnyWordToken(value, LogWordTokens);
     }
 
     private static bool IsCampaignRecapPublicationKind(string value)
