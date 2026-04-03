@@ -2160,6 +2160,18 @@ public sealed class CampaignWorkspaceServerPlaneService
                 ContainsCampaignRelationshipSplitTokenSignal(receipt.SourceKind, receipt.Summary, null));
     }
 
+    private static bool IsRosterConsequenceSignal(CampaignConsequenceProjection consequence)
+    {
+        return IsRosterMovementSignalKind(consequence.Kind)
+            || ContainsRosterSplitTokenSignal(consequence.Kind, consequence.Label, consequence.Summary)
+            || ContainsRosterSplitTokenSignal(consequence.Kind, consequence.Label, consequence.State)
+            || ContainsRosterSplitTokenSignalFromCandidates(consequence.EvidenceLines)
+            || ContainsRosterSplitTokenSignalFromCandidates(consequence.Receipts.SelectMany(static receipt => new string?[] { receipt.SourceKind, receipt.Summary }))
+            || consequence.EvidenceLines.Any(ContainsRosterToken)
+            || consequence.Receipts.Any(static receipt =>
+                ContainsRosterSplitTokenSignal(receipt.SourceKind, receipt.Summary, null));
+    }
+
     private static GovernedPrepPacketSummary? BuildRosterMovementPrepPacket(
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
@@ -2167,6 +2179,11 @@ public sealed class CampaignWorkspaceServerPlaneService
         RosterTransferProjection[] transfers = (workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
             .OrderByDescending(static item => item.TransferredAtUtc)
             .Take(3)
+            .ToArray();
+        CampaignConsequenceProjection[] rosterConsequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+            .Where(static consequence => IsRosterConsequenceSignal(consequence))
+            .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
+            .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] rosterChangeSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
             .Where(static packet => IsRosterMovementSignal(packet))
@@ -2185,6 +2202,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 workspace.NextSessionCarryForward?.ReturnSummary,
                 workspace.NextSessionCarryForward?.NextSafeAction);
         if (transfers.Length == 0
+            && rosterConsequences.Length == 0
             && rosterChangeSignals.Length == 0
             && rosterObjectives.Length == 0
             && !carryForwardRosterSignal)
@@ -2194,6 +2212,7 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         IReadOnlyList<string> evidence = BuildEvidenceLines(
             rosterChangeSignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "roster movement signal")),
+            rosterConsequences.Select(static consequence => DescribeSignalLabel(consequence.Label, consequence.Kind, consequence.State)),
             transfers.Select(DescribeRosterTransferEvidence),
             carryForwardRosterSignal
                 ? BuildEvidenceLines(
@@ -2205,10 +2224,18 @@ public sealed class CampaignWorkspaceServerPlaneService
             rosterObjectives.Select(static objective => DescribeSignalLabel(objective.Title, objective.Status, "roster objective")),
             rosterChangeSignals.Select(static packet => packet.Summary),
             rosterChangeSignals.Select(static packet => packet.Label),
+            rosterConsequences.Select(static consequence => consequence.Summary),
+            rosterConsequences.Select(static consequence => consequence.Label),
+            rosterConsequences.SelectMany(static consequence => consequence.EvidenceLines),
+            rosterConsequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.Summary)),
             rosterObjectives.Select(static objective => objective.Summary),
             rosterObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."),
             transfers.SelectMany(static item => item.AuditLines));
-        int signalCount = transfers.Length + rosterChangeSignals.Length + rosterObjectives.Length + (carryForwardRosterSignal ? 1 : 0);
+        int signalCount = transfers.Length
+            + rosterConsequences.Length
+            + rosterChangeSignals.Length
+            + rosterObjectives.Length
+            + (carryForwardRosterSignal ? 1 : 0);
         string summary = transfers.Length > 0
             ? $"{signalCount} roster movement signal(s) keep ownership and campaign movement on the same governed lane."
             : $"{signalCount} roster movement signal(s) stay governed from roster-change packets, run pressure, and carry-forward signals while transfer receipts catch up.";
@@ -2218,6 +2245,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 leadRun?.UpdatedAtUtc
             }
             .Concat(transfers.Select(static item => (DateTimeOffset?)item.TransferredAtUtc))
+            .Concat(rosterConsequences.Select(static consequence => (DateTimeOffset?)consequence.UpdatedAtUtc))
             .Concat(rosterChangeSignals.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
             .Concat(rosterObjectives.Select(static objective => (DateTimeOffset?)objective.UpdatedAtUtc))
             .Where(static item => item.HasValue)
@@ -2247,6 +2275,10 @@ public sealed class CampaignWorkspaceServerPlaneService
                 transfers.Select(static item => item.TargetCrewName),
                 rosterChangeSignals.Select(static item => item.Kind),
                 rosterChangeSignals.Select(static item => item.Label),
+                rosterConsequences.Select(static consequence => consequence.Kind),
+                rosterConsequences.Select(static consequence => consequence.Label),
+                rosterConsequences.Select(static consequence => consequence.State),
+                rosterConsequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.SourceKind)),
                 rosterObjectives.Select(static item => item.Title),
                 rosterObjectives.Select(static item => item.Status),
                 rosterObjectives.Select(static item => item.Pressure),
@@ -2290,6 +2322,20 @@ public sealed class CampaignWorkspaceServerPlaneService
         return ContainsRosterToken(title)
             || ContainsRosterToken(summary)
             || ContainsRosterSplitTokenSignal(title, summary);
+    }
+
+    private static bool ContainsRosterSplitTokenSignalFromCandidates(IEnumerable<string?> rawCandidates)
+    {
+        string[] candidates = rawCandidates
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value!)
+            .ToArray();
+        if (candidates.Length == 0)
+        {
+            return false;
+        }
+
+        return ContainsRosterSplitTokenSignal(candidates);
     }
 
     private static bool ContainsRosterSplitTokenSignal(params string?[] values)
@@ -2805,6 +2851,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static bool IsEventControlConsequenceSignal(CampaignConsequenceProjection consequence)
     {
         return IsCampaignRelationshipConsequenceSignal(consequence)
+            || IsRosterConsequenceSignal(consequence)
             || IsOppositionConsequenceSignal(consequence);
     }
 
