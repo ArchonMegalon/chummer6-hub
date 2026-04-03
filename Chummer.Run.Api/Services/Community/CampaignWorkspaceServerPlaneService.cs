@@ -1991,7 +1991,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] aftermathSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsAftermathSignalKind(packet.Kind))
+            .Where(static packet => IsAftermathSignal(packet))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
