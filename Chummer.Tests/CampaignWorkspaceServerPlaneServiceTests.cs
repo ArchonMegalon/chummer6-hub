@@ -365,6 +365,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketKeepsRelationshipKindFallbackWhenDiaryEvidenceIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnKindsAndVerboseDiaryEvidence();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("campaign_return_window", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("heat_pressure_lane", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void CampaignReturnPacketIncludesRecapKindFallbackWhenRecapSignalsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnRecapKindsOnly();
@@ -2133,6 +2147,66 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [returnWindow],
             Consequences: [heatLane],
             NextSessionCarryForward: carryForward,
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnKindsAndVerboseDiaryEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection returnWindow = new(
+            PacketId: "packet-1",
+            Kind: "campaign_return_window",
+            Label: "",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(1));
+        CampaignConsequenceProjection heatLane = new(
+            ConsequenceId: "consequence-1",
+            Kind: "heat_pressure_lane",
+            Label: "",
+            State: "",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+        PublicationSafeProjection recapA = new(
+            ProjectionId: "recap-1",
+            Kind: "session_recap",
+            Label: "Session recap lane A",
+            Summary: "Session recap evidence line A remains verbose while return packets hydrate.");
+        PublicationSafeProjection recapB = new(
+            ProjectionId: "recap-2",
+            Kind: "session_recap",
+            Label: "Session recap lane B",
+            Summary: "Session recap evidence line B remains verbose while return packets hydrate.");
+        PublicationSafeProjection recapC = new(
+            ProjectionId: "recap-3",
+            Kind: "session_recap",
+            Label: "Session recap lane C",
+            Summary: "Session recap evidence line C remains verbose while return packets hydrate.");
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [recapA, recapB, recapC],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [returnWindow],
+            Consequences: [heatLane],
             AftermathPackages: []);
     }
 
