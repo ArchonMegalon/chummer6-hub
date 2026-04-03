@@ -1444,44 +1444,90 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static GovernedPrepPacketSummary? BuildContinuityPrepPacket(CampaignWorkspaceProjection workspace)
     {
+        WorkspaceChangePacketProjection[] continuitySignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Where(static packet => IsContinuitySignalKind(packet.Kind))
+            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
+
         if (workspace.LatestContinuity is null
             && workspace.RecapShelf.Count == 0
-            && workspace.Dossiers.Count == 0)
+            && workspace.Dossiers.Count == 0
+            && continuitySignals.Length == 0
+            && workspace.NextSessionCarryForward is null)
         {
             return null;
         }
 
         IReadOnlyList<string> evidence = new[]
             {
-                workspace.LatestContinuity?.Summary
+                workspace.LatestContinuity?.Summary,
+                workspace.NextSessionCarryForward?.Summary,
+                workspace.NextSessionCarryForward?.ReturnSummary
             }
             .Concat(workspace.RecapShelf.Select(static item => item.Summary))
             .Concat(workspace.Dossiers.Select(static item => item.LatestContinuity?.Summary))
+            .Concat(continuitySignals.Select(static packet => packet.Summary))
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .Select(static item => item!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
+        int continuitySignalCount = (workspace.LatestContinuity is null ? 0 : 1)
+            + workspace.RecapShelf.Count
+            + workspace.Dossiers.Count
+            + continuitySignals.Length
+            + (workspace.NextSessionCarryForward is null ? 0 : 1);
+        string summary = workspace.RecapShelf.Count == 0 && workspace.LatestContinuity is null
+            ? $"{Math.Max(1, continuitySignalCount)} continuity signal(s) stay attached to the shared return lane even before recap-safe output is published."
+            : $"{workspace.RecapShelf.Count} recap-safe output(s) stay attached to the same shared continuity spine.";
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                workspace.LatestContinuity?.CapturedAtUtc,
+                workspace.NextSessionCarryForward?.UpdatedAtUtc
+            }
+            .Concat(continuitySignals.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.UtcNow)
+            .Max();
 
         return new GovernedPrepPacketSummary(
             PacketId: $"continuity:{workspace.WorkspaceId}",
             Kind: "continuity_packet",
             Title: $"{workspace.CampaignName} continuity handoff",
-            Summary: workspace.RecapShelf.Count == 0
-                ? "Continuity is pinned to the current shared return lane even before the first recap-safe output is published."
-                : $"{workspace.RecapShelf.Count} recap-safe output(s) stay attached to the same shared continuity spine.",
+            Summary: summary,
             BindingSummary: "Bound to the same continuity snapshot that reopens dossiers, recaps, and publication-safe follow-through.",
             Reusable: false,
             SearchTerms: BuildSearchTerms(
                 workspace.CampaignName,
                 workspace.ReturnSummary,
                 workspace.LatestContinuity?.Summary,
+                workspace.NextSessionCarryForward?.Label,
+                workspace.NextSessionCarryForward?.Summary,
                 workspace.RecapShelf.Select(static item => item.Label),
                 workspace.RecapShelf.Select(static item => item.Kind),
-                workspace.Dossiers.Select(static item => item.RunnerHandle)),
+                workspace.Dossiers.Select(static item => item.RunnerHandle),
+                continuitySignals.Select(static packet => packet.Kind),
+                continuitySignals.Select(static packet => packet.Label)),
             EvidenceLines: evidence,
-            UpdatedAtUtc: workspace.LatestContinuity?.CapturedAtUtc
-                ?? DateTimeOffset.UtcNow);
+            UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsContinuitySignalKind(string? kind)
+    {
+        string normalizedKind = kind?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+        {
+            return false;
+        }
+
+        return string.Equals(normalizedKind, "continuity", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "next_session_carry_forward", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "after_action_report", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "downtime_brief", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("continuity", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("carry_forward", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildCampaignReturnPrepPacket(
