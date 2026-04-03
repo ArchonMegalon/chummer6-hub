@@ -2454,10 +2454,15 @@ public sealed class CampaignWorkspaceServerPlaneService
             || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Summary, carryForward.NextSafeAction, carryForward.ReturnSummary);
         bool rosterSignal = IsRosterObjectiveSignal(carryForward.Label, carryForward.Summary)
             || IsRosterObjectiveSignal(carryForward.ReturnSummary, carryForward.NextSafeAction);
-        bool prepLaunchSignal = ContainsPrepLaunchToken(carryForward.Label, carryForward.Summary)
-            || ContainsPrepLaunchToken(carryForward.ReturnSummary, carryForward.NextSafeAction);
-        bool travelPrefetchSignal = ContainsTravelPrefetchToken(carryForward.Label, carryForward.Summary)
-            || ContainsTravelPrefetchToken(carryForward.ReturnSummary, carryForward.NextSafeAction);
+        string combinedCarryForwardText = string.Join(' ', new[]
+        {
+            carryForward.Label,
+            carryForward.Summary,
+            carryForward.ReturnSummary,
+            carryForward.NextSafeAction
+        }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+        bool prepLaunchSignal = ContainsPrepLaunchToken(combinedCarryForwardText);
+        bool travelPrefetchSignal = ContainsTravelPrefetchToken(combinedCarryForwardText);
 
         return eventOrOppositionSignal
             || relationshipSignal
