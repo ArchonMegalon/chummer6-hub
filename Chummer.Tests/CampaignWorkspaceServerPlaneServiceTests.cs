@@ -1924,6 +1924,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketIncludesBothRelationshipAndOppositionConsequencesWhenBothArePresent()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithMixedOppositionAndRelationshipConsequences();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("threat_window", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("heat pressure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void OppositionPacketFallsBackToOppositionChangeSignalsWhenConsequencesAndRunPressureAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionChangeSignalsOnly();
