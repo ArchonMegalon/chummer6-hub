@@ -1148,6 +1148,28 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RosterMovementPacketDoesNotActivateFromCrewReturnLaneMentionsWithoutRosterIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCrewReturnLaneMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void EventControlPacketDoesNotActivateFromCrewReturnLaneMentionsWithoutRosterIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCrewReturnLaneMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void EventControlPacketDoesNotActivateFromFactionInterstateMentionsWithoutMutationIdentity()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithFactionInterstateMentionsOnly();
@@ -4909,6 +4931,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [crewRemoveSignal],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCrewReturnLaneMentionsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection crewReturnSignal = new(
+            PacketId: "packet-crew-return-1",
+            Kind: "continuity_update",
+            Label: "Crew return lane note",
+            Summary: "Crew return window remains governed for continuity follow-through.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-crew-return-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [crewReturnSignal],
             Consequences: [],
             PrepLaunches: [],
             TravelPrefetches: []);
