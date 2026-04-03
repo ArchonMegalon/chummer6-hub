@@ -2635,7 +2635,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             {
                 leadRun?.UpdatedAtUtc,
                 workspace.LatestContinuity?.CapturedAtUtc,
-                carryForward?.UpdatedAtUtc
+                carryForwardSignal ? carryForward?.UpdatedAtUtc : null
             }
             .Concat(packages.Select(static item => (DateTimeOffset?)item.GeneratedAtUtc))
             .Concat(aftermathSignals.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
@@ -2994,7 +2994,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>());
         DateTimeOffset updatedAtUtc = new[]
             {
-                carryForward?.UpdatedAtUtc,
+                carryForwardSignal ? carryForward?.UpdatedAtUtc : null,
                 leadRun?.UpdatedAtUtc,
                 sceneSignal ? activeScene?.UpdatedAtUtc : null
             }
