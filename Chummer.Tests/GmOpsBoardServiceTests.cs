@@ -284,17 +284,55 @@ public sealed class GmOpsBoardServiceTests
         {
             RevealCount = -1
         };
+        var revealMetadataWithoutCount = BuildPortableAsset(
+            assetId: "prep_invalid_reveal_state_no_count",
+            now: now.AddMinutes(11)) with
+        {
+            LastRevealedAtUtc = now.AddMinutes(10),
+            LastRevealChannel = "gm-ops",
+            RevealCount = 0
+        };
+        var revealCountWithoutTimestamp = BuildPortableAsset(
+            assetId: "prep_invalid_reveal_state_no_timestamp",
+            now: now.AddMinutes(14)) with
+        {
+            LastRevealedAtUtc = null,
+            LastRevealChannel = "gm-ops",
+            RevealCount = 2
+        };
+        var revealCountWithoutChannel = BuildPortableAsset(
+            assetId: "prep_invalid_reveal_state_no_channel",
+            now: now.AddMinutes(17)) with
+        {
+            LastRevealedAtUtc = now.AddMinutes(16),
+            LastRevealChannel = " ",
+            RevealCount = 2
+        };
 
-        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([updatedBeforeCreated, revealAfterUpdated, negativeRevealCount]);
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets(
+        [
+            updatedBeforeCreated,
+            revealAfterUpdated,
+            negativeRevealCount,
+            revealMetadataWithoutCount,
+            revealCountWithoutTimestamp,
+            revealCountWithoutChannel
+        ]);
 
         Assert.Equal(0, result.ImportedCount);
-        Assert.Equal(3, result.SkippedCount);
+        Assert.Equal(6, result.SkippedCount);
         Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_timeline" && conflict.Reason == "invalid-asset-timeline");
         Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_reveal_time" && conflict.Reason == "invalid-asset-reveal-timestamp");
         Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_reveal_count" && conflict.Reason == "invalid-asset-reveal-count");
+        Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_reveal_state_no_count" && conflict.Reason == "invalid-asset-reveal-state");
+        Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_reveal_state_no_timestamp" && conflict.Reason == "invalid-asset-reveal-state");
+        Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_reveal_state_no_channel" && conflict.Reason == "invalid-asset-reveal-state");
         Assert.Null(service.GetPrepAsset("prep_invalid_timeline"));
         Assert.Null(service.GetPrepAsset("prep_invalid_reveal_time"));
         Assert.Null(service.GetPrepAsset("prep_invalid_reveal_count"));
+        Assert.Null(service.GetPrepAsset("prep_invalid_reveal_state_no_count"));
+        Assert.Null(service.GetPrepAsset("prep_invalid_reveal_state_no_timestamp"));
+        Assert.Null(service.GetPrepAsset("prep_invalid_reveal_state_no_channel"));
     }
 
     private static GmOpsBoardService CreateService()
