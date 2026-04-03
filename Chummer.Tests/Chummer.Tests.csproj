@@ -18,6 +18,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Chummer.Run.Api\Chummer.Run.Api.csproj" />
+    <ProjectReference Include="..\Chummer.Run.AI\Chummer.Run.AI.csproj" />
+    <ProjectReference Include="..\Chummer.Play.Contracts\Chummer.Play.Contracts.csproj" />
+    <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
   </ItemGroup>
 
 </Project>
