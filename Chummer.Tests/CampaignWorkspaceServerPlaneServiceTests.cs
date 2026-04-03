@@ -1927,6 +1927,18 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RosterMovementPacketUpdatedAtIgnoresUnrelatedCarryForwardTimestampWhenCarryForwardIsNotARosterSignal()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterSignalAndUnrelatedCarryForwardTimestampSkew();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
+        Assert.Equal(DateTimeOffset.Parse("2026-04-03T00:01:00Z"), packet.UpdatedAtUtc);
+    }
+
+    [Fact]
     public void EventControlPacketSummaryFallsBackToConsequenceKindsWhenConsequenceLabelsAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlConsequenceKindsOnly();
@@ -7196,6 +7208,52 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "",
             ChangePackets: [eventControlSignal],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithRosterSignalAndUnrelatedCarryForwardTimestampSkew()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection rosterSignal = new(
+            PacketId: "packet-roster-1",
+            Kind: "roster_movement",
+            Label: "Roster movement lane update",
+            Summary: "Roster transfer window remains governed while receipts hydrate.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-unrelated-roster-1",
+            Label: "Operator queue note",
+            Summary: "Publication checklist reconciliation is still pending.",
+            ReturnSummary: "Workspace governance note remains open.",
+            NextSafeAction: "Review operator queue before docs refresh.",
+            EvidenceLines: ["Queue evidence remains pending reconciliation."],
+            UpdatedAtUtc: now.AddMinutes(9));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-roster-updated-at-skew-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [rosterSignal],
             Consequences: [],
             NextSessionCarryForward: carryForward,
             PrepLaunches: [],
