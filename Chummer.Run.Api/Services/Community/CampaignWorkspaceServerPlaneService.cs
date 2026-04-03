@@ -169,17 +169,31 @@ public sealed class CampaignWorkspaceServerPlaneService
         "crew"
     ];
 
-    private static readonly string[] RosterMovementWordPrefixes =
-    [
-        "transfer",
-        "assign",
-        "handoff",
-        "move",
-        "rotat"
-    ];
-
     private static readonly string[] RosterMovementWordTokens =
     [
+        "transfer",
+        "transfers",
+        "transferred",
+        "transferring",
+        "assign",
+        "assigns",
+        "assigned",
+        "assignment",
+        "reassign",
+        "reassigns",
+        "reassigned",
+        "reassignment",
+        "handoff",
+        "handoffs",
+        "move",
+        "moves",
+        "moved",
+        "moving",
+        "movement",
+        "rotate",
+        "rotates",
+        "rotated",
+        "rotation",
         "bench",
         "benches",
         "benched",
@@ -2226,8 +2240,7 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static bool ContainsRosterMovementToken(string value)
     {
-        bool hasGeneralMovementToken = ContainsAnyWordTokenPrefix(value, RosterMovementWordPrefixes)
-            || ContainsAnyWordToken(value, RosterMovementWordTokens);
+        bool hasGeneralMovementToken = ContainsAnyWordToken(value, RosterMovementWordTokens);
         if (hasGeneralMovementToken)
         {
             return true;
