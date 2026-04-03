@@ -338,6 +338,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketKeepsKindFallbackEvidenceWhenCarryForwardIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnKindsAndVerboseCarryForward();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("campaign_return_window", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("heat_pressure_lane", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void CampaignReturnPacketIncludesRecapKindFallbackWhenRecapSignalsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnRecapKindsOnly();
@@ -638,6 +652,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(packet.Reusable);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("heat_pressure_lane", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("faction_status_window", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketKeepsKindFallbackEvidenceWhenCarryForwardIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlKindsAndVerboseCarryForward();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("season_operation_checkpoint", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("heat_pressure_lane", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1892,6 +1920,60 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             AftermathPackages: []);
     }
 
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnKindsAndVerboseCarryForward()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection returnWindow = new(
+            PacketId: "packet-1",
+            Kind: "campaign_return_window",
+            Label: "",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(1));
+        CampaignConsequenceProjection heatLane = new(
+            ConsequenceId: "consequence-1",
+            Kind: "heat_pressure_lane",
+            Label: "",
+            State: "elevated",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "Return lane priority",
+            Summary: "Carry-forward summary keeps reopen actions staged.",
+            ReturnSummary: "Return summary keeps the session handoff governed.",
+            NextSafeAction: "Reopen the campaign from the governed return lane.",
+            EvidenceLines: [],
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [returnWindow],
+            Consequences: [heatLane],
+            NextSessionCarryForward: carryForward,
+            AftermathPackages: []);
+    }
+
     private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnRecapKindsOnly()
     {
         RuleEnvironmentRef environment = new(
@@ -2655,6 +2737,61 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "",
             ChangePackets: [],
             Consequences: [heatVariant, factionVariant],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlKindsAndVerboseCarryForward()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection seasonOperation = new(
+            PacketId: "packet-1",
+            Kind: "season_operation_checkpoint",
+            Label: "",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+        CampaignConsequenceProjection heatVariant = new(
+            ConsequenceId: "consequence-1",
+            Kind: "heat_pressure_lane",
+            Label: "",
+            State: "elevated",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(3));
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "Event control lane",
+            Summary: "Carry-forward keeps the event board attached to return.",
+            ReturnSummary: "Season controls reopen from one governed lane.",
+            NextSafeAction: "Reopen event controls before launch.",
+            EvidenceLines: [],
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [seasonOperation],
+            Consequences: [heatVariant],
+            NextSessionCarryForward: carryForward,
             PrepLaunches: [],
             TravelPrefetches: []);
     }
