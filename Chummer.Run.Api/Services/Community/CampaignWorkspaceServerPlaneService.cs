@@ -1576,12 +1576,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] returnChanges = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsCampaignReturnSignalKind(packet.Kind))
+            .Where(static packet => IsCampaignReturnSignal(packet))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] aftermathChanges = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsAftermathSignalKind(packet.Kind))
+            .Where(static packet => IsAftermathSignal(packet))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
@@ -1598,8 +1598,8 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         int diarySignalCount = diaryRecaps.Length + returnChanges.Length + aftermathPackages.Length + aftermathChanges.Length;
         int relationshipSignalCount = relationshipConsequences.Length
-            + returnChanges.Count(static packet => IsCampaignRelationshipSignalKind(packet.Kind))
-            + aftermathChanges.Count(static packet => IsCampaignRelationshipSignalKind(packet.Kind));
+            + returnChanges.Count(static packet => IsCampaignRelationshipSignal(packet))
+            + aftermathChanges.Count(static packet => IsCampaignRelationshipSignal(packet));
         string summary = $"{Math.Max(1, diarySignalCount)} diary/continuity signal(s) and {relationshipSignalCount} relationship signal(s) stay on one governed return lane for downtime and next-session reopen.";
         string bindingSummary = leadRun is null
             ? "Diary updates, contacts, heat, and return cues stay attached to the same campaign truth without local note-shadow models."
@@ -1707,6 +1707,18 @@ public sealed class CampaignWorkspaceServerPlaneService
             || IsCampaignRelationshipSignalKind(normalizedKind);
     }
 
+    private static bool IsCampaignReturnSignal(WorkspaceChangePacketProjection packet)
+    {
+        return IsCampaignReturnSignalKind(packet.Kind)
+            || IsCampaignReturnSignalKind(packet.Label)
+            || IsCampaignReturnSignalKind(packet.Summary)
+            || ContainsCampaignReturnRecapToken(packet.Label)
+            || ContainsCampaignReturnRecapToken(packet.Summary)
+            || IsDiarySignalKind(packet.Label)
+            || IsDiarySignalKind(packet.Summary)
+            || IsCampaignRelationshipSignal(packet);
+    }
+
     private static bool IsDiarySignalKind(string? kind)
     {
         string normalizedKind = kind?.Trim() ?? string.Empty;
@@ -1796,6 +1808,13 @@ public sealed class CampaignWorkspaceServerPlaneService
             || normalizedKind.Contains("state", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("status", StringComparison.OrdinalIgnoreCase);
         return hasRelationshipToken && hasMutationToken;
+    }
+
+    private static bool IsCampaignRelationshipSignal(WorkspaceChangePacketProjection packet)
+    {
+        return IsCampaignRelationshipSignalKind(packet.Kind)
+            || IsCampaignRelationshipSignalKind(packet.Label)
+            || IsCampaignRelationshipSignalKind(packet.Summary);
     }
 
     private static bool IsCampaignRelationshipConsequenceKind(string? kind)
@@ -2047,6 +2066,13 @@ public sealed class CampaignWorkspaceServerPlaneService
             || normalizedKind.Contains("after_action", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("recap", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("debrief", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAftermathSignal(WorkspaceChangePacketProjection packet)
+    {
+        return IsAftermathSignalKind(packet.Kind)
+            || ContainsAftermathRecapToken(packet.Label)
+            || ContainsAftermathRecapToken(packet.Summary);
     }
 
     private static bool IsAftermathRecapSignal(PublicationSafeProjection item)
@@ -2425,12 +2451,26 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static bool IsEventControlSignal(WorkspaceChangePacketProjection packet)
     {
         return IsEventControlSignalKind(packet.Kind)
-            || ContainsEventControlToken(packet.Label)
-            || ContainsEventControlToken(packet.Summary)
+            || ContainsEventControlFallbackToken(packet.Label)
+            || ContainsEventControlFallbackToken(packet.Summary)
             || ContainsOppositionToken(packet.Label)
             || ContainsOppositionToken(packet.Summary)
             || IsCampaignRelationshipSignalKind(packet.Label)
             || IsCampaignRelationshipSignalKind(packet.Summary);
+    }
+
+    private static bool ContainsEventControlFallbackToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Contains("event", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("season", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("timeline", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("operation", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("checkpoint", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrefetchOpsPacket(
