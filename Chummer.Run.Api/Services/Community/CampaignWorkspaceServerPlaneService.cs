@@ -2316,6 +2316,8 @@ public sealed class CampaignWorkspaceServerPlaneService
                 rosterObjectives.Select(static item => item.Status),
                 rosterObjectives.Select(static item => item.Pressure),
                 workspace.NextSessionCarryForward?.Label,
+                workspace.NextSessionCarryForward?.ReturnSummary,
+                workspace.NextSessionCarryForward?.NextSafeAction,
                 workspace.NextSessionCarryForward?.Summary,
                 workspace.NextSessionCarryForward?.EvidenceLines),
             EvidenceLines: evidence,
@@ -2792,9 +2794,10 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "operations",
                 "roster",
                 leadRun?.Title,
+                carryForwardSignal ? carryForward?.ReturnSummary : null,
+                carryForwardSignal ? carryForward?.NextSafeAction : null,
                 carryForwardSignal ? carryForward?.Label : null,
                 carryForwardSignal ? carryForward?.Summary : null,
-                carryForwardSignal ? carryForward?.NextSafeAction : null,
                 carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>(),
                 eventPackets.Select(static packet => packet.Kind),
                 eventPackets.Select(static packet => packet.Label),
@@ -3263,21 +3266,22 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static IReadOnlyList<string> BuildSearchTerms(params object?[] values)
     {
-        HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> seenTokens = new(StringComparer.OrdinalIgnoreCase);
+        List<string> orderedTokens = new();
 
         foreach (string text in FlattenValues(values))
         {
             foreach (string rawToken in text.Split(SearchSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 string normalized = NormalizeSearchToken(rawToken);
-                if (normalized.Length >= 3)
+                if (normalized.Length >= 3 && seenTokens.Add(normalized))
                 {
-                    tokens.Add(normalized);
+                    orderedTokens.Add(normalized);
                 }
             }
         }
 
-        return tokens.Take(10).ToArray();
+        return orderedTokens.Take(10).ToArray();
     }
 
     private static IReadOnlyList<string> BuildEvidenceLines(params object?[] values)
