@@ -2206,6 +2206,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             travelPrefetches.SelectMany(static receipt => receipt.InventoryLines),
             consequences.Select(static consequence => consequence.Summary),
             consequences.Select(static consequence => consequence.Label),
+            consequences.Select(static consequence => DescribeSignalLabel(consequence.Label, consequence.Kind, consequence.State)),
             consequences.SelectMany(static consequence => consequence.EvidenceLines),
             consequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.Summary)));
         DateTimeOffset updatedAtUtc = new[]
