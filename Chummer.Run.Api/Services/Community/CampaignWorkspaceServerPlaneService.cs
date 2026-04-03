@@ -20,7 +20,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         "factions"
     ];
 
-    private static readonly string[] CampaignRelationshipMutationWordTokens =
+    private static readonly string[] CampaignRelationshipStrongMutationWordTokens =
     [
         "update",
         "updates",
@@ -31,11 +31,6 @@ public sealed class CampaignWorkspaceServerPlaneService
         "changed",
         "changing",
         "delta",
-        "lane",
-        "window",
-        "fallout",
-        "cooldown",
-        "cooling",
         "shift",
         "shifts",
         "shifted",
@@ -59,7 +54,16 @@ public sealed class CampaignWorkspaceServerPlaneService
         "decline",
         "declines",
         "declined",
-        "declining"
+        "declining",
+        "fallout"
+    ];
+
+    private static readonly string[] CampaignRelationshipContextMutationWordTokens =
+    [
+        "lane",
+        "window",
+        "cooldown",
+        "cooling"
     ];
 
     private static readonly string[] EventControlWordTokens =
@@ -2078,7 +2082,21 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return ContainsAnyWordToken(value, CampaignRelationshipMutationWordTokens);
+        return ContainsAnyWordToken(value, CampaignRelationshipStrongMutationWordTokens)
+            || (ContainsAnyWordToken(value, CampaignRelationshipContextMutationWordTokens)
+                && IsStructuredSignalKind(value));
+    }
+
+    private static bool IsStructuredSignalKind(string value)
+    {
+        string normalized = value.Trim();
+        if (normalized.Length == 0)
+        {
+            return false;
+        }
+
+        return normalized.IndexOf(' ') < 0
+            && normalized.IndexOf('_') >= 0;
     }
 
     private static bool IsCampaignRelationshipConsequenceKind(string? kind)
