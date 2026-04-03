@@ -1562,16 +1562,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         RunProjection? leadRun)
     {
         PublicationSafeProjection[] diaryRecaps = workspace.RecapShelf
-            .Where(static item =>
-            {
-                string kind = item.Kind.Trim();
-                return kind.Contains("diary", StringComparison.OrdinalIgnoreCase)
-                    || kind.Contains("downtime", StringComparison.OrdinalIgnoreCase)
-                    || kind.Contains("recap", StringComparison.OrdinalIgnoreCase)
-                    || kind.Contains("after_action", StringComparison.OrdinalIgnoreCase)
-                    || kind.Contains("career", StringComparison.OrdinalIgnoreCase)
-                    || kind.Contains("log", StringComparison.OrdinalIgnoreCase);
-            })
+            .Where(static item => IsCampaignReturnRecapSignal(item))
             .Take(4)
             .ToArray();
         AftermathRecapPackageProjection[] aftermathPackages = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
@@ -1739,6 +1730,39 @@ public sealed class CampaignWorkspaceServerPlaneService
             || normalizedKind.Contains("entry", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("note", StringComparison.OrdinalIgnoreCase);
         return hasDiaryToken && hasMutationToken;
+    }
+
+    private static bool IsCampaignReturnRecapSignal(PublicationSafeProjection item)
+    {
+        string kind = item.Kind.Trim();
+        if (kind.Contains("diary", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("downtime", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("recap", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("after_action", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("career", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("log", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return ContainsCampaignReturnRecapToken(item.Label)
+            || ContainsCampaignReturnRecapToken(item.Summary);
+    }
+
+    private static bool ContainsCampaignReturnRecapToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Contains("diary", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("downtime", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("recap", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("after action", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("after-action", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("career", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("log", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsCampaignRelationshipSignalKind(string? kind)

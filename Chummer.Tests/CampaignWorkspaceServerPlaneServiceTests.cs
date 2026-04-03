@@ -405,6 +405,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketFallsBackToRecapLabelWhenRecapKindIsSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnRecapLabelOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("session diary recap label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void PrepLibraryIncludesPrepLaunchPacketWhenGovernedPrepLaunchReceiptsExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
@@ -2238,6 +2251,41 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ProjectionId: "recap-1",
             Kind: "session_recap",
             Label: "",
+            Summary: "");
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [recap],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnRecapLabelOnly()
+    {
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-1",
+            Kind: "",
+            Label: "Session diary recap label",
             Summary: "");
 
         return new CampaignWorkspaceProjection(
