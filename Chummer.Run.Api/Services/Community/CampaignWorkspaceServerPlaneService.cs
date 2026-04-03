@@ -105,6 +105,16 @@ public sealed class CampaignWorkspaceServerPlaneService
         "bench"
     ];
 
+    private static readonly string[] PrepLaunchWordTokens =
+    [
+        "prep"
+    ];
+
+    private static readonly string[] PrepLaunchWordPrefixes =
+    [
+        "launch"
+    ];
+
     private sealed record WorkspaceContext(
         CampaignWorkspaceProjection Workspace,
         CampaignWorkspaceDigestProjection? Digest,
@@ -2325,8 +2335,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             return true;
         }
 
-        return normalizedKind.Contains("prep", StringComparison.OrdinalIgnoreCase)
-            && normalizedKind.Contains("launch", StringComparison.OrdinalIgnoreCase);
+        return ContainsPrepLaunchToken(normalizedKind);
     }
 
     private static bool IsPrepLaunchSignal(WorkspaceChangePacketProjection packet)
@@ -2344,8 +2353,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return value.Contains("prep", StringComparison.OrdinalIgnoreCase)
-            && value.Contains("launch", StringComparison.OrdinalIgnoreCase);
+        return ContainsAnyWordToken(value, PrepLaunchWordTokens)
+            && ContainsAnyWordTokenPrefix(value, PrepLaunchWordPrefixes);
     }
 
     private static bool ContainsPrepLaunchToken(string? primary, string? secondary)
