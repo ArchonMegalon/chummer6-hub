@@ -14,4 +14,9 @@ if [[ ! -f "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" ]]; then
   exit 1
 fi
 
-python3 "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "$TARGET"
+VERIFY_ARGS=()
+if [[ "${CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE:-1}" != "0" ]]; then
+  VERIFY_ARGS+=(--require-complete-desktop-coverage)
+fi
+
+python3 "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "${VERIFY_ARGS[@]}" "$TARGET"
