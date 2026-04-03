@@ -375,6 +375,31 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketFallsBackToRelationshipConsequenceLabelsWhenFalloutSignalsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithSparseRelationshipConsequenceFalloutLabelOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("contact fallout consequence label", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain("and 0 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CampaignReturnPacketDoesNotActivateFromRelationshipMentionsWithoutMutationSignals()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithSparseRelationshipMentionOnlyConsequenceEvidence();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignReturnPacketIncludesChangePacketLabelsWhenChangeSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnSignalLabelsOnly();
@@ -771,6 +796,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(packet.Reusable);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("season operation label", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("contact pressure label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketFallsBackToRelationshipConsequenceLabelsWhenFalloutSignalsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithSparseRelationshipConsequenceFalloutLabelOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("contact fallout consequence label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketDoesNotActivateFromRelationshipMentionsWithoutMutationSignals()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithSparseRelationshipMentionOnlyConsequenceEvidence();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -2479,6 +2528,84 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             State: "elevated",
             Summary: "Status shifted during downtime follow-through.",
             EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [],
+            Consequences: [consequence],
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithSparseRelationshipConsequenceFalloutLabelOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        CampaignConsequenceProjection consequence = new(
+            ConsequenceId: "consequence-1",
+            Kind: "",
+            Label: "Contact fallout consequence label",
+            State: "elevated",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [],
+            Consequences: [consequence],
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithSparseRelationshipMentionOnlyConsequenceEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        CampaignConsequenceProjection consequence = new(
+            ConsequenceId: "consequence-1",
+            Kind: "",
+            Label: "",
+            State: "steady",
+            Summary: "",
+            EvidenceLines: ["Contact directory note captured for table reference."],
             Receipts: [],
             UpdatedAtUtc: now.AddMinutes(3));
 
