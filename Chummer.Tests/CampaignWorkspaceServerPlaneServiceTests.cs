@@ -68,6 +68,22 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("downtime", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void PrepLibraryIncludesEventControlPacketWhenCarryForwardAndChangePacketsExist()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControls();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("event", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("season", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("control", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("return", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -162,6 +178,68 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Return lane summary",
             RosterTransfers: [transfer],
             AftermathPackages: [aftermath]);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControls()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        var carryForward = new NextSessionCarryForwardProjection(
+            CarryForwardId: "carry-1",
+            Label: "Next session carry-forward",
+            Summary: "Season event controls and return windows are staged for the next run.",
+            ReturnSummary: "Return window remains governed from workspace state.",
+            NextSafeAction: "Open event controls before launching the next prep lane.",
+            EvidenceLines: ["Carry-forward receipt captured from the latest continuity lane."],
+            UpdatedAtUtc: now.AddMinutes(5));
+
+        var changePacket = new WorkspaceChangePacketProjection(
+            PacketId: "packet-1",
+            Kind: "prep_launch",
+            Label: "GM prep launch",
+            Summary: "Event board packet launched for season operations.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        var consequence = new CampaignConsequenceProjection(
+            ConsequenceId: "consequence-1",
+            Kind: "heat",
+            Label: "Heat posture",
+            State: "elevated",
+            Summary: "Event pressure remains elevated until the return loop is confirmed.",
+            EvidenceLines: ["Heat review line captured for event control."],
+            Receipts:
+            [
+                new CampaignConsequenceReceipt(
+                    ReceiptId: "objective-1",
+                    SourceKind: "objective",
+                    Summary: "Open pressure objective still active.")
+            ],
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [changePacket],
+            Consequences: [consequence],
+            NextSessionCarryForward: carryForward);
     }
 
     private static WorkspaceRestoreProjection BuildEmptyRestore()

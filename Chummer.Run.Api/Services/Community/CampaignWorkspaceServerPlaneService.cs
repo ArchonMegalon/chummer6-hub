@@ -1276,6 +1276,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             packets.Add(rosterPacket);
         }
 
+        if (BuildEventControlPrepPacket(workspace) is { } eventControlPacket)
+        {
+            packets.Add(eventControlPacket);
+        }
+
         if (BuildAftermathPrepPacket(workspace, leadRun) is { } aftermathPacket)
         {
             packets.Add(aftermathPacket);
@@ -1513,6 +1518,84 @@ public sealed class CampaignWorkspaceServerPlaneService
                 packages.Select(static item => item.ArtifactId)),
             EvidenceLines: evidence,
             UpdatedAtUtc: packages.Max(static item => item.GeneratedAtUtc));
+    }
+
+    private static GovernedPrepPacketSummary? BuildEventControlPrepPacket(CampaignWorkspaceProjection workspace)
+    {
+        WorkspaceChangePacketProjection[] eventPackets = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Where(static packet => string.Equals(packet.Kind, "next_session_carry_forward", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(packet.Kind, "prep_launch", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(packet.Kind, "roster_transfer", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(packet.Kind, "aftermath", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(packet.Kind, "downtime", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(packet.Kind, "replay_timeline", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(packet.Kind, "travel_prefetch", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(packet.Kind, "continuity", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
+        CampaignConsequenceProjection[] consequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+            .Where(static consequence => string.Equals(consequence.Kind, "heat", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(consequence.Kind, "contact", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(consequence.Kind, "reputation", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(consequence.Kind, "faction", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
+            .Take(3)
+            .ToArray();
+
+        NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
+        if (eventPackets.Length == 0
+            && consequences.Length == 0
+            && carryForward is null)
+        {
+            return null;
+        }
+
+        int eventCount = eventPackets.Length + (carryForward is null ? 0 : 1);
+        string consequenceSummary = consequences.Length == 0
+            ? "Heat, contacts, and consequence posture stay linked to the same campaign return lane."
+            : $"{consequences.Length} consequence signal(s) ({string.Join(", ", consequences.Select(static item => item.Label))}) stay attached to event control.";
+        IReadOnlyList<string> evidence = BuildEvidenceLines(
+            carryForward?.Summary,
+            carryForward?.ReturnSummary,
+            workspace.ReturnSummary,
+            eventPackets.Select(static packet => packet.Summary),
+            consequences.Select(static consequence => consequence.Summary),
+            consequences.SelectMany(static consequence => consequence.EvidenceLines));
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                carryForward?.UpdatedAtUtc
+            }
+            .Concat(eventPackets.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
+            .Concat(consequences.Select(static consequence => (DateTimeOffset?)consequence.UpdatedAtUtc))
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.UtcNow)
+            .Max();
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"event-control:{workspace.WorkspaceId}",
+            Kind: "event_control_packet",
+            Title: $"{workspace.CampaignName} event and season controls",
+            Summary: $"{eventCount} event-control receipt(s) keep season operations and return-loop governance on one lane. {consequenceSummary}",
+            BindingSummary: "Reusable across GM operations so prep launches, return windows, and consequence governance stay on campaign truth.",
+            Reusable: true,
+            SearchTerms: BuildSearchTerms(
+                workspace.CampaignName,
+                "event",
+                "season",
+                "control",
+                "return",
+                "operations",
+                carryForward?.Label,
+                carryForward?.Summary,
+                eventPackets.Select(static packet => packet.Kind),
+                eventPackets.Select(static packet => packet.Label),
+                consequences.Select(static consequence => consequence.Kind),
+                consequences.Select(static consequence => consequence.Label),
+                consequences.Select(static consequence => consequence.State)),
+            EvidenceLines: evidence,
+            UpdatedAtUtc: updatedAtUtc);
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrepPacket(
