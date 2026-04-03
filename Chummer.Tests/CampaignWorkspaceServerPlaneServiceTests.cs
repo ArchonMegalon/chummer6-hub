@@ -83,6 +83,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketIncludesSignalLabelsWhenSignalSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathSignalLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("downtime label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void PrepLibraryIncludesEventControlPacketWhenCarryForwardAndChangePacketsExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControls();
@@ -285,6 +298,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("travel", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("prefetch", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("change packets", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TravelPrefetchPacketIncludesSignalLabelsWhenSignalSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithTravelPrefetchSignalLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("travel prefetch label", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -558,6 +584,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RosterMovementPacketIncludesChangeAndCarryForwardLabelsWhenSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterSignalLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("crew assignment label", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("roster return label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void PrepLaunchPacketFallsBackToChangeSignalsWhenLaunchReceiptsAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchChangeSignalsOnly();
@@ -571,6 +612,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("prep", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("launch", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("change packets", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void PrepLaunchPacketIncludesSignalLabelsWhenLaunchSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchSignalLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("scene prep label", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -906,6 +961,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReadinessCues: [],
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
+            ChangePackets: [aftermathChange],
+            Consequences: [],
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathSignalLabelsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection aftermathChange = new(
+            PacketId: "packet-1",
+            Kind: "downtime_brief",
+            Label: "Downtime label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
             ChangePackets: [aftermathChange],
             Consequences: [],
             AftermathPackages: []);
@@ -1331,6 +1423,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReadinessCues: [],
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
+            ChangePackets: [prefetchChange],
+            Consequences: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithTravelPrefetchSignalLabelsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection prefetchChange = new(
+            PacketId: "packet-1",
+            Kind: "travel_prefetch",
+            Label: "Travel prefetch label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
             ChangePackets: [prefetchChange],
             Consequences: [],
             TravelPrefetches: []);
@@ -1865,6 +1994,73 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             NextSessionCarryForward: carryForward);
     }
 
+    private static CampaignWorkspaceProjection BuildWorkspaceWithRosterSignalLabelsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-1",
+            Title: "Roster handoff label",
+            Status: "open",
+            Pressure: "medium",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "Current run remains active.",
+            ActiveSceneId: null,
+            Objectives: [objective],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        WorkspaceChangePacketProjection rosterChange = new(
+            PacketId: "packet-1",
+            Kind: "roster_assignment",
+            Label: "Crew assignment label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "Roster return label",
+            Summary: "",
+            ReturnSummary: "",
+            NextSafeAction: "",
+            EvidenceLines: [],
+            UpdatedAtUtc: now.AddMinutes(5));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [rosterChange],
+            Consequences: [],
+            NextSessionCarryForward: carryForward);
+    }
+
     private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlRunPressureSignalsOnly()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
@@ -2229,6 +2425,64 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReadinessCues: [],
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
+            ChangePackets: [prepLaunchChange],
+            Consequences: [],
+            PrepLaunches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchSignalLabelsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-1",
+            Title: "Prep launch validation",
+            Status: "open",
+            Pressure: "medium",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "Current run remains active.",
+            ActiveSceneId: null,
+            Objectives: [objective],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        WorkspaceChangePacketProjection prepLaunchChange = new(
+            PacketId: "packet-1",
+            Kind: "prep_launch",
+            Label: "Scene prep label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
             ChangePackets: [prepLaunchChange],
             Consequences: [],
             PrepLaunches: []);

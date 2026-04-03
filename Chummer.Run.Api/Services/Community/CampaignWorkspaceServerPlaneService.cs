@@ -1812,11 +1812,14 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Select(static item => item.Summary)
             .Concat(transfers.SelectMany(static item => item.AuditLines))
             .Concat(rosterChangeSignals.Select(static packet => packet.Summary))
+            .Concat(rosterChangeSignals.Select(static packet => packet.Label))
             .Concat(rosterObjectives.Select(static objective => objective.Summary))
+            .Concat(rosterObjectives.Select(static objective => objective.Title))
             .Concat(rosterObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."))
             .Concat(
                 carryForwardRosterSignal
                     ? BuildEvidenceLines(
+                        workspace.NextSessionCarryForward?.Label,
                         workspace.NextSessionCarryForward?.Summary,
                         workspace.NextSessionCarryForward?.ReturnSummary,
                         workspace.NextSessionCarryForward?.NextSafeAction)
@@ -1934,9 +1937,12 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         IReadOnlyList<string> evidence = packages
             .Select(static item => item.Summary)
+            .Concat(packages.Select(static item => item.Title))
             .Concat(packages.SelectMany(static item => item.EvidenceLines))
             .Concat(recapSignals.Select(static item => item.Summary))
+            .Concat(recapSignals.Select(static item => item.Label))
             .Concat(aftermathSignals.Select(static item => item.Summary))
+            .Concat(aftermathSignals.Select(static item => item.Label))
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
@@ -2027,8 +2033,10 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         IReadOnlyList<string> evidence = launches
             .Select(static item => item.Summary)
+            .Concat(launches.Select(static item => item.PacketTitle))
             .Concat(launches.SelectMany(static item => item.AuditLines))
             .Concat(launchSignals.Select(static packet => packet.Summary))
+            .Concat(launchSignals.Select(static packet => packet.Label))
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
@@ -2358,6 +2366,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Concat(receipts.SelectMany(static item => item.InventoryLines))
             .Concat(receipts.SelectMany(static item => item.Boundaries))
             .Concat(prefetchSignals.Select(static item => item.Summary))
+            .Concat(prefetchSignals.Select(static item => item.Label))
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
