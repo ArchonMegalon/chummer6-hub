@@ -551,7 +551,15 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                     local.LastRevealedAtUtc = asset.LastRevealedAtUtc;
                     local.LastRevealChannel = NormalizeOptional(asset.LastRevealChannel);
                     local.RevealCount = asset.RevealCount;
-                    local.GovernedProject = NormalizeGovernedProject(asset.GovernedProject);
+                    local.GovernedProject = NormalizeGovernedProject(asset.GovernedProject, out string? governedProjectDropReason);
+                    if (asset.GovernedProject is not null && local.GovernedProject is null)
+                    {
+                        conflicts.Add(new OfflineSyncConflict(
+                            Surface: "ops-prep",
+                            EntityId: normalizedAssetId,
+                            Reason: governedProjectDropReason ?? "invalid-governed-project",
+                            Resolution: "dropped-governed-project"));
+                    }
                 }
 
                 imported++;
@@ -580,7 +588,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 Status = string.IsNullOrWhiteSpace(asset.Status) ? "draft" : asset.Status.Trim(),
                 CreatedBy = NormalizeOptional(asset.CreatedBy),
                 RuntimeFingerprint = NormalizeOptional(asset.RuntimeFingerprint),
-                GovernedProject = NormalizeGovernedProject(asset.GovernedProject),
+                GovernedProject = NormalizeGovernedProject(asset.GovernedProject, out string? newAssetGovernedProjectDropReason),
                 CreatedAtUtc = asset.CreatedAtUtc,
                 UpdatedAtUtc = asset.UpdatedAtUtc,
                 LastRevealedAtUtc = asset.LastRevealedAtUtc,
@@ -589,6 +597,14 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             };
 
             _assets[state.AssetId] = state;
+            if (asset.GovernedProject is not null && state.GovernedProject is null)
+            {
+                conflicts.Add(new OfflineSyncConflict(
+                    Surface: "ops-prep",
+                    EntityId: normalizedAssetId,
+                    Reason: newAssetGovernedProjectDropReason ?? "invalid-governed-project",
+                    Resolution: "dropped-governed-project"));
+            }
             imported++;
         }
 
@@ -675,10 +691,13 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
-    private static GmPrepAssetGovernedProjectReference? NormalizeGovernedProject(OfflineSyncPrepGovernedProjectReference? governedProject)
+    private static GmPrepAssetGovernedProjectReference? NormalizeGovernedProject(
+        OfflineSyncPrepGovernedProjectReference? governedProject,
+        out string? dropReason)
     {
         if (governedProject is null)
         {
+            dropReason = null;
             return null;
         }
 
@@ -693,12 +712,19 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             || title is null
             || rulesetId is null
             || linkTarget is null
-            || trustTier is null
-            || !SupportsGovernedPacketBinding(projectKind))
+            || trustTier is null)
         {
+            dropReason = "invalid-governed-project-required-fields";
             return null;
         }
 
+        if (!SupportsGovernedPacketBinding(projectKind))
+        {
+            dropReason = "invalid-governed-project-kind";
+            return null;
+        }
+
+        dropReason = null;
         return new GmPrepAssetGovernedProjectReference(
             ProjectKind: projectKind,
             ProjectId: projectId,

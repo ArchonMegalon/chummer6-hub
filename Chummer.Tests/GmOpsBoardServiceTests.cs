@@ -78,6 +78,10 @@ public sealed class GmOpsBoardServiceTests
         Assert.NotNull(stored);
 
         Assert.Equal(1, result.ImportedCount);
+        OfflineSyncConflict conflict = Assert.Single(result.Conflicts);
+        Assert.Equal("prep_missing_fields", conflict.EntityId);
+        Assert.Equal("invalid-governed-project-required-fields", conflict.Reason);
+        Assert.Equal("dropped-governed-project", conflict.Resolution);
         Assert.Null(stored!.GovernedProject);
     }
 
@@ -112,12 +116,13 @@ public sealed class GmOpsBoardServiceTests
                 TrustTier: " verified ",
                 RuntimeFingerprint: " runtime:1 "));
 
-        service.ReconcilePortableAssets([asset]);
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([asset]);
         GmPrepAssetRecord? stored = service.GetPrepAsset(asset.AssetId);
         Assert.NotNull(stored);
 
         GmPrepAssetGovernedProjectReference? governed = stored!.GovernedProject;
         Assert.NotNull(governed);
+        Assert.Empty(result.Conflicts);
         Assert.Equal("npc-pack", governed!.ProjectKind);
         Assert.Equal("renraku-security", governed.ProjectId);
         Assert.Equal("Renraku security roster", governed.Title);
@@ -157,9 +162,13 @@ public sealed class GmOpsBoardServiceTests
                 LinkTarget: "/hub/run-modules/module_01",
                 TrustTier: "verified"));
 
-        service.ReconcilePortableAssets([asset]);
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([asset]);
         GmPrepAssetRecord? stored = service.GetPrepAsset(asset.AssetId);
         Assert.NotNull(stored);
+        OfflineSyncConflict conflict = Assert.Single(result.Conflicts);
+        Assert.Equal("prep_unsupported_kind", conflict.EntityId);
+        Assert.Equal("invalid-governed-project-kind", conflict.Reason);
+        Assert.Equal("dropped-governed-project", conflict.Resolution);
         Assert.Null(stored!.GovernedProject);
     }
 
