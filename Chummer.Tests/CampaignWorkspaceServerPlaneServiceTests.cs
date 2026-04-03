@@ -164,6 +164,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketFallsBackToRecapLabelWhenRecapKindIsSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathRecapLabelOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("downtime recap label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void AftermathPacketKeepsRecapKindFallbackWhenPackageEvidenceIsVerbose()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathRecapKindsAndVerbosePackage();
@@ -1535,6 +1548,41 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ProjectionId: "recap-1",
             Kind: "downtime_brief",
             Label: "",
+            Summary: "");
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [recap],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathRecapLabelOnly()
+    {
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-1",
+            Kind: "",
+            Label: "Downtime recap label",
             Summary: "");
 
         return new CampaignWorkspaceProjection(
