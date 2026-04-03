@@ -84,6 +84,22 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("return", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void PrepLibraryIncludesCampaignReturnPacketWhenDiaryAndRelationshipSignalsExist()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnSignals();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("diary", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("contacts", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("heat", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("return", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -240,6 +256,77 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [changePacket],
             Consequences: [consequence],
             NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnSignals()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-1",
+            Kind: "session_recap",
+            Label: "After action diary",
+            Summary: "Diary recap records downtime outcomes and next-session obligations.");
+        WorkspaceChangePacketProjection changePacket = new(
+            PacketId: "packet-1",
+            Kind: "next_session_carry_forward",
+            Label: "Carry-forward packet",
+            Summary: "Carry-forward packet keeps diary and contact follow-through on one lane.",
+            UpdatedAtUtc: now.AddMinutes(3));
+        CampaignConsequenceProjection contactConsequence = new(
+            ConsequenceId: "consequence-1",
+            Kind: "contact",
+            Label: "Fixer pressure",
+            State: "active",
+            Summary: "Contact obligations remain active in the return loop.",
+            EvidenceLines: ["Contact diary update captured from the latest recap."],
+            Receipts:
+            [
+                new CampaignConsequenceReceipt(
+                    ReceiptId: "receipt-1",
+                    SourceKind: "contact",
+                    Summary: "Contact relationship changed after downtime.")
+            ],
+            UpdatedAtUtc: now.AddMinutes(4));
+        CampaignConsequenceProjection heatConsequence = new(
+            ConsequenceId: "consequence-2",
+            Kind: "heat",
+            Label: "Street heat",
+            State: "elevated",
+            Summary: "Operational heat stays elevated until the next session opens.",
+            EvidenceLines: ["Heat trend remains tied to the same return lane."],
+            Receipts:
+            [
+                new CampaignConsequenceReceipt(
+                    ReceiptId: "receipt-2",
+                    SourceKind: "objective",
+                    Summary: "Open objective keeps pressure elevated.")
+            ],
+            UpdatedAtUtc: now.AddMinutes(5));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [recap],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [changePacket],
+            Consequences: [contactConsequence, heatConsequence]);
     }
 
     private static WorkspaceRestoreProjection BuildEmptyRestore()
