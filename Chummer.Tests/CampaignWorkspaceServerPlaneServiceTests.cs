@@ -422,6 +422,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void TravelPacketIncludesFallbackEvidenceWhenRestoreSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        WorkspaceRestoreProjection restore = BuildRestoreWithTravelPacketSparseEvidence();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("travel_cache on linux (offline/preview)", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("campaign_recap_bundle", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("campaign_approved", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void EventControlPacketIncludesOpsReceiptsWhenPrepLaunchAndTravelPrefetchExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
@@ -3442,6 +3457,47 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [],
             Consequences: [],
             NextSessionCarryForward: null);
+    }
+
+    private static WorkspaceRestoreProjection BuildRestoreWithTravelPacketSparseEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef sparseRuleEnvironment = new(
+            EnvironmentId: "env-restore-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "",
+            ApprovalState: "campaign_approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ClaimedDeviceRestoreProjection device = new(
+            InstallationId: "install-1",
+            DeviceRole: "travel_cache",
+            Platform: "linux",
+            HeadId: "offline",
+            Channel: "preview",
+            HostLabel: null,
+            RestoreSummary: "");
+
+        RestoreArtifactProjection artifact = new(
+            ArtifactId: "artifact-1",
+            Label: "",
+            Kind: "campaign_recap_bundle",
+            Summary: "");
+
+        return new WorkspaceRestoreProjection(
+            RestoreId: "restore-sparse-travel-1",
+            UserId: "user-1",
+            RecentDossiers: [],
+            RecentCampaigns: [],
+            RecentRuleEnvironments: [sparseRuleEnvironment],
+            RecentArtifacts: [artifact],
+            Entitlements: [],
+            ClaimedDevices: [device],
+            ConflictSummaries: [],
+            LocalOnlyNotes: [],
+            GeneratedAtUtc: now);
     }
 
     private static WorkspaceRestoreProjection BuildEmptyRestore()

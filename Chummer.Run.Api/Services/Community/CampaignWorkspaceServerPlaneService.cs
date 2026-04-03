@@ -2461,14 +2461,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
-        IReadOnlyList<string> evidence = restore.ClaimedDevices
-            .Select(static item => item.RestoreSummary)
-            .Concat(restore.RecentArtifacts.Select(static item => item.Summary))
-            .Concat(restore.RecentRuleEnvironments.Select(static item => item.CompatibilityFingerprint))
-            .Where(static item => !string.IsNullOrWhiteSpace(item))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
-            .ToArray();
+        IReadOnlyList<string> evidence = BuildEvidenceLines(
+            restore.ClaimedDevices.Select(DescribeClaimedDeviceTravelEvidence),
+            restore.RecentArtifacts.Select(DescribeRestoreArtifactEvidence),
+            restore.RecentRuleEnvironments.Select(DescribeRestoreRuleEnvironmentEvidence));
 
         return new GovernedPrepPacketSummary(
             PacketId: $"travel:{workspace.WorkspaceId}",
@@ -2583,6 +2579,32 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return secondFallback?.Trim() ?? string.Empty;
     }
+
+    private static string DescribeClaimedDeviceTravelEvidence(ClaimedDeviceRestoreProjection item)
+    {
+        string? summary = NormalizeOptional(item.RestoreSummary);
+        if (summary is not null)
+        {
+            return summary;
+        }
+
+        string role = NormalizeOptional(item.DeviceRole) ?? "claimed device";
+        string platform = NormalizeOptional(item.Platform) ?? "unknown platform";
+        string? head = NormalizeOptional(item.HeadId);
+        string? channel = NormalizeOptional(item.Channel);
+
+        return head is null
+            ? $"{role} on {platform}"
+            : channel is null
+                ? $"{role} on {platform} ({head})"
+                : $"{role} on {platform} ({head}/{channel})";
+    }
+
+    private static string DescribeRestoreArtifactEvidence(RestoreArtifactProjection item)
+        => DescribeSignalLabel(item.Summary, item.Label, item.Kind);
+
+    private static string DescribeRestoreRuleEnvironmentEvidence(RuleEnvironmentRef item)
+        => DescribeSignalLabel(item.CompatibilityFingerprint, item.ApprovalState, item.OwnerScope);
 
     private static IEnumerable<string> FlattenValues(IEnumerable<object?> values)
     {
