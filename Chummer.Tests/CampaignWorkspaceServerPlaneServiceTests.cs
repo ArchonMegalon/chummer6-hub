@@ -263,6 +263,22 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketFallsBackToExplicitEventSignalVariantsWhenOtherFamiliesAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlExplicitEventSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("event", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("season", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("event window", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("season operation", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void EventControlPacketFallsBackToRunPressureSignalsWhenReceiptsAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlRunPressureSignalsOnly();
@@ -306,6 +322,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(packet.Reusable);
         Assert.Contains("opposition", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("opposition command board", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void OppositionPacketFallsBackToOppositionChangeSignalsWhenConsequencesAndRunPressureAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionChangeSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("opposition", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("opposition", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("threat", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1050,6 +1081,50 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             TravelPrefetches: []);
     }
 
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlExplicitEventSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection eventWindowShift = new(
+            PacketId: "packet-1",
+            Kind: "event_window_shift",
+            Label: "Event window shift",
+            Summary: "Event window shift keeps timeline governance visible while derivative receipt families catch up.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        WorkspaceChangePacketProjection seasonOpsCheckpoint = new(
+            PacketId: "packet-2",
+            Kind: "season_operation_checkpoint",
+            Label: "Season operation checkpoint",
+            Summary: "Season operation checkpoint preserves operator timeline control on the same governed lane.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [eventWindowShift, seasonOpsCheckpoint],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
     private static CampaignWorkspaceProjection BuildWorkspaceWithRosterSignalsOnly()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
@@ -1300,6 +1375,48 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Consequences: [],
             PrepLaunches: [],
             TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithOppositionChangeSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection oppositionWindow = new(
+            PacketId: "packet-1",
+            Kind: "opposition_window_shift",
+            Label: "Opposition window shift",
+            Summary: "Opposition window shift keeps threat posture visible before consequence or run-pressure summaries arrive.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        WorkspaceChangePacketProjection threatLane = new(
+            PacketId: "packet-2",
+            Kind: "threat_control_delta",
+            Label: "Threat control delta",
+            Summary: "Threat control delta remains attached to the governed opposition lane.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [oppositionWindow, threatLane],
+            Consequences: []);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchChangeSignalsOnly()

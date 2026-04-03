@@ -1372,6 +1372,11 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
     {
+        WorkspaceChangePacketProjection[] oppositionSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Where(static packet => IsOppositionSignalKind(packet.Kind))
+            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
         CampaignConsequenceProjection[] consequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .Take(3)
@@ -1385,7 +1390,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         SceneProjection? activeScene = leadRun?.Scenes
             .FirstOrDefault(item => string.Equals(item.SceneId, leadRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
             ?? leadRun?.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
-        if (consequences.Length == 0
+        if (oppositionSignals.Length == 0
+            && consequences.Length == 0
             && objectiveSignals.Length == 0
             && string.IsNullOrWhiteSpace(activeScene?.Summary))
         {
@@ -1393,14 +1399,16 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         string labels = string.Join(", ",
-            consequences.Select(static item => item.Label)
+            oppositionSignals.Select(static item => item.Label)
+                .Concat(consequences.Select(static item => item.Label))
                 .Concat(objectiveSignals.Select(static item => item.Title))
                 .Distinct(StringComparer.OrdinalIgnoreCase));
-        int signalCount = consequences.Length + objectiveSignals.Length + (string.IsNullOrWhiteSpace(activeScene?.Summary) ? 0 : 1);
-        string summary = consequences.Length > 0
+        int signalCount = oppositionSignals.Length + consequences.Length + objectiveSignals.Length + (string.IsNullOrWhiteSpace(activeScene?.Summary) ? 0 : 1);
+        string summary = consequences.Length > 0 || oppositionSignals.Length > 0
             ? $"{signalCount} governed opposition signal(s) are active: {labels}."
             : $"{signalCount} governed opposition signal(s) are active from run pressure and active-scene cues: {labels}.";
         IReadOnlyList<string> evidence = BuildEvidenceLines(
+            oppositionSignals.Select(static item => item.Summary),
             consequences.SelectMany(static item => item.EvidenceLines.Concat(item.Receipts.Select(static receipt => receipt.Summary))),
             objectiveSignals.Select(static item => item.Summary),
             objectiveSignals.Select(static item => $"{item.Title} stays {item.Status} with {item.Pressure} pressure."),
@@ -1418,6 +1426,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             SearchTerms: BuildSearchTerms(
                 workspace.CampaignName,
                 labels,
+                oppositionSignals.Select(static item => item.Kind),
+                oppositionSignals.Select(static item => item.Label),
                 consequences.Select(static item => item.Kind),
                 consequences.Select(static item => item.State),
                 consequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.SourceKind)),
@@ -1434,6 +1444,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                     activeScene?.UpdatedAtUtc,
                     leadRun?.UpdatedAtUtc
                 }
+                .Concat(oppositionSignals.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
                 .Concat(consequences.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
                 .Concat(objectiveSignals.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
                 .Where(static item => item.HasValue)
@@ -2270,6 +2281,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             || IsRosterMovementSignalKind(normalizedKind)
             || IsPrepLaunchSignalKind(normalizedKind)
             || IsTravelPrefetchSignalKind(normalizedKind)
+            || ContainsEventControlToken(normalizedKind)
             || IsCampaignRelationshipSignalKind(normalizedKind)
             || IsOppositionSignalKind(normalizedKind);
     }
