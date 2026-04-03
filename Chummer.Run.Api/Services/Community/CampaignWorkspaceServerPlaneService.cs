@@ -1764,7 +1764,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static item => item.LaunchedAtUtc)
             .Take(4)
             .ToArray();
-        if (launches.Length == 0)
+        WorkspaceChangePacketProjection[] launchSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Where(static packet => IsPrepLaunchSignalKind(packet.Kind))
+            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
+        if (launches.Length == 0 && launchSignals.Length == 0)
         {
             return null;
         }
@@ -1772,16 +1777,31 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<string> evidence = launches
             .Select(static item => item.Summary)
             .Concat(launches.SelectMany(static item => item.AuditLines))
+            .Concat(launchSignals.Select(static packet => packet.Summary))
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
+        int signalCount = launches.Length + launchSignals.Length;
+        string summary = launches.Length > 0
+            ? $"{signalCount} prep-launch signal(s) keep packet launches auditable on the same campaign lane."
+            : $"{signalCount} prep-launch signal(s) stay governed from prep-launch change packets while launch receipts catch up.";
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                leadRun?.UpdatedAtUtc
+            }
+            .Concat(launches.Select(static item => (DateTimeOffset?)item.LaunchedAtUtc))
+            .Concat(launchSignals.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.UtcNow)
+            .Max();
 
         return new GovernedPrepPacketSummary(
             PacketId: $"prep-launch:{workspace.WorkspaceId}",
             Kind: "prep_launch_packet",
             Title: $"{workspace.CampaignName} governed prep launches",
-            Summary: $"{launches.Length} prep-launch receipt(s) keep packet launches auditable on the same campaign lane.",
+            Summary: summary,
             BindingSummary: leadRun is null
                 ? "Launch actions stay attached to campaign truth so GM prep operations do not fork into local-only notes."
                 : $"Launch actions stay attached to {leadRun.Title} and the same account-audit campaign backbone.",
@@ -1796,9 +1816,29 @@ public sealed class CampaignWorkspaceServerPlaneService
                 launches.Select(static item => item.PacketTitle),
                 launches.Select(static item => item.TargetRunTitle),
                 launches.Select(static item => item.TargetSceneTitle),
-                launches.Select(static item => item.InitiatedByUserId)),
+                launches.Select(static item => item.InitiatedByUserId),
+                launchSignals.Select(static item => item.Kind),
+                launchSignals.Select(static item => item.Label)),
             EvidenceLines: evidence,
-            UpdatedAtUtc: launches.Max(static item => item.LaunchedAtUtc));
+            UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsPrepLaunchSignalKind(string? kind)
+    {
+        string normalizedKind = kind?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+        {
+            return false;
+        }
+
+        if (string.Equals(normalizedKind, "prep_launch", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "prep_packet_launch", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return normalizedKind.Contains("prep", StringComparison.OrdinalIgnoreCase)
+            && normalizedKind.Contains("launch", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildEventControlPrepPacket(CampaignWorkspaceProjection workspace)
