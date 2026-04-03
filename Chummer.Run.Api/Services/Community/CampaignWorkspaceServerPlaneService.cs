@@ -2030,12 +2030,16 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return value.Contains("roster", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("crew", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("assignment", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("handoff", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("bench", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("rotation", StringComparison.OrdinalIgnoreCase);
+        bool hasRosterIdentityToken = value.Contains("roster", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("crew", StringComparison.OrdinalIgnoreCase);
+        if (hasRosterIdentityToken)
+        {
+            return true;
+        }
+
+        bool hasBenchRotationPair = value.Contains("bench", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("rotation", StringComparison.OrdinalIgnoreCase);
+        return hasBenchRotationPair;
     }
 
     private static GovernedPrepPacketSummary? BuildAftermathPrepPacket(
@@ -2568,9 +2572,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             return true;
         }
 
-        return IsContinuitySignalKind(normalizedKind)
-            || IsAftermathSignalKind(normalizedKind)
-            || IsRosterMovementSignalKind(normalizedKind)
+        return IsRosterMovementSignalKind(normalizedKind)
             || IsPrepLaunchSignalKind(normalizedKind)
             || IsTravelPrefetchSignalKind(normalizedKind)
             || ContainsEventControlToken(normalizedKind)
