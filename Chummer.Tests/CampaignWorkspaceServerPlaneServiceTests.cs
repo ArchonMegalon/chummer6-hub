@@ -130,6 +130,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("device", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void EventControlPacketIncludesOpsReceiptsWhenPrepLaunchAndTravelPrefetchExist()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("event", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("operations", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("event-control receipt", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
