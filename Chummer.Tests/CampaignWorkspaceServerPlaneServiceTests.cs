@@ -434,6 +434,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(packet.EvidenceLines, line => line.Contains("travel_cache on linux (offline/preview)", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("campaign_recap_bundle", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("campaign_approved", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("recap", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
