@@ -2573,6 +2573,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             || ContainsEventControlFallbackToken(packet.Summary)
             || ContainsOppositionToken(packet.Label)
             || ContainsOppositionToken(packet.Summary)
+            || IsCampaignRelationshipSignal(packet)
             || IsCampaignRelationshipSignalKind(packet.Label)
             || IsCampaignRelationshipSignalKind(packet.Summary);
     }
