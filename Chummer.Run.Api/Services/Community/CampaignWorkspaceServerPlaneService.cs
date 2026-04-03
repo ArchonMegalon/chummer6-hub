@@ -131,8 +131,9 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
         string? normalizedQuery = NormalizeOptional(queryText);
+        IReadOnlyList<string> queryTokens = BuildPrepLibraryQueryTokens(normalizedQuery);
         IReadOnlyList<GovernedPrepPacketSummary> packets = prepLibrary.Packets
-            .Where(packet => MatchesPrepLibraryQuery(packet, normalizedQuery))
+            .Where(packet => MatchesPrepLibraryQuery(packet, queryTokens))
             .ToArray();
 
         return new CampaignPrepLibrarySearchResponse(
@@ -1568,14 +1569,44 @@ public sealed class CampaignWorkspaceServerPlaneService
         return filtered.Length == 0 ? string.Empty : new string(filtered);
     }
 
-    private static bool MatchesPrepLibraryQuery(GovernedPrepPacketSummary packet, string? queryText)
+    private static IReadOnlyList<string> BuildPrepLibraryQueryTokens(string? queryText)
     {
         if (string.IsNullOrWhiteSpace(queryText))
+        {
+            return Array.Empty<string>();
+        }
+
+        HashSet<string> tokens = queryText
+            .Split(SearchSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(NormalizeSearchToken)
+            .Where(static token => token.Length >= 2)
+            .Select(static token => token.ToLowerInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (tokens.Count == 0)
+        {
+            string normalized = NormalizeSearchToken(queryText).ToLowerInvariant();
+            if (normalized.Length >= 2)
+            {
+                tokens.Add(normalized);
+            }
+        }
+
+        return tokens.ToArray();
+    }
+
+    private static bool MatchesPrepLibraryQuery(
+        GovernedPrepPacketSummary packet,
+        IReadOnlyList<string> queryTokens)
+    {
+        if (queryTokens.Count == 0)
         {
             return true;
         }
 
-        return new[]
+        string searchable = string.Join(
+            " ",
+            new[]
             {
                 packet.Title,
                 packet.Summary,
@@ -1583,7 +1614,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             }
             .Concat(packet.SearchTerms)
             .Concat(packet.EvidenceLines)
-            .Any(text => text.Contains(queryText, StringComparison.OrdinalIgnoreCase));
+            .Where(static text => !string.IsNullOrWhiteSpace(text)))
+            .ToLowerInvariant();
+
+        return queryTokens.All(token => searchable.Contains(token, StringComparison.OrdinalIgnoreCase));
     }
 
     private static RunProjection? ResolvePrepLaunchRun(
