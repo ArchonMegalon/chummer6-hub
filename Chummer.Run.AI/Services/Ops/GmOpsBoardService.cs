@@ -664,6 +664,20 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             return false;
         }
 
+        bool hasRevealTimestamp = asset.LastRevealedAtUtc.HasValue;
+        bool hasRevealChannel = !string.IsNullOrWhiteSpace(asset.LastRevealChannel);
+        if (asset.RevealCount == 0 && (hasRevealTimestamp || hasRevealChannel))
+        {
+            reason = "invalid-asset-reveal-state";
+            return false;
+        }
+
+        if (asset.RevealCount > 0 && (!hasRevealTimestamp || !hasRevealChannel))
+        {
+            reason = "invalid-asset-reveal-state";
+            return false;
+        }
+
         reason = null;
         return true;
     }
