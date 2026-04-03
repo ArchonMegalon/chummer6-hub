@@ -1276,7 +1276,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             packets.Add(campaignReturnPacket);
         }
 
-        if (BuildRosterMovementPrepPacket(workspace) is { } rosterPacket)
+        if (BuildRosterMovementPrepPacket(workspace, leadRun) is { } rosterPacket)
         {
             packets.Add(rosterPacket);
         }
@@ -1580,13 +1580,34 @@ public sealed class CampaignWorkspaceServerPlaneService
             UpdatedAtUtc: updatedAtUtc);
     }
 
-    private static GovernedPrepPacketSummary? BuildRosterMovementPrepPacket(CampaignWorkspaceProjection workspace)
+    private static GovernedPrepPacketSummary? BuildRosterMovementPrepPacket(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? leadRun)
     {
         RosterTransferProjection[] transfers = (workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
             .OrderByDescending(static item => item.TransferredAtUtc)
             .Take(3)
             .ToArray();
-        if (transfers.Length == 0)
+        WorkspaceChangePacketProjection[] rosterChangeSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Where(static packet => IsRosterMovementSignalKind(packet.Kind))
+            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
+        ObjectiveProjection[] rosterObjectives = (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
+            .Where(static objective => IsRosterObjectiveSignal(objective.Title, objective.Summary))
+            .OrderByDescending(static objective => objective.UpdatedAtUtc)
+            .Take(3)
+            .ToArray();
+        bool carryForwardRosterSignal = IsRosterObjectiveSignal(
+            workspace.NextSessionCarryForward?.Label,
+            workspace.NextSessionCarryForward?.Summary)
+            || IsRosterObjectiveSignal(
+                workspace.NextSessionCarryForward?.ReturnSummary,
+                workspace.NextSessionCarryForward?.NextSafeAction);
+        if (transfers.Length == 0
+            && rosterChangeSignals.Length == 0
+            && rosterObjectives.Length == 0
+            && !carryForwardRosterSignal)
         {
             return null;
         }
@@ -1594,31 +1615,103 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<string> evidence = transfers
             .Select(static item => item.Summary)
             .Concat(transfers.SelectMany(static item => item.AuditLines))
+            .Concat(rosterChangeSignals.Select(static packet => packet.Summary))
+            .Concat(rosterObjectives.Select(static objective => objective.Summary))
+            .Concat(rosterObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."))
+            .Concat(
+                carryForwardRosterSignal
+                    ? BuildEvidenceLines(
+                        workspace.NextSessionCarryForward?.Summary,
+                        workspace.NextSessionCarryForward?.ReturnSummary,
+                        workspace.NextSessionCarryForward?.NextSafeAction)
+                    : Array.Empty<string>())
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
+        int signalCount = transfers.Length + rosterChangeSignals.Length + rosterObjectives.Length + (carryForwardRosterSignal ? 1 : 0);
+        string summary = transfers.Length > 0
+            ? $"{signalCount} roster movement signal(s) keep ownership and campaign movement on the same governed lane."
+            : $"{signalCount} roster movement signal(s) stay governed from roster-change packets, run pressure, and carry-forward signals while transfer receipts catch up.";
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                workspace.NextSessionCarryForward?.UpdatedAtUtc,
+                leadRun?.UpdatedAtUtc
+            }
+            .Concat(transfers.Select(static item => (DateTimeOffset?)item.TransferredAtUtc))
+            .Concat(rosterChangeSignals.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
+            .Concat(rosterObjectives.Select(static objective => (DateTimeOffset?)objective.UpdatedAtUtc))
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.UtcNow)
+            .Max();
 
         return new GovernedPrepPacketSummary(
             PacketId: $"roster:{workspace.WorkspaceId}",
             Kind: "roster_movement_packet",
             Title: $"{workspace.CampaignName} roster movement packet",
-            Summary: $"{transfers.Length} roster transfer receipt(s) keep ownership and campaign movement on the same governed lane.",
+            Summary: summary,
             BindingSummary: "Reusable across campaign and season operations so roster movement stays auditable without shadow notes.",
             Reusable: true,
             SearchTerms: BuildSearchTerms(
                 workspace.CampaignName,
                 "roster",
                 "movement",
+                "crew",
+                "assignment",
                 transfers.Select(static item => item.RunnerHandle),
                 transfers.Select(static item => item.SourceCampaignName),
                 transfers.Select(static item => item.TargetCampaignName),
                 transfers.Select(static item => item.SourceGroupName),
                 transfers.Select(static item => item.TargetGroupName),
                 transfers.Select(static item => item.SourceCrewName),
-                transfers.Select(static item => item.TargetCrewName)),
+                transfers.Select(static item => item.TargetCrewName),
+                rosterChangeSignals.Select(static item => item.Kind),
+                rosterChangeSignals.Select(static item => item.Label),
+                rosterObjectives.Select(static item => item.Title),
+                rosterObjectives.Select(static item => item.Status),
+                rosterObjectives.Select(static item => item.Pressure),
+                workspace.NextSessionCarryForward?.Label,
+                workspace.NextSessionCarryForward?.Summary),
             EvidenceLines: evidence,
-            UpdatedAtUtc: transfers.Max(static item => item.TransferredAtUtc));
+            UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsRosterMovementSignalKind(string? kind)
+    {
+        string normalizedKind = kind?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+        {
+            return false;
+        }
+
+        return string.Equals(normalizedKind, "roster_transfer", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "roster_assignment", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "roster_move", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "crew_assignment", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "crew_handoff", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("roster", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("crew", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsRosterObjectiveSignal(string? title, string? summary)
+    {
+        return ContainsRosterToken(title) || ContainsRosterToken(summary);
+    }
+
+    private static bool ContainsRosterToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Contains("roster", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("crew", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("assignment", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("handoff", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("bench", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("rotation", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildAftermathPrepPacket(
