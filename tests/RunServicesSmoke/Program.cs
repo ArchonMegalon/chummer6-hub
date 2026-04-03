@@ -2797,6 +2797,7 @@ async Task VerifyPublicLandingProjectionAsync()
                 || item.SearchTerms.Any(term => string.Equals(term, "opposition", StringComparison.OrdinalIgnoreCase)))),
         "campaign spine server plane api should expose searchable governed opposition packets.");
     Assert(workspaceServerPlanePayload.PrepLibrary.Packets.Any(item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal) && item.SearchTerms.Any(term => string.Equals(term, "diary", StringComparison.OrdinalIgnoreCase))), "campaign spine server plane api should expose a dedicated diary/contact/heat return-loop packet.");
+    Assert(workspaceServerPlanePayload.PrepLibrary.Packets.Any(item => string.Equals(item.Kind, "campaign_memory_packet", StringComparison.Ordinal) && item.SearchTerms.Any(term => string.Equals(term, "memory", StringComparison.OrdinalIgnoreCase))), "campaign spine server plane api should expose a dedicated campaign-memory packet for long-lived return truth.");
     Assert(workspaceServerPlanePayload.PrepLaunches.Count == 0, "campaign spine server plane api should start without any governed prep-launch receipts.");
     Assert(workspaceServerPlanePayload.TravelMode.TravelReadyDeviceCount >= 1, "campaign spine server plane api should expose safehouse/travel readiness for claimed devices.");
     Assert(workspaceServerPlanePayload.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal), "campaign spine server plane api should carry prep packets into the bounded prefetch inventory summary.");
@@ -2826,6 +2827,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var prepLibraryDiaryResult = await campaignSpineController.GetMyCampaignWorkspacePrepLibrary(workspaceId, "diary heat", CancellationToken.None);
     var prepLibraryDiaryPayload = (prepLibraryDiaryResult.Result as OkObjectResult)?.Value as CampaignPrepLibrarySearchResponse ?? prepLibraryDiaryResult.Value;
     Assert(prepLibraryDiaryPayload?.Items.Any(item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal)) == true, "campaign spine prep-library api should return the diary/contact/heat return-loop packet for diary+heat search.");
+    var prepLibraryMemoryResult = await campaignSpineController.GetMyCampaignWorkspacePrepLibrary(workspaceId, "memory", CancellationToken.None);
+    var prepLibraryMemoryPayload = (prepLibraryMemoryResult.Result as OkObjectResult)?.Value as CampaignPrepLibrarySearchResponse ?? prepLibraryMemoryResult.Value;
+    Assert(prepLibraryMemoryPayload?.Items.Any(item => string.Equals(item.Kind, "campaign_memory_packet", StringComparison.Ordinal)) == true, "campaign spine prep-library api should return the campaign-memory packet for memory-focused search.");
     var prepLaunchResult = await campaignSpineController.LaunchMyCampaignWorkspacePrepPacket(
         workspaceId,
         new GovernedPrepLaunchRequest(
