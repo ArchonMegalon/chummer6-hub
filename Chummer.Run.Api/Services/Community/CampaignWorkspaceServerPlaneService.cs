@@ -115,6 +115,17 @@ public sealed class CampaignWorkspaceServerPlaneService
         "launch"
     ];
 
+    private static readonly string[] TravelPrefetchWordTokens =
+    [
+        "travel",
+        "travels"
+    ];
+
+    private static readonly string[] TravelPrefetchWordPrefixes =
+    [
+        "prefetch"
+    ];
+
     private sealed record WorkspaceContext(
         CampaignWorkspaceProjection Workspace,
         CampaignWorkspaceDigestProjection? Digest,
@@ -2782,8 +2793,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             return true;
         }
 
-        return normalizedKind.Contains("travel", StringComparison.OrdinalIgnoreCase)
-            && normalizedKind.Contains("prefetch", StringComparison.OrdinalIgnoreCase);
+        return ContainsTravelPrefetchToken(normalizedKind);
     }
 
     private static bool IsTravelPrefetchSignal(WorkspaceChangePacketProjection packet)
@@ -2801,8 +2811,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return value.Contains("travel", StringComparison.OrdinalIgnoreCase)
-            && value.Contains("prefetch", StringComparison.OrdinalIgnoreCase);
+        return ContainsAnyWordToken(value, TravelPrefetchWordTokens)
+            && ContainsAnyWordTokenPrefix(value, TravelPrefetchWordPrefixes);
     }
 
     private static bool ContainsTravelPrefetchToken(string? primary, string? secondary)

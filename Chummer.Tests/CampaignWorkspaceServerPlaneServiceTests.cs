@@ -1070,6 +1070,28 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void TravelPrefetchPacketDoesNotActivateFromTraveloguePrefetchingMentionsWithoutTravelPrefetchIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithTraveloguePrefetchingMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void EventControlPacketDoesNotActivateFromTraveloguePrefetchingMentionsWithoutTravelPrefetchIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithTraveloguePrefetchingMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void EventControlPacketDoesNotActivateFromContactlessMentionsWithoutRelationshipIdentity()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithContactlessStatusMentionsOnly();
@@ -4628,6 +4650,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [relaunchSignal],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithTraveloguePrefetchingMentionsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection travelogueSignal = new(
+            PacketId: "packet-travelogue-prefetching-1",
+            Kind: "continuity_update",
+            Label: "Travelogue prefetching note",
+            Summary: "Travelogue prefetching commentary remains continuity-only.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-travelogue-prefetching-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [travelogueSignal],
             Consequences: [],
             PrepLaunches: [],
             TravelPrefetches: []);
