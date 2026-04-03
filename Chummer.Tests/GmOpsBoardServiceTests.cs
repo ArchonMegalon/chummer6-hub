@@ -200,6 +200,78 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public void ReconcilePortableAssets_SkipsAssets_WhenIncomingPayloadContainsAmbiguousDuplicateAssetVersions()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        var first = BuildPortableAsset(
+            assetId: "prep_duplicate_asset",
+            now: now,
+            title: "First payload title");
+        var second = BuildPortableAsset(
+            assetId: " prep_duplicate_asset ",
+            now: now,
+            title: "Second payload title");
+
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([first, second]);
+
+        Assert.Equal(0, result.ImportedCount);
+        Assert.Equal(2, result.SkippedCount);
+        Assert.Equal(2, result.Conflicts.Count);
+        Assert.All(result.Conflicts, conflict =>
+        {
+            Assert.Equal("prep_duplicate_asset", conflict.EntityId);
+            Assert.Equal("duplicate-asset-id-ambiguous", conflict.Reason);
+            Assert.Equal("skipped-invalid", conflict.Resolution);
+            Assert.Equal(now.ToUnixTimeSeconds().ToString(), conflict.LocalFingerprint);
+            Assert.Equal("conflicting-payload", conflict.RemoteFingerprint);
+        });
+        Assert.Null(service.GetPrepAsset("prep_duplicate_asset"));
+    }
+
+    [Fact]
+    public void ReconcilePortableAssets_KeepsExistingAsset_WhenIncomingPayloadContainsAmbiguousDuplicateAssetVersions()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult seedResult = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "prep_duplicate_asset_existing",
+                now: now,
+                title: "Seed title")
+        ]);
+        Assert.Equal(1, seedResult.ImportedCount);
+
+        var duplicateOne = BuildPortableAsset(
+            assetId: "prep_duplicate_asset_existing",
+            now: now.AddMinutes(3),
+            title: "Duplicate update one");
+        var duplicateTwo = BuildPortableAsset(
+            assetId: " prep_duplicate_asset_existing ",
+            now: now.AddMinutes(3),
+            title: "Duplicate update two");
+
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([duplicateOne, duplicateTwo]);
+
+        Assert.Equal(0, result.ImportedCount);
+        Assert.Equal(2, result.SkippedCount);
+        Assert.Equal(2, result.Conflicts.Count);
+        Assert.All(result.Conflicts, conflict =>
+        {
+            Assert.Equal("prep_duplicate_asset_existing", conflict.EntityId);
+            Assert.Equal("duplicate-asset-id-ambiguous", conflict.Reason);
+            Assert.Equal("skipped-invalid", conflict.Resolution);
+            Assert.Equal(now.AddMinutes(3).ToUnixTimeSeconds().ToString(), conflict.LocalFingerprint);
+            Assert.Equal("conflicting-payload", conflict.RemoteFingerprint);
+        });
+
+        GmPrepAssetRecord? stored = service.GetPrepAsset("prep_duplicate_asset_existing");
+        Assert.NotNull(stored);
+        Assert.Equal("Seed title", stored!.Title);
+    }
+
+    [Fact]
     public void ReconcilePortableAssets_KeepsLocalAsset_WhenCampaignDoesNotMatchExistingAsset()
     {
         var service = CreateService();
