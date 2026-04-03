@@ -1604,7 +1604,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             returnChanges.Select(static item => item.Summary),
             aftermathChanges.Select(static item => item.Summary),
             relationshipConsequences.Select(static item => item.Summary),
-            relationshipConsequences.SelectMany(static item => item.EvidenceLines));
+            relationshipConsequences.SelectMany(static item => item.EvidenceLines),
+            relationshipConsequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.Summary)));
         DateTimeOffset updatedAtUtc = new[]
             {
                 workspace.LatestContinuity?.CapturedAtUtc,
@@ -1647,7 +1648,8 @@ public sealed class CampaignWorkspaceServerPlaneService
                 aftermathChanges.Select(static item => item.Label),
                 relationshipConsequences.Select(static item => item.Kind),
                 relationshipConsequences.Select(static item => item.Label),
-                relationshipConsequences.Select(static item => item.State)),
+                relationshipConsequences.Select(static item => item.State),
+                relationshipConsequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.SourceKind))),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
     }
@@ -2157,7 +2159,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             travelPrefetches.Select(static receipt => receipt.PrefetchSummary),
             travelPrefetches.SelectMany(static receipt => receipt.InventoryLines),
             consequences.Select(static consequence => consequence.Summary),
-            consequences.SelectMany(static consequence => consequence.EvidenceLines));
+            consequences.SelectMany(static consequence => consequence.EvidenceLines),
+            consequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.Summary)));
         DateTimeOffset updatedAtUtc = new[]
             {
                 carryForward?.UpdatedAtUtc,
@@ -2217,7 +2220,8 @@ public sealed class CampaignWorkspaceServerPlaneService
                 travelPrefetches.Select(static receipt => receipt.Channel),
                 consequences.Select(static consequence => consequence.Kind),
                 consequences.Select(static consequence => consequence.Label),
-                consequences.Select(static consequence => consequence.State)),
+                consequences.Select(static consequence => consequence.State),
+                consequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.SourceKind))),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
     }
