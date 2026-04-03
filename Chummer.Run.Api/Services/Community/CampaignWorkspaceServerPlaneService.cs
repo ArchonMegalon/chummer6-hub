@@ -1937,8 +1937,8 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static bool IsCampaignReturnRecapSignal(PublicationSafeProjection item)
     {
         string kind = item.Kind.Trim();
-        if (kind.Contains("after_action", StringComparison.OrdinalIgnoreCase)
-            || ContainsAnyWordToken(kind, CampaignReturnRecapWordTokens))
+        if (ContainsAnyWordToken(kind, CampaignReturnRecapWordTokens)
+            || ContainsAfterActionTokenPair(kind))
         {
             return true;
         }
@@ -1955,9 +1955,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(value, CampaignReturnRecapWordTokens)
-            || value.Contains("after action", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("after-action", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("after_action", StringComparison.OrdinalIgnoreCase);
+            || ContainsAfterActionTokenPair(value);
     }
 
     private static bool IsCampaignRelationshipSignalKind(string? kind)
@@ -2294,9 +2292,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(normalizedKind, AftermathRecapWordTokens)
-            || normalizedKind.Contains("after action", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("after-action", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("after_action", StringComparison.OrdinalIgnoreCase);
+            || ContainsAfterActionTokenPair(normalizedKind);
     }
 
     private static bool IsAftermathSignal(WorkspaceChangePacketProjection packet)
@@ -2325,9 +2321,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(value, AftermathRecapWordTokens)
-            || value.Contains("after action", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("after-action", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("after_action", StringComparison.OrdinalIgnoreCase);
+            || ContainsAfterActionTokenPair(value);
     }
 
     private static GovernedPrepPacketSummary? BuildPrepLaunchOpsPacket(
@@ -2774,6 +2768,17 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return false;
+    }
+
+    private static bool ContainsAfterActionTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["after"])
+            && ContainsAnyWordToken(value, ["action"]);
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrefetchOpsPacket(
