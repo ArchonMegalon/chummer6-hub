@@ -151,6 +151,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketIncludesRecapKindFallbackWhenRecapSignalsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathRecapKindsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("downtime_brief", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void PrepLibraryIncludesEventControlPacketWhenCarryForwardAndChangePacketsExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControls();
@@ -1215,6 +1228,41 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "",
             ChangePackets: [aftermathChange],
+            Consequences: [],
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathRecapKindsOnly()
+    {
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-1",
+            Kind: "downtime_brief",
+            Label: "",
+            Summary: "");
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [recap],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
             Consequences: [],
             AftermathPackages: []);
     }

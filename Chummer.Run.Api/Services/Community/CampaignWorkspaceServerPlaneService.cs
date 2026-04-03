@@ -1959,6 +1959,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Concat(packages.SelectMany(static item => item.EvidenceLines))
             .Concat(recapSignals.Select(static item => item.Summary))
             .Concat(recapSignals.Select(static item => item.Label))
+            .Concat(recapSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")))
             .Concat(aftermathSignals.Select(static item => item.Summary))
             .Concat(aftermathSignals.Select(static item => item.Label))
             .Concat(aftermathSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")))
