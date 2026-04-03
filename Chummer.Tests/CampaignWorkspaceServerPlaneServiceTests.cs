@@ -916,6 +916,33 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RosterMovementPacketKeepsSignalKindFallbackWhenTransferEvidenceIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterTransfersSparseAndVerboseOpsEvidence();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("roster_assignment", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("Ghostline transfer Neon Cradle -> Season Ops", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketKeepsRosterTransferIdentityWhenOpsEvidenceIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterTransfersSparseAndVerboseOpsEvidence();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("Ghostline transfer Neon Cradle -> Season Ops", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void PrepLaunchPacketFallsBackToChangeSignalsWhenLaunchReceiptsAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchChangeSignalsOnly();
@@ -3271,6 +3298,102 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "",
             ChangePackets: [],
             Consequences: [],
+            RosterTransfers: [transfer],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithRosterTransfersSparseAndVerboseOpsEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        RosterTransferProjection transfer = new(
+            TransferId: "transfer-1",
+            DossierId: "dossier-1",
+            RunnerHandle: "Ghostline",
+            PreviousOwnerUserId: "user-a",
+            CurrentOwnerUserId: "user-b",
+            SourceGroupId: "group-a",
+            SourceGroupName: "Night Shift",
+            SourceCampaignId: "campaign-a",
+            SourceCampaignName: "Neon Cradle",
+            SourceCrewId: "crew-a",
+            SourceCrewName: "Wardens",
+            TargetGroupId: "group-b",
+            TargetGroupName: "Aftermath Desk",
+            TargetCampaignId: "campaign-b",
+            TargetCampaignName: "Season Ops",
+            TargetCrewId: "crew-b",
+            TargetCrewName: "Season Operations Roster",
+            InitiatedByUserId: "gm-1",
+            Summary: "",
+            AuditLines:
+            [
+                "Transfer receipt line A includes verbose season-operation context for launch prep and roster pressure.",
+                "Transfer receipt line B includes verbose staffing context for event windows and checkpoint planning.",
+                "Transfer receipt line C includes verbose accountability context for operator lane governance."
+            ],
+            Receipts: [],
+            TransferredAtUtc: now.AddMinutes(3));
+
+        WorkspaceChangePacketProjection rosterSignal = new(
+            PacketId: "packet-roster",
+            Kind: "roster_assignment",
+            Label: "",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(4));
+        WorkspaceChangePacketProjection eventSignalA = new(
+            PacketId: "packet-event-a",
+            Kind: "season_operation_checkpoint",
+            Label: "Season board lane A",
+            Summary: "Season operation control timeline is saturated with verbose lane details for packet A.",
+            UpdatedAtUtc: now.AddMinutes(5));
+        WorkspaceChangePacketProjection eventSignalB = new(
+            PacketId: "packet-event-b",
+            Kind: "event_window_shift",
+            Label: "Season board lane B",
+            Summary: "Event window control timeline is saturated with verbose lane details for packet B.",
+            UpdatedAtUtc: now.AddMinutes(6));
+        WorkspaceChangePacketProjection eventSignalC = new(
+            PacketId: "packet-event-c",
+            Kind: "operation_checkpoint",
+            Label: "Season board lane C",
+            Summary: "Operation checkpoint control timeline is saturated with verbose lane details for packet C.",
+            UpdatedAtUtc: now.AddMinutes(7));
+
+        CampaignConsequenceProjection consequence = new(
+            ConsequenceId: "consequence-1",
+            Kind: "heat_pressure_lane",
+            Label: "Heat pressure lane",
+            State: "active",
+            Summary: "Heat pressure remains attached to event-control governance.",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(8));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [rosterSignal, eventSignalA, eventSignalB, eventSignalC],
+            Consequences: [consequence],
             RosterTransfers: [transfer],
             PrepLaunches: [],
             TravelPrefetches: []);
