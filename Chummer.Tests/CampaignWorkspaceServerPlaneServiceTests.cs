@@ -2014,6 +2014,31 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void OppositionPacketActivatesFromCarryForwardOppositionSignalsWhenOtherFamiliesLag()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionCarryForwardSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("opposition", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void OppositionPacketActivatesFromCarryForwardOppositionEvidenceLinesWhenPrimaryFieldsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionCarryForwardEvidenceSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+    }
+
+    [Fact]
     public void OppositionPacketIncludesSignalLabelsWhenSignalSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionSignalLabelsOnly();
@@ -7767,6 +7792,86 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Return lane summary",
             ChangePackets: [oppositionVariant],
             Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithOppositionCarryForwardSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "Opposition lane carry-forward",
+            Summary: "Opposition pressure remains active while receipts hydrate.",
+            ReturnSummary: "Threat response window stays governed for next reopen.",
+            NextSafeAction: "Review opposition board before launch.",
+            EvidenceLines: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithOppositionCarryForwardEvidenceSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "Operator lane note",
+            Summary: "Queue reconciliation remains pending.",
+            ReturnSummary: "Carry-forward handoff remains tracked.",
+            NextSafeAction: "Review operator checklist.",
+            EvidenceLines: ["Threat window remains active while the opposition board is reopened."],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
             PrepLaunches: [],
             TravelPrefetches: []);
     }

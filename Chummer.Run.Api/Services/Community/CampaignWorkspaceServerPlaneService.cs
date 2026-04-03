@@ -1649,10 +1649,15 @@ public sealed class CampaignWorkspaceServerPlaneService
             .FirstOrDefault(item => string.Equals(item.SceneId, leadRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
             ?? leadRun?.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
         bool sceneSignal = IsOppositionObjectiveSignal(activeScene?.Title, activeScene?.Summary, null);
+        NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
+        bool carryForwardSignal = IsOppositionObjectiveSignal(carryForward?.Label, carryForward?.Summary, null)
+            || IsOppositionObjectiveSignal(carryForward?.ReturnSummary, carryForward?.NextSafeAction, null)
+            || (carryForward?.EvidenceLines?.Any(ContainsOppositionToken) ?? false);
         if (oppositionSignals.Length == 0
             && consequences.Length == 0
             && objectiveSignals.Length == 0
-            && !sceneSignal)
+            && !sceneSignal
+            && !carryForwardSignal)
         {
             return null;
         }
@@ -1662,13 +1667,24 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .Select(static item => DescribeSignalLabel(item.Label, item.Kind, "opposition signal"))
                 .Concat(consequences.Select(static item => DescribeSignalLabel(item.Label, item.Kind, item.State)))
                 .Concat(objectiveSignals.Select(static item => DescribeSignalLabel(item.Title, item.Status, "run pressure")))
+                .Concat(carryForwardSignal
+                    ? new[]
+                    {
+                        DescribeSignalLabel(carryForward?.Label, carryForward?.ReturnSummary, "carry-forward opposition signal"),
+                        DescribeSignalLabel(carryForward?.NextSafeAction, null, "carry-forward opposition action")
+                    }
+                    : Array.Empty<string>())
                 .Where(static item => !string.IsNullOrWhiteSpace(item))
                 .Distinct(StringComparer.OrdinalIgnoreCase));
         if (string.IsNullOrWhiteSpace(labels))
         {
             labels = "governed opposition cues";
         }
-        int signalCount = oppositionSignals.Length + consequences.Length + objectiveSignals.Length + (sceneSignal ? 1 : 0);
+        int signalCount = oppositionSignals.Length
+            + consequences.Length
+            + objectiveSignals.Length
+            + (sceneSignal ? 1 : 0)
+            + (carryForwardSignal ? 1 : 0);
         string summary = consequences.Length > 0 || oppositionSignals.Length > 0
             ? $"{signalCount} governed opposition signal(s) are active: {labels}."
             : $"{signalCount} governed opposition signal(s) are active from run pressure and active-scene cues: {labels}.";
@@ -1682,7 +1698,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             consequences.SelectMany(static item => item.EvidenceLines.Concat(item.Receipts.Select(static receipt => receipt.Summary))),
             objectiveSignals.Select(static item => item.Summary),
             objectiveSignals.Select(static item => $"{item.Title} stays {item.Status} with {item.Pressure} pressure."),
-            sceneSignal ? activeScene?.Summary : null);
+            sceneSignal ? activeScene?.Summary : null,
+            carryForwardSignal ? carryForward?.Label : null,
+            carryForwardSignal ? carryForward?.Summary : null,
+            carryForwardSignal ? carryForward?.ReturnSummary : null,
+            carryForwardSignal ? carryForward?.NextSafeAction : null,
+            carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>());
 
         return new GovernedPrepPacketSummary(
             PacketId: $"opposition:{workspace.WorkspaceId}",
@@ -1707,12 +1728,18 @@ public sealed class CampaignWorkspaceServerPlaneService
                 activeScene?.Title,
                 activeScene?.Summary,
                 leadRun?.Title,
-                leadRun?.Objectives.Select(static item => item.Title)),
+                leadRun?.Objectives.Select(static item => item.Title),
+                carryForwardSignal ? carryForward?.Label : null,
+                carryForwardSignal ? carryForward?.Summary : null,
+                carryForwardSignal ? carryForward?.ReturnSummary : null,
+                carryForwardSignal ? carryForward?.NextSafeAction : null,
+                carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>()),
             EvidenceLines: evidence,
             UpdatedAtUtc: new[]
                 {
                     sceneSignal ? activeScene?.UpdatedAtUtc : null,
-                    leadRun?.UpdatedAtUtc
+                    leadRun?.UpdatedAtUtc,
+                    carryForwardSignal ? carryForward?.UpdatedAtUtc : null
                 }
                 .Concat(oppositionSignals.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
                 .Concat(consequences.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
