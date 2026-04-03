@@ -1957,20 +1957,17 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
-        IReadOnlyList<string> evidence = packages
-            .Select(static item => item.Summary)
-            .Concat(packages.Select(static item => item.Title))
-            .Concat(packages.SelectMany(static item => item.EvidenceLines))
-            .Concat(recapSignals.Select(static item => item.Summary))
-            .Concat(recapSignals.Select(static item => item.Label))
-            .Concat(recapSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")))
-            .Concat(aftermathSignals.Select(static item => item.Summary))
-            .Concat(aftermathSignals.Select(static item => item.Label))
-            .Concat(aftermathSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")))
-            .Where(static item => !string.IsNullOrWhiteSpace(item))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
-            .ToArray();
+        IReadOnlyList<string> evidence = BuildEvidenceLines(
+            recapSignals.Select(static item => item.Summary),
+            recapSignals.Select(static item => item.Label),
+            recapSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")),
+            aftermathSignals.Select(static item => item.Summary),
+            aftermathSignals.Select(static item => item.Label),
+            aftermathSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")),
+            packages.Select(static item => item.Summary),
+            packages.Select(static item => item.Title),
+            packages.Select(static item => DescribeSignalLabel(item.Title, item.PackageKind, "aftermath package")),
+            packages.SelectMany(static item => item.EvidenceLines));
         int signalCount = packages.Length + recapSignals.Length + aftermathSignals.Length;
         string summary = packages.Length > 0
             ? $"{signalCount} aftermath or downtime signal(s) stay attached for recap, recovery, and next-session return."

@@ -164,6 +164,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketKeepsRecapKindFallbackWhenPackageEvidenceIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathRecapKindsAndVerbosePackage();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("downtime_brief", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void PrepLibraryIncludesEventControlPacketWhenCarryForwardAndChangePacketsExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControls();
@@ -1417,6 +1430,59 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [],
             Consequences: [],
             AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathRecapKindsAndVerbosePackage()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-1",
+            Kind: "downtime_brief",
+            Label: "",
+            Summary: "");
+        AftermathRecapPackageProjection package = new(
+            PackageId: "package-1",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            RunId: "run-1",
+            RunTitle: "Dockyard Pressure Test",
+            PackageKind: "aftermath",
+            Title: "Verbose aftermath package title line",
+            Summary: "Verbose aftermath package summary line",
+            ArtifactId: "artifact-1",
+            EvidenceLines:
+            [
+                "Verbose aftermath evidence line one.",
+                "Verbose aftermath evidence line two."
+            ],
+            InitiatedByUserId: "gm-1",
+            GeneratedAtUtc: now);
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [recap],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            AftermathPackages: [package]);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithRelationshipChangeSignalsOnly()
