@@ -2371,16 +2371,13 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
-        IReadOnlyList<string> evidence = receipts
-            .Select(static item => item.PrefetchSummary)
-            .Concat(receipts.SelectMany(static item => item.InventoryLines))
-            .Concat(receipts.SelectMany(static item => item.Boundaries))
-            .Concat(prefetchSignals.Select(static item => item.Summary))
-            .Concat(prefetchSignals.Select(static item => item.Label))
-            .Where(static item => !string.IsNullOrWhiteSpace(item))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
-            .ToArray();
+        IReadOnlyList<string> evidence = BuildEvidenceLines(
+            receipts.Select(static item => item.PrefetchSummary),
+            receipts.SelectMany(static item => item.InventoryLines),
+            receipts.SelectMany(static item => item.Boundaries),
+            prefetchSignals.Select(static item => item.Summary),
+            prefetchSignals.Select(static item => item.Label),
+            prefetchSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "travel prefetch signal")));
         int signalCount = receipts.Length + prefetchSignals.Length;
         string summary = receipts.Length > 0
             ? $"{signalCount} travel-prefetch signal(s) keep offline staging deliberate and reviewable per claimed device."
