@@ -661,6 +661,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void OppositionPacketIncludesConsequenceKindFallbackInEvidenceWhenConsequenceSignalsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionConsequenceKindsSparseOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("opposition_window", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("threat_window", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void OppositionPacketFallsBackToRunPressureWhenConsequencesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRunPressureSignalsOnly();
@@ -2924,6 +2938,54 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "",
             ChangePackets: [oppositionWindow, threatWindow],
             Consequences: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithOppositionConsequenceKindsSparseOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        CampaignConsequenceProjection oppositionWindow = new(
+            ConsequenceId: "consequence-1",
+            Kind: "opposition_window",
+            Label: "",
+            State: "active",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(1));
+        CampaignConsequenceProjection threatWindow = new(
+            ConsequenceId: "consequence-2",
+            Kind: "threat_window",
+            Label: "",
+            State: "active",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [oppositionWindow, threatWindow]);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchChangeSignalsOnly()
