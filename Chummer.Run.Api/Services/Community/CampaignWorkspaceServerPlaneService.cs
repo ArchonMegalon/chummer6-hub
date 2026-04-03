@@ -34,6 +34,18 @@ public sealed class CampaignWorkspaceServerPlaneService
         "checkpoints"
     ];
 
+    private static readonly string[] OppositionWordTokens =
+    [
+        "opposition",
+        "oppositions",
+        "hostile",
+        "hostiles",
+        "adversary",
+        "adversaries",
+        "threat",
+        "threats"
+    ];
+
     private sealed record WorkspaceContext(
         CampaignWorkspaceProjection Workspace,
         CampaignWorkspaceDigestProjection? Digest,
@@ -2541,10 +2553,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return value.Contains("opposition", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("hostile", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("adversary", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("threat", StringComparison.OrdinalIgnoreCase);
+        return ContainsAnyWordToken(value, OppositionWordTokens);
     }
 
     private static bool IsOppositionSignalKind(string? kind)
@@ -2563,10 +2572,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             return true;
         }
 
-        return normalizedKind.Contains("opposition", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("threat", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("hostile", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("adversary", StringComparison.OrdinalIgnoreCase);
+        return ContainsAnyWordToken(normalizedKind, OppositionWordTokens);
     }
 
     private static bool IsOppositionConsequenceSignal(CampaignConsequenceProjection consequence)
