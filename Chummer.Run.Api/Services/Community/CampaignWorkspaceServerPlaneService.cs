@@ -1580,7 +1580,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         CampaignConsequenceProjection[] relationshipConsequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
-            .Where(static consequence => IsCampaignRelationshipConsequenceKind(consequence.Kind))
+            .Where(static consequence => IsCampaignRelationshipConsequenceSignal(consequence))
             .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
             .Take(4)
             .ToArray();
@@ -1875,6 +1875,16 @@ public sealed class CampaignWorkspaceServerPlaneService
             || normalizedKind.Contains("heat", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("reputation", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("faction", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsCampaignRelationshipConsequenceSignal(CampaignConsequenceProjection consequence)
+    {
+        return IsCampaignRelationshipConsequenceKind(consequence.Kind)
+            || ContainsCampaignRelationshipSplitTokenSignal(consequence.Kind, consequence.Label, consequence.Summary)
+            || ContainsCampaignRelationshipSplitTokenSignal(consequence.Kind, consequence.Label, consequence.State)
+            || consequence.EvidenceLines.Any(ContainsCampaignRelationshipToken)
+            || consequence.Receipts.Any(static receipt =>
+                ContainsCampaignRelationshipSplitTokenSignal(receipt.SourceKind, receipt.Summary, null));
     }
 
     private static GovernedPrepPacketSummary? BuildRosterMovementPrepPacket(
@@ -2275,7 +2285,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         CampaignConsequenceProjection[] consequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
-            .Where(static consequence => IsCampaignRelationshipConsequenceKind(consequence.Kind))
+            .Where(static consequence => IsCampaignRelationshipConsequenceSignal(consequence))
             .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
             .Take(3)
             .ToArray();
