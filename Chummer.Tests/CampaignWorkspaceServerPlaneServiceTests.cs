@@ -202,6 +202,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketIncludesRelationshipConsequenceReceiptEvidenceWhenConsequenceSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnRelationshipReceiptEvidenceOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("support case", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void PrepLibraryIncludesPrepLaunchPacketWhenGovernedPrepLaunchReceiptsExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
@@ -321,6 +334,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("event", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("heat pressure", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("fixer obligation", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketIncludesRelationshipConsequenceReceiptEvidenceWhenConsequenceSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlRelationshipReceiptEvidenceOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("support case", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1050,6 +1076,49 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             AftermathPackages: []);
     }
 
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnRelationshipReceiptEvidenceOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        CampaignConsequenceReceipt receipt = new(
+            ReceiptId: "receipt-1",
+            SourceKind: "support_case",
+            Summary: "Support case receipt confirms heat pressure remains governed for return.");
+        CampaignConsequenceProjection heatVariant = new(
+            ConsequenceId: "consequence-1",
+            Kind: "heat_pressure_lane",
+            Label: "Heat pressure",
+            State: "elevated",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [receipt],
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [],
+            Consequences: [heatVariant],
+            AftermathPackages: []);
+    }
+
     private static CampaignWorkspaceProjection BuildWorkspaceWithTravelPrefetchChangeSignalsOnly()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
@@ -1324,6 +1393,50 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Return lane summary",
             ChangePackets: [heatPressureLane, contactObligationLane],
             Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlRelationshipReceiptEvidenceOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        CampaignConsequenceReceipt receipt = new(
+            ReceiptId: "receipt-1",
+            SourceKind: "support_case",
+            Summary: "Support case receipt confirms heat pressure remains attached to event control.");
+        CampaignConsequenceProjection heatVariant = new(
+            ConsequenceId: "consequence-1",
+            Kind: "heat_pressure_lane",
+            Label: "Heat pressure",
+            State: "elevated",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [receipt],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [],
+            Consequences: [heatVariant],
             PrepLaunches: [],
             TravelPrefetches: []);
     }
