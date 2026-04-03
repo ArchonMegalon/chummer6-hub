@@ -1598,8 +1598,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             : $"{leadRun.Title} and campaign return cues share the same diary/contact/heat continuity lane.";
         IReadOnlyList<string> evidence = BuildEvidenceLines(
             workspace.ReturnSummary,
+            workspace.NextSessionCarryForward?.Label,
             workspace.NextSessionCarryForward?.Summary,
             workspace.NextSessionCarryForward?.ReturnSummary,
+            workspace.NextSessionCarryForward?.NextSafeAction,
             diaryRecaps.Select(static item => item.Summary),
             aftermathPackages.Select(static item => item.Summary),
             aftermathPackages.SelectMany(static item => item.EvidenceLines),
@@ -1642,6 +1644,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "return",
                 workspace.ReturnSummary,
                 workspace.NextSessionCarryForward?.Label,
+                workspace.NextSessionCarryForward?.NextSafeAction,
                 diaryRecaps.Select(static item => item.Kind),
                 diaryRecaps.Select(static item => item.Label),
                 aftermathPackages.Select(static item => item.PackageKind),
@@ -2150,8 +2153,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             ? " Event/season controls are currently driven by run-pressure signals while receipt streams catch up."
             : string.Empty;
         IReadOnlyList<string> evidence = BuildEvidenceLines(
+            carryForward?.Label,
             carryForward?.Summary,
             carryForward?.ReturnSummary,
+            carryForward?.NextSafeAction,
             workspace.ReturnSummary,
             eventPackets.Select(static packet => packet.Summary),
             eventPackets.Select(static packet => packet.Label),
@@ -2204,6 +2209,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 leadRun?.Title,
                 carryForward?.Label,
                 carryForward?.Summary,
+                carryForward?.NextSafeAction,
                 eventPackets.Select(static packet => packet.Kind),
                 eventPackets.Select(static packet => packet.Label),
                 rosterTransfers.Select(static transfer => transfer.RunnerHandle),
