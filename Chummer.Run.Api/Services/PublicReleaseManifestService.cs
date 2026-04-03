@@ -30,19 +30,22 @@ public sealed class PublicReleaseManifestService
     {
         var root = ResolveDownloadsRoot();
         var registryManifestUrl = ResolveRegistryManifestUrl();
+        PublicReleaseManifestDto? runtimeManifest = null;
         if (!string.IsNullOrWhiteSpace(registryManifestUrl))
         {
-            var runtimeManifest = TryLoadRegistryReleaseManifestFromUrl(registryManifestUrl);
-            if (runtimeManifest is not null)
-            {
-                return ApplyLocalReleaseProofFallback(runtimeManifest);
-            }
+            runtimeManifest = TryLoadRegistryReleaseManifestFromUrl(registryManifestUrl);
         }
 
         var registryManifestPath = ResolveRegistryManifestPath(root);
         if (File.Exists(registryManifestPath))
         {
-            return ApplyLocalReleaseProofFallback(LoadRegistryReleaseManifest(registryManifestPath));
+            var canonicalManifest = LoadRegistryReleaseManifest(registryManifestPath);
+            return ApplyLocalReleaseProofFallback(ChoosePreferredRegistryManifest(runtimeManifest, canonicalManifest));
+        }
+
+        if (runtimeManifest is not null)
+        {
+            return ApplyLocalReleaseProofFallback(runtimeManifest);
         }
 
         var manifestPath = Path.Combine(root, "releases.json");
@@ -60,6 +63,25 @@ public sealed class PublicReleaseManifestService
         }
 
         return ApplyLocalReleaseProofFallback(LoadReleaseManifest(manifestPath));
+    }
+
+    private static PublicReleaseManifestDto ChoosePreferredRegistryManifest(
+        PublicReleaseManifestDto? runtimeManifest,
+        PublicReleaseManifestDto canonicalManifest)
+    {
+        if (runtimeManifest is { Downloads.Count: > 0 })
+        {
+            return canonicalManifest.Downloads.Count == 0 || runtimeManifest.PublishedAt >= canonicalManifest.PublishedAt
+                ? runtimeManifest
+                : canonicalManifest;
+        }
+
+        if (canonicalManifest.Downloads.Count > 0)
+        {
+            return canonicalManifest;
+        }
+
+        return runtimeManifest ?? canonicalManifest;
     }
 
     public string? ResolveDownloadFilePath(string? path)
@@ -135,6 +157,13 @@ public sealed class PublicReleaseManifestService
         }
 
         return ResolveDownloadFilePath(fileName);
+    }
+
+    public string? ResolveCanonicalManifestFilePath()
+    {
+        var root = ResolveDownloadsRoot();
+        var path = ResolveRegistryManifestPath(root);
+        return File.Exists(path) ? path : null;
     }
 
     private string ResolveDownloadsRoot()

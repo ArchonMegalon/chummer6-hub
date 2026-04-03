@@ -1,4 +1,5 @@
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -44,5 +45,390 @@ public sealed class ReleaseSelectionServiceTests
         Assert.Equal("Need install help?", experience.InstallHelpLabel);
         Assert.NotNull(experience.Recommended);
         Assert.Equal("Avalonia Desktop Linux X64 Installer", experience.Recommended!.Artifact.Platform);
+        Assert.True(experience.RequestedPlatformHasPublicDownload);
+        Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "linux" && item.PubliclyAvailable);
+    }
+
+    [Fact]
+    public void BuildExperienceMarksUnsupportedRequestedPlatformAsUnavailableWithoutPretendingItIsRecommended()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260401-065126",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-01T06:51:26Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-x64-installer",
+                    Platform: "Avalonia Desktop Linux X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    Sha256: "6b0a63c39850a257e66d142c0bad196a7cc4fcbaf027635965f138f534bb13ea",
+                    SizeBytes: 34297862,
+                    Head: "avalonia",
+                    PlatformId: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    InstallAccessClass: "open_public")
+            ]);
+
+        var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", authenticated: false);
+
+        Assert.Equal("Windows", experience.RequestedPlatformLabel);
+        Assert.False(experience.RequestedPlatformHasPublicDownload);
+        Assert.False(string.IsNullOrWhiteSpace(experience.PlatformShelfNoticeTitle));
+        var windows = Assert.Single(experience.PlatformAvailability, item => item.PlatformId == "windows");
+        Assert.False(windows.PubliclyAvailable);
+        Assert.Contains("does not publish a Windows artifact yet", windows.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildExperienceNormalizesPreviewMacDmgIntoAccountGatedSetupScriptPreview()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260401-065126",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-01T06:51:26Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-x64-installer",
+                    Platform: "Avalonia Desktop Linux X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    Sha256: "6b0a63c39850a257e66d142c0bad196a7cc4fcbaf027635965f138f534bb13ea",
+                    SizeBytes: 34297862,
+                    Head: "avalonia",
+                    PlatformId: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    InstallAccessClass: "open_public"),
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-osx-arm64-installer",
+                    Platform: "Avalonia Desktop macOS ARM64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    Sha256: "7b0a63c39850a257e66d142c0bad196a7cc4fcbaf027635965f138f534bb13ef",
+                    SizeBytes: 44297862,
+                    Head: "avalonia",
+                    PlatformId: "osx-arm64",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    InstallAccessClass: "open_public"),
+            ],
+            ProofStatus: "passed",
+            ProofRoutes:
+            [
+                "/downloads/install/avalonia-osx-arm64-installer"
+            ]);
+
+        var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (X11; Linux x86_64)", authenticated: false);
+
+        Assert.Contains(experience.OtherPlatforms, item => item.Artifact.Id == "avalonia-osx-arm64-installer");
+        var mac = Assert.Single(experience.PlatformAvailability, item => item.PlatformId == "macos");
+        Assert.True(mac.PubliclyAvailable);
+    }
+
+    [Fact]
+    public void BuildExperienceUsesMacSetupScriptForAuthenticatedMacUsers()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260402-161430",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-02T16:14:30Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-osx-arm64-installer",
+                    Platform: "Avalonia Desktop macOS ARM64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    Sha256: "7b0a63c39850a257e66d142c0bad196a7cc4fcbaf027635965f138f534bb13ef",
+                    SizeBytes: 44297862,
+                    Head: "avalonia",
+                    PlatformId: "osx-arm64",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    InstallAccessClass: "account_required")
+            ],
+            ProofStatus: "passed",
+            ProofRoutes:
+            [
+                "/downloads/install/avalonia-osx-arm64-installer"
+            ]);
+
+        var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4)", authenticated: true);
+
+        var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
+        Assert.Equal("Open Mac install command", recommended.ActionLabel);
+        Assert.Equal("/downloads/install/avalonia-osx-arm64-installer", recommended.DispatchHref);
+        Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
+        Assert.Contains("verifies the published DMG digest", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && item.PubliclyAvailable);
+        Assert.True(service.UsesMacBootstrapScript(recommended.Artifact));
+    }
+
+    [Fact]
+    public void BuildExperienceUsesWindowsSetupScriptForAuthenticatedWindowsUsers()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260403-150000",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-03T15:00:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-installer",
+                    Platform: "Avalonia Desktop Windows x64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    Sha256: "w1",
+                    SizeBytes: 404,
+                    Head: "avalonia",
+                    PlatformId: "win-x64",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    InstallAccessClass: "account_required")
+            ],
+            ProofStatus: "passed",
+            ProofRoutes:
+            [
+                "/downloads/install/avalonia-osx-arm64-installer",
+                "/downloads/install/avalonia-osx-x64-installer"
+            ]);
+
+        var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", authenticated: true);
+
+        var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
+        Assert.Equal("Open Windows install command", recommended.ActionLabel);
+        Assert.Equal("/downloads/install/avalonia-win-x64-installer", recommended.DispatchHref);
+        Assert.Contains("short-lived PowerShell command", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Auto select", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildExperienceUsesLinuxSetupScriptForAuthenticatedLinuxUsers()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260403-150000",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-03T15:00:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-x64-installer",
+                    Platform: "Avalonia Desktop Linux x64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    Sha256: "l1",
+                    SizeBytes: 505,
+                    Head: "avalonia",
+                    PlatformId: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    InstallAccessClass: "account_required")
+            ],
+            ProofStatus: "passed",
+            ProofRoutes:
+            [
+                "/downloads/install/avalonia-osx-arm64-installer",
+                "/downloads/install/avalonia-osx-x64-installer"
+            ]);
+
+        var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (X11; Linux x86_64)", authenticated: true);
+
+        var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
+        Assert.Equal("Open Linux install command", recommended.ActionLabel);
+        Assert.Equal("/downloads/install/avalonia-linux-x64-installer", recommended.DispatchHref);
+        Assert.Contains("short-lived shell command", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Auto select", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildExperiencePromptsGuestMacUsersToSignInForSetupScript()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260402-161430",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-02T16:14:30Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-osx-arm64-installer",
+                    Platform: "Avalonia Desktop macOS ARM64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    Sha256: "7b0a63c39850a257e66d142c0bad196a7cc4fcbaf027635965f138f534bb13ef",
+                    SizeBytes: 44297862,
+                    Head: "avalonia",
+                    PlatformId: "osx-arm64",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    InstallAccessClass: "account_required")
+            ],
+            ProofStatus: "passed",
+            ProofRoutes:
+            [
+                "/downloads/install/avalonia-osx-arm64-installer"
+            ]);
+
+        var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4)", authenticated: false);
+
+        var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
+        Assert.Equal("Create account for Mac install command", recommended.ActionLabel);
+        Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
+        Assert.StartsWith("/signup?next=", recommended.DispatchHref, StringComparison.Ordinal);
+        Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", recommended.DispatchHref, StringComparison.Ordinal);
+        Assert.Equal("Continue with Google", experience.GuestGateSecondaryLabel);
+        Assert.Equal("/auth/google/start?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", experience.GuestGateSecondaryHref);
+        Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && item.PubliclyAvailable);
+    }
+
+    [Fact]
+    public void BuildExperienceWithholdsMacSetupScriptPreviewWithoutExplicitArtifactProof()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260402-203858",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-02T20:38:58Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-osx-arm64-installer",
+                    Platform: "Avalonia Desktop macOS ARM64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    Sha256: "arm64",
+                    SizeBytes: 44297862,
+                    Head: "avalonia",
+                    PlatformId: "osx-arm64",
+                    Arch: "arm64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    InstallAccessClass: "open_public")
+            ],
+            Status: "published");
+
+        var experience = service.BuildExperience(
+            manifest,
+            userAgent: "Mozilla/5.0 (Macintosh; Apple Silicon Mac OS X 14_4)",
+            authenticated: false);
+
+        Assert.Null(experience.Recommended);
+        Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && !item.PubliclyAvailable);
+    }
+
+    [Fact]
+    public void BuildExperiencePrefersArchitectureMatchWithinDetectedPlatform()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260402-161430",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-02T16:14:30Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-osx-x64-installer",
+                    Platform: "Avalonia Desktop macOS X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-osx-x64-installer.dmg",
+                    Sha256: "x64",
+                    SizeBytes: 44297862,
+                    Head: "avalonia",
+                    PlatformId: "macOS",
+                    Arch: "x64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-x64-installer.dmg",
+                    InstallAccessClass: "account_required"),
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-osx-arm64-installer",
+                    Platform: "Avalonia Desktop macOS ARM64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    Sha256: "arm64",
+                    SizeBytes: 44297862,
+                    Head: "avalonia",
+                    PlatformId: "macOS",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    InstallAccessClass: "account_required")
+            ],
+            ProofStatus: "passed",
+            ProofRoutes:
+            [
+                "/downloads/install/avalonia-osx-arm64-installer",
+                "/downloads/install/avalonia-osx-x64-installer"
+            ]);
+
+        var experience = service.BuildExperience(
+            manifest,
+            userAgent: "Mozilla/5.0 (Macintosh; Apple Silicon Mac OS X 14_4) AppleWebKit/605.1.15 Version/17.4 Safari/605.1.15 arm64",
+            authenticated: true);
+
+        var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
+        Assert.Equal("avalonia-osx-arm64-installer", recommended.Artifact.Id);
+        Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
     }
 }

@@ -1726,6 +1726,33 @@ public sealed class CampaignWorkspaceServerPlaneService
             carryForwardSignal ? carryForward?.NextSafeAction : null,
             carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>());
 
+        IReadOnlyList<string> searchTerms = BuildSearchTerms(
+            workspace.CampaignName,
+            "opposition",
+            "packet",
+            labels,
+            oppositionSignals.Select(static item => item.Kind),
+            oppositionSignals.Select(static item => item.Label),
+            consequences.Select(static item => item.Kind),
+            consequences.Select(static item => item.State),
+            consequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.SourceKind)),
+            objectiveSignals.Select(static item => item.Title),
+            objectiveSignals.Select(static item => item.Status),
+            objectiveSignals.Select(static item => item.Pressure),
+            activeScene?.Title,
+            activeScene?.Summary,
+            leadRun?.Title,
+            leadRun?.Objectives.Select(static item => item.Title),
+            carryForwardSignal ? carryForward?.Label : null,
+            carryForwardSignal ? carryForward?.Summary : null,
+            carryForwardSignal ? carryForward?.ReturnSummary : null,
+            carryForwardSignal ? carryForward?.NextSafeAction : null,
+            carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>());
+        if (searchTerms.Count < 3)
+        {
+            searchTerms = BuildSearchTerms(searchTerms, "opposition", "packet", "prep");
+        }
+
         return new GovernedPrepPacketSummary(
             PacketId: $"opposition:{workspace.WorkspaceId}",
             Kind: "opposition_packet",
@@ -1735,26 +1762,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 ? "Reusable across the campaign so the next scene can bind real opposition truth without local shadow packet models."
                 : $"Reusable across {workspace.CampaignName}; currently bound to {leadRun.Title} and the active return lane.",
             Reusable: true,
-            SearchTerms: BuildSearchTerms(
-                workspace.CampaignName,
-                labels,
-                oppositionSignals.Select(static item => item.Kind),
-                oppositionSignals.Select(static item => item.Label),
-                consequences.Select(static item => item.Kind),
-                consequences.Select(static item => item.State),
-                consequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.SourceKind)),
-                objectiveSignals.Select(static item => item.Title),
-                objectiveSignals.Select(static item => item.Status),
-                objectiveSignals.Select(static item => item.Pressure),
-                activeScene?.Title,
-                activeScene?.Summary,
-                leadRun?.Title,
-                leadRun?.Objectives.Select(static item => item.Title),
-                carryForwardSignal ? carryForward?.Label : null,
-                carryForwardSignal ? carryForward?.Summary : null,
-                carryForwardSignal ? carryForward?.ReturnSummary : null,
-                carryForwardSignal ? carryForward?.NextSafeAction : null,
-                carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>()),
+            SearchTerms: searchTerms,
             EvidenceLines: evidence,
             UpdatedAtUtc: new[]
                 {

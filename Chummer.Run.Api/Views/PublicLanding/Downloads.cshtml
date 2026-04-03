@@ -7,46 +7,59 @@
     var guestGateRequired = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
     var recommendedIsInstaller = release.Recommended?.Installer == true;
     var platformShelfNotice = !string.IsNullOrWhiteSpace(release.PlatformShelfNoticeSummary);
+    var requestedPlatformUnavailable = platformShelfNotice && !release.RequestedPlatformHasPublicDownload;
+    var deviceLabel = release.RequestedPlatformLabel ?? "this device";
+    var hasAdvancedDownloads = release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0 || release.ManualPackages.Count > 0;
+    var hasAdvancedPanels = hasAdvancedDownloads || release.PlatformAvailability.Count > 0 || Model.TrustPulse is not null || Model.SignedInStatus is not null;
+    var optionPool = (release.Recommended is null ? Enumerable.Empty<ReleaseOptionViewModel>() : new[] { release.Recommended })
+        .Concat(release.Alternatives)
+        .Concat(release.OtherPlatforms)
+        .Concat(release.ManualPackages)
+        .ToArray();
+
+    static bool MatchesPlatform(PublicReleaseArtifactDto artifact, string platformId)
+    {
+        var candidatePlatformId = artifact.PlatformId ?? string.Empty;
+        var candidatePlatform = artifact.Platform ?? string.Empty;
+        return platformId switch
+        {
+            "windows" => candidatePlatformId.Contains("win", StringComparison.OrdinalIgnoreCase)
+                || candidatePlatform.Contains("Windows", StringComparison.OrdinalIgnoreCase),
+            "linux" => candidatePlatformId.Contains("linux", StringComparison.OrdinalIgnoreCase)
+                || candidatePlatform.Contains("Linux", StringComparison.OrdinalIgnoreCase),
+            "macos" => candidatePlatformId.Contains("osx", StringComparison.OrdinalIgnoreCase)
+                || candidatePlatformId.Contains("mac", StringComparison.OrdinalIgnoreCase)
+                || candidatePlatform.Contains("mac", StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
+    }
+
+    ReleaseOptionViewModel? ResolvePlatformOption(string platformId)
+        => optionPool.FirstOrDefault(option => MatchesPlatform(option.Artifact, platformId));
+
+    var recommendedUsesMacSetupScript = release.Recommended is not null && MatchesPlatform(release.Recommended.Artifact, "macos");
 }
 
 <section class="release-stage">
     <div class="release-stage__lead">
         <p class="eyebrow">Downloads</p>
-        <h1 class="page-title">@(recommendedIsInstaller ? "Install the current preview" : "Download the current preview")</h1>
+        <h1 class="page-title">Download Chummer</h1>
         <p class="page-copy">
-            @(platformShelfNotice
-                ? "This device platform is not on the current public shelf. Read the current platform note before treating the preview as installable on this machine."
-                : recommendedIsInstaller
-                    ? "Start with the recommended installer for this device. Release details and advanced packages stay underneath so the first decision stays simple."
-                    : "Start with the recommended package for this device. Release details and setup notes stay underneath so the first decision stays simple.")
+            @(requestedPlatformUnavailable
+                ? $"This browser looks like {deviceLabel}, but that platform is not on the current public shelf."
+                : $"This browser looks like {deviceLabel}. The button below is selected for that platform.")
         </p>
         <p class="release-stage__note">
             @(platformShelfNotice
                 ? release.PlatformShelfNoticeSummary
-                : guestGateRequired
-                ? release.GuestGateSummary
-                : recommendedIsInstaller
-                    ? "Use the recommended installer first. Everything else stays collapsed underneath unless you know you need it."
-                    : "Use the recommended package first. Everything else stays collapsed underneath unless you know you need it.")
+                : recommendedUsesMacSetupScript
+                        ? "On macOS, the default path is a signed-in install handoff instead of a double-clicked unsigned script. It gives you a Terminal command that starts the guided Mac setup assistant, installs the selected desktop apps, and carries a short-lived install ticket instead of exposing the link in the command URL."
+                    : guestGateRequired
+                        ? release.GuestGateSummary
+                        : "Advanced builds, manual packages, and release details stay collapsed underneath.")
         </p>
-        @if (platformShelfNotice)
-        {
-            <div class="release-stage__note">
-                <strong>@release.PlatformShelfNoticeTitle</strong>
-            </div>
-        }
     </div>
 </section>
-
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
 
 @if (Model.Manifest.Downloads.Count == 0 || release.Recommended is null)
 {
@@ -66,19 +79,34 @@ else
     <section class="recommended-download" id="recommended-download">
         <article class="recommended-download__card">
             <div class="recommended-download__copy">
-                <span class="tag">@(guestGateRequired ? release.GuestGateHeading : "Recommended")</span>
-                <h2>@release.Recommended.Title</h2>
-                <p>@(recommendedIsInstaller
-                    ? "Use the recommended installer first. Release detail, alternate packages, and manual paths stay collapsed underneath."
-                    : "Use the recommended package first. Release detail, alternate packages, and setup notes stay collapsed underneath.")</p>
-                <p class="muted-copy">@release.Display.ChannelLabel · @release.Display.BuildLabel · @release.Display.PublishedLabel</p>
+                <span class="tag">
+                    @(requestedPlatformUnavailable
+                        ? $"No public {deviceLabel} build"
+                        : release.RequestedPlatformLabel is null
+                            ? "Recommended"
+                            : $"Recommended for {deviceLabel}")
+                </span>
+                <h2>@(requestedPlatformUnavailable ? $"This browser looks like {deviceLabel}" : release.Recommended.Title)</h2>
+                <p>@(requestedPlatformUnavailable ? release.PlatformShelfNoticeSummary : release.Recommended.SupportLine)</p>
                 <div class="recommended-download__meta">
-                    <span>@release.Recommended.PlatformLabel</span>
+                    <span>@(requestedPlatformUnavailable ? (release.RequestedPlatformLabel ?? "Platform note") : release.Recommended.PlatformLabel)</span>
+                    @if (!requestedPlatformUnavailable)
+                    {
+                        <span>@release.Recommended.SizeLabel</span>
+                    }
+                    <span>@(recommendedIsInstaller ? "Install path" : "Download path")</span>
+                    <span>@release.Display.BuildLabel</span>
+                    <span>@release.Display.PublishedLabel</span>
                 </div>
                 <div class="stacked-actions">
-                    @if (guestGateRequired)
+                    @if (requestedPlatformUnavailable)
                     {
-                        <a class="button-like button-like--primary" href="@release.GuestGatePrimaryHref">@release.GuestGatePrimaryLabel</a>
+                        <a class="button-like button-like--primary" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                        <a class="button-like button-like--secondary" href="#platform-shelf">See other platforms</a>
+                    }
+                    else if (guestGateRequired)
+                    {
+                        <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
                         <a class="button-like button-like--secondary" href="@release.GuestGateSecondaryHref">@release.GuestGateSecondaryLabel</a>
                     }
                     else
@@ -88,99 +116,91 @@ else
                         {
                             <a class="button-like button-like--secondary" href="/login?next=@Uri.EscapeDataString("/downloads")">Already have an account? Sign in</a>
                         }
+                        else
+                        {
+                            <a class="button-like button-like--secondary" href="/account/access">Open Devices and access</a>
+                        }
                     }
                 </div>
-                <p class="muted-copy"><a class="quiet-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a></p>
-                <details class="details-drawer">
-                    <summary>Release notes, known issues, and requirements</summary>
-                    <div class="settings-summary-list">
-                        <div class="settings-summary-row">
-                            <span>Release notes</span>
-                            <strong>@release.ReleaseNotesSummary</strong>
-                        </div>
-                        <div class="settings-summary-row">
-                            <span>Known issues</span>
-                            <strong>@(Model.Manifest.KnownIssueSummary ?? "Check the install and trust lane before you commit a fresh device to this preview.")</strong>
-                        </div>
-                        <div class="settings-summary-row">
-                            <span>Update status</span>
-                            <strong>@release.UpdatePostureSummary</strong>
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(Model.Manifest.SupportabilitySummary))
-                        {
-                            <div class="settings-summary-row">
-                                <span>Supportability</span>
-                                <strong>@Model.Manifest.SupportabilitySummary</strong>
-                            </div>
-                        }
-                        <div class="settings-summary-row">
-                            <span>@(recommendedIsInstaller ? "Install path" : "Download path")</span>
-                            <strong>@release.Recommended.SupportLine</strong>
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(Model.Manifest.FixAvailabilitySummary))
-                        {
-                            <div class="settings-summary-row">
-                                <span>Fix availability</span>
-                                <strong>@Model.Manifest.FixAvailabilitySummary</strong>
-                            </div>
-                        }
-                        <div class="settings-summary-row">
-                            <span>System requirements</span>
-                            <strong>@string.Join(" ", release.SystemRequirements)</strong>
-                        </div>
-                    </div>
-                    <div class="settings-summary-list">
-                        <div class="settings-summary-row">
-                            <span>Package size</span>
-                            <strong>@release.Recommended.SizeLabel</strong>
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(release.Recommended.ShaPreview))
-                        {
-                            <div class="settings-summary-row">
-                                <span>Integrity preview</span>
-                                <strong><code class="mono-receipt">@release.Recommended.ShaPreview</code></strong>
-                            </div>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(Model.Manifest.RolloutReason))
-                        {
-                            <div class="settings-summary-row">
-                                <span>Release posture</span>
-                                <strong>@Model.Manifest.RolloutReason</strong>
-                            </div>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus))
-                        {
-                            <div class="settings-summary-row">
-                                <span>Local release proof</span>
-                                <strong>
-                                    @Model.Manifest.ProofStatus
-                                    @if (Model.Manifest.ProofGeneratedAt is not null)
-                                    {
-                                        <text> · @Model.Manifest.ProofGeneratedAt.Value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'")</text>
-                                    }
-                                </strong>
-                            </div>
-                        }
-                    </div>
-                    <div class="stacked-actions">
-                        <a class="button-like button-like--ghost" href="/now">Open current release</a>
-                        <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
-                    </div>
-                </details>
+                @if (!requestedPlatformUnavailable)
+                {
+                    <p class="downloads-inline-note">
+                        @(recommendedUsesMacSetupScript
+                            ? "Open the Mac install handoff, copy the Terminal command, and paste it into Terminal. It starts a guided Mac setup assistant that lets you choose which Chummer apps to install, where to install them, and whether to open them when it finishes."
+                            : "After install, open Chummer and use Load Demo Runner to inspect the bundled Soma-Career.chum5 sample before starting blank.")
+                    </p>
+                }
+                @if (hasAdvancedPanels)
+                {
+                    <p class="downloads-advanced-link">
+                        <a class="inline-link" href="#advanced-downloads">Advanced download options</a>
+                    </p>
+                }
             </div>
         </article>
     </section>
 
-    @if (release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0 || release.ManualPackages.Count > 0)
+    @if (hasAdvancedPanels)
     {
-        <section class="release-shelf release-shelf--manual">
+        <section class="release-shelf release-shelf--manual" id="advanced-downloads">
             <details class="release-accordion">
                 <summary>Advanced download options</summary>
                 <div class="release-accordion__body">
+                    <div class="downloads-advanced-group">
+                        <h3 class="downloads-subheading">Install notes</h3>
+                        <div class="downloads-facts">
+                            <article class="downloads-fact">
+                                <span>Detected device</span>
+                                <strong>@deviceLabel gets the default path on this page.</strong>
+                            </article>
+                            <article class="downloads-fact">
+                                <span>First launch</span>
+                                <strong>Use <code class="mono-receipt">Load Demo Runner</code> to inspect the bundled <code class="mono-receipt">Soma-Career.chum5</code> sample before you start blank.</strong>
+                            </article>
+                            <article class="downloads-fact">
+                                <span>Support path</span>
+                                <strong>@(Model.Chrome.Authenticated ? "This install stays tied to your signed-in recovery and support path." : "Sign in when you want recovery, support continuity, and claim-linked install history tied to the same machine.")</strong>
+                            </article>
+                        </div>
+                        <div class="stacked-actions">
+                            <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                            <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
+                            <a class="button-like button-like--ghost" href="/now">Open current release</a>
+                        </div>
+                    </div>
+
+                    <div class="downloads-advanced-group">
+                        <h3 class="downloads-subheading">Release notes, known issues, and requirements</h3>
+                        <p class="muted-copy">Use the release rail for proof details, known issues, and platform requirements before install support routing.</p>
+                    </div>
+
+                    @if (release.PlatformAvailability.Count > 0)
+                    {
+                        <div class="downloads-advanced-group">
+                            <h3 class="downloads-subheading">Platform shelf</h3>
+                            <div class="downloads-platform-grid">
+                                @foreach (var platform in release.PlatformAvailability)
+                                {
+                                    var platformOption = ResolvePlatformOption(platform.PlatformId);
+                                    <article class="downloads-platform-card">
+                                        <span class="platform-pill">@platform.StatusLabel</span>
+                                        <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this browser)" : string.Empty)</h3>
+                                        <p>@platform.Summary</p>
+                                        <p class="muted-copy">@platform.PrimaryPackageLabel · @platform.SupportabilityLabel</p>
+                                        @if (platformOption is not null)
+                                        {
+                                            <a class="button-like button-like--ghost" href="@platformOption.DispatchHref">@platformOption.ActionLabel</a>
+                                        }
+                                    </article>
+                                }
+                            </div>
+                        </div>
+                    }
+
                     @if (release.Alternatives.Count > 0)
                     {
-                        <details class="details-drawer">
-                            <summary>More options for @release.Recommended.PlatformLabel</summary>
+                        <div class="downloads-advanced-group">
+                            <h3 class="downloads-subheading">More options for @release.Recommended.PlatformLabel</h3>
                             <div class="evidence-row-list">
                                 @foreach (var download in release.Alternatives)
                                 {
@@ -190,7 +210,8 @@ else
                                             <p>@download.SupportLine</p>
                                         </div>
                                         <div class="download-row__meta">
-                                            <span class="platform-pill">@download.SizeLabel</span>
+                                            <span class="platform-pill">@download.HeadLabel</span>
+                                            <span class="muted-copy">@download.SizeLabel</span>
                                             @if (!string.IsNullOrWhiteSpace(download.ShaPreview))
                                             {
                                                 <code class="mono-receipt">@download.ShaPreview</code>
@@ -200,13 +221,13 @@ else
                                     </article>
                                 }
                             </div>
-                        </details>
+                        </div>
                     }
 
                     @if (release.OtherPlatforms.Count > 0)
                     {
-                        <details class="details-drawer">
-                            <summary>Other platforms</summary>
+                        <div class="downloads-advanced-group">
+                            <h3 class="downloads-subheading">Other platforms</h3>
                             <div class="evidence-row-list">
                                 @foreach (var download in release.OtherPlatforms)
                                 {
@@ -223,13 +244,13 @@ else
                                     </article>
                                 }
                             </div>
-                        </details>
+                        </div>
                     }
 
                     @if (release.ManualPackages.Count > 0)
                     {
-                        <details class="details-drawer">
-                            <summary>Manual packages for advanced installs</summary>
+                        <div class="downloads-advanced-group">
+                            <h3 class="downloads-subheading">Manual packages for support-directed installs</h3>
                             <div class="evidence-row-list">
                                 @foreach (var download in release.ManualPackages)
                                 {
@@ -246,7 +267,23 @@ else
                                     </article>
                                 }
                             </div>
-                        </details>
+                        </div>
+                    }
+
+                    @if (Model.TrustPulse is not null)
+                    {
+                        <div class="downloads-advanced-group">
+                            <h3 class="downloads-subheading">Release truth</h3>
+                            @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+                        </div>
+                    }
+
+                    @if (Model.SignedInStatus is not null)
+                    {
+                        <div class="downloads-advanced-group">
+                            <h3 class="downloads-subheading">Signed-in install status</h3>
+                            @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+                        </div>
                     }
                 </div>
             </details>
