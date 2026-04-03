@@ -2078,7 +2078,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static item => item.StagedAtUtc)
             .Take(4)
             .ToArray();
-        if (receipts.Length == 0)
+        WorkspaceChangePacketProjection[] prefetchSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Where(static packet => IsTravelPrefetchSignalKind(packet.Kind))
+            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
+        if (receipts.Length == 0 && prefetchSignals.Length == 0)
         {
             return null;
         }
@@ -2087,16 +2092,31 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Select(static item => item.PrefetchSummary)
             .Concat(receipts.SelectMany(static item => item.InventoryLines))
             .Concat(receipts.SelectMany(static item => item.Boundaries))
+            .Concat(prefetchSignals.Select(static item => item.Summary))
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
+        int signalCount = receipts.Length + prefetchSignals.Length;
+        string summary = receipts.Length > 0
+            ? $"{signalCount} travel-prefetch signal(s) keep offline staging deliberate and reviewable per claimed device."
+            : $"{signalCount} travel-prefetch signal(s) stay governed from change packets while travel receipt ingestion catches up.";
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                leadRun?.UpdatedAtUtc
+            }
+            .Concat(receipts.Select(static item => (DateTimeOffset?)item.StagedAtUtc))
+            .Concat(prefetchSignals.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.UtcNow)
+            .Max();
 
         return new GovernedPrepPacketSummary(
             PacketId: $"travel-prefetch:{workspace.WorkspaceId}",
             Kind: "travel_prefetch_packet",
             Title: $"{workspace.CampaignName} staged travel prefetch receipts",
-            Summary: $"{receipts.Length} travel-prefetch receipt(s) keep offline staging deliberate and reviewable per claimed device.",
+            Summary: summary,
             BindingSummary: leadRun is null
                 ? "Travel staging actions stay attached to campaign truth so safehouse/travel operations are auditable."
                 : $"Travel staging actions stay attached to {leadRun.Title} and the same account-audit campaign backbone.",
@@ -2113,9 +2133,28 @@ public sealed class CampaignWorkspaceServerPlaneService
                 receipts.Select(static item => item.Platform),
                 receipts.Select(static item => item.HeadId),
                 receipts.Select(static item => item.Channel),
-                receipts.Select(static item => item.InitiatedByUserId)),
+                receipts.Select(static item => item.InitiatedByUserId),
+                prefetchSignals.Select(static item => item.Kind),
+                prefetchSignals.Select(static item => item.Label)),
             EvidenceLines: evidence,
-            UpdatedAtUtc: receipts.Max(static item => item.StagedAtUtc));
+            UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsTravelPrefetchSignalKind(string? kind)
+    {
+        string normalizedKind = kind?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+        {
+            return false;
+        }
+
+        if (string.Equals(normalizedKind, "travel_prefetch", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return normalizedKind.Contains("travel", StringComparison.OrdinalIgnoreCase)
+            && normalizedKind.Contains("prefetch", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrepPacket(
