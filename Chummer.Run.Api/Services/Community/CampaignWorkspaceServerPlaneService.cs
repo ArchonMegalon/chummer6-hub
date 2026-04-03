@@ -2034,7 +2034,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             return true;
         }
 
-        return ContainsCampaignRelationshipToken(normalizedKind);
+        return ContainsCampaignRelationshipToken(normalizedKind)
+            && ContainsCampaignRelationshipMutationToken(normalizedKind);
     }
 
     private static bool IsCampaignRelationshipConsequenceSignal(CampaignConsequenceProjection consequence)
