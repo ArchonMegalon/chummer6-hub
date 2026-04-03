@@ -1319,27 +1319,32 @@ public sealed class CampaignWorkspaceServerPlaneService
         SceneProjection? activeScene = leadRun?.Scenes
             .FirstOrDefault(item => string.Equals(item.SceneId, leadRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
             ?? leadRun?.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
-        if (activeScene is null && string.IsNullOrWhiteSpace(workspace.ActiveSceneSummary))
+        string? normalizedActiveSceneSummary = NormalizeOptional(activeScene?.Summary);
+        string? normalizedWorkspaceSceneSummary = NormalizeOptional(workspace.ActiveSceneSummary);
+        ObjectiveProjection? leadObjective = leadRun?.Objectives.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
+        string? normalizedObjectiveSummary = NormalizeOptional(leadObjective?.Summary);
+        string? normalizedSceneTitle = NormalizeOptional(activeScene?.Title);
+        string? normalizedObjectiveTitle = NormalizeOptional(leadObjective?.Title);
+
+        if (activeScene is null && normalizedWorkspaceSceneSummary is null)
         {
             return null;
         }
 
-        IReadOnlyList<string> evidence = new[]
-            {
-                activeScene?.Summary,
-                workspace.ActiveSceneSummary,
-                leadRun?.Objectives.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault()?.Summary,
-                workspace.RuleEnvironment.CompatibilityFingerprint
-            }
-            .Where(static item => !string.IsNullOrWhiteSpace(item))
-            .Select(static item => item!.Trim())
-            .Take(4)
-            .ToArray();
-        string sceneTitle = activeScene?.Title ?? "Active scene";
+        string sceneTitle = normalizedSceneTitle ?? "Active scene";
         string title = $"{sceneTitle} scene packet";
-        string summary = activeScene?.Summary
-            ?? workspace.ActiveSceneSummary
-            ?? "Current scene prep is compiled from the shared campaign return lane.";
+        IReadOnlyList<string> evidence = BuildEvidenceLines(
+            normalizedActiveSceneSummary,
+            normalizedWorkspaceSceneSummary,
+            normalizedSceneTitle,
+            normalizedObjectiveSummary,
+            normalizedObjectiveTitle,
+            workspace.RuleEnvironment.CompatibilityFingerprint);
+        string summary = normalizedActiveSceneSummary
+            ?? normalizedWorkspaceSceneSummary
+            ?? (normalizedSceneTitle is null
+                ? "Current scene prep is compiled from the shared campaign return lane."
+                : $"{normalizedSceneTitle} scene prep is compiled from the shared campaign return lane.");
         string bindingSummary = leadRun is null
             ? $"Bound to {workspace.CampaignName} from the current shared return lane."
             : activeScene is null

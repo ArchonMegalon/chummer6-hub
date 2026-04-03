@@ -69,6 +69,34 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void ScenePacketIncludesSceneAndObjectiveLabelsWhenSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithSceneSignalLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "scene_packet", StringComparison.Ordinal));
+        Assert.False(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("dockyard checkpoint label", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("hostile extraction team label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ScenePacketSummaryFallsBackWhenSceneSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithSceneSignalLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "scene_packet", StringComparison.Ordinal));
+        Assert.Contains("compiled from the shared campaign return lane", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void AftermathPacketFallsBackToChangeSignalsWhenPackagesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathChangeSignalsOnly();
@@ -1514,6 +1542,65 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Title: "Dockyard pressure test",
             Status: "active",
             Summary: "Current run remains under hostile pressure.",
+            ActiveSceneId: "scene-1",
+            Objectives: [objective],
+            Scenes: [scene],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [],
+            Consequences: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithSceneSignalLabelsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-1",
+            Title: "Hostile extraction team label",
+            Status: "open",
+            Pressure: "high",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        SceneProjection scene = new(
+            SceneId: "scene-1",
+            RunId: "run-1",
+            Title: "Dockyard checkpoint label",
+            Revision: "r3",
+            Status: "active",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "",
             ActiveSceneId: "scene-1",
             Objectives: [objective],
             Scenes: [scene],
