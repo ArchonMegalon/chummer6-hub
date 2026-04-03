@@ -229,9 +229,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         "travels"
     ];
 
-    private static readonly string[] TravelPrefetchWordPrefixes =
+    private static readonly string[] TravelPrefetchActionWordTokens =
     [
-        "prefetch"
+        "prefetch",
+        "prefetches",
+        "prefetched",
+        "prefetching"
     ];
 
     private static readonly string[] BoundedWordTokens =
@@ -2980,7 +2983,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(value, TravelPrefetchWordTokens)
-            && ContainsAnyWordTokenPrefix(value, TravelPrefetchWordPrefixes);
+            && ContainsAnyWordToken(value, TravelPrefetchActionWordTokens);
     }
 
     private static bool ContainsTravelPrefetchToken(string? primary, string? secondary)
