@@ -422,6 +422,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDoesNotActivateFromDiscontinuityMentionsWithoutContinuityIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithDiscontinuityMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignReturnPacketIgnoresFactionInterstateMentionsForRelationshipMutationSignals()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithFactionInterstateMentionsOnly();
@@ -1757,6 +1768,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.False(packet.Reusable);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("next_session_carry_forward", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("Session recap lane", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ContinuityPacketDoesNotActivateFromDiscontinuityMentionsWithoutContinuityIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithDiscontinuityMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "continuity_packet", StringComparison.Ordinal));
     }
 
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
@@ -6582,6 +6604,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [continuityChange],
             Consequences: [],
             NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithDiscontinuityMentionsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection discontinuitySignal = new(
+            PacketId: "packet-discontinuity-1",
+            Kind: "status_note",
+            Label: "Discontinuity watch note",
+            Summary: "Discontinuity drift remains under review while queue triage is scheduled.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-discontinuity-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [discontinuitySignal],
+            Consequences: [],
+            NextSessionCarryForward: null);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithContinuitySparseSignalKindsAndLabelsOnly()

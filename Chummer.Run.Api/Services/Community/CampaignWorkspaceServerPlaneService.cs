@@ -80,6 +80,21 @@ public sealed class CampaignWorkspaceServerPlaneService
         "log"
     ];
 
+    private static readonly string[] ContinuityWordTokens =
+    [
+        "continuity"
+    ];
+
+    private static readonly string[] CarryForwardWordTokens =
+    [
+        "carry"
+    ];
+
+    private static readonly string[] ForwardWordTokens =
+    [
+        "forward"
+    ];
+
     private static readonly string[] AftermathRecapWordTokens =
     [
         "aftermath",
@@ -1670,8 +1685,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             || string.Equals(normalizedKind, "next_session_carry_forward", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "after_action_report", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "downtime_brief", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("continuity", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("carry_forward", StringComparison.OrdinalIgnoreCase);
+            || ContainsAnyWordToken(normalizedKind, ContinuityWordTokens)
+            || (ContainsAnyWordToken(normalizedKind, CarryForwardWordTokens)
+                && ContainsAnyWordToken(normalizedKind, ForwardWordTokens));
     }
 
     private static bool IsContinuitySignal(WorkspaceChangePacketProjection packet)
