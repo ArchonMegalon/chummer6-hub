@@ -101,6 +101,32 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryIncludesCampaignMemoryPacketWhenWorkspaceMemoryExists()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignMemorySignals();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_memory_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("memory", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("long-lived memory", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("memory ledger", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CampaignMemoryPacketDoesNotActivateFromCarryForwardWindowSignalsWithoutMemoryContext()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardWindowOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "campaign_memory_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ScenePacketIncludesSceneAndObjectiveLabelsWhenSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithSceneSignalLabelsOnly();
@@ -3068,6 +3094,65 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [changePacket],
             Consequences: [consequence],
             NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignMemorySignals()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        CampaignMemoryProjection campaignMemory = new(
+            MemoryId: "memory-1",
+            Label: "Long-lived memory ledger",
+            Summary: "Long-lived campaign memory keeps season outcomes and contact fallout reviewable.",
+            ReturnSummary: "Memory return lane stays attached to the same governed workspace.",
+            NextSafeAction: "Review memory ledger before next session prep.",
+            EvidenceLines: ["Long-lived memory evidence remains attached to recap and consequence receipts."],
+            UpdatedAtUtc: now.AddMinutes(4));
+        WorkspaceChangePacketProjection memoryChange = new(
+            PacketId: "packet-1",
+            Kind: "campaign_memory_update",
+            Label: "Campaign memory update",
+            Summary: "Campaign memory ledger updated after downtime reconciliation.",
+            UpdatedAtUtc: now.AddMinutes(3));
+        CampaignConsequenceProjection memoryConsequence = new(
+            ConsequenceId: "consequence-1",
+            Kind: "campaign_memory",
+            Label: "Memory continuity watch",
+            State: "active",
+            Summary: "Long-lived memory continuity remains active for next-session follow-through.",
+            EvidenceLines: ["Memory continuity receipt linked to governed recap package."],
+            Receipts:
+            [
+                new CampaignConsequenceReceipt(
+                    ReceiptId: "receipt-1",
+                    SourceKind: "campaign_memory",
+                    Summary: "Memory ledger receipt captured from shared campaign board.")
+            ],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [memoryChange],
+            Consequences: [memoryConsequence],
+            CampaignMemory: campaignMemory);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnSignals()

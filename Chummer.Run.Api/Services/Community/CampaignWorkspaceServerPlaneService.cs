@@ -183,6 +183,15 @@ public sealed class CampaignWorkspaceServerPlaneService
         "continuity"
     ];
 
+    private static readonly string[] CampaignMemoryWordTokens =
+    [
+        "memory",
+        "archive",
+        "history",
+        "timeline",
+        "ledger"
+    ];
+
     private static readonly string[] CarryForwardWordTokens =
     [
         "carry"
@@ -1544,6 +1553,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             packets.Add(continuityPacket);
         }
 
+        if (BuildCampaignMemoryPrepPacket(workspace, leadRun) is { } campaignMemoryPacket)
+        {
+            packets.Add(campaignMemoryPacket);
+        }
+
         if (BuildCampaignReturnPrepPacket(workspace, leadRun) is { } campaignReturnPacket)
         {
             packets.Add(campaignReturnPacket);
@@ -1925,6 +1939,148 @@ public sealed class CampaignWorkspaceServerPlaneService
                 && ContainsAnyWordToken(line, ["handoff", "lane", "reopen", "session", "next"]));
 
         return primarySignal || evidenceSignal;
+    }
+
+    private static GovernedPrepPacketSummary? BuildCampaignMemoryPrepPacket(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? leadRun)
+    {
+        CampaignMemoryProjection? campaignMemory = workspace.CampaignMemory;
+        NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
+        WorkspaceChangePacketProjection[] memorySignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Where(static packet => IsCampaignMemorySignal(packet))
+            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
+        CampaignConsequenceProjection[] memoryConsequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+            .Where(static consequence => IsCampaignMemoryConsequenceSignal(consequence))
+            .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
+        bool carryForwardSignal = IsCampaignMemoryCarryForwardSignal(carryForward);
+        if (campaignMemory is null
+            && memorySignals.Length == 0
+            && memoryConsequences.Length == 0
+            && !carryForwardSignal)
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> evidence = BuildEvidenceLines(
+            campaignMemory?.Label,
+            campaignMemory?.Summary,
+            campaignMemory?.ReturnSummary,
+            campaignMemory?.NextSafeAction,
+            campaignMemory?.EvidenceLines,
+            memorySignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "campaign memory signal")),
+            memorySignals.Select(static packet => packet.Summary),
+            memorySignals.Select(static packet => packet.Label),
+            memoryConsequences.Select(static consequence => DescribeSignalLabel(consequence.Label, consequence.Kind, consequence.State)),
+            memoryConsequences.Select(static consequence => consequence.Summary),
+            memoryConsequences.Select(static consequence => consequence.Label),
+            memoryConsequences.SelectMany(static consequence => consequence.EvidenceLines),
+            memoryConsequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.Summary)),
+            carryForwardSignal ? carryForward?.Label : null,
+            carryForwardSignal ? carryForward?.Summary : null,
+            carryForwardSignal ? carryForward?.ReturnSummary : null,
+            carryForwardSignal ? carryForward?.NextSafeAction : null,
+            carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>());
+        int signalCount = (campaignMemory is null ? 0 : 1)
+            + memorySignals.Length
+            + memoryConsequences.Length
+            + (carryForwardSignal ? 1 : 0);
+        string summary = campaignMemory is null
+            ? $"{signalCount} campaign-memory signal(s) stay governed from return, consequence, and change packets while memory projection refresh catches up."
+            : $"{signalCount} campaign-memory signal(s) keep long-lived campaign diary, consequence, and return truth on one governed lane.";
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                campaignMemory?.UpdatedAtUtc,
+                leadRun?.UpdatedAtUtc,
+                carryForwardSignal ? carryForward?.UpdatedAtUtc : null
+            }
+            .Concat(memorySignals.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
+            .Concat(memoryConsequences.Select(static consequence => (DateTimeOffset?)consequence.UpdatedAtUtc))
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.UtcNow)
+            .Max();
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"memory:{workspace.WorkspaceId}",
+            Kind: "campaign_memory_packet",
+            Title: $"{workspace.CampaignName} campaign memory packet",
+            Summary: summary,
+            BindingSummary: leadRun is null
+                ? "Reusable across campaign and GM operations so long-lived memory stays on governed return truth."
+                : $"Reusable across {workspace.CampaignName} and currently anchored to {leadRun.Title} for long-lived return continuity.",
+            Reusable: true,
+            SearchTerms: BuildSearchTerms(
+                workspace.CampaignName,
+                "campaign",
+                "memory",
+                "history",
+                campaignMemory?.Label,
+                campaignMemory?.Summary,
+                campaignMemory?.ReturnSummary,
+                campaignMemory?.NextSafeAction,
+                campaignMemory?.EvidenceLines,
+                memorySignals.Select(static packet => packet.Kind),
+                memorySignals.Select(static packet => packet.Label),
+                memoryConsequences.Select(static consequence => consequence.Kind),
+                memoryConsequences.Select(static consequence => consequence.Label),
+                memoryConsequences.Select(static consequence => consequence.State),
+                memoryConsequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.SourceKind)),
+                carryForwardSignal ? carryForward?.Label : null,
+                carryForwardSignal ? carryForward?.Summary : null,
+                carryForwardSignal ? carryForward?.ReturnSummary : null,
+                carryForwardSignal ? carryForward?.NextSafeAction : null,
+                carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>()),
+            EvidenceLines: evidence,
+            UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsCampaignMemorySignal(WorkspaceChangePacketProjection packet)
+    {
+        return IsCampaignMemorySignalKind(packet.Kind)
+            || IsCampaignMemorySignalKind(packet.Label)
+            || IsCampaignMemorySignalKind(packet.Summary);
+    }
+
+    private static bool IsCampaignMemoryConsequenceSignal(CampaignConsequenceProjection consequence)
+    {
+        return IsCampaignMemorySignalKind(consequence.Kind)
+            || IsCampaignMemorySignalKind(consequence.Label)
+            || IsCampaignMemorySignalKind(consequence.Summary)
+            || consequence.EvidenceLines.Any(IsCampaignMemorySignalKind)
+            || consequence.Receipts.Any(static receipt => IsCampaignMemorySignalKind(receipt.SourceKind) || IsCampaignMemorySignalKind(receipt.Summary));
+    }
+
+    private static bool IsCampaignMemoryCarryForwardSignal(NextSessionCarryForwardProjection? carryForward)
+    {
+        if (carryForward is null)
+        {
+            return false;
+        }
+
+        return IsCampaignMemorySignalKind(carryForward.Label)
+            || IsCampaignMemorySignalKind(carryForward.Summary)
+            || IsCampaignMemorySignalKind(carryForward.ReturnSummary)
+            || IsCampaignMemorySignalKind(carryForward.NextSafeAction)
+            || carryForward.EvidenceLines.Any(IsCampaignMemorySignalKind);
+    }
+
+    private static bool IsCampaignMemorySignalKind(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        string normalizedValue = value.Trim();
+        return string.Equals(normalizedValue, "campaign_memory", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedValue, "campaign_memory_update", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedValue, "campaign_memory_snapshot", StringComparison.OrdinalIgnoreCase)
+            || ContainsAnyWordToken(normalizedValue, CampaignMemoryWordTokens);
     }
 
     private static GovernedPrepPacketSummary? BuildCampaignReturnPrepPacket(
