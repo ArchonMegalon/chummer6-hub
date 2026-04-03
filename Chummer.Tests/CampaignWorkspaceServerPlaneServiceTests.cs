@@ -643,6 +643,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(packet.EvidenceLines, line => line.Contains("carry-forward", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void ContinuityPacketIncludesSignalLabelsWhenSignalSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuitySignalLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "continuity_packet", StringComparison.Ordinal));
+        Assert.False(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("continuity carry-forward label", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("return handoff label", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -2529,6 +2543,52 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReadinessCues: [],
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
+            ChangePackets: [continuityChange],
+            Consequences: [],
+            NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithContinuitySignalLabelsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection continuityChange = new(
+            PacketId: "packet-1",
+            Kind: "next_session_carry_forward",
+            Label: "Continuity carry-forward label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "Return handoff label",
+            Summary: "",
+            ReturnSummary: "",
+            NextSafeAction: "",
+            EvidenceLines: [],
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
             ChangePackets: [continuityChange],
             Consequences: [],
             NextSessionCarryForward: carryForward);
