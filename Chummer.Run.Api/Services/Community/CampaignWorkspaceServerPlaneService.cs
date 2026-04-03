@@ -1602,8 +1602,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             aftermathPackages.Select(static item => item.Summary),
             aftermathPackages.SelectMany(static item => item.EvidenceLines),
             returnChanges.Select(static item => item.Summary),
+            returnChanges.Select(static item => item.Label),
             aftermathChanges.Select(static item => item.Summary),
+            aftermathChanges.Select(static item => item.Label),
             relationshipConsequences.Select(static item => item.Summary),
+            relationshipConsequences.Select(static item => item.Label),
             relationshipConsequences.SelectMany(static item => item.EvidenceLines),
             relationshipConsequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.Summary)));
         DateTimeOffset updatedAtUtc = new[]
@@ -2149,6 +2152,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             carryForward?.ReturnSummary,
             workspace.ReturnSummary,
             eventPackets.Select(static packet => packet.Summary),
+            eventPackets.Select(static packet => packet.Label),
             eventObjectives.Select(static objective => objective.Summary),
             eventObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."),
             sceneSignal ? activeScene?.Summary : null,
@@ -2159,6 +2163,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             travelPrefetches.Select(static receipt => receipt.PrefetchSummary),
             travelPrefetches.SelectMany(static receipt => receipt.InventoryLines),
             consequences.Select(static consequence => consequence.Summary),
+            consequences.Select(static consequence => consequence.Label),
             consequences.SelectMany(static consequence => consequence.EvidenceLines),
             consequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.Summary)));
         DateTimeOffset updatedAtUtc = new[]
