@@ -1958,7 +1958,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(3)
             .ToArray();
         PublicationSafeProjection[] recapSignals = workspace.RecapShelf
-            .Where(static item => IsAftermathSignalKind(item.Kind))
+            .Where(static item => IsAftermathRecapSignal(item))
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] aftermathSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
@@ -2046,6 +2046,32 @@ public sealed class CampaignWorkspaceServerPlaneService
             || normalizedKind.Contains("after_action", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("recap", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("debrief", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAftermathRecapSignal(PublicationSafeProjection item)
+    {
+        if (IsAftermathSignalKind(item.Kind))
+        {
+            return true;
+        }
+
+        return ContainsAftermathRecapToken(item.Label)
+            || ContainsAftermathRecapToken(item.Summary);
+    }
+
+    private static bool ContainsAftermathRecapToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Contains("aftermath", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("downtime", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("after action", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("after-action", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("recap", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("debrief", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildPrepLaunchOpsPacket(
