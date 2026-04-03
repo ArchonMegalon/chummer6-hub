@@ -233,7 +233,7 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
-    public void ReconcilePortableAssets_SkipsAssets_WhenKindOrAudienceIsInvalid()
+    public void ReconcilePortableAssets_SkipsAssets_WhenKindAudienceOrStatusIsInvalid()
     {
         var service = CreateService();
         var now = DateTimeOffset.UtcNow;
@@ -249,15 +249,53 @@ public sealed class GmOpsBoardServiceTests
         {
             Audience = "not-an-audience"
         };
+        var invalidStatus = BuildPortableAsset(
+            assetId: "prep_invalid_status",
+            now: now.AddMinutes(2)) with
+        {
+            Status = "not-a-status"
+        };
+        var blankStatus = BuildPortableAsset(
+            assetId: "prep_blank_status",
+            now: now.AddMinutes(3)) with
+        {
+            Status = " "
+        };
 
-        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([invalidKind, invalidAudience]);
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([invalidKind, invalidAudience, invalidStatus, blankStatus]);
 
         Assert.Equal(0, result.ImportedCount);
-        Assert.Equal(2, result.SkippedCount);
+        Assert.Equal(4, result.SkippedCount);
         Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_kind" && conflict.Reason == "invalid-asset-kind");
         Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_audience" && conflict.Reason == "invalid-asset-audience");
+        Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_invalid_status" && conflict.Reason == "invalid-asset-status");
+        Assert.Contains(result.Conflicts, conflict => conflict.EntityId == "prep_blank_status" && conflict.Reason == "invalid-asset-status");
         Assert.Null(service.GetPrepAsset("prep_invalid_kind"));
         Assert.Null(service.GetPrepAsset("prep_invalid_audience"));
+        Assert.Null(service.GetPrepAsset("prep_invalid_status"));
+        Assert.Null(service.GetPrepAsset("prep_blank_status"));
+    }
+
+    [Fact]
+    public void ReconcilePortableAssets_NormalizesKnownStatuses_ToCanonicalValues()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        var asset = BuildPortableAsset(
+            assetId: "prep_status_normalized",
+            now: now) with
+        {
+            Status = " ReVeAled "
+        };
+
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([asset]);
+
+        Assert.Equal(1, result.ImportedCount);
+        Assert.Equal(0, result.SkippedCount);
+        Assert.Empty(result.Conflicts);
+        GmPrepAssetRecord? stored = service.GetPrepAsset("prep_status_normalized");
+        Assert.NotNull(stored);
+        Assert.Equal("revealed", stored!.Status);
     }
 
     [Fact]

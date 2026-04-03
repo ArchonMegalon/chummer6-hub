@@ -32,6 +32,16 @@ public interface IGmOpsBoardService
 
 public sealed class GmOpsBoardService : IGmOpsBoardService
 {
+    private static readonly HashSet<string> AllowedPortableAssetStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "draft",
+        "ready",
+        "in-progress",
+        "completed",
+        "approval-required",
+        "revealed"
+    };
+
     private sealed class PrepAssetState
     {
         public required string AssetId { get; init; }
@@ -489,6 +499,17 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 continue;
             }
 
+            if (!HasValidPortableAssetStatus(asset.Status, out string? statusReason))
+            {
+                skipped++;
+                conflicts.Add(new OfflineSyncConflict(
+                    Surface: "ops-prep",
+                    EntityId: normalizedAssetId,
+                    Reason: statusReason ?? "invalid-asset-status",
+                    Resolution: "skipped-invalid"));
+                continue;
+            }
+
             if (!HasValidPortableAssetTimeline(asset, out string? timelineReason))
             {
                 skipped++;
@@ -546,7 +567,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                         Label: string.IsNullOrWhiteSpace(item.Label) ? "Checklist item" : item.Label.Trim(),
                         Completed: item.Completed,
                         Notes: NormalizeOptional(item.Notes))));
-                    local.Status = string.IsNullOrWhiteSpace(asset.Status) ? local.Status : asset.Status.Trim();
+                    local.Status = NormalizePortableAssetStatus(asset.Status);
                     local.UpdatedAtUtc = asset.UpdatedAtUtc;
                     local.LastRevealedAtUtc = asset.LastRevealedAtUtc;
                     local.LastRevealChannel = NormalizeOptional(asset.LastRevealChannel);
@@ -585,7 +606,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                     Notes: NormalizeOptional(item.Notes))).ToList(),
                 Evidence = Array.Empty<EvidencePointer>(),
                 Reusable = true,
-                Status = string.IsNullOrWhiteSpace(asset.Status) ? "draft" : asset.Status.Trim(),
+                Status = NormalizePortableAssetStatus(asset.Status),
                 CreatedBy = NormalizeOptional(asset.CreatedBy),
                 RuntimeFingerprint = NormalizeOptional(asset.RuntimeFingerprint),
                 GovernedProject = NormalizeGovernedProject(asset.GovernedProject, out string? newAssetGovernedProjectDropReason),
@@ -636,6 +657,35 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
 
         reason = null;
         return true;
+    }
+
+    private static bool HasValidPortableAssetStatus(string? status, out string? reason)
+    {
+        string? normalized = NormalizeOptional(status);
+        if (normalized is null || !AllowedPortableAssetStatuses.Contains(normalized))
+        {
+            reason = "invalid-asset-status";
+            return false;
+        }
+
+        reason = null;
+        return true;
+    }
+
+    private static string NormalizePortableAssetStatus(string status)
+    {
+        string normalized = status.Trim();
+        if (string.Equals(normalized, "in-progress", StringComparison.OrdinalIgnoreCase))
+        {
+            return "in-progress";
+        }
+
+        if (string.Equals(normalized, "approval-required", StringComparison.OrdinalIgnoreCase))
+        {
+            return "approval-required";
+        }
+
+        return normalized.ToLowerInvariant();
     }
 
     private static bool HasValidPortableAssetTimeline(OfflineSyncPrepAsset asset, out string? reason)
