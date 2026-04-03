@@ -80,6 +80,14 @@ public sealed class CampaignWorkspaceServerPlaneService
         "log"
     ];
 
+    private static readonly string[] AftermathRecapWordTokens =
+    [
+        "aftermath",
+        "downtime",
+        "recap",
+        "debrief"
+    ];
+
     private static readonly string[] RosterIdentityWordTokens =
     [
         "roster",
@@ -2231,12 +2239,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return value.Contains("aftermath", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("downtime", StringComparison.OrdinalIgnoreCase)
+        return ContainsAnyWordToken(value, AftermathRecapWordTokens)
             || value.Contains("after action", StringComparison.OrdinalIgnoreCase)
             || value.Contains("after-action", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("recap", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("debrief", StringComparison.OrdinalIgnoreCase);
+            || value.Contains("after_action", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildPrepLaunchOpsPacket(

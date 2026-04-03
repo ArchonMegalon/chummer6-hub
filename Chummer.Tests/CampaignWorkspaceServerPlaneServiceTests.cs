@@ -411,6 +411,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDoesNotActivateFromRecapitalizationMentionsWithoutAftermathIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRecapitalizationMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignReturnPacketIgnoresFactionInterstateMentionsForRelationshipMutationSignals()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithFactionInterstateMentionsOnly();
@@ -1012,6 +1023,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
 
         Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AftermathPacketDoesNotActivateFromRecapitalizationMentionsWithoutAftermathIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRecapitalizationMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -2836,6 +2858,42 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [backlogSignal],
+            Consequences: [],
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithRecapitalizationMentionsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection recapitalizationSignal = new(
+            PacketId: "packet-recapitalization-1",
+            Kind: "status_note",
+            Label: "Recapitalization planning note",
+            Summary: "Recapitalization planning remains pending for fiscal review.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-recapitalization-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [recapitalizationSignal],
             Consequences: [],
             AftermathPackages: []);
     }
