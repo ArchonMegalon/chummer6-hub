@@ -2280,13 +2280,34 @@ public sealed class CampaignWorkspaceServerPlaneService
         return IsRosterMovementSignalKind(packet.Kind)
             || IsRosterMovementSignalKind(packet.Label)
             || IsRosterMovementSignalKind(packet.Summary)
+            || ContainsRosterSplitTokenSignal(packet.Kind, packet.Label, packet.Summary)
             || ContainsRosterToken(packet.Label)
             || ContainsRosterToken(packet.Summary);
     }
 
     private static bool IsRosterObjectiveSignal(string? title, string? summary)
     {
-        return ContainsRosterToken(title) || ContainsRosterToken(summary);
+        return ContainsRosterToken(title)
+            || ContainsRosterToken(summary)
+            || ContainsRosterSplitTokenSignal(title, summary);
+    }
+
+    private static bool ContainsRosterSplitTokenSignal(params string?[] values)
+    {
+        string combined = string.Join(' ', values.Where(static value => !string.IsNullOrWhiteSpace(value)));
+        if (string.IsNullOrWhiteSpace(combined))
+        {
+            return false;
+        }
+
+        bool hasRosterIdentityToken = ContainsAnyWordToken(combined, RosterIdentityWordTokens);
+        if (hasRosterIdentityToken && ContainsRosterMovementToken(combined))
+        {
+            return true;
+        }
+
+        return ContainsAnyWordToken(combined, ["bench"])
+            && ContainsAnyWordToken(combined, ["rotation"]);
     }
 
     private static bool ContainsRosterToken(string? value)
