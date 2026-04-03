@@ -4,6 +4,18 @@ Updated: 2026-03-30T11:00:07+02:00
 
 ## Handoff refresh (2026-04-03T00:00:00Z)
 
+- Event-control carry-forward now fail-closes relationship-only return cues unless explicit GM ops context is present:
+  - `Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs` now requires event/opposition context before relationship split-token carry-forward cues can activate `event_control_packet`.
+  - relationship-only carry-forward cues remain governed on `campaign_return_packet` instead of leaking into GM event controls.
+- Added focused regression coverage in `Chummer.Tests/CampaignWorkspaceServerPlaneServiceTests.cs`:
+  - `EventControlPacketDoesNotActivateFromCarryForwardRelationshipSignalsWithoutEventContext`
+  - asserts `event_control_packet` is absent while `campaign_return_packet` remains present under relationship-only carry-forward inputs.
+- Re-verified clean with:
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "FullyQualifiedName~EventControlPacketDoesNotActivateFromCarryForwardRelationshipSignalsWithoutEventContext" --nologo -v minimal`
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "FullyQualifiedName~CampaignWorkspaceServerPlaneServiceTests" --nologo -v minimal`
+
+## Handoff refresh (2026-04-03T00:00:00Z)
+
 - Campaign prep-library synthesis now treats roster movement and aftermath/downtime as first-class governed prep lanes:
   - `Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs` now emits a reusable `roster_movement_packet` from governed `RosterTransfers` and a reusable `aftermath_packet` from governed `AftermathPackages`, then includes both in `BuildPrepPackets(...)`.
   - packet search posture now explicitly covers roster/campaign/crew movement terms and aftermath/downtime/run/artifact continuity terms instead of relying on incidental text from scene/opposition packets.
