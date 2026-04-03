@@ -2005,8 +2005,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             || string.Equals(normalizedKind, "roster_move", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "crew_assignment", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "crew_handoff", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("roster", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("crew", StringComparison.OrdinalIgnoreCase);
+            || ((normalizedKind.Contains("roster", StringComparison.OrdinalIgnoreCase)
+                    || normalizedKind.Contains("crew", StringComparison.OrdinalIgnoreCase))
+                && ContainsRosterMovementToken(normalizedKind))
+            || (normalizedKind.Contains("bench", StringComparison.OrdinalIgnoreCase)
+                && normalizedKind.Contains("rotation", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsRosterMovementSignal(WorkspaceChangePacketProjection packet)
@@ -2032,7 +2035,7 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         bool hasRosterIdentityToken = value.Contains("roster", StringComparison.OrdinalIgnoreCase)
             || value.Contains("crew", StringComparison.OrdinalIgnoreCase);
-        if (hasRosterIdentityToken)
+        if (hasRosterIdentityToken && ContainsRosterMovementToken(value))
         {
             return true;
         }
@@ -2040,6 +2043,17 @@ public sealed class CampaignWorkspaceServerPlaneService
         bool hasBenchRotationPair = value.Contains("bench", StringComparison.OrdinalIgnoreCase)
             && value.Contains("rotation", StringComparison.OrdinalIgnoreCase);
         return hasBenchRotationPair;
+    }
+
+    private static bool ContainsRosterMovementToken(string value)
+    {
+        return value.Contains("transfer", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("assign", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("handoff", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("return", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("move", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("rotation", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("bench", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildAftermathPrepPacket(
