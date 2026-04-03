@@ -1422,7 +1422,10 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<string> evidence = BuildEvidenceLines(
             oppositionSignals.Select(static item => item.Summary),
             oppositionSignals.Select(static item => item.Label),
+            oppositionSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "opposition signal")),
+            consequences.Select(static item => item.Summary),
             consequences.Select(static item => item.Label),
+            consequences.Select(static item => DescribeSignalLabel(item.Label, item.Kind, item.State)),
             consequences.SelectMany(static item => item.EvidenceLines.Concat(item.Receipts.Select(static receipt => receipt.Summary))),
             objectiveSignals.Select(static item => item.Summary),
             objectiveSignals.Select(static item => $"{item.Title} stays {item.Status} with {item.Pressure} pressure."),
