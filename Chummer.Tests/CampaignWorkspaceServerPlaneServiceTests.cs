@@ -2674,6 +2674,31 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "continuity_packet", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void ContinuityPacketDoesNotActivateFromUnrelatedCarryForwardNotesOnly()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithUnrelatedContinuityCarryForwardNotesOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "continuity_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ContinuityPacketActivatesFromCarryForwardEvidenceLinesWhenPrimaryFieldsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuityCarryForwardEvidenceSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "continuity_packet", StringComparison.Ordinal));
+        Assert.False(packet.Reusable);
+        Assert.Contains("continuity", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("continuity lane remains open", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -8988,6 +9013,88 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [continuityChange],
+            Consequences: [],
+            NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithUnrelatedContinuityCarryForwardNotesOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-unrelated-continuity-1",
+            Label: "Planning board note",
+            Summary: "Program backlog tracking remains under review in this operator-only note.",
+            ReturnSummary: "Queue status remains unchanged while approval review is pending.",
+            NextSafeAction: "Schedule governance review after staffing sync.",
+            EvidenceLines: ["No campaign continuity payload has been attached to this planning note."],
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-unrelated-continuity-carry-forward-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithContinuityCarryForwardEvidenceSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-continuity-evidence-1",
+            Label: "",
+            Summary: "",
+            ReturnSummary: "",
+            NextSafeAction: "",
+            EvidenceLines:
+            [
+                "Campaign continuity lane remains open for next-session return.",
+                "Carry forward continuity handoff is queued for review."
+            ],
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-continuity-carry-forward-evidence-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
             Consequences: [],
             NextSessionCarryForward: carryForward);
     }

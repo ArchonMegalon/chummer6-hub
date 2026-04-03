@@ -1773,6 +1773,8 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static GovernedPrepPacketSummary? BuildContinuityPrepPacket(CampaignWorkspaceProjection workspace)
     {
+        NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
+        bool carryForwardSignal = IsContinuityCarryForwardSignal(carryForward);
         WorkspaceChangePacketProjection[] continuitySignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
             .Where(static packet => IsContinuitySignal(packet))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
@@ -1783,7 +1785,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             && workspace.RecapShelf.Count == 0
             && workspace.Dossiers.Count == 0
             && continuitySignals.Length == 0
-            && workspace.NextSessionCarryForward is null)
+            && !carryForwardSignal)
         {
             return null;
         }
@@ -1792,10 +1794,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             continuitySignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "continuity signal")),
             workspace.RecapShelf.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "continuity signal")),
             workspace.LatestContinuity?.Summary,
-            workspace.NextSessionCarryForward?.Label,
-            workspace.NextSessionCarryForward?.Summary,
-            workspace.NextSessionCarryForward?.ReturnSummary,
-            workspace.NextSessionCarryForward?.NextSafeAction,
+            carryForwardSignal ? carryForward?.Label : null,
+            carryForwardSignal ? carryForward?.Summary : null,
+            carryForwardSignal ? carryForward?.ReturnSummary : null,
+            carryForwardSignal ? carryForward?.NextSafeAction : null,
+            carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>(),
             continuitySignals.Select(static packet => packet.Summary),
             continuitySignals.Select(static packet => packet.Label),
             workspace.RecapShelf.Select(static item => item.Summary),
@@ -1805,14 +1808,14 @@ public sealed class CampaignWorkspaceServerPlaneService
             + workspace.RecapShelf.Count
             + workspace.Dossiers.Count
             + continuitySignals.Length
-            + (workspace.NextSessionCarryForward is null ? 0 : 1);
+            + (carryForwardSignal ? 1 : 0);
         string summary = workspace.RecapShelf.Count == 0 && workspace.LatestContinuity is null
             ? $"{Math.Max(1, continuitySignalCount)} continuity signal(s) stay attached to the shared return lane even before recap-safe output is published."
             : $"{workspace.RecapShelf.Count} recap-safe output(s) stay attached to the same shared continuity spine.";
         DateTimeOffset updatedAtUtc = new[]
             {
                 workspace.LatestContinuity?.CapturedAtUtc,
-                workspace.NextSessionCarryForward?.UpdatedAtUtc
+                carryForwardSignal ? carryForward?.UpdatedAtUtc : null
             }
             .Concat(continuitySignals.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
             .Where(static item => item.HasValue)
@@ -1831,8 +1834,11 @@ public sealed class CampaignWorkspaceServerPlaneService
                 workspace.CampaignName,
                 workspace.ReturnSummary,
                 workspace.LatestContinuity?.Summary,
-                workspace.NextSessionCarryForward?.Label,
-                workspace.NextSessionCarryForward?.Summary,
+                carryForwardSignal ? carryForward?.Label : null,
+                carryForwardSignal ? carryForward?.Summary : null,
+                carryForwardSignal ? carryForward?.ReturnSummary : null,
+                carryForwardSignal ? carryForward?.NextSafeAction : null,
+                carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>(),
                 workspace.RecapShelf.Select(static item => item.Label),
                 workspace.RecapShelf.Select(static item => item.Kind),
                 workspace.Dossiers.Select(static item => item.RunnerHandle),
@@ -1866,6 +1872,51 @@ public sealed class CampaignWorkspaceServerPlaneService
             || IsContinuitySignalKind(packet.Summary)
             || ContainsCampaignReturnRecapToken(packet.Label)
             || ContainsCampaignReturnRecapToken(packet.Summary);
+    }
+
+    private static bool IsContinuityCarryForwardSignal(NextSessionCarryForwardProjection? carryForward)
+    {
+        if (carryForward is null)
+        {
+            return false;
+        }
+
+        string combinedCarryForwardText = string.Join(' ', new[]
+        {
+            carryForward.Label,
+            carryForward.Summary,
+            carryForward.ReturnSummary,
+            carryForward.NextSafeAction
+        }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+        bool returnHandoffSignal = ContainsAnyWordToken(combinedCarryForwardText, ReturnWordTokens)
+            && ContainsAnyWordToken(combinedCarryForwardText, ["handoff", "lane", "reopen", "session", "next"]);
+        bool continuityLaneSignal = ContainsAnyWordToken(combinedCarryForwardText, ContinuityWordTokens)
+            && (ContainsAnyWordToken(combinedCarryForwardText, ReturnWordTokens)
+                || (ContainsAnyWordToken(combinedCarryForwardText, CarryForwardWordTokens)
+                    && ContainsAnyWordToken(combinedCarryForwardText, ForwardWordTokens))
+                || ContainsAnyWordToken(combinedCarryForwardText, ["handoff", "lane", "reopen", "session", "next"]));
+        bool primarySignal = IsContinuitySignalKind(carryForward.Label)
+            || IsContinuitySignalKind(carryForward.Summary)
+            || IsContinuitySignalKind(carryForward.ReturnSummary)
+            || IsContinuitySignalKind(carryForward.NextSafeAction)
+            || ContainsCampaignReturnRecapToken(carryForward.Label)
+            || ContainsCampaignReturnRecapToken(carryForward.Summary)
+            || ContainsCampaignReturnRecapToken(carryForward.ReturnSummary)
+            || ContainsCampaignReturnRecapToken(carryForward.NextSafeAction)
+            || continuityLaneSignal
+            || returnHandoffSignal;
+        bool evidenceSignal = carryForward.EvidenceLines.Any(static line =>
+                ContainsAnyWordToken(line, ContinuityWordTokens)
+                && (ContainsAnyWordToken(line, ReturnWordTokens)
+                    || (ContainsAnyWordToken(line, CarryForwardWordTokens)
+                        && ContainsAnyWordToken(line, ForwardWordTokens))
+                    || ContainsAnyWordToken(line, ["handoff", "lane", "reopen", "session", "next"])))
+            || carryForward.EvidenceLines.Any(ContainsCampaignReturnRecapToken)
+            || carryForward.EvidenceLines.Any(static line =>
+                ContainsAnyWordToken(line, ReturnWordTokens)
+                && ContainsAnyWordToken(line, ["handoff", "lane", "reopen", "session", "next"]));
+
+        return primarySignal || evidenceSignal;
     }
 
     private static GovernedPrepPacketSummary? BuildCampaignReturnPrepPacket(
