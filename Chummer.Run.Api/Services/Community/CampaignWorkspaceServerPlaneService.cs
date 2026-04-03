@@ -22,6 +22,14 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static readonly string[] CampaignRelationshipMutationWordTokens =
     [
+        "update",
+        "updates",
+        "updated",
+        "updating",
+        "change",
+        "changes",
+        "changed",
+        "changing",
         "delta",
         "lane",
         "window",
@@ -46,8 +54,6 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static readonly string[] CampaignRelationshipMutationWordPrefixes =
     [
-        "updat",
-        "chang",
         "pressur",
         "escalat",
         "declin"
