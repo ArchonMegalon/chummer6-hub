@@ -2437,7 +2437,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             : $"{signalCount} roster movement signal(s) stay governed from roster-change packets, run pressure, and carry-forward signals while transfer receipts catch up.";
         DateTimeOffset updatedAtUtc = new[]
             {
-                workspace.NextSessionCarryForward?.UpdatedAtUtc,
+                carryForwardRosterSignal ? workspace.NextSessionCarryForward?.UpdatedAtUtc : null,
                 leadRun?.UpdatedAtUtc
             }
             .Concat(transfers.Select(static item => (DateTimeOffset?)item.TransferredAtUtc))
