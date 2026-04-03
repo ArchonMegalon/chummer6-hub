@@ -189,6 +189,22 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketFallsBackToSignalFamilyVariants()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlSignalVariants();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("event", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("prep launch", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("travel prefetch", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("crew handoff", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void OppositionPacketFallsBackToRunPressureWhenConsequencesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRunPressureSignalsOnly();
@@ -729,6 +745,56 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Return lane summary",
             ChangePackets: [],
             Consequences: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlSignalVariants()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection prepLaunchVariant = new(
+            PacketId: "packet-1",
+            Kind: "prep_packet_launch",
+            Label: "Prep launch variant",
+            Summary: "Prep launch variant packet remains attached to event controls.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        WorkspaceChangePacketProjection travelPrefetchVariant = new(
+            PacketId: "packet-2",
+            Kind: "travel_prefetch_request",
+            Label: "Travel prefetch variant",
+            Summary: "Travel prefetch variant packet remains attached to event controls.",
+            UpdatedAtUtc: now.AddMinutes(2));
+        WorkspaceChangePacketProjection rosterVariant = new(
+            PacketId: "packet-3",
+            Kind: "crew_handoff",
+            Label: "Roster movement variant",
+            Summary: "Crew handoff variant packet remains attached to season operations.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [prepLaunchVariant, travelPrefetchVariant, rosterVariant],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithRosterSignalsOnly()

@@ -1967,14 +1967,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static GovernedPrepPacketSummary? BuildEventControlPrepPacket(CampaignWorkspaceProjection workspace)
     {
         WorkspaceChangePacketProjection[] eventPackets = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => string.Equals(packet.Kind, "next_session_carry_forward", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(packet.Kind, "prep_launch", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(packet.Kind, "roster_transfer", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(packet.Kind, "aftermath", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(packet.Kind, "downtime", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(packet.Kind, "replay_timeline", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(packet.Kind, "travel_prefetch", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(packet.Kind, "continuity", StringComparison.OrdinalIgnoreCase))
+            .Where(static packet => IsEventControlSignalKind(packet.Kind))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
@@ -2068,6 +2061,28 @@ public sealed class CampaignWorkspaceServerPlaneService
                 consequences.Select(static consequence => consequence.State)),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsEventControlSignalKind(string? kind)
+    {
+        string normalizedKind = kind?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+        {
+            return false;
+        }
+
+        if (string.Equals(normalizedKind, "event_control", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "season_control", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "replay_timeline", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return IsContinuitySignalKind(normalizedKind)
+            || IsAftermathSignalKind(normalizedKind)
+            || IsRosterMovementSignalKind(normalizedKind)
+            || IsPrepLaunchSignalKind(normalizedKind)
+            || IsTravelPrefetchSignalKind(normalizedKind);
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrefetchOpsPacket(
