@@ -691,6 +691,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketFallsBackToSignalLabelsWhenEventSignalKindsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlSparseSignalKindsAndLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("season operation label", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("contact pressure label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void EventControlPacketIncludesKindFallbackWhenEventSignalsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlSignalKindsOnly();
@@ -3141,6 +3155,50 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "",
             ChangePackets: [seasonOperation, eventWindowShift],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlSparseSignalKindsAndLabelsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection seasonOperation = new(
+            PacketId: "packet-1",
+            Kind: "",
+            Label: "Season operation label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+        WorkspaceChangePacketProjection relationshipPressure = new(
+            PacketId: "packet-2",
+            Kind: "",
+            Label: "Contact pressure label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [seasonOperation, relationshipPressure],
             Consequences: [],
             PrepLaunches: [],
             TravelPrefetches: []);
