@@ -3329,6 +3329,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
     {
+        NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
         TravelPrefetchReceiptProjection[] receipts = (workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>())
             .OrderByDescending(static item => item.StagedAtUtc)
             .Take(4)
@@ -3338,24 +3339,36 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
-        if (receipts.Length == 0 && prefetchSignals.Length == 0)
+        bool carryForwardSignal = IsTravelPrefetchCarryForwardSignal(carryForward);
+        if (receipts.Length == 0 && prefetchSignals.Length == 0 && !carryForwardSignal)
         {
             return null;
         }
 
         IReadOnlyList<string> evidence = BuildEvidenceLines(
             prefetchSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "travel prefetch signal")),
+            carryForwardSignal
+                ? BuildEvidenceLines(
+                    carryForward?.Label,
+                    carryForward?.Summary,
+                    carryForward?.ReturnSummary,
+                    carryForward?.NextSafeAction,
+                    carryForward?.EvidenceLines)
+                : Array.Empty<string>(),
             receipts.Select(DescribeTravelPrefetchEvidence),
             receipts.SelectMany(static item => item.InventoryLines),
             receipts.SelectMany(static item => item.Boundaries),
             prefetchSignals.Select(static item => item.Summary),
             prefetchSignals.Select(static item => item.Label));
-        int signalCount = receipts.Length + prefetchSignals.Length;
+        int signalCount = receipts.Length + prefetchSignals.Length + (carryForwardSignal ? 1 : 0);
         string summary = receipts.Length > 0
             ? $"{signalCount} travel-prefetch signal(s) keep offline staging deliberate and reviewable per claimed device."
-            : $"{signalCount} travel-prefetch signal(s) stay governed from change packets while travel receipt ingestion catches up.";
+            : carryForwardSignal
+                ? $"{signalCount} travel-prefetch signal(s) stay governed from carry-forward/change cues while travel receipt ingestion catches up."
+                : $"{signalCount} travel-prefetch signal(s) stay governed from change packets while travel receipt ingestion catches up.";
         DateTimeOffset updatedAtUtc = new[]
             {
+                carryForwardSignal ? carryForward?.UpdatedAtUtc : null,
                 leadRun?.UpdatedAtUtc
             }
             .Concat(receipts.Select(static item => (DateTimeOffset?)item.StagedAtUtc))
@@ -3387,10 +3400,34 @@ public sealed class CampaignWorkspaceServerPlaneService
                 receipts.Select(static item => item.HeadId),
                 receipts.Select(static item => item.Channel),
                 receipts.Select(static item => item.InitiatedByUserId),
+                carryForwardSignal ? carryForward?.Label : null,
+                carryForwardSignal ? carryForward?.Summary : null,
+                carryForwardSignal ? carryForward?.ReturnSummary : null,
+                carryForwardSignal ? carryForward?.NextSafeAction : null,
+                carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>(),
                 prefetchSignals.Select(static item => item.Kind),
                 prefetchSignals.Select(static item => item.Label)),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsTravelPrefetchCarryForwardSignal(NextSessionCarryForwardProjection? carryForward)
+    {
+        if (carryForward is null)
+        {
+            return false;
+        }
+
+        string combinedCarryForwardText = string.Join(' ', new[]
+        {
+            carryForward.Label,
+            carryForward.Summary,
+            carryForward.ReturnSummary,
+            carryForward.NextSafeAction
+        }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+
+        return ContainsTravelPrefetchToken(combinedCarryForwardText)
+            || carryForward.EvidenceLines.Any(ContainsTravelPrefetchToken);
     }
 
     private static bool IsTravelPrefetchSignalKind(string? kind)
