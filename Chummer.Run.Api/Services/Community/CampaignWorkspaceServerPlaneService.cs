@@ -1829,7 +1829,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         IReadOnlyList<string> evidence = transfers
-            .Select(static item => item.Summary)
+            .Select(DescribeRosterTransferEvidence)
             .Concat(transfers.SelectMany(static item => item.AuditLines))
             .Concat(rosterChangeSignals.Select(static packet => packet.Summary))
             .Concat(rosterChangeSignals.Select(static packet => packet.Label))
@@ -2204,7 +2204,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             eventObjectives.Select(static objective => objective.Summary),
             eventObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."),
             sceneSignal ? activeScene?.Summary : null,
-            rosterTransfers.Select(static transfer => transfer.Summary),
+            rosterTransfers.Select(DescribeRosterTransferEvidence),
             rosterTransfers.SelectMany(static transfer => transfer.AuditLines),
             prepLaunches.Select(DescribePrepLaunchEvidence),
             prepLaunches.SelectMany(static launch => launch.AuditLines),
@@ -2604,6 +2604,26 @@ public sealed class CampaignWorkspaceServerPlaneService
             : channel is null
                 ? $"{role} on {platform} ({head})"
                 : $"{role} on {platform} ({head}/{channel})";
+    }
+
+    private static string DescribeRosterTransferEvidence(RosterTransferProjection item)
+    {
+        string? summary = NormalizeOptional(item.Summary);
+        if (summary is not null)
+        {
+            return summary;
+        }
+
+        string runner = NormalizeOptional(item.RunnerHandle) ?? "runner transfer";
+        string source = NormalizeOptional(item.SourceCampaignName)
+            ?? NormalizeOptional(item.SourceGroupName)
+            ?? NormalizeOptional(item.SourceCrewName)
+            ?? "source lane";
+        string target = NormalizeOptional(item.TargetCampaignName)
+            ?? NormalizeOptional(item.TargetGroupName)
+            ?? NormalizeOptional(item.TargetCrewName)
+            ?? "target lane";
+        return $"{runner} transfer {source} -> {target}";
     }
 
     private static string DescribePrepLaunchEvidence(GovernedPrepLaunchProjection item)
