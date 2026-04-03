@@ -2,6 +2,31 @@
 
 Updated: 2026-03-30T11:00:07+02:00
 
+## Handoff refresh (2026-04-03T00:00:00Z)
+
+- Campaign prep-library synthesis now treats roster movement and aftermath/downtime as first-class governed prep lanes:
+  - `Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs` now emits a reusable `roster_movement_packet` from governed `RosterTransfers` and a reusable `aftermath_packet` from governed `AftermathPackages`, then includes both in `BuildPrepPackets(...)`.
+  - packet search posture now explicitly covers roster/campaign/crew movement terms and aftermath/downtime/run/artifact continuity terms instead of relying on incidental text from scene/opposition packets.
+- Added focused regression coverage in `Chummer.Tests/CampaignWorkspaceServerPlaneServiceTests.cs`:
+  - `PrepLibraryIncludesRosterMovementPacketWhenRosterTransfersExist`
+  - `PrepLibraryIncludesAftermathPacketWhenAftermathPackagesExist`
+- Re-verified clean with:
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "FullyQualifiedName~CampaignWorkspaceServerPlaneServiceTests" --nologo`
+
+## Handoff refresh (2026-04-02T17:40:42+02:00)
+
+- Public release-truth and desktop platform honesty were tightened around the real shelf instead of internal artifact existence:
+  - `Chummer.Run.Api/Services/ReleaseSelectionService.cs` now builds an explicit platform-availability matrix, marks the requested device platform as unavailable when it is off-shelf, and blocks macOS from public visibility until canonical release proof explicitly names the promoted mac artifact route.
+  - `Chummer.Run.Api/ViewModels/SiteViewModels.cs`, `Views/PublicLanding/Downloads.cshtml`, and `Views/PublicLanding/Status.cshtml` now expose that matrix to users so `/downloads` and `/status` say which desktop platforms are actually public right now instead of quietly falling through to another platform.
+  - `Chummer.Run.Api/Services/HubPageChromeService.cs` now keeps the landing-page header CTA aligned with the landing canon, while `Controllers/PublicLandingController.cs` and `Services/SignedInTrustStatusService.cs` now phrase guest-readable shelves and signed-in follow-through consistently (`Guest-readable handoff` plus `Signed-in handoff` continuity).
+- The customer-facing proof rails were repaired rather than weakened:
+  - `tests/RunServicesSmoke/Program.cs` now supplies the current `PublicLandingController` constructor dependencies (`ReleaseUploadTicketService`, `IWebHostEnvironment`) and locks the guest-readable shelf expectations plus the off-shelf macOS behavior.
+  - `Chummer.Tests/ReleaseSelectionServiceTests.cs` now proves unsupported requested platforms stay unavailable without pretending another platform is recommended, and it proves macOS stays withheld until explicit promoted-proof routes exist.
+- Re-verified clean with:
+  - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "FullyQualifiedName~ReleaseSelectionServiceTests|FullyQualifiedName~PublicReleaseManifestServiceTests" --nologo`
+  - `bash scripts/ai/run_services_smoke.sh`
+  - `python3 ../chummer-hub-registry/scripts/verify_public_release_channel.py /docker/chummer5a/Docker/Downloads`
+
 ## Handoff refresh (2026-03-30T11:00:07+02:00)
 
 - Guest `/help` is now part of the browser-proof lane instead of only the raw-route audit:
