@@ -49,14 +49,19 @@ public sealed class CampaignWorkspaceServerPlaneService
         "surged",
         "drop",
         "drops",
-        "dropped"
-    ];
-
-    private static readonly string[] CampaignRelationshipMutationWordPrefixes =
-    [
-        "pressur",
-        "escalat",
-        "declin"
+        "dropped",
+        "pressure",
+        "pressures",
+        "pressured",
+        "pressuring",
+        "escalate",
+        "escalates",
+        "escalated",
+        "escalating",
+        "decline",
+        "declines",
+        "declined",
+        "declining"
     ];
 
     private static readonly string[] EventControlWordTokens =
@@ -2072,8 +2077,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return ContainsAnyWordToken(value, CampaignRelationshipMutationWordTokens)
-            || ContainsAnyWordTokenPrefix(value, CampaignRelationshipMutationWordPrefixes);
+        return ContainsAnyWordToken(value, CampaignRelationshipMutationWordTokens);
     }
 
     private static bool IsCampaignRelationshipConsequenceKind(string? kind)
@@ -2812,20 +2816,6 @@ public sealed class CampaignWorkspaceServerPlaneService
         foreach (string part in parts)
         {
             if (tokens.Any(token => string.Equals(token, part, StringComparison.OrdinalIgnoreCase)))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool ContainsAnyWordTokenPrefix(string value, IReadOnlyList<string> prefixes)
-    {
-        string[] parts = value.Split(SearchSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        foreach (string part in parts)
-        {
-            if (prefixes.Any(prefix => part.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
             {
                 return true;
             }
