@@ -127,6 +127,33 @@ public sealed class GmOpsBoardServiceTests
         Assert.Equal("runtime:1", governed.RuntimeFingerprint);
     }
 
+    [Fact]
+    public void ReconcilePortableAssets_UpdatesExistingAsset_WhenRemoteAssetIdHasWhitespace()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        var initial = BuildPortableAsset(
+            assetId: "prep_whitespace_id",
+            now: now,
+            title: "Initial packet");
+        var updated = BuildPortableAsset(
+            assetId: " prep_whitespace_id ",
+            now: now.AddMinutes(2),
+            title: "Updated packet");
+
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([initial, updated]);
+
+        Assert.Equal(2, result.ImportedCount);
+        Assert.Equal(0, result.SkippedCount);
+        GmPrepAssetRecord? stored = service.GetPrepAsset("prep_whitespace_id");
+        Assert.NotNull(stored);
+        Assert.Equal("Updated packet", stored!.Title);
+
+        GmPrepAssetListResponse listed = service.ListPrepAssets(campaignId: "campaign_ops");
+        Assert.Single(listed.Items);
+        Assert.Equal("prep_whitespace_id", listed.Items[0].AssetId);
+    }
+
     private static GmOpsBoardService CreateService()
     {
         var ledger = new SessionLedgerService();

@@ -455,7 +455,8 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         var conflicts = new List<OfflineSyncConflict>();
         foreach (var asset in assets)
         {
-            if (string.IsNullOrWhiteSpace(asset.AssetId))
+            string? normalizedAssetId = NormalizeOptional(asset.AssetId);
+            if (normalizedAssetId is null)
             {
                 skipped++;
                 conflicts.Add(new OfflineSyncConflict(
@@ -471,13 +472,13 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 skipped++;
                 conflicts.Add(new OfflineSyncConflict(
                     Surface: "ops-prep",
-                    EntityId: asset.AssetId.Trim(),
+                    EntityId: normalizedAssetId,
                     Reason: "invalid-asset-required-fields",
                     Resolution: "skipped-invalid"));
                 continue;
             }
 
-            if (_assets.TryGetValue(asset.AssetId, out var local))
+            if (_assets.TryGetValue(normalizedAssetId, out var local))
             {
                 lock (local)
                 {
@@ -486,7 +487,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                         skipped++;
                         conflicts.Add(new OfflineSyncConflict(
                             Surface: "ops-prep",
-                            EntityId: asset.AssetId,
+                            EntityId: normalizedAssetId,
                             Reason: "stale-remote",
                             Resolution: "kept-local",
                             LocalFingerprint: local.UpdatedAtUtc.ToUnixTimeSeconds().ToString(),
@@ -523,7 +524,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
 
             var state = new PrepAssetState
             {
-                AssetId = asset.AssetId.Trim(),
+                AssetId = normalizedAssetId,
                 CampaignId = asset.CampaignId.Trim(),
                 SessionId = NormalizeOptional(asset.SessionId),
                 SceneId = NormalizeOptional(asset.SceneId),
