@@ -125,20 +125,18 @@ public sealed class CampaignWorkspaceServerPlaneService
     [
         "update",
         "updates",
+        "updated",
+        "updating",
         "change",
         "changes",
+        "changed",
+        "changing",
         "entry",
         "entries",
         "entered",
         "entering",
         "note",
         "notes"
-    ];
-
-    private static readonly string[] DiaryMutationWordPrefixes =
-    [
-        "updat",
-        "chang"
     ];
 
     private static readonly string[] ContinuityWordTokens =
@@ -1975,8 +1973,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             || (ContainsAnyWordToken(normalizedKind, SessionWordTokens)
                 && ContainsAnyWordToken(normalizedKind, LogWordTokens))
             || ContainsAnyWordToken(normalizedKind, SessionLogCompactWordTokens);
-        bool hasMutationToken = ContainsAnyWordToken(normalizedKind, DiaryMutationWordTokens)
-            || ContainsAnyWordTokenPrefix(normalizedKind, DiaryMutationWordPrefixes);
+        bool hasMutationToken = ContainsAnyWordToken(normalizedKind, DiaryMutationWordTokens);
         return hasDiaryToken && hasMutationToken;
     }
 

@@ -520,6 +520,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDoesNotActivateFromJournalUpdateableMentionsWithoutDiaryMutationIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithJournalUpdateableMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignReturnPacketDoesNotActivateFromCampaignerReturnableWindowshadeMentionsWithoutReturnIdentity()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignerReturnableWindowshadeMentionsOnly();
@@ -7345,6 +7356,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [enterpriseSignal],
+            Consequences: [],
+            NextSessionCarryForward: null);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithJournalUpdateableMentionsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection updateableSignal = new(
+            PacketId: "packet-journal-updateable-1",
+            Kind: "status_brief",
+            Label: "Journal updateable template",
+            Summary: "Template policy remains stable while governance review is pending.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-journal-updateable-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [updateableSignal],
             Consequences: [],
             NextSessionCarryForward: null);
     }
