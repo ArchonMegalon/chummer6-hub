@@ -1973,15 +1973,15 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         IReadOnlyList<string> evidence = BuildEvidenceLines(
+            recapSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")),
+            aftermathSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")),
+            packages.Select(static item => DescribeSignalLabel(item.Title, item.PackageKind, "aftermath package")),
             recapSignals.Select(static item => item.Summary),
             recapSignals.Select(static item => item.Label),
-            recapSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")),
             aftermathSignals.Select(static item => item.Summary),
             aftermathSignals.Select(static item => item.Label),
-            aftermathSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")),
             packages.Select(static item => item.Summary),
             packages.Select(static item => item.Title),
-            packages.Select(static item => DescribeSignalLabel(item.Title, item.PackageKind, "aftermath package")),
             packages.SelectMany(static item => item.EvidenceLines));
         int signalCount = packages.Length + recapSignals.Length + aftermathSignals.Length;
         string summary = packages.Length > 0

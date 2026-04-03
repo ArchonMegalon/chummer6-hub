@@ -190,6 +190,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketKeepsRecapKindFallbackWhenRecapEvidenceIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathRecapKindsAndVerboseRecapEvidence();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("downtime_brief", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void PrepLibraryIncludesEventControlPacketWhenCarryForwardAndChangePacketsExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControls();
@@ -1682,6 +1695,56 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [],
             Consequences: [],
             AftermathPackages: [package]);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathRecapKindsAndVerboseRecapEvidence()
+    {
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        PublicationSafeProjection recapOne = new(
+            ProjectionId: "recap-1",
+            Kind: "downtime_brief",
+            Label: "",
+            Summary: "Verbose downtime recap lane summary line one.");
+        PublicationSafeProjection recapTwo = new(
+            ProjectionId: "recap-2",
+            Kind: "downtime_brief",
+            Label: "",
+            Summary: "Verbose downtime recap lane summary line two.");
+        PublicationSafeProjection recapThree = new(
+            ProjectionId: "recap-3",
+            Kind: "downtime_brief",
+            Label: "",
+            Summary: "Verbose downtime recap lane summary line three.");
+        PublicationSafeProjection recapFour = new(
+            ProjectionId: "recap-4",
+            Kind: "downtime_brief",
+            Label: "",
+            Summary: "Verbose downtime recap lane summary line four.");
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [recapOne, recapTwo, recapThree, recapFour],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            AftermathPackages: []);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithRelationshipChangeSignalsOnly()
