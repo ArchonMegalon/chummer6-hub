@@ -625,6 +625,22 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketCountsRelationshipSignalsWhenConsequenceEvidenceStructuredMutationContextAndRelationshipTokensAreSplitAcrossLines()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnConsequenceEvidenceStructuredSplitRelationshipSignalTokens();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("relationship_window", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("contact board label", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("and 0 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void CampaignReturnPacketIncludesCarryForwardLabelWhenCarryForwardSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnCarryForwardLabelOnly();
@@ -1077,6 +1093,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("season operation label", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("contact board label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketActivatesFromConsequenceEvidenceStructuredMutationContextAndRelationshipTokensSplitAcrossLines()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlConsequenceEvidenceStructuredSplitRelationshipSignalTokens();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("relationship_window", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("contact board label", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -3939,6 +3969,56 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             AftermathPackages: []);
     }
 
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnConsequenceEvidenceStructuredSplitRelationshipSignalTokens()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection returnWindow = new(
+            PacketId: "packet-1",
+            Kind: "",
+            Label: "Return window label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+        CampaignConsequenceProjection consequence = new(
+            ConsequenceId: "consequence-1",
+            Kind: "continuity_note",
+            Label: "Contact board label",
+            State: "",
+            Summary: "Continuity board wording only.",
+            EvidenceLines:
+            [
+                "relationship_window",
+                "contact board label"
+            ],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [returnWindow],
+            Consequences: [consequence],
+            AftermathPackages: []);
+    }
+
     private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnKindsOnly()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
@@ -5058,6 +5138,57 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "",
             ChangePackets: [seasonOperation, splitRelationship],
             Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlConsequenceEvidenceStructuredSplitRelationshipSignalTokens()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection seasonOperation = new(
+            PacketId: "packet-1",
+            Kind: "",
+            Label: "Season operation label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+        CampaignConsequenceProjection consequence = new(
+            ConsequenceId: "consequence-1",
+            Kind: "continuity_note",
+            Label: "Contact board label",
+            State: "",
+            Summary: "Continuity board wording only.",
+            EvidenceLines:
+            [
+                "relationship_window",
+                "contact board label"
+            ],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [seasonOperation],
+            Consequences: [consequence],
             PrepLaunches: [],
             TravelPrefetches: []);
     }
