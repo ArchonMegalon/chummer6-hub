@@ -1698,16 +1698,29 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
             .Take(3)
             .ToArray();
+        GovernedPrepLaunchProjection[] prepLaunches = (workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>())
+            .OrderByDescending(static launch => launch.LaunchedAtUtc)
+            .Take(3)
+            .ToArray();
+        TravelPrefetchReceiptProjection[] travelPrefetches = (workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>())
+            .OrderByDescending(static receipt => receipt.StagedAtUtc)
+            .Take(3)
+            .ToArray();
 
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
         if (eventPackets.Length == 0
             && consequences.Length == 0
+            && prepLaunches.Length == 0
+            && travelPrefetches.Length == 0
             && carryForward is null)
         {
             return null;
         }
 
-        int eventCount = eventPackets.Length + (carryForward is null ? 0 : 1);
+        int eventCount = eventPackets.Length
+            + prepLaunches.Length
+            + travelPrefetches.Length
+            + (carryForward is null ? 0 : 1);
         string consequenceSummary = consequences.Length == 0
             ? "Heat, contacts, and consequence posture stay linked to the same campaign return lane."
             : $"{consequences.Length} consequence signal(s) ({string.Join(", ", consequences.Select(static item => item.Label))}) stay attached to event control.";
@@ -1716,6 +1729,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             carryForward?.ReturnSummary,
             workspace.ReturnSummary,
             eventPackets.Select(static packet => packet.Summary),
+            prepLaunches.Select(static launch => launch.Summary),
+            prepLaunches.SelectMany(static launch => launch.AuditLines),
+            travelPrefetches.Select(static receipt => receipt.PrefetchSummary),
+            travelPrefetches.SelectMany(static receipt => receipt.InventoryLines),
             consequences.Select(static consequence => consequence.Summary),
             consequences.SelectMany(static consequence => consequence.EvidenceLines));
         DateTimeOffset updatedAtUtc = new[]
@@ -1723,6 +1740,8 @@ public sealed class CampaignWorkspaceServerPlaneService
                 carryForward?.UpdatedAtUtc
             }
             .Concat(eventPackets.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
+            .Concat(prepLaunches.Select(static launch => (DateTimeOffset?)launch.LaunchedAtUtc))
+            .Concat(travelPrefetches.Select(static receipt => (DateTimeOffset?)receipt.StagedAtUtc))
             .Concat(consequences.Select(static consequence => (DateTimeOffset?)consequence.UpdatedAtUtc))
             .Where(static item => item.HasValue)
             .Select(static item => item!.Value)
@@ -1747,6 +1766,15 @@ public sealed class CampaignWorkspaceServerPlaneService
                 carryForward?.Summary,
                 eventPackets.Select(static packet => packet.Kind),
                 eventPackets.Select(static packet => packet.Label),
+                prepLaunches.Select(static launch => launch.PacketKind),
+                prepLaunches.Select(static launch => launch.PacketTitle),
+                prepLaunches.Select(static launch => launch.TargetRunTitle),
+                prepLaunches.Select(static launch => launch.TargetSceneTitle),
+                travelPrefetches.Select(static receipt => receipt.InstallationId),
+                travelPrefetches.Select(static receipt => receipt.DeviceRole),
+                travelPrefetches.Select(static receipt => receipt.Platform),
+                travelPrefetches.Select(static receipt => receipt.HeadId),
+                travelPrefetches.Select(static receipt => receipt.Channel),
                 consequences.Select(static consequence => consequence.Kind),
                 consequences.Select(static consequence => consequence.Label),
                 consequences.Select(static consequence => consequence.State)),
