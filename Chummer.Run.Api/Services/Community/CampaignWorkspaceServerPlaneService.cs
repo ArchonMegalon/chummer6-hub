@@ -1547,6 +1547,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             })
             .Take(4)
             .ToArray();
+        AftermathRecapPackageProjection[] aftermathPackages = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
+            .OrderByDescending(static item => item.GeneratedAtUtc)
+            .Take(4)
+            .ToArray();
         CampaignConsequenceProjection[] relationshipConsequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
             .Where(static consequence => string.Equals(consequence.Kind, "contact", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(consequence.Kind, "heat", StringComparison.OrdinalIgnoreCase)
@@ -1564,16 +1568,23 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
+        WorkspaceChangePacketProjection[] aftermathChanges = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Where(static packet => IsAftermathSignalKind(packet.Kind))
+            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
 
         if (diaryRecaps.Length == 0
+            && aftermathPackages.Length == 0
             && relationshipConsequences.Length == 0
             && returnChanges.Length == 0
+            && aftermathChanges.Length == 0
             && workspace.NextSessionCarryForward is null)
         {
             return null;
         }
 
-        int diarySignalCount = diaryRecaps.Length + returnChanges.Length;
+        int diarySignalCount = diaryRecaps.Length + returnChanges.Length + aftermathPackages.Length + aftermathChanges.Length;
         int relationshipSignalCount = relationshipConsequences.Length;
         string summary = $"{Math.Max(1, diarySignalCount)} diary/continuity signal(s) and {relationshipSignalCount} relationship signal(s) stay on one governed return lane for downtime and next-session reopen.";
         string bindingSummary = leadRun is null
@@ -1584,7 +1595,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             workspace.NextSessionCarryForward?.Summary,
             workspace.NextSessionCarryForward?.ReturnSummary,
             diaryRecaps.Select(static item => item.Summary),
+            aftermathPackages.Select(static item => item.Summary),
+            aftermathPackages.SelectMany(static item => item.EvidenceLines),
             returnChanges.Select(static item => item.Summary),
+            aftermathChanges.Select(static item => item.Summary),
             relationshipConsequences.Select(static item => item.Summary),
             relationshipConsequences.SelectMany(static item => item.EvidenceLines));
         DateTimeOffset updatedAtUtc = new[]
@@ -1593,7 +1607,9 @@ public sealed class CampaignWorkspaceServerPlaneService
                 workspace.NextSessionCarryForward?.UpdatedAtUtc
             }
             .Concat(returnChanges.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
+            .Concat(aftermathChanges.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
             .Concat(relationshipConsequences.Select(static consequence => (DateTimeOffset?)consequence.UpdatedAtUtc))
+            .Concat(aftermathPackages.Select(static package => (DateTimeOffset?)package.GeneratedAtUtc))
             .Where(static item => item.HasValue)
             .Select(static item => item!.Value)
             .DefaultIfEmpty(DateTimeOffset.UtcNow)
@@ -1612,13 +1628,19 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "contacts",
                 "heat",
                 "downtime",
+                "aftermath",
                 "return",
                 workspace.ReturnSummary,
                 workspace.NextSessionCarryForward?.Label,
                 diaryRecaps.Select(static item => item.Kind),
                 diaryRecaps.Select(static item => item.Label),
+                aftermathPackages.Select(static item => item.PackageKind),
+                aftermathPackages.Select(static item => item.Title),
+                aftermathPackages.Select(static item => item.RunTitle),
                 returnChanges.Select(static item => item.Kind),
                 returnChanges.Select(static item => item.Label),
+                aftermathChanges.Select(static item => item.Kind),
+                aftermathChanges.Select(static item => item.Label),
                 relationshipConsequences.Select(static item => item.Kind),
                 relationshipConsequences.Select(static item => item.Label),
                 relationshipConsequences.Select(static item => item.State)),
@@ -1768,7 +1790,16 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static item => item.GeneratedAtUtc)
             .Take(3)
             .ToArray();
-        if (packages.Length == 0)
+        PublicationSafeProjection[] recapSignals = workspace.RecapShelf
+            .Where(static item => IsAftermathSignalKind(item.Kind))
+            .Take(4)
+            .ToArray();
+        WorkspaceChangePacketProjection[] aftermathSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Where(static packet => IsAftermathSignalKind(packet.Kind))
+            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
+        if (packages.Length == 0 && recapSignals.Length == 0 && aftermathSignals.Length == 0)
         {
             return null;
         }
@@ -1776,16 +1807,34 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<string> evidence = packages
             .Select(static item => item.Summary)
             .Concat(packages.SelectMany(static item => item.EvidenceLines))
+            .Concat(recapSignals.Select(static item => item.Summary))
+            .Concat(aftermathSignals.Select(static item => item.Summary))
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
+        int signalCount = packages.Length + recapSignals.Length + aftermathSignals.Length;
+        string summary = packages.Length > 0
+            ? $"{signalCount} aftermath or downtime signal(s) stay attached for recap, recovery, and next-session return."
+            : $"{signalCount} aftermath or downtime signal(s) stay governed from recap/change signals while package receipts catch up.";
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                leadRun?.UpdatedAtUtc,
+                workspace.LatestContinuity?.CapturedAtUtc,
+                workspace.NextSessionCarryForward?.UpdatedAtUtc
+            }
+            .Concat(packages.Select(static item => (DateTimeOffset?)item.GeneratedAtUtc))
+            .Concat(aftermathSignals.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.UtcNow)
+            .Max();
 
         return new GovernedPrepPacketSummary(
             PacketId: $"aftermath:{workspace.WorkspaceId}",
             Kind: "aftermath_packet",
             Title: $"{workspace.CampaignName} aftermath and downtime packet",
-            Summary: $"{packages.Length} aftermath or downtime package(s) stay attached for recap, recovery, and next-session return.",
+            Summary: summary,
             BindingSummary: leadRun is null
                 ? "Reusable across the campaign so aftermath, downtime, and return stay on governed workspace truth."
                 : $"Reusable across {workspace.CampaignName} and currently anchored to {leadRun.Title} for return-loop continuity.",
@@ -1794,12 +1843,40 @@ public sealed class CampaignWorkspaceServerPlaneService
                 workspace.CampaignName,
                 "aftermath",
                 "downtime",
+                "recap",
                 packages.Select(static item => item.PackageKind),
                 packages.Select(static item => item.Title),
                 packages.Select(static item => item.RunTitle),
-                packages.Select(static item => item.ArtifactId)),
+                packages.Select(static item => item.ArtifactId),
+                recapSignals.Select(static item => item.Kind),
+                recapSignals.Select(static item => item.Label),
+                aftermathSignals.Select(static packet => packet.Kind),
+                aftermathSignals.Select(static packet => packet.Label)),
             EvidenceLines: evidence,
-            UpdatedAtUtc: packages.Max(static item => item.GeneratedAtUtc));
+            UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsAftermathSignalKind(string? kind)
+    {
+        string normalizedKind = kind?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedKind))
+        {
+            return false;
+        }
+
+        if (string.Equals(normalizedKind, "aftermath", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "downtime", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "downtime_brief", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "after_action_report", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return normalizedKind.Contains("aftermath", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("downtime", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("after_action", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("recap", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("debrief", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildPrepLaunchOpsPacket(

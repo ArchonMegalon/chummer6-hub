@@ -69,6 +69,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketFallsBackToChangeSignalsWhenPackagesAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathChangeSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("aftermath", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("change signals", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PrepLibraryIncludesEventControlPacketWhenCarryForwardAndChangePacketsExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControls();
@@ -98,6 +112,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("contacts", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("heat", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("return", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CampaignReturnPacketFallsBackToAftermathSignalsWhenDiaryAndRelationshipSignalsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("aftermath", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("aftermath", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -442,6 +470,94 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Return lane summary",
             ChangePackets: [changePacket],
             Consequences: [contactConsequence, heatConsequence]);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        AftermathRecapPackageProjection aftermath = new(
+            PackageId: "package-1",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            RunId: "run-1",
+            RunTitle: "Dockyard pressure test",
+            PackageKind: "downtime_brief",
+            Title: "Aftermath downtime brief",
+            Summary: "Aftermath summary captures downtime obligations for return.",
+            ArtifactId: "artifact-1",
+            EvidenceLines: ["Aftermath heat and contact fallout captured for return."],
+            InitiatedByUserId: "gm-1",
+            GeneratedAtUtc: now.AddMinutes(6));
+
+        WorkspaceChangePacketProjection aftermathChange = new(
+            PacketId: "packet-1",
+            Kind: "aftermath",
+            Label: "Aftermath change packet",
+            Summary: "Aftermath change remains governed on the return lane.",
+            UpdatedAtUtc: now.AddMinutes(5));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [aftermathChange],
+            Consequences: [],
+            AftermathPackages: [aftermath]);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathChangeSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection aftermathChange = new(
+            PacketId: "packet-1",
+            Kind: "downtime_brief",
+            Label: "Downtime signal",
+            Summary: "Downtime change packet keeps aftermath continuity visible before package receipts land.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [aftermathChange],
+            Consequences: [],
+            AftermathPackages: []);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts()
