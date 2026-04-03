@@ -1809,6 +1809,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
+        Assert.Contains("campaign", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1821,6 +1822,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
+        Assert.Contains("campaign", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
