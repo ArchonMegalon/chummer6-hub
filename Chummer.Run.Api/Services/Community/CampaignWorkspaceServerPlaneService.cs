@@ -1876,6 +1876,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         bool carryForwardSignal = IsCampaignReturnCarryForwardSignal(carryForward);
+        bool carryForwardRelationshipSignal = IsCampaignReturnCarryForwardRelationshipSignal(carryForward);
 
         if (diaryRecaps.Length == 0
             && aftermathPackages.Length == 0
@@ -1894,7 +1895,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             + (carryForwardSignal ? 1 : 0);
         int relationshipSignalCount = relationshipConsequences.Length
             + returnChanges.Count(static packet => IsCampaignRelationshipSignal(packet))
-            + aftermathChanges.Count(static packet => IsCampaignRelationshipSignal(packet));
+            + aftermathChanges.Count(static packet => IsCampaignRelationshipSignal(packet))
+            + (carryForwardRelationshipSignal ? 1 : 0);
         string summary = $"{Math.Max(1, diarySignalCount)} diary/continuity signal(s) and {relationshipSignalCount} relationship signal(s) stay on one governed return lane for downtime and next-session reopen.";
         string bindingSummary = leadRun is null
             ? "Diary updates, contacts, heat, and return cues stay attached to the same campaign truth without local note-shadow models."
@@ -2013,6 +2015,19 @@ public sealed class CampaignWorkspaceServerPlaneService
             || ContainsCampaignRelationshipSplitTokenSignalFromCandidates(carryForward.EvidenceLines);
 
         return primarySignal || evidenceSignal;
+    }
+
+    private static bool IsCampaignReturnCarryForwardRelationshipSignal(NextSessionCarryForwardProjection? carryForward)
+    {
+        if (carryForward is null)
+        {
+            return false;
+        }
+
+        return ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.Summary, carryForward.ReturnSummary)
+            || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.NextSafeAction, carryForward.ReturnSummary)
+            || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Summary, carryForward.NextSafeAction, carryForward.ReturnSummary)
+            || ContainsCampaignRelationshipSplitTokenSignalFromCandidates(carryForward.EvidenceLines);
     }
 
     private static bool IsCampaignReturnSignalKind(string? kind)
