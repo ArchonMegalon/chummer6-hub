@@ -2483,8 +2483,13 @@ public sealed class CampaignWorkspaceServerPlaneService
                 restore.ClaimedDevices.Select(static item => item.Platform),
                 restore.ClaimedDevices.Select(static item => item.HeadId),
                 restore.ClaimedDevices.Select(static item => item.Channel),
+                restore.ClaimedDevices.Select(DescribeClaimedDeviceTravelEvidence),
                 restore.RecentArtifacts.Select(static item => item.Label),
-                restore.RecentRuleEnvironments.Select(static item => item.CompatibilityFingerprint)),
+                restore.RecentArtifacts.Select(static item => item.Kind),
+                restore.RecentArtifacts.Select(static item => item.Summary),
+                restore.RecentRuleEnvironments.Select(static item => item.CompatibilityFingerprint),
+                restore.RecentRuleEnvironments.Select(static item => item.ApprovalState),
+                restore.RecentRuleEnvironments.Select(static item => item.OwnerScope)),
             EvidenceLines: evidence,
             UpdatedAtUtc: restore.GeneratedAtUtc);
     }
