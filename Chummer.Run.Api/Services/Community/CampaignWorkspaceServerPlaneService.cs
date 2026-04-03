@@ -80,6 +80,46 @@ public sealed class CampaignWorkspaceServerPlaneService
         "log"
     ];
 
+    private static readonly string[] DiaryWordTokens =
+    [
+        "diary",
+        "journal"
+    ];
+
+    private static readonly string[] SessionWordTokens =
+    [
+        "session"
+    ];
+
+    private static readonly string[] LogWordTokens =
+    [
+        "log"
+    ];
+
+    private static readonly string[] SessionLogCompactWordTokens =
+    [
+        "sessionlog"
+    ];
+
+    private static readonly string[] DiaryMutationWordTokens =
+    [
+        "update",
+        "updates",
+        "change",
+        "changes",
+        "entry",
+        "entries",
+        "note",
+        "notes"
+    ];
+
+    private static readonly string[] DiaryMutationWordPrefixes =
+    [
+        "updat",
+        "chang",
+        "entr"
+    ];
+
     private static readonly string[] ContinuityWordTokens =
     [
         "continuity"
@@ -1875,14 +1915,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             return true;
         }
 
-        bool hasDiaryToken = normalizedKind.Contains("diary", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("journal", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("session_log", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("sessionlog", StringComparison.OrdinalIgnoreCase);
-        bool hasMutationToken = normalizedKind.Contains("update", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("change", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("entry", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("note", StringComparison.OrdinalIgnoreCase);
+        bool hasDiaryToken = ContainsAnyWordToken(normalizedKind, DiaryWordTokens)
+            || (ContainsAnyWordToken(normalizedKind, SessionWordTokens)
+                && ContainsAnyWordToken(normalizedKind, LogWordTokens))
+            || ContainsAnyWordToken(normalizedKind, SessionLogCompactWordTokens);
+        bool hasMutationToken = ContainsAnyWordToken(normalizedKind, DiaryMutationWordTokens)
+            || ContainsAnyWordTokenPrefix(normalizedKind, DiaryMutationWordPrefixes);
         return hasDiaryToken && hasMutationToken;
     }
 
