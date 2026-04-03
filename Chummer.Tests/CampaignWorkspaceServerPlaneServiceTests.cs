@@ -826,6 +826,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void TravelReadyDeviceDoesNotActivateFromPrefetchingSummaryWithoutTravelIdentity()
+    {
+        ClaimedDeviceRestoreProjection device = BuildClaimedDeviceRestore(
+            deviceRole: "workstation",
+            restoreSummary: "Campaign prefetching notes remain continuity-only.");
+
+        bool travelReady = InvokeIsTravelReadyDevice(device);
+
+        Assert.False(travelReady);
+    }
+
+    [Fact]
+    public void TravelReadyDeviceActivatesFromTravelPrefetchSummaryTokens()
+    {
+        ClaimedDeviceRestoreProjection device = BuildClaimedDeviceRestore(
+            deviceRole: "workstation",
+            restoreSummary: "Travel prefetch receipts remain staged for bounded return.");
+
+        bool travelReady = InvokeIsTravelReadyDevice(device);
+
+        Assert.True(travelReady);
+    }
+
+    [Fact]
     public void EventControlPacketIncludesOpsReceiptsWhenPrepLaunchAndTravelPrefetchExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
@@ -1982,6 +2006,15 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("BuildPrepPackets was not found.");
 
         return Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepPacketSummary>>(method.Invoke(null, [workspace, restore, leadRun]));
+    }
+
+    private static bool InvokeIsTravelReadyDevice(ClaimedDeviceRestoreProjection device)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("IsTravelReadyDevice", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("IsTravelReadyDevice was not found.");
+
+        return Assert.IsType<bool>(method.Invoke(null, [device]));
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithRosterAndAftermath()
@@ -7290,6 +7323,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LocalOnlyNotes: [],
             GeneratedAtUtc: now);
     }
+
+    private static ClaimedDeviceRestoreProjection BuildClaimedDeviceRestore(string deviceRole, string restoreSummary)
+        => new(
+            InstallationId: "install-claimed-1",
+            DeviceRole: deviceRole,
+            Platform: "linux",
+            HeadId: "desktop",
+            Channel: "preview",
+            HostLabel: null,
+            RestoreSummary: restoreSummary);
 
     private static WorkspaceRestoreProjection BuildEmptyRestore()
         => new(

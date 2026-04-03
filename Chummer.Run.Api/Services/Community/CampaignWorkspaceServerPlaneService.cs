@@ -201,6 +201,21 @@ public sealed class CampaignWorkspaceServerPlaneService
         "prefetch"
     ];
 
+    private static readonly string[] BoundedWordTokens =
+    [
+        "bounded"
+    ];
+
+    private static readonly string[] OfflineWordTokens =
+    [
+        "offline"
+    ];
+
+    private static readonly string[] UseWordTokens =
+    [
+        "use"
+    ];
+
     private sealed record WorkspaceContext(
         CampaignWorkspaceProjection Workspace,
         CampaignWorkspaceDigestProjection? Digest,
@@ -3399,8 +3414,20 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static bool IsTravelReadyDevice(ClaimedDeviceRestoreProjection device)
         => string.Equals(device.DeviceRole, "travel_cache", StringComparison.OrdinalIgnoreCase)
             || string.Equals(device.DeviceRole, "play_tablet", StringComparison.OrdinalIgnoreCase)
-            || device.RestoreSummary.Contains("bounded offline use", StringComparison.OrdinalIgnoreCase)
-            || device.RestoreSummary.Contains("prefetch", StringComparison.OrdinalIgnoreCase);
+            || ContainsBoundedOfflineUseTokenSignal(device.RestoreSummary)
+            || ContainsTravelPrefetchToken(device.RestoreSummary);
+
+    private static bool ContainsBoundedOfflineUseTokenSignal(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, BoundedWordTokens)
+            && ContainsAnyWordToken(value, OfflineWordTokens)
+            && ContainsAnyWordToken(value, UseWordTokens);
+    }
 
     private static string ResolveTravelDeviceStatus(ClaimedDeviceRestoreProjection device, bool hasConflicts)
     {
