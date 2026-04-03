@@ -10,6 +10,20 @@ namespace Chummer.Run.Api.Services.Community;
 
 public sealed class CampaignWorkspaceServerPlaneService
 {
+    private static readonly string[] EventControlWordTokens =
+    [
+        "event",
+        "events",
+        "season",
+        "seasons",
+        "timeline",
+        "timelines",
+        "operation",
+        "operations",
+        "checkpoint",
+        "checkpoints"
+    ];
+
     private sealed record WorkspaceContext(
         CampaignWorkspaceProjection Workspace,
         CampaignWorkspaceDigestProjection? Digest,
@@ -2513,11 +2527,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return value.Contains("event", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("season", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("timeline", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("operation", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("checkpoint", StringComparison.OrdinalIgnoreCase);
+        return ContainsAnyWordToken(value, EventControlWordTokens);
     }
 
     private static bool ContainsOppositionToken(string? value)
@@ -2614,11 +2624,21 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return value.Contains("event", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("season", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("timeline", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("operation", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("checkpoint", StringComparison.OrdinalIgnoreCase);
+        return ContainsAnyWordToken(value, EventControlWordTokens);
+    }
+
+    private static bool ContainsAnyWordToken(string value, IReadOnlyList<string> tokens)
+    {
+        string[] parts = value.Split(SearchSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (string part in parts)
+        {
+            if (tokens.Any(token => string.Equals(token, part, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrefetchOpsPacket(
