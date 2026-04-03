@@ -2128,7 +2128,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] launchSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsPrepLaunchSignalKind(packet.Kind))
+            .Where(static packet => IsPrepLaunchSignal(packet))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
@@ -2201,6 +2201,24 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return normalizedKind.Contains("prep", StringComparison.OrdinalIgnoreCase)
             && normalizedKind.Contains("launch", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPrepLaunchSignal(WorkspaceChangePacketProjection packet)
+    {
+        return IsPrepLaunchSignalKind(packet.Kind)
+            || ContainsPrepLaunchToken(packet.Label)
+            || ContainsPrepLaunchToken(packet.Summary);
+    }
+
+    private static bool ContainsPrepLaunchToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Contains("prep", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("launch", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildEventControlPrepPacket(
@@ -2501,7 +2519,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] prefetchSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsTravelPrefetchSignalKind(packet.Kind))
+            .Where(static packet => IsTravelPrefetchSignal(packet))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
@@ -2575,6 +2593,24 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return normalizedKind.Contains("travel", StringComparison.OrdinalIgnoreCase)
             && normalizedKind.Contains("prefetch", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsTravelPrefetchSignal(WorkspaceChangePacketProjection packet)
+    {
+        return IsTravelPrefetchSignalKind(packet.Kind)
+            || ContainsTravelPrefetchToken(packet.Label)
+            || ContainsTravelPrefetchToken(packet.Summary);
+    }
+
+    private static bool ContainsTravelPrefetchToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Contains("travel", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("prefetch", StringComparison.OrdinalIgnoreCase);
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrepPacket(

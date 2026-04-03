@@ -572,6 +572,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void TravelPrefetchPacketFallsBackToSignalLabelsWhenSignalKindsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithTravelPrefetchSparseSignalKindsAndLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("travel prefetch label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void TravelPrefetchPacketIncludesKindFallbackWhenSignalsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithTravelPrefetchKindsOnly();
@@ -1162,6 +1175,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("scene prep label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void PrepLaunchPacketFallsBackToSignalLabelsWhenSignalKindsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchSparseSignalKindsAndLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("scene prep launch label", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -2727,6 +2754,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             PacketId: "packet-1",
             Kind: "travel_prefetch",
             Label: "",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [prefetchChange],
+            Consequences: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithTravelPrefetchSparseSignalKindsAndLabelsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection prefetchChange = new(
+            PacketId: "packet-1",
+            Kind: "",
+            Label: "Travel prefetch label",
             Summary: "",
             UpdatedAtUtc: now.AddMinutes(4));
 
@@ -4777,6 +4841,64 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             PacketId: "packet-1",
             Kind: "prep_launch",
             Label: "",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [prepLaunchChange],
+            Consequences: [],
+            PrepLaunches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchSparseSignalKindsAndLabelsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-1",
+            Title: "Prep launch validation",
+            Status: "open",
+            Pressure: "medium",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "Current run remains active.",
+            ActiveSceneId: null,
+            Objectives: [objective],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        WorkspaceChangePacketProjection prepLaunchChange = new(
+            PacketId: "packet-1",
+            Kind: "",
+            Label: "Scene prep launch label",
             Summary: "",
             UpdatedAtUtc: now.AddMinutes(4));
 
