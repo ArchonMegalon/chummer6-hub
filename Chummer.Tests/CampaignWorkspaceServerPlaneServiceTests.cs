@@ -187,6 +187,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketFallsBackToRelationshipSignalVariantsWithoutExplicitMutationVerbs()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnRelationshipSignalVariantsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("return", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("heat pressure", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("fixer obligation", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void PrepLibraryIncludesPrepLaunchPacketWhenGovernedPrepLaunchReceiptsExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
@@ -291,6 +306,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("2 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("heat pressure", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("faction pressure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketFallsBackToRelationshipSignalVariantsWithoutExplicitMutationVerbs()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlRelationshipSignalVariantsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("event", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("heat pressure", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("fixer obligation", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -977,6 +1007,49 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             AftermathPackages: []);
     }
 
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnRelationshipSignalVariantsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection heatPressureLane = new(
+            PacketId: "packet-1",
+            Kind: "heat_pressure_lane",
+            Label: "Heat pressure lane",
+            Summary: "Heat pressure remains attached to the campaign return lane before consequence receipts land.",
+            UpdatedAtUtc: now.AddMinutes(3));
+        WorkspaceChangePacketProjection contactObligationLane = new(
+            PacketId: "packet-2",
+            Kind: "contact_obligation_lane",
+            Label: "Fixer obligation lane",
+            Summary: "Fixer obligation remains attached to the same governed return lane.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [heatPressureLane, contactObligationLane],
+            Consequences: [],
+            AftermathPackages: []);
+    }
+
     private static CampaignWorkspaceProjection BuildWorkspaceWithTravelPrefetchChangeSignalsOnly()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
@@ -1207,6 +1280,50 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Return lane summary",
             ChangePackets: [],
             Consequences: [heatVariant, factionVariant],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlRelationshipSignalVariantsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection heatPressureLane = new(
+            PacketId: "packet-1",
+            Kind: "heat_pressure_lane",
+            Label: "Heat pressure lane",
+            Summary: "Heat pressure remains attached to event controls while consequence receipts catch up.",
+            UpdatedAtUtc: now.AddMinutes(2));
+        WorkspaceChangePacketProjection contactObligationLane = new(
+            PacketId: "packet-2",
+            Kind: "contact_obligation_lane",
+            Label: "Fixer obligation lane",
+            Summary: "Fixer obligation remains attached to event controls on the same governed lane.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [heatPressureLane, contactObligationLane],
+            Consequences: [],
             PrepLaunches: [],
             TravelPrefetches: []);
     }
