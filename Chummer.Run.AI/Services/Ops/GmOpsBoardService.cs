@@ -478,6 +478,28 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 continue;
             }
 
+            if (!HasValidPortableAssetEnums(asset, out string? enumReason))
+            {
+                skipped++;
+                conflicts.Add(new OfflineSyncConflict(
+                    Surface: "ops-prep",
+                    EntityId: normalizedAssetId,
+                    Reason: enumReason ?? "invalid-asset-enum",
+                    Resolution: "skipped-invalid"));
+                continue;
+            }
+
+            if (!HasValidPortableAssetTimeline(asset, out string? timelineReason))
+            {
+                skipped++;
+                conflicts.Add(new OfflineSyncConflict(
+                    Surface: "ops-prep",
+                    EntityId: normalizedAssetId,
+                    Reason: timelineReason ?? "invalid-asset-timeline",
+                    Resolution: "skipped-invalid"));
+                continue;
+            }
+
             if (_assets.TryGetValue(normalizedAssetId, out var local))
             {
                 lock (local)
@@ -567,6 +589,54 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         !string.IsNullOrWhiteSpace(asset.CampaignId)
         && !string.IsNullOrWhiteSpace(asset.Title)
         && !string.IsNullOrWhiteSpace(asset.Body);
+
+    private static bool HasValidPortableAssetEnums(OfflineSyncPrepAsset asset, out string? reason)
+    {
+        if (!Enum.TryParse<GmPrepAssetKind>(asset.Kind, ignoreCase: true, out _))
+        {
+            reason = "invalid-asset-kind";
+            return false;
+        }
+
+        if (!Enum.TryParse<GmPrepAssetAudience>(asset.Audience, ignoreCase: true, out _))
+        {
+            reason = "invalid-asset-audience";
+            return false;
+        }
+
+        reason = null;
+        return true;
+    }
+
+    private static bool HasValidPortableAssetTimeline(OfflineSyncPrepAsset asset, out string? reason)
+    {
+        if (asset.CreatedAtUtc == default || asset.UpdatedAtUtc == default)
+        {
+            reason = "invalid-asset-timeline";
+            return false;
+        }
+
+        if (asset.UpdatedAtUtc < asset.CreatedAtUtc)
+        {
+            reason = "invalid-asset-timeline";
+            return false;
+        }
+
+        if (asset.LastRevealedAtUtc is { } lastRevealed && (lastRevealed < asset.CreatedAtUtc || lastRevealed > asset.UpdatedAtUtc))
+        {
+            reason = "invalid-asset-reveal-timestamp";
+            return false;
+        }
+
+        if (asset.RevealCount < 0)
+        {
+            reason = "invalid-asset-reveal-count";
+            return false;
+        }
+
+        reason = null;
+        return true;
+    }
 
     private EvidencePointer[] ResolveEvidence(string? sessionId, string? sceneId, IReadOnlyList<string>? eventIds)
     {
