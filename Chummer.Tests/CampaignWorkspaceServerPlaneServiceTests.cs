@@ -1712,6 +1712,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void OppositionPacketDoesNotActivateFromBenignRunObjectivesWithoutOppositionSignals()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithBenignRunSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void OppositionPacketDoesNotActivateFromBenignActiveSceneSummaryWithoutOppositionSignals()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithBenignSceneSummaryOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void EventControlPacketDoesNotActivateFromCampaignReturnWindowSignalsOnly()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnVariantSignalsOnly();
@@ -4690,6 +4714,116 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Summary: "Current run remains under hostile pressure.",
             ActiveSceneId: "scene-1",
             Objectives: [objective],
+            Scenes: [scene],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [],
+            Consequences: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithBenignRunSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-1",
+            Title: "Inventory refresh checklist",
+            Status: "open",
+            Pressure: "low",
+            Summary: "The table inventory checklist remains open for bookkeeping.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        SceneProjection scene = new(
+            SceneId: "scene-1",
+            RunId: "run-1",
+            Title: "Backroom inventory desk",
+            Revision: "r1",
+            Status: "active",
+            Summary: "Backroom inventory reconciliation is still in progress.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Backroom ledger pass",
+            Status: "active",
+            Summary: "Current run remains focused on bookkeeping updates.",
+            ActiveSceneId: "scene-1",
+            Objectives: [objective],
+            Scenes: [scene],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [],
+            Consequences: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithBenignSceneSummaryOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        SceneProjection scene = new(
+            SceneId: "scene-1",
+            RunId: "run-1",
+            Title: "Backroom inventory desk",
+            Revision: "r1",
+            Status: "active",
+            Summary: "Backroom inventory reconciliation is still in progress.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Backroom ledger pass",
+            Status: "active",
+            Summary: "Current run remains focused on bookkeeping updates.",
+            ActiveSceneId: "scene-1",
+            Objectives: [],
             Scenes: [scene],
             LatestContinuity: null,
             CreatedAtUtc: now.AddDays(-1),

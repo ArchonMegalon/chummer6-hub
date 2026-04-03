@@ -1640,17 +1640,19 @@ public sealed class CampaignWorkspaceServerPlaneService
             .ToArray();
         ObjectiveProjection[] objectiveSignals = (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
             .Where(static item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase))
+                && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase)
+                && IsOppositionObjectiveSignal(item.Title, item.Summary, item.Pressure))
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .Take(3)
             .ToArray();
         SceneProjection? activeScene = leadRun?.Scenes
             .FirstOrDefault(item => string.Equals(item.SceneId, leadRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
             ?? leadRun?.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
+        bool sceneSignal = IsOppositionObjectiveSignal(activeScene?.Title, activeScene?.Summary, null);
         if (oppositionSignals.Length == 0
             && consequences.Length == 0
             && objectiveSignals.Length == 0
-            && string.IsNullOrWhiteSpace(activeScene?.Summary))
+            && !sceneSignal)
         {
             return null;
         }
@@ -1666,7 +1668,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         {
             labels = "governed opposition cues";
         }
-        int signalCount = oppositionSignals.Length + consequences.Length + objectiveSignals.Length + (string.IsNullOrWhiteSpace(activeScene?.Summary) ? 0 : 1);
+        int signalCount = oppositionSignals.Length + consequences.Length + objectiveSignals.Length + (sceneSignal ? 1 : 0);
         string summary = consequences.Length > 0 || oppositionSignals.Length > 0
             ? $"{signalCount} governed opposition signal(s) are active: {labels}."
             : $"{signalCount} governed opposition signal(s) are active from run pressure and active-scene cues: {labels}.";
@@ -1680,7 +1682,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             consequences.SelectMany(static item => item.EvidenceLines.Concat(item.Receipts.Select(static receipt => receipt.Summary))),
             objectiveSignals.Select(static item => item.Summary),
             objectiveSignals.Select(static item => $"{item.Title} stays {item.Status} with {item.Pressure} pressure."),
-            activeScene?.Summary);
+            sceneSignal ? activeScene?.Summary : null);
 
         return new GovernedPrepPacketSummary(
             PacketId: $"opposition:{workspace.WorkspaceId}",
@@ -1709,7 +1711,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             EvidenceLines: evidence,
             UpdatedAtUtc: new[]
                 {
-                    activeScene?.UpdatedAtUtc,
+                    sceneSignal ? activeScene?.UpdatedAtUtc : null,
                     leadRun?.UpdatedAtUtc
                 }
                 .Concat(oppositionSignals.Select(static item => (DateTimeOffset?)item.UpdatedAtUtc))
@@ -2888,6 +2890,13 @@ public sealed class CampaignWorkspaceServerPlaneService
         return IsOppositionSignalKind(packet.Kind)
             || ContainsOppositionToken(packet.Label)
             || ContainsOppositionToken(packet.Summary);
+    }
+
+    private static bool IsOppositionObjectiveSignal(string? title, string? summary, string? pressure)
+    {
+        return ContainsOppositionToken(title)
+            || ContainsOppositionToken(summary)
+            || ContainsOppositionToken(pressure);
     }
 
     private static bool IsEventControlSignalKind(string? kind)
