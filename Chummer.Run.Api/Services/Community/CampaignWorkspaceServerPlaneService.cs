@@ -200,9 +200,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         "benching"
     ];
 
-    private static readonly string[] RosterReturnWordPrefixes =
+    private static readonly string[] RosterReturnWordTokens =
     [
-        "return"
+        "return",
+        "returns",
+        "returned",
+        "returning"
     ];
 
     private static readonly string[] PrepLaunchWordTokens =
@@ -2247,7 +2250,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(value, ["roster"])
-            && ContainsAnyWordTokenPrefix(value, RosterReturnWordPrefixes);
+            && ContainsAnyWordToken(value, RosterReturnWordTokens);
     }
 
     private static GovernedPrepPacketSummary? BuildAftermathPrepPacket(
