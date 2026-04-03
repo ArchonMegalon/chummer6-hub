@@ -1845,7 +1845,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(3)
             .ToArray();
         WorkspaceChangePacketProjection[] rosterChangeSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsRosterMovementSignalKind(packet.Kind))
+            .Where(static packet => IsRosterMovementSignal(packet))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
@@ -1947,6 +1947,15 @@ public sealed class CampaignWorkspaceServerPlaneService
             || string.Equals(normalizedKind, "crew_handoff", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("roster", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("crew", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsRosterMovementSignal(WorkspaceChangePacketProjection packet)
+    {
+        return IsRosterMovementSignalKind(packet.Kind)
+            || IsRosterMovementSignalKind(packet.Label)
+            || IsRosterMovementSignalKind(packet.Summary)
+            || ContainsRosterToken(packet.Label)
+            || ContainsRosterToken(packet.Summary);
     }
 
     private static bool IsRosterObjectiveSignal(string? title, string? summary)
@@ -2451,6 +2460,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static bool IsEventControlSignal(WorkspaceChangePacketProjection packet)
     {
         return IsEventControlSignalKind(packet.Kind)
+            || IsRosterMovementSignal(packet)
             || ContainsEventControlFallbackToken(packet.Label)
             || ContainsEventControlFallbackToken(packet.Summary)
             || ContainsOppositionToken(packet.Label)
