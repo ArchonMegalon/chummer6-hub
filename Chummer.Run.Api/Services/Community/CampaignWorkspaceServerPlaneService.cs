@@ -2117,7 +2117,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             || IsAftermathSignalKind(normalizedKind)
             || IsRosterMovementSignalKind(normalizedKind)
             || IsPrepLaunchSignalKind(normalizedKind)
-            || IsTravelPrefetchSignalKind(normalizedKind);
+            || IsTravelPrefetchSignalKind(normalizedKind)
+            || IsCampaignRelationshipSignalKind(normalizedKind);
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrefetchOpsPacket(
