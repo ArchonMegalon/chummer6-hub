@@ -20,6 +20,31 @@ public sealed class CampaignWorkspaceServerPlaneService
         "factions"
     ];
 
+    private static readonly string[] CampaignRelationshipMutationWordTokens =
+    [
+        "delta",
+        "lane",
+        "window",
+        "state",
+        "status",
+        "fallout",
+        "cooldown",
+        "cooling"
+    ];
+
+    private static readonly string[] CampaignRelationshipMutationWordPrefixes =
+    [
+        "updat",
+        "chang",
+        "shift",
+        "pressur",
+        "escalat",
+        "spike",
+        "surge",
+        "declin",
+        "drop"
+    ];
+
     private static readonly string[] EventControlWordTokens =
     [
         "event",
@@ -53,6 +78,23 @@ public sealed class CampaignWorkspaceServerPlaneService
         "recap",
         "career",
         "log"
+    ];
+
+    private static readonly string[] RosterIdentityWordTokens =
+    [
+        "roster",
+        "crew"
+    ];
+
+    private static readonly string[] RosterMovementWordPrefixes =
+    [
+        "transfer",
+        "assign",
+        "handoff",
+        "return",
+        "move",
+        "rotat",
+        "bench"
     ];
 
     private sealed record WorkspaceContext(
@@ -1882,23 +1924,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return value.Contains("update", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("change", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("shift", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("delta", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("pressure", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("lane", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("window", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("state", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("status", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("fallout", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("escalat", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("spike", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("surge", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("cooldown", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("cooling", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("decline", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("drop", StringComparison.OrdinalIgnoreCase);
+        return ContainsAnyWordToken(value, CampaignRelationshipMutationWordTokens)
+            || ContainsAnyWordTokenPrefix(value, CampaignRelationshipMutationWordPrefixes);
     }
 
     private static bool IsCampaignRelationshipConsequenceKind(string? kind)
@@ -2037,11 +2064,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             || string.Equals(normalizedKind, "roster_move", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "crew_assignment", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "crew_handoff", StringComparison.OrdinalIgnoreCase)
-            || ((normalizedKind.Contains("roster", StringComparison.OrdinalIgnoreCase)
-                    || normalizedKind.Contains("crew", StringComparison.OrdinalIgnoreCase))
+            || ((ContainsAnyWordToken(normalizedKind, RosterIdentityWordTokens))
                 && ContainsRosterMovementToken(normalizedKind))
-            || (normalizedKind.Contains("bench", StringComparison.OrdinalIgnoreCase)
-                && normalizedKind.Contains("rotation", StringComparison.OrdinalIgnoreCase));
+            || (ContainsAnyWordToken(normalizedKind, ["bench"])
+                && ContainsAnyWordToken(normalizedKind, ["rotation"]));
     }
 
     private static bool IsRosterMovementSignal(WorkspaceChangePacketProjection packet)
@@ -2065,27 +2091,20 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        bool hasRosterIdentityToken = value.Contains("roster", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("crew", StringComparison.OrdinalIgnoreCase);
+        bool hasRosterIdentityToken = ContainsAnyWordToken(value, RosterIdentityWordTokens);
         if (hasRosterIdentityToken && ContainsRosterMovementToken(value))
         {
             return true;
         }
 
-        bool hasBenchRotationPair = value.Contains("bench", StringComparison.OrdinalIgnoreCase)
-            && value.Contains("rotation", StringComparison.OrdinalIgnoreCase);
+        bool hasBenchRotationPair = ContainsAnyWordToken(value, ["bench"])
+            && ContainsAnyWordToken(value, ["rotation"]);
         return hasBenchRotationPair;
     }
 
     private static bool ContainsRosterMovementToken(string value)
     {
-        return value.Contains("transfer", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("assign", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("handoff", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("return", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("move", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("rotation", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("bench", StringComparison.OrdinalIgnoreCase);
+        return ContainsAnyWordTokenPrefix(value, RosterMovementWordPrefixes);
     }
 
     private static GovernedPrepPacketSummary? BuildAftermathPrepPacket(
@@ -2645,6 +2664,20 @@ public sealed class CampaignWorkspaceServerPlaneService
         foreach (string part in parts)
         {
             if (tokens.Any(token => string.Equals(token, part, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsAnyWordTokenPrefix(string value, IReadOnlyList<string> prefixes)
+    {
+        string[] parts = value.Split(SearchSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (string part in parts)
+        {
+            if (prefixes.Any(prefix => part.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
             {
                 return true;
             }
