@@ -433,6 +433,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDoesNotActivateFromAfterActionableMentionsWithoutAfterActionIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAfterActionableMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignReturnPacketDoesNotActivateFromDiscontinuityMentionsWithoutContinuityIdentity()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithDiscontinuityMentionsOnly();
@@ -1095,6 +1106,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     public void AftermathPacketDoesNotActivateFromRecapitalizationKindWithoutAftermathIdentity()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRecapitalizationKindOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AftermathPacketDoesNotActivateFromAfterActionableMentionsWithoutAfterActionIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAfterActionableMentionsOnly();
         WorkspaceRestoreProjection restore = BuildEmptyRestore();
 
         IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
@@ -3090,6 +3112,42 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [recapitalizationSignal],
+            Consequences: [],
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAfterActionableMentionsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection afterActionableSignal = new(
+            PacketId: "packet-after-actionable-1",
+            Kind: "status_after_actionable_note",
+            Label: "After actionable checklist review",
+            Summary: "Actionable follow-ups were documented for general table hygiene.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-after-actionable-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [afterActionableSignal],
             Consequences: [],
             AftermathPackages: []);
     }
