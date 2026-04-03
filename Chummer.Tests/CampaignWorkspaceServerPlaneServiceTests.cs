@@ -1516,6 +1516,52 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDoesNotCountContactCooldownMentionsAsRelationshipMutationSignals()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithContactCooldownMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.Contains("0 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void EventControlPacketDoesNotActivateFromContactCooldownMentionsWithoutMutationIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithContactCooldownMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CampaignReturnPacketDoesNotCountContactCoolingMentionsAsRelationshipMutationSignals()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithContactCoolingMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.Contains("0 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void EventControlPacketDoesNotActivateFromContactCoolingMentionsWithoutMutationIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithContactCoolingMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignReturnPacketDoesNotCountContactDropboxMentionsAsRelationshipMutationSignals()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithContactDropboxMentionsOnly();
@@ -5768,6 +5814,80 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [contactLaneSignal],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithContactCooldownMentionsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection contactCooldownSignal = new(
+            PacketId: "packet-contact-cooldown-1",
+            Kind: "status_note",
+            Label: "Contact cooldown board",
+            Summary: "Contact cooldown board remains continuity-only before mutation receipts are logged.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-contact-cooldown-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [contactCooldownSignal],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithContactCoolingMentionsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection contactCoolingSignal = new(
+            PacketId: "packet-contact-cooling-1",
+            Kind: "status_note",
+            Label: "Contact cooling board",
+            Summary: "Contact cooling board remains continuity-only before mutation receipts are logged.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-contact-cooling-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [contactCoolingSignal],
             Consequences: [],
             PrepLaunches: [],
             TravelPrefetches: []);
