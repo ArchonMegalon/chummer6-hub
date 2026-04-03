@@ -1379,7 +1379,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         RunProjection? leadRun)
     {
         WorkspaceChangePacketProjection[] oppositionSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsOppositionSignalKind(packet.Kind))
+            .Where(static packet => IsOppositionSignal(packet))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
@@ -2388,6 +2388,13 @@ public sealed class CampaignWorkspaceServerPlaneService
             || ContainsOppositionToken(consequence.Summary)
             || consequence.EvidenceLines.Any(ContainsOppositionToken)
             || consequence.Receipts.Any(static receipt => ContainsOppositionToken(receipt.SourceKind) || ContainsOppositionToken(receipt.Summary));
+    }
+
+    private static bool IsOppositionSignal(WorkspaceChangePacketProjection packet)
+    {
+        return IsOppositionSignalKind(packet.Kind)
+            || ContainsOppositionToken(packet.Label)
+            || ContainsOppositionToken(packet.Summary);
     }
 
     private static bool IsEventControlSignalKind(string? kind)
