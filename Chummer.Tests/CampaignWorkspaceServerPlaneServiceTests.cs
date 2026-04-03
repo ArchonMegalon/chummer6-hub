@@ -406,6 +406,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketSummaryFallsBackToConsequenceKindsWhenConsequenceLabelsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlConsequenceKindsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("heat_pressure_lane", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("faction_status_window", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void EventControlPacketFallsBackToExplicitEventSignalVariantsWhenOtherFamiliesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlExplicitEventSignalsOnly();
@@ -494,6 +508,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(packet.Reusable);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("opposition window label", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("threat lane label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void OppositionPacketSummaryFallsBackToKindsWhenSignalLabelsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionKindsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("opposition_window", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("threat_window", packet.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1677,6 +1705,55 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             TravelPrefetches: []);
     }
 
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlConsequenceKindsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        CampaignConsequenceProjection heatVariant = new(
+            ConsequenceId: "consequence-1",
+            Kind: "heat_pressure_lane",
+            Label: "",
+            State: "elevated",
+            Summary: "Heat pressure stays attached to event controls.",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+        CampaignConsequenceProjection factionVariant = new(
+            ConsequenceId: "consequence-2",
+            Kind: "faction_status_window",
+            Label: "",
+            State: "active",
+            Summary: "Faction pressure stays attached to event controls.",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [heatVariant, factionVariant],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
     private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlExplicitEventSignalsOnly()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
@@ -2054,6 +2131,48 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "",
             ChangePackets: [oppositionWindow, threatLane],
+            Consequences: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithOppositionKindsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection oppositionWindow = new(
+            PacketId: "packet-1",
+            Kind: "opposition_window",
+            Label: "",
+            Summary: "Opposition window remains active.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        WorkspaceChangePacketProjection threatWindow = new(
+            PacketId: "packet-2",
+            Kind: "threat_window",
+            Label: "",
+            Summary: "Threat window remains active.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [oppositionWindow, threatWindow],
             Consequences: []);
     }
 

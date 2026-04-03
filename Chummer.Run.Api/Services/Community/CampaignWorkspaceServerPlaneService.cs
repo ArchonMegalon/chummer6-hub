@@ -1399,10 +1399,16 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         string labels = string.Join(", ",
-            oppositionSignals.Select(static item => item.Label)
-                .Concat(consequences.Select(static item => item.Label))
-                .Concat(objectiveSignals.Select(static item => item.Title))
+            oppositionSignals
+                .Select(static item => DescribeSignalLabel(item.Label, item.Kind, "opposition signal"))
+                .Concat(consequences.Select(static item => DescribeSignalLabel(item.Label, item.Kind, item.State)))
+                .Concat(objectiveSignals.Select(static item => DescribeSignalLabel(item.Title, item.Status, "run pressure")))
+                .Where(static item => !string.IsNullOrWhiteSpace(item))
                 .Distinct(StringComparer.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(labels))
+        {
+            labels = "governed opposition cues";
+        }
         int signalCount = oppositionSignals.Length + consequences.Length + objectiveSignals.Length + (string.IsNullOrWhiteSpace(activeScene?.Summary) ? 0 : 1);
         string summary = consequences.Length > 0 || oppositionSignals.Length > 0
             ? $"{signalCount} governed opposition signal(s) are active: {labels}."
@@ -2143,9 +2149,16 @@ public sealed class CampaignWorkspaceServerPlaneService
             + eventObjectives.Length
             + (sceneSignal ? 1 : 0)
             + (carryForward is null ? 0 : 1);
+        string consequenceLabels = string.Join(", ",
+            consequences
+                .Select(static item => DescribeSignalLabel(item.Label, item.Kind, item.State))
+                .Where(static item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase));
         string consequenceSummary = consequences.Length == 0
             ? "Heat, contacts, and consequence posture stay linked to the same campaign return lane."
-            : $"{consequences.Length} consequence signal(s) ({string.Join(", ", consequences.Select(static item => item.Label))}) stay attached to event control.";
+            : string.IsNullOrWhiteSpace(consequenceLabels)
+                ? $"{consequences.Length} consequence signal(s) stay attached to event control."
+                : $"{consequences.Length} consequence signal(s) ({consequenceLabels}) stay attached to event control.";
         string sourceSummary = eventPackets.Length == 0
             && prepLaunches.Length == 0
             && travelPrefetches.Length == 0
@@ -2527,6 +2540,21 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
+
+    private static string DescribeSignalLabel(string? preferredLabel, string? firstFallback, string? secondFallback)
+    {
+        if (!string.IsNullOrWhiteSpace(preferredLabel))
+        {
+            return preferredLabel.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(firstFallback))
+        {
+            return firstFallback.Trim();
+        }
+
+        return secondFallback?.Trim() ?? string.Empty;
+    }
 
     private static IEnumerable<string> FlattenValues(IEnumerable<object?> values)
     {
