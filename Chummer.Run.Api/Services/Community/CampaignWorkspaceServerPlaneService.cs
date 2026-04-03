@@ -1803,27 +1803,59 @@ public sealed class CampaignWorkspaceServerPlaneService
             return true;
         }
 
-        bool hasRelationshipToken = normalizedKind.Contains("contact", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("heat", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("reputation", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("faction", StringComparison.OrdinalIgnoreCase);
-        bool hasMutationToken = normalizedKind.Contains("update", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("change", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("shift", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("delta", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("pressure", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("lane", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("window", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("state", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("status", StringComparison.OrdinalIgnoreCase);
-        return hasRelationshipToken && hasMutationToken;
+        return ContainsCampaignRelationshipToken(normalizedKind)
+            && ContainsCampaignRelationshipMutationToken(normalizedKind);
     }
 
     private static bool IsCampaignRelationshipSignal(WorkspaceChangePacketProjection packet)
     {
         return IsCampaignRelationshipSignalKind(packet.Kind)
             || IsCampaignRelationshipSignalKind(packet.Label)
-            || IsCampaignRelationshipSignalKind(packet.Summary);
+            || IsCampaignRelationshipSignalKind(packet.Summary)
+            || ContainsCampaignRelationshipSplitTokenSignal(packet.Kind, packet.Label, packet.Summary);
+    }
+
+    private static bool ContainsCampaignRelationshipSplitTokenSignal(string? kind, string? label, string? summary)
+    {
+        string combined = string.Join(' ', new[] { kind, label, summary }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+        if (string.IsNullOrWhiteSpace(combined))
+        {
+            return false;
+        }
+
+        return ContainsCampaignRelationshipToken(combined)
+            && ContainsCampaignRelationshipMutationToken(combined);
+    }
+
+    private static bool ContainsCampaignRelationshipToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Contains("contact", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("heat", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("reputation", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("faction", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsCampaignRelationshipMutationToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Contains("update", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("change", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("shift", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("delta", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("pressure", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("lane", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("window", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("state", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("status", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsCampaignRelationshipConsequenceKind(string? kind)
