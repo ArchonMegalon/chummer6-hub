@@ -652,6 +652,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDoesNotActivateFromContinuityOnlyCarryForwardNotesWithoutDiaryOrReturnSignals()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuityOnlyCarryForwardNotes();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignReturnPacketIncludesCarryForwardLabelWhenCarryForwardSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnCarryForwardLabelOnly();
@@ -4165,6 +4176,49 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         return new CampaignWorkspaceProjection(
             WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithContinuityOnlyCarryForwardNotes()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-continuity-only-1",
+            Label: "Continuity board note",
+            Summary: "Campaign continuity remains steady while operator planning is pending.",
+            ReturnSummary: "Continuity checklist remains unchanged.",
+            NextSafeAction: "Review continuity board updates before next planning review.",
+            EvidenceLines:
+            [
+                "Continuity board audit note captured.",
+                "No relationship mutation receipt is attached."
+            ],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-continuity-only-carry-forward-1",
             CampaignId: "campaign-a",
             CampaignName: "Neon Cradle",
             Visibility: "group",

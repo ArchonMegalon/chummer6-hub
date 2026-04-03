@@ -2065,10 +2065,10 @@ public sealed class CampaignWorkspaceServerPlaneService
         }.Where(static value => !string.IsNullOrWhiteSpace(value)));
         bool returnLaneSignal = ContainsAnyWordToken(combinedCarryForwardText, ReturnWordTokens)
             && ContainsAnyWordToken(combinedCarryForwardText, ["lane", "reopen", "downtime", "session", "next"]);
-        bool primarySignal = IsCampaignReturnSignalKind(carryForward.Label)
-            || IsCampaignReturnSignalKind(carryForward.Summary)
-            || IsCampaignReturnSignalKind(carryForward.ReturnSummary)
-            || IsCampaignReturnSignalKind(carryForward.NextSafeAction)
+        bool primarySignal = IsCampaignReturnCarryForwardTextSignal(carryForward.Label)
+            || IsCampaignReturnCarryForwardTextSignal(carryForward.Summary)
+            || IsCampaignReturnCarryForwardTextSignal(carryForward.ReturnSummary)
+            || IsCampaignReturnCarryForwardTextSignal(carryForward.NextSafeAction)
             || ContainsCampaignReturnRecapToken(carryForward.Label)
             || ContainsCampaignReturnRecapToken(carryForward.Summary)
             || ContainsCampaignReturnRecapToken(carryForward.ReturnSummary)
@@ -2081,12 +2081,40 @@ public sealed class CampaignWorkspaceServerPlaneService
             || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.NextSafeAction, carryForward.ReturnSummary)
             || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Summary, carryForward.NextSafeAction, carryForward.ReturnSummary)
             || returnLaneSignal;
-        bool evidenceSignal = carryForward.EvidenceLines.Any(IsCampaignReturnSignalKind)
+        bool evidenceSignal = carryForward.EvidenceLines.Any(IsCampaignReturnCarryForwardTextSignal)
             || carryForward.EvidenceLines.Any(ContainsCampaignReturnRecapToken)
             || carryForward.EvidenceLines.Any(IsDiarySignalKind)
             || ContainsCampaignRelationshipSplitTokenSignalFromCandidates(carryForward.EvidenceLines);
 
         return primarySignal || evidenceSignal;
+    }
+
+    private static bool IsCampaignReturnCarryForwardTextSignal(string? value)
+    {
+        string normalized = value?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        if (string.Equals(normalized, "campaign_return", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "return_loop", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "return_window", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "next_session_return", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        bool containsReturnLaneToken = ContainsAnyWordToken(normalized, ReturnWordTokens)
+            && ContainsAnyWordToken(normalized, ["campaign", "session", "loop", "window", "lane", "reopen", "downtime", "next", "handoff"]);
+        if (containsReturnLaneToken)
+        {
+            return true;
+        }
+
+        return ContainsCampaignReturnRecapToken(normalized)
+            || IsDiarySignalKind(normalized)
+            || IsCampaignRelationshipSignalKind(normalized);
     }
 
     private static bool IsCampaignReturnCarryForwardRelationshipSignal(NextSessionCarryForwardProjection? carryForward)
