@@ -504,6 +504,20 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             {
                 lock (local)
                 {
+                    string normalizedRemoteCampaignId = asset.CampaignId.Trim();
+                    if (!string.Equals(local.CampaignId, normalizedRemoteCampaignId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        skipped++;
+                        conflicts.Add(new OfflineSyncConflict(
+                            Surface: "ops-prep",
+                            EntityId: normalizedAssetId,
+                            Reason: "campaign-mismatch",
+                            Resolution: "kept-local",
+                            LocalFingerprint: local.CampaignId,
+                            RemoteFingerprint: normalizedRemoteCampaignId));
+                        continue;
+                    }
+
                     if (asset.UpdatedAtUtc <= local.UpdatedAtUtc)
                     {
                         skipped++;
@@ -517,7 +531,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                         continue;
                     }
 
-                    local.CampaignId = asset.CampaignId.Trim();
+                    local.CampaignId = normalizedRemoteCampaignId;
                     local.SessionId = NormalizeOptional(asset.SessionId);
                     local.SceneId = NormalizeOptional(asset.SceneId);
                     local.Title = asset.Title.Trim();

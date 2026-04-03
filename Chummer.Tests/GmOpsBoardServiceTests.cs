@@ -191,6 +191,39 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public void ReconcilePortableAssets_KeepsLocalAsset_WhenCampaignDoesNotMatchExistingAsset()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        var local = BuildPortableAsset(
+            assetId: "prep_campaign_guard",
+            now: now,
+            campaignId: "campaign_alpha",
+            title: "Alpha prep");
+        var remoteCollision = BuildPortableAsset(
+            assetId: "prep_campaign_guard",
+            now: now.AddMinutes(2),
+            campaignId: "campaign_beta",
+            title: "Beta prep takeover");
+
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([local, remoteCollision]);
+
+        Assert.Equal(1, result.ImportedCount);
+        Assert.Equal(1, result.SkippedCount);
+        OfflineSyncConflict conflict = Assert.Single(result.Conflicts);
+        Assert.Equal("prep_campaign_guard", conflict.EntityId);
+        Assert.Equal("campaign-mismatch", conflict.Reason);
+        Assert.Equal("kept-local", conflict.Resolution);
+        Assert.Equal("campaign_alpha", conflict.LocalFingerprint);
+        Assert.Equal("campaign_beta", conflict.RemoteFingerprint);
+
+        GmPrepAssetRecord? stored = service.GetPrepAsset("prep_campaign_guard");
+        Assert.NotNull(stored);
+        Assert.Equal("campaign_alpha", stored!.CampaignId);
+        Assert.Equal("Alpha prep", stored.Title);
+    }
+
+    [Fact]
     public void ReconcilePortableAssets_SkipsAssets_WhenKindOrAudienceIsInvalid()
     {
         var service = CreateService();
