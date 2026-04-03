@@ -46,6 +46,15 @@ public sealed class CampaignWorkspaceServerPlaneService
         "threats"
     ];
 
+    private static readonly string[] CampaignReturnRecapWordTokens =
+    [
+        "diary",
+        "downtime",
+        "recap",
+        "career",
+        "log"
+    ];
+
     private sealed record WorkspaceContext(
         CampaignWorkspaceProjection Workspace,
         CampaignWorkspaceDigestProjection? Digest,
@@ -1793,12 +1802,8 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static bool IsCampaignReturnRecapSignal(PublicationSafeProjection item)
     {
         string kind = item.Kind.Trim();
-        if (kind.Contains("diary", StringComparison.OrdinalIgnoreCase)
-            || kind.Contains("downtime", StringComparison.OrdinalIgnoreCase)
-            || kind.Contains("recap", StringComparison.OrdinalIgnoreCase)
-            || kind.Contains("after_action", StringComparison.OrdinalIgnoreCase)
-            || kind.Contains("career", StringComparison.OrdinalIgnoreCase)
-            || kind.Contains("log", StringComparison.OrdinalIgnoreCase))
+        if (kind.Contains("after_action", StringComparison.OrdinalIgnoreCase)
+            || ContainsAnyWordToken(kind, CampaignReturnRecapWordTokens))
         {
             return true;
         }
@@ -1814,13 +1819,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return value.Contains("diary", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("downtime", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("recap", StringComparison.OrdinalIgnoreCase)
+        return ContainsAnyWordToken(value, CampaignReturnRecapWordTokens)
             || value.Contains("after action", StringComparison.OrdinalIgnoreCase)
             || value.Contains("after-action", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("career", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("log", StringComparison.OrdinalIgnoreCase);
+            || value.Contains("after_action", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsCampaignRelationshipSignalKind(string? kind)
