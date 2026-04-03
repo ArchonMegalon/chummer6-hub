@@ -2055,13 +2055,21 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static bool ContainsCampaignRelationshipSplitTokenSignal(string? kind, string? label, string? summary)
     {
-        string[] candidates = [kind ?? string.Empty, label ?? string.Empty, summary ?? string.Empty];
-        string combined = string.Join(' ', candidates.Where(static value => !string.IsNullOrWhiteSpace(value)));
-        if (string.IsNullOrWhiteSpace(combined))
+        return ContainsCampaignRelationshipSplitTokenSignalFromCandidates([kind, label, summary]);
+    }
+
+    private static bool ContainsCampaignRelationshipSplitTokenSignalFromCandidates(IEnumerable<string?> rawCandidates)
+    {
+        string[] candidates = rawCandidates
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value!)
+            .ToArray();
+        if (candidates.Length == 0)
         {
             return false;
         }
 
+        string combined = string.Join(' ', candidates);
         if (!ContainsCampaignRelationshipToken(combined))
         {
             return false;
@@ -2144,6 +2152,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         return IsCampaignRelationshipConsequenceKind(consequence.Kind)
             || ContainsCampaignRelationshipSplitTokenSignal(consequence.Kind, consequence.Label, consequence.Summary)
             || ContainsCampaignRelationshipSplitTokenSignal(consequence.Kind, consequence.Label, consequence.State)
+            || ContainsCampaignRelationshipSplitTokenSignalFromCandidates(consequence.EvidenceLines)
+            || ContainsCampaignRelationshipSplitTokenSignalFromCandidates(consequence.Receipts.SelectMany(static receipt => new string?[] { receipt.SourceKind, receipt.Summary }))
             || consequence.EvidenceLines.Any(static line =>
                 ContainsCampaignRelationshipToken(line) && ContainsCampaignRelationshipMutationToken(line))
             || consequence.Receipts.Any(static receipt =>
