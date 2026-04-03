@@ -2164,7 +2164,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         RunProjection? leadRun)
     {
         WorkspaceChangePacketProjection[] eventPackets = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsEventControlSignalKind(packet.Kind))
+            .Where(static packet => IsEventControlSignal(packet))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
@@ -2413,6 +2413,17 @@ public sealed class CampaignWorkspaceServerPlaneService
             || ContainsEventControlToken(normalizedKind)
             || IsCampaignRelationshipSignalKind(normalizedKind)
             || IsOppositionSignalKind(normalizedKind);
+    }
+
+    private static bool IsEventControlSignal(WorkspaceChangePacketProjection packet)
+    {
+        return IsEventControlSignalKind(packet.Kind)
+            || ContainsEventControlToken(packet.Label)
+            || ContainsEventControlToken(packet.Summary)
+            || ContainsOppositionToken(packet.Label)
+            || ContainsOppositionToken(packet.Summary)
+            || IsCampaignRelationshipSignalKind(packet.Label)
+            || IsCampaignRelationshipSignalKind(packet.Summary);
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrefetchOpsPacket(
