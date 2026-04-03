@@ -92,6 +92,29 @@ public sealed class CampaignWorkspaceServerPlaneService
         "threats"
     ];
 
+    private static readonly string[] OppositionIdentityWordTokens =
+    [
+        "opposition",
+        "oppositions",
+        "hostile",
+        "hostiles",
+        "adversary",
+        "adversaries"
+    ];
+
+    private static readonly string[] OppositionThreatContextWordTokens =
+    [
+        "window",
+        "lane",
+        "control",
+        "board",
+        "scene",
+        "run",
+        "objective",
+        "checkpoint",
+        "response"
+    ];
+
     private static readonly string[] CampaignReturnRecapWordTokens =
     [
         "diary",
@@ -1650,9 +1673,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             ?? leadRun?.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
         bool sceneSignal = IsOppositionObjectiveSignal(activeScene?.Title, activeScene?.Summary, null);
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
-        bool carryForwardSignal = IsOppositionObjectiveSignal(carryForward?.Label, carryForward?.Summary, null)
-            || IsOppositionObjectiveSignal(carryForward?.ReturnSummary, carryForward?.NextSafeAction, null)
-            || (carryForward?.EvidenceLines?.Any(ContainsOppositionToken) ?? false);
+        bool carryForwardSignal = IsOppositionCarryForwardSignal(carryForward);
         if (oppositionSignals.Length == 0
             && consequences.Length == 0
             && objectiveSignals.Length == 0
@@ -2967,10 +2988,16 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        bool eventOrOppositionSignal = IsEventControlObjectiveSignal(carryForward.Label, carryForward.Summary)
-            || IsEventControlObjectiveSignal(carryForward.ReturnSummary, carryForward.NextSafeAction);
+        bool eventOrOppositionSignal = ContainsEventControlToken(carryForward.Label)
+            || ContainsEventControlToken(carryForward.Summary)
+            || ContainsEventControlToken(carryForward.ReturnSummary)
+            || ContainsEventControlToken(carryForward.NextSafeAction)
+            || IsOppositionCarryForwardTextSignal(carryForward.Label)
+            || IsOppositionCarryForwardTextSignal(carryForward.Summary)
+            || IsOppositionCarryForwardTextSignal(carryForward.ReturnSummary)
+            || IsOppositionCarryForwardTextSignal(carryForward.NextSafeAction);
         bool eventOrOppositionEvidenceSignal = carryForward.EvidenceLines.Any(static line =>
-            ContainsEventControlToken(line) || ContainsOppositionToken(line));
+            ContainsEventControlToken(line) || IsOppositionCarryForwardTextSignal(line));
         bool relationshipSignal = ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.Summary, carryForward.ReturnSummary)
             || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.NextSafeAction, carryForward.ReturnSummary)
             || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Summary, carryForward.NextSafeAction, carryForward.ReturnSummary)
@@ -3075,6 +3102,36 @@ public sealed class CampaignWorkspaceServerPlaneService
         return ContainsOppositionToken(title)
             || ContainsOppositionToken(summary)
             || ContainsOppositionToken(pressure);
+    }
+
+    private static bool IsOppositionCarryForwardSignal(NextSessionCarryForwardProjection? carryForward)
+    {
+        if (carryForward is null)
+        {
+            return false;
+        }
+
+        return IsOppositionCarryForwardTextSignal(carryForward.Label)
+            || IsOppositionCarryForwardTextSignal(carryForward.Summary)
+            || IsOppositionCarryForwardTextSignal(carryForward.ReturnSummary)
+            || IsOppositionCarryForwardTextSignal(carryForward.NextSafeAction)
+            || carryForward.EvidenceLines.Any(IsOppositionCarryForwardTextSignal);
+    }
+
+    private static bool IsOppositionCarryForwardTextSignal(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        if (ContainsAnyWordToken(value, OppositionIdentityWordTokens))
+        {
+            return true;
+        }
+
+        return ContainsAnyWordToken(value, ["threat", "threats"])
+            && ContainsAnyWordToken(value, OppositionThreatContextWordTokens);
     }
 
     private static bool IsEventControlSignalKind(string? kind)
