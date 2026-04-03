@@ -280,6 +280,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketFallsBackToOppositionSignalVariantsWhenEventFamiliesLag()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlOppositionSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("opposition", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("opposition command board", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void OppositionPacketFallsBackToRunPressureWhenConsequencesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRunPressureSignalsOnly();
@@ -1164,6 +1179,74 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [],
             Consequences: [],
             RosterTransfers: [transfer],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlOppositionSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection oppositionVariant = new(
+            PacketId: "packet-1",
+            Kind: "opposition_window_shift",
+            Label: "Opposition window shift",
+            Summary: "Opposition command board remains active while event-control receipts catch up.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-1",
+            Title: "Hostile response window",
+            Status: "open",
+            Pressure: "high",
+            Summary: "Hostile pressure remains active until the organizer event board is reopened.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        SceneProjection scene = new(
+            SceneId: "scene-1",
+            RunId: "run-1",
+            Title: "Dockyard opposition board",
+            Revision: "r6",
+            Status: "active",
+            Summary: "Opposition command board remains active for the next season-control checkpoint.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "Current run remains active under hostile pressure.",
+            ActiveSceneId: "scene-1",
+            Objectives: [objective],
+            Scenes: [scene],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(5));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [oppositionVariant],
+            Consequences: [],
             PrepLaunches: [],
             TravelPrefetches: []);
     }
