@@ -455,6 +455,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void OppositionPacketIncludesSignalLabelsWhenSignalSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionSignalLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("opposition window label", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("threat lane label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void OppositionPacketFallsBackToRunPressureWhenConsequencesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRunPressureSignalsOnly();
@@ -1890,6 +1904,48 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReadinessCues: [],
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
+            ChangePackets: [oppositionWindow, threatLane],
+            Consequences: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithOppositionSignalLabelsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection oppositionWindow = new(
+            PacketId: "packet-1",
+            Kind: "opposition_window_shift",
+            Label: "Opposition window label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(1));
+        WorkspaceChangePacketProjection threatLane = new(
+            PacketId: "packet-2",
+            Kind: "threat_control_delta",
+            Label: "Threat lane label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
             ChangePackets: [oppositionWindow, threatLane],
             Consequences: []);
     }
