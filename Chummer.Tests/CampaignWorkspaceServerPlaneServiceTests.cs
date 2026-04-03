@@ -960,6 +960,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLaunchPacketKeepsKindFallbackWhenLaunchEvidenceIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchKindsAndVerboseLaunchEvidence();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("prep_launch", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("season prep lane", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void ContinuityPacketFallsBackToCarryForwardAndContinuityChangeSignals()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuitySignalsOnly();
@@ -3844,6 +3859,110 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [prepLaunchChange],
             Consequences: [],
             PrepLaunches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchKindsAndVerboseLaunchEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-1",
+            Title: "Prep launch validation",
+            Status: "open",
+            Pressure: "medium",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "Current run remains active.",
+            ActiveSceneId: null,
+            Objectives: [objective],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        WorkspaceChangePacketProjection prepLaunchChange = new(
+            PacketId: "packet-1",
+            Kind: "prep_launch",
+            Label: "",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        GovernedPrepLaunchProjection launchA = new(
+            LaunchId: "launch-1",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            PacketId: "scene:workspace-1",
+            PacketKind: "scene_packet",
+            PacketTitle: "Season prep lane A",
+            TargetRunId: "run-1",
+            TargetRunTitle: "Dockyard pressure test",
+            TargetSceneId: "scene-a",
+            TargetSceneTitle: "Pier ingress",
+            InitiatedByUserId: "gm-1",
+            Summary: "Season prep lane A remains richly documented for launch audit detail.",
+            AuditLines: ["Launch lane A audit details are fully populated."],
+            LaunchedAtUtc: now.AddMinutes(8));
+        GovernedPrepLaunchProjection launchB = new(
+            LaunchId: "launch-2",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            PacketId: "scene:workspace-2",
+            PacketKind: "scene_packet",
+            PacketTitle: "Season prep lane B",
+            TargetRunId: "run-1",
+            TargetRunTitle: "Dockyard pressure test",
+            TargetSceneId: "scene-b",
+            TargetSceneTitle: "Signal tunnel",
+            InitiatedByUserId: "gm-1",
+            Summary: "Season prep lane B remains richly documented for launch audit detail.",
+            AuditLines: ["Launch lane B audit details are fully populated."],
+            LaunchedAtUtc: now.AddMinutes(7));
+        GovernedPrepLaunchProjection launchC = new(
+            LaunchId: "launch-3",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            PacketId: "scene:workspace-3",
+            PacketKind: "scene_packet",
+            PacketTitle: "Season prep lane C",
+            TargetRunId: "run-1",
+            TargetRunTitle: "Dockyard pressure test",
+            TargetSceneId: "scene-c",
+            TargetSceneTitle: "Grid relay",
+            InitiatedByUserId: "gm-1",
+            Summary: "Season prep lane C remains richly documented for launch audit detail.",
+            AuditLines: ["Launch lane C audit details are fully populated."],
+            LaunchedAtUtc: now.AddMinutes(6));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [prepLaunchChange],
+            Consequences: [],
+            PrepLaunches: [launchA, launchB, launchC]);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithContinuitySignalsOnly()

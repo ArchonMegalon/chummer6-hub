@@ -2053,12 +2053,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         IReadOnlyList<string> evidence = BuildEvidenceLines(
+            launchSignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "prep launch signal")),
             launches.Select(DescribePrepLaunchEvidence),
             launches.Select(static item => item.PacketTitle),
-            launches.SelectMany(static item => item.AuditLines),
             launchSignals.Select(static packet => packet.Summary),
             launchSignals.Select(static packet => packet.Label),
-            launchSignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "prep launch signal")));
+            launches.SelectMany(static item => item.AuditLines));
         int signalCount = launches.Length + launchSignals.Length;
         string summary = launches.Length > 0
             ? $"{signalCount} prep-launch signal(s) keep packet launches auditable on the same campaign lane."
