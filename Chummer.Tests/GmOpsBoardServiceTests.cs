@@ -10,6 +10,40 @@ namespace Chummer.Tests;
 public sealed class GmOpsBoardServiceTests
 {
     [Fact]
+    public void ReconcilePortableAssets_SkipsAssets_WhenRequiredAssetFieldsAreMissing()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        var missingCampaign = BuildPortableAsset(
+            assetId: "prep_missing_campaign",
+            now: now,
+            campaignId: " ");
+        var missingTitle = BuildPortableAsset(
+            assetId: "prep_missing_title",
+            now: now.AddMinutes(1),
+            title: "");
+        var missingBody = BuildPortableAsset(
+            assetId: "prep_missing_body",
+            now: now.AddMinutes(2),
+            body: "   ");
+
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([missingCampaign, missingTitle, missingBody]);
+
+        Assert.Equal(0, result.ImportedCount);
+        Assert.Equal(3, result.SkippedCount);
+        Assert.Equal(3, result.Conflicts.Count);
+        Assert.All(result.Conflicts, conflict =>
+        {
+            Assert.Equal("ops-prep", conflict.Surface);
+            Assert.Equal("invalid-asset-required-fields", conflict.Reason);
+            Assert.Equal("skipped-invalid", conflict.Resolution);
+        });
+        Assert.Null(service.GetPrepAsset("prep_missing_campaign"));
+        Assert.Null(service.GetPrepAsset("prep_missing_title"));
+        Assert.Null(service.GetPrepAsset("prep_missing_body"));
+    }
+
+    [Fact]
     public void ReconcilePortableAssets_DropsGovernedProject_WhenRequiredFieldsAreMissing()
     {
         var service = CreateService();
@@ -99,4 +133,28 @@ public sealed class GmOpsBoardServiceTests
         var outbox = new DeliveryOutboxService();
         return new GmOpsBoardService(ledger, outbox);
     }
+
+    private static OfflineSyncPrepAsset BuildPortableAsset(
+        string assetId,
+        DateTimeOffset now,
+        string campaignId = "campaign_ops",
+        string title = "Portable prep asset",
+        string body = "portable body") =>
+        new(
+            AssetId: assetId,
+            CampaignId: campaignId,
+            SessionId: "session_ops",
+            SceneId: "scene_ops",
+            Title: title,
+            Kind: nameof(GmPrepAssetKind.Note),
+            Audience: nameof(GmPrepAssetAudience.GameMaster),
+            Summary: "portable",
+            Body: body,
+            Tags: ["portable"],
+            ChecklistItems: Array.Empty<OfflineSyncPrepChecklistItem>(),
+            Status: "draft",
+            CreatedBy: "gm.ops",
+            RuntimeFingerprint: "ops-fingerprint",
+            CreatedAtUtc: now.AddMinutes(-5),
+            UpdatedAtUtc: now);
 }
