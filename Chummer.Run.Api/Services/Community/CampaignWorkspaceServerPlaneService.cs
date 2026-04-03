@@ -29,20 +29,28 @@ public sealed class CampaignWorkspaceServerPlaneService
         "status",
         "fallout",
         "cooldown",
-        "cooling"
+        "cooling",
+        "shift",
+        "shifts",
+        "shifted",
+        "spike",
+        "spikes",
+        "spiked",
+        "surge",
+        "surges",
+        "surged",
+        "drop",
+        "drops",
+        "dropped"
     ];
 
     private static readonly string[] CampaignRelationshipMutationWordPrefixes =
     [
         "updat",
         "chang",
-        "shift",
         "pressur",
         "escalat",
-        "spike",
-        "surge",
-        "declin",
-        "drop"
+        "declin"
     ];
 
     private static readonly string[] EventControlWordTokens =
