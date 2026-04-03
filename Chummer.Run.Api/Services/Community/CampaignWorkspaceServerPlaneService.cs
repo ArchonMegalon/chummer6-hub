@@ -129,6 +129,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         "changes",
         "entry",
         "entries",
+        "entered",
+        "entering",
         "note",
         "notes"
     ];
@@ -136,8 +138,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static readonly string[] DiaryMutationWordPrefixes =
     [
         "updat",
-        "chang",
-        "entr"
+        "chang"
     ];
 
     private static readonly string[] ContinuityWordTokens =
