@@ -974,41 +974,37 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static string BoundedRecapShelfCategory(PublicationSafeProjection item)
     {
         string normalizedKind = item.Kind.Trim().ToLowerInvariant();
-        if (normalizedKind.Contains("campaign_recap", StringComparison.Ordinal)
-            || normalizedKind == "campaign")
+        if (IsCampaignRecapPublicationKind(normalizedKind))
         {
             return "campaign";
         }
 
-        if (normalizedKind.Contains("primer", StringComparison.Ordinal))
+        if (IsPrimerPublicationKind(normalizedKind))
         {
             return "primer";
         }
 
-        if (normalizedKind.Contains("runboard", StringComparison.Ordinal)
-            || normalizedKind.Contains("module", StringComparison.Ordinal))
+        if (IsRunboardOrModulePublicationKind(normalizedKind))
         {
             return "run_module";
         }
 
-        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        if (IsDossierPublicationKind(normalizedKind))
         {
             return "dossier";
         }
 
-        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        if (IsReplayPublicationKind(normalizedKind))
         {
             return "replay";
         }
 
-        if (normalizedKind.Contains("session_recap", StringComparison.Ordinal)
-            || normalizedKind.Contains("after_action", StringComparison.Ordinal)
-            || normalizedKind.Contains("recap", StringComparison.Ordinal))
+        if (IsAftermathRecapPublicationKind(normalizedKind))
         {
             return "aftermath";
         }
 
-        if (normalizedKind.Contains("downtime", StringComparison.Ordinal))
+        if (IsDowntimePublicationKind(normalizedKind))
         {
             return "downtime";
         }
@@ -1035,13 +1031,12 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static bool SupportsCreatorShelfProjection(PublicationSafeProjection item)
     {
         var normalizedKind = item.Kind.Trim().ToLowerInvariant();
-        return normalizedKind.Contains("recap", StringComparison.Ordinal)
-            || normalizedKind.Contains("after", StringComparison.Ordinal)
-            || normalizedKind.Contains("downtime", StringComparison.Ordinal)
-            || normalizedKind.Contains("replay", StringComparison.Ordinal)
-            || normalizedKind.Contains("dossier", StringComparison.Ordinal)
-            || normalizedKind.Contains("runboard", StringComparison.Ordinal)
-            || normalizedKind.Contains("campaign", StringComparison.Ordinal);
+        return IsAftermathRecapPublicationKind(normalizedKind)
+            || IsDowntimePublicationKind(normalizedKind)
+            || IsReplayPublicationKind(normalizedKind)
+            || IsDossierPublicationKind(normalizedKind)
+            || IsRunboardOrModulePublicationKind(normalizedKind)
+            || IsCampaignRecapPublicationKind(normalizedKind);
     }
 
     private static CreatorPublicationProjection? ResolveCreatorPublicationForRecapItem(
@@ -1069,13 +1064,13 @@ public sealed class CampaignWorkspaceServerPlaneService
         var normalizedKind = item.Kind.Trim().ToLowerInvariant();
         if (creatorLinked)
         {
-            return normalizedKind.Contains("dossier", StringComparison.Ordinal)
+            return IsDossierPublicationKind(normalizedKind)
                 ? "personal,campaign,creator"
                 : "campaign,creator";
         }
 
-        if (normalizedKind.Contains("dossier", StringComparison.Ordinal)
-            || normalizedKind.Contains("campaign_recap", StringComparison.Ordinal))
+        if (IsDossierPublicationKind(normalizedKind)
+            || IsCampaignRecapPublicationKind(normalizedKind))
         {
             return "personal,campaign";
         }
@@ -1088,17 +1083,17 @@ public sealed class CampaignWorkspaceServerPlaneService
         PublicationSafeProjection item)
     {
         var normalizedKind = item.Kind.Trim().ToLowerInvariant();
-        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        if (IsDossierPublicationKind(normalizedKind))
         {
             return $"{workspace.CampaignName} reuses the same governed dossier artifact on the signed-in account path instead of forking a shadow copy.";
         }
 
-        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        if (IsRunboardOrModulePublicationKind(normalizedKind))
         {
             return $"{workspace.CampaignName} keeps this GM-facing packet on the shared campaign rail so organizer follow-through stays reviewable.";
         }
 
-        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        if (IsReplayPublicationKind(normalizedKind))
         {
             return $"{workspace.CampaignName} keeps this replay-safe artifact pinned to the shared continuity lane so contested turns can be reviewed without forking campaign truth.";
         }
@@ -1109,12 +1104,12 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static string DescribeRecapShelfPublicationState(PublicationSafeProjection item)
     {
         var normalizedKind = item.Kind.Trim().ToLowerInvariant();
-        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        if (IsDossierPublicationKind(normalizedKind))
         {
             return "personal_ready";
         }
 
-        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        if (IsRunboardOrModulePublicationKind(normalizedKind))
         {
             return "campaign_ready";
         }
@@ -1188,17 +1183,17 @@ public sealed class CampaignWorkspaceServerPlaneService
         PublicationSafeProjection item)
     {
         var normalizedKind = item.Kind.Trim().ToLowerInvariant();
-        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        if (IsDossierPublicationKind(normalizedKind))
         {
             return $"Personal and campaign views already share this {workspace.CampaignName} artifact without requiring a second export lane.";
         }
 
-        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        if (IsRunboardOrModulePublicationKind(normalizedKind))
         {
             return "Campaign return and GM prep reuse the same packet before shared publication opens.";
         }
 
-        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        if (IsReplayPublicationKind(normalizedKind))
         {
             return "Campaign return and contested-turn review reuse the same replay-safe packet before shared publication opens.";
         }
@@ -1211,17 +1206,17 @@ public sealed class CampaignWorkspaceServerPlaneService
         PublicationSafeProjection item)
     {
         var normalizedKind = item.Kind.Trim().ToLowerInvariant();
-        if (normalizedKind.Contains("runboard", StringComparison.Ordinal))
+        if (IsRunboardOrModulePublicationKind(normalizedKind))
         {
             return "Keep prep, aftermath, and next-session follow-through on the shared campaign rail before you branch into another export lane.";
         }
 
-        if (normalizedKind.Contains("replay", StringComparison.Ordinal))
+        if (IsReplayPublicationKind(normalizedKind))
         {
             return "Keep contested-turn review on the shared campaign rail before you widen the replay artifact audience or publish another copy.";
         }
 
-        if (normalizedKind.Contains("dossier", StringComparison.Ordinal))
+        if (IsDossierPublicationKind(normalizedKind))
         {
             return "Reopen the shared campaign view before you move this runner artifact into another campaign, shelf, or publication step.";
         }
@@ -2780,6 +2775,36 @@ public sealed class CampaignWorkspaceServerPlaneService
         return ContainsAnyWordToken(value, ["after"])
             && ContainsAnyWordToken(value, ["action"]);
     }
+
+    private static bool IsCampaignRecapPublicationKind(string value)
+    {
+        if (string.Equals(value, "campaign", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return ContainsAnyWordToken(value, ["campaign"])
+            && ContainsAnyWordToken(value, ["recap"]);
+    }
+
+    private static bool IsPrimerPublicationKind(string value)
+        => ContainsAnyWordToken(value, ["primer"]);
+
+    private static bool IsRunboardOrModulePublicationKind(string value)
+        => ContainsAnyWordToken(value, ["runboard", "module"]);
+
+    private static bool IsDossierPublicationKind(string value)
+        => ContainsAnyWordToken(value, ["dossier"]);
+
+    private static bool IsReplayPublicationKind(string value)
+        => ContainsAnyWordToken(value, ["replay"]);
+
+    private static bool IsAftermathRecapPublicationKind(string value)
+        => ContainsAnyWordToken(value, ["aftermath", "recap", "debrief"])
+            || ContainsAfterActionTokenPair(value);
+
+    private static bool IsDowntimePublicationKind(string value)
+        => ContainsAnyWordToken(value, ["downtime"]);
 
     private static GovernedPrepPacketSummary? BuildTravelPrefetchOpsPacket(
         CampaignWorkspaceProjection workspace,
