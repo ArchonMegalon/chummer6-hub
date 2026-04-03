@@ -557,6 +557,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void TravelPrefetchPacketKeepsKindFallbackWhenReceiptEvidenceIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithTravelPrefetchKindsAndVerboseReceiptEvidence();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("travel_prefetch", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void TravelPacketIncludesFallbackEvidenceWhenRestoreSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
@@ -2554,6 +2567,100 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [prefetchChange],
             Consequences: [],
             TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithTravelPrefetchKindsAndVerboseReceiptEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection prefetchChange = new(
+            PacketId: "packet-1",
+            Kind: "travel_prefetch",
+            Label: "",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(8));
+
+        TravelPrefetchReceiptProjection receiptOne = new(
+            ReceiptId: "prefetch-1",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            InstallationId: "install-1",
+            DeviceRole: "travel_cache",
+            Platform: "ios",
+            HeadId: "mobile",
+            Channel: "preview",
+            PrefetchSummary: "Verbose prefetch summary line one.",
+            InventoryLines: [],
+            Boundaries: [],
+            InitiatedByUserId: "gm-1",
+            StagedAtUtc: now.AddMinutes(4));
+        TravelPrefetchReceiptProjection receiptTwo = new(
+            ReceiptId: "prefetch-2",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            InstallationId: "install-2",
+            DeviceRole: "travel_cache",
+            Platform: "android",
+            HeadId: "mobile",
+            Channel: "preview",
+            PrefetchSummary: "Verbose prefetch summary line two.",
+            InventoryLines: [],
+            Boundaries: [],
+            InitiatedByUserId: "gm-1",
+            StagedAtUtc: now.AddMinutes(5));
+        TravelPrefetchReceiptProjection receiptThree = new(
+            ReceiptId: "prefetch-3",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            InstallationId: "install-3",
+            DeviceRole: "travel_cache",
+            Platform: "windows",
+            HeadId: "desktop",
+            Channel: "stable",
+            PrefetchSummary: "Verbose prefetch summary line three.",
+            InventoryLines: [],
+            Boundaries: [],
+            InitiatedByUserId: "gm-1",
+            StagedAtUtc: now.AddMinutes(6));
+        TravelPrefetchReceiptProjection receiptFour = new(
+            ReceiptId: "prefetch-4",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            InstallationId: "install-4",
+            DeviceRole: "travel_cache",
+            Platform: "linux",
+            HeadId: "desktop",
+            Channel: "stable",
+            PrefetchSummary: "Verbose prefetch summary line four.",
+            InventoryLines: [],
+            Boundaries: [],
+            InitiatedByUserId: "gm-1",
+            StagedAtUtc: now.AddMinutes(7));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [prefetchChange],
+            Consequences: [],
+            TravelPrefetches: [receiptOne, receiptTwo, receiptThree, receiptFour]);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithRunPressureSignalsOnly()
