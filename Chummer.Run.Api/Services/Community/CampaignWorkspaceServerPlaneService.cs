@@ -1409,6 +1409,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             : $"{signalCount} governed opposition signal(s) are active from run pressure and active-scene cues: {labels}.";
         IReadOnlyList<string> evidence = BuildEvidenceLines(
             oppositionSignals.Select(static item => item.Summary),
+            oppositionSignals.Select(static item => item.Label),
+            consequences.Select(static item => item.Label),
             consequences.SelectMany(static item => item.EvidenceLines.Concat(item.Receipts.Select(static receipt => receipt.Summary))),
             objectiveSignals.Select(static item => item.Summary),
             objectiveSignals.Select(static item => $"{item.Title} stays {item.Status} with {item.Pressure} pressure."),
