@@ -1323,6 +1323,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         string? normalizedWorkspaceSceneSummary = NormalizeOptional(workspace.ActiveSceneSummary);
         ObjectiveProjection? leadObjective = leadRun?.Objectives.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
         string? normalizedObjectiveSummary = NormalizeOptional(leadObjective?.Summary);
+        string? normalizedLeadRunTitle = NormalizeOptional(leadRun?.Title);
         string? normalizedSceneTitle = NormalizeOptional(activeScene?.Title);
         string? normalizedObjectiveTitle = NormalizeOptional(leadObjective?.Title);
 
@@ -1348,8 +1349,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         string bindingSummary = leadRun is null
             ? $"Bound to {workspace.CampaignName} from the current shared return lane."
             : activeScene is null
-                ? $"Bound to {leadRun.Title} from the current shared return lane."
-                : $"Bound to {leadRun.Title} / {activeScene.Title} on {workspace.RuleEnvironment.CompatibilityFingerprint}.";
+                ? $"Bound to {normalizedLeadRunTitle ?? "active run"} from the current shared return lane."
+                : $"Bound to {normalizedLeadRunTitle ?? "active run"} / {sceneTitle} on {workspace.RuleEnvironment.CompatibilityFingerprint}.";
 
         return new GovernedPrepPacketSummary(
             PacketId: $"scene:{workspace.WorkspaceId}",
