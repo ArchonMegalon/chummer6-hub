@@ -381,6 +381,48 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLaunchPacketIncludesFallbackEvidenceWhenLaunchReceiptsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithSparseOpsReceipts();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("scene_packet for run-1 / scene-1", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void TravelPrefetchPacketIncludesFallbackEvidenceWhenReceiptSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithSparseOpsReceipts();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("travel_cache on ios (mobile/preview)", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketIncludesOpsFallbackEvidenceWhenReceiptSummariesAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithSparseOpsReceipts();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("scene_packet for run-1 / scene-1", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("travel_cache on ios (mobile/preview)", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void TravelPrefetchPacketFallsBackToChangeSignalsWhenReceiptsAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithTravelPrefetchChangeSignalsOnly();
@@ -450,6 +492,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("event", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("operations", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("event-control receipt", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("install-local secrets remain local", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1402,6 +1445,87 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReadinessCues: [],
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
+            PrepLaunches: [prepLaunch],
+            TravelPrefetches: [prefetch]);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithSparseOpsReceipts()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-1",
+            Title: "Season operation checkpoint",
+            Status: "open",
+            Pressure: "medium",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        RunProjection run = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "Current run remains active.",
+            ActiveSceneId: null,
+            Objectives: [objective],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        GovernedPrepLaunchProjection prepLaunch = new(
+            LaunchId: "launch-1",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            PacketId: "scene:workspace-1",
+            PacketKind: "scene_packet",
+            PacketTitle: "",
+            TargetRunId: "run-1",
+            TargetRunTitle: "",
+            TargetSceneId: "scene-1",
+            TargetSceneTitle: "",
+            InitiatedByUserId: "gm-1",
+            Summary: "",
+            AuditLines: [],
+            LaunchedAtUtc: now.AddMinutes(6));
+
+        TravelPrefetchReceiptProjection prefetch = new(
+            ReceiptId: "prefetch-1",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            InstallationId: "install-1",
+            DeviceRole: "travel_cache",
+            Platform: "ios",
+            HeadId: "mobile",
+            Channel: "preview",
+            PrefetchSummary: "",
+            InventoryLines: [],
+            Boundaries: [],
+            InitiatedByUserId: "gm-1",
+            StagedAtUtc: now.AddMinutes(7));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
             PrepLaunches: [prepLaunch],
             TravelPrefetches: [prefetch]);
     }

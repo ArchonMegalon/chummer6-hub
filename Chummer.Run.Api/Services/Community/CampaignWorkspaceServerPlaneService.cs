@@ -2055,7 +2055,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         IReadOnlyList<string> evidence = BuildEvidenceLines(
-            launches.Select(static item => item.Summary),
+            launches.Select(DescribePrepLaunchEvidence),
             launches.Select(static item => item.PacketTitle),
             launches.SelectMany(static item => item.AuditLines),
             launchSignals.Select(static packet => packet.Summary),
@@ -2198,7 +2198,6 @@ public sealed class CampaignWorkspaceServerPlaneService
             carryForward?.Summary,
             carryForward?.ReturnSummary,
             carryForward?.NextSafeAction,
-            workspace.ReturnSummary,
             eventPackets.Select(static packet => packet.Summary),
             eventPackets.Select(static packet => packet.Label),
             eventPackets.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "event control signal")),
@@ -2207,10 +2206,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             sceneSignal ? activeScene?.Summary : null,
             rosterTransfers.Select(static transfer => transfer.Summary),
             rosterTransfers.SelectMany(static transfer => transfer.AuditLines),
-            prepLaunches.Select(static launch => launch.Summary),
+            prepLaunches.Select(DescribePrepLaunchEvidence),
             prepLaunches.SelectMany(static launch => launch.AuditLines),
-            travelPrefetches.Select(static receipt => receipt.PrefetchSummary),
+            travelPrefetches.Select(DescribeTravelPrefetchEvidence),
+            travelPrefetches.SelectMany(static receipt => receipt.Boundaries),
             travelPrefetches.SelectMany(static receipt => receipt.InventoryLines),
+            workspace.ReturnSummary,
             consequences.Select(static consequence => consequence.Summary),
             consequences.Select(static consequence => consequence.Label),
             consequences.Select(static consequence => DescribeSignalLabel(consequence.Label, consequence.Kind, consequence.State)),
@@ -2384,7 +2385,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         IReadOnlyList<string> evidence = BuildEvidenceLines(
-            receipts.Select(static item => item.PrefetchSummary),
+            receipts.Select(DescribeTravelPrefetchEvidence),
             receipts.SelectMany(static item => item.InventoryLines),
             receipts.SelectMany(static item => item.Boundaries),
             prefetchSignals.Select(static item => item.Summary),
@@ -2594,6 +2595,52 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         string role = NormalizeOptional(item.DeviceRole) ?? "claimed device";
+        string platform = NormalizeOptional(item.Platform) ?? "unknown platform";
+        string? head = NormalizeOptional(item.HeadId);
+        string? channel = NormalizeOptional(item.Channel);
+
+        return head is null
+            ? $"{role} on {platform}"
+            : channel is null
+                ? $"{role} on {platform} ({head})"
+                : $"{role} on {platform} ({head}/{channel})";
+    }
+
+    private static string DescribePrepLaunchEvidence(GovernedPrepLaunchProjection item)
+    {
+        string? summary = NormalizeOptional(item.Summary);
+        if (summary is not null)
+        {
+            return summary;
+        }
+
+        string packetIdentity = DescribeSignalLabel(item.PacketTitle, item.PacketKind, "prep launch packet");
+        string? targetRun = NormalizeOptional(item.TargetRunTitle) ?? NormalizeOptional(item.TargetRunId);
+        string? targetScene = NormalizeOptional(item.TargetSceneTitle) ?? NormalizeOptional(item.TargetSceneId);
+        if (targetRun is null && targetScene is null)
+        {
+            return packetIdentity;
+        }
+
+        if (targetRun is not null && targetScene is not null)
+        {
+            return $"{packetIdentity} for {targetRun} / {targetScene}";
+        }
+
+        return targetRun is not null
+            ? $"{packetIdentity} for {targetRun}"
+            : $"{packetIdentity} for {targetScene}";
+    }
+
+    private static string DescribeTravelPrefetchEvidence(TravelPrefetchReceiptProjection item)
+    {
+        string? summary = NormalizeOptional(item.PrefetchSummary);
+        if (summary is not null)
+        {
+            return summary;
+        }
+
+        string role = NormalizeOptional(item.DeviceRole) ?? "travel device";
         string platform = NormalizeOptional(item.Platform) ?? "unknown platform";
         string? head = NormalizeOptional(item.HeadId);
         string? channel = NormalizeOptional(item.Channel);
