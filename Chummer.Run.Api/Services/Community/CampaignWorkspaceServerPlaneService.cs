@@ -3077,13 +3077,6 @@ public sealed class CampaignWorkspaceServerPlaneService
             || IsOppositionCarryForwardTextSignal(carryForward.NextSafeAction);
         bool eventOrOppositionEvidenceSignal = carryForward.EvidenceLines.Any(static line =>
             ContainsEventControlToken(line) || IsOppositionCarryForwardTextSignal(line));
-        bool relationshipSignal = ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.Summary, carryForward.ReturnSummary)
-            || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.NextSafeAction, carryForward.ReturnSummary)
-            || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Summary, carryForward.NextSafeAction, carryForward.ReturnSummary)
-            || ContainsCampaignRelationshipSplitTokenSignalFromCandidates(carryForward.EvidenceLines);
-        bool rosterSignal = IsRosterObjectiveSignal(carryForward.Label, carryForward.Summary)
-            || IsRosterObjectiveSignal(carryForward.ReturnSummary, carryForward.NextSafeAction)
-            || ContainsRosterSplitTokenSignalFromCandidates(carryForward.EvidenceLines);
         string combinedCarryForwardText = string.Join(' ', new[]
         {
             carryForward.Label,
@@ -3091,6 +3084,16 @@ public sealed class CampaignWorkspaceServerPlaneService
             carryForward.ReturnSummary,
             carryForward.NextSafeAction
         }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+        bool relationshipSignal = ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.Summary, carryForward.ReturnSummary)
+            || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.NextSafeAction, carryForward.ReturnSummary)
+            || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Summary, carryForward.NextSafeAction, carryForward.ReturnSummary)
+            || ContainsCampaignRelationshipSplitTokenSignalFromCandidates(carryForward.EvidenceLines);
+        bool relationshipEventContextSignal = ContainsEventControlToken(combinedCarryForwardText)
+            || ContainsOppositionToken(combinedCarryForwardText)
+            || carryForward.EvidenceLines.Any(static line => ContainsEventControlToken(line) || ContainsOppositionToken(line));
+        bool rosterSignal = IsRosterObjectiveSignal(carryForward.Label, carryForward.Summary)
+            || IsRosterObjectiveSignal(carryForward.ReturnSummary, carryForward.NextSafeAction)
+            || ContainsRosterSplitTokenSignalFromCandidates(carryForward.EvidenceLines);
         bool prepLaunchSignal = ContainsPrepLaunchToken(combinedCarryForwardText);
         bool travelPrefetchSignal = ContainsTravelPrefetchToken(combinedCarryForwardText);
         bool prepLaunchEvidenceSignal = carryForward.EvidenceLines.Any(ContainsPrepLaunchToken);
@@ -3098,7 +3101,7 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return eventOrOppositionSignal
             || eventOrOppositionEvidenceSignal
-            || relationshipSignal
+            || (relationshipSignal && relationshipEventContextSignal)
             || rosterSignal
             || prepLaunchSignal
             || travelPrefetchSignal

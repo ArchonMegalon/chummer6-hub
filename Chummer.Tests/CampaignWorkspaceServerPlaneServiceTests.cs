@@ -1843,6 +1843,18 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketDoesNotActivateFromCarryForwardRelationshipSignalsWithoutEventContext()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardRelationshipSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.Contains(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void EventControlPacketActivatesFromRosterCarryForwardSignalsWhenOtherFamiliesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterEventCarryForwardOnly();
@@ -7145,6 +7157,46 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Campaign return handoff remains tracked.",
             NextSafeAction: "Review operator checklist.",
             EvidenceLines: ["Opposition window remains active while event controls are reopened."],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlCarryForwardRelationshipSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "Relationship lane carry-forward",
+            Summary: "Contact pressure update remains pending.",
+            ReturnSummary: "Heat relationship lane remains on return follow-through.",
+            NextSafeAction: "Review contact lane update before table reopen.",
+            EvidenceLines: ["Contact relationship lane change remains pending."],
             UpdatedAtUtc: now.AddMinutes(2));
 
         return new CampaignWorkspaceProjection(
