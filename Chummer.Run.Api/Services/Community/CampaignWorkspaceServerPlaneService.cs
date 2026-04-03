@@ -1481,12 +1481,16 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<string> evidence = new[]
             {
                 workspace.LatestContinuity?.Summary,
+                workspace.NextSessionCarryForward?.Label,
                 workspace.NextSessionCarryForward?.Summary,
-                workspace.NextSessionCarryForward?.ReturnSummary
+                workspace.NextSessionCarryForward?.ReturnSummary,
+                workspace.NextSessionCarryForward?.NextSafeAction
             }
             .Concat(workspace.RecapShelf.Select(static item => item.Summary))
+            .Concat(workspace.RecapShelf.Select(static item => item.Label))
             .Concat(workspace.Dossiers.Select(static item => item.LatestContinuity?.Summary))
             .Concat(continuitySignals.Select(static packet => packet.Summary))
+            .Concat(continuitySignals.Select(static packet => packet.Label))
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .Select(static item => item!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
