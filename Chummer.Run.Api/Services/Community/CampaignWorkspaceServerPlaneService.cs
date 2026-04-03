@@ -1271,6 +1271,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             packets.Add(continuityPacket);
         }
 
+        if (BuildCampaignReturnPrepPacket(workspace, leadRun) is { } campaignReturnPacket)
+        {
+            packets.Add(campaignReturnPacket);
+        }
+
         if (BuildRosterMovementPrepPacket(workspace) is { } rosterPacket)
         {
             packets.Add(rosterPacket);
@@ -1435,6 +1440,102 @@ public sealed class CampaignWorkspaceServerPlaneService
             EvidenceLines: evidence,
             UpdatedAtUtc: workspace.LatestContinuity?.CapturedAtUtc
                 ?? DateTimeOffset.UtcNow);
+    }
+
+    private static GovernedPrepPacketSummary? BuildCampaignReturnPrepPacket(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? leadRun)
+    {
+        PublicationSafeProjection[] diaryRecaps = workspace.RecapShelf
+            .Where(static item =>
+            {
+                string kind = item.Kind.Trim();
+                return kind.Contains("diary", StringComparison.OrdinalIgnoreCase)
+                    || kind.Contains("downtime", StringComparison.OrdinalIgnoreCase)
+                    || kind.Contains("recap", StringComparison.OrdinalIgnoreCase)
+                    || kind.Contains("after_action", StringComparison.OrdinalIgnoreCase)
+                    || kind.Contains("career", StringComparison.OrdinalIgnoreCase)
+                    || kind.Contains("log", StringComparison.OrdinalIgnoreCase);
+            })
+            .Take(4)
+            .ToArray();
+        CampaignConsequenceProjection[] relationshipConsequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+            .Where(static consequence => string.Equals(consequence.Kind, "contact", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(consequence.Kind, "heat", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(consequence.Kind, "reputation", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(consequence.Kind, "faction", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
+        WorkspaceChangePacketProjection[] returnChanges = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Where(static packet => string.Equals(packet.Kind, "next_session_carry_forward", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(packet.Kind, "after_action_report", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(packet.Kind, "downtime_brief", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(packet.Kind, "continuity", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(packet.Kind, "contact_update", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+            .Take(4)
+            .ToArray();
+
+        if (diaryRecaps.Length == 0
+            && relationshipConsequences.Length == 0
+            && returnChanges.Length == 0
+            && workspace.NextSessionCarryForward is null)
+        {
+            return null;
+        }
+
+        int diarySignalCount = diaryRecaps.Length + returnChanges.Length;
+        int relationshipSignalCount = relationshipConsequences.Length;
+        string summary = $"{Math.Max(1, diarySignalCount)} diary/continuity signal(s) and {relationshipSignalCount} relationship signal(s) stay on one governed return lane for downtime and next-session reopen.";
+        string bindingSummary = leadRun is null
+            ? "Diary updates, contacts, heat, and return cues stay attached to the same campaign truth without local note-shadow models."
+            : $"{leadRun.Title} and campaign return cues share the same diary/contact/heat continuity lane.";
+        IReadOnlyList<string> evidence = BuildEvidenceLines(
+            workspace.ReturnSummary,
+            workspace.NextSessionCarryForward?.Summary,
+            workspace.NextSessionCarryForward?.ReturnSummary,
+            diaryRecaps.Select(static item => item.Summary),
+            returnChanges.Select(static item => item.Summary),
+            relationshipConsequences.Select(static item => item.Summary),
+            relationshipConsequences.SelectMany(static item => item.EvidenceLines));
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                workspace.LatestContinuity?.CapturedAtUtc,
+                workspace.NextSessionCarryForward?.UpdatedAtUtc
+            }
+            .Concat(returnChanges.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
+            .Concat(relationshipConsequences.Select(static consequence => (DateTimeOffset?)consequence.UpdatedAtUtc))
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.UtcNow)
+            .Max();
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"campaign-return:{workspace.WorkspaceId}",
+            Kind: "campaign_return_packet",
+            Title: $"{workspace.CampaignName} diary, contacts, and heat return packet",
+            Summary: summary,
+            BindingSummary: bindingSummary,
+            Reusable: true,
+            SearchTerms: BuildSearchTerms(
+                workspace.CampaignName,
+                "diary",
+                "contacts",
+                "heat",
+                "downtime",
+                "return",
+                workspace.ReturnSummary,
+                workspace.NextSessionCarryForward?.Label,
+                diaryRecaps.Select(static item => item.Kind),
+                diaryRecaps.Select(static item => item.Label),
+                returnChanges.Select(static item => item.Kind),
+                returnChanges.Select(static item => item.Label),
+                relationshipConsequences.Select(static item => item.Kind),
+                relationshipConsequences.Select(static item => item.Label),
+                relationshipConsequences.Select(static item => item.State)),
+            EvidenceLines: evidence,
+            UpdatedAtUtc: updatedAtUtc);
     }
 
     private static GovernedPrepPacketSummary? BuildRosterMovementPrepPacket(CampaignWorkspaceProjection workspace)
