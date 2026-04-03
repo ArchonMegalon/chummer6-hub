@@ -466,6 +466,17 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 continue;
             }
 
+            if (!HasRequiredPortableAssetFields(asset))
+            {
+                skipped++;
+                conflicts.Add(new OfflineSyncConflict(
+                    Surface: "ops-prep",
+                    EntityId: asset.AssetId.Trim(),
+                    Reason: "invalid-asset-required-fields",
+                    Resolution: "skipped-invalid"));
+                continue;
+            }
+
             if (_assets.TryGetValue(asset.AssetId, out var local))
             {
                 lock (local)
@@ -550,6 +561,11 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             SkippedCount: skipped,
             Conflicts: conflicts);
     }
+
+    private static bool HasRequiredPortableAssetFields(OfflineSyncPrepAsset asset) =>
+        !string.IsNullOrWhiteSpace(asset.CampaignId)
+        && !string.IsNullOrWhiteSpace(asset.Title)
+        && !string.IsNullOrWhiteSpace(asset.Body);
 
     private EvidencePointer[] ResolveEvidence(string? sessionId, string? sceneId, IReadOnlyList<string>? eventIds)
     {
