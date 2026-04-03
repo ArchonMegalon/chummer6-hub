@@ -100,6 +100,36 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("return", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void PrepLibraryIncludesPrepLaunchPacketWhenGovernedPrepLaunchReceiptsExist()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("prep", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("launch", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("audit", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void PrepLibraryIncludesTravelPrefetchPacketWhenPrefetchReceiptsExist()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("travel", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("prefetch", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("device", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -327,6 +357,66 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Return lane summary",
             ChangePackets: [changePacket],
             Consequences: [contactConsequence, heatConsequence]);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        GovernedPrepLaunchProjection prepLaunch = new(
+            LaunchId: "launch-1",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            PacketId: "scene:workspace-1",
+            PacketKind: "scene_packet",
+            PacketTitle: "Dockyard scene packet",
+            TargetRunId: "run-1",
+            TargetRunTitle: "Dockyard pressure test",
+            TargetSceneId: "scene-1",
+            TargetSceneTitle: "Dockyard checkpoint",
+            InitiatedByUserId: "gm-1",
+            Summary: "GM launched governed scene packet for the next table run.",
+            AuditLines: ["Prep launch receipt captured on the account audit lane."],
+            LaunchedAtUtc: now.AddMinutes(6));
+
+        TravelPrefetchReceiptProjection prefetch = new(
+            ReceiptId: "prefetch-1",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            InstallationId: "install-1",
+            DeviceRole: "travel_cache",
+            Platform: "ios",
+            HeadId: "mobile",
+            Channel: "preview",
+            PrefetchSummary: "Travel prefetch staged for the next session return loop.",
+            InventoryLines: ["Staged dossier, campaign, and prep packet inventory for travel mode."],
+            Boundaries: ["Install-local secrets remain local and are never synced."],
+            InitiatedByUserId: "gm-1",
+            StagedAtUtc: now.AddMinutes(7));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            PrepLaunches: [prepLaunch],
+            TravelPrefetches: [prefetch]);
     }
 
     private static WorkspaceRestoreProjection BuildEmptyRestore()

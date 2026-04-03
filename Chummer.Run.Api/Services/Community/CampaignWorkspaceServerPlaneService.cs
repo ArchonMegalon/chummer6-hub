@@ -1291,6 +1291,16 @@ public sealed class CampaignWorkspaceServerPlaneService
             packets.Add(aftermathPacket);
         }
 
+        if (BuildPrepLaunchOpsPacket(workspace, leadRun) is { } prepLaunchOpsPacket)
+        {
+            packets.Add(prepLaunchOpsPacket);
+        }
+
+        if (BuildTravelPrefetchOpsPacket(workspace, leadRun) is { } travelPrefetchOpsPacket)
+        {
+            packets.Add(travelPrefetchOpsPacket);
+        }
+
         if (BuildTravelPrepPacket(workspace, restore) is { } travelPacket)
         {
             packets.Add(travelPacket);
@@ -1621,6 +1631,51 @@ public sealed class CampaignWorkspaceServerPlaneService
             UpdatedAtUtc: packages.Max(static item => item.GeneratedAtUtc));
     }
 
+    private static GovernedPrepPacketSummary? BuildPrepLaunchOpsPacket(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? leadRun)
+    {
+        GovernedPrepLaunchProjection[] launches = (workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>())
+            .OrderByDescending(static item => item.LaunchedAtUtc)
+            .Take(4)
+            .ToArray();
+        if (launches.Length == 0)
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> evidence = launches
+            .Select(static item => item.Summary)
+            .Concat(launches.SelectMany(static item => item.AuditLines))
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"prep-launch:{workspace.WorkspaceId}",
+            Kind: "prep_launch_packet",
+            Title: $"{workspace.CampaignName} governed prep launches",
+            Summary: $"{launches.Length} prep-launch receipt(s) keep packet launches auditable on the same campaign lane.",
+            BindingSummary: leadRun is null
+                ? "Launch actions stay attached to campaign truth so GM prep operations do not fork into local-only notes."
+                : $"Launch actions stay attached to {leadRun.Title} and the same account-audit campaign backbone.",
+            Reusable: true,
+            SearchTerms: BuildSearchTerms(
+                workspace.CampaignName,
+                "prep",
+                "launch",
+                "governed",
+                "audit",
+                launches.Select(static item => item.PacketKind),
+                launches.Select(static item => item.PacketTitle),
+                launches.Select(static item => item.TargetRunTitle),
+                launches.Select(static item => item.TargetSceneTitle),
+                launches.Select(static item => item.InitiatedByUserId)),
+            EvidenceLines: evidence,
+            UpdatedAtUtc: launches.Max(static item => item.LaunchedAtUtc));
+    }
+
     private static GovernedPrepPacketSummary? BuildEventControlPrepPacket(CampaignWorkspaceProjection workspace)
     {
         WorkspaceChangePacketProjection[] eventPackets = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
@@ -1697,6 +1752,54 @@ public sealed class CampaignWorkspaceServerPlaneService
                 consequences.Select(static consequence => consequence.State)),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static GovernedPrepPacketSummary? BuildTravelPrefetchOpsPacket(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? leadRun)
+    {
+        TravelPrefetchReceiptProjection[] receipts = (workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>())
+            .OrderByDescending(static item => item.StagedAtUtc)
+            .Take(4)
+            .ToArray();
+        if (receipts.Length == 0)
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> evidence = receipts
+            .Select(static item => item.PrefetchSummary)
+            .Concat(receipts.SelectMany(static item => item.InventoryLines))
+            .Concat(receipts.SelectMany(static item => item.Boundaries))
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"travel-prefetch:{workspace.WorkspaceId}",
+            Kind: "travel_prefetch_packet",
+            Title: $"{workspace.CampaignName} staged travel prefetch receipts",
+            Summary: $"{receipts.Length} travel-prefetch receipt(s) keep offline staging deliberate and reviewable per claimed device.",
+            BindingSummary: leadRun is null
+                ? "Travel staging actions stay attached to campaign truth so safehouse/travel operations are auditable."
+                : $"Travel staging actions stay attached to {leadRun.Title} and the same account-audit campaign backbone.",
+            Reusable: true,
+            SearchTerms: BuildSearchTerms(
+                workspace.CampaignName,
+                "travel",
+                "prefetch",
+                "offline",
+                "safehouse",
+                "device",
+                receipts.Select(static item => item.InstallationId),
+                receipts.Select(static item => item.DeviceRole),
+                receipts.Select(static item => item.Platform),
+                receipts.Select(static item => item.HeadId),
+                receipts.Select(static item => item.Channel),
+                receipts.Select(static item => item.InitiatedByUserId)),
+            EvidenceLines: evidence,
+            UpdatedAtUtc: receipts.Max(static item => item.StagedAtUtc));
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrepPacket(
