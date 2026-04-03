@@ -1281,7 +1281,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             packets.Add(rosterPacket);
         }
 
-        if (BuildEventControlPrepPacket(workspace) is { } eventControlPacket)
+        if (BuildEventControlPrepPacket(workspace, leadRun) is { } eventControlPacket)
         {
             packets.Add(eventControlPacket);
         }
@@ -1999,7 +1999,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             && normalizedKind.Contains("launch", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static GovernedPrepPacketSummary? BuildEventControlPrepPacket(CampaignWorkspaceProjection workspace)
+    private static GovernedPrepPacketSummary? BuildEventControlPrepPacket(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? leadRun)
     {
         WorkspaceChangePacketProjection[] eventPackets = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
             .Where(static packet => IsEventControlSignalKind(packet.Kind))
@@ -2022,12 +2024,23 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static receipt => receipt.StagedAtUtc)
             .Take(3)
             .ToArray();
+        ObjectiveProjection[] eventObjectives = (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
+            .Where(static objective => IsEventControlObjectiveSignal(objective.Title, objective.Summary))
+            .OrderByDescending(static objective => objective.UpdatedAtUtc)
+            .Take(3)
+            .ToArray();
+        SceneProjection? activeScene = leadRun?.Scenes
+            .FirstOrDefault(item => string.Equals(item.SceneId, leadRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
+            ?? leadRun?.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
+        bool sceneSignal = IsEventControlObjectiveSignal(activeScene?.Title, activeScene?.Summary);
 
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
         if (eventPackets.Length == 0
             && consequences.Length == 0
             && prepLaunches.Length == 0
             && travelPrefetches.Length == 0
+            && eventObjectives.Length == 0
+            && !sceneSignal
             && carryForward is null)
         {
             return null;
@@ -2036,15 +2049,26 @@ public sealed class CampaignWorkspaceServerPlaneService
         int eventCount = eventPackets.Length
             + prepLaunches.Length
             + travelPrefetches.Length
+            + eventObjectives.Length
+            + (sceneSignal ? 1 : 0)
             + (carryForward is null ? 0 : 1);
         string consequenceSummary = consequences.Length == 0
             ? "Heat, contacts, and consequence posture stay linked to the same campaign return lane."
             : $"{consequences.Length} consequence signal(s) ({string.Join(", ", consequences.Select(static item => item.Label))}) stay attached to event control.";
+        string sourceSummary = eventPackets.Length == 0
+            && prepLaunches.Length == 0
+            && travelPrefetches.Length == 0
+            && eventObjectives.Length > 0
+            ? " Event/season controls are currently driven by run-pressure signals while receipt streams catch up."
+            : string.Empty;
         IReadOnlyList<string> evidence = BuildEvidenceLines(
             carryForward?.Summary,
             carryForward?.ReturnSummary,
             workspace.ReturnSummary,
             eventPackets.Select(static packet => packet.Summary),
+            eventObjectives.Select(static objective => objective.Summary),
+            eventObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."),
+            sceneSignal ? activeScene?.Summary : null,
             prepLaunches.Select(static launch => launch.Summary),
             prepLaunches.SelectMany(static launch => launch.AuditLines),
             travelPrefetches.Select(static receipt => receipt.PrefetchSummary),
@@ -2053,12 +2077,15 @@ public sealed class CampaignWorkspaceServerPlaneService
             consequences.SelectMany(static consequence => consequence.EvidenceLines));
         DateTimeOffset updatedAtUtc = new[]
             {
-                carryForward?.UpdatedAtUtc
+                carryForward?.UpdatedAtUtc,
+                leadRun?.UpdatedAtUtc,
+                sceneSignal ? activeScene?.UpdatedAtUtc : null
             }
             .Concat(eventPackets.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
             .Concat(prepLaunches.Select(static launch => (DateTimeOffset?)launch.LaunchedAtUtc))
             .Concat(travelPrefetches.Select(static receipt => (DateTimeOffset?)receipt.StagedAtUtc))
             .Concat(consequences.Select(static consequence => (DateTimeOffset?)consequence.UpdatedAtUtc))
+            .Concat(eventObjectives.Select(static objective => (DateTimeOffset?)objective.UpdatedAtUtc))
             .Where(static item => item.HasValue)
             .Select(static item => item!.Value)
             .DefaultIfEmpty(DateTimeOffset.UtcNow)
@@ -2068,7 +2095,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             PacketId: $"event-control:{workspace.WorkspaceId}",
             Kind: "event_control_packet",
             Title: $"{workspace.CampaignName} event and season controls",
-            Summary: $"{eventCount} event-control receipt(s) keep season operations and return-loop governance on one lane. {consequenceSummary}",
+            Summary: $"{eventCount} event-control receipt(s) keep season operations and return-loop governance on one lane. {consequenceSummary}{sourceSummary}",
             BindingSummary: "Reusable across GM operations so prep launches, return windows, and consequence governance stay on campaign truth.",
             Reusable: true,
             SearchTerms: BuildSearchTerms(
@@ -2078,10 +2105,16 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "control",
                 "return",
                 "operations",
+                leadRun?.Title,
                 carryForward?.Label,
                 carryForward?.Summary,
                 eventPackets.Select(static packet => packet.Kind),
                 eventPackets.Select(static packet => packet.Label),
+                eventObjectives.Select(static objective => objective.Title),
+                eventObjectives.Select(static objective => objective.Status),
+                eventObjectives.Select(static objective => objective.Pressure),
+                sceneSignal ? activeScene?.Title : null,
+                sceneSignal ? activeScene?.Summary : null,
                 prepLaunches.Select(static launch => launch.PacketKind),
                 prepLaunches.Select(static launch => launch.PacketTitle),
                 prepLaunches.Select(static launch => launch.TargetRunTitle),
@@ -2096,6 +2129,26 @@ public sealed class CampaignWorkspaceServerPlaneService
                 consequences.Select(static consequence => consequence.State)),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsEventControlObjectiveSignal(string? title, string? summary)
+    {
+        return ContainsEventControlToken(title) || ContainsEventControlToken(summary);
+    }
+
+    private static bool ContainsEventControlToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Contains("event", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("season", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("timeline", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("window", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("operation", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("checkpoint", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsEventControlSignalKind(string? kind)
