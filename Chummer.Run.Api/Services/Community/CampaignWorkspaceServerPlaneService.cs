@@ -2312,6 +2312,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         bool sceneSignal = IsEventControlObjectiveSignal(activeScene?.Title, activeScene?.Summary);
 
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
+        bool carryForwardSignal = IsEventControlCarryForwardSignal(carryForward);
         if (eventPackets.Length == 0
             && consequences.Length == 0
             && rosterTransfers.Length == 0
@@ -2319,7 +2320,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             && travelPrefetches.Length == 0
             && eventObjectives.Length == 0
             && !sceneSignal
-            && carryForward is null)
+            && !carryForwardSignal)
         {
             return null;
         }
@@ -2331,7 +2332,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             + travelPrefetches.Length
             + eventObjectives.Length
             + (sceneSignal ? 1 : 0)
-            + (carryForward is null ? 0 : 1);
+            + (carryForwardSignal ? 1 : 0);
         string consequenceLabels = string.Join(", ",
             consequences
                 .Select(static item => DescribeSignalLabel(item.Label, item.Kind, item.State))
@@ -2369,10 +2370,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             travelPrefetches.SelectMany(static receipt => receipt.InventoryLines),
             workspace.ReturnSummary,
             workspace.ReturnSummary,
-            carryForward?.Label,
-            carryForward?.Summary,
-            carryForward?.ReturnSummary,
-            carryForward?.NextSafeAction);
+            carryForwardSignal ? carryForward?.Label : null,
+            carryForwardSignal ? carryForward?.Summary : null,
+            carryForwardSignal ? carryForward?.ReturnSummary : null,
+            carryForwardSignal ? carryForward?.NextSafeAction : null);
         DateTimeOffset updatedAtUtc = new[]
             {
                 carryForward?.UpdatedAtUtc,
@@ -2407,9 +2408,9 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "operations",
                 "roster",
                 leadRun?.Title,
-                carryForward?.Label,
-                carryForward?.Summary,
-                carryForward?.NextSafeAction,
+                carryForwardSignal ? carryForward?.Label : null,
+                carryForwardSignal ? carryForward?.Summary : null,
+                carryForwardSignal ? carryForward?.NextSafeAction : null,
                 eventPackets.Select(static packet => packet.Kind),
                 eventPackets.Select(static packet => packet.Label),
                 rosterTransfers.Select(static transfer => transfer.RunnerHandle),
@@ -2437,6 +2438,32 @@ public sealed class CampaignWorkspaceServerPlaneService
                 consequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.SourceKind))),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsEventControlCarryForwardSignal(NextSessionCarryForwardProjection? carryForward)
+    {
+        if (carryForward is null)
+        {
+            return false;
+        }
+
+        bool eventOrOppositionSignal = IsEventControlObjectiveSignal(carryForward.Label, carryForward.Summary)
+            || IsEventControlObjectiveSignal(carryForward.ReturnSummary, carryForward.NextSafeAction);
+        bool relationshipSignal = ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.Summary, carryForward.ReturnSummary)
+            || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.NextSafeAction, carryForward.ReturnSummary)
+            || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Summary, carryForward.NextSafeAction, carryForward.ReturnSummary);
+        bool rosterSignal = IsRosterObjectiveSignal(carryForward.Label, carryForward.Summary)
+            || IsRosterObjectiveSignal(carryForward.ReturnSummary, carryForward.NextSafeAction);
+        bool prepLaunchSignal = ContainsPrepLaunchToken(carryForward.Label, carryForward.Summary)
+            || ContainsPrepLaunchToken(carryForward.ReturnSummary, carryForward.NextSafeAction);
+        bool travelPrefetchSignal = ContainsTravelPrefetchToken(carryForward.Label, carryForward.Summary)
+            || ContainsTravelPrefetchToken(carryForward.ReturnSummary, carryForward.NextSafeAction);
+
+        return eventOrOppositionSignal
+            || relationshipSignal
+            || rosterSignal
+            || prepLaunchSignal
+            || travelPrefetchSignal;
     }
 
     private static bool IsEventControlObjectiveSignal(string? title, string? summary)
