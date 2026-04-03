@@ -175,8 +175,15 @@ public sealed class CampaignWorkspaceServerPlaneService
         "assign",
         "handoff",
         "move",
-        "rotat",
-        "bench"
+        "rotat"
+    ];
+
+    private static readonly string[] RosterMovementWordTokens =
+    [
+        "bench",
+        "benches",
+        "benched",
+        "benching"
     ];
 
     private static readonly string[] RosterReturnWordPrefixes =
@@ -2219,7 +2226,8 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static bool ContainsRosterMovementToken(string value)
     {
-        bool hasGeneralMovementToken = ContainsAnyWordTokenPrefix(value, RosterMovementWordPrefixes);
+        bool hasGeneralMovementToken = ContainsAnyWordTokenPrefix(value, RosterMovementWordPrefixes)
+            || ContainsAnyWordToken(value, RosterMovementWordTokens);
         if (hasGeneralMovementToken)
         {
             return true;
