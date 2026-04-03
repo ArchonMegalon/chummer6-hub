@@ -1652,6 +1652,24 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
+        if (string.Equals(normalizedKind, "campaign_return", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "return_loop", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "return_window", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "next_session_return", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        bool containsReturnLaneToken = normalizedKind.Contains("return", StringComparison.OrdinalIgnoreCase)
+            && (normalizedKind.Contains("campaign", StringComparison.OrdinalIgnoreCase)
+                || normalizedKind.Contains("session", StringComparison.OrdinalIgnoreCase)
+                || normalizedKind.Contains("loop", StringComparison.OrdinalIgnoreCase)
+                || normalizedKind.Contains("window", StringComparison.OrdinalIgnoreCase));
+        if (containsReturnLaneToken)
+        {
+            return true;
+        }
+
         return IsContinuitySignalKind(normalizedKind)
             || IsCampaignRelationshipSignalKind(normalizedKind);
     }
