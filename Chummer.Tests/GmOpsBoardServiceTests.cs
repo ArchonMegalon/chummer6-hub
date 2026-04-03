@@ -128,6 +128,42 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public void ReconcilePortableAssets_DropsGovernedProject_WhenProjectKindIsUnsupported()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        var asset = new OfflineSyncPrepAsset(
+            AssetId: "prep_unsupported_kind",
+            CampaignId: "campaign_ops",
+            SessionId: "session_ops",
+            SceneId: "scene_ops",
+            Title: "Governed packet with unsupported kind",
+            Kind: nameof(GmPrepAssetKind.Note),
+            Audience: nameof(GmPrepAssetAudience.GameMaster),
+            Summary: "Unsupported kind should fail closed.",
+            Body: "ops",
+            Tags: ["governed-packet"],
+            ChecklistItems: Array.Empty<OfflineSyncPrepChecklistItem>(),
+            Status: "draft",
+            CreatedBy: "gm.ops",
+            RuntimeFingerprint: "ops-fingerprint",
+            CreatedAtUtc: now.AddMinutes(-5),
+            UpdatedAtUtc: now,
+            GovernedProject: new OfflineSyncPrepGovernedProjectReference(
+                ProjectKind: "run-module",
+                ProjectId: "module_01",
+                Title: "Run module",
+                RulesetId: "sr5",
+                LinkTarget: "/hub/run-modules/module_01",
+                TrustTier: "verified"));
+
+        service.ReconcilePortableAssets([asset]);
+        GmPrepAssetRecord? stored = service.GetPrepAsset(asset.AssetId);
+        Assert.NotNull(stored);
+        Assert.Null(stored!.GovernedProject);
+    }
+
+    [Fact]
     public void ReconcilePortableAssets_UpdatesExistingAsset_WhenRemoteAssetIdHasWhitespace()
     {
         var service = CreateService();

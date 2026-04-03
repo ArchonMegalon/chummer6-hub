@@ -679,7 +679,8 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             || title is null
             || rulesetId is null
             || linkTarget is null
-            || trustTier is null)
+            || trustTier is null
+            || !SupportsGovernedPacketBinding(projectKind))
         {
             return null;
         }
