@@ -2586,6 +2586,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
     {
+        NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
         GovernedPrepLaunchProjection[] launches = (workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>())
             .OrderByDescending(static item => item.LaunchedAtUtc)
             .Take(4)
@@ -2595,7 +2596,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
-        if (launches.Length == 0 && launchSignals.Length == 0)
+        bool carryForwardSignal = IsPrepLaunchCarryForwardSignal(carryForward);
+        if (launches.Length == 0 && launchSignals.Length == 0 && !carryForwardSignal)
         {
             return null;
         }
@@ -2603,17 +2605,25 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<string> evidence = BuildEvidenceLines(
             launchSignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "prep launch signal")),
             launches.Select(DescribePrepLaunchEvidence),
+            carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>(),
+            carryForwardSignal ? carryForward?.ReturnSummary : null,
+            carryForwardSignal ? carryForward?.NextSafeAction : null,
+            carryForwardSignal ? carryForward?.Label : null,
+            carryForwardSignal ? carryForward?.Summary : null,
             launches.Select(static item => item.PacketTitle),
             launchSignals.Select(static packet => packet.Summary),
             launchSignals.Select(static packet => packet.Label),
             launches.SelectMany(static item => item.AuditLines));
-        int signalCount = launches.Length + launchSignals.Length;
+        int signalCount = launches.Length + launchSignals.Length + (carryForwardSignal ? 1 : 0);
         string summary = launches.Length > 0
             ? $"{signalCount} prep-launch signal(s) keep packet launches auditable on the same campaign lane."
-            : $"{signalCount} prep-launch signal(s) stay governed from prep-launch change packets while launch receipts catch up.";
+            : carryForwardSignal
+                ? $"{signalCount} prep-launch signal(s) stay governed from change/carry-forward cues while launch receipts catch up."
+                : $"{signalCount} prep-launch signal(s) stay governed from prep-launch change packets while launch receipts catch up.";
         DateTimeOffset updatedAtUtc = new[]
             {
-                leadRun?.UpdatedAtUtc
+                leadRun?.UpdatedAtUtc,
+                carryForward?.UpdatedAtUtc
             }
             .Concat(launches.Select(static item => (DateTimeOffset?)item.LaunchedAtUtc))
             .Concat(launchSignals.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
@@ -2637,6 +2647,11 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "launch",
                 "governed",
                 "audit",
+                carryForwardSignal ? carryForward?.ReturnSummary : null,
+                carryForwardSignal ? carryForward?.NextSafeAction : null,
+                carryForwardSignal ? carryForward?.Label : null,
+                carryForwardSignal ? carryForward?.Summary : null,
+                carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>(),
                 launches.Select(static item => item.PacketKind),
                 launches.Select(static item => item.PacketTitle),
                 launches.Select(static item => item.TargetRunTitle),
@@ -2646,6 +2661,25 @@ public sealed class CampaignWorkspaceServerPlaneService
                 launchSignals.Select(static item => item.Label)),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsPrepLaunchCarryForwardSignal(NextSessionCarryForwardProjection? carryForward)
+    {
+        if (carryForward is null)
+        {
+            return false;
+        }
+
+        string combinedCarryForwardText = string.Join(' ', new[]
+        {
+            carryForward.Label,
+            carryForward.Summary,
+            carryForward.ReturnSummary,
+            carryForward.NextSafeAction
+        }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+        bool primarySignal = ContainsPrepLaunchToken(combinedCarryForwardText);
+        bool evidenceSignal = carryForward.EvidenceLines.Any(ContainsPrepLaunchToken);
+        return primarySignal || evidenceSignal;
     }
 
     private static bool IsPrepLaunchSignalKind(string? kind)
