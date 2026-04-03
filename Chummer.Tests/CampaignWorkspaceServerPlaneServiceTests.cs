@@ -1903,6 +1903,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketUpdatedAtIgnoresUnrelatedCarryForwardTimestampWhenCarryForwardIsNotAnAftermathSignal()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathSignalAndUnrelatedCarryForwardTimestampSkew();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.Equal(DateTimeOffset.Parse("2026-04-03T00:01:00Z"), packet.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public void EventControlPacketUpdatedAtIgnoresUnrelatedCarryForwardTimestampWhenCarryForwardIsNotAnEventSignal()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlSignalAndUnrelatedCarryForwardTimestampSkew();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.Equal(DateTimeOffset.Parse("2026-04-03T00:01:00Z"), packet.UpdatedAtUtc);
+    }
+
+    [Fact]
     public void EventControlPacketSummaryFallsBackToConsequenceKindsWhenConsequenceLabelsAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlConsequenceKindsOnly();
@@ -7068,6 +7092,98 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "",
             ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathSignalAndUnrelatedCarryForwardTimestampSkew()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection aftermathSignal = new(
+            PacketId: "packet-aftermath-1",
+            Kind: "aftermath",
+            Label: "Aftermath lane update",
+            Summary: "Aftermath lane remains governed while recap packages hydrate.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-unrelated-1",
+            Label: "Operator queue note",
+            Summary: "Publish checklist reconciliation is still pending.",
+            ReturnSummary: "Workspace governance note remains open.",
+            NextSafeAction: "Review operator queue before docs refresh.",
+            EvidenceLines: ["Queue evidence remains pending reconciliation."],
+            UpdatedAtUtc: now.AddMinutes(9));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-aftermath-updated-at-skew-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [aftermathSignal],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlSignalAndUnrelatedCarryForwardTimestampSkew()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection eventControlSignal = new(
+            PacketId: "packet-event-control-1",
+            Kind: "event_control",
+            Label: "Event control update",
+            Summary: "Season control remains active on the governed lane.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-unrelated-2",
+            Label: "Operator queue note",
+            Summary: "Publication checklist reconciliation is still pending.",
+            ReturnSummary: "Workspace governance note remains open.",
+            NextSafeAction: "Review operator queue before docs refresh.",
+            EvidenceLines: ["Queue evidence remains pending reconciliation."],
+            UpdatedAtUtc: now.AddMinutes(9));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-event-control-updated-at-skew-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [eventControlSignal],
             Consequences: [],
             NextSessionCarryForward: carryForward,
             PrepLaunches: [],
