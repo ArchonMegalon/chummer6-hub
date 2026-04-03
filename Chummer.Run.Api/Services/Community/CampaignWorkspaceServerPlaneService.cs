@@ -1271,6 +1271,16 @@ public sealed class CampaignWorkspaceServerPlaneService
             packets.Add(continuityPacket);
         }
 
+        if (BuildRosterMovementPrepPacket(workspace) is { } rosterPacket)
+        {
+            packets.Add(rosterPacket);
+        }
+
+        if (BuildAftermathPrepPacket(workspace, leadRun) is { } aftermathPacket)
+        {
+            packets.Add(aftermathPacket);
+        }
+
         if (BuildTravelPrepPacket(workspace, restore) is { } travelPacket)
         {
             packets.Add(travelPacket);
@@ -1420,6 +1430,89 @@ public sealed class CampaignWorkspaceServerPlaneService
             EvidenceLines: evidence,
             UpdatedAtUtc: workspace.LatestContinuity?.CapturedAtUtc
                 ?? DateTimeOffset.UtcNow);
+    }
+
+    private static GovernedPrepPacketSummary? BuildRosterMovementPrepPacket(CampaignWorkspaceProjection workspace)
+    {
+        RosterTransferProjection[] transfers = (workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
+            .OrderByDescending(static item => item.TransferredAtUtc)
+            .Take(3)
+            .ToArray();
+        if (transfers.Length == 0)
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> evidence = transfers
+            .Select(static item => item.Summary)
+            .Concat(transfers.SelectMany(static item => item.AuditLines))
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"roster:{workspace.WorkspaceId}",
+            Kind: "roster_movement_packet",
+            Title: $"{workspace.CampaignName} roster movement packet",
+            Summary: $"{transfers.Length} roster transfer receipt(s) keep ownership and campaign movement on the same governed lane.",
+            BindingSummary: "Reusable across campaign and season operations so roster movement stays auditable without shadow notes.",
+            Reusable: true,
+            SearchTerms: BuildSearchTerms(
+                workspace.CampaignName,
+                "roster",
+                "movement",
+                transfers.Select(static item => item.RunnerHandle),
+                transfers.Select(static item => item.SourceCampaignName),
+                transfers.Select(static item => item.TargetCampaignName),
+                transfers.Select(static item => item.SourceGroupName),
+                transfers.Select(static item => item.TargetGroupName),
+                transfers.Select(static item => item.SourceCrewName),
+                transfers.Select(static item => item.TargetCrewName)),
+            EvidenceLines: evidence,
+            UpdatedAtUtc: transfers.Max(static item => item.TransferredAtUtc));
+    }
+
+    private static GovernedPrepPacketSummary? BuildAftermathPrepPacket(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? leadRun)
+    {
+        AftermathRecapPackageProjection[] packages = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
+            .OrderByDescending(static item => item.GeneratedAtUtc)
+            .Take(3)
+            .ToArray();
+        if (packages.Length == 0)
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> evidence = packages
+            .Select(static item => item.Summary)
+            .Concat(packages.SelectMany(static item => item.EvidenceLines))
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"aftermath:{workspace.WorkspaceId}",
+            Kind: "aftermath_packet",
+            Title: $"{workspace.CampaignName} aftermath and downtime packet",
+            Summary: $"{packages.Length} aftermath or downtime package(s) stay attached for recap, recovery, and next-session return.",
+            BindingSummary: leadRun is null
+                ? "Reusable across the campaign so aftermath, downtime, and return stay on governed workspace truth."
+                : $"Reusable across {workspace.CampaignName} and currently anchored to {leadRun.Title} for return-loop continuity.",
+            Reusable: true,
+            SearchTerms: BuildSearchTerms(
+                workspace.CampaignName,
+                "aftermath",
+                "downtime",
+                packages.Select(static item => item.PackageKind),
+                packages.Select(static item => item.Title),
+                packages.Select(static item => item.RunTitle),
+                packages.Select(static item => item.ArtifactId)),
+            EvidenceLines: evidence,
+            UpdatedAtUtc: packages.Max(static item => item.GeneratedAtUtc));
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrepPacket(
