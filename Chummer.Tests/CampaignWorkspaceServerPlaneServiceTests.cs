@@ -924,6 +924,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void TravelPrefetchPacketActivatesFromCarryForwardSplitTokensWhenReceiptsLag()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithTravelPrefetchCarryForwardSplitTokensOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("travel lane note", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("prefetch sealed offline kit", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void TravelPacketIncludesFallbackEvidenceWhenRestoreSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
@@ -2660,6 +2674,18 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
 
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.Equal(DateTimeOffset.Parse("2026-04-03T00:01:00Z"), packet.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public void TravelPrefetchPacketUpdatedAtIgnoresUnrelatedCarryForwardTimestampWhenCarryForwardIsNotATravelPrefetchSignal()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithTravelPrefetchSignalAndUnrelatedCarryForwardTimestampSkew();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
         Assert.Equal(DateTimeOffset.Parse("2026-04-03T00:01:00Z"), packet.UpdatedAtUtc);
     }
 
@@ -7609,6 +7635,52 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "",
             ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithTravelPrefetchSignalAndUnrelatedCarryForwardTimestampSkew()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection travelPrefetchSignal = new(
+            PacketId: "packet-travel-prefetch-1",
+            Kind: "travel_prefetch",
+            Label: "Travel prefetch lane update",
+            Summary: "Travel prefetch stays governed while staging receipts hydrate.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-unrelated-travel-prefetch-1",
+            Label: "Operator queue note",
+            Summary: "Publication checklist reconciliation is still pending.",
+            ReturnSummary: "Workspace governance note remains open.",
+            NextSafeAction: "Review operator queue before docs refresh.",
+            EvidenceLines: ["Queue evidence remains pending reconciliation."],
+            UpdatedAtUtc: now.AddMinutes(9));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-travel-prefetch-updated-at-skew-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [travelPrefetchSignal],
             Consequences: [],
             NextSessionCarryForward: carryForward,
             PrepLaunches: [],
