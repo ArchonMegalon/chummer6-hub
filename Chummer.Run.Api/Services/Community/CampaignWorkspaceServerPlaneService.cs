@@ -1384,6 +1384,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         CampaignConsequenceProjection[] consequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+            .Where(static consequence => IsOppositionConsequenceSignal(consequence))
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .Take(3)
             .ToArray();
@@ -2378,6 +2379,15 @@ public sealed class CampaignWorkspaceServerPlaneService
             || normalizedKind.Contains("threat", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("hostile", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("adversary", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsOppositionConsequenceSignal(CampaignConsequenceProjection consequence)
+    {
+        return IsOppositionSignalKind(consequence.Kind)
+            || ContainsOppositionToken(consequence.Label)
+            || ContainsOppositionToken(consequence.Summary)
+            || consequence.EvidenceLines.Any(ContainsOppositionToken)
+            || consequence.Receipts.Any(static receipt => ContainsOppositionToken(receipt.SourceKind) || ContainsOppositionToken(receipt.Summary));
     }
 
     private static bool IsEventControlSignalKind(string? kind)
