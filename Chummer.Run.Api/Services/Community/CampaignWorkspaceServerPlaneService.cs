@@ -1497,6 +1497,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             }
             .Concat(workspace.RecapShelf.Select(static item => item.Summary))
             .Concat(workspace.RecapShelf.Select(static item => item.Label))
+            .Concat(workspace.RecapShelf.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "continuity signal")))
             .Concat(workspace.Dossiers.Select(static item => item.LatestContinuity?.Summary))
             .Concat(continuitySignals.Select(static packet => packet.Summary))
             .Concat(continuitySignals.Select(static packet => packet.Label))

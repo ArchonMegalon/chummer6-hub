@@ -835,6 +835,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(packet.EvidenceLines, line => line.Contains("next_session_carry_forward", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void ContinuityPacketIncludesRecapKindFallbackWhenRecapSignalsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuityRecapKindsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "continuity_packet", StringComparison.Ordinal));
+        Assert.False(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("session_recap", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -3346,6 +3359,41 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [continuityChange],
             Consequences: [],
             NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithContinuityRecapKindsOnly()
+    {
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-1",
+            Kind: "session_recap",
+            Label: "",
+            Summary: "");
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [recap],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: null);
     }
 
     private static WorkspaceRestoreProjection BuildEmptyRestore()
