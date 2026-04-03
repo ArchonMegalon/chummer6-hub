@@ -1474,7 +1474,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static GovernedPrepPacketSummary? BuildContinuityPrepPacket(CampaignWorkspaceProjection workspace)
     {
         WorkspaceChangePacketProjection[] continuitySignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsContinuitySignalKind(packet.Kind))
+            .Where(static packet => IsContinuitySignal(packet))
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
@@ -1556,6 +1556,15 @@ public sealed class CampaignWorkspaceServerPlaneService
             || string.Equals(normalizedKind, "downtime_brief", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("continuity", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("carry_forward", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsContinuitySignal(WorkspaceChangePacketProjection packet)
+    {
+        return IsContinuitySignalKind(packet.Kind)
+            || IsContinuitySignalKind(packet.Label)
+            || IsContinuitySignalKind(packet.Summary)
+            || ContainsCampaignReturnRecapToken(packet.Label)
+            || ContainsCampaignReturnRecapToken(packet.Summary);
     }
 
     private static GovernedPrepPacketSummary? BuildCampaignReturnPrepPacket(

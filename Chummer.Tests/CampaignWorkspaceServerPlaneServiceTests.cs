@@ -1223,6 +1223,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void ContinuityPacketFallsBackToSignalLabelsWhenSignalKindsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuitySparseSignalKindsAndLabelsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "continuity_packet", StringComparison.Ordinal));
+        Assert.False(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("continuity carry-forward label", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("return handoff label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void ContinuityPacketIncludesKindFallbackWhenSignalsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuitySignalKindsOnly();
@@ -5002,6 +5016,52 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         NextSessionCarryForwardProjection carryForward = new(
             CarryForwardId: "carry-1",
             Label: "",
+            Summary: "",
+            ReturnSummary: "",
+            NextSafeAction: "",
+            EvidenceLines: [],
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [continuityChange],
+            Consequences: [],
+            NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithContinuitySparseSignalKindsAndLabelsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection continuityChange = new(
+            PacketId: "packet-1",
+            Kind: "",
+            Label: "Continuity carry-forward label",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "Return handoff label",
             Summary: "",
             ReturnSummary: "",
             NextSafeAction: "",
