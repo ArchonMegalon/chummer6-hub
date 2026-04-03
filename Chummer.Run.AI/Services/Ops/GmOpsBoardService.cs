@@ -463,6 +463,29 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         var imported = 0;
         var skipped = 0;
         var conflicts = new List<OfflineSyncConflict>();
+        var signaturesByAssetVersion = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> ambiguousAssetVersions = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var candidate in assets)
+        {
+            string? normalizedCandidateAssetId = NormalizeOptional(candidate.AssetId);
+            if (normalizedCandidateAssetId is null)
+            {
+                continue;
+            }
+
+            string versionKey = BuildPortableAssetVersionKey(normalizedCandidateAssetId, candidate.UpdatedAtUtc);
+            string signature = BuildPortableAssetConflictFingerprint(candidate);
+            if (!signaturesByAssetVersion.TryGetValue(versionKey, out string? existingSignature))
+            {
+                signaturesByAssetVersion[versionKey] = signature;
+                continue;
+            }
+
+            if (!string.Equals(existingSignature, signature, StringComparison.Ordinal))
+            {
+                ambiguousAssetVersions.Add(versionKey);
+            }
+        }
         foreach (var asset in assets)
         {
             string? normalizedAssetId = NormalizeOptional(asset.AssetId);
@@ -474,6 +497,19 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                     EntityId: "missing-asset-id",
                     Reason: "invalid-asset",
                     Resolution: "skipped-invalid"));
+                continue;
+            }
+
+            if (ambiguousAssetVersions.Contains(BuildPortableAssetVersionKey(normalizedAssetId, asset.UpdatedAtUtc)))
+            {
+                skipped++;
+                conflicts.Add(new OfflineSyncConflict(
+                    Surface: "ops-prep",
+                    EntityId: normalizedAssetId,
+                    Reason: "duplicate-asset-id-ambiguous",
+                    Resolution: "skipped-invalid",
+                    LocalFingerprint: asset.UpdatedAtUtc.ToUnixTimeSeconds().ToString(),
+                    RemoteFingerprint: "conflicting-payload"));
                 continue;
             }
 
@@ -635,6 +671,40 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             SkippedCount: skipped,
             Conflicts: conflicts);
     }
+
+    private static string BuildPortableAssetVersionKey(string normalizedAssetId, DateTimeOffset updatedAtUtc) =>
+        $"{normalizedAssetId}|{updatedAtUtc.ToUnixTimeMilliseconds()}";
+
+    private static string BuildPortableAssetConflictFingerprint(OfflineSyncPrepAsset asset) =>
+        string.Join('|',
+            NormalizeOptional(asset.CampaignId) ?? string.Empty,
+            NormalizeOptional(asset.SessionId) ?? string.Empty,
+            NormalizeOptional(asset.SceneId) ?? string.Empty,
+            NormalizeOptional(asset.Title) ?? string.Empty,
+            NormalizeOptional(asset.Kind) ?? string.Empty,
+            NormalizeOptional(asset.Audience) ?? string.Empty,
+            NormalizeOptional(asset.Summary) ?? string.Empty,
+            NormalizeOptional(asset.Body) ?? string.Empty,
+            NormalizeOptional(asset.Status) ?? string.Empty,
+            NormalizeOptional(asset.CreatedBy) ?? string.Empty,
+            NormalizeOptional(asset.RuntimeFingerprint) ?? string.Empty,
+            asset.CreatedAtUtc.ToUnixTimeMilliseconds().ToString(),
+            NormalizeOptional(asset.LastRevealChannel) ?? string.Empty,
+            asset.LastRevealedAtUtc?.ToUnixTimeMilliseconds().ToString() ?? string.Empty,
+            asset.RevealCount.ToString(),
+            string.Join(',', NormalizeList(asset.Tags)),
+            string.Join(',', asset.ChecklistItems.Select(static item =>
+                $"{NormalizeOptional(item.ItemId) ?? string.Empty}:{NormalizeOptional(item.Label) ?? string.Empty}:{item.Completed}:{NormalizeOptional(item.Notes) ?? string.Empty}")),
+            asset.GovernedProject is null
+                ? string.Empty
+                : string.Join('~',
+                    NormalizeOptional(asset.GovernedProject.ProjectKind) ?? string.Empty,
+                    NormalizeOptional(asset.GovernedProject.ProjectId) ?? string.Empty,
+                    NormalizeOptional(asset.GovernedProject.Title) ?? string.Empty,
+                    NormalizeOptional(asset.GovernedProject.RulesetId) ?? string.Empty,
+                    NormalizeOptional(asset.GovernedProject.LinkTarget) ?? string.Empty,
+                    NormalizeOptional(asset.GovernedProject.TrustTier) ?? string.Empty,
+                    NormalizeOptional(asset.GovernedProject.RuntimeFingerprint) ?? string.Empty));
 
     private static bool HasRequiredPortableAssetFields(OfflineSyncPrepAsset asset) =>
         !string.IsNullOrWhiteSpace(asset.CampaignId)
