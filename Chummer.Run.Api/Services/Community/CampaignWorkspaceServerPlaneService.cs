@@ -2426,6 +2426,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
     {
+        NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
         AftermathRecapPackageProjection[] packages = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
             .OrderByDescending(static item => item.GeneratedAtUtc)
             .Take(3)
@@ -2439,7 +2440,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
-        if (packages.Length == 0 && recapSignals.Length == 0 && aftermathSignals.Length == 0)
+        bool carryForwardSignal = IsAftermathCarryForwardSignal(carryForward);
+        if (packages.Length == 0 && recapSignals.Length == 0 && aftermathSignals.Length == 0 && !carryForwardSignal)
         {
             return null;
         }
@@ -2448,6 +2450,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             recapSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")),
             aftermathSignals.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")),
             packages.Select(static item => DescribeSignalLabel(item.Title, item.PackageKind, "aftermath package")),
+            carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>(),
+            carryForwardSignal ? carryForward?.ReturnSummary : null,
+            carryForwardSignal ? carryForward?.NextSafeAction : null,
+            carryForwardSignal ? carryForward?.Label : null,
+            carryForwardSignal ? carryForward?.Summary : null,
             recapSignals.Select(static item => item.Summary),
             recapSignals.Select(static item => item.Label),
             aftermathSignals.Select(static item => item.Summary),
@@ -2455,15 +2462,17 @@ public sealed class CampaignWorkspaceServerPlaneService
             packages.Select(static item => item.Summary),
             packages.Select(static item => item.Title),
             packages.SelectMany(static item => item.EvidenceLines));
-        int signalCount = packages.Length + recapSignals.Length + aftermathSignals.Length;
+        int signalCount = packages.Length + recapSignals.Length + aftermathSignals.Length + (carryForwardSignal ? 1 : 0);
         string summary = packages.Length > 0
             ? $"{signalCount} aftermath or downtime signal(s) stay attached for recap, recovery, and next-session return."
-            : $"{signalCount} aftermath or downtime signal(s) stay governed from recap/change signals while package receipts catch up.";
+            : carryForwardSignal
+                ? $"{signalCount} aftermath or downtime signal(s) stay governed from recap/change/carry-forward cues while package receipts catch up."
+                : $"{signalCount} aftermath or downtime signal(s) stay governed from recap/change signals while package receipts catch up.";
         DateTimeOffset updatedAtUtc = new[]
             {
                 leadRun?.UpdatedAtUtc,
                 workspace.LatestContinuity?.CapturedAtUtc,
-                workspace.NextSessionCarryForward?.UpdatedAtUtc
+                carryForward?.UpdatedAtUtc
             }
             .Concat(packages.Select(static item => (DateTimeOffset?)item.GeneratedAtUtc))
             .Concat(aftermathSignals.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
@@ -2486,6 +2495,11 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "aftermath",
                 "downtime",
                 "recap",
+                carryForwardSignal ? carryForward?.ReturnSummary : null,
+                carryForwardSignal ? carryForward?.NextSafeAction : null,
+                carryForwardSignal ? carryForward?.Label : null,
+                carryForwardSignal ? carryForward?.Summary : null,
+                carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>(),
                 packages.Select(static item => item.PackageKind),
                 packages.Select(static item => item.Title),
                 packages.Select(static item => item.RunTitle),
@@ -2496,6 +2510,27 @@ public sealed class CampaignWorkspaceServerPlaneService
                 aftermathSignals.Select(static packet => packet.Label)),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsAftermathCarryForwardSignal(NextSessionCarryForwardProjection? carryForward)
+    {
+        if (carryForward is null)
+        {
+            return false;
+        }
+
+        bool primarySignal = IsAftermathSignalKind(carryForward.Label)
+            || IsAftermathSignalKind(carryForward.Summary)
+            || IsAftermathSignalKind(carryForward.ReturnSummary)
+            || IsAftermathSignalKind(carryForward.NextSafeAction)
+            || ContainsAftermathRecapToken(carryForward.Label)
+            || ContainsAftermathRecapToken(carryForward.Summary)
+            || ContainsAftermathRecapToken(carryForward.ReturnSummary)
+            || ContainsAftermathRecapToken(carryForward.NextSafeAction);
+        bool evidenceSignal = carryForward.EvidenceLines.Any(IsAftermathSignalKind)
+            || carryForward.EvidenceLines.Any(ContainsAftermathRecapToken);
+
+        return primarySignal || evidenceSignal;
     }
 
     private static bool IsAftermathSignalKind(string? kind)
