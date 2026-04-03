@@ -2292,11 +2292,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             return true;
         }
 
-        return normalizedKind.Contains("aftermath", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("downtime", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("after_action", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("recap", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("debrief", StringComparison.OrdinalIgnoreCase);
+        return ContainsAnyWordToken(normalizedKind, AftermathRecapWordTokens)
+            || normalizedKind.Contains("after action", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("after-action", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("after_action", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsAftermathSignal(WorkspaceChangePacketProjection packet)

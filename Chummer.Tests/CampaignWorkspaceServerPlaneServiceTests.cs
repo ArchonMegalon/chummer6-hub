@@ -1070,6 +1070,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketDoesNotActivateFromRecapitalizationKindWithoutAftermathIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRecapitalizationKindOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void EventControlPacketDoesNotActivateFromCooperationMentionsWithoutEventSemantics()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCooperationMentionsOnly();
@@ -2970,6 +2981,42 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         return new CampaignWorkspaceProjection(
             WorkspaceId: "workspace-recapitalization-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [recapitalizationSignal],
+            Consequences: [],
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithRecapitalizationKindOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection recapitalizationSignal = new(
+            PacketId: "packet-recapitalization-kind-1",
+            Kind: "recapitalization_signal",
+            Label: "Fiscal planning signal",
+            Summary: "Fiscal planning remains pending for finance review.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-recapitalization-kind-1",
             CampaignId: "campaign-a",
             CampaignName: "Neon Cradle",
             Visibility: "group",
