@@ -41,6 +41,38 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void BoundedRecapShelfCategoryDoesNotActivateFromRecapitalizationKindWithoutRecapIdentity()
+    {
+        PublicationSafeProjection publication = BuildPublicationSafeProjection("recapitalization_signal");
+
+        string category = InvokeBoundedRecapShelfCategory(publication);
+
+        Assert.Equal("other", category);
+    }
+
+    [Fact]
+    public void SupportsCreatorShelfProjectionDoesNotActivateFromAfterburnerCampaignerRunboardwalkWithoutTokenIdentity()
+    {
+        PublicationSafeProjection publication = BuildPublicationSafeProjection("afterburner_campaigner_runboardwalk");
+
+        bool supported = InvokeSupportsCreatorShelfProjection(publication);
+
+        Assert.False(supported);
+    }
+
+    [Fact]
+    public void BoundedRecapShelfCategoryKeepsCampaignRecapBundleClassification()
+    {
+        PublicationSafeProjection publication = BuildPublicationSafeProjection("campaign_recap_bundle");
+
+        string category = InvokeBoundedRecapShelfCategory(publication);
+        bool supported = InvokeSupportsCreatorShelfProjection(publication);
+
+        Assert.Equal("campaign", category);
+        Assert.True(supported);
+    }
+
+    [Fact]
     public void PrepLibraryIncludesRosterMovementPacketWhenRosterTransfersExist()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
@@ -1875,6 +1907,31 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         return Assert.IsType<bool>(method.Invoke(null, [packet, queryTokens]));
     }
+
+    private static string InvokeBoundedRecapShelfCategory(PublicationSafeProjection item)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BoundedRecapShelfCategory", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BoundedRecapShelfCategory was not found.");
+
+        return Assert.IsType<string>(method.Invoke(null, [item]));
+    }
+
+    private static bool InvokeSupportsCreatorShelfProjection(PublicationSafeProjection item)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("SupportsCreatorShelfProjection", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("SupportsCreatorShelfProjection was not found.");
+
+        return Assert.IsType<bool>(method.Invoke(null, [item]));
+    }
+
+    private static PublicationSafeProjection BuildPublicationSafeProjection(string kind)
+        => new(
+            ProjectionId: $"publication-{kind}",
+            Kind: kind,
+            Label: "Publication label",
+            Summary: "Publication summary");
 
     private static IReadOnlyList<GovernedPrepPacketSummary> InvokeBuildPrepPackets(
         CampaignWorkspaceProjection workspace,
