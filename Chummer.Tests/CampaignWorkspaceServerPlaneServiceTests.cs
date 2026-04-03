@@ -682,6 +682,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketKeepsConsequenceKindFallbackWhenEventEvidenceIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlKindsAndVerboseEventEvidence();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("heat_pressure_lane", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("season board lane", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void EventControlPacketFallsBackToExplicitEventSignalVariantsWhenOtherFamiliesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlExplicitEventSignalsOnly();
@@ -2884,6 +2898,64 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [seasonOperation],
             Consequences: [heatVariant],
             NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlKindsAndVerboseEventEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection eventSignalA = new(
+            PacketId: "event-1",
+            Kind: "season_operation_checkpoint",
+            Label: "Season board lane A",
+            Summary: "Season operation control timeline is saturated with verbose lane details for packet A.",
+            UpdatedAtUtc: now.AddMinutes(2));
+        WorkspaceChangePacketProjection eventSignalB = new(
+            PacketId: "event-2",
+            Kind: "event_window_shift",
+            Label: "Season board lane B",
+            Summary: "Event window control timeline is saturated with verbose lane details for packet B.",
+            UpdatedAtUtc: now.AddMinutes(3));
+        WorkspaceChangePacketProjection eventSignalC = new(
+            PacketId: "event-3",
+            Kind: "operation_checkpoint",
+            Label: "Season board lane C",
+            Summary: "Operation checkpoint control timeline is saturated with verbose lane details for packet C.",
+            UpdatedAtUtc: now.AddMinutes(4));
+        CampaignConsequenceProjection heatVariant = new(
+            ConsequenceId: "consequence-1",
+            Kind: "heat_pressure_lane",
+            Label: "",
+            State: "active",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(5));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [eventSignalA, eventSignalB, eventSignalC],
+            Consequences: [heatVariant],
             PrepLaunches: [],
             TravelPrefetches: []);
     }

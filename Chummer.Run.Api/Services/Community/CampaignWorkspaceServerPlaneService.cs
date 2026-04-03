@@ -2192,9 +2192,14 @@ public sealed class CampaignWorkspaceServerPlaneService
             ? " Event/season controls are currently driven by run-pressure signals while receipt streams catch up."
             : string.Empty;
         IReadOnlyList<string> evidence = BuildEvidenceLines(
+            consequences.Select(static consequence => DescribeSignalLabel(consequence.Label, consequence.Kind, consequence.State)),
+            consequences.Select(static consequence => consequence.Summary),
+            consequences.Select(static consequence => consequence.Label),
+            consequences.SelectMany(static consequence => consequence.EvidenceLines),
+            consequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.Summary)),
+            eventPackets.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "event control signal")),
             eventPackets.Select(static packet => packet.Summary),
             eventPackets.Select(static packet => packet.Label),
-            eventPackets.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "event control signal")),
             eventObjectives.Select(static objective => objective.Summary),
             eventObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."),
             sceneSignal ? activeScene?.Summary : null,
@@ -2206,11 +2211,6 @@ public sealed class CampaignWorkspaceServerPlaneService
             travelPrefetches.SelectMany(static receipt => receipt.Boundaries),
             travelPrefetches.SelectMany(static receipt => receipt.InventoryLines),
             workspace.ReturnSummary,
-            consequences.Select(static consequence => consequence.Summary),
-            consequences.Select(static consequence => consequence.Label),
-            consequences.Select(static consequence => DescribeSignalLabel(consequence.Label, consequence.Kind, consequence.State)),
-            consequences.SelectMany(static consequence => consequence.EvidenceLines),
-            consequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.Summary)),
             workspace.ReturnSummary,
             carryForward?.Label,
             carryForward?.Summary,
