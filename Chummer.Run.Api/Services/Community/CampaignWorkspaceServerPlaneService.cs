@@ -80,6 +80,19 @@ public sealed class CampaignWorkspaceServerPlaneService
         "log"
     ];
 
+    private static readonly string[] ReturnWordTokens =
+    [
+        "return"
+    ];
+
+    private static readonly string[] ReturnLaneContextWordTokens =
+    [
+        "campaign",
+        "session",
+        "loop",
+        "window"
+    ];
+
     private static readonly string[] DiaryWordTokens =
     [
         "diary",
@@ -1873,11 +1886,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             return true;
         }
 
-        bool containsReturnLaneToken = normalizedKind.Contains("return", StringComparison.OrdinalIgnoreCase)
-            && (normalizedKind.Contains("campaign", StringComparison.OrdinalIgnoreCase)
-                || normalizedKind.Contains("session", StringComparison.OrdinalIgnoreCase)
-                || normalizedKind.Contains("loop", StringComparison.OrdinalIgnoreCase)
-                || normalizedKind.Contains("window", StringComparison.OrdinalIgnoreCase));
+        bool containsReturnLaneToken = ContainsAnyWordToken(normalizedKind, ReturnWordTokens)
+            && ContainsAnyWordToken(normalizedKind, ReturnLaneContextWordTokens);
         if (containsReturnLaneToken)
         {
             return true;

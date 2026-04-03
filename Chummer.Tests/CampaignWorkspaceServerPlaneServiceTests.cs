@@ -444,6 +444,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDoesNotActivateFromCampaignerReturnableWindowshadeMentionsWithoutReturnIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignerReturnableWindowshadeMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignReturnPacketIgnoresFactionInterstateMentionsForRelationshipMutationSignals()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithFactionInterstateMentionsOnly();
@@ -6687,6 +6698,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [keynoteSignal],
+            Consequences: [],
+            NextSessionCarryForward: null);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignerReturnableWindowshadeMentionsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection windowshadeSignal = new(
+            PacketId: "packet-campaigner-returnable-windowshade-1",
+            Kind: "status_note",
+            Label: "Campaigner returnable windowshade note",
+            Summary: "Windowshade procurement remains scheduled for maintenance follow-through.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-campaigner-returnable-windowshade-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [windowshadeSignal],
             Consequences: [],
             NextSessionCarryForward: null);
     }
