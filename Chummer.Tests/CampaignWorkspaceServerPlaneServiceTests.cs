@@ -2603,6 +2603,18 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLaunchPacketUpdatedAtIgnoresUnrelatedCarryForwardTimestampWhenCarryForwardIsNotAPrepLaunchSignal()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchSignalAndUnrelatedCarryForwardTimestampSkew();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.Equal(DateTimeOffset.Parse("2026-04-03T00:01:00Z"), packet.UpdatedAtUtc);
+    }
+
+    [Fact]
     public void ContinuityPacketFallsBackToCarryForwardAndContinuityChangeSignals()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuitySignalsOnly();
@@ -7264,6 +7276,52 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "",
             ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchSignalAndUnrelatedCarryForwardTimestampSkew()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection prepLaunchSignal = new(
+            PacketId: "packet-prep-launch-1",
+            Kind: "prep_launch",
+            Label: "Prep launch lane update",
+            Summary: "Prep launch stays governed while launch receipts hydrate.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-unrelated-prep-1",
+            Label: "Operator queue note",
+            Summary: "Publication checklist reconciliation is still pending.",
+            ReturnSummary: "Workspace governance note remains open.",
+            NextSafeAction: "Review operator queue before docs refresh.",
+            EvidenceLines: ["Queue evidence remains pending reconciliation."],
+            UpdatedAtUtc: now.AddMinutes(9));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-prep-launch-updated-at-skew-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [prepLaunchSignal],
             Consequences: [],
             NextSessionCarryForward: carryForward,
             PrepLaunches: [],

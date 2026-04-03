@@ -2786,7 +2786,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         DateTimeOffset updatedAtUtc = new[]
             {
                 leadRun?.UpdatedAtUtc,
-                carryForward?.UpdatedAtUtc
+                carryForwardSignal ? carryForward?.UpdatedAtUtc : null
             }
             .Concat(launches.Select(static item => (DateTimeOffset?)item.LaunchedAtUtc))
             .Concat(launchSignals.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
