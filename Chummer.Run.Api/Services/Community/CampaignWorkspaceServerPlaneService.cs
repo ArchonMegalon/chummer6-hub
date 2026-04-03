@@ -218,9 +218,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         "prep"
     ];
 
-    private static readonly string[] PrepLaunchWordPrefixes =
+    private static readonly string[] PrepLaunchActionWordTokens =
     [
-        "launch"
+        "launch",
+        "launches",
+        "launched",
+        "launching"
     ];
 
     private static readonly string[] TravelPrefetchWordTokens =
@@ -2484,7 +2487,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(value, PrepLaunchWordTokens)
-            && ContainsAnyWordTokenPrefix(value, PrepLaunchWordPrefixes);
+            && ContainsAnyWordToken(value, PrepLaunchActionWordTokens);
     }
 
     private static bool ContainsPrepLaunchToken(string? primary, string? secondary)

@@ -1335,6 +1335,28 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLaunchPacketDoesNotActivateFromPrepLaunchableMentionsWithoutLaunchIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchableMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void EventControlPacketDoesNotActivateFromPrepLaunchableMentionsWithoutLaunchIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchableMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void TravelPrefetchPacketDoesNotActivateFromTraveloguePrefetchingMentionsWithoutTravelPrefetchIdentity()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithTraveloguePrefetchingMentionsOnly();
@@ -5434,6 +5456,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [prefetchableSignal],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchableMentionsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        WorkspaceChangePacketProjection launchableSignal = new(
+            PacketId: "packet-prep-launchable-1",
+            Kind: "status_note",
+            Label: "Prep launchable checklist",
+            Summary: "Checklist language remains continuity-only for governance prep.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-prep-launchable-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [launchableSignal],
             Consequences: [],
             PrepLaunches: [],
             TravelPrefetches: []);
