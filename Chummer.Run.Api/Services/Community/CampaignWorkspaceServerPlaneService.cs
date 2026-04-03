@@ -1605,7 +1605,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         int diarySignalCount = diaryRecaps.Length + returnChanges.Length + aftermathPackages.Length + aftermathChanges.Length;
-        int relationshipSignalCount = relationshipConsequences.Length;
+        int relationshipSignalCount = relationshipConsequences.Length
+            + returnChanges.Count(static packet => IsCampaignRelationshipSignalKind(packet.Kind))
+            + aftermathChanges.Count(static packet => IsCampaignRelationshipSignalKind(packet.Kind));
         string summary = $"{Math.Max(1, diarySignalCount)} diary/continuity signal(s) and {relationshipSignalCount} relationship signal(s) stay on one governed return lane for downtime and next-session reopen.";
         string bindingSummary = leadRun is null
             ? "Diary updates, contacts, heat, and return cues stay attached to the same campaign truth without local note-shadow models."
