@@ -2588,7 +2588,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
         CampaignConsequenceProjection[] consequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
-            .Where(static consequence => IsCampaignRelationshipConsequenceSignal(consequence))
+            .Where(static consequence => IsEventControlConsequenceSignal(consequence))
             .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
             .Take(3)
             .ToArray();
@@ -2800,6 +2800,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(value, OppositionWordTokens);
+    }
+
+    private static bool IsEventControlConsequenceSignal(CampaignConsequenceProjection consequence)
+    {
+        return IsCampaignRelationshipConsequenceSignal(consequence)
+            || IsOppositionConsequenceSignal(consequence);
     }
 
     private static bool IsOppositionSignalKind(string? kind)
