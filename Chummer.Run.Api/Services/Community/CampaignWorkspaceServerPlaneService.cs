@@ -1618,11 +1618,6 @@ public sealed class CampaignWorkspaceServerPlaneService
             ? "Diary updates, contacts, heat, and return cues stay attached to the same campaign truth without local note-shadow models."
             : $"{leadRun.Title} and campaign return cues share the same diary/contact/heat continuity lane.";
         IReadOnlyList<string> evidence = BuildEvidenceLines(
-            workspace.ReturnSummary,
-            workspace.NextSessionCarryForward?.Label,
-            workspace.NextSessionCarryForward?.Summary,
-            workspace.NextSessionCarryForward?.ReturnSummary,
-            workspace.NextSessionCarryForward?.NextSafeAction,
             diaryRecaps.Select(static item => item.Summary),
             diaryRecaps.Select(static item => item.Label),
             diaryRecaps.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "diary signal")),
@@ -1638,7 +1633,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             relationshipConsequences.Select(static item => item.Label),
             relationshipConsequences.Select(static item => DescribeSignalLabel(item.Label, item.Kind, item.State)),
             relationshipConsequences.SelectMany(static item => item.EvidenceLines),
-            relationshipConsequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.Summary)));
+            relationshipConsequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.Summary)),
+            workspace.ReturnSummary,
+            workspace.NextSessionCarryForward?.Label,
+            workspace.NextSessionCarryForward?.Summary,
+            workspace.NextSessionCarryForward?.ReturnSummary,
+            workspace.NextSessionCarryForward?.NextSafeAction);
         DateTimeOffset updatedAtUtc = new[]
             {
                 workspace.LatestContinuity?.CapturedAtUtc,
@@ -2194,10 +2194,6 @@ public sealed class CampaignWorkspaceServerPlaneService
             ? " Event/season controls are currently driven by run-pressure signals while receipt streams catch up."
             : string.Empty;
         IReadOnlyList<string> evidence = BuildEvidenceLines(
-            carryForward?.Label,
-            carryForward?.Summary,
-            carryForward?.ReturnSummary,
-            carryForward?.NextSafeAction,
             eventPackets.Select(static packet => packet.Summary),
             eventPackets.Select(static packet => packet.Label),
             eventPackets.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "event control signal")),
@@ -2216,7 +2212,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             consequences.Select(static consequence => consequence.Label),
             consequences.Select(static consequence => DescribeSignalLabel(consequence.Label, consequence.Kind, consequence.State)),
             consequences.SelectMany(static consequence => consequence.EvidenceLines),
-            consequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.Summary)));
+            consequences.SelectMany(static consequence => consequence.Receipts.Select(static receipt => receipt.Summary)),
+            workspace.ReturnSummary,
+            carryForward?.Label,
+            carryForward?.Summary,
+            carryForward?.ReturnSummary,
+            carryForward?.NextSafeAction);
         DateTimeOffset updatedAtUtc = new[]
             {
                 carryForward?.UpdatedAtUtc,
