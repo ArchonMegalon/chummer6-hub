@@ -1069,6 +1069,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(packet.EvidenceLines, line => line.Contains("session_recap", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void ContinuityPacketKeepsContinuityKindFallbackWhenRecapEvidenceIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuityKindsAndVerboseRecapEvidence();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "continuity_packet", StringComparison.Ordinal));
+        Assert.False(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("next_session_carry_forward", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("Session recap lane", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -4308,6 +4322,57 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ChangePackets: [continuityChange],
             Consequences: [],
             NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithContinuityKindsAndVerboseRecapEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        PublicationSafeProjection recapA = new(
+            ProjectionId: "recap-a",
+            Kind: "session_recap",
+            Label: "Session recap lane A",
+            Summary: "Session recap evidence line A remains verbose while continuity projections hydrate.");
+        PublicationSafeProjection recapB = new(
+            ProjectionId: "recap-b",
+            Kind: "session_recap",
+            Label: "Session recap lane B",
+            Summary: "Session recap evidence line B remains verbose while continuity projections hydrate.");
+        PublicationSafeProjection recapC = new(
+            ProjectionId: "recap-c",
+            Kind: "session_recap",
+            Label: "Session recap lane C",
+            Summary: "Session recap evidence line C remains verbose while continuity projections hydrate.");
+        WorkspaceChangePacketProjection continuityChange = new(
+            PacketId: "packet-1",
+            Kind: "next_session_carry_forward",
+            Label: "",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [recapA, recapB, recapC],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [continuityChange],
+            Consequences: [],
+            NextSessionCarryForward: null);
     }
 
     private static WorkspaceRestoreProjection BuildRestoreWithTravelPacketSparseEvidence()

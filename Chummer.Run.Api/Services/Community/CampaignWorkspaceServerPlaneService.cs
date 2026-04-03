@@ -1487,27 +1487,19 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
-        IReadOnlyList<string> evidence = workspace.RecapShelf
-            .Select(static item => item.Summary)
-            .Concat(workspace.RecapShelf.Select(static item => item.Label))
-            .Concat(workspace.RecapShelf.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "continuity signal")))
-            .Concat(workspace.Dossiers.Select(static item => item.LatestContinuity?.Summary))
-            .Concat(continuitySignals.Select(static packet => packet.Summary))
-            .Concat(continuitySignals.Select(static packet => packet.Label))
-            .Concat(continuitySignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "continuity signal")))
-            .Concat(
-            [
-                workspace.LatestContinuity?.Summary,
-                workspace.NextSessionCarryForward?.Label,
-                workspace.NextSessionCarryForward?.Summary,
-                workspace.NextSessionCarryForward?.ReturnSummary,
-                workspace.NextSessionCarryForward?.NextSafeAction
-            ])
-            .Where(static item => !string.IsNullOrWhiteSpace(item))
-            .Select(static item => item!.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
-            .ToArray();
+        IReadOnlyList<string> evidence = BuildEvidenceLines(
+            continuitySignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "continuity signal")),
+            workspace.RecapShelf.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "continuity signal")),
+            workspace.LatestContinuity?.Summary,
+            workspace.NextSessionCarryForward?.Label,
+            workspace.NextSessionCarryForward?.Summary,
+            workspace.NextSessionCarryForward?.ReturnSummary,
+            workspace.NextSessionCarryForward?.NextSafeAction,
+            continuitySignals.Select(static packet => packet.Summary),
+            continuitySignals.Select(static packet => packet.Label),
+            workspace.RecapShelf.Select(static item => item.Summary),
+            workspace.RecapShelf.Select(static item => item.Label),
+            workspace.Dossiers.Select(static item => item.LatestContinuity?.Summary));
         int continuitySignalCount = (workspace.LatestContinuity is null ? 0 : 1)
             + workspace.RecapShelf.Count
             + workspace.Dossiers.Count
