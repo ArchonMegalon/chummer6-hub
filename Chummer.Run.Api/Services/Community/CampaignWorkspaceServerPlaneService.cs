@@ -2207,7 +2207,8 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         return IsPrepLaunchSignalKind(packet.Kind)
             || ContainsPrepLaunchToken(packet.Label)
-            || ContainsPrepLaunchToken(packet.Summary);
+            || ContainsPrepLaunchToken(packet.Summary)
+            || ContainsPrepLaunchToken(packet.Label, packet.Summary);
     }
 
     private static bool ContainsPrepLaunchToken(string? value)
@@ -2219,6 +2220,17 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return value.Contains("prep", StringComparison.OrdinalIgnoreCase)
             && value.Contains("launch", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsPrepLaunchToken(string? primary, string? secondary)
+    {
+        if (string.IsNullOrWhiteSpace(primary) && string.IsNullOrWhiteSpace(secondary))
+        {
+            return false;
+        }
+
+        string combined = $"{primary} {secondary}";
+        return ContainsPrepLaunchToken(combined);
     }
 
     private static GovernedPrepPacketSummary? BuildEventControlPrepPacket(
@@ -2599,7 +2611,8 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         return IsTravelPrefetchSignalKind(packet.Kind)
             || ContainsTravelPrefetchToken(packet.Label)
-            || ContainsTravelPrefetchToken(packet.Summary);
+            || ContainsTravelPrefetchToken(packet.Summary)
+            || ContainsTravelPrefetchToken(packet.Label, packet.Summary);
     }
 
     private static bool ContainsTravelPrefetchToken(string? value)
@@ -2611,6 +2624,17 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return value.Contains("travel", StringComparison.OrdinalIgnoreCase)
             && value.Contains("prefetch", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsTravelPrefetchToken(string? primary, string? secondary)
+    {
+        if (string.IsNullOrWhiteSpace(primary) && string.IsNullOrWhiteSpace(secondary))
+        {
+            return false;
+        }
+
+        string combined = $"{primary} {secondary}";
+        return ContainsTravelPrefetchToken(combined);
     }
 
     private static GovernedPrepPacketSummary? BuildTravelPrepPacket(
