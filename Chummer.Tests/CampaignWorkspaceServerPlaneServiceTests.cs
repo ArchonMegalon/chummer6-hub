@@ -1535,6 +1535,28 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void TravelPrefetchPacketDoesNotActivateFromCarryForwardTravelPrefetchableMentionsWithoutPrefetchIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithTravelPrefetchableCarryForwardMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void EventControlPacketDoesNotActivateFromCarryForwardTravelPrefetchableMentionsWithoutPrefetchIdentity()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithTravelPrefetchableCarryForwardMentionsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void EventControlPacketDoesNotActivateFromContactlessMentionsWithoutRelationshipIdentity()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithContactlessStatusMentionsOnly();
@@ -6648,6 +6670,46 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Return lane summary",
             ChangePackets: [prefetchableSignal],
             Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithTravelPrefetchableCarryForwardMentionsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-travel-prefetchable-1",
+            Label: "Travel prefetchable checklist",
+            Summary: "Checklist language remains continuity-only for the return board.",
+            ReturnSummary: "Return lane note remains governed.",
+            NextSafeAction: "Review checklist posture before publication.",
+            EvidenceLines: [],
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-travel-prefetchable-carry-forward-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
             PrepLaunches: [],
             TravelPrefetches: []);
     }
