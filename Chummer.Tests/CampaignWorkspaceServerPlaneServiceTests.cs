@@ -801,6 +801,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void OppositionPacketKeepsConsequenceKindFallbackWhenOppositionEvidenceIsVerbose()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionConsequenceKindsSparseAndVerboseSignals();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("threat_window", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void OppositionPacketFallsBackToRunPressureWhenConsequencesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRunPressureSignalsOnly();
@@ -3533,6 +3546,58 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "",
             ChangePackets: [],
             Consequences: [oppositionWindow, threatWindow]);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithOppositionConsequenceKindsSparseAndVerboseSignals()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection oppositionWindowSignal = new(
+            PacketId: "packet-1",
+            Kind: "opposition_window_shift",
+            Label: "Opposition window label",
+            Summary: "Opposition window summary line remains verbose in evidence.",
+            UpdatedAtUtc: now.AddMinutes(3));
+        WorkspaceChangePacketProjection threatWindowSignal = new(
+            PacketId: "packet-2",
+            Kind: "threat_window_shift",
+            Label: "Threat window label",
+            Summary: "Threat window summary line remains verbose in evidence.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        CampaignConsequenceProjection sparseConsequence = new(
+            ConsequenceId: "consequence-1",
+            Kind: "threat_window",
+            Label: "",
+            State: "active",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [oppositionWindowSignal, threatWindowSignal],
+            Consequences: [sparseConsequence]);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithPrepLaunchChangeSignalsOnly()
