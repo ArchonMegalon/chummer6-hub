@@ -2191,6 +2191,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             workspace.ReturnSummary,
             eventPackets.Select(static packet => packet.Summary),
             eventPackets.Select(static packet => packet.Label),
+            eventPackets.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "event control signal")),
             eventObjectives.Select(static objective => objective.Summary),
             eventObjectives.Select(static objective => $"{objective.Title} stays {objective.Status} with {objective.Pressure} pressure."),
             sceneSignal ? activeScene?.Summary : null,

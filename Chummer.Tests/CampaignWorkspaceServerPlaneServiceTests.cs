@@ -487,6 +487,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketIncludesKindFallbackWhenEventSignalsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlSignalKindsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("season_operation_checkpoint", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("event_window_shift", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void EventControlPacketIncludesCarryForwardLabelWhenCarryForwardSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardLabelOnly();
@@ -2078,6 +2092,50 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "",
             ChangePackets: [seasonOperation, relationshipPressure],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEventControlSignalKindsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection seasonOperation = new(
+            PacketId: "packet-1",
+            Kind: "season_operation_checkpoint",
+            Label: "",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(2));
+        WorkspaceChangePacketProjection eventWindowShift = new(
+            PacketId: "packet-2",
+            Kind: "event_window_shift",
+            Label: "",
+            Summary: "",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [seasonOperation, eventWindowShift],
             Consequences: [],
             PrepLaunches: [],
             TravelPrefetches: []);
