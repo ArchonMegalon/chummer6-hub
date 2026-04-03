@@ -2044,16 +2044,13 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
-        IReadOnlyList<string> evidence = launches
-            .Select(static item => item.Summary)
-            .Concat(launches.Select(static item => item.PacketTitle))
-            .Concat(launches.SelectMany(static item => item.AuditLines))
-            .Concat(launchSignals.Select(static packet => packet.Summary))
-            .Concat(launchSignals.Select(static packet => packet.Label))
-            .Where(static item => !string.IsNullOrWhiteSpace(item))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
-            .ToArray();
+        IReadOnlyList<string> evidence = BuildEvidenceLines(
+            launches.Select(static item => item.Summary),
+            launches.Select(static item => item.PacketTitle),
+            launches.SelectMany(static item => item.AuditLines),
+            launchSignals.Select(static packet => packet.Summary),
+            launchSignals.Select(static packet => packet.Label),
+            launchSignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "prep launch signal")));
         int signalCount = launches.Length + launchSignals.Length;
         string summary = launches.Length > 0
             ? $"{signalCount} prep-launch signal(s) keep packet launches auditable on the same campaign lane."
