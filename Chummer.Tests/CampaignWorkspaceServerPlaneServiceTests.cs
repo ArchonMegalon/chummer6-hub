@@ -881,6 +881,34 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void OppositionPacketExcludesNonOppositionConsequencesFromSummaryAndEvidence()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithMixedOppositionAndRelationshipConsequences();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("threat_window", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain("heat_pressure_lane", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(packet.EvidenceLines, line => line.Contains("heat pressure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void OppositionPacketFallsBackToConsequenceLabelWhenConsequenceKindIsSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionConsequenceLabelOnlyAndSparseKind();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("opposition window label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void OppositionPacketFallsBackToRunPressureWhenConsequencesAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRunPressureSignalsOnly();
@@ -4004,6 +4032,93 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "",
             ChangePackets: [oppositionWindowSignal, threatWindowSignal],
+            Consequences: [sparseConsequence]);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithMixedOppositionAndRelationshipConsequences()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        CampaignConsequenceProjection opposition = new(
+            ConsequenceId: "consequence-1",
+            Kind: "threat_window",
+            Label: "",
+            State: "active",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+        CampaignConsequenceProjection relationship = new(
+            ConsequenceId: "consequence-2",
+            Kind: "heat_pressure_lane",
+            Label: "Heat pressure lane",
+            State: "active",
+            Summary: "Heat pressure remains attached to event-control governance.",
+            EvidenceLines: ["Heat pressure receipt line"],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [opposition, relationship]);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithOppositionConsequenceLabelOnlyAndSparseKind()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        CampaignConsequenceProjection sparseConsequence = new(
+            ConsequenceId: "consequence-1",
+            Kind: "",
+            Label: "Opposition window label",
+            State: "active",
+            Summary: "",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
             Consequences: [sparseConsequence]);
     }
 
