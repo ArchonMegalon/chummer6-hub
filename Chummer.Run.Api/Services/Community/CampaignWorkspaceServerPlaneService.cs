@@ -10,6 +10,16 @@ namespace Chummer.Run.Api.Services.Community;
 
 public sealed class CampaignWorkspaceServerPlaneService
 {
+    private static readonly string[] CampaignRelationshipWordTokens =
+    [
+        "contact",
+        "contacts",
+        "heat",
+        "reputation",
+        "faction",
+        "factions"
+    ];
+
     private static readonly string[] EventControlWordTokens =
     [
         "event",
@@ -1848,10 +1858,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return value.Contains("contact", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("heat", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("reputation", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("faction", StringComparison.OrdinalIgnoreCase);
+        return ContainsAnyWordToken(value, CampaignRelationshipWordTokens);
     }
 
     private static bool ContainsCampaignRelationshipMutationToken(string? value)
@@ -1893,10 +1900,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             return true;
         }
 
-        return normalizedKind.Contains("contact", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("heat", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("reputation", StringComparison.OrdinalIgnoreCase)
-            || normalizedKind.Contains("faction", StringComparison.OrdinalIgnoreCase);
+        return ContainsCampaignRelationshipToken(normalizedKind);
     }
 
     private static bool IsCampaignRelationshipConsequenceSignal(CampaignConsequenceProjection consequence)
