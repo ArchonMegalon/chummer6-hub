@@ -1851,6 +1851,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
     {
+        NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
         PublicationSafeProjection[] diaryRecaps = workspace.RecapShelf
             .Where(static item => IsCampaignReturnRecapSignal(item))
             .Take(4)
@@ -1874,18 +1875,23 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static packet => packet.UpdatedAtUtc)
             .Take(4)
             .ToArray();
+        bool carryForwardSignal = IsCampaignReturnCarryForwardSignal(carryForward);
 
         if (diaryRecaps.Length == 0
             && aftermathPackages.Length == 0
             && relationshipConsequences.Length == 0
             && returnChanges.Length == 0
             && aftermathChanges.Length == 0
-            && workspace.NextSessionCarryForward is null)
+            && !carryForwardSignal)
         {
             return null;
         }
 
-        int diarySignalCount = diaryRecaps.Length + returnChanges.Length + aftermathPackages.Length + aftermathChanges.Length;
+        int diarySignalCount = diaryRecaps.Length
+            + returnChanges.Length
+            + aftermathPackages.Length
+            + aftermathChanges.Length
+            + (carryForwardSignal ? 1 : 0);
         int relationshipSignalCount = relationshipConsequences.Length
             + returnChanges.Count(static packet => IsCampaignRelationshipSignal(packet))
             + aftermathChanges.Count(static packet => IsCampaignRelationshipSignal(packet));
@@ -1912,15 +1918,15 @@ public sealed class CampaignWorkspaceServerPlaneService
             relationshipConsequences.Select(static item => item.Summary),
             relationshipConsequences.Select(static item => item.Label),
             workspace.ReturnSummary,
-            workspace.NextSessionCarryForward?.Label,
-            workspace.NextSessionCarryForward?.Summary,
-            workspace.NextSessionCarryForward?.ReturnSummary,
-            workspace.NextSessionCarryForward?.NextSafeAction,
-            workspace.NextSessionCarryForward?.EvidenceLines);
+            carryForwardSignal ? carryForward?.Label : null,
+            carryForwardSignal ? carryForward?.Summary : null,
+            carryForwardSignal ? carryForward?.ReturnSummary : null,
+            carryForwardSignal ? carryForward?.NextSafeAction : null,
+            carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>());
         DateTimeOffset updatedAtUtc = new[]
             {
                 workspace.LatestContinuity?.CapturedAtUtc,
-                workspace.NextSessionCarryForward?.UpdatedAtUtc
+                carryForwardSignal ? carryForward?.UpdatedAtUtc : null
             }
             .Concat(returnChanges.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
             .Concat(aftermathChanges.Select(static packet => (DateTimeOffset?)packet.UpdatedAtUtc))
@@ -1947,9 +1953,11 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "aftermath",
                 "return",
                 workspace.ReturnSummary,
-                workspace.NextSessionCarryForward?.Label,
-                workspace.NextSessionCarryForward?.NextSafeAction,
-                workspace.NextSessionCarryForward?.EvidenceLines,
+                carryForwardSignal ? carryForward?.Label : null,
+                carryForwardSignal ? carryForward?.Summary : null,
+                carryForwardSignal ? carryForward?.ReturnSummary : null,
+                carryForwardSignal ? carryForward?.NextSafeAction : null,
+                carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>(),
                 diaryRecaps.Select(static item => item.Kind),
                 diaryRecaps.Select(static item => item.Label),
                 aftermathPackages.Select(static item => item.PackageKind),
@@ -1965,6 +1973,46 @@ public sealed class CampaignWorkspaceServerPlaneService
                 relationshipConsequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.SourceKind))),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
+    }
+
+    private static bool IsCampaignReturnCarryForwardSignal(NextSessionCarryForwardProjection? carryForward)
+    {
+        if (carryForward is null)
+        {
+            return false;
+        }
+
+        string combinedCarryForwardText = string.Join(' ', new[]
+        {
+            carryForward.Label,
+            carryForward.Summary,
+            carryForward.ReturnSummary,
+            carryForward.NextSafeAction
+        }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+        bool returnLaneSignal = ContainsAnyWordToken(combinedCarryForwardText, ReturnWordTokens)
+            && ContainsAnyWordToken(combinedCarryForwardText, ["lane", "reopen", "downtime", "session", "next"]);
+        bool primarySignal = IsCampaignReturnSignalKind(carryForward.Label)
+            || IsCampaignReturnSignalKind(carryForward.Summary)
+            || IsCampaignReturnSignalKind(carryForward.ReturnSummary)
+            || IsCampaignReturnSignalKind(carryForward.NextSafeAction)
+            || ContainsCampaignReturnRecapToken(carryForward.Label)
+            || ContainsCampaignReturnRecapToken(carryForward.Summary)
+            || ContainsCampaignReturnRecapToken(carryForward.ReturnSummary)
+            || ContainsCampaignReturnRecapToken(carryForward.NextSafeAction)
+            || IsDiarySignalKind(carryForward.Label)
+            || IsDiarySignalKind(carryForward.Summary)
+            || IsDiarySignalKind(carryForward.ReturnSummary)
+            || IsDiarySignalKind(carryForward.NextSafeAction)
+            || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.Summary, carryForward.ReturnSummary)
+            || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Label, carryForward.NextSafeAction, carryForward.ReturnSummary)
+            || ContainsCampaignRelationshipSplitTokenSignal(carryForward.Summary, carryForward.NextSafeAction, carryForward.ReturnSummary)
+            || returnLaneSignal;
+        bool evidenceSignal = carryForward.EvidenceLines.Any(IsCampaignReturnSignalKind)
+            || carryForward.EvidenceLines.Any(ContainsCampaignReturnRecapToken)
+            || carryForward.EvidenceLines.Any(IsDiarySignalKind)
+            || ContainsCampaignRelationshipSplitTokenSignalFromCandidates(carryForward.EvidenceLines);
+
+        return primarySignal || evidenceSignal;
     }
 
     private static bool IsCampaignReturnSignalKind(string? kind)

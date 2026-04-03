@@ -641,6 +641,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDoesNotActivateFromUnrelatedCarryForwardNotesOnly()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithNonEventCarryForwardOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignReturnPacketIncludesCarryForwardLabelWhenCarryForwardSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnCarryForwardLabelOnly();
@@ -652,6 +663,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(packet.Reusable);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("return lane label", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("reopen from governed return lane", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CampaignReturnPacketActivatesFromCarryForwardEvidenceLinesWhenPrimaryFieldsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnCarryForwardEvidenceSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("campaign_return_window", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("contact status changed after downtime", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -4076,6 +4101,49 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "",
             NextSafeAction: "Reopen from governed return lane.",
             EvidenceLines: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnCarryForwardEvidenceSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-1",
+            Label: "",
+            Summary: "",
+            ReturnSummary: "",
+            NextSafeAction: "",
+            EvidenceLines:
+            [
+                "campaign_return_window",
+                "contact status changed after downtime"
+            ],
             UpdatedAtUtc: now.AddMinutes(2));
 
         return new CampaignWorkspaceProjection(
