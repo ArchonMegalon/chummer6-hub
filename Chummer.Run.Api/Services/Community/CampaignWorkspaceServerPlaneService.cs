@@ -100,7 +100,10 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static readonly string[] ReturnWordTokens =
     [
-        "return"
+        "return",
+        "returns",
+        "returned",
+        "returning"
     ];
 
     private static readonly string[] ReturnLaneContextWordTokens =
