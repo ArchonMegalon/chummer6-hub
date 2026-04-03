@@ -1623,10 +1623,13 @@ public sealed class CampaignWorkspaceServerPlaneService
             aftermathPackages.SelectMany(static item => item.EvidenceLines),
             returnChanges.Select(static item => item.Summary),
             returnChanges.Select(static item => item.Label),
+            returnChanges.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "return signal")),
             aftermathChanges.Select(static item => item.Summary),
             aftermathChanges.Select(static item => item.Label),
+            aftermathChanges.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "aftermath signal")),
             relationshipConsequences.Select(static item => item.Summary),
             relationshipConsequences.Select(static item => item.Label),
+            relationshipConsequences.Select(static item => DescribeSignalLabel(item.Label, item.Kind, item.State)),
             relationshipConsequences.SelectMany(static item => item.EvidenceLines),
             relationshipConsequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.Summary)));
         DateTimeOffset updatedAtUtc = new[]
