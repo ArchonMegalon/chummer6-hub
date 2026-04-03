@@ -2107,6 +2107,28 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void OppositionPacketDoesNotActivateFromUnrelatedCarryForwardThreatModelNotesOnly()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithThreatModelCarryForwardOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void EventControlPacketDoesNotActivateFromUnrelatedCarryForwardThreatModelNotesOnly()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithThreatModelCarryForwardOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        Assert.DoesNotContain(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void OppositionPacketIncludesSignalLabelsWhenSignalSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionSignalLabelsOnly();
@@ -8117,6 +8139,46 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         return new CampaignWorkspaceProjection(
             WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithThreatModelCarryForwardOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-threat-model-1",
+            Label: "Threat model carry-forward",
+            Summary: "Threat model backlog remains queued for architecture review.",
+            ReturnSummary: "Capture threat model updates in the governance log.",
+            NextSafeAction: "Review threat model checklist before publishing docs.",
+            EvidenceLines: ["Threat model worksheet remains open for documentation signoff."],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-threat-model-carry-forward-1",
             CampaignId: "campaign-a",
             CampaignName: "Neon Cradle",
             Visibility: "group",
