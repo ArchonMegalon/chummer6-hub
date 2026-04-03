@@ -2478,11 +2478,11 @@ public sealed class CampaignWorkspaceServerPlaneService
                 rosterObjectives.Select(static item => item.Title),
                 rosterObjectives.Select(static item => item.Status),
                 rosterObjectives.Select(static item => item.Pressure),
-                workspace.NextSessionCarryForward?.Label,
-                workspace.NextSessionCarryForward?.ReturnSummary,
-                workspace.NextSessionCarryForward?.NextSafeAction,
-                workspace.NextSessionCarryForward?.Summary,
-                workspace.NextSessionCarryForward?.EvidenceLines),
+                carryForwardRosterSignal ? workspace.NextSessionCarryForward?.Label : null,
+                carryForwardRosterSignal ? workspace.NextSessionCarryForward?.ReturnSummary : null,
+                carryForwardRosterSignal ? workspace.NextSessionCarryForward?.NextSafeAction : null,
+                carryForwardRosterSignal ? workspace.NextSessionCarryForward?.Summary : null,
+                carryForwardRosterSignal ? workspace.NextSessionCarryForward?.EvidenceLines : Array.Empty<string>()),
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
     }

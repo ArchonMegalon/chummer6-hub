@@ -2024,6 +2024,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RosterMovementPacketSearchTermsIgnoreUnrelatedCarryForwardTextWhenCarryForwardIsNotARosterSignal()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterSignalAndUnrelatedCarryForwardTimestampSkew();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
+        Assert.Contains("roster", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("operator", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("queue", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("publication", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void EventControlPacketSummaryFallsBackToConsequenceKindsWhenConsequenceLabelsAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlConsequenceKindsOnly();
