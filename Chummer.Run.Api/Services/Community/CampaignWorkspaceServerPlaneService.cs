@@ -1855,7 +1855,15 @@ public sealed class CampaignWorkspaceServerPlaneService
             || value.Contains("lane", StringComparison.OrdinalIgnoreCase)
             || value.Contains("window", StringComparison.OrdinalIgnoreCase)
             || value.Contains("state", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("status", StringComparison.OrdinalIgnoreCase);
+            || value.Contains("status", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("fallout", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("escalat", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("spike", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("surge", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("cooldown", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("cooling", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("decline", StringComparison.OrdinalIgnoreCase)
+            || value.Contains("drop", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsCampaignRelationshipConsequenceKind(string? kind)
@@ -1882,7 +1890,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         return IsCampaignRelationshipConsequenceKind(consequence.Kind)
             || ContainsCampaignRelationshipSplitTokenSignal(consequence.Kind, consequence.Label, consequence.Summary)
             || ContainsCampaignRelationshipSplitTokenSignal(consequence.Kind, consequence.Label, consequence.State)
-            || consequence.EvidenceLines.Any(ContainsCampaignRelationshipToken)
+            || consequence.EvidenceLines.Any(static line =>
+                ContainsCampaignRelationshipToken(line) && ContainsCampaignRelationshipMutationToken(line))
             || consequence.Receipts.Any(static receipt =>
                 ContainsCampaignRelationshipSplitTokenSignal(receipt.SourceKind, receipt.Summary, null));
     }
