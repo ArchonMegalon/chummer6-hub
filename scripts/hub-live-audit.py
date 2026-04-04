@@ -4681,6 +4681,18 @@ def verify_signed_in_work_audit(
         ("queryText=next-session-return-lanes", "next-session-return-lanes"),
         ("queryText=next%20sessions%20return%20lanes", "next sessions return lanes"),
         ("queryText=next-sessions-return-lanes", "next-sessions-return-lanes"),
+        ("queryText=offlinereadiness", "offlinereadiness"),
+        ("queryText=offlinereadinesses", "offlinereadinesses"),
+        ("queryText=travelreadiness", "travelreadiness"),
+        ("queryText=travelreadinesses", "travelreadinesses"),
+        ("queryText=safehousereadiness", "safehousereadiness"),
+        ("queryText=safehousereadinesses", "safehousereadinesses"),
+        ("queryText=mobileofflinereadiness", "mobileofflinereadiness"),
+        ("queryText=mobileofflinereadinesses", "mobileofflinereadinesses"),
+        ("queryText=mobiletravelcache", "mobiletravelcache"),
+        ("queryText=mobiletravelcaches", "mobiletravelcaches"),
+        ("queryText=mobilesafehousereadiness", "mobilesafehousereadiness"),
+        ("queryText=mobilesafehousereadinesses", "mobilesafehousereadinesses"),
     ]:
         assert_prep_library_query_has_items(query_suffix, label)
 

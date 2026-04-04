@@ -7255,6 +7255,19 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail travel-prefetches compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail travel-prefetches compact search');
 
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinereadiness', 'compact offlinereadiness continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinereadinesses', 'compact offlinereadinesses continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadiness', 'compact travelreadiness continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadinesses', 'compact travelreadinesses continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousereadiness', 'compact safehousereadiness continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousereadinesses', 'compact safehousereadinesses continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinereadiness', 'compact mobileofflinereadiness continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinereadinesses', 'compact mobileofflinereadinesses continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobiletravelcache', 'compact mobiletravelcache continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobiletravelcaches', 'compact mobiletravelcaches continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousereadiness', 'compact mobilesafehousereadiness continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousereadinesses', 'compact mobilesafehousereadinesses continuity prep');
+
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
     page.locator('a[href*="/account/work/publications/"]').first().click()
