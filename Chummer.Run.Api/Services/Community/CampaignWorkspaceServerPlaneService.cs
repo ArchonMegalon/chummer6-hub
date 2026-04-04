@@ -3927,7 +3927,6 @@ public sealed class CampaignWorkspaceServerPlaneService
             NormalizeOptional(package.PackageKind) ?? string.Empty,
             NormalizeOptional(package.Title) ?? string.Empty,
             NormalizeOptional(package.Summary) ?? string.Empty,
-            NormalizeOptional(package.ArtifactId) ?? string.Empty,
             NormalizeEvidenceLines(package.EvidenceLines),
             NormalizeOptional(package.ProvenanceSummary) ?? string.Empty,
             NormalizeOptional(package.AuditSummary) ?? string.Empty,
