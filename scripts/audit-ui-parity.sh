@@ -881,6 +881,11 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.journeysPassed declares unexpected journey ids: "
             f"{release_channel_path} ({', '.join(unexpected_journeys)})"
         )
+    if normalized_journeys != list(REQUIRED_RELEASE_PROOF_JOURNEYS):
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.journeysPassed must preserve canonical baseline journey ordering: "
+            f"{release_channel_path} (actual={normalized_journeys}, expected={list(REQUIRED_RELEASE_PROOF_JOURNEYS)})"
+        )
     proof_routes = resolve_alias_value(
         proof,
         primary_key="proofRoutes",
@@ -927,6 +932,11 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
         raise SystemExit(
             "parity audit failed: release-channel nested receipt releaseProof.proofRoutes declares unexpected flagship routes: "
             f"{release_channel_path} ({', '.join(unexpected_routes)})"
+        )
+    if normalized_routes != list(REQUIRED_RELEASE_PROOF_ROUTES):
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.proofRoutes must preserve canonical flagship route ordering: "
+            f"{release_channel_path} (actual={normalized_routes}, expected={list(REQUIRED_RELEASE_PROOF_ROUTES)})"
         )
 
 

@@ -108,10 +108,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("must match an allowed canonical release origin", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed is missing required baseline journey ids", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed declares unexpected journey ids", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.journeysPassed must preserve canonical baseline journey ordering", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed must use canonical lowercase journey ids", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed must use canonical journey id tokens", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.proofRoutes is missing required flagship routes", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.proofRoutes declares unexpected flagship routes", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.proofRoutes must preserve canonical flagship route ordering", script, StringComparison.Ordinal);
         Assert.Contains("must use canonical lowercase route casing", script, StringComparison.Ordinal);
         Assert.Contains("must not include percent-encoded or escaped path characters", script, StringComparison.Ordinal);
         Assert.Contains("workflow_parity_receipt_channel_ids", script, StringComparison.Ordinal);
