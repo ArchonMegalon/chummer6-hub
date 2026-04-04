@@ -66,8 +66,14 @@ public sealed class TravelModeCacheFreshnessTests
         Assert.Equal(1, summary.FreshCacheDeviceCount);
         Assert.Equal(1, summary.StaleCacheDeviceCount);
         Assert.Contains("fresh staged cache", summary.CacheFreshnessSummary, StringComparison.Ordinal);
-        Assert.Contains("while offline", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
+        Assert.Contains("Offline actionability is explicit across", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
         Assert.Contains("downtime/diary", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
+        Assert.Equal(4, summary.OfflineLaneCues.Count);
+        Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("ready", cue.Status));
+        Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "downtime_diary" && cue.SignalCount >= 0);
+        Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "contacts_heat" && cue.SignalCount >= 0);
+        Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "aftermath_recap" && cue.SignalCount >= 0);
+        Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "prep_review" && cue.SignalCount >= 0);
         Assert.Equal("ready", summary.Devices.First(item => item.InstallationId == "install-fresh").Status);
         Assert.Equal("stale", summary.Devices.First(item => item.InstallationId == "install-stale").Status);
     }
@@ -92,8 +98,32 @@ public sealed class TravelModeCacheFreshnessTests
         Assert.Equal(0, summary.FreshCacheDeviceCount);
         Assert.Equal(1, summary.StaleCacheDeviceCount);
         Assert.Contains("No travel-prefetch receipt exists yet", summary.CacheFreshnessSummary, StringComparison.Ordinal);
-        Assert.Contains("while offline", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
+        Assert.Contains("Offline actionability is explicit across", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
+        Assert.Equal(4, summary.OfflineLaneCues.Count);
+        Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("ready", cue.Status));
         Assert.Equal("stale", summary.Devices.Single().Status);
+    }
+
+    [Fact]
+    public void BuildTravelMode_MarksOfflineLanesBlockedWhenNoTravelSafeDeviceExists()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspace();
+        WorkspaceRestoreProjection restore = BuildRestore(
+            new ClaimedDeviceRestoreProjection(
+                InstallationId: "install-a",
+                DeviceRole: "workstation",
+                Platform: "windows",
+                HeadId: "avalonia",
+                Channel: "preview",
+                HostLabel: "desktop",
+                RestoreSummary: "Desktop restore stays linked."));
+
+        TravelModeReadinessSummary summary = InvokeBuildTravelMode(workspace, restore, BuildPrepLibrary());
+
+        Assert.Equal(0, summary.TravelReadyDeviceCount);
+        Assert.Equal(4, summary.OfflineLaneCues.Count);
+        Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("blocked", cue.Status));
+        Assert.Contains("Offline actionability is blocked", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
     }
 
     private static TravelModeReadinessSummary InvokeBuildTravelMode(

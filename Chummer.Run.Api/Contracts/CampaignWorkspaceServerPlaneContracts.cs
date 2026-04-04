@@ -69,12 +69,19 @@ public sealed record TravelModeReadinessSummary(
     string PrefetchInventorySummary,
     string CacheFreshnessSummary,
     string OfflineActionabilitySummary,
+    IReadOnlyList<TravelOfflineLaneCue> OfflineLaneCues,
     int ClaimedDeviceCount,
     int TravelReadyDeviceCount,
     int FreshCacheDeviceCount,
     int StaleCacheDeviceCount,
     IReadOnlyList<TravelModeDeviceReadinessCue> Devices,
     IReadOnlyList<string> Boundaries);
+
+public sealed record TravelOfflineLaneCue(
+    string Lane,
+    string Status,
+    int SignalCount,
+    string Summary);
 
 public sealed record TravelModeDeviceReadinessCue(
     string InstallationId,

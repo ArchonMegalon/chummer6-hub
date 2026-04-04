@@ -7828,18 +7828,25 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     private static TravelModeReadinessSummary BuildTravelModeReadinessSummary()
-        => new(
-            Status: "ready",
-            Summary: "Travel readiness is green.",
-            PrefetchInventorySummary: "Prefetch inventory is attached.",
-            CacheFreshnessSummary: "1 ready device has a fresh staged cache.",
-            OfflineActionabilitySummary: "Offline actionability remains explicit.",
-            ClaimedDeviceCount: 1,
-            TravelReadyDeviceCount: 1,
-            FreshCacheDeviceCount: 1,
-            StaleCacheDeviceCount: 0,
-            Devices: [],
-            Boundaries: []);
+        => new TravelModeReadinessSummary(
+            "ready",
+            "Travel readiness is green.",
+            "Prefetch inventory is attached.",
+            "1 ready device has a fresh staged cache.",
+            "Offline actionability remains explicit.",
+            [
+                new TravelOfflineLaneCue(
+                    Lane: "downtime_diary",
+                    Status: "ready",
+                    SignalCount: 1,
+                    Summary: "Downtime and diary continuity stays explicit while offline.")
+            ],
+            1,
+            1,
+            1,
+            0,
+            [],
+            []);
 
     private static RunboardSummary? InvokeBuildRunboardSummary(
         CampaignWorkspaceProjection workspace,
