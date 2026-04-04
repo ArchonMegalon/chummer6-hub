@@ -67,8 +67,11 @@ public sealed record TravelModeReadinessSummary(
     string Status,
     string Summary,
     string PrefetchInventorySummary,
+    string CacheFreshnessSummary,
     int ClaimedDeviceCount,
     int TravelReadyDeviceCount,
+    int FreshCacheDeviceCount,
+    int StaleCacheDeviceCount,
     IReadOnlyList<TravelModeDeviceReadinessCue> Devices,
     IReadOnlyList<string> Boundaries);
 
