@@ -979,6 +979,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail season-control compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season-control compact search');
 
+  await page.fill('#prepQuery', 'season control');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=season(?:%20|\+)control/.test(page.url()), 'Workspace detail search should preserve the split season control prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail season control split search');
+  await expectBodyText(page, 'match(es) for "season control"', '/account/work/workspaces detail season control split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail season control split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail season control split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail season control split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail season control split search');
+  const workspaceSeasonControlSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceSeasonControlSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split season control query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail season control split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season control split search');
+
   await page.fill('#prepQuery', 'seasoncontrols');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -1104,6 +1125,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail event-ops compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event-ops compact search');
+
+  await page.fill('#prepQuery', 'event ops');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=event(?:%20|\+)ops/.test(page.url()), 'Workspace detail search should preserve the split event ops prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail event ops split search');
+  await expectBodyText(page, 'match(es) for "event ops"', '/account/work/workspaces detail event ops split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail event ops split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail event ops split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail event ops split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail event ops split search');
+  const workspaceEventOpsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEventOpsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split event ops query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail event ops split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event ops split search');
 
   await page.fill('#prepQuery', 'eventop');
   await Promise.all([
