@@ -872,6 +872,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDeduplicatesSemanticallyIdenticalAftermathPackageVersions_WhenPackageIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithAftermathSignalsOnly();
+        IReadOnlyList<AftermathRecapPackageProjection> packages =
+            Assert.IsAssignableFrom<IReadOnlyList<AftermathRecapPackageProjection>>(seed.AftermathPackages);
+        AftermathRecapPackageProjection package = packages[0];
+        AftermathRecapPackageProjection duplicateWithDifferentId = package with
+        {
+            PackageId = "aftermath-semantic-dup"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            AftermathPackages = [package, duplicateWithDifferentId]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packetSummary = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packetSummary.Reusable);
+        Assert.Contains("2 diary/continuity signal(s) and 0 relationship signal(s)", packetSummary.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void CampaignReturnPacketFallsBackToSignalLabelsWhenChangeSignalKindsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnSparseSignalKindsAndLabelsOnly();
@@ -1160,6 +1184,31 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLaunchPacketDeduplicatesSemanticallyIdenticalLaunchVersions_WhenLaunchIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        IReadOnlyList<GovernedPrepLaunchProjection> launches =
+            Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepLaunchProjection>>(seed.PrepLaunches);
+        GovernedPrepLaunchProjection launch = Assert.Single(launches);
+        GovernedPrepLaunchProjection duplicateWithDifferentId = launch with
+        {
+            LaunchId = "launch-semantic-dup"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            PrepLaunches = [launch, duplicateWithDifferentId],
+            TravelPrefetches = []
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 prep-launch signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void TravelPrefetchPacketDeduplicatesIdenticalReceiptVersions_WhenPayloadRepeatsSameRow()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
@@ -1170,6 +1219,31 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         {
             PrepLaunches = [],
             TravelPrefetches = [prefetch, prefetch]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 travel-prefetch signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TravelPrefetchPacketDeduplicatesSemanticallyIdenticalReceiptVersions_WhenReceiptIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        IReadOnlyList<TravelPrefetchReceiptProjection> prefetches =
+            Assert.IsAssignableFrom<IReadOnlyList<TravelPrefetchReceiptProjection>>(seed.TravelPrefetches);
+        TravelPrefetchReceiptProjection prefetch = Assert.Single(prefetches);
+        TravelPrefetchReceiptProjection duplicateWithDifferentId = prefetch with
+        {
+            ReceiptId = "prefetch-semantic-dup"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            PrepLaunches = [],
+            TravelPrefetches = [prefetch, duplicateWithDifferentId]
         };
         WorkspaceRestoreProjection restore = BuildEmptyRestore();
 
@@ -1569,6 +1643,38 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         {
             PrepLaunches = [launch, launch],
             TravelPrefetches = [prefetch, prefetch]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("2 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void EventControlPacketDeduplicatesSemanticallyIdenticalPrepAndTravelReceiptVersions_WhenIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        IReadOnlyList<GovernedPrepLaunchProjection> launches =
+            Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepLaunchProjection>>(seed.PrepLaunches);
+        IReadOnlyList<TravelPrefetchReceiptProjection> prefetches =
+            Assert.IsAssignableFrom<IReadOnlyList<TravelPrefetchReceiptProjection>>(seed.TravelPrefetches);
+        GovernedPrepLaunchProjection launch = Assert.Single(launches);
+        TravelPrefetchReceiptProjection prefetch = Assert.Single(prefetches);
+        GovernedPrepLaunchProjection launchDuplicateWithDifferentId = launch with
+        {
+            LaunchId = "launch-semantic-dup"
+        };
+        TravelPrefetchReceiptProjection prefetchDuplicateWithDifferentId = prefetch with
+        {
+            ReceiptId = "prefetch-semantic-dup"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            PrepLaunches = [launch, launchDuplicateWithDifferentId],
+            TravelPrefetches = [prefetch, prefetchDuplicateWithDifferentId]
         };
         WorkspaceRestoreProjection restore = BuildEmptyRestore();
 
