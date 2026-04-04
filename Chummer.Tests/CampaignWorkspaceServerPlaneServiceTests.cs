@@ -2856,6 +2856,28 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void ContinuityPacketDeduplicatesIdenticalSignalVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithContinuitySignalLabelsOnly();
+        IReadOnlyList<WorkspaceChangePacketProjection> seedPackets =
+            Assert.IsAssignableFrom<IReadOnlyList<WorkspaceChangePacketProjection>>(seed.ChangePackets);
+        WorkspaceChangePacketProjection first = Assert.Single(seedPackets);
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ChangePackets = [first, first]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "continuity_packet", StringComparison.Ordinal));
+        Assert.False(packet.Reusable);
+        Assert.Contains("2 continuity signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("continuity carry-forward label", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("return handoff label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void ContinuityPacketIncludesKindFallbackWhenSignalsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuitySignalKindsOnly();
