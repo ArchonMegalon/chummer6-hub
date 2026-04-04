@@ -2785,6 +2785,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail league-ctrls hyphen search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league-ctrls hyphen search');
 
+  await page.fill('#prepQuery', 'league ctrl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league(?:%20|\+)ctrl/.test(page.url()), 'Workspace detail search should preserve the split league ctrl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league ctrl split search');
+  await expectBodyText(page, 'match(es) for "league ctrl"', '/account/work/workspaces detail league ctrl split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league ctrl split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league ctrl split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league ctrl split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league ctrl split search');
+  const workspaceLeagueCtrlSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueCtrlSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split league ctrl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league ctrl split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league ctrl split search');
+
   await page.fill('#prepQuery', 'league-ctrl');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -3309,6 +3330,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail community-ctrls hyphen search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community-ctrls hyphen search');
+
+  await page.fill('#prepQuery', 'community ctrl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community(?:%20|\+)ctrl/.test(page.url()), 'Workspace detail search should preserve the split community ctrl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community ctrl split search');
+  await expectBodyText(page, 'match(es) for "community ctrl"', '/account/work/workspaces detail community ctrl split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community ctrl split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community ctrl split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community ctrl split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community ctrl split search');
+  const workspaceCommunityCtrlSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityCtrlSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split community ctrl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community ctrl split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community ctrl split search');
 
   await page.fill('#prepQuery', 'community-ctrl');
   await Promise.all([
