@@ -1575,6 +1575,34 @@ def verify_signed_in_work_audit(
     prep_library_event_control_hyphen = json.loads(body)
     if not (prep_library_event_control_hyphen.get("items") or []):
         raise AssertionError("prep-library event-control search did not expose any governed packet")
+    prep_library_event_ctrl_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=event%20ctrl"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_event_ctrl_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_event_ctrl_path} returned {status}, expected 200")
+
+    prep_library_event_ctrl = json.loads(body)
+    if not (prep_library_event_ctrl.get("items") or []):
+        raise AssertionError("prep-library event ctrl search did not expose any governed packet")
+    prep_library_event_ctrl_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=event-ctrl"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_event_ctrl_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_event_ctrl_hyphen_path} returned {status}, expected 200")
+
+    prep_library_event_ctrl_hyphen = json.loads(body)
+    if not (prep_library_event_ctrl_hyphen.get("items") or []):
+        raise AssertionError("prep-library event-ctrl search did not expose any governed packet")
     prep_library_eventctrl_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=eventctrl"
     status, body, _, _ = fetch(
         base_url,
@@ -3829,6 +3857,36 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_event_control_hyphen_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_event_control_hyphen_search_path} should return at least one governed prep packet for the event-control query")
+    workspace_event_ctrl_search_path = f"{workspace_path}?prepQuery=event%20ctrl"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_event_ctrl_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_event_ctrl_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_event_ctrl_search_path)
+    require_snippet(body, 'match(es) for "event ctrl"', workspace_event_ctrl_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_event_ctrl_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_event_ctrl_search_path} should return at least one governed prep packet for the event ctrl query")
+    workspace_event_ctrl_hyphen_search_path = f"{workspace_path}?prepQuery=event-ctrl"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_event_ctrl_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_event_ctrl_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_event_ctrl_hyphen_search_path)
+    require_snippet(body, 'match(es) for "event-ctrl"', workspace_event_ctrl_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_event_ctrl_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_event_ctrl_hyphen_search_path} should return at least one governed prep packet for the event-ctrl query")
     workspace_eventctrl_search_path = f"{workspace_path}?prepQuery=eventctrl"
     status, body, _, _ = fetch(
         base_url,

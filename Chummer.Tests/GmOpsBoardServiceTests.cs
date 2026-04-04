@@ -1069,6 +1069,8 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse eventControlSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event control");
         GmPrepAssetListResponse eventControlsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event controls");
         GmPrepAssetListResponse eventControlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event-control");
+        GmPrepAssetListResponse eventCtrlSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event ctrl");
+        GmPrepAssetListResponse eventCtrlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event-ctrl");
         GmPrepAssetListResponse eventOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventops");
         GmPrepAssetListResponse eventOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventop");
         GmPrepAssetListResponse eventOpsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event ops");
@@ -1166,6 +1168,8 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(eventControlSpacedMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventControlsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventControlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(eventCtrlSpacedMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(eventCtrlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventOpsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventOpMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventOpsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
