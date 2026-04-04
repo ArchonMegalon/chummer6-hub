@@ -634,6 +634,71 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineCampaignMemoryTreatsWhitespacePaddedDuplicatePackageIdsAsOneAnchor()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        AftermathRecapPackageProjection downtimePackage = new(
+            PackageId: "package-shared-whitespace-id",
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            RunId: null,
+            RunTitle: null,
+            PackageKind: "downtime_brief",
+            Title: "Downtime brief",
+            Summary: "Downtime obligations remain attached to return lane.",
+            ArtifactId: "artifact-downtime-shared-whitespace-id",
+            EvidenceLines: ["Downtime evidence line."],
+            InitiatedByUserId: "gm-1",
+            GeneratedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+        AftermathRecapPackageProjection aftermathVariant = downtimePackage with
+        {
+            PackageId = "  package-shared-whitespace-id  ",
+            PackageKind = "after_action_report",
+            Title = "After-action report",
+            Summary = "After-action recap packet remains attached to return lane."
+        };
+
+        CampaignMemoryProjection? memory = InvokeCampaignSpineBuildCampaignMemory(campaign, [aftermathVariant, downtimePackage]);
+
+        Assert.NotNull(memory);
+        Assert.Contains("downtime brief", memory!.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("after-action report", memory.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CampaignSpineWorkspaceChangePacketsDeduplicateWhitespacePaddedAftermathPackageIds()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        AftermathRecapPackageProjection replayPackage = new(
+            PackageId: "package-shared-whitespace-id",
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            RunId: null,
+            RunTitle: null,
+            PackageKind: "replay_timeline",
+            Title: "Replay timeline",
+            Summary: "Replay packet stays attached to continuity.",
+            ArtifactId: "artifact-replay-shared-whitespace-id",
+            EvidenceLines: ["Replay evidence line."],
+            InitiatedByUserId: "gm-1",
+            GeneratedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+        AftermathRecapPackageProjection downtimeVariant = replayPackage with
+        {
+            PackageId = "  package-shared-whitespace-id  ",
+            PackageKind = "downtime_brief",
+            Title = "Downtime brief",
+            Summary = "Downtime obligations remain attached to return lane."
+        };
+
+        IReadOnlyList<WorkspaceChangePacketProjection> packets = InvokeCampaignSpineBuildWorkspaceChangePackets(campaign, [replayPackage, downtimeVariant]);
+
+        WorkspaceChangePacketProjection packet = Assert.Single(packets);
+        Assert.Equal("replay_package", packet.Kind);
+    }
+
+    [Fact]
     public void CampaignMemoryPacketDoesNotActivateFromCarryForwardWindowSignalsWithoutMemoryContext()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardWindowOnly();
@@ -4308,6 +4373,29 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             aftermathPackages,
             null
         ]);
+    }
+
+    private static IReadOnlyList<WorkspaceChangePacketProjection> InvokeCampaignSpineBuildWorkspaceChangePackets(
+        CampaignProjection campaign,
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("BuildWorkspaceChangePackets", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildWorkspaceChangePackets was not found.");
+
+        return Assert.IsAssignableFrom<IReadOnlyList<WorkspaceChangePacketProjection>>(method.Invoke(null,
+        [
+            campaign,
+            Array.Empty<PublicationSafeProjection>(),
+            null,
+            null,
+            null,
+            Array.Empty<RosterTransferProjection>(),
+            Array.Empty<GovernedPrepLaunchProjection>(),
+            Array.Empty<TravelPrefetchReceiptProjection>(),
+            aftermathPackages,
+            null
+        ]));
     }
 
     private static IReadOnlyList<RecapShelfEntry> InvokeBuildRecapShelf(CampaignWorkspaceProjection workspace)
