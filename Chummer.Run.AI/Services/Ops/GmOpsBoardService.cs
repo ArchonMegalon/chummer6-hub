@@ -1099,9 +1099,14 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "enemies",
             "opfor",
             "opforce",
+            "opforces",
+            "opfors",
             "op-force",
+            "op-forces",
             "op force",
+            "op forces",
             "op_for",
+            "op_fors",
             "threat"))
         {
             return "opposition";
@@ -1256,8 +1261,12 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "crew",
             "rostermove",
             "rostermoves",
+            "rosterswap",
+            "rosterswaps",
             "crewmove",
             "crewmoves",
+            "crewswap",
+            "crewswaps",
             "rostertransfer",
             "rostertransfers",
             "rosterhandoff",
@@ -1270,6 +1279,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "transfer",
             "assignment",
             "reassign",
+            "swap",
             "bench",
             "rotation"))
         {

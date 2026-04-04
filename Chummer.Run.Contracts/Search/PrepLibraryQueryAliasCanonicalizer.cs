@@ -376,6 +376,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("rostermove");
         }
 
+        if (tokens.Contains("crewswap"))
+        {
+            tokens.Remove("crewswap");
+            tokens.Add("rostermove");
+        }
+
         if (tokens.Contains("crewmovement"))
         {
             tokens.Remove("crewmovement");
@@ -388,6 +394,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("rostermove");
         }
 
+        if (tokens.Contains("crewswaps"))
+        {
+            tokens.Remove("crewswaps");
+            tokens.Add("rostermove");
+        }
+
         if (tokens.Contains("crewmovements"))
         {
             tokens.Remove("crewmovements");
@@ -397,6 +409,18 @@ public static class PrepLibraryQueryAliasCanonicalizer
         if (tokens.Contains("rostermoves"))
         {
             tokens.Remove("rostermoves");
+            tokens.Add("rostermove");
+        }
+
+        if (tokens.Contains("rosterswap"))
+        {
+            tokens.Remove("rosterswap");
+            tokens.Add("rostermove");
+        }
+
+        if (tokens.Contains("rosterswaps"))
+        {
+            tokens.Remove("rosterswaps");
             tokens.Add("rostermove");
         }
 
@@ -415,6 +439,13 @@ public static class PrepLibraryQueryAliasCanonicalizer
         if (tokens.Contains("crew") && tokens.Contains("moves"))
         {
             tokens.Remove("moves");
+            tokens.Add("move");
+        }
+
+        if (tokens.Contains("crew") && (tokens.Contains("swap") || tokens.Contains("swaps")))
+        {
+            tokens.Remove("swap");
+            tokens.Remove("swaps");
             tokens.Add("move");
         }
 
@@ -459,6 +490,13 @@ public static class PrepLibraryQueryAliasCanonicalizer
         if (tokens.Contains("roster") && tokens.Contains("moves"))
         {
             tokens.Remove("moves");
+            tokens.Add("move");
+        }
+
+        if (tokens.Contains("roster") && (tokens.Contains("swap") || tokens.Contains("swaps")))
+        {
+            tokens.Remove("swap");
+            tokens.Remove("swaps");
             tokens.Add("move");
         }
 
@@ -695,11 +733,15 @@ public static class PrepLibraryQueryAliasCanonicalizer
         }
 
         if ((tokens.Contains("op") && tokens.Contains("for"))
-            || (tokens.Contains("op") && tokens.Contains("force")))
+            || (tokens.Contains("op") && tokens.Contains("fors"))
+            || (tokens.Contains("op") && tokens.Contains("force"))
+            || (tokens.Contains("op") && tokens.Contains("forces")))
         {
             tokens.Remove("op");
             tokens.Remove("for");
+            tokens.Remove("fors");
             tokens.Remove("force");
+            tokens.Remove("forces");
             tokens.Add("opfor");
         }
 

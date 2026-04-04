@@ -65,6 +65,9 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("op_force")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("opforces")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("opfors")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("op-forces")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("op forces")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("op_fors")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositions")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixforce")));
     }
@@ -483,8 +486,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("crewtransfers");
         IReadOnlyList<string> compactMoveTokens = InvokeBuildTokens("crewmove");
         IReadOnlyList<string> compactMovePluralTokens = InvokeBuildTokens("crewmoves");
+        IReadOnlyList<string> compactSwapTokens = InvokeBuildTokens("crewswap");
+        IReadOnlyList<string> compactSwapPluralTokens = InvokeBuildTokens("crewswaps");
         IReadOnlyList<string> compactMovementTokens = InvokeBuildTokens("crewmovement");
         IReadOnlyList<string> compactMovementPluralTokens = InvokeBuildTokens("crewmovements");
+        IReadOnlyList<string> compactRosterSwapTokens = InvokeBuildTokens("rosterswap");
+        IReadOnlyList<string> compactRosterSwapPluralTokens = InvokeBuildTokens("rosterswaps");
         IReadOnlyList<string> compactRosterMovePluralTokens = InvokeBuildTokens("rostermoves");
         IReadOnlyList<string> compactRosterMovementTokens = InvokeBuildTokens("rostermovement");
         IReadOnlyList<string> compactRosterMovementPluralTokens = InvokeBuildTokens("rostermovements");
@@ -514,8 +521,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.True(InvokeMatches(packet, compactMoveTokens));
         Assert.True(InvokeMatches(packet, compactMovePluralTokens));
+        Assert.True(InvokeMatches(packet, compactSwapTokens));
+        Assert.True(InvokeMatches(packet, compactSwapPluralTokens));
         Assert.True(InvokeMatches(packet, compactMovementTokens));
         Assert.True(InvokeMatches(packet, compactMovementPluralTokens));
+        Assert.True(InvokeMatches(packet, compactRosterSwapTokens));
+        Assert.True(InvokeMatches(packet, compactRosterSwapPluralTokens));
         Assert.True(InvokeMatches(packet, compactRosterMovePluralTokens));
         Assert.True(InvokeMatches(packet, compactRosterMovementTokens));
         Assert.True(InvokeMatches(packet, compactRosterMovementPluralTokens));
