@@ -43,6 +43,20 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void AuditUiParityUsesActiveParityGeneratorInsteadOfRetiredLegacyShellFiles()
+    {
+        string scriptPath = RepoPaths.FromRoot("scripts", "audit-ui-parity.sh");
+        string script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("scripts/generate-parity-checklist.sh", script, StringComparison.Ordinal);
+        Assert.Contains("docs/PARITY_CHECKLIST.md", script, StringComparison.Ordinal);
+        Assert.Contains("Parity audit passed", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("Chummer.Web/wwwroot/index.html", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("Chummer/Forms/ChummerMainForm.Designer.cs", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("required files missing", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ParityOracleTokenListsUseCanonicalStringIds()
     {
         string oraclePath = RepoPaths.FromRoot("docs", "PARITY_ORACLE.json");
