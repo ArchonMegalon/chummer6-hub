@@ -722,8 +722,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                     nextSafeAction.Summary));
         }
 
-        SupportCaseDigestViewModel? supportAction = supportDigests.FirstOrDefault(static item => item.ReporterActionNeeded)
-            ?? supportDigests.FirstOrDefault(static item => item.CanVerifyFix);
+        SupportCaseDigestViewModel? supportAction = ResolvePrioritySupportDigest(supportDigests);
         if (supportAction is not null)
         {
             return new WorkspaceStateSummary(
@@ -1451,9 +1450,8 @@ public sealed class CampaignWorkspaceServerPlaneService
                 ActionHref: $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}"));
         }
 
-        if (supportDigests.Count > 0)
+        if (ResolvePrioritySupportDigest(supportDigests) is { } leadCase)
         {
-            SupportCaseDigestViewModel leadCase = supportDigests[0];
             notices.Add(new DecisionNotice(
                 NoticeId: $"support:{leadCase.CaseId}",
                 Kind: "support_follow_through",
@@ -1527,8 +1525,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         InstallLinkingSummaryDto? installLinking,
         IReadOnlyList<SupportCaseDigestViewModel> supportDigests)
     {
-        SupportCaseDigestViewModel? actionCase = supportDigests.FirstOrDefault(static item => item.ReporterActionNeeded)
-            ?? supportDigests.FirstOrDefault(static item => item.CanVerifyFix);
+        SupportCaseDigestViewModel? actionCase = ResolvePrioritySupportDigest(supportDigests);
         if (actionCase is not null)
         {
             return new NextSafeActionCue(
@@ -1553,6 +1550,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             Summary: workspace.NextSafeAction ?? "Open the shared campaign view and continue from the latest continuity snapshot.",
             SourceKind: "workspace");
     }
+
+    private static SupportCaseDigestViewModel? ResolvePrioritySupportDigest(IReadOnlyList<SupportCaseDigestViewModel> supportDigests)
+        => supportDigests.FirstOrDefault(static item => item.ReporterActionNeeded)
+            ?? supportDigests.FirstOrDefault(static item => item.CanVerifyFix);
 
     private static CampaignPrepLibrarySummary BuildPrepLibrary(
         CampaignWorkspaceProjection workspace,
