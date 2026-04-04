@@ -629,6 +629,29 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDeduplicatesIdenticalRelationshipConsequenceVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithCampaignReturnRelationshipConsequenceVariantsOnly();
+        IReadOnlyList<CampaignConsequenceProjection> consequences =
+            Assert.IsAssignableFrom<IReadOnlyList<CampaignConsequenceProjection>>(seed.Consequences);
+        CampaignConsequenceProjection first = consequences[0];
+        CampaignConsequenceProjection second = consequences[1];
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            Consequences = [first, first, second]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("2 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("heat pressure", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("fixer pressure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void CampaignReturnPacketFallsBackToSignalLabelsWhenChangeSignalKindsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnSparseSignalKindsAndLabelsOnly();
@@ -1194,6 +1217,29 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("2 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("season operation label", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("contact pressure label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketDeduplicatesIdenticalConsequenceVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithEventControlRelationshipConsequenceVariantsOnly();
+        IReadOnlyList<CampaignConsequenceProjection> consequences =
+            Assert.IsAssignableFrom<IReadOnlyList<CampaignConsequenceProjection>>(seed.Consequences);
+        CampaignConsequenceProjection first = consequences[0];
+        CampaignConsequenceProjection second = consequences[1];
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            Consequences = [first, first, second]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("2 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("heat pressure", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("faction pressure", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
