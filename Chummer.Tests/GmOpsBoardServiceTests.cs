@@ -862,6 +862,38 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatDiaryPluralSignalsAsContinuityReturnDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:25:15Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Campaign diaries remain unresolved before next session return checkpoint reopen.",
+                AtUtc: baseTime,
+                EventId: "evt-diaries"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(15),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-diaries", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatCarryForwardReturnSignalsAsContinuityReturnDomain()
     {
         SessionLedgerService ledger = new();

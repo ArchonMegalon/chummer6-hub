@@ -1480,6 +1480,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
 
         if (ContainsAny(combined,
                 "diary",
+                "diaries",
                 "journal",
                 "downtime",
                 "aftermath",
