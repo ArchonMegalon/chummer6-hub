@@ -2350,6 +2350,8 @@ public sealed class CampaignSpineService
         BuildLabRuleEnvironmentDiffProjection ruleEnvironmentDiff)
     {
         const int maxOutputs = 8;
+        var activeEnvironment = workspace?.RuleEnvironment ?? dossier.RuleEnvironment;
+        string sourceHintAuditToken = BuildBuildLabSourceHintAuditToken(activeEnvironment);
         var governedExports = new[]
         {
             BuildBuildLabGovernedOutput(
@@ -2361,6 +2363,7 @@ public sealed class CampaignSpineService
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
+                sourceHintAuditToken: sourceHintAuditToken,
                 nextSafeAction: "Open workflow.templates.character to save a governed character-template export."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2371,6 +2374,7 @@ public sealed class CampaignSpineService
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
+                sourceHintAuditToken: sourceHintAuditToken,
                 nextSafeAction: "Open workflow.exchange.json before publishing JSON exchange payloads."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2381,6 +2385,7 @@ public sealed class CampaignSpineService
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
+                sourceHintAuditToken: sourceHintAuditToken,
                 nextSafeAction: "Open workflow.exchange.foundry before publishing exchange payloads."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2391,6 +2396,7 @@ public sealed class CampaignSpineService
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
+                sourceHintAuditToken: sourceHintAuditToken,
                 nextSafeAction: "Open workflow.viewer.sheet and confirm the current handoff posture before print/export."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2401,6 +2407,7 @@ public sealed class CampaignSpineService
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
+                sourceHintAuditToken: sourceHintAuditToken,
                 nextSafeAction: "Open workflow.export.pdf to generate the current print-ready PDF from this handoff."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2411,6 +2418,7 @@ public sealed class CampaignSpineService
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
+                sourceHintAuditToken: sourceHintAuditToken,
                 nextSafeAction: "Open workflow.replay.timeline before publishing replay timeline artifacts."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2421,6 +2429,7 @@ public sealed class CampaignSpineService
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
+                sourceHintAuditToken: sourceHintAuditToken,
                 nextSafeAction: "Open workflow.recap.session before publishing session recap artifacts."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2431,6 +2440,7 @@ public sealed class CampaignSpineService
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
                 ruleEnvironmentDiff: ruleEnvironmentDiff,
+                sourceHintAuditToken: sourceHintAuditToken,
                 nextSafeAction: "Open workflow.module.run before publishing run-module artifacts.")
         };
 
@@ -2514,6 +2524,7 @@ public sealed class CampaignSpineService
         string runtimeFingerprint,
         string explainReceiptId,
         BuildLabRuleEnvironmentDiffProjection ruleEnvironmentDiff,
+        string sourceHintAuditToken,
         string nextSafeAction)
     {
         string laneLabel = BuildBuildLabOutputLaneLabel(kind);
@@ -2528,12 +2539,12 @@ public sealed class CampaignSpineService
             PublicationState: "ready",
             TrustBand: "governed",
             Discoverable: true,
-            PublicationSummary: $"Lane {laneLabel} is ready on {runtimeFingerprint} with explain receipt {explainReceiptId}; rule diff {ruleEnvironmentDiff.BeforeFingerprint} -> {ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}).",
+            PublicationSummary: $"Lane {laneLabel} is ready on {runtimeFingerprint} with explain receipt {explainReceiptId}; rule diff {ruleEnvironmentDiff.BeforeFingerprint} -> {ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}); source hints {sourceHintAuditToken}.",
             CreatorPublicationId: null,
             NextSafeAction: nextSafeAction,
             ProvenanceSummary: $"Explain receipt {explainReceiptId} governs this build follow-through lane.",
-            AuditSummary: $"lane:{kind}; rule-environment:{ruleEnvironmentDiff.BeforeFingerprint}->{ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}); runtime:{runtimeFingerprint}; explain:{explainReceiptId}",
-            CompatibilitySummary: $"Compatibility stays pinned to {runtimeFingerprint} with rule diff {ruleEnvironmentDiff.BeforeFingerprint} -> {ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}).",
+            AuditSummary: $"lane:{kind}; rule-environment:{ruleEnvironmentDiff.BeforeFingerprint}->{ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}); runtime:{runtimeFingerprint}; explain:{explainReceiptId}; source-hints:{sourceHintAuditToken}",
+            CompatibilitySummary: $"Compatibility stays pinned to {runtimeFingerprint} with rule diff {ruleEnvironmentDiff.BeforeFingerprint} -> {ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}) and source hints {sourceHintAuditToken}.",
             LineageSummary: $"{dossier.DossierId} keeps {kind} on the governed build lane with explain receipt {explainReceiptId}.");
     }
 
@@ -2859,6 +2870,19 @@ public sealed class CampaignSpineService
         }
 
         return $"{string.Join(", ", values.Take(3))} (+{values.Count - 3} more)";
+    }
+
+    private static string BuildBuildLabSourceHintAuditToken(RuleEnvironmentRef environment)
+    {
+        IReadOnlyList<string> sourcePacks = NormalizeBuildLabHintValues(environment.SourcePacks);
+        IReadOnlyList<string> houseRulePacks = NormalizeBuildLabHintValues(environment.HouseRulePacks);
+        string sourceToken = sourcePacks.Count == 0
+            ? "none"
+            : string.Join("+", sourcePacks.Select(static value => value.Replace(' ', '_')));
+        string houseRuleToken = houseRulePacks.Count == 0
+            ? "none"
+            : string.Join("+", houseRulePacks.Select(static value => value.Replace(' ', '_')));
+        return $"sources:{sourceToken}|house-rules:{houseRuleToken}";
     }
 
     private static IReadOnlyList<string> BuildBuildLabPlannerCoverageLines(
