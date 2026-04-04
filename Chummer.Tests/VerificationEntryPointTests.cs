@@ -420,7 +420,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=contact", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=contacts", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=journal", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=sessionlog", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=diary", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=downtime", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermath", audit, StringComparison.Ordinal);
@@ -445,7 +448,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=contact", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=contacts", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=journal", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=sessionlog", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=diary", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=downtime", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=aftermath", audit, StringComparison.Ordinal);
@@ -504,8 +510,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact eventctrl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=heat", playwright, StringComparison.Ordinal);
         Assert.Contains("heat continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=contact", playwright, StringComparison.Ordinal);
+        Assert.Contains("contact continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=contacts", playwright, StringComparison.Ordinal);
         Assert.Contains("contacts continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=journal", playwright, StringComparison.Ordinal);
+        Assert.Contains("journal continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=sessionlog", playwright, StringComparison.Ordinal);
+        Assert.Contains("sessionlog continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=diary", playwright, StringComparison.Ordinal);
         Assert.Contains("diary continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=downtime", playwright, StringComparison.Ordinal);

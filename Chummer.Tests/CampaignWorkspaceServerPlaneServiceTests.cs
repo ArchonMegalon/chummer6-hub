@@ -2758,8 +2758,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
         Assert.Contains("diary", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("journal", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("sessionlog", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("contact", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("contacts", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("heat", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("recap", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("return", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
     }
 
