@@ -198,6 +198,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.baseUrl outside allowed canonical release origins", script, StringComparison.Ordinal);
         Assert.Contains("reject conflicting alias values between releaseProof.baseUrl and releaseProof.base_url", script, StringComparison.Ordinal);
+        Assert.Contains("reject conflicting alias values between releaseProof.proofRoutes and releaseProof.proof_routes", script, StringComparison.Ordinal);
+        Assert.Contains("reject conflicting alias values between releaseProof.journeysPassed and releaseProof.journeys_passed", script, StringComparison.Ordinal);
         Assert.Contains("reject non-canonical releaseProof.baseUrl origin casing/trailing slash", script, StringComparison.Ordinal);
         Assert.Contains("reject missing releaseProof.baseUrl origin", script, StringComparison.Ordinal);
         Assert.Contains("reject non-http(s) releaseProof.baseUrl schemes", script, StringComparison.Ordinal);
@@ -229,6 +231,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject whitespace-padded releaseProof.journeysPassed journey ids", script, StringComparison.Ordinal);
         Assert.Contains("reject blank releaseProof.journeysPassed journey ids", script, StringComparison.Ordinal);
         Assert.Contains("reject missing releaseProof.generatedAt timestamps", script, StringComparison.Ordinal);
+        Assert.Contains("reject conflicting alias values between releaseProof.generatedAt and releaseProof.generated_at", script, StringComparison.Ordinal);
         Assert.Contains("reject stale releaseProof.generatedAt timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject invalid-format releaseProof.generatedAt timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.generatedAt timestamps with excessive future skew", script, StringComparison.Ordinal);

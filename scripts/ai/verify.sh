@@ -112,6 +112,58 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["proofRoutes"] = [
+    "/downloads/install/avalonia-linux-x64-installer",
+    "/home/access",
+    "/home/work",
+    "/account/work",
+    "/account/support",
+    "/contact",
+]
+payload["releaseProof"]["proof_routes"] = ["/home/access"]
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject conflicting alias values between releaseProof.proofRoutes and releaseProof.proof_routes." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["journeysPassed"] = [
+    "install_claim_restore_continue",
+    "build_explain_publish",
+    "campaign_session_recover_recap",
+    "report_cluster_release_notify",
+]
+payload["releaseProof"]["journeys_passed"] = ["install_claim_restore_continue"]
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject conflicting alias values between releaseProof.journeysPassed and releaseProof.journeys_passed." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
 payload["releaseProof"]["baseUrl"] = "https://Chummer.run/"
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
@@ -697,6 +749,26 @@ PY
 if bash scripts/audit-ui-parity.sh; then
   mv "$release_channel_backup" "$release_channel_path"
   echo "verify gate failed: parity audit should reject stale releaseProof.generatedAt timestamps." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["generatedAt"] = "2026-01-01T00:00:00Z"
+payload["releaseProof"]["generated_at"] = "2026-01-01T00:05:00Z"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject conflicting alias values between releaseProof.generatedAt and releaseProof.generated_at." >&2
   exit 1
 fi
 mv "$release_channel_backup" "$release_channel_path"
