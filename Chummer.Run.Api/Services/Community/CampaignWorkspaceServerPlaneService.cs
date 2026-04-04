@@ -623,7 +623,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         int consequenceCount = DeduplicateSemanticCampaignConsequenceVersions(
                 workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
             .Count();
-        int rosterTransferCount = DeduplicateIdenticalRosterTransferVersions(
+        int rosterTransferCount = DeduplicateSemanticRosterTransferVersions(
                 workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
             .Count();
         CampaignReadinessCue? attentionCue = workspace.ReadinessCues.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
@@ -2557,7 +2557,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
     {
-        RosterTransferProjection[] transfers = DeduplicateIdenticalRosterTransferVersions(
+        RosterTransferProjection[] transfers = DeduplicateSemanticRosterTransferVersions(
                 (workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
                 .OrderByDescending(static item => item.TransferredAtUtc))
             .Take(3)
@@ -3104,7 +3104,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static consequence => consequence.UpdatedAtUtc))
             .Take(3)
             .ToArray();
-        RosterTransferProjection[] rosterTransfers = DeduplicateIdenticalRosterTransferVersions(
+        RosterTransferProjection[] rosterTransfers = DeduplicateSemanticRosterTransferVersions(
                 (workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
                 .OrderByDescending(static transfer => transfer.TransferredAtUtc))
             .Take(3)
@@ -3824,22 +3824,21 @@ public sealed class CampaignWorkspaceServerPlaneService
             NormalizeOptional(packet.Summary) ?? string.Empty,
             packet.UpdatedAtUtc.ToUnixTimeMilliseconds().ToString());
 
-    private static IEnumerable<RosterTransferProjection> DeduplicateIdenticalRosterTransferVersions(
+    private static IEnumerable<RosterTransferProjection> DeduplicateSemanticRosterTransferVersions(
         IEnumerable<RosterTransferProjection> transfers)
     {
         HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
         foreach (RosterTransferProjection transfer in transfers)
         {
-            if (seenKeys.Add(BuildRosterTransferDedupeKey(transfer)))
+            if (seenKeys.Add(BuildRosterTransferSemanticDedupeKey(transfer)))
             {
                 yield return transfer;
             }
         }
     }
 
-    private static string BuildRosterTransferDedupeKey(RosterTransferProjection transfer) =>
+    private static string BuildRosterTransferSemanticDedupeKey(RosterTransferProjection transfer) =>
         string.Join('|',
-            NormalizeOptional(transfer.TransferId) ?? string.Empty,
             NormalizeOptional(transfer.DossierId) ?? string.Empty,
             NormalizeOptional(transfer.RunnerHandle) ?? string.Empty,
             NormalizeOptional(transfer.SourceGroupId) ?? string.Empty,

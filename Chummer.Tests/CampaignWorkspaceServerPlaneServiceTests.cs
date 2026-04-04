@@ -175,6 +175,26 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignWorkspaceSummaryDeduplicatesSemanticallyIdenticalRosterTransfers_WhenTransferIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        RosterTransferProjection transfer = Assert.Single(seed.RosterTransfers ?? Array.Empty<RosterTransferProjection>());
+        RosterTransferProjection duplicateWithDifferentId = transfer with
+        {
+            TransferId = "transfer-semantic-dup"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RosterTransfers = [transfer, duplicateWithDifferentId]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        CampaignWorkspaceSummary summary = InvokeBuildCampaignWorkspaceSummary(workspace, restore);
+
+        Assert.Contains("1 roster-transfer receipt(s)", summary.PublicationSummary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void RecapShelfDeduplicatesSemanticallyIdenticalRows_WhenProjectionIdsDiffer()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
@@ -2654,6 +2674,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(packet.Reusable);
         Assert.Contains("roster", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("season operations roster", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketDeduplicatesSemanticallyIdenticalRosterTransferVersions_WhenTransferIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithEventControlRosterTransfersOnly();
+        IReadOnlyList<RosterTransferProjection> transfers =
+            Assert.IsAssignableFrom<IReadOnlyList<RosterTransferProjection>>(seed.RosterTransfers);
+        RosterTransferProjection transfer = Assert.Single(transfers);
+        RosterTransferProjection duplicateWithDifferentId = transfer with
+        {
+            TransferId = "transfer-semantic-dup"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RosterTransfers = [transfer, duplicateWithDifferentId]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
