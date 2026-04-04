@@ -464,6 +464,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         var skipped = 0;
         var conflicts = new List<OfflineSyncConflict>();
         var signaturesByAssetVersion = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var processedNonAmbiguousAssetVersions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         HashSet<string> ambiguousAssetVersions = new(StringComparer.OrdinalIgnoreCase);
         foreach (var candidate in assets)
         {
@@ -500,7 +501,8 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 continue;
             }
 
-            if (ambiguousAssetVersions.Contains(BuildPortableAssetVersionKey(normalizedAssetId, asset.UpdatedAtUtc)))
+            string versionKey = BuildPortableAssetVersionKey(normalizedAssetId, asset.UpdatedAtUtc);
+            if (ambiguousAssetVersions.Contains(versionKey))
             {
                 skipped++;
                 conflicts.Add(new OfflineSyncConflict(
@@ -510,6 +512,11 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                     Resolution: "skipped-invalid",
                     LocalFingerprint: asset.UpdatedAtUtc.ToUnixTimeSeconds().ToString(),
                     RemoteFingerprint: "conflicting-payload"));
+                continue;
+            }
+
+            if (!processedNonAmbiguousAssetVersions.Add(versionKey))
+            {
                 continue;
             }
 
