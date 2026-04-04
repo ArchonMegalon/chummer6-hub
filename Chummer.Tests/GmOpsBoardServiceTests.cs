@@ -533,6 +533,46 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatGmOpsShorthandAsEventControlDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:47:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open gmops board remains unresolved before next checkpoint.",
+                AtUtc: baseTime,
+                EventId: "evt-gmops"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open gmop queue remains unresolved for event-control follow-through.",
+                AtUtc: baseTime.AddMinutes(1),
+                EventId: "evt-gmop"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(3, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-gmop", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-gmops", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[2].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatCompactPrepLaunchAndTravelPrefetchShorthandAsEventControlDomain()
     {
         SessionLedgerService ledger = new();
@@ -793,6 +833,8 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse prepLibraryMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "preplibrary");
         GmPrepAssetListResponse eventControlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventcontrol");
         GmPrepAssetListResponse eventCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventctrl");
+        GmPrepAssetListResponse gmOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gmops");
+        GmPrepAssetListResponse gmOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gmop");
         GmPrepAssetListResponse seasonOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasonops");
         GmPrepAssetListResponse seasonOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasonop");
         GmPrepAssetListResponse rosterMoveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostermove");
@@ -803,6 +845,8 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(prepLibraryMatches.Items, item => item.AssetId == "prep_library_ops");
         Assert.Contains(eventControlMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventCtrlMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(gmOpsMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(gmOpMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(seasonOpsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(seasonOpMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(rosterMoveMatches.Items, item => item.AssetId == "roster_move_ops");
