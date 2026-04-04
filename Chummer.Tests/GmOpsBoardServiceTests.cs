@@ -2189,6 +2189,8 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse nextSessionLoopPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsessionloops");
         GmPrepAssetListResponse sessionReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sessionreturn");
         GmPrepAssetListResponse sessionReturnPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sessionreturns");
+        GmPrepAssetListResponse sessionReturnLoopMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sessionreturnloop");
+        GmPrepAssetListResponse sessionReturnLoopPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sessionreturnloops");
         GmPrepAssetListResponse returnLoopMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "returnloop");
         GmPrepAssetListResponse returnLoopPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "returnloops");
         GmPrepAssetListResponse hyphenNextSessionMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "next-session");
@@ -2211,6 +2213,8 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(nextSessionLoopPluralMatches.Items, item => item.AssetId == "return_loop_ops");
         Assert.Contains(sessionReturnMatches.Items, item => item.AssetId == "return_loop_ops");
         Assert.Contains(sessionReturnPluralMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(sessionReturnLoopMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(sessionReturnLoopPluralMatches.Items, item => item.AssetId == "return_loop_ops");
         Assert.Contains(returnLoopMatches.Items, item => item.AssetId == "return_loop_ops");
         Assert.Contains(returnLoopPluralMatches.Items, item => item.AssetId == "return_loop_ops");
         Assert.Contains(hyphenNextSessionMatches.Items, item => item.AssetId == "return_loop_ops");

@@ -380,6 +380,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("next session return")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionreturn")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionreturns")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionreturnloops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("session-return")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("session return")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("returnloop")));

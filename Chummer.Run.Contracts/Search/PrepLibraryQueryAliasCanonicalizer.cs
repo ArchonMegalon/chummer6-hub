@@ -813,6 +813,15 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("return");
         }
 
+        if (tokens.Contains("sessionreturnloop") || tokens.Contains("sessionreturnloops"))
+        {
+            tokens.Remove("sessionreturnloop");
+            tokens.Remove("sessionreturnloops");
+            tokens.Add("session");
+            tokens.Add("return");
+            tokens.Add("loop");
+        }
+
         if (tokens.Contains("nextsession") || tokens.Contains("nextsessions"))
         {
             tokens.Remove("nextsession");
