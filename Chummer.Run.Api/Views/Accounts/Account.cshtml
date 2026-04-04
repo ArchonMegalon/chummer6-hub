@@ -1785,6 +1785,13 @@
                                     <strong>@selectedBuildLabHandoff.PlannerCoverageSummary</strong>
                                 </div>
                             }
+                            @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.CrewFitSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Crew fit</span>
+                                    <strong>@selectedBuildLabHandoff.CrewFitSummary</strong>
+                                </div>
+                            }
                         </div>
                         @if (selectedBuildLabHandoff.TradeoffLines.Count > 0)
                         {
@@ -1800,7 +1807,7 @@
                         }
                         @if (selectedBuildLabHandoff.PlannerCoverageLines is { Count: > 0 })
                         {
-                            <p><strong>Coverage:</strong> @string.Join(" ", selectedBuildLabHandoff.PlannerCoverageLines.Take(4))</p>
+                            <p><strong>Coverage:</strong> @string.Join(" ", selectedBuildLabHandoff.PlannerCoverageLines.Take(5))</p>
                         }
                         @if (selectedBuildLabHandoff.Outputs.Count > 0)
                         {
@@ -2526,6 +2533,10 @@
                                     @if (!string.IsNullOrWhiteSpace(handoff.PlannerCoverageSummary))
                                     {
                                         <span> Coverage: @handoff.PlannerCoverageSummary.</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(handoff.CrewFitSummary))
+                                    {
+                                        <span> Crew fit: @handoff.CrewFitSummary.</span>
                                     }
                                     @if (handoff.Outputs.Count > 0)
                                     {

@@ -587,7 +587,8 @@ public sealed record BuildLabHandoffProjection(
     BuildLabRuleEnvironmentDiffProjection? RuleEnvironmentDiff = null,
     IReadOnlyList<string>? Watchouts = null,
     string? PlannerCoverageSummary = null,
-    IReadOnlyList<string>? PlannerCoverageLines = null);
+    IReadOnlyList<string>? PlannerCoverageLines = null,
+    string? CrewFitSummary = null);
 
 public sealed record BuildLabRuleEnvironmentDiffProjection(
     string Status,

@@ -902,6 +902,10 @@
                                                                 {
                                                                     <span> Coverage: @handoff.PlannerCoverageSummary.</span>
                                                                 }
+                                                                @if (!string.IsNullOrWhiteSpace(handoff.CrewFitSummary))
+                                                                {
+                                                                    <span> Crew fit: @handoff.CrewFitSummary.</span>
+                                                                }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SupportClosureSummary))
                                                                 {
                                                                     <span> Support: @handoff.SupportClosureSummary.</span>
