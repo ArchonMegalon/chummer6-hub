@@ -229,6 +229,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_memory_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
         Assert.Contains("memory", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("archive", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("history", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("timeline", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("ledger", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("long-lived memory", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("memory ledger", StringComparison.OrdinalIgnoreCase));
     }
