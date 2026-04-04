@@ -116,6 +116,40 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignWorkspaceSummaryDeduplicatesIdenticalPublicationFamilies_WhenPayloadRepeatsSameRows()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        RosterTransferProjection transfer = Assert.Single(seed.RosterTransfers ?? Array.Empty<RosterTransferProjection>());
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-1",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap-safe output remains attached to campaign continuity.");
+        CampaignConsequenceProjection consequence = new(
+            ConsequenceId: "consequence-1",
+            Kind: "heat_pressure_lane",
+            Label: "Heat pressure lane",
+            State: "active",
+            Summary: "Heat pressure remains attached to campaign continuity.",
+            EvidenceLines: [],
+            Receipts: [],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recap, recap],
+            Consequences = [consequence, consequence],
+            RosterTransfers = [transfer, transfer]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        CampaignWorkspaceSummary summary = InvokeBuildCampaignWorkspaceSummary(workspace, restore);
+
+        Assert.Contains("1 publication-safe output(s)", summary.PublicationSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1 governed consequence signal(s)", summary.PublicationSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1 roster-transfer receipt(s)", summary.PublicationSummary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void CampaignMemoryPacketDoesNotActivateFromCarryForwardWindowSignalsWithoutMemoryContext()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardWindowOnly();
@@ -3331,6 +3365,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("BuildPrepPackets was not found.");
 
         return Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepPacketSummary>>(method.Invoke(null, [workspace, restore, leadRun]));
+    }
+
+    private static CampaignWorkspaceSummary InvokeBuildCampaignWorkspaceSummary(
+        CampaignWorkspaceProjection workspace,
+        WorkspaceRestoreProjection restore)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BuildCampaignWorkspaceSummary", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildCampaignWorkspaceSummary was not found.");
+
+        return Assert.IsType<CampaignWorkspaceSummary>(method.Invoke(null, [workspace, null, restore]));
     }
 
     private static RunboardSummary? InvokeBuildRunboardSummary(
