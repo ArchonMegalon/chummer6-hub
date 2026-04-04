@@ -619,6 +619,13 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceDigestProjection? digest,
         WorkspaceRestoreProjection restore)
     {
+        int recapCount = DeduplicateIdenticalPublicationRecapVersions(workspace.RecapShelf).Count();
+        int consequenceCount = DeduplicateIdenticalCampaignConsequenceVersions(
+                workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+            .Count();
+        int rosterTransferCount = DeduplicateIdenticalRosterTransferVersions(
+                workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
+            .Count();
         CampaignReadinessCue? attentionCue = workspace.ReadinessCues.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
         string restorePrefetchSummary = DescribeRestorePrefetchSummary(restore);
         string restoreSummary = restore.ConflictSummaries.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item)) is { } conflictSummary
@@ -626,16 +633,16 @@ public sealed class CampaignWorkspaceServerPlaneService
             : restore.LocalOnlyNotes.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item)) is { } localOnlySummary
                 ? $"{restorePrefetchSummary} {localOnlySummary}"
                 : $"{restorePrefetchSummary} Restore posture is attached to claimed installs and continuity snapshots instead of a local-only guess.";
-        string publicationSummary = workspace.RecapShelf.Count == 0
+        string publicationSummary = recapCount == 0
             ? "No recap-safe output is pinned yet, so the workspace still needs its first publication-safe continuity handoff."
-            : $"{workspace.RecapShelf.Count} publication-safe output(s) are attached to the same campaign continuity spine.";
-        if (workspace.Consequences is { Count: > 0 })
+            : $"{recapCount} publication-safe output(s) are attached to the same campaign continuity spine.";
+        if (consequenceCount > 0)
         {
-            publicationSummary = $"{publicationSummary} {workspace.Consequences.Count} governed consequence signal(s) stay attached to the same workspace.";
+            publicationSummary = $"{publicationSummary} {consequenceCount} governed consequence signal(s) stay attached to the same workspace.";
         }
-        if (workspace.RosterTransfers is { Count: > 0 })
+        if (rosterTransferCount > 0)
         {
-            publicationSummary = $"{publicationSummary} {workspace.RosterTransfers.Count} roster-transfer receipt(s) keep source, target, and ownership changes reviewable from the same workspace.";
+            publicationSummary = $"{publicationSummary} {rosterTransferCount} roster-transfer receipt(s) keep source, target, and ownership changes reviewable from the same workspace.";
         }
 
         return new CampaignWorkspaceSummary(
