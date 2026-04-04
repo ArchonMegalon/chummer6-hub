@@ -4733,15 +4733,18 @@ public sealed class CampaignSpineService
     {
         if (leadHandoff is null)
         {
-            return "Compare by provenance, visibility, trust ranking, lineage, and campaign-return fit instead of popularity, install counts, or shelf age.";
+            return "Compare by provenance, visibility, trust ranking, lineage, explicit rule-environment before/after diff evidence, and campaign-return fit instead of popularity, install counts, or shelf age.";
         }
 
         string exchangeParity = AccountService.NormalizeOptional(leadHandoff.ExchangeParitySummary)
             ?? "sheet/print/export/viewer and adjacent exchange parity lanes are still pending explicit readiness evidence";
         string portabilityPillar = AccountService.NormalizeOptional(leadHandoff.PortabilityPillarSummary)
             ?? "dossier/exchange/replay/recap/module portability lanes are still pending explicit readiness evidence";
+        string ruleEnvironmentDiff = leadHandoff.RuleEnvironmentDiff is null
+            ? "rule-environment before/after diff evidence is still pending explicit handoff receipts"
+            : $"rule-environment diff {leadHandoff.RuleEnvironmentDiff.BeforeFingerprint} -> {leadHandoff.RuleEnvironmentDiff.AfterFingerprint} ({leadHandoff.RuleEnvironmentDiff.Status})";
 
-        return $"Compare by provenance, visibility, trust ranking, lineage, {leadHandoff.Title} receipts, {exchangeParity}, {portabilityPillar}, and campaign-return fit instead of popularity, install counts, or shelf age.";
+        return $"Compare by provenance, visibility, trust ranking, lineage, {leadHandoff.Title} receipts, {ruleEnvironmentDiff}, {exchangeParity}, {portabilityPillar}, and campaign-return fit instead of popularity, install counts, or shelf age.";
     }
 
     private static string DescribeCreatorPublicationLineage(

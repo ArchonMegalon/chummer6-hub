@@ -2283,7 +2283,31 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         Assert.Contains("sheet/print/export/viewer and adjacent exchange parity lanes", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("dossier/exchange/replay/recap/module portability lanes", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("rule-environment diff", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("sr6-preview -> sr6-mainline", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("campaign-return fit", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CampaignSpineBuildCreatorPublicationsComparisonSummaryFallsBackToRuleEnvironmentDiffEvidenceWithoutBuildLabHandoff()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath() with
+        {
+            RecapShelf =
+            [
+                new PublicationSafeProjection(
+                    ProjectionId: "recap-rule-diff-fallback",
+                    Kind: "campaign_recap_bundle",
+                    Label: "Session recap",
+                    Summary: "Recap row",
+                    CreatorPublicationId: "pub-rule-diff-fallback")
+            ]
+        };
+
+        CreatorPublicationProjection publication = Assert.Single(
+            InvokeCampaignSpineBuildCreatorPublications([workspace]));
+
+        Assert.Contains("rule-environment before/after diff evidence", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
