@@ -3060,9 +3060,10 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
     {
-        WorkspaceChangePacketProjection[] eventPackets = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsEventControlSignal(packet))
-            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+        WorkspaceChangePacketProjection[] eventPackets = DeduplicateIdenticalChangePacketVersions(
+                (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+                .Where(static packet => IsEventControlSignal(packet))
+                .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
         CampaignConsequenceProjection[] consequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
@@ -3763,6 +3764,27 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
+
+    private static IEnumerable<WorkspaceChangePacketProjection> DeduplicateIdenticalChangePacketVersions(
+        IEnumerable<WorkspaceChangePacketProjection> packets)
+    {
+        HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
+        foreach (WorkspaceChangePacketProjection packet in packets)
+        {
+            if (seenKeys.Add(BuildChangePacketDedupeKey(packet)))
+            {
+                yield return packet;
+            }
+        }
+    }
+
+    private static string BuildChangePacketDedupeKey(WorkspaceChangePacketProjection packet) =>
+        string.Join('|',
+            NormalizeOptional(packet.PacketId) ?? string.Empty,
+            NormalizeOptional(packet.Kind) ?? string.Empty,
+            NormalizeOptional(packet.Label) ?? string.Empty,
+            NormalizeOptional(packet.Summary) ?? string.Empty,
+            packet.UpdatedAtUtc.ToUnixTimeMilliseconds().ToString());
 
     private static string DescribeSignalLabel(string? preferredLabel, string? firstFallback, string? secondFallback)
     {

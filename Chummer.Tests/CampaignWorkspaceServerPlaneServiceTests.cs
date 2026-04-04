@@ -1109,6 +1109,29 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketDeduplicatesIdenticalSignalVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithEventControlSignalLabelsOnly();
+        IReadOnlyList<WorkspaceChangePacketProjection> seedPackets =
+            Assert.IsAssignableFrom<IReadOnlyList<WorkspaceChangePacketProjection>>(seed.ChangePackets);
+        WorkspaceChangePacketProjection first = seedPackets[0];
+        WorkspaceChangePacketProjection second = seedPackets[1];
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ChangePackets = [first, first, second]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("2 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("season operation label", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("contact pressure label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void EventControlPacketFallsBackToRelationshipConsequenceLabelsWhenFalloutSignalsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithSparseRelationshipConsequenceFalloutLabelOnly();
