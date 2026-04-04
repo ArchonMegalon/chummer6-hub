@@ -71,6 +71,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("flagship_head_missing_contract_markers", script, StringComparison.Ordinal);
         Assert.Contains("flagship_head_contract_marker_statuses", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_receipt_exists", script, StringComparison.Ordinal);
+        Assert.Contains("release_channel_channel_id", script, StringComparison.Ordinal);
+        Assert.Contains("release_channel_version", script, StringComparison.Ordinal);
+        Assert.Contains("workflow_parity_receipt_channel_ids", script, StringComparison.Ordinal);
+        Assert.Contains("flagship_gate.headProofs.status_malformed_entries", script, StringComparison.Ordinal);
+        Assert.Contains("flagship_gate.headProofs.status_non_canonical_keys", script, StringComparison.Ordinal);
+        Assert.Contains("flagship_gate.headProofs.status_duplicate_normalized_keys", script, StringComparison.Ordinal);
         Assert.Contains("workflow_execution_missing_receipts", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_workflow_family_audit_tests", script, StringComparison.Ordinal);
         Assert.Contains("sr4_workflow_parity_status", script, StringComparison.Ordinal);
@@ -88,6 +94,13 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("missing_screenshots", script, StringComparison.Ordinal);
         Assert.Contains("missing_theme_tokens", script, StringComparison.Ordinal);
         Assert.Contains("flagship_theme_readability_contrast", script, StringComparison.Ordinal);
+        Assert.Contains("runtime_backed_shell_menu", script, StringComparison.Ordinal);
+        Assert.Contains("runtime_backed_menu_bar_labels", script, StringComparison.Ordinal);
+        Assert.Contains("runtime_backed_toolstrip_actions", script, StringComparison.Ordinal);
+        Assert.Contains("runtime_backed_tab_panel_only_header", script, StringComparison.Ordinal);
+        Assert.Contains("runtime_backed_clickable_primary_menus", script, StringComparison.Ordinal);
+        Assert.Contains("loaded_runner_tab_strip_control_present", script, StringComparison.Ordinal);
+        Assert.Contains("loaded_runner_tab_posture_control_present", script, StringComparison.Ordinal);
         Assert.Contains("flagship theme/readability proof is not pass-ready", script, StringComparison.Ordinal);
         Assert.Contains("invalid_screenshots", script, StringComparison.Ordinal);
         Assert.Contains("undersized_screenshots", script, StringComparison.Ordinal);
@@ -373,9 +386,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=contacts", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=diary", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=contacts", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=diary", audit, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -410,6 +425,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("heat continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=contacts", playwright, StringComparison.Ordinal);
         Assert.Contains("contacts continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=diary", playwright, StringComparison.Ordinal);
+        Assert.Contains("diary continuity prep query", playwright, StringComparison.Ordinal);
     }
 
     [Fact]
