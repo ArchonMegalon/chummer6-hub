@@ -721,7 +721,14 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilecompanionreturnloop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilecompanionreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilecompanionreturnlanes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilecompanionsreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilecompanionsreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignmobilecompanionreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignmobilecompanionreturnlanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignmobilecompanionreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignmobilecompanionsreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignmobilecompanionsreturnloops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignmobilecompanionsreturnlanes")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixreturnloop")));
     }

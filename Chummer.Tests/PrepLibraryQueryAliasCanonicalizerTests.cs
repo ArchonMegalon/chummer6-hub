@@ -140,7 +140,13 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
     {
         HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
         {
-            "campaignmobilecompanionreturnloops"
+            "mobilecompanionreturnlanes",
+            "mobilecompanionsreturnloop",
+            "mobilecompanionsreturnloops",
+            "campaignmobilecompanionreturnlane",
+            "campaignmobilecompanionreturnlanes",
+            "campaignmobilecompanionsreturnloop",
+            "campaignmobilecompanionsreturnloops"
         };
 
         PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
@@ -151,7 +157,13 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.Contains("safehouse", tokens);
         Assert.Contains("return", tokens);
         Assert.Contains("loop", tokens);
-        Assert.DoesNotContain("campaignmobilecompanionreturnloops", tokens);
+        Assert.DoesNotContain("mobilecompanionreturnlanes", tokens);
+        Assert.DoesNotContain("mobilecompanionsreturnloop", tokens);
+        Assert.DoesNotContain("mobilecompanionsreturnloops", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionreturnlane", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionreturnlanes", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionsreturnloop", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionsreturnloops", tokens);
         Assert.DoesNotContain("mobile", tokens);
         Assert.DoesNotContain("companion", tokens);
         Assert.DoesNotContain("companions", tokens);

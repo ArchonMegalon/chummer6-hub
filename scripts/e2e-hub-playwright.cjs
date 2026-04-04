@@ -6043,6 +6043,13 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4packets', 'compact campaignworkspacev4packets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4brief', 'compact campaignworkspacev4brief continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4briefs', 'compact campaignworkspacev4briefs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionreturnlanes', 'compact mobilecompanionreturnlanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionsreturnloop', 'compact mobilecompanionsreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionsreturnloops', 'compact mobilecompanionsreturnloops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignmobilecompanionreturnlane', 'compact campaignmobilecompanionreturnlane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignmobilecompanionreturnlanes', 'compact campaignmobilecompanionreturnlanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignmobilecompanionsreturnloop', 'compact campaignmobilecompanionsreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignmobilecompanionsreturnloops', 'compact campaignmobilecompanionsreturnloops continuity prep');
 
   await page.fill('#prepQuery', 'sessionreturn');
   await Promise.all([
