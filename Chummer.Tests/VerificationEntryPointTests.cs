@@ -372,8 +372,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Pragma", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=contacts", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=contacts", audit, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -406,6 +408,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact seasonops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=heat", playwright, StringComparison.Ordinal);
         Assert.Contains("heat continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=contacts", playwright, StringComparison.Ordinal);
+        Assert.Contains("contacts continuity prep query", playwright, StringComparison.Ordinal);
     }
 
     [Fact]
