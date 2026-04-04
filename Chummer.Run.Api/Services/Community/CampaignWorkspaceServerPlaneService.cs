@@ -1681,9 +1681,30 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return packets
-            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .OrderByDescending(static item => ResolvePrepPacketPriority(item.Kind))
+            .ThenByDescending(static item => item.UpdatedAtUtc)
             .ThenBy(static item => item.Title, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static int ResolvePrepPacketPriority(string kind)
+    {
+        string normalizedKind = NormalizeOptional(kind)?.ToLowerInvariant() ?? string.Empty;
+        return normalizedKind switch
+        {
+            "opposition_packet" => 9,
+            "event_control_packet" => 8,
+            "roster_movement_packet" => 7,
+            "scene_packet" => 6,
+            "campaign_return_packet" => 5,
+            "campaign_memory_packet" => 4,
+            "continuity_packet" => 3,
+            "aftermath_packet" => 2,
+            "prep_launch_packet" => 1,
+            "travel_prefetch_packet" => 0,
+            "travel_packet" => -1,
+            _ => -2
+        };
     }
 
     private static GovernedPrepPacketSummary? BuildScenePrepPacket(

@@ -5485,6 +5485,62 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryOrderingPrioritizesOppositionAndRosterPacketsAheadOfNewerOpsReceipts()
+    {
+        CampaignWorkspaceProjection oppositionWorkspace = BuildWorkspaceWithOppositionChangeSignalsOnly();
+        CampaignWorkspaceProjection rosterWorkspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceProjection opsWorkspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        CampaignWorkspaceProjection workspace = oppositionWorkspace with
+        {
+            RosterTransfers = rosterWorkspace.RosterTransfers,
+            PrepLaunches = opsWorkspace.PrepLaunches,
+            TravelPrefetches = opsWorkspace.TravelPrefetches
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        int oppositionIndex = IndexOfPacketKind(packets, "opposition_packet");
+        int rosterIndex = IndexOfPacketKind(packets, "roster_movement_packet");
+        int prepLaunchIndex = IndexOfPacketKind(packets, "prep_launch_packet");
+        int travelPrefetchIndex = IndexOfPacketKind(packets, "travel_prefetch_packet");
+
+        Assert.True(oppositionIndex >= 0);
+        Assert.True(rosterIndex >= 0);
+        Assert.True(prepLaunchIndex >= 0);
+        Assert.True(travelPrefetchIndex >= 0);
+        Assert.True(oppositionIndex < prepLaunchIndex);
+        Assert.True(oppositionIndex < travelPrefetchIndex);
+        Assert.True(rosterIndex < prepLaunchIndex);
+        Assert.True(rosterIndex < travelPrefetchIndex);
+    }
+
+    [Fact]
+    public void PrepLibraryOrderingPrioritizesEventControlPacketAheadOfNewerOpsReceipts()
+    {
+        CampaignWorkspaceProjection eventWorkspace = BuildWorkspaceWithEventControls();
+        CampaignWorkspaceProjection opsWorkspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        CampaignWorkspaceProjection workspace = eventWorkspace with
+        {
+            PrepLaunches = opsWorkspace.PrepLaunches,
+            TravelPrefetches = opsWorkspace.TravelPrefetches
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        int eventControlIndex = IndexOfPacketKind(packets, "event_control_packet");
+        int prepLaunchIndex = IndexOfPacketKind(packets, "prep_launch_packet");
+        int travelPrefetchIndex = IndexOfPacketKind(packets, "travel_prefetch_packet");
+
+        Assert.True(eventControlIndex >= 0);
+        Assert.True(prepLaunchIndex >= 0);
+        Assert.True(travelPrefetchIndex >= 0);
+        Assert.True(eventControlIndex < prepLaunchIndex);
+        Assert.True(eventControlIndex < travelPrefetchIndex);
+    }
+
+    [Fact]
     public void RosterMovementPacketFallsBackToChangeAndCarryForwardSignalsWhenTransfersAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterSignalsOnly();
@@ -6530,6 +6586,14 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         return (RunboardSummary?)method.Invoke(null, [workspace, leadRun]);
     }
+
+    private static int IndexOfPacketKind(IReadOnlyList<GovernedPrepPacketSummary> packets, string kind)
+        => packets
+            .Select(static (item, index) => new { item.Kind, index })
+            .Where(item => string.Equals(item.Kind, kind, StringComparison.Ordinal))
+            .Select(static item => item.index)
+            .DefaultIfEmpty(-1)
+            .First();
 
     private static bool InvokeIsTravelReadyDevice(ClaimedDeviceRestoreProjection device)
     {
