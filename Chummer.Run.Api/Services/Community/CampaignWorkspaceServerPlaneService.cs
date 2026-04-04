@@ -14,6 +14,8 @@ public sealed class CampaignWorkspaceServerPlaneService
     [
         "contact",
         "contacts",
+        "connection",
+        "connections",
         "heat",
         "favor",
         "favors",
