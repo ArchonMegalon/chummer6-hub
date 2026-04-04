@@ -3028,7 +3028,7 @@ public sealed class CampaignSpineService
     {
         var parity = ResolveBuildLabExchangeParity(outputs);
         int readyCount = parity.Count(static lane => lane.ready);
-        return $"{readyCount} of {parity.Count} sheet/print/export/viewer parity lanes are release-ready.";
+        return $"{readyCount} of {parity.Count} sheet/print/export/viewer and adjacent exchange parity lanes are release-ready.";
     }
 
     private static IReadOnlyList<string> BuildBuildLabExchangeParityLines(IReadOnlyList<PublicationSafeProjection> outputs)
@@ -4737,7 +4737,7 @@ public sealed class CampaignSpineService
         }
 
         string exchangeParity = AccountService.NormalizeOptional(leadHandoff.ExchangeParitySummary)
-            ?? "sheet/print/export/viewer parity lanes are still pending explicit readiness evidence";
+            ?? "sheet/print/export/viewer and adjacent exchange parity lanes are still pending explicit readiness evidence";
         string portabilityPillar = AccountService.NormalizeOptional(leadHandoff.PortabilityPillarSummary)
             ?? "dossier/exchange/replay/recap/module portability lanes are still pending explicit readiness evidence";
 

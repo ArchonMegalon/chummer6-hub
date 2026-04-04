@@ -2281,7 +2281,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
                 [dossier],
                 [handoff]));
 
-        Assert.Contains("sheet/print/export/viewer parity lanes", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("sheet/print/export/viewer and adjacent exchange parity lanes", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("dossier/exchange/replay/recap/module portability lanes", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("campaign-return fit", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
     }
@@ -7547,7 +7547,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.BuildSurfaceLines!, line => line.Contains("Compare lane:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.BuildSurfaceLines!, line => line.Contains("Advancement lane:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.BuildSurfaceLines!, line => line.Contains("Crew-fit lane:", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("sheet/print/export/viewer parity lanes", handoff.ExchangeParitySummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("sheet/print/export/viewer and adjacent exchange parity lanes", handoff.ExchangeParitySummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(handoff.ExchangeParityLines);
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Sheet viewer:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Print PDF export:", StringComparison.OrdinalIgnoreCase));
