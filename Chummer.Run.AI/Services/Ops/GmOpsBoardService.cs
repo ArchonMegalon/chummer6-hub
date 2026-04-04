@@ -97,15 +97,27 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
 
         var unresolved = projection.Events
             .Where(static item => LooksUnresolved(item.EventType, item.Payload))
-            .OrderByDescending(item => item.AtUtc)
+            .Select(item =>
+            {
+                string severity = ResolveSeverity(item.EventType, item.Payload);
+                return new
+                {
+                    Event = item,
+                    Severity = severity,
+                    SeverityPriority = ResolveSeverityPriority(severity)
+                };
+            })
+            .OrderByDescending(static item => item.SeverityPriority)
+            .ThenByDescending(static item => item.Event.AtUtc)
+            .ThenBy(static item => item.Event.EventId, StringComparer.Ordinal)
             .Take(6)
             .Select(item => new OpsBoardUnresolvedItem(
-                ItemId: $"ops:{item.EventId}",
-                Summary: item.Payload,
-                Severity: ResolveSeverity(item.EventType, item.Payload),
+                ItemId: $"ops:{item.Event.EventId}",
+                Summary: item.Event.Payload,
+                Severity: item.Severity,
                 Evidence:
                 [
-                    new EvidencePointer("ledger-event", item.EventId, item.EventType, item.Payload)
+                    new EvidencePointer("ledger-event", item.Event.EventId, item.Event.EventType, item.Event.Payload)
                 ]))
             .ToList();
 
@@ -1038,6 +1050,15 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
 
         return "low";
     }
+
+    private static int ResolveSeverityPriority(string severity)
+        => severity switch
+        {
+            "high" => 3,
+            "medium" => 2,
+            "low" => 1,
+            _ => 0
+        };
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
