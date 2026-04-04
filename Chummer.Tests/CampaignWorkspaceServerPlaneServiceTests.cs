@@ -1132,6 +1132,50 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineResolveWorkspaceNextSafeActionFallsBackToCampaignNameWhenLeadRunMissing()
+    {
+        CampaignProjection campaign = BuildCampaignProjection(BuildWorkspaceWithRosterAndAftermath());
+        WorkspaceRestoreProjection restore = new(
+            RestoreId: "restore-1",
+            UserId: "user-1",
+            RecentDossiers: [],
+            RecentCampaigns: [],
+            RecentRuleEnvironments: [],
+            RecentArtifacts: [],
+            Entitlements: [],
+            ClaimedDevices: [],
+            ConflictSummaries: [],
+            LocalOnlyNotes: [],
+            GeneratedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+        SceneProjection activeScene = new(
+            SceneId: "scene-orphaned-run",
+            RunId: "run-orphaned",
+            Title: "Fallback Scene",
+            Revision: "v8",
+            Status: "active",
+            Summary: "Scene signal arrived before run hydration.",
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+        ObjectiveProjection leadObjective = new(
+            ObjectiveId: "objective-fallback",
+            Title: "Fallback Objective",
+            Status: "open",
+            Pressure: "high",
+            Summary: "Objective signal arrived before run hydration.",
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:01:00Z"));
+
+        string nextSafeAction = InvokeCampaignSpineResolveWorkspaceNextSafeAction(
+            campaign,
+            restore,
+            [],
+            [],
+            leadRun: null,
+            activeScene: activeScene,
+            leadObjective: leadObjective);
+
+        Assert.Contains($"in {campaign.Name}", nextSafeAction, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CampaignSpineCampaignMemoryPrefersMostRecentConsequenceRosterPrepAndTravelReceipts()
     {
         CampaignWorkspaceProjection rosterWorkspace = BuildWorkspaceWithRosterAndAftermath();
@@ -5410,6 +5454,31 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("ResolveRosterTransferRequestIdentity was not found.");
 
         return Assert.IsType<string>(method.Invoke(null, [identity, fieldLabel]));
+    }
+
+    private static string InvokeCampaignSpineResolveWorkspaceNextSafeAction(
+        CampaignProjection campaign,
+        WorkspaceRestoreProjection restore,
+        IReadOnlyList<PublicationSafeProjection> recapShelf,
+        IReadOnlyList<CampaignReadinessCue> readinessCues,
+        RunProjection? leadRun,
+        SceneProjection? activeScene,
+        ObjectiveProjection? leadObjective)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("ResolveWorkspaceNextSafeAction", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("ResolveWorkspaceNextSafeAction was not found.");
+
+        return Assert.IsType<string>(method.Invoke(null,
+        [
+            campaign,
+            restore,
+            recapShelf,
+            readinessCues,
+            leadRun,
+            activeScene,
+            leadObjective
+        ]));
     }
 
     private static IReadOnlyList<CreatorPublicationProjection> InvokeCampaignSpineBuildCreatorPublications(
