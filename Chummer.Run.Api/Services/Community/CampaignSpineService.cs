@@ -2282,9 +2282,9 @@ public sealed class CampaignSpineService
                 };
                 var readyOutputSummary = outputs.Count switch
                 {
-                    1 => "1 dossier or campaign-safe output is already ready for export, exchange, and artifact follow-through.",
-                    > 1 => $"{outputs.Count} dossier or campaign-safe outputs are already ready for export, exchange, and artifact follow-through.",
-                    _ => "Publication-safe outputs will appear as replay, recap, module, and dossier cards once the first run lands."
+                    1 => "1 dossier or campaign-safe output is already ready for export, exchange, recap follow-through, and artifact follow-through.",
+                    > 1 => $"{outputs.Count} dossier or campaign-safe outputs are already ready for export, exchange, recap follow-through, and artifact follow-through.",
+                    _ => "Publication-safe outputs will appear as replay, recap, module, and dossier cards once the first run lands so recap follow-through stays explicit."
                 };
                 var campaignReturnSummary = workspace?.ReturnSummary
                     ?? "No campaign workspace is attached yet, so return still lands on the living dossier until the first governed campaign handoff exists.";
@@ -3067,7 +3067,7 @@ public sealed class CampaignSpineService
     {
         var lanes = ResolveBuildLabPortabilityPillar(outputs);
         int readyCount = lanes.Count(static lane => lane.ready);
-        return $"{readyCount} of {lanes.Count} exchange/replay/recap/module portability lanes are release-ready.";
+        return $"{readyCount} of {lanes.Count} dossier/exchange/replay/recap/module portability lanes are release-ready.";
     }
 
     private static IReadOnlyList<string> BuildBuildLabPortabilityPillarLines(IReadOnlyList<PublicationSafeProjection> outputs)
@@ -3094,6 +3094,7 @@ public sealed class CampaignSpineService
 
         return
         [
+            Lane("Dossier exchange", "character_template", outputs),
             Lane("JSON exchange", "json_exchange", outputs),
             Lane("Foundry exchange", "foundry_exchange", outputs),
             Lane("Replay timeline", "replay_timeline", outputs),
