@@ -2543,6 +2543,34 @@ def verify_signed_in_work_audit(
     prep_library_connections = json.loads(body)
     if not (prep_library_connections.get("items") or []):
         raise AssertionError("prep-library connections search did not expose any governed packet")
+    prep_library_relationship_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=relationship"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_relationship_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_relationship_path} returned {status}, expected 200")
+
+    prep_library_relationship = json.loads(body)
+    if not (prep_library_relationship.get("items") or []):
+        raise AssertionError("prep-library relationship search did not expose any governed packet")
+    prep_library_relationships_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=relationships"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_relationships_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_relationships_path} returned {status}, expected 200")
+
+    prep_library_relationships = json.loads(body)
+    if not (prep_library_relationships.get("items") or []):
+        raise AssertionError("prep-library relationships search did not expose any governed packet")
     prep_library_faction_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=faction"
     status, body, _, _ = fetch(
         base_url,
@@ -5410,6 +5438,36 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_connections_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_connections_search_path} should return at least one governed prep packet for the connections query")
+    workspace_relationship_search_path = f"{workspace_path}?prepQuery=relationship"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_relationship_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_relationship_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_relationship_search_path)
+    require_snippet(body, 'match(es) for "relationship"', workspace_relationship_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_relationship_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_relationship_search_path} should return at least one governed prep packet for the relationship query")
+    workspace_relationships_search_path = f"{workspace_path}?prepQuery=relationships"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_relationships_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_relationships_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_relationships_search_path)
+    require_snippet(body, 'match(es) for "relationships"', workspace_relationships_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_relationships_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_relationships_search_path} should return at least one governed prep packet for the relationships query")
     workspace_faction_search_path = f"{workspace_path}?prepQuery=faction"
     status, body, _, _ = fetch(
         base_url,

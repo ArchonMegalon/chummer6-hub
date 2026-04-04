@@ -5054,6 +5054,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("connection");
         }
 
+        if (tokens.Contains("relationships"))
+        {
+            tokens.Remove("relationships");
+            tokens.Add("relationship");
+        }
+
         if (tokens.Contains("factions"))
         {
             tokens.Remove("factions");
