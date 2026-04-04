@@ -91,7 +91,13 @@ def parse_required_token_list(oracle: dict[str, object], key: str, *, source: st
             )
         normalized_tokens[normalized_key] = token
         tokens.append(token)
-    return sorted(tokens)
+    canonical_order = sorted(tokens)
+    if tokens != canonical_order:
+        raise ValueError(
+            f"{source}.{key} must preserve canonical token ordering "
+            f"(actual={tokens}, expected={canonical_order})"
+        )
+    return canonical_order
 
 
 def parse_catalog_token_matches(matches: Sequence[str], *, source: str, allow_duplicate_ids: bool) -> list[str]:

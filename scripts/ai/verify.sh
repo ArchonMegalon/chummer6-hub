@@ -266,6 +266,30 @@ bash scripts/ai/run_services_restore_drill.sh
 bash scripts/ai/run_services_verification.sh
 run_ui_parity_audit_with_workflow_gate_retry
 
+parity_oracle_path="$ROOT_DIR/docs/PARITY_ORACLE.json"
+parity_oracle_backup="$(mktemp)"
+cp "$parity_oracle_path" "$parity_oracle_backup"
+python3 - "$parity_oracle_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+tabs = payload.get("tabs")
+if not isinstance(tabs, list) or len(tabs) < 2:
+    raise SystemExit("tabs list is missing or too short for parity-oracle ordering mutation")
+tabs[0], tabs[1] = tabs[1], tabs[0]
+payload["tabs"] = tabs
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/generate-parity-checklist.sh; then
+  mv "$parity_oracle_backup" "$parity_oracle_path"
+  echo "verify gate failed: parity checklist generator should reject non-canonical parity oracle token ordering." >&2
+  exit 1
+fi
+mv "$parity_oracle_backup" "$parity_oracle_path"
+
 release_channel_path="$(
 python3 - <<'PY'
 import json
