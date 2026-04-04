@@ -68,11 +68,12 @@ public sealed class TravelModeCacheFreshnessTests
         Assert.Contains("fresh staged cache", summary.CacheFreshnessSummary, StringComparison.Ordinal);
         Assert.Contains("Offline actionability is bounded but degraded across", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
         Assert.Contains("downtime/diary", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
-        Assert.Equal(4, summary.OfflineLaneCues.Count);
+        Assert.Equal(5, summary.OfflineLaneCues.Count);
         Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("degraded", cue.Status));
         Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "downtime_diary" && cue.SignalCount >= 0);
         Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "contacts_heat" && cue.SignalCount >= 0);
         Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "aftermath_recap" && cue.SignalCount >= 0);
+        Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "return_loop" && cue.SignalCount >= 0);
         Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "prep_review" && cue.SignalCount >= 0);
         Assert.Equal("ready", summary.Devices.First(item => item.InstallationId == "install-fresh").Status);
         Assert.Equal("stale", summary.Devices.First(item => item.InstallationId == "install-stale").Status);
@@ -99,7 +100,7 @@ public sealed class TravelModeCacheFreshnessTests
         Assert.Equal(1, summary.StaleCacheDeviceCount);
         Assert.Contains("No travel-prefetch receipt exists yet", summary.CacheFreshnessSummary, StringComparison.Ordinal);
         Assert.Contains("Offline actionability is bounded but degraded across", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
-        Assert.Equal(4, summary.OfflineLaneCues.Count);
+        Assert.Equal(5, summary.OfflineLaneCues.Count);
         Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("degraded", cue.Status));
         Assert.Equal("stale", summary.Devices.Single().Status);
     }
@@ -121,7 +122,7 @@ public sealed class TravelModeCacheFreshnessTests
         TravelModeReadinessSummary summary = InvokeBuildTravelMode(workspace, restore, BuildPrepLibrary());
 
         Assert.Equal(0, summary.TravelReadyDeviceCount);
-        Assert.Equal(4, summary.OfflineLaneCues.Count);
+        Assert.Equal(5, summary.OfflineLaneCues.Count);
         Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("blocked", cue.Status));
         Assert.Contains("Offline actionability is blocked", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
     }
