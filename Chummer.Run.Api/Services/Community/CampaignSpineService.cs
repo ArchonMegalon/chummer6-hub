@@ -3067,7 +3067,7 @@ public sealed class CampaignSpineService
                     ? publicationSummary
                     : item.PublicationSummary,
                 CreatorPublicationId = string.IsNullOrWhiteSpace(item.CreatorPublicationId)
-                    ? StableId("publication", $"{workspaceId}:{item.ProjectionId}")
+                    ? StableId("publication", $"{workspaceId}:{ResolveRecapProjectionIdentity(item)}")
                     : item.CreatorPublicationId,
                 NextSafeAction = string.IsNullOrWhiteSpace(item.NextSafeAction)
                     ? nextSafeAction
@@ -3099,6 +3099,11 @@ public sealed class CampaignSpineService
 
     private static string ResolveChangePacketIdentity(string? identity, string fallback)
         => AccountService.NormalizeOptional(identity) ?? fallback;
+
+    private static string ResolveRecapProjectionIdentity(PublicationSafeProjection recap)
+        => ResolveChangePacketIdentity(
+            recap.ProjectionId,
+            StableId("projection", $"{AccountService.NormalizeOptional(recap.Kind) ?? "recap"}:{AccountService.NormalizeOptional(recap.Label) ?? "entry"}"));
 
     private static string ResolveAftermathPackageIdentity(AftermathRecapPackageProjection package)
     {
@@ -3700,7 +3705,7 @@ public sealed class CampaignSpineService
                     .Select(item =>
                     {
                         PublicationSafeProjection recap = item.Item;
-                        string artifact = recap.ArtifactId ?? StableId("artifact", $"{workspace.WorkspaceId}:{recap.ProjectionId}");
+                        string artifact = recap.ArtifactId ?? StableId("artifact", $"{workspace.WorkspaceId}:{ResolveRecapProjectionIdentity(recap)}");
                         string publicationKind = NormalizeCreatorPublicationKind(recap.Kind);
                         string nextSafeAction = !string.IsNullOrWhiteSpace(recap.NextSafeAction)
                             ? recap.NextSafeAction!
