@@ -20,6 +20,7 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     IReadOnlyList<SupportClosureCue> SupportClosures,
     IReadOnlyList<KnownIssueAffectingInstall> KnownIssues,
     IReadOnlyList<DecisionNotice> DecisionNotices,
+    GmOperationsReadinessSummary GmOperations,
     CampaignPrepLibrarySummary PrepLibrary,
     IReadOnlyList<GovernedPrepLaunchProjection> PrepLaunches,
     TravelModeReadinessSummary TravelMode,
@@ -30,6 +31,23 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     NextSessionCarryForwardProjection? NextSessionCarryForward,
     NextSafeActionCue NextSafeAction,
     DateTimeOffset GeneratedAtUtc);
+
+public sealed record GmOperationsReadinessSummary(
+    string Status,
+    string Summary,
+    string AccountBackboneSummary,
+    int OppositionSignalCount,
+    int RosterMovementSignalCount,
+    int PrepPacketCount,
+    int PrepLaunchCount,
+    int EventControlSignalCount,
+    IReadOnlyList<GmOperationsLaneCue> LaneCues);
+
+public sealed record GmOperationsLaneCue(
+    string Lane,
+    string Status,
+    int SignalCount,
+    string Summary);
 
 public sealed record WorkspaceStateSummary(
     string Status,
