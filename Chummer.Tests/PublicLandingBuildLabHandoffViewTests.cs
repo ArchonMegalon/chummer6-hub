@@ -16,11 +16,13 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("handoff.Outputs.Count - 8", view, StringComparison.Ordinal);
         Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
         Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
+        Assert.Contains("@output.AuditSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff", view, StringComparison.Ordinal);
         Assert.Contains("Rule diff:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.CrewFitSummary", view, StringComparison.Ordinal);
         Assert.Contains("Crew fit:", view, StringComparison.Ordinal);
         Assert.Contains("Output next:", view, StringComparison.Ordinal);
         Assert.Contains("Output provenance:", view, StringComparison.Ordinal);
+        Assert.Contains("Output audit:", view, StringComparison.Ordinal);
     }
 }
