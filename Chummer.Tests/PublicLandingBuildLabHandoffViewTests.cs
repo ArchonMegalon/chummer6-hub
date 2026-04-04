@@ -28,6 +28,10 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("handoff.ConditionalStateSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.ConditionalStateLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Conditional lane:", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.SourceHintSummary", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.SourceHintLines.Take(2)", view, StringComparison.Ordinal);
+        Assert.Contains("Source-linked hints:", view, StringComparison.Ordinal);
+        Assert.Contains("Source hint:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Planner lane:", view, StringComparison.Ordinal);
         Assert.Contains("Output next:", view, StringComparison.Ordinal);

@@ -1863,6 +1863,13 @@
                                     <strong>@selectedBuildLabHandoff.ConditionalStateSummary</strong>
                                 </div>
                             }
+                            @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.SourceHintSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Source-linked hints</span>
+                                    <strong>@selectedBuildLabHandoff.SourceHintSummary</strong>
+                                </div>
+                            }
                         </div>
                         @if (selectedBuildLabHandoff.TradeoffLines.Count > 0)
                         {
@@ -1883,6 +1890,10 @@
                         @if (selectedBuildLabHandoff.ConditionalStateLines is { Count: > 0 })
                         {
                             <p><strong>Conditional rail:</strong> @string.Join(" ", selectedBuildLabHandoff.ConditionalStateLines.Take(3))</p>
+                        }
+                        @if (selectedBuildLabHandoff.SourceHintLines is { Count: > 0 })
+                        {
+                            <p><strong>Source-linked hints:</strong> @string.Join(" ", selectedBuildLabHandoff.SourceHintLines.Take(3))</p>
                         }
                         @if (selectedBuildLabHandoff.Outputs.Count > 0)
                         {
@@ -2644,6 +2655,17 @@
                                     @if (!string.IsNullOrWhiteSpace(handoff.CrewFitSummary))
                                     {
                                         <span> Crew fit: @handoff.CrewFitSummary.</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(handoff.SourceHintSummary))
+                                    {
+                                        <span> Source-linked hints: @handoff.SourceHintSummary.</span>
+                                    }
+                                    @if (handoff.SourceHintLines is { Count: > 0 })
+                                    {
+                                        foreach (var sourceHintLine in handoff.SourceHintLines.Take(2))
+                                        {
+                                            <span> Source hint: @sourceHintLine</span>
+                                        }
                                     }
                                     @if (handoff.RuleEnvironmentDiff is not null)
                                     {

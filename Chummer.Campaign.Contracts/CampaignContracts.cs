@@ -592,7 +592,9 @@ public sealed record BuildLabHandoffProjection(
     IReadOnlyList<string>? PlannerCoverageLines = null,
     string? CrewFitSummary = null,
     string? ConditionalStateSummary = null,
-    IReadOnlyList<string>? ConditionalStateLines = null);
+    IReadOnlyList<string>? ConditionalStateLines = null,
+    string? SourceHintSummary = null,
+    IReadOnlyList<string>? SourceHintLines = null);
 
 public sealed record BuildLabRuleEnvironmentDiffProjection(
     string Status,
