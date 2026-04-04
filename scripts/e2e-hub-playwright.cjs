@@ -2575,6 +2575,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail leaguectls compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leaguectls compact search');
 
+  await page.fill('#prepQuery', 'leaguectrls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=leaguectrls/.test(page.url()), 'Workspace detail search should preserve the compact leaguectrls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail leaguectrls compact search');
+  await expectBodyText(page, 'match(es) for "leaguectrls"', '/account/work/workspaces detail leaguectrls compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail leaguectrls compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail leaguectrls compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail leaguectrls compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail leaguectrls compact search');
+  const workspaceLeagueCtrlsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueCtrlsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact leaguectrls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail leaguectrls compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leaguectrls compact search');
+
   await page.fill('#prepQuery', 'league-ctrl');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -2931,6 +2952,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail communityctls compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityctls compact search');
+
+  await page.fill('#prepQuery', 'communityctrls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=communityctrls/.test(page.url()), 'Workspace detail search should preserve the compact communityctrls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail communityctrls compact search');
+  await expectBodyText(page, 'match(es) for "communityctrls"', '/account/work/workspaces detail communityctrls compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail communityctrls compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail communityctrls compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail communityctrls compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail communityctrls compact search');
+  const workspaceCommunityCtrlsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityCtrlsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact communityctrls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail communityctrls compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityctrls compact search');
 
   await page.fill('#prepQuery', 'community-ctrl');
   await Promise.all([

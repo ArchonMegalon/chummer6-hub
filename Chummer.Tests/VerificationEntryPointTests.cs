@@ -620,6 +620,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=leaguectrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=leaguectl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=leaguectls", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=leaguectrls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=league-ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=communityops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community-op", audit, StringComparison.Ordinal);
@@ -637,6 +638,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=communityctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=communityctl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=communityctls", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=communityctrls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community-ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heats", audit, StringComparison.Ordinal);
@@ -912,6 +914,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=leaguectrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=leaguectl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=leaguectls", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=leaguectrls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=league-ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=communityops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=community-op", audit, StringComparison.Ordinal);
@@ -929,6 +932,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=communityctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=communityctl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=communityctls", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=communityctrls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=community-ctrl", audit, StringComparison.Ordinal);
     }
 
@@ -1106,6 +1110,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact leaguectl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=leaguectls", playwright, StringComparison.Ordinal);
         Assert.Contains("compact leaguectls prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=leaguectrls", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact leaguectrls prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=league-ctrl", playwright, StringComparison.Ordinal);
         Assert.Contains("hyphen league-ctrl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=communityops", playwright, StringComparison.Ordinal);
@@ -1140,6 +1146,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact communityctl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=communityctls", playwright, StringComparison.Ordinal);
         Assert.Contains("compact communityctls prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=communityctrls", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact communityctrls prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=community-ctrl", playwright, StringComparison.Ordinal);
         Assert.Contains("hyphen community-ctrl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=heat", playwright, StringComparison.Ordinal);
