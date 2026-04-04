@@ -981,6 +981,45 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("diary");
         }
 
+        bool hasCampaignRelationshipOrDiaryScope =
+            tokens.Contains("contact")
+            || tokens.Contains("contacts")
+            || tokens.Contains("connection")
+            || tokens.Contains("connections")
+            || tokens.Contains("relationship")
+            || tokens.Contains("relationships")
+            || tokens.Contains("faction")
+            || tokens.Contains("factions")
+            || tokens.Contains("heat")
+            || tokens.Contains("heats")
+            || tokens.Contains("diary")
+            || tokens.Contains("diaries")
+            || tokens.Contains("journal")
+            || tokens.Contains("journals")
+            || tokens.Contains("sessionlog")
+            || tokens.Contains("sessionlogs")
+            || (tokens.Contains("session") && tokens.Contains("log"))
+            || (tokens.Contains("session") && tokens.Contains("logs"));
+        if (hasCampaignRelationshipOrDiaryScope)
+        {
+            tokens.Remove("update");
+            tokens.Remove("updates");
+            tokens.Remove("updated");
+            tokens.Remove("updating");
+            tokens.Remove("change");
+            tokens.Remove("changes");
+            tokens.Remove("changed");
+            tokens.Remove("changing");
+            tokens.Remove("delta");
+            tokens.Remove("deltas");
+            tokens.Remove("shift");
+            tokens.Remove("shifts");
+            tokens.Remove("shifted");
+            tokens.Remove("shifting");
+            tokens.Remove("mutation");
+            tokens.Remove("mutations");
+        }
+
         if (tokens.Contains("downtimes"))
         {
             tokens.Remove("downtimes");

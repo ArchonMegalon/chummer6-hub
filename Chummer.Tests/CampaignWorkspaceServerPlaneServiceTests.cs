@@ -448,6 +448,29 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingCollapsesContactHeatAndDiaryMutationShorthand()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "campaign-return:mutations",
+            Kind: "campaign_return_packet",
+            Title: "Neon Cradle diary, contacts, and heat return packet",
+            Summary: "Diary, contacts, and heat continuity remain on one governed return lane.",
+            BindingSummary: "Bound to the shared campaign return lane for downtime and next-session reopen.",
+            Reusable: true,
+            SearchTerms: ["diary", "contact", "connection", "heat", "return", "session", "loop"],
+            EvidenceLines: ["Relationship continuity stays attached to the governed return lane."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("contact updates")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("contacts changed")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("connection shifts")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("heat changes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diary update")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaries updates")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrix updates")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsContinuityPluralShorthandAcrossWhitespaceAndPunctuation()
     {
         var packet = new GovernedPrepPacketSummary(
