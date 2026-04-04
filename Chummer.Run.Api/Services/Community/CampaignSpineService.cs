@@ -2956,7 +2956,9 @@ public sealed class CampaignSpineService
                 UpdatedAtUtc: leadObjective.UpdatedAtUtc));
         }
 
-        RosterTransferProjection? rosterTransfer = rosterTransfers.FirstOrDefault();
+        RosterTransferProjection? rosterTransfer = rosterTransfers
+            .OrderByDescending(static item => item.TransferredAtUtc)
+            .FirstOrDefault();
         if (rosterTransfer is not null)
         {
             string rosterTransferId = ResolveChangePacketIdentity(
@@ -2970,7 +2972,9 @@ public sealed class CampaignSpineService
                 UpdatedAtUtc: rosterTransfer.TransferredAtUtc));
         }
 
-        GovernedPrepLaunchProjection? prepLaunch = prepLaunches.FirstOrDefault();
+        GovernedPrepLaunchProjection? prepLaunch = prepLaunches
+            .OrderByDescending(static item => item.LaunchedAtUtc)
+            .FirstOrDefault();
         if (prepLaunch is not null)
         {
             string prepLaunchId = ResolveChangePacketIdentity(
@@ -2984,7 +2988,9 @@ public sealed class CampaignSpineService
                 UpdatedAtUtc: prepLaunch.LaunchedAtUtc));
         }
 
-        TravelPrefetchReceiptProjection? travelPrefetch = travelPrefetchReceipts.FirstOrDefault();
+        TravelPrefetchReceiptProjection? travelPrefetch = travelPrefetchReceipts
+            .OrderByDescending(static item => item.StagedAtUtc)
+            .FirstOrDefault();
         if (travelPrefetch is not null)
         {
             string travelPrefetchReceiptId = ResolveChangePacketIdentity(
