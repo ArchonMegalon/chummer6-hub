@@ -1422,7 +1422,7 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         field_name="visual receipt required_tests",
         path=path,
     )
-    expected_required_tests = {
+    expected_required_tests = (
         "Desktop_shell_preserves_chummer5a_familiarity_cues",
         "Desktop_shell_preserves_classic_dense_three_pane_workbench_posture",
         "Theme_tokens_preserve_chummer5a_palette_and_readability",
@@ -1452,32 +1452,39 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         "Standalone_command_dialog_pane_routes_command_selection_field_updates_and_dialog_actions",
         "Standalone_coach_sidecar_copy_button_raises_event_when_launch_uri_is_available",
         "Loaded_runner_main_window_routes_navigation_palette_dialog_and_quick_action_surfaces_end_to_end",
-    }
-    missing_required_tests = sorted(expected_required_tests.difference(required_tests))
+    )
+    missing_required_tests = sorted(
+        test_name for test_name in expected_required_tests if test_name not in required_tests
+    )
     if missing_required_tests:
         raise SystemExit(
             "parity audit failed: visual receipt is missing required milestone-2 visual tests: "
             + ", ".join(missing_required_tests)
             + f" ({path})"
         )
-    unexpected_required_tests = sorted(set(required_tests).difference(expected_required_tests))
+    unexpected_required_tests = sorted(
+        test_name for test_name in required_tests if test_name not in expected_required_tests
+    )
     if unexpected_required_tests:
         raise SystemExit(
             "parity audit failed: visual receipt declares unexpected milestone-2 visual tests: "
             + ", ".join(unexpected_required_tests)
             + f" ({path})"
         )
-    required_interaction_keys = set(
-        require_canonical_unique_string_list(
-            require_string_list(
-                evidence.get("required_legacy_interaction_keys"),
-                message=f"parity audit failed: visual receipt required_legacy_interaction_keys must be a string array: {path}",
-            ),
-            field_name="visual receipt required_legacy_interaction_keys",
-            path=path,
+    if tuple(required_tests) != expected_required_tests:
+        raise SystemExit(
+            "parity audit failed: visual receipt required_tests must preserve canonical milestone-2 visual test ordering: "
+            f"{path} (actual={required_tests}, expected={list(expected_required_tests)})"
         )
+    required_interaction_keys = require_canonical_unique_string_list(
+        require_string_list(
+            evidence.get("required_legacy_interaction_keys"),
+            message=f"parity audit failed: visual receipt required_legacy_interaction_keys must be a string array: {path}",
+        ),
+        field_name="visual receipt required_legacy_interaction_keys",
+        path=path,
     )
-    required_surfaces = {
+    required_surfaces = (
         "runtimeBackedLegacyWorkbench",
         "legacyDenseBuilderRhythm",
         "legacyCreationWorkflowRhythm",
@@ -1491,20 +1498,29 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         "legacyVehiclesBuilderRhythm",
         "legacyContactsWorkflowRhythm",
         "legacyDiaryWorkflowRhythm",
-    }
-    missing_surface_keys = sorted(required_surfaces.difference(required_interaction_keys))
+    )
+    missing_surface_keys = sorted(
+        surface_key for surface_key in required_surfaces if surface_key not in required_interaction_keys
+    )
     if missing_surface_keys:
         raise SystemExit(
             "parity audit failed: visual receipt is missing required milestone-2 interaction keys: "
             + ", ".join(missing_surface_keys)
             + f" ({path})"
         )
-    unexpected_surface_keys = sorted(required_interaction_keys.difference(required_surfaces))
+    unexpected_surface_keys = sorted(
+        surface_key for surface_key in required_interaction_keys if surface_key not in required_surfaces
+    )
     if unexpected_surface_keys:
         raise SystemExit(
             "parity audit failed: visual receipt declares unexpected milestone-2 interaction keys: "
             + ", ".join(unexpected_surface_keys)
             + f" ({path})"
+        )
+    if tuple(required_interaction_keys) != required_surfaces:
+        raise SystemExit(
+            "parity audit failed: visual receipt required_legacy_interaction_keys must preserve canonical milestone-2 interaction key ordering: "
+            f"{path} (actual={required_interaction_keys}, expected={list(required_surfaces)})"
         )
     required_visual_status_fields = {
         "runtime_backed_legacy_workbench": "runtime-backed legacy workbench",
@@ -1689,7 +1705,7 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         field_name="visual receipt required_screenshots",
         path=path,
     )
-    expected_required_screenshots = {
+    expected_required_screenshots = (
         "01-initial-shell-light.png",
         "02-menu-open-light.png",
         "03-settings-open-light.png",
@@ -1705,20 +1721,33 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         "13-matrix-dialog-light.png",
         "14-advancement-dialog-light.png",
         "15-creation-section-light.png",
-    }
-    missing_required_screenshots = sorted(expected_required_screenshots.difference(required_screenshots))
+    )
+    missing_required_screenshots = sorted(
+        screenshot_name
+        for screenshot_name in expected_required_screenshots
+        if screenshot_name not in required_screenshots
+    )
     if missing_required_screenshots:
         raise SystemExit(
             "parity audit failed: visual receipt is missing required milestone-2 screenshots: "
             + ", ".join(missing_required_screenshots)
             + f" ({path})"
         )
-    unexpected_required_screenshots = sorted(set(required_screenshots).difference(expected_required_screenshots))
+    unexpected_required_screenshots = sorted(
+        screenshot_name
+        for screenshot_name in required_screenshots
+        if screenshot_name not in expected_required_screenshots
+    )
     if unexpected_required_screenshots:
         raise SystemExit(
             "parity audit failed: visual receipt declares unexpected milestone-2 screenshots: "
             + ", ".join(unexpected_required_screenshots)
             + f" ({path})"
+        )
+    if tuple(required_screenshots) != expected_required_screenshots:
+        raise SystemExit(
+            "parity audit failed: visual receipt required_screenshots must preserve canonical milestone-2 screenshot ordering: "
+            f"{path} (actual={required_screenshots}, expected={list(expected_required_screenshots)})"
         )
     require_empty_collection(
         evidence.get("missing_screenshots"),

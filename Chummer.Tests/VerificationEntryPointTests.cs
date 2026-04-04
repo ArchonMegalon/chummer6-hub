@@ -160,9 +160,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Loaded_runner_main_window_routes_navigation_palette_dialog_and_quick_action_surfaces_end_to_end", script, StringComparison.Ordinal);
         Assert.Contains("missing required milestone-2 visual tests", script, StringComparison.Ordinal);
         Assert.Contains("declares unexpected milestone-2 visual tests", script, StringComparison.Ordinal);
+        Assert.Contains("must preserve canonical milestone-2 visual test ordering", script, StringComparison.Ordinal);
         Assert.Contains("required_screenshots", script, StringComparison.Ordinal);
         Assert.Contains("missing required milestone-2 screenshots", script, StringComparison.Ordinal);
         Assert.Contains("declares unexpected milestone-2 screenshots", script, StringComparison.Ordinal);
+        Assert.Contains("must preserve canonical milestone-2 screenshot ordering", script, StringComparison.Ordinal);
         Assert.Contains("screenshot_dir is missing", script, StringComparison.Ordinal);
         Assert.Contains("screenshot_dir does not exist", script, StringComparison.Ordinal);
         Assert.Contains("screenshot_timestamps must be a JSON object", script, StringComparison.Ordinal);
@@ -191,6 +193,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("legacyMagicWorkflowRhythm", script, StringComparison.Ordinal);
         Assert.Contains("legacyDiaryWorkflowRhythm", script, StringComparison.Ordinal);
         Assert.Contains("declares unexpected milestone-2 interaction keys", script, StringComparison.Ordinal);
+        Assert.Contains("must preserve canonical milestone-2 interaction key ordering", script, StringComparison.Ordinal);
         Assert.Contains("legacy_familiarity_bridge", script, StringComparison.Ordinal);
         Assert.Contains("required_visual_status_fields", script, StringComparison.Ordinal);
         Assert.Contains("{label} proof is not pass-ready", script, StringComparison.Ordinal);
