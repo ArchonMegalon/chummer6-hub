@@ -259,6 +259,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         "postrun",
         "afteractionreport",
         "afteractionreports",
+        "afteractionreview",
+        "afteractionreviews",
         "aar",
         "aars",
         "retro",

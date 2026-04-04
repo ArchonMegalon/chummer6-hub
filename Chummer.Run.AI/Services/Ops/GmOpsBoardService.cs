@@ -1320,6 +1320,8 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 "debriefings",
                 "afteractionreport",
                 "afteractionreports",
+                "afteractionreview",
+                "afteractionreviews",
                 "aar",
                 "aars",
                 "retro",
@@ -1329,7 +1331,11 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 "after action report",
                 "after action reports",
                 "after-action report",
-                "after-action reports")
+                "after-action reports",
+                "after action review",
+                "after action reviews",
+                "after-action review",
+                "after-action reviews")
             || (ContainsAny(combined,
                     "packet",
                     "packets",
