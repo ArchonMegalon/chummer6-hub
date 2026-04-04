@@ -1276,6 +1276,41 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public void ListPrepAssets_QuerySupportsSessionLogPluralShorthandAcrossWhitespaceAndPunctuation()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult import = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "session_log_ops",
+                now: now,
+                title: "Session log continuity packet",
+                body: "Session log continuity remains governed for return and diary review.")
+        ]);
+
+        Assert.Equal(1, import.ImportedCount);
+        Assert.Equal(0, import.SkippedCount);
+        Assert.Empty(import.Conflicts);
+
+        GmPrepAssetListResponse compactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sessionlog");
+        GmPrepAssetListResponse compactPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sessionlogs");
+        GmPrepAssetListResponse splitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "session log");
+        GmPrepAssetListResponse splitPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "session logs");
+        GmPrepAssetListResponse hyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "session-log");
+        GmPrepAssetListResponse hyphenPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "session-logs");
+        GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixlogs");
+
+        Assert.Contains(compactMatches.Items, item => item.AssetId == "session_log_ops");
+        Assert.Contains(compactPluralMatches.Items, item => item.AssetId == "session_log_ops");
+        Assert.Contains(splitMatches.Items, item => item.AssetId == "session_log_ops");
+        Assert.Contains(splitPluralMatches.Items, item => item.AssetId == "session_log_ops");
+        Assert.Contains(hyphenMatches.Items, item => item.AssetId == "session_log_ops");
+        Assert.Contains(hyphenPluralMatches.Items, item => item.AssetId == "session_log_ops");
+        Assert.Empty(negativeMatches.Items);
+    }
+
+    [Fact]
     public void ReconcilePortableAssets_SkipsAssets_WhenIncomingPayloadContainsAmbiguousDuplicateAssetVersions()
     {
         var service = CreateService();

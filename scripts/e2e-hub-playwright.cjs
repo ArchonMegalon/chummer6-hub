@@ -2617,6 +2617,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail sessionlog search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail sessionlog search');
 
+  await page.fill('#prepQuery', 'sessionlogs');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=sessionlogs/.test(page.url()), 'Workspace detail search should preserve the compact sessionlogs continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail sessionlogs search');
+  await expectBodyText(page, 'match(es) for "sessionlogs"', '/account/work/workspaces detail sessionlogs search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail sessionlogs search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail sessionlogs search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail sessionlogs search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail sessionlogs search');
+  const workspaceSessionLogsSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceSessionLogsSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact sessionlogs continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail sessionlogs search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail sessionlogs search');
+
+  await page.fill('#prepQuery', 'session logs');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=session(?:%20|\+)logs/.test(page.url()), 'Workspace detail search should preserve the split session logs continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail session logs search');
+  await expectBodyText(page, 'match(es) for "session logs"', '/account/work/workspaces detail session logs search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail session logs search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail session logs search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail session logs search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail session logs search');
+  const workspaceSessionLogsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceSessionLogsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split session logs continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail session logs search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail session logs search');
+
   await page.fill('#prepQuery', 'diary');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
