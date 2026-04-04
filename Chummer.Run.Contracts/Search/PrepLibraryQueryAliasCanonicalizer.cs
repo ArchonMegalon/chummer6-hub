@@ -116,6 +116,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "gmoperationpackets", "gm", "operation", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "gmcontrolpacket", "gm", "control", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "gmcontrolpackets", "gm", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasteropspacket", "game", "master", "ops", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasteropspackets", "game", "master", "ops", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasteroperationpacket", "game", "master", "operation", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasteroperationpackets", "game", "master", "operation", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemastercontrolpacket", "game", "master", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemastercontrolpackets", "game", "master", "control", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "workspacev4", "workspace", "v4");
         RewriteCompactContinuityMutationAlias(tokens, "workspacev4packet", "workspace", "v4", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "workspacev4packets", "workspace", "v4", "packet");
