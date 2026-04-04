@@ -629,6 +629,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=leagueoperations", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=league-operations", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=league%20ops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=league%20op", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=league-ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=leaguecontrol", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=league%20controls", audit, StringComparison.Ordinal);
@@ -655,6 +656,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=communityoperations", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community-operations", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community%20ops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=community%20op", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community-ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=communitycontrol", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community%20controls", audit, StringComparison.Ordinal);
@@ -941,6 +943,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=leagueoperations", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=league-operations", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=league%20ops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=league%20op", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=league-ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=leaguecontrol", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=league%20controls", audit, StringComparison.Ordinal);
@@ -967,6 +970,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=communityoperations", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=community-operations", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=community%20ops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=community%20op", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=community-ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=communitycontrol", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=community%20controls", audit, StringComparison.Ordinal);
@@ -1149,6 +1153,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("hyphen league-operations prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=league(?:%20|\\+)ops", playwright, StringComparison.Ordinal);
         Assert.Contains("split league ops prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=league(?:%20|\\+)op", playwright, StringComparison.Ordinal);
+        Assert.Contains("split league op prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=league-ops", playwright, StringComparison.Ordinal);
         Assert.Contains("hyphen league-ops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=leaguecontrol", playwright, StringComparison.Ordinal);
@@ -1201,6 +1207,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("hyphen community-operations prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=community(?:%20|\\+)ops", playwright, StringComparison.Ordinal);
         Assert.Contains("split community ops prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=community(?:%20|\\+)op", playwright, StringComparison.Ordinal);
+        Assert.Contains("split community op prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=community-ops", playwright, StringComparison.Ordinal);
         Assert.Contains("hyphen community-ops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=communitycontrol", playwright, StringComparison.Ordinal);

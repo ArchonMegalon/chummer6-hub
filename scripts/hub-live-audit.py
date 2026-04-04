@@ -2415,6 +2415,20 @@ def verify_signed_in_work_audit(
     prep_library_league_ops = json.loads(body)
     if not (prep_library_league_ops.get("items") or []):
         raise AssertionError("prep-library league ops search did not expose any governed packet")
+    prep_library_league_op_split_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=league%20op"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_league_op_split_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_league_op_split_path} returned {status}, expected 200")
+
+    prep_library_league_op_split = json.loads(body)
+    if not (prep_library_league_op_split.get("items") or []):
+        raise AssertionError("prep-library league op search did not expose any governed packet")
     prep_library_league_ops_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=league-ops"
     status, body, _, _ = fetch(
         base_url,
@@ -2779,6 +2793,20 @@ def verify_signed_in_work_audit(
     prep_library_community_ops = json.loads(body)
     if not (prep_library_community_ops.get("items") or []):
         raise AssertionError("prep-library community ops search did not expose any governed packet")
+    prep_library_community_op_split_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=community%20op"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_community_op_split_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_community_op_split_path} returned {status}, expected 200")
+
+    prep_library_community_op_split = json.loads(body)
+    if not (prep_library_community_op_split.get("items") or []):
+        raise AssertionError("prep-library community op search did not expose any governed packet")
     prep_library_community_ops_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=community-ops"
     status, body, _, _ = fetch(
         base_url,
@@ -5961,6 +5989,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_league_ops_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_league_ops_search_path} should return at least one governed prep packet for the league ops query")
+    workspace_league_op_search_path = f"{workspace_path}?prepQuery=league%20op"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_league_op_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_league_op_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_league_op_search_path)
+    require_snippet(body, 'match(es) for "league op"', workspace_league_op_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_league_op_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_league_op_search_path} should return at least one governed prep packet for the league op query")
     workspace_league_ops_hyphen_search_path = f"{workspace_path}?prepQuery=league-ops"
     status, body, _, _ = fetch(
         base_url,
@@ -6336,6 +6379,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_community_ops_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_community_ops_search_path} should return at least one governed prep packet for the community ops query")
+    workspace_community_op_search_path = f"{workspace_path}?prepQuery=community%20op"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_community_op_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_community_op_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_community_op_search_path)
+    require_snippet(body, 'match(es) for "community op"', workspace_community_op_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_community_op_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_community_op_search_path} should return at least one governed prep packet for the community op query")
     workspace_community_ops_hyphen_search_path = f"{workspace_path}?prepQuery=community-ops"
     status, body, _, _ = fetch(
         base_url,
