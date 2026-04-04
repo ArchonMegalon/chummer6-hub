@@ -4591,6 +4591,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail lessonslearned compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail lessonslearned compact search');
 
+  await page.fill('#prepQuery', 'lessonlearnt');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=lessonlearnt/.test(page.url()), 'Workspace detail search should preserve the compact lessonlearnt continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail lessonlearnt compact search');
+  await expectBodyText(page, 'match(es) for "lessonlearnt"', '/account/work/workspaces detail lessonlearnt compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail lessonlearnt compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail lessonlearnt compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail lessonlearnt compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail lessonlearnt compact search');
+  const workspaceLessonLearntCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLessonLearntCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact lessonlearnt continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail lessonlearnt compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail lessonlearnt compact search');
+
+  await page.fill('#prepQuery', 'lessonslearnt');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=lessonslearnt/.test(page.url()), 'Workspace detail search should preserve the compact lessonslearnt continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail lessonslearnt compact search');
+  await expectBodyText(page, 'match(es) for "lessonslearnt"', '/account/work/workspaces detail lessonslearnt compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail lessonslearnt compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail lessonslearnt compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail lessonslearnt compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail lessonslearnt compact search');
+  const workspaceLessonsLearntCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLessonsLearntCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact lessonslearnt continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail lessonslearnt compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail lessonslearnt compact search');
+
   await page.fill('#prepQuery', 'lesson learned');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -4632,6 +4674,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail lessons learned split search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail lessons learned split search');
+
+  await page.fill('#prepQuery', 'lesson learnt');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=lesson(?:%20|\+)learnt/.test(page.url()), 'Workspace detail search should preserve the split lesson learnt continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail lesson learnt split search');
+  await expectBodyText(page, 'match(es) for "lesson learnt"', '/account/work/workspaces detail lesson learnt split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail lesson learnt split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail lesson learnt split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail lesson learnt split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail lesson learnt split search');
+  const workspaceLessonLearntSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLessonLearntSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split lesson learnt continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail lesson learnt split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail lesson learnt split search');
+
+  await page.fill('#prepQuery', 'lessons learnt');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=lessons(?:%20|\+)learnt/.test(page.url()), 'Workspace detail search should preserve the split lessons learnt continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail lessons learnt split search');
+  await expectBodyText(page, 'match(es) for "lessons learnt"', '/account/work/workspaces detail lessons learnt split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail lessons learnt split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail lessons learnt split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail lessons learnt split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail lessons learnt split search');
+  const workspaceLessonsLearntSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLessonsLearntSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split lessons learnt continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail lessons learnt split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail lessons learnt split search');
 
   await page.fill('#prepQuery', 'lesson-learned');
   await Promise.all([

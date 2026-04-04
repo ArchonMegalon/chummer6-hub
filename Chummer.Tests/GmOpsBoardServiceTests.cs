@@ -713,6 +713,38 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatLessonLearntContinuityShorthandAsPrepLibraryDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:24:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open lessons learnt prep lane remains unresolved before next return checkpoint.",
+                AtUtc: baseTime,
+                EventId: "evt-lessons-learnt"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-lessons-learnt", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatCompactDomainShorthandAsGovernedOpsDomains()
     {
         SessionLedgerService ledger = new();
@@ -1849,10 +1881,16 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse hotWashesHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "hot-washes");
         GmPrepAssetListResponse lessonLearnedCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lessonlearned");
         GmPrepAssetListResponse lessonsLearnedCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lessonslearned");
+        GmPrepAssetListResponse lessonLearntCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lessonlearnt");
+        GmPrepAssetListResponse lessonsLearntCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lessonslearnt");
         GmPrepAssetListResponse lessonLearnedSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lesson learned");
         GmPrepAssetListResponse lessonsLearnedSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lessons learned");
+        GmPrepAssetListResponse lessonLearntSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lesson learnt");
+        GmPrepAssetListResponse lessonsLearntSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lessons learnt");
         GmPrepAssetListResponse lessonLearnedHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lesson-learned");
         GmPrepAssetListResponse lessonsLearnedHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lessons-learned");
+        GmPrepAssetListResponse lessonLearntHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lesson-learnt");
+        GmPrepAssetListResponse lessonsLearntHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lessons-learnt");
         GmPrepAssetListResponse recapsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "recaps");
         GmPrepAssetListResponse returnsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "returns");
         GmPrepAssetListResponse memoriesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "memories");
@@ -1934,10 +1972,16 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(hotWashesHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(lessonLearnedCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(lessonsLearnedCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(lessonLearntCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(lessonsLearntCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(lessonLearnedSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(lessonsLearnedSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(lessonLearntSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(lessonsLearntSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(lessonLearnedHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(lessonsLearnedHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(lessonLearntHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(lessonsLearntHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(recapsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(returnsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(memoriesMatches.Items, item => item.AssetId == "continuity_plural_ops");

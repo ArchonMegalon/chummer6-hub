@@ -272,7 +272,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         "hotwash",
         "hotwashes",
         "lessonlearned",
-        "lessonslearned"
+        "lessonslearned",
+        "lessonlearnt",
+        "lessonslearnt"
     ];
 
     private static readonly string[] RosterIdentityWordTokens =
@@ -3791,9 +3793,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return ContainsAnyWordToken(value, ["lessonlearned", "lessonslearned"])
+        return ContainsAnyWordToken(value, ["lessonlearned", "lessonslearned", "lessonlearnt", "lessonslearnt"])
             || (ContainsAnyWordToken(value, ["lesson", "lessons"])
-                && ContainsAnyWordToken(value, ["learned"]));
+                && ContainsAnyWordToken(value, ["learned", "learnt"]));
     }
 
     private static bool ContainsSessionLogTokenPair(string? value)
