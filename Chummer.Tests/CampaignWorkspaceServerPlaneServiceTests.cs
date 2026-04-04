@@ -783,6 +783,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDeduplicatesSemanticallyIdenticalRelationshipConsequenceVersions_WhenProjectionIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithCampaignReturnRelationshipConsequenceVariantsOnly();
+        IReadOnlyList<CampaignConsequenceProjection> consequences =
+            Assert.IsAssignableFrom<IReadOnlyList<CampaignConsequenceProjection>>(seed.Consequences);
+        CampaignConsequenceProjection first = consequences[0];
+        CampaignConsequenceProjection duplicateWithDifferentId = first with
+        {
+            ConsequenceId = "consequence-1-semantic-dup"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            Consequences = [first, duplicateWithDifferentId]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void CampaignReturnPacketDeduplicatesIdenticalAftermathPackageVersions_WhenPayloadRepeatsSameRow()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithAftermathSignalsOnly();
@@ -1437,6 +1461,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("2 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("heat pressure", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("faction pressure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketDeduplicatesSemanticallyIdenticalConsequenceVersions_WhenProjectionIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithEventControlRelationshipConsequenceVariantsOnly();
+        IReadOnlyList<CampaignConsequenceProjection> consequences =
+            Assert.IsAssignableFrom<IReadOnlyList<CampaignConsequenceProjection>>(seed.Consequences);
+        CampaignConsequenceProjection first = consequences[0];
+        CampaignConsequenceProjection duplicateWithDifferentId = first with
+        {
+            ConsequenceId = "consequence-1-semantic-dup"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            Consequences = [first, duplicateWithDifferentId]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -2842,6 +2890,33 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(packet.Reusable);
         Assert.Contains("3 roster movement signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("roster-change packets", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RosterMovementPacketDeduplicatesSemanticallyIdenticalRunPressureObjectiveVersions_WhenProjectionIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterSignalsOnly();
+        RunProjection run = Assert.Single(seed.Runs);
+        ObjectiveProjection objective = Assert.Single(run.Objectives);
+        ObjectiveProjection duplicateWithDifferentId = objective with
+        {
+            ObjectiveId = "objective-semantic-dup"
+        };
+        RunProjection updatedRun = run with
+        {
+            Objectives = [objective, duplicateWithDifferentId]
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            Runs = [updatedRun]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, updatedRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("3 roster movement signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
