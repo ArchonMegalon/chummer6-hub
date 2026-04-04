@@ -1021,6 +1021,69 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail roster compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail roster compact search');
 
+  await page.fill('#prepQuery', 'rostertransfer');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=rostertransfer/.test(page.url()), 'Workspace detail search should preserve the compact rostertransfer prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail roster-transfer compact search');
+  await expectBodyText(page, 'match(es) for "rostertransfer"', '/account/work/workspaces detail roster-transfer compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail roster-transfer compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail roster-transfer compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail roster-transfer compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail roster-transfer compact search');
+  const workspaceRosterTransferCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceRosterTransferCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact rostertransfer query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail roster-transfer compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail roster-transfer compact search');
+
+  await page.fill('#prepQuery', 'rosterhandoff');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=rosterhandoff/.test(page.url()), 'Workspace detail search should preserve the compact rosterhandoff prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail roster-handoff compact search');
+  await expectBodyText(page, 'match(es) for "rosterhandoff"', '/account/work/workspaces detail roster-handoff compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail roster-handoff compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail roster-handoff compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail roster-handoff compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail roster-handoff compact search');
+  const workspaceRosterHandoffCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceRosterHandoffCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact rosterhandoff query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail roster-handoff compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail roster-handoff compact search');
+
+  await page.fill('#prepQuery', 'crewhandoff');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=crewhandoff/.test(page.url()), 'Workspace detail search should preserve the compact crewhandoff prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail crew-handoff compact search');
+  await expectBodyText(page, 'match(es) for "crewhandoff"', '/account/work/workspaces detail crew-handoff compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail crew-handoff compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail crew-handoff compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail crew-handoff compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail crew-handoff compact search');
+  const workspaceCrewHandoffCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCrewHandoffCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact crewhandoff query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail crew-handoff compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail crew-handoff compact search');
+
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
     page.locator('a[href*="/account/work/publications/"]').first().click()
