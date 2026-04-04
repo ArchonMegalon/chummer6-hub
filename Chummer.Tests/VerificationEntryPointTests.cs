@@ -83,6 +83,13 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release-channel nested receipt generatedAt is in the future", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof is required", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.status must be pass/passed/ready", script, StringComparison.Ordinal);
+        Assert.Contains("must be an ISO timestamp", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_UI_PARITY_RELEASE_PROOF_MAX_AGE_SECONDS", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_UI_PARITY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.generatedAt is stale", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.generatedAt is in the future", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_UI_PARITY_ALLOWED_RELEASE_PROOF_BASE_URLS", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_ALLOWED_RELEASE_PROOF_BASE_URLS", script, StringComparison.Ordinal);
         Assert.Contains("must use canonical origin form with no trailing slash", script, StringComparison.Ordinal);

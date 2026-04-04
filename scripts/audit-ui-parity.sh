@@ -71,6 +71,8 @@ import urllib.parse
 UTC = dt.timezone.utc
 DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS = 24 * 60 * 60
 DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS = 5 * 60
+DEFAULT_RELEASE_PROOF_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+DEFAULT_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS = 5 * 60
 REQUIRED_RELEASE_PROOF_JOURNEYS = (
     "install_claim_restore_continue",
     "build_explain_publish",
@@ -283,6 +285,41 @@ def normalize_release_proof_base_url(raw_base_url: object, *, field_path: str, s
     return canonical_base_url
 
 
+def parse_iso_timestamp(value: object, *, field_path: str, source: pathlib.Path) -> dt.datetime:
+    raw = str(value or "").strip()
+    if not raw:
+        raise SystemExit(f"parity audit failed: {field_path} must be an ISO timestamp: {source}")
+    normalized = raw.replace("Z", "+00:00")
+    try:
+        parsed = dt.datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise SystemExit(f"parity audit failed: {field_path} must be an ISO timestamp: {source}") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def parse_non_negative_int_env(
+    raw_value: object,
+    *,
+    default_value: int,
+    field_path: str,
+) -> int:
+    if raw_value in (None, ""):
+        return default_value
+    try:
+        parsed = int(str(raw_value).strip())
+    except (TypeError, ValueError) as exc:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must be a non-negative integer"
+        ) from exc
+    if parsed < 0:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must be a non-negative integer"
+        )
+    return parsed
+
+
 def parse_allowed_release_proof_base_urls(raw_value: object) -> tuple[str, ...]:
     if raw_value in (None, ""):
         return DEFAULT_ALLOWED_RELEASE_PROOF_BASE_URLS
@@ -327,6 +364,34 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
         raise SystemExit(
             "parity audit failed: release-channel nested receipt releaseProof.status must be pass/passed/ready: "
             f"{release_channel_path} (status={proof_status or 'missing'})"
+        )
+    proof_generated_at = parse_iso_timestamp(
+        proof.get("generatedAt") or proof.get("generated_at"),
+        field_path="releaseProof.generatedAt",
+        source=release_channel_path,
+    )
+    release_proof_max_age_seconds = parse_non_negative_int_env(
+        os.environ.get("CHUMMER_UI_PARITY_RELEASE_PROOF_MAX_AGE_SECONDS")
+        or os.environ.get("CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS"),
+        default_value=DEFAULT_RELEASE_PROOF_MAX_AGE_SECONDS,
+        field_path="CHUMMER_UI_PARITY_RELEASE_PROOF_MAX_AGE_SECONDS/CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS",
+    )
+    release_proof_max_future_skew_seconds = parse_non_negative_int_env(
+        os.environ.get("CHUMMER_UI_PARITY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS")
+        or os.environ.get("CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS"),
+        default_value=DEFAULT_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS,
+        field_path="CHUMMER_UI_PARITY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS/CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
+    )
+    release_proof_age_seconds = int((dt.datetime.now(UTC) - proof_generated_at).total_seconds())
+    if release_proof_age_seconds > release_proof_max_age_seconds:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.generatedAt is stale: "
+            f"{release_channel_path} (age_seconds={release_proof_age_seconds}, max_age_seconds={release_proof_max_age_seconds})"
+        )
+    if release_proof_age_seconds < -release_proof_max_future_skew_seconds:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.generatedAt is in the future: "
+            f"{release_channel_path} (future_skew_seconds={abs(release_proof_age_seconds)}, max_future_skew_seconds={release_proof_max_future_skew_seconds})"
         )
     proof_base_url = normalize_release_proof_base_url(
         proof.get("baseUrl") or proof.get("base_url"),
