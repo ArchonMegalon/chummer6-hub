@@ -531,6 +531,24 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineResolveRosterTransferRequestIdentityNormalizesWhitespacePaddedIds()
+    {
+        string normalized = InvokeCampaignSpineResolveRosterTransferRequestIdentity("  dossier-1  ", "dossier");
+
+        Assert.Equal("dossier-1", normalized);
+    }
+
+    [Fact]
+    public void CampaignSpineResolveRosterTransferRequestIdentityThrowsForWhitespaceOnlyIds()
+    {
+        TargetInvocationException ex = Assert.Throws<TargetInvocationException>(
+            () => InvokeCampaignSpineResolveRosterTransferRequestIdentity("   ", "dossier"));
+
+        KeyNotFoundException inner = Assert.IsType<KeyNotFoundException>(ex.InnerException);
+        Assert.Contains("Unknown dossier", inner.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CampaignSpineAttachCreatorPublicationPostureUsesLatestPublication_WhenRecapArtifactIdHasWhitespacePadding()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
@@ -4642,6 +4660,15 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("AttachCreatorPublicationPosture was not found.");
 
         return Assert.IsAssignableFrom<IReadOnlyList<CampaignWorkspaceProjection>>(method.Invoke(null, [workspaces, creatorPublications]));
+    }
+
+    private static string InvokeCampaignSpineResolveRosterTransferRequestIdentity(string? identity, string fieldLabel)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("ResolveRosterTransferRequestIdentity", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("ResolveRosterTransferRequestIdentity was not found.");
+
+        return Assert.IsType<string>(method.Invoke(null, [identity, fieldLabel]));
     }
 
     private static IReadOnlyList<CreatorPublicationProjection> InvokeCampaignSpineBuildCreatorPublications(

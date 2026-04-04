@@ -531,8 +531,9 @@ public sealed class CampaignSpineService
         lock (_store.Gate)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            var dossier = _store.DossiersById.GetValueOrDefault(request.DossierId)
-                ?? throw new KeyNotFoundException($"Unknown dossier: {request.DossierId}");
+            string dossierId = ResolveRosterTransferRequestIdentity(request.DossierId, "dossier");
+            var dossier = _store.DossiersById.GetValueOrDefault(dossierId)
+                ?? throw new KeyNotFoundException($"Unknown dossier: {dossierId}");
             var sourceCampaign = _store.CampaignSpinesById.GetValueOrDefault(dossier.CampaignId ?? string.Empty)
                 ?? throw new KeyNotFoundException($"Unknown source campaign: {dossier.CampaignId}");
             var sourceGroup = _store.GroupsById.GetValueOrDefault(sourceCampaign.GroupId)
@@ -542,8 +543,9 @@ public sealed class CampaignSpineService
                 throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm on the source group to move roster state.");
             }
 
-            var targetGroup = _store.GroupsById.GetValueOrDefault(request.TargetGroupId)
-                ?? throw new KeyNotFoundException($"Unknown target group: {request.TargetGroupId}");
+            string targetGroupId = ResolveRosterTransferRequestIdentity(request.TargetGroupId, "target group");
+            var targetGroup = _store.GroupsById.GetValueOrDefault(targetGroupId)
+                ?? throw new KeyNotFoundException($"Unknown target group: {targetGroupId}");
             if (!CanManageRosterGroup(targetGroup, requester.UserId))
             {
                 throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm on the target group to move roster state.");
@@ -551,12 +553,14 @@ public sealed class CampaignSpineService
 
             string previousOwnerUserId = dossier.OwnerUserId;
             var previousOwner = _store.UsersById.GetValueOrDefault(previousOwnerUserId);
-            string currentOwnerUserId = string.IsNullOrWhiteSpace(request.TargetOwnerUserId)
+            string currentOwnerUserId = AccountService.NormalizeOptional(request.TargetOwnerUserId)
+                is not { } normalizedTargetOwnerUserId
                 ? dossier.OwnerUserId
-                : request.TargetOwnerUserId.Trim();
+                : normalizedTargetOwnerUserId;
             var currentOwner = _store.UsersById.GetValueOrDefault(currentOwnerUserId)
                 ?? throw new KeyNotFoundException($"Unknown target owner: {currentOwnerUserId}");
-            var targetCampaign = ResolveOrCreateTransferCampaignLocked(targetGroup, request.TargetCampaignId, request.TargetCampaignTitle, now);
+            string? targetCampaignId = AccountService.NormalizeOptional(request.TargetCampaignId);
+            var targetCampaign = ResolveOrCreateTransferCampaignLocked(targetGroup, targetCampaignId, request.TargetCampaignTitle, now);
             if (!string.Equals(previousOwnerUserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase)
                 && _store.DossiersById.Values.Any(item =>
                     !string.Equals(item.DossierId, dossier.DossierId, StringComparison.OrdinalIgnoreCase)
@@ -3099,6 +3103,10 @@ public sealed class CampaignSpineService
 
     private static string ResolveChangePacketIdentity(string? identity, string fallback)
         => AccountService.NormalizeOptional(identity) ?? fallback;
+
+    private static string ResolveRosterTransferRequestIdentity(string? identity, string fieldLabel)
+        => AccountService.NormalizeOptional(identity)
+            ?? throw new KeyNotFoundException($"Unknown {fieldLabel}: {identity}");
 
     private static string ResolveRecapProjectionIdentity(PublicationSafeProjection recap)
         => ResolveChangePacketIdentity(
