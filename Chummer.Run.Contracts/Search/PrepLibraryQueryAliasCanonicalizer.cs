@@ -562,6 +562,18 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("opfor");
         }
 
+        if (tokens.Contains("opforces"))
+        {
+            tokens.Remove("opforces");
+            tokens.Add("opfor");
+        }
+
+        if (tokens.Contains("opfors"))
+        {
+            tokens.Remove("opfors");
+            tokens.Add("opfor");
+        }
+
         if (tokens.Contains("sessionlogs"))
         {
             tokens.Remove("sessionlogs");
