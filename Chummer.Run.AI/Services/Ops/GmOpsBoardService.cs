@@ -1066,8 +1066,32 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         return combined.Contains("unresolved", StringComparison.OrdinalIgnoreCase)
             || combined.Contains("open", StringComparison.OrdinalIgnoreCase)
             || combined.Contains("todo", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("pending", StringComparison.OrdinalIgnoreCase)
             || combined.Contains("threat", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("heat", StringComparison.OrdinalIgnoreCase);
+            || combined.Contains("heat", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("carry-forward", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("carry forward", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("return lane", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("return_loop", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("return loop", StringComparison.OrdinalIgnoreCase)
+            || (ContainsAny(combined,
+                    "stale",
+                    "cache stale",
+                    "cache drift",
+                    "sync drift",
+                    "sync lag",
+                    "unsynced",
+                    "out of sync",
+                    "out-of-sync")
+                && ContainsAny(combined,
+                    "campaign",
+                    "session",
+                    "offline",
+                    "safehouse",
+                    "mobile",
+                    "travel",
+                    "cache",
+                    "return"));
     }
 
     private static string ResolveSeverity(string eventType, string payload)
@@ -1263,23 +1287,36 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "rostermoves",
             "rosterswap",
             "rosterswaps",
+            "rostershift",
+            "rostershifts",
             "crewmove",
             "crewmoves",
             "crewswap",
             "crewswaps",
+            "crewshift",
+            "crewshifts",
             "rostertransfer",
             "rostertransfers",
             "rosterhandoff",
             "rosterhandoffs",
+            "rosterhandover",
+            "rosterhandovers",
             "crewhandoff",
             "crewhandoffs",
+            "crewhandover",
+            "crewhandovers",
             "crewtransfer",
             "crewtransfers",
             "handoff",
+            "handover",
             "transfer",
             "assignment",
             "reassign",
             "swap",
+            "shift",
+            "shifts",
+            "shifted",
+            "shifting",
             "bench",
             "rotation"))
         {
@@ -1412,6 +1449,55 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             return "prep_library";
         }
 
+        if (ContainsAny(combined,
+                "diary",
+                "journal",
+                "downtime",
+                "aftermath",
+                "contacts",
+                "contact",
+                "connection",
+                "connections",
+                "relationship",
+                "relationships",
+                "heat",
+                "travel",
+                "safehouse",
+                "offline",
+                "off-line",
+                "mobile",
+                "cache",
+                "stale",
+                "unsynced",
+                "sync drift",
+                "sync lag",
+                "out of sync",
+                "out-of-sync",
+                "resync",
+                "re-sync",
+                "return lane",
+                "return lanes",
+                "return_loop",
+                "return loop",
+                "next session return",
+                "next-session return",
+                "carry-forward",
+                "carry forward")
+            && ContainsAny(combined,
+                "campaign",
+                "session",
+                "return",
+                "loop",
+                "lane",
+                "pending",
+                "open",
+                "unresolved",
+                "checkpoint",
+                "reopen"))
+        {
+            return "continuity_return";
+        }
+
         return "general";
     }
 
@@ -1425,6 +1511,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "event_control" => 3,
             "roster_movement" => 2,
             "prep_library" => 2,
+            "continuity_return" => 2,
             "general" => 1,
             _ => 0
         };
