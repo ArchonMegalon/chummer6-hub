@@ -107,6 +107,16 @@ def require_empty_collection(value: object, *, message: str) -> None:
     raise SystemExit(message)
 
 
+def require_int_at_least(value: object, *, minimum: int, message: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise SystemExit(message) from exc
+    if parsed < minimum:
+        raise SystemExit(f"{message} (value={parsed}, minimum={minimum})")
+    return parsed
+
+
 def require_empty_problem_map(value: object, *, message: str) -> None:
     if not isinstance(value, dict):
         raise SystemExit(message)
@@ -359,6 +369,28 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
     require_empty_collection(
         evidence.get("workflow_execution_failing_receipts"),
         message=f"parity audit failed: workflow receipt reports failing execution receipts: {path}",
+    )
+    require_empty_collection(
+        evidence.get("workflow_execution_weak_receipts"),
+        message=f"parity audit failed: workflow receipt reports weakly grounded execution receipts: {path}",
+    )
+    require_empty_collection(
+        evidence.get("workflow_family_missing_receipts"),
+        message=f"parity audit failed: workflow receipt reports missing workflow-family receipts: {path}",
+    )
+    require_empty_collection(
+        evidence.get("workflow_family_failing_receipts"),
+        message=f"parity audit failed: workflow receipt reports failing workflow-family receipts: {path}",
+    )
+    require_int_at_least(
+        evidence.get("workflow_family_receipt_count_checked"),
+        minimum=1,
+        message=f"parity audit failed: workflow receipt must check at least one workflow-family receipt: {path}",
+    )
+    require_int_at_least(
+        evidence.get("workflow_execution_receipt_count_checked"),
+        minimum=1,
+        message=f"parity audit failed: workflow receipt must check at least one workflow execution receipt: {path}",
     )
     require_empty_collection(
         evidence.get("missing_required_workflow_family_audit_tests"),
