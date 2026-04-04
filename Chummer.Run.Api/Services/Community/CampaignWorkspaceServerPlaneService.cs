@@ -3933,26 +3933,6 @@ public sealed class CampaignWorkspaceServerPlaneService
             NormalizeOptional(package.AuditSummary) ?? string.Empty,
             package.GeneratedAtUtc.ToUnixTimeMilliseconds().ToString());
 
-    private static IEnumerable<PublicationSafeProjection> DeduplicateIdenticalPublicationRecapVersions(
-        IEnumerable<PublicationSafeProjection> recaps)
-    {
-        HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
-        foreach (PublicationSafeProjection recap in recaps)
-        {
-            if (seenKeys.Add(BuildPublicationRecapDedupeKey(recap)))
-            {
-                yield return recap;
-            }
-        }
-    }
-
-    private static string BuildPublicationRecapDedupeKey(PublicationSafeProjection recap) =>
-        string.Join('|',
-            NormalizeOptional(recap.ProjectionId) ?? string.Empty,
-            NormalizeOptional(recap.Kind) ?? string.Empty,
-            NormalizeOptional(recap.Label) ?? string.Empty,
-            NormalizeOptional(recap.Summary) ?? string.Empty);
-
     private static IEnumerable<PublicationSafeProjection> DeduplicateSemanticPublicationRecapVersions(
         IEnumerable<PublicationSafeProjection> recaps)
     {
