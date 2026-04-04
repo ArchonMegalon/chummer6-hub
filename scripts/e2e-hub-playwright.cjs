@@ -4171,6 +4171,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail recaps search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail recaps search');
 
+  await page.fill('#prepQuery', 'aar');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=aar/.test(page.url()), 'Workspace detail search should preserve the compact aar continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail aar compact search');
+  await expectBodyText(page, 'match(es) for "aar"', '/account/work/workspaces detail aar compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail aar compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail aar compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail aar compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail aar compact search');
+  const workspaceAarCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAarCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact aar continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail aar compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail aar compact search');
+
+  await page.fill('#prepQuery', 'aars');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=aars/.test(page.url()), 'Workspace detail search should preserve the compact aars continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail aars compact search');
+  await expectBodyText(page, 'match(es) for "aars"', '/account/work/workspaces detail aars compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail aars compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail aars compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail aars compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail aars compact search');
+  const workspaceAarsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAarsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact aars continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail aars compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail aars compact search');
+
   await page.fill('#prepQuery', 'afteraction');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),

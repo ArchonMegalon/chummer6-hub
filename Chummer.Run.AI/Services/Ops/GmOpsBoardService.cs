@@ -1320,6 +1320,8 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 "debriefings",
                 "afteractionreport",
                 "afteractionreports",
+                "aar",
+                "aars",
                 "after action report",
                 "after action reports",
                 "after-action report",

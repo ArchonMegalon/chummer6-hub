@@ -258,7 +258,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         "postsession",
         "postrun",
         "afteractionreport",
-        "afteractionreports"
+        "afteractionreports",
+        "aar",
+        "aars"
     ];
 
     private static readonly string[] RosterIdentityWordTokens =

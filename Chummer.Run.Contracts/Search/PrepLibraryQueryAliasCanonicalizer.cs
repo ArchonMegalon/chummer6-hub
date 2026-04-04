@@ -925,6 +925,18 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("recap");
         }
 
+        if (tokens.Contains("aar"))
+        {
+            tokens.Remove("aar");
+            tokens.Add("recap");
+        }
+
+        if (tokens.Contains("aars"))
+        {
+            tokens.Remove("aars");
+            tokens.Add("recap");
+        }
+
         if (tokens.Contains("returns"))
         {
             tokens.Remove("returns");
