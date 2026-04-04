@@ -809,6 +809,16 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("loop");
         }
 
+        if (tokens.Contains("nextsessionreturnlane") || tokens.Contains("nextsessionreturnlanes"))
+        {
+            tokens.Remove("nextsessionreturnlane");
+            tokens.Remove("nextsessionreturnlanes");
+            tokens.Add("next");
+            tokens.Add("session");
+            tokens.Add("return");
+            tokens.Add("loop");
+        }
+
         if (tokens.Contains("nextsessionloop") || tokens.Contains("nextsessionloops"))
         {
             tokens.Remove("nextsessionloop");
@@ -836,6 +846,15 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("loop");
         }
 
+        if (tokens.Contains("sessionreturnlane") || tokens.Contains("sessionreturnlanes"))
+        {
+            tokens.Remove("sessionreturnlane");
+            tokens.Remove("sessionreturnlanes");
+            tokens.Add("session");
+            tokens.Add("return");
+            tokens.Add("loop");
+        }
+
         if (tokens.Contains("nextsession") || tokens.Contains("nextsessions"))
         {
             tokens.Remove("nextsession");
@@ -854,10 +873,41 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("session");
         }
 
+        if (tokens.Contains("returnlane") || tokens.Contains("returnlanes"))
+        {
+            tokens.Remove("returnlane");
+            tokens.Remove("returnlanes");
+            tokens.Add("return");
+            tokens.Add("loop");
+            tokens.Add("session");
+        }
+
+        if ((tokens.Contains("return") || tokens.Contains("session")) && tokens.Contains("lane"))
+        {
+            tokens.Remove("lane");
+            tokens.Add("loop");
+        }
+
+        if ((tokens.Contains("return") || tokens.Contains("session")) && tokens.Contains("lanes"))
+        {
+            tokens.Remove("lanes");
+            tokens.Add("loop");
+        }
+
         if ((tokens.Contains("return") || tokens.Contains("session")) && tokens.Contains("loops"))
         {
             tokens.Remove("loops");
             tokens.Add("loop");
+        }
+
+        if (tokens.Contains("sessions")
+            && (tokens.Contains("next")
+                || tokens.Contains("return")
+                || tokens.Contains("loop")
+                || tokens.Contains("loops")))
+        {
+            tokens.Remove("sessions");
+            tokens.Add("session");
         }
 
         if ((tokens.Contains("op") && tokens.Contains("for"))

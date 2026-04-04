@@ -378,6 +378,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturnloop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturnlanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionloop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionloops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("next-session")));
@@ -388,19 +390,38 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionreturns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionreturnloop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionreturnlanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("session-return")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("session return")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("session return loops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("session-return-loops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("session return lane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("session return lanes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("session-return-lane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("session-return-lanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("returnloop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("returnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("returnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("returnlanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("return-loop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("return loop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("return loops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("return-loops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("return lane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("return lanes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("return-lane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("return-lanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("next session return loops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("next-session-return-loops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("next session return lanes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("next-session-return-lanes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("next sessions return loops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("next-sessions-return-loops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("next sessions return lanes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("next-sessions-return-lanes")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixloop")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixlane")));
     }
 
     [Fact]
