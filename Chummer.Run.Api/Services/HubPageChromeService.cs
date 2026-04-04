@@ -27,27 +27,33 @@ public sealed class HubPageChromeService
         var surface = _landing.LoadSurface();
         var nav = _navigation.LoadNavigation();
         var publicPrimaryCta = BuildPublicPrimaryCta();
+        var normalizedCurrentPath = NormalizeRoute(currentPath);
+        var heroPrimaryAction = surface.HeroCtas
+            .FirstOrDefault(action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase));
         var signInAction = surface.GuestShellActions
             .FirstOrDefault(action => string.Equals(NormalizeRoute(action.Href), "/login", StringComparison.OrdinalIgnoreCase))
             ?? new PublicLandingActionDto("Sign in", "/login?next=/home", "secondary");
         var createAccountAction = surface.GuestShellActions
             .FirstOrDefault(action => string.Equals(NormalizeRoute(action.Href), "/signup", StringComparison.OrdinalIgnoreCase))
             ?? new PublicLandingActionDto("Create account", "/signup?next=/home", "primary");
-        var primaryHeaderAction = publicPrimaryCta is null
+        var contextualSignInHref = BuildContextualSignInHref(normalizedCurrentPath, signInAction.Href);
+        var primaryHeaderAction = string.Equals(NormalizeRoute(currentPath), "/", StringComparison.OrdinalIgnoreCase) && heroPrimaryAction is not null
+            ? heroPrimaryAction
+            : publicPrimaryCta is null
             ? createAccountAction
             : new PublicLandingActionDto(publicPrimaryCta.Label, publicPrimaryCta.Href, publicPrimaryCta.Tone);
         var actions = new[]
         {
             new SiteChromeActionViewModel(
                 signInAction.Label,
-                signInAction.Href,
+                contextualSignInHref,
                 "link",
-                Current: string.Equals(NormalizeRoute(currentPath), NormalizeRoute(signInAction.Href), StringComparison.OrdinalIgnoreCase)),
+                Current: string.Equals(normalizedCurrentPath, NormalizeRoute(contextualSignInHref), StringComparison.OrdinalIgnoreCase)),
             new SiteChromeActionViewModel(
                 primaryHeaderAction.Label,
                 primaryHeaderAction.Href,
                 primaryHeaderAction.Emphasis,
-                Current: string.Equals(NormalizeRoute(currentPath), NormalizeRoute(primaryHeaderAction.Href), StringComparison.OrdinalIgnoreCase))
+                Current: string.Equals(normalizedCurrentPath, NormalizeRoute(primaryHeaderAction.Href), StringComparison.OrdinalIgnoreCase))
         };
 
         return new SiteChromeViewModel(
@@ -63,6 +69,23 @@ public sealed class HubPageChromeService
             SignedInLabel: null,
             FooterCanonicalSource: surface.FooterCanonicalSource,
             FooterGeneratedNote: surface.FooterGeneratedNote);
+    }
+
+    private static string BuildContextualSignInHref(string normalizedCurrentPath, string fallbackHref)
+    {
+        if (normalizedCurrentPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"/auth/google/start?next={Uri.EscapeDataString(normalizedCurrentPath)}";
+        }
+
+        if (normalizedCurrentPath.StartsWith("/login", StringComparison.OrdinalIgnoreCase)
+            || normalizedCurrentPath.StartsWith("/signup", StringComparison.OrdinalIgnoreCase)
+            || normalizedCurrentPath.StartsWith("/auth/", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrWhiteSpace(fallbackHref) ? "/login" : fallbackHref.Trim();
+        }
+
+        return $"/login?next={Uri.EscapeDataString(normalizedCurrentPath)}";
     }
 
     public SiteChromeViewModel BuildAuthenticatedChrome(string title, string description, string currentPath, string signedInLabel)
