@@ -91,6 +91,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("legacyContactsDiaryRhythm", script, StringComparison.Ordinal);
         Assert.Contains("legacyMagicWorkflowRhythm", script, StringComparison.Ordinal);
         Assert.Contains("legacyDiaryWorkflowRhythm", script, StringComparison.Ordinal);
+        Assert.Contains("legacy_familiarity_bridge", script, StringComparison.Ordinal);
+        Assert.Contains("required_visual_status_fields", script, StringComparison.Ordinal);
+        Assert.Contains("{label} proof is not pass-ready", script, StringComparison.Ordinal);
         Assert.Contains("Parity audit passed", script, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer.Web/wwwroot/index.html", script, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer/Forms/ChummerMainForm.Designer.cs", script, StringComparison.Ordinal);
