@@ -2882,6 +2882,90 @@ def verify_signed_in_work_audit(
     prep_library_recaps = json.loads(body)
     if not (prep_library_recaps.get("items") or []):
         raise AssertionError("prep-library recaps search did not expose any governed packet")
+    prep_library_afteraction_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=afteraction"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_afteraction_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_afteraction_path} returned {status}, expected 200")
+
+    prep_library_afteraction = json.loads(body)
+    if not (prep_library_afteraction.get("items") or []):
+        raise AssertionError("prep-library afteraction search did not expose any governed packet")
+    prep_library_afteractions_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=afteractions"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_afteractions_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_afteractions_path} returned {status}, expected 200")
+
+    prep_library_afteractions = json.loads(body)
+    if not (prep_library_afteractions.get("items") or []):
+        raise AssertionError("prep-library afteractions search did not expose any governed packet")
+    prep_library_after_action_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=after%20action"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_after_action_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_after_action_path} returned {status}, expected 200")
+
+    prep_library_after_action = json.loads(body)
+    if not (prep_library_after_action.get("items") or []):
+        raise AssertionError("prep-library after action search did not expose any governed packet")
+    prep_library_after_actions_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=after%20actions"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_after_actions_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_after_actions_path} returned {status}, expected 200")
+
+    prep_library_after_actions = json.loads(body)
+    if not (prep_library_after_actions.get("items") or []):
+        raise AssertionError("prep-library after actions search did not expose any governed packet")
+    prep_library_after_action_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=after-action"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_after_action_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_after_action_hyphen_path} returned {status}, expected 200")
+
+    prep_library_after_action_hyphen = json.loads(body)
+    if not (prep_library_after_action_hyphen.get("items") or []):
+        raise AssertionError("prep-library after-action search did not expose any governed packet")
+    prep_library_after_actions_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=after-actions"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_after_actions_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_after_actions_hyphen_path} returned {status}, expected 200")
+
+    prep_library_after_actions_hyphen = json.loads(body)
+    if not (prep_library_after_actions_hyphen.get("items") or []):
+        raise AssertionError("prep-library after-actions search did not expose any governed packet")
 
     prep_library_return_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=return"
     status, body, _, _ = fetch(
@@ -5840,6 +5924,96 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_recaps_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_recaps_search_path} should return at least one governed prep packet for the recaps query")
+    workspace_afteraction_search_path = f"{workspace_path}?prepQuery=afteraction"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_afteraction_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_afteraction_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_afteraction_search_path)
+    require_snippet(body, 'match(es) for "afteraction"', workspace_afteraction_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_afteraction_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_afteraction_search_path} should return at least one governed prep packet for the afteraction query")
+    workspace_afteractions_search_path = f"{workspace_path}?prepQuery=afteractions"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_afteractions_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_afteractions_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_afteractions_search_path)
+    require_snippet(body, 'match(es) for "afteractions"', workspace_afteractions_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_afteractions_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_afteractions_search_path} should return at least one governed prep packet for the afteractions query")
+    workspace_after_action_search_path = f"{workspace_path}?prepQuery=after%20action"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_after_action_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_after_action_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_after_action_search_path)
+    require_snippet(body, 'match(es) for "after action"', workspace_after_action_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_after_action_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_after_action_search_path} should return at least one governed prep packet for the after action query")
+    workspace_after_actions_search_path = f"{workspace_path}?prepQuery=after%20actions"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_after_actions_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_after_actions_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_after_actions_search_path)
+    require_snippet(body, 'match(es) for "after actions"', workspace_after_actions_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_after_actions_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_after_actions_search_path} should return at least one governed prep packet for the after actions query")
+    workspace_after_action_hyphen_search_path = f"{workspace_path}?prepQuery=after-action"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_after_action_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_after_action_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_after_action_hyphen_search_path)
+    require_snippet(body, 'match(es) for "after-action"', workspace_after_action_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_after_action_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_after_action_hyphen_search_path} should return at least one governed prep packet for the after-action query")
+    workspace_after_actions_hyphen_search_path = f"{workspace_path}?prepQuery=after-actions"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_after_actions_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_after_actions_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_after_actions_hyphen_search_path)
+    require_snippet(body, 'match(es) for "after-actions"', workspace_after_actions_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_after_actions_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_after_actions_hyphen_search_path} should return at least one governed prep packet for the after-actions query")
     workspace_return_search_path = f"{workspace_path}?prepQuery=return"
     status, body, _, _ = fetch(
         base_url,
