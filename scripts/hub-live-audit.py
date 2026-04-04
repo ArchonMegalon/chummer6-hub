@@ -1507,6 +1507,20 @@ def verify_signed_in_work_audit(
     prep_library_contact = json.loads(body)
     if not (prep_library_contact.get("items") or []):
         raise AssertionError("prep-library contact search did not expose any governed packet")
+    prep_library_connection_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=connection"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_connection_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_connection_path} returned {status}, expected 200")
+
+    prep_library_connection = json.loads(body)
+    if not (prep_library_connection.get("items") or []):
+        raise AssertionError("prep-library connection search did not expose any governed packet")
     prep_library_journal_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=journal"
     status, body, _, _ = fetch(
         base_url,
@@ -2550,6 +2564,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_contact_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_contact_search_path} should return at least one governed prep packet for the contact query")
+    workspace_connection_search_path = f"{workspace_path}?prepQuery=connection"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_connection_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_connection_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_connection_search_path)
+    require_snippet(body, 'match(es) for "connection"', workspace_connection_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_connection_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_connection_search_path} should return at least one governed prep packet for the connection query")
     workspace_journal_search_path = f"{workspace_path}?prepQuery=journal"
     status, body, _, _ = fetch(
         base_url,

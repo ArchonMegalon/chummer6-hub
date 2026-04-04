@@ -436,6 +436,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=opforce", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=contact", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=contacts", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=connection", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=journal", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=sessionlog", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=diary", audit, StringComparison.Ordinal);
@@ -475,6 +476,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=opforce", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=contact", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=contacts", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=connection", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=journal", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=sessionlog", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=diary", audit, StringComparison.Ordinal);
@@ -558,6 +560,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("contact continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=contacts", playwright, StringComparison.Ordinal);
         Assert.Contains("contacts continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=connection", playwright, StringComparison.Ordinal);
+        Assert.Contains("connection continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=journal", playwright, StringComparison.Ordinal);
         Assert.Contains("journal continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=sessionlog", playwright, StringComparison.Ordinal);
