@@ -595,6 +595,83 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["uiLocalizationReleaseGate"] = "pass"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject non-object releaseProof.uiLocalizationReleaseGate payloads." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["uiLocalizationReleaseGate"]["status"] = "failed"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject non-passing releaseProof.uiLocalizationReleaseGate.status values." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["uiLocalizationReleaseGate"].pop("generatedAt", None)
+payload["releaseProof"]["uiLocalizationReleaseGate"].pop("generated_at", None)
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject missing releaseProof.uiLocalizationReleaseGate.generatedAt timestamps." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["uiLocalizationReleaseGate"]["generatedAt"] = "2000-01-01T00:00:00Z"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject stale releaseProof.uiLocalizationReleaseGate.generatedAt timestamps." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
 payload.pop("releaseProof", None)
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY

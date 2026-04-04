@@ -425,6 +425,43 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.generatedAt is in the future: "
             f"{release_channel_path} (future_skew_seconds={abs(release_proof_age_seconds)}, max_future_skew_seconds={release_proof_max_future_skew_seconds})"
         )
+    localization_gate = proof.get("uiLocalizationReleaseGate")
+    if localization_gate is not None:
+        localization_gate_object = require_object(
+            localization_gate,
+            message=(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate must be an object: "
+                f"{release_channel_path}"
+            ),
+        )
+        localization_gate_status = normalized_token(localization_gate_object.get("status"))
+        if localization_gate_status not in {"pass", "passed", "ready"}:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.status must be pass/passed/ready: "
+                f"{release_channel_path} (status={localization_gate_status or 'missing'})"
+            )
+        localization_gate_generated_at = parse_iso_timestamp(
+            resolve_alias_value(
+                localization_gate_object,
+                primary_key="generatedAt",
+                secondary_key="generated_at",
+                field_name="releaseProof.uiLocalizationReleaseGate.generatedAt",
+                source=release_channel_path,
+            ),
+            field_path="releaseProof.uiLocalizationReleaseGate.generatedAt",
+            source=release_channel_path,
+        )
+        localization_gate_age_seconds = int((dt.datetime.now(UTC) - localization_gate_generated_at).total_seconds())
+        if localization_gate_age_seconds > release_proof_max_age_seconds:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generatedAt is stale: "
+                f"{release_channel_path} (age_seconds={localization_gate_age_seconds}, max_age_seconds={release_proof_max_age_seconds})"
+            )
+        if localization_gate_age_seconds < -release_proof_max_future_skew_seconds:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generatedAt is in the future: "
+                f"{release_channel_path} (future_skew_seconds={abs(localization_gate_age_seconds)}, max_future_skew_seconds={release_proof_max_future_skew_seconds})"
+            )
     proof_base_url = normalize_release_proof_base_url(
         resolve_alias_value(
             proof,
