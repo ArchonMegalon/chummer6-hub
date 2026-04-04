@@ -227,6 +227,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "oppositionbriefs",
             "oppositionbrf",
             "oppositionbrfs",
+            "oppositionspacket",
+            "oppositionspackets",
+            "oppositionspkt",
+            "oppositionspkts",
+            "oppositionsbrief",
+            "oppositionsbriefs",
+            "oppositionsbrf",
+            "oppositionsbrfs",
             "rostermovepacket",
             "rostermovepackets",
             "rostermovepkt",
@@ -321,6 +329,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("oppositionbriefs", tokens);
         Assert.DoesNotContain("oppositionbrf", tokens);
         Assert.DoesNotContain("oppositionbrfs", tokens);
+        Assert.DoesNotContain("oppositionspacket", tokens);
+        Assert.DoesNotContain("oppositionspackets", tokens);
+        Assert.DoesNotContain("oppositionspkt", tokens);
+        Assert.DoesNotContain("oppositionspkts", tokens);
+        Assert.DoesNotContain("oppositionsbrief", tokens);
+        Assert.DoesNotContain("oppositionsbriefs", tokens);
+        Assert.DoesNotContain("oppositionsbrf", tokens);
+        Assert.DoesNotContain("oppositionsbrfs", tokens);
         Assert.DoesNotContain("rostermovepacket", tokens);
         Assert.DoesNotContain("rostermovepackets", tokens);
         Assert.DoesNotContain("rostermovepkt", tokens);

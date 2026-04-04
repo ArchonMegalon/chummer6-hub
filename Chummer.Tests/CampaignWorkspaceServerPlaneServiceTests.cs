@@ -174,6 +174,14 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionbrfs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionpkt")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionpkts")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionspacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionspackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionsbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionsbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionsbrf")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionsbrfs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionspkt")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionspkts")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovepacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovepackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovepkt")));

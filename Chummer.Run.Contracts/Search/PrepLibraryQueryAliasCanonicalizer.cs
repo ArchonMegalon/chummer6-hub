@@ -152,6 +152,14 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "oppositionbriefs", "opposition", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "oppositionbrf", "opposition", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "oppositionbrfs", "opposition", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "oppositionspacket", "opposition", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "oppositionspackets", "opposition", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "oppositionspkt", "opposition", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "oppositionspkts", "opposition", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "oppositionsbrief", "opposition", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "oppositionsbriefs", "opposition", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "oppositionsbrf", "opposition", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "oppositionsbrfs", "opposition", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "rostermovepacket", "roster", "movement", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "rostermovepackets", "roster", "movement", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "rostermovepkt", "roster", "movement", "packet");

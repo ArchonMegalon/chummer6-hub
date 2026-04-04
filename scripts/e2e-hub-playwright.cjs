@@ -6013,6 +6013,14 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionbriefs', 'compact oppositionbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionbrf', 'compact oppositionbrf continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionbrfs', 'compact oppositionbrfs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionspacket', 'compact oppositionspacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionspackets', 'compact oppositionspackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionspkt', 'compact oppositionspkt continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionspkts', 'compact oppositionspkts continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionsbrief', 'compact oppositionsbrief continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionsbriefs', 'compact oppositionsbriefs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionsbrf', 'compact oppositionsbrf continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionsbrfs', 'compact oppositionsbrfs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovepacket', 'compact rostermovepacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovepackets', 'compact rostermovepackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovepkt', 'compact rostermovepkt continuity prep');
