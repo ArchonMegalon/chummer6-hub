@@ -3736,6 +3736,90 @@ def verify_signed_in_work_audit(
     prep_library_retrospectives = json.loads(body)
     if not (prep_library_retrospectives.get("items") or []):
         raise AssertionError("prep-library retrospectives search did not expose any governed packet")
+    prep_library_hotwash_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=hotwash"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_hotwash_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_hotwash_path} returned {status}, expected 200")
+
+    prep_library_hotwash = json.loads(body)
+    if not (prep_library_hotwash.get("items") or []):
+        raise AssertionError("prep-library hotwash search did not expose any governed packet")
+    prep_library_hotwashes_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=hotwashes"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_hotwashes_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_hotwashes_path} returned {status}, expected 200")
+
+    prep_library_hotwashes = json.loads(body)
+    if not (prep_library_hotwashes.get("items") or []):
+        raise AssertionError("prep-library hotwashes search did not expose any governed packet")
+    prep_library_hot_wash_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=hot%20wash"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_hot_wash_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_hot_wash_path} returned {status}, expected 200")
+
+    prep_library_hot_wash = json.loads(body)
+    if not (prep_library_hot_wash.get("items") or []):
+        raise AssertionError("prep-library hot wash search did not expose any governed packet")
+    prep_library_hot_washes_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=hot%20washes"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_hot_washes_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_hot_washes_path} returned {status}, expected 200")
+
+    prep_library_hot_washes = json.loads(body)
+    if not (prep_library_hot_washes.get("items") or []):
+        raise AssertionError("prep-library hot washes search did not expose any governed packet")
+    prep_library_hot_wash_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=hot-wash"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_hot_wash_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_hot_wash_hyphen_path} returned {status}, expected 200")
+
+    prep_library_hot_wash_hyphen = json.loads(body)
+    if not (prep_library_hot_wash_hyphen.get("items") or []):
+        raise AssertionError("prep-library hot-wash search did not expose any governed packet")
+    prep_library_hot_washes_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=hot-washes"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_hot_washes_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_hot_washes_hyphen_path} returned {status}, expected 200")
+
+    prep_library_hot_washes_hyphen = json.loads(body)
+    if not (prep_library_hot_washes_hyphen.get("items") or []):
+        raise AssertionError("prep-library hot-washes search did not expose any governed packet")
     prep_library_afteraction_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=afteraction"
     status, body, _, _ = fetch(
         base_url,
@@ -7887,6 +7971,96 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_retrospectives_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_retrospectives_search_path} should return at least one governed prep packet for the retrospectives query")
+    workspace_hotwash_search_path = f"{workspace_path}?prepQuery=hotwash"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_hotwash_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_hotwash_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_hotwash_search_path)
+    require_snippet(body, 'match(es) for "hotwash"', workspace_hotwash_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_hotwash_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_hotwash_search_path} should return at least one governed prep packet for the hotwash query")
+    workspace_hotwashes_search_path = f"{workspace_path}?prepQuery=hotwashes"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_hotwashes_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_hotwashes_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_hotwashes_search_path)
+    require_snippet(body, 'match(es) for "hotwashes"', workspace_hotwashes_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_hotwashes_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_hotwashes_search_path} should return at least one governed prep packet for the hotwashes query")
+    workspace_hot_wash_search_path = f"{workspace_path}?prepQuery=hot%20wash"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_hot_wash_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_hot_wash_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_hot_wash_search_path)
+    require_snippet(body, 'match(es) for "hot wash"', workspace_hot_wash_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_hot_wash_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_hot_wash_search_path} should return at least one governed prep packet for the hot wash query")
+    workspace_hot_washes_search_path = f"{workspace_path}?prepQuery=hot%20washes"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_hot_washes_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_hot_washes_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_hot_washes_search_path)
+    require_snippet(body, 'match(es) for "hot washes"', workspace_hot_washes_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_hot_washes_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_hot_washes_search_path} should return at least one governed prep packet for the hot washes query")
+    workspace_hot_wash_hyphen_search_path = f"{workspace_path}?prepQuery=hot-wash"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_hot_wash_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_hot_wash_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_hot_wash_hyphen_search_path)
+    require_snippet(body, 'match(es) for "hot-wash"', workspace_hot_wash_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_hot_wash_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_hot_wash_hyphen_search_path} should return at least one governed prep packet for the hot-wash query")
+    workspace_hot_washes_hyphen_search_path = f"{workspace_path}?prepQuery=hot-washes"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_hot_washes_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_hot_washes_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_hot_washes_hyphen_search_path)
+    require_snippet(body, 'match(es) for "hot-washes"', workspace_hot_washes_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_hot_washes_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_hot_washes_hyphen_search_path} should return at least one governed prep packet for the hot-washes query")
     workspace_afteraction_search_path = f"{workspace_path}?prepQuery=afteraction"
     status, body, _, _ = fetch(
         base_url,

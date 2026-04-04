@@ -674,6 +674,38 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatHotWashContinuityShorthandAsPrepLibraryDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:23:30Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open hot-wash prep lane remains unresolved before next return checkpoint.",
+                AtUtc: baseTime,
+                EventId: "evt-hot-wash"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-hot-wash", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatCompactDomainShorthandAsGovernedOpsDomains()
     {
         SessionLedgerService ledger = new();
@@ -1802,6 +1834,12 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse retrosMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "retros");
         GmPrepAssetListResponse retrospectiveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "retrospective");
         GmPrepAssetListResponse retrospectivesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "retrospectives");
+        GmPrepAssetListResponse hotWashCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "hotwash");
+        GmPrepAssetListResponse hotWashesCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "hotwashes");
+        GmPrepAssetListResponse hotWashSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "hot wash");
+        GmPrepAssetListResponse hotWashesSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "hot washes");
+        GmPrepAssetListResponse hotWashHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "hot-wash");
+        GmPrepAssetListResponse hotWashesHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "hot-washes");
         GmPrepAssetListResponse recapsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "recaps");
         GmPrepAssetListResponse returnsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "returns");
         GmPrepAssetListResponse memoriesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "memories");
@@ -1875,6 +1913,12 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(retrosMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(retrospectiveMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(retrospectivesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(hotWashCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(hotWashesCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(hotWashSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(hotWashesSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(hotWashHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(hotWashesHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(recapsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(returnsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(memoriesMatches.Items, item => item.AssetId == "continuity_plural_ops");

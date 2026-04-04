@@ -482,6 +482,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("retros")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("retrospective")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("retrospectives")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("hotwash")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("hotwashes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("hot wash")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("hot washes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("hot-wash")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("hot-washes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("recaps")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("returns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("memories")));
@@ -513,6 +519,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaar")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixretro")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixretrospective")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixhotwash")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostmortem")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostsession")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostrun")));

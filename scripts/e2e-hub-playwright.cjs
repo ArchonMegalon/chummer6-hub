@@ -4423,6 +4423,132 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail retrospectives compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail retrospectives compact search');
 
+  await page.fill('#prepQuery', 'hotwash');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=hotwash/.test(page.url()), 'Workspace detail search should preserve the compact hotwash continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail hotwash compact search');
+  await expectBodyText(page, 'match(es) for "hotwash"', '/account/work/workspaces detail hotwash compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail hotwash compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail hotwash compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail hotwash compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail hotwash compact search');
+  const workspaceHotWashCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceHotWashCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact hotwash continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail hotwash compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hotwash compact search');
+
+  await page.fill('#prepQuery', 'hotwashes');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=hotwashes/.test(page.url()), 'Workspace detail search should preserve the compact hotwashes continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail hotwashes compact search');
+  await expectBodyText(page, 'match(es) for "hotwashes"', '/account/work/workspaces detail hotwashes compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail hotwashes compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail hotwashes compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail hotwashes compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail hotwashes compact search');
+  const workspaceHotWashesCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceHotWashesCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact hotwashes continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail hotwashes compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hotwashes compact search');
+
+  await page.fill('#prepQuery', 'hot wash');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=hot(?:%20|\+)wash/.test(page.url()), 'Workspace detail search should preserve the split hot wash continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail hot wash split search');
+  await expectBodyText(page, 'match(es) for "hot wash"', '/account/work/workspaces detail hot wash split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail hot wash split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail hot wash split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail hot wash split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail hot wash split search');
+  const workspaceHotWashSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceHotWashSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split hot wash continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail hot wash split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hot wash split search');
+
+  await page.fill('#prepQuery', 'hot washes');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=hot(?:%20|\+)washes/.test(page.url()), 'Workspace detail search should preserve the split hot washes continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail hot washes split search');
+  await expectBodyText(page, 'match(es) for "hot washes"', '/account/work/workspaces detail hot washes split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail hot washes split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail hot washes split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail hot washes split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail hot washes split search');
+  const workspaceHotWashesSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceHotWashesSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split hot washes continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail hot washes split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hot washes split search');
+
+  await page.fill('#prepQuery', 'hot-wash');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=hot-wash/.test(page.url()), 'Workspace detail search should preserve the hyphen hot-wash continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail hot-wash hyphen search');
+  await expectBodyText(page, 'match(es) for "hot-wash"', '/account/work/workspaces detail hot-wash hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail hot-wash hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail hot-wash hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail hot-wash hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail hot-wash hyphen search');
+  const workspaceHotWashHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceHotWashHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen hot-wash continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail hot-wash hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hot-wash hyphen search');
+
+  await page.fill('#prepQuery', 'hot-washes');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=hot-washes/.test(page.url()), 'Workspace detail search should preserve the hyphen hot-washes continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail hot-washes hyphen search');
+  await expectBodyText(page, 'match(es) for "hot-washes"', '/account/work/workspaces detail hot-washes hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail hot-washes hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail hot-washes hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail hot-washes hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail hot-washes hyphen search');
+  const workspaceHotWashesHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceHotWashesHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen hot-washes continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail hot-washes hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hot-washes hyphen search');
+
   await page.fill('#prepQuery', 'afteraction');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
