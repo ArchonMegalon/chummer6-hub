@@ -295,8 +295,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season operation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("seasonoperation")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-operation")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season operations")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("seasonoperations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season control")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-control")));
