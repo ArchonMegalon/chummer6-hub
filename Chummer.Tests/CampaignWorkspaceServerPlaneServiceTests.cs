@@ -350,6 +350,88 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineGroupSeasonBoardEntryWatchoutPrefersAttentionCueOverEarlierReviewCue()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        CampaignReadinessCue reviewCue = new(
+            CueId: "cue-review-1",
+            Severity: "review",
+            Title: "Rule environment review",
+            Summary: "Ruleset should be reviewed.");
+        CampaignReadinessCue attentionCue = new(
+            CueId: "cue-attention-1",
+            Severity: "attention",
+            Title: "Open objective pressure",
+            Summary: "Objective pressure remains high.");
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ReadinessCues = [reviewCue, attentionCue]
+        };
+
+        IReadOnlyList<CommunitySeasonBoardEntryProjection> entries = InvokeCampaignSpineBuildGroupSeasonBoardEntries([workspace]);
+
+        CommunitySeasonBoardEntryProjection entry = Assert.Single(entries);
+        Assert.Contains("Open objective pressure", entry.WatchoutSummary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule environment review", entry.WatchoutSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CampaignSpineGroupSeasonBoardEntryWatchoutPrefersWarningCueOverEarlierReviewCue()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        CampaignReadinessCue reviewCue = new(
+            CueId: "cue-review-1",
+            Severity: "review",
+            Title: "Rule environment review",
+            Summary: "Ruleset should be reviewed.");
+        CampaignReadinessCue warningCue = new(
+            CueId: "cue-warning-1",
+            Severity: "warning",
+            Title: "Continuity gap detected",
+            Summary: "At least one dossier is missing continuity.");
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ReadinessCues = [reviewCue, warningCue]
+        };
+
+        IReadOnlyList<CommunitySeasonBoardEntryProjection> entries = InvokeCampaignSpineBuildGroupSeasonBoardEntries([workspace]);
+
+        CommunitySeasonBoardEntryProjection entry = Assert.Single(entries);
+        Assert.Contains("Continuity gap detected", entry.WatchoutSummary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule environment review", entry.WatchoutSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CampaignSpineGroupOperatorWatchoutsPrioritizeAttentionBeforeReviewWhenLimited()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceProjection reviewHeavyWorkspace = seed with
+        {
+            CampaignName = "Review lane",
+            ReadinessCues =
+            [
+                new CampaignReadinessCue("cue-review-1", "review", "Rule environment review", "Ruleset should be reviewed."),
+                new CampaignReadinessCue("cue-review-2", "review", "Crew roster review", "Crew roster requires review."),
+                new CampaignReadinessCue("cue-review-3", "review", "Offline cache review", "Offline cache should be reviewed."),
+                new CampaignReadinessCue("cue-review-4", "review", "Recap shelf review", "Recap shelf should be reviewed.")
+            ]
+        };
+        CampaignWorkspaceProjection attentionWorkspace = seed with
+        {
+            CampaignName = "Attention lane",
+            ReadinessCues =
+            [
+                new CampaignReadinessCue("cue-attention-1", "attention", "Open objective pressure", "Objective pressure remains high.")
+            ]
+        };
+
+        IReadOnlyList<string> watchouts = InvokeCampaignSpineBuildGroupOperatorWatchouts([reviewHeavyWorkspace, attentionWorkspace]);
+
+        Assert.Equal(4, watchouts.Count);
+        Assert.Contains("Attention lane: Open objective pressure — Objective pressure remains high.", watchouts, StringComparer.Ordinal);
+    }
+
+    [Fact]
     public void RecapShelfDeduplicatesSemanticallyIdenticalRows_WhenProjectionIdsDiffer()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
@@ -5793,6 +5875,26 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("ResolveRosterTransferRequestIdentity was not found.");
 
         return Assert.IsType<string>(method.Invoke(null, [identity, fieldLabel]));
+    }
+
+    private static IReadOnlyList<CommunitySeasonBoardEntryProjection> InvokeCampaignSpineBuildGroupSeasonBoardEntries(
+        IReadOnlyList<CampaignWorkspaceProjection> workspaces)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("BuildGroupSeasonBoardEntries", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildGroupSeasonBoardEntries was not found.");
+
+        return Assert.IsAssignableFrom<IReadOnlyList<CommunitySeasonBoardEntryProjection>>(method.Invoke(null, [workspaces]));
+    }
+
+    private static IReadOnlyList<string> InvokeCampaignSpineBuildGroupOperatorWatchouts(
+        IReadOnlyList<CampaignWorkspaceProjection> workspaces)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("BuildGroupOperatorWatchouts", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildGroupOperatorWatchouts was not found.");
+
+        return Assert.IsAssignableFrom<IReadOnlyList<string>>(method.Invoke(null, [workspaces]));
     }
 
     private static string InvokeCampaignSpineResolveWorkspaceNextSafeAction(
