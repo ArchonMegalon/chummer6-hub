@@ -198,10 +198,18 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("event operation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-operation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("event operations")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season operation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-operation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season operations")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season control")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-control")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leagueops")));

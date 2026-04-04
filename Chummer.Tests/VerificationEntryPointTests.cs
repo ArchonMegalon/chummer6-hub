@@ -206,6 +206,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject missing required releaseProof.proofRoutes flagship routes", script, StringComparison.Ordinal);
         Assert.Contains("reject missing required releaseProof.journeysPassed baseline journey ids", script, StringComparison.Ordinal);
         Assert.Contains("reject unexpected releaseProof.journeysPassed journey ids", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-canonical lowercase releaseProof.journeysPassed journey ids", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-canonical token shape in releaseProof.journeysPassed journey ids", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -463,6 +465,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Pragma", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonop", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=season-operation", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=season-operations", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasoncontrol", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=season%20control", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasoncontrols", audit, StringComparison.Ordinal);
@@ -473,6 +477,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventop", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=event-operation", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=event-operations", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmop", audit, StringComparison.Ordinal);
@@ -536,6 +542,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=travelprefetches", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonop", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=season-operation", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=season-operations", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasoncontrol", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=season%20control", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasoncontrols", audit, StringComparison.Ordinal);
@@ -546,6 +554,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventop", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=event-operation", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=event-operations", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmop", audit, StringComparison.Ordinal);
@@ -639,6 +649,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact seasonops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=seasonop", playwright, StringComparison.Ordinal);
         Assert.Contains("compact seasonop prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=season-operation", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen season-operation prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=season-operations", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen season-operations prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=seasoncontrol", playwright, StringComparison.Ordinal);
         Assert.Contains("compact seasoncontrol prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=season(?:%20|\\+)control", playwright, StringComparison.Ordinal);
@@ -659,6 +673,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("split event ops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventop", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventop prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=event-operation", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen event-operation prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=event-operations", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen event-operations prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gmops", playwright, StringComparison.Ordinal);
         Assert.Contains("compact gmops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gm(?:%20|\\+)ops", playwright, StringComparison.Ordinal);

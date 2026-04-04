@@ -1421,6 +1421,34 @@ def verify_signed_in_work_audit(
     prep_library_seasonop = json.loads(body)
     if not (prep_library_seasonop.get("items") or []):
         raise AssertionError("prep-library seasonop search did not expose any governed packet")
+    prep_library_season_operation_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=season-operation"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_season_operation_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_season_operation_path} returned {status}, expected 200")
+
+    prep_library_season_operation = json.loads(body)
+    if not (prep_library_season_operation.get("items") or []):
+        raise AssertionError("prep-library season-operation search did not expose any governed packet")
+    prep_library_season_operations_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=season-operations"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_season_operations_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_season_operations_path} returned {status}, expected 200")
+
+    prep_library_season_operations = json.loads(body)
+    if not (prep_library_season_operations.get("items") or []):
+        raise AssertionError("prep-library season-operations search did not expose any governed packet")
     prep_library_seasoncontrol_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=seasoncontrol"
     status, body, _, _ = fetch(
         base_url,
@@ -1561,6 +1589,34 @@ def verify_signed_in_work_audit(
     prep_library_eventop = json.loads(body)
     if not (prep_library_eventop.get("items") or []):
         raise AssertionError("prep-library eventop search did not expose any governed packet")
+    prep_library_event_operation_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=event-operation"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_event_operation_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_event_operation_path} returned {status}, expected 200")
+
+    prep_library_event_operation = json.loads(body)
+    if not (prep_library_event_operation.get("items") or []):
+        raise AssertionError("prep-library event-operation search did not expose any governed packet")
+    prep_library_event_operations_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=event-operations"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_event_operations_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_event_operations_path} returned {status}, expected 200")
+
+    prep_library_event_operations = json.loads(body)
+    if not (prep_library_event_operations.get("items") or []):
+        raise AssertionError("prep-library event-operations search did not expose any governed packet")
     prep_library_gmops_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=gmops"
     status, body, _, _ = fetch(
         base_url,
@@ -2936,6 +2992,36 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_seasonop_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_seasonop_search_path} should return at least one governed prep packet for the seasonop query")
+    workspace_season_operation_search_path = f"{workspace_path}?prepQuery=season-operation"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_season_operation_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_season_operation_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_season_operation_search_path)
+    require_snippet(body, 'match(es) for "season-operation"', workspace_season_operation_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_season_operation_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_season_operation_search_path} should return at least one governed prep packet for the season-operation query")
+    workspace_season_operations_search_path = f"{workspace_path}?prepQuery=season-operations"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_season_operations_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_season_operations_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_season_operations_search_path)
+    require_snippet(body, 'match(es) for "season-operations"', workspace_season_operations_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_season_operations_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_season_operations_search_path} should return at least one governed prep packet for the season-operations query")
     workspace_seasoncontrol_search_path = f"{workspace_path}?prepQuery=seasoncontrol"
     status, body, _, _ = fetch(
         base_url,
@@ -3086,6 +3172,36 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_eventop_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_eventop_search_path} should return at least one governed prep packet for the eventop query")
+    workspace_event_operation_search_path = f"{workspace_path}?prepQuery=event-operation"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_event_operation_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_event_operation_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_event_operation_search_path)
+    require_snippet(body, 'match(es) for "event-operation"', workspace_event_operation_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_event_operation_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_event_operation_search_path} should return at least one governed prep packet for the event-operation query")
+    workspace_event_operations_search_path = f"{workspace_path}?prepQuery=event-operations"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_event_operations_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_event_operations_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_event_operations_search_path)
+    require_snippet(body, 'match(es) for "event-operations"', workspace_event_operations_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_event_operations_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_event_operations_search_path} should return at least one governed prep packet for the event-operations query")
     workspace_gmops_search_path = f"{workspace_path}?prepQuery=gmops"
     status, body, _, _ = fetch(
         base_url,
