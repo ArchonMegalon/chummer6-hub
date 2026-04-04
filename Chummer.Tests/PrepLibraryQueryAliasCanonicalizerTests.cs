@@ -199,11 +199,17 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "travelprefetches",
             "oppositionpacket",
             "oppositionpackets",
+            "oppositionbrief",
+            "oppositionbriefs",
             "rostermovepacket",
             "rostermovepackets",
             "rostermovementpacket",
+            "rostermovebrief",
+            "rostermovementbriefs",
             "eventcontrolpacket",
-            "eventcontrolpackets"
+            "eventcontrolpackets",
+            "eventcontrolbrief",
+            "eventcontrolbriefs"
         };
 
         PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
@@ -225,11 +231,17 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("travelprefetches", tokens);
         Assert.DoesNotContain("oppositionpacket", tokens);
         Assert.DoesNotContain("oppositionpackets", tokens);
+        Assert.DoesNotContain("oppositionbrief", tokens);
+        Assert.DoesNotContain("oppositionbriefs", tokens);
         Assert.DoesNotContain("rostermovepacket", tokens);
         Assert.DoesNotContain("rostermovepackets", tokens);
         Assert.DoesNotContain("rostermovementpacket", tokens);
+        Assert.DoesNotContain("rostermovebrief", tokens);
+        Assert.DoesNotContain("rostermovementbriefs", tokens);
         Assert.DoesNotContain("eventcontrolpacket", tokens);
         Assert.DoesNotContain("eventcontrolpackets", tokens);
+        Assert.DoesNotContain("eventcontrolbrief", tokens);
+        Assert.DoesNotContain("eventcontrolbriefs", tokens);
     }
 
     [Fact]
@@ -258,9 +270,15 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "gmopspacket",
             "gmoperationpackets",
             "gmcontrolpacket",
+            "gmopsbriefs",
+            "gmoperationbrief",
+            "gmcontrolbriefs",
             "gamemasteropspacket",
             "gamemasteroperationpackets",
             "gamemastercontrolpacket",
+            "gamemasteropsbriefs",
+            "gamemasteroperationbrief",
+            "gamemastercontrolbriefs",
             "rostertransfer",
             "rostertransfers",
             "rosterhandoff",
@@ -306,9 +324,15 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("gmopspacket", tokens);
         Assert.DoesNotContain("gmoperationpackets", tokens);
         Assert.DoesNotContain("gmcontrolpacket", tokens);
+        Assert.DoesNotContain("gmopsbriefs", tokens);
+        Assert.DoesNotContain("gmoperationbrief", tokens);
+        Assert.DoesNotContain("gmcontrolbriefs", tokens);
         Assert.DoesNotContain("gamemasteropspacket", tokens);
         Assert.DoesNotContain("gamemasteroperationpackets", tokens);
         Assert.DoesNotContain("gamemastercontrolpacket", tokens);
+        Assert.DoesNotContain("gamemasteropsbriefs", tokens);
+        Assert.DoesNotContain("gamemasteroperationbrief", tokens);
+        Assert.DoesNotContain("gamemastercontrolbriefs", tokens);
         Assert.DoesNotContain("rostertransfer", tokens);
         Assert.DoesNotContain("rostertransfers", tokens);
         Assert.DoesNotContain("rosterhandoff", tokens);

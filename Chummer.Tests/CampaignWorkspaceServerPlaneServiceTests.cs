@@ -162,11 +162,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplibrarypacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionpackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovepacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovepackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovementpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovebrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovementbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolpackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbriefs")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpacket")));
     }
 
@@ -226,9 +232,15 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmopspacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmoperationpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmcontrolpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmopsbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmoperationbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmcontrolbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemasteropspacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemasteroperationpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemastercontrolpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemasteropsbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemasteroperationbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemastercontrolbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("workspacev4")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignworkspacev4")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("workspacev4packet")));
