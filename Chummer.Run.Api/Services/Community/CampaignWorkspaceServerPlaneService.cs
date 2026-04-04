@@ -677,7 +677,10 @@ public sealed class CampaignWorkspaceServerPlaneService
         TravelModeReadinessSummary travelMode,
         NextSafeActionCue nextSafeAction)
     {
-        ContinuityConflictCue? blockingConflict = continuityConflicts.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
+        ContinuityConflictCue? blockingConflict = continuityConflicts
+            .Where(static cue => NeedsAttention(cue.Severity))
+            .OrderByDescending(static cue => ResolveReadinessAttentionPriority(cue.Severity))
+            .FirstOrDefault();
         if (blockingConflict is not null)
         {
             return new WorkspaceStateSummary(
@@ -703,7 +706,10 @@ public sealed class CampaignWorkspaceServerPlaneService
                     travelMode.PrefetchInventorySummary));
         }
 
-        RuleEnvironmentHealthCue? ruleAttention = ruleEnvironmentHealth.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
+        RuleEnvironmentHealthCue? ruleAttention = ruleEnvironmentHealth
+            .Where(static cue => NeedsAttention(cue.Severity))
+            .OrderByDescending(static cue => ResolveReadinessAttentionPriority(cue.Severity))
+            .FirstOrDefault();
         if (ruleAttention is not null)
         {
             return new WorkspaceStateSummary(
