@@ -147,4 +147,30 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("companions", tokens);
         Assert.DoesNotContain("loops", tokens);
     }
+
+    [Fact]
+    public void RewriteAliases_CollapsesCompactGovernedPacketFormsIntoPrepOpsTokens()
+    {
+        HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "preplibrarypacket",
+            "oppositionpackets",
+            "rostermovementpacket",
+            "eventcontrolpackets"
+        };
+
+        PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
+
+        Assert.Contains("prep", tokens);
+        Assert.Contains("library", tokens);
+        Assert.Contains("opposition", tokens);
+        Assert.Contains("roster", tokens);
+        Assert.Contains("move", tokens);
+        Assert.Contains("eventcontrol", tokens);
+        Assert.Contains("packet", tokens);
+        Assert.DoesNotContain("preplibrarypacket", tokens);
+        Assert.DoesNotContain("oppositionpackets", tokens);
+        Assert.DoesNotContain("rostermovementpacket", tokens);
+        Assert.DoesNotContain("eventcontrolpackets", tokens);
+    }
 }

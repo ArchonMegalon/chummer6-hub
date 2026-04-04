@@ -102,6 +102,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsCompactGovernedPacketForms()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "prep:compact-packets",
+            Kind: "event_control_packet",
+            Title: "Neon Cradle prep library opposition roster movement move event control operation packet",
+            Summary: "Compact governed packet forms stay on one GM prep lane.",
+            BindingSummary: "Bound to campaign return and continuity receipts.",
+            Reusable: true,
+            SearchTerms: ["prep", "library", "opposition", "roster", "movement", "move", "eventcontrol", "operation", "packet"],
+            EvidenceLines: ["Compact packet forms should collapse into governed prep and GM ops tokens."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplibrarypacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionpackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovementpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolpackets")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpacket")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsEventCtrlShorthandAcrossWhitespaceBoundaries()
     {
         var packet = new GovernedPrepPacketSummary(
