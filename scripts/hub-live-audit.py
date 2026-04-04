@@ -4619,146 +4619,71 @@ def verify_signed_in_work_audit(
     if not (prep_library_after_action_reviews_hyphen.get("items") or []):
         raise AssertionError("prep-library after-action reviews search did not expose any governed packet")
 
-    prep_library_return_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=return"
-    status, body, _, _ = fetch(
-        base_url,
-        prep_library_return_path,
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"{prep_library_return_path} returned {status}, expected 200")
+    def assert_prep_library_query_has_items(query_suffix: str, label: str) -> None:
+        prep_library_query_path = (
+            f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?{query_suffix}"
+        )
+        status, body, _, _ = fetch(
+            base_url,
+            prep_library_query_path,
+            public_host=public_host,
+            forwarded_proto=forwarded_proto,
+            request_headers={"Cookie": cookie_header},
+        )
+        if status != 200:
+            raise AssertionError(f"{prep_library_query_path} returned {status}, expected 200")
 
-    prep_library_return = json.loads(body)
-    if not (prep_library_return.get("items") or []):
-        raise AssertionError("prep-library return search did not expose any governed packet")
-    prep_library_returns_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=returns"
-    status, body, _, _ = fetch(
-        base_url,
-        prep_library_returns_path,
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"{prep_library_returns_path} returned {status}, expected 200")
+        prep_library_query = json.loads(body)
+        if not (prep_library_query.get("items") or []):
+            raise AssertionError(f"prep-library {label} search did not expose any governed packet")
 
-    prep_library_returns = json.loads(body)
-    if not (prep_library_returns.get("items") or []):
-        raise AssertionError("prep-library returns search did not expose any governed packet")
-    prep_library_return_loop_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=returnloop"
-    status, body, _, _ = fetch(
-        base_url,
-        prep_library_return_loop_path,
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"{prep_library_return_loop_path} returned {status}, expected 200")
+    for query_suffix, label in [
+        ("queryText=return", "return"),
+        ("queryText=returns", "returns"),
+        ("queryText=returnloop", "returnloop"),
+        ("queryText=returnloops", "returnloops"),
+        ("queryText=returnlane", "returnlane"),
+        ("queryText=returnlanes", "returnlanes"),
+        ("queryText=return%20loop", "return loop"),
+        ("queryText=return%20loops", "return loops"),
+        ("queryText=return-loops", "return-loops"),
+        ("queryText=return%20lane", "return lane"),
+        ("queryText=return%20lanes", "return lanes"),
+        ("queryText=return-lane", "return-lane"),
+        ("queryText=return-lanes", "return-lanes"),
+        ("queryText=nextsession", "nextsession"),
+        ("queryText=nextsessions", "nextsessions"),
+        ("queryText=nextsessionreturn", "nextsessionreturn"),
+        ("queryText=nextsessionreturns", "nextsessionreturns"),
+        ("queryText=nextsessionreturnloop", "nextsessionreturnloop"),
+        ("queryText=nextsessionreturnloops", "nextsessionreturnloops"),
+        ("queryText=nextsessionreturnlane", "nextsessionreturnlane"),
+        ("queryText=nextsessionreturnlanes", "nextsessionreturnlanes"),
+        ("queryText=nextsessionloop", "nextsessionloop"),
+        ("queryText=nextsessionloops", "nextsessionloops"),
+        ("queryText=sessionreturn", "sessionreturn"),
+        ("queryText=sessionreturns", "sessionreturns"),
+        ("queryText=sessionreturnloop", "sessionreturnloop"),
+        ("queryText=sessionreturnloops", "sessionreturnloops"),
+        ("queryText=sessionreturnlane", "sessionreturnlane"),
+        ("queryText=sessionreturnlanes", "sessionreturnlanes"),
+        ("queryText=session%20return%20loops", "session return loops"),
+        ("queryText=session-return-loops", "session-return-loops"),
+        ("queryText=session%20return%20lane", "session return lane"),
+        ("queryText=session%20return%20lanes", "session return lanes"),
+        ("queryText=session-return-lane", "session-return-lane"),
+        ("queryText=session-return-lanes", "session-return-lanes"),
+        ("queryText=next%20session%20return%20loops", "next session return loops"),
+        ("queryText=next-session-return-loops", "next-session-return-loops"),
+        ("queryText=next%20sessions%20return%20loops", "next sessions return loops"),
+        ("queryText=next-sessions-return-loops", "next-sessions-return-loops"),
+        ("queryText=next%20session%20return%20lanes", "next session return lanes"),
+        ("queryText=next-session-return-lanes", "next-session-return-lanes"),
+        ("queryText=next%20sessions%20return%20lanes", "next sessions return lanes"),
+        ("queryText=next-sessions-return-lanes", "next-sessions-return-lanes"),
+    ]:
+        assert_prep_library_query_has_items(query_suffix, label)
 
-    prep_library_return_loop = json.loads(body)
-    if not (prep_library_return_loop.get("items") or []):
-        raise AssertionError("prep-library returnloop search did not expose any governed packet")
-    prep_library_return_loops_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=returnloops"
-    status, body, _, _ = fetch(
-        base_url,
-        prep_library_return_loops_path,
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"{prep_library_return_loops_path} returned {status}, expected 200")
-
-    prep_library_return_loops = json.loads(body)
-    if not (prep_library_return_loops.get("items") or []):
-        raise AssertionError("prep-library returnloops search did not expose any governed packet")
-    prep_library_next_session_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=nextsession"
-    status, body, _, _ = fetch(
-        base_url,
-        prep_library_next_session_path,
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"{prep_library_next_session_path} returned {status}, expected 200")
-
-    prep_library_next_session = json.loads(body)
-    if not (prep_library_next_session.get("items") or []):
-        raise AssertionError("prep-library nextsession search did not expose any governed packet")
-    prep_library_next_sessions_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=nextsessions"
-    status, body, _, _ = fetch(
-        base_url,
-        prep_library_next_sessions_path,
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"{prep_library_next_sessions_path} returned {status}, expected 200")
-
-    prep_library_next_sessions = json.loads(body)
-    if not (prep_library_next_sessions.get("items") or []):
-        raise AssertionError("prep-library nextsessions search did not expose any governed packet")
-    prep_library_next_session_return_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=nextsessionreturn"
-    status, body, _, _ = fetch(
-        base_url,
-        prep_library_next_session_return_path,
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"{prep_library_next_session_return_path} returned {status}, expected 200")
-
-    prep_library_next_session_return = json.loads(body)
-    if not (prep_library_next_session_return.get("items") or []):
-        raise AssertionError("prep-library nextsessionreturn search did not expose any governed packet")
-    prep_library_next_session_returns_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=nextsessionreturns"
-    status, body, _, _ = fetch(
-        base_url,
-        prep_library_next_session_returns_path,
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"{prep_library_next_session_returns_path} returned {status}, expected 200")
-
-    prep_library_next_session_returns = json.loads(body)
-    if not (prep_library_next_session_returns.get("items") or []):
-        raise AssertionError("prep-library nextsessionreturns search did not expose any governed packet")
-    prep_library_session_return_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=sessionreturn"
-    status, body, _, _ = fetch(
-        base_url,
-        prep_library_session_return_path,
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"{prep_library_session_return_path} returned {status}, expected 200")
-
-    prep_library_session_return = json.loads(body)
-    if not (prep_library_session_return.get("items") or []):
-        raise AssertionError("prep-library sessionreturn search did not expose any governed packet")
-    prep_library_session_returns_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=sessionreturns"
-    status, body, _, _ = fetch(
-        base_url,
-        prep_library_session_returns_path,
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"{prep_library_session_returns_path} returned {status}, expected 200")
-
-    prep_library_session_returns = json.loads(body)
-    if not (prep_library_session_returns.get("items") or []):
-        raise AssertionError("prep-library sessionreturns search did not expose any governed packet")
     prep_library_memory_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=memory"
     status, body, _, _ = fetch(
         base_url,
@@ -9752,6 +9677,61 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_session_returns_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_session_returns_search_path} should return at least one governed prep packet for the sessionreturns query")
+
+    def assert_workspace_prep_query_has_items(prep_query_value: str, label: str) -> None:
+        workspace_prep_search_path = f"{workspace_path}?prepQuery={prep_query_value}"
+        status, body, _, _ = fetch(
+            base_url,
+            workspace_prep_search_path,
+            public_host=public_host,
+            forwarded_proto=forwarded_proto,
+            request_headers={"Cookie": cookie_header},
+        )
+        if status != 200:
+            raise AssertionError(f"{workspace_prep_search_path} returned {status}, expected 200")
+        require_snippet(body, "Search results:", workspace_prep_search_path)
+        require_snippet(body, f'match(es) for "{label}"', workspace_prep_search_path)
+        require_snippet(body, prep_launch["packetTitle"], workspace_prep_search_path)
+        if "No governed prep packet matched that search yet." in body:
+            raise AssertionError(
+                f"{workspace_prep_search_path} should return at least one governed prep packet for the {label} query"
+            )
+
+    for prep_query_value, label in [
+        ("nextsessionreturnloop", "nextsessionreturnloop"),
+        ("nextsessionreturnloops", "nextsessionreturnloops"),
+        ("nextsessionreturnlane", "nextsessionreturnlane"),
+        ("nextsessionreturnlanes", "nextsessionreturnlanes"),
+        ("nextsessionloop", "nextsessionloop"),
+        ("nextsessionloops", "nextsessionloops"),
+        ("sessionreturnloop", "sessionreturnloop"),
+        ("sessionreturnloops", "sessionreturnloops"),
+        ("sessionreturnlane", "sessionreturnlane"),
+        ("sessionreturnlanes", "sessionreturnlanes"),
+        ("session%20return%20loops", "session return loops"),
+        ("session-return-loops", "session-return-loops"),
+        ("session%20return%20lane", "session return lane"),
+        ("session%20return%20lanes", "session return lanes"),
+        ("session-return-lane", "session-return-lane"),
+        ("session-return-lanes", "session-return-lanes"),
+        ("return%20loop", "return loop"),
+        ("return%20loops", "return loops"),
+        ("return-loops", "return-loops"),
+        ("return%20lane", "return lane"),
+        ("return%20lanes", "return lanes"),
+        ("return-lane", "return-lane"),
+        ("return-lanes", "return-lanes"),
+        ("next%20session%20return%20loops", "next session return loops"),
+        ("next-session-return-loops", "next-session-return-loops"),
+        ("next%20sessions%20return%20loops", "next sessions return loops"),
+        ("next-sessions-return-loops", "next-sessions-return-loops"),
+        ("next%20session%20return%20lanes", "next session return lanes"),
+        ("next-session-return-lanes", "next-session-return-lanes"),
+        ("next%20sessions%20return%20lanes", "next sessions return lanes"),
+        ("next-sessions-return-lanes", "next-sessions-return-lanes"),
+    ]:
+        assert_workspace_prep_query_has_items(prep_query_value, label)
+
     workspace_memory_search_path = f"{workspace_path}?prepQuery=memory"
     status, body, _, _ = fetch(
         base_url,
