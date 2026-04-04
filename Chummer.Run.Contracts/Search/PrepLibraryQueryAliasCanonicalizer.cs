@@ -68,6 +68,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "aftermathreturns", "aftermath", "return");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnloop", "aftermath", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnloops", "aftermath", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturn", "aftermath", "return");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturns", "aftermath", "return");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnloop", "aftermath", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnloops", "aftermath", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnlane", "aftermath", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnlanes", "aftermath", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturn", "downtime", "return");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturns", "downtime", "return");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturnloop", "downtime", "return", "loop");
@@ -96,6 +102,10 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnpackets", "aftermath", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnbrief", "aftermath", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnbriefs", "aftermath", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnpacket", "aftermath", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnpackets", "aftermath", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnbrief", "aftermath", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnbriefs", "aftermath", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturnpacket", "downtime", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturnpackets", "downtime", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturnbrief", "downtime", "return", "packet");
@@ -106,6 +116,8 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "diarycontactsheatpackets", "diary", "contacts", "heat", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathdowntimepacket", "aftermath", "downtime", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathdowntimepackets", "aftermath", "downtime", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsdowntimepacket", "aftermath", "downtime", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathsdowntimepackets", "aftermath", "downtime", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "preplaunch", "prep", "launch");
         RewriteCompactContinuityMutationAlias(tokens, "preplaunches", "prep", "launch");
         RewriteCompactContinuityMutationAlias(tokens, "travelprefetch", "travel", "prefetch");
