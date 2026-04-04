@@ -2268,8 +2268,8 @@ public sealed class CampaignSpineService
                 var workspace = workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, dossier.CampaignId, StringComparison.OrdinalIgnoreCase));
                 var explainReceiptId = $"buildlab.handoff.{dossier.DossierId}";
                 var runtimeFingerprint = workspace?.RuleEnvironment.CompatibilityFingerprint ?? dossier.RuleEnvironment.CompatibilityFingerprint;
-                var outputs = BuildBuildLabOutputs(dossier, workspace, runtimeFingerprint, explainReceiptId);
                 var ruleEnvironmentDiff = BuildBuildLabRuleEnvironmentDiff(dossier.RuleEnvironment, workspace?.RuleEnvironment);
+                var outputs = BuildBuildLabOutputs(dossier, workspace, runtimeFingerprint, explainReceiptId, ruleEnvironmentDiff);
                 var variantLabel = workspace is null ? "Living dossier carry-forward" : "Ops-first dossier carry-forward";
                 var progressionLabel = workspace is null ? "Ready to seed into a campaign" : "25 / 50 / 100 Karma path stays attached to the campaign return";
                 var nextSafeAction = ResolveBuildLabNextSafeAction(workspace, outputs, restore);
@@ -2338,7 +2338,8 @@ public sealed class CampaignSpineService
         RunnerDossierProjection dossier,
         CampaignWorkspaceProjection? workspace,
         string runtimeFingerprint,
-        string explainReceiptId)
+        string explainReceiptId,
+        BuildLabRuleEnvironmentDiffProjection ruleEnvironmentDiff)
     {
         const int maxOutputs = 8;
         var governedExports = new[]
@@ -2351,6 +2352,7 @@ public sealed class CampaignSpineService
                 summary: "Save this build lane as a reusable character template without forking dossier truth.",
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
+                ruleEnvironmentDiff: ruleEnvironmentDiff,
                 nextSafeAction: "Open workflow.templates.character to save a governed character-template export."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2360,6 +2362,7 @@ public sealed class CampaignSpineService
                 summary: "Prepare a governed JSON exchange payload from this build handoff before external handoff or replay ingest.",
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
+                ruleEnvironmentDiff: ruleEnvironmentDiff,
                 nextSafeAction: "Open workflow.exchange.json before publishing JSON exchange payloads."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2369,6 +2372,7 @@ public sealed class CampaignSpineService
                 summary: "Prepare a governed Foundry-class exchange payload from this build handoff.",
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
+                ruleEnvironmentDiff: ruleEnvironmentDiff,
                 nextSafeAction: "Open workflow.exchange.foundry before publishing exchange payloads."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2378,6 +2382,7 @@ public sealed class CampaignSpineService
                 summary: "Review the same handoff in the governed sheet viewer before print/export decisions.",
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
+                ruleEnvironmentDiff: ruleEnvironmentDiff,
                 nextSafeAction: "Open workflow.viewer.sheet and confirm the current handoff posture before print/export."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2387,6 +2392,7 @@ public sealed class CampaignSpineService
                 summary: "Export a governed print-ready PDF from the same handoff without forking rule-environment or explain truth.",
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
+                ruleEnvironmentDiff: ruleEnvironmentDiff,
                 nextSafeAction: "Open workflow.export.pdf to generate the current print-ready PDF from this handoff."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2396,6 +2402,7 @@ public sealed class CampaignSpineService
                 summary: "Generate a governed replay timeline artifact from this build handoff before contested-turn review or replay publication.",
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
+                ruleEnvironmentDiff: ruleEnvironmentDiff,
                 nextSafeAction: "Open workflow.replay.timeline before publishing replay timeline artifacts."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2405,6 +2412,7 @@ public sealed class CampaignSpineService
                 summary: "Generate a governed session recap artifact from this build handoff so return, audit, and support closure keep one truth lane.",
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
+                ruleEnvironmentDiff: ruleEnvironmentDiff,
                 nextSafeAction: "Open workflow.recap.session before publishing session recap artifacts."),
             BuildBuildLabGovernedOutput(
                 dossier,
@@ -2414,6 +2422,7 @@ public sealed class CampaignSpineService
                 summary: "Package a governed run-module artifact from this build handoff so prep, exchange, and publication reuse one lineage.",
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
+                ruleEnvironmentDiff: ruleEnvironmentDiff,
                 nextSafeAction: "Open workflow.module.run before publishing run-module artifacts.")
         };
 
@@ -2452,6 +2461,7 @@ public sealed class CampaignSpineService
         string summary,
         string runtimeFingerprint,
         string explainReceiptId,
+        BuildLabRuleEnvironmentDiffProjection ruleEnvironmentDiff,
         string nextSafeAction)
         => new(
             ProjectionId: StableId("buildlab-output", $"{dossier.DossierId}:{projectionIdSuffix}"),
@@ -2464,11 +2474,11 @@ public sealed class CampaignSpineService
             PublicationState: "ready",
             TrustBand: "governed",
             Discoverable: true,
-            PublicationSummary: $"Anchored on {runtimeFingerprint} with explain receipt {explainReceiptId}.",
+            PublicationSummary: $"Ready on {runtimeFingerprint} with explain receipt {explainReceiptId}; rule diff {ruleEnvironmentDiff.BeforeFingerprint} -> {ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}).",
             CreatorPublicationId: null,
             NextSafeAction: nextSafeAction,
             ProvenanceSummary: $"Explain receipt {explainReceiptId} governs this build follow-through lane.",
-            AuditSummary: $"rule-environment:{runtimeFingerprint}");
+            AuditSummary: $"rule-environment:{ruleEnvironmentDiff.BeforeFingerprint}->{ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}); runtime:{runtimeFingerprint}; explain:{explainReceiptId}");
 
     private static BuildLabRuleEnvironmentDiffProjection BuildBuildLabRuleEnvironmentDiff(
         RuleEnvironmentRef dossierRuleEnvironment,

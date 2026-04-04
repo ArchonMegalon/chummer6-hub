@@ -931,6 +931,14 @@
                                                                         {
                                                                             <span> Output provenance: @output.ProvenanceSummary.</span>
                                                                         }
+                                                                        @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
+                                                                        {
+                                                                            <span> Output publication: @output.PublicationSummary.</span>
+                                                                        }
+                                                                        @if (!string.IsNullOrWhiteSpace(output.PublicationState) || !string.IsNullOrWhiteSpace(output.TrustBand))
+                                                                        {
+                                                                            <span> Output lane status: @HumanizeStatus(output.PublicationState, "Ready") / @HumanizeStatus(output.TrustBand, "Governed").</span>
+                                                                        }
                                                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                                                         {
                                                                             <span> Output audit: @output.AuditSummary.</span>

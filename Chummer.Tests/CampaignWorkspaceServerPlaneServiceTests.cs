@@ -7284,6 +7284,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "replay_timeline", StringComparison.Ordinal));
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "session_recap", StringComparison.Ordinal));
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "run_module", StringComparison.Ordinal));
+        Assert.All(
+            handoff.Outputs,
+            output =>
+            {
+                Assert.Equal("ready", output.PublicationState);
+                Assert.Equal("governed", output.TrustBand);
+                Assert.NotNull(output.PublicationSummary);
+                Assert.Contains("rule diff", output.PublicationSummary!, StringComparison.OrdinalIgnoreCase);
+                Assert.NotNull(output.AuditSummary);
+                Assert.Contains("rule-environment:sr6-preview->sr6-mainline", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
+            });
         Assert.Contains(handoff.TradeoffLines, line => line.Contains("Rule-environment diff", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(handoff.RuleEnvironmentDiff);
         Assert.Equal("requires_review", handoff.RuleEnvironmentDiff!.Status);
@@ -7822,6 +7833,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Summary: "Travel readiness is green.",
             PrefetchInventorySummary: "Prefetch inventory is attached.",
             CacheFreshnessSummary: "1 ready device has a fresh staged cache.",
+            OfflineActionabilitySummary: "Offline actionability remains explicit.",
             ClaimedDeviceCount: 1,
             TravelReadyDeviceCount: 1,
             FreshCacheDeviceCount: 1,
