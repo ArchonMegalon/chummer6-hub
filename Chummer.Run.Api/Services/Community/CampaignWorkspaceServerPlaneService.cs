@@ -4375,7 +4375,17 @@ public sealed class CampaignWorkspaceServerPlaneService
             }
         }
 
+        RewritePrepLibraryQueryAliases(tokens);
         return tokens.ToArray();
+    }
+
+    private static void RewritePrepLibraryQueryAliases(HashSet<string> tokens)
+    {
+        if (tokens.Contains("eventctrl"))
+        {
+            tokens.Remove("eventctrl");
+            tokens.Add("eventcontrol");
+        }
     }
 
     private static bool MatchesPrepLibraryQuery(

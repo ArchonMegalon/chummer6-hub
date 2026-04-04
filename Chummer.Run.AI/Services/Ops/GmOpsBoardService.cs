@@ -477,8 +477,22 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         return true;
     }
 
-    private static string[] TokenizeQueryText(string queryText) =>
-        queryText.Split([' ', '\t', '\r', '\n', ',', ';', ':', '/', '-', '_'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    private static string[] TokenizeQueryText(string queryText)
+    {
+        HashSet<string> tokens = queryText
+            .Split([' ', '\t', '\r', '\n', ',', ';', ':', '/', '-', '_'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(static token => !string.IsNullOrWhiteSpace(token))
+            .Select(static token => token.Trim().ToLowerInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (tokens.Contains("eventctrl"))
+        {
+            tokens.Remove("eventctrl");
+            tokens.Add("eventcontrol");
+        }
+
+        return tokens.ToArray();
+    }
 
     private static string BuildCompactSearchableText(string value)
     {
