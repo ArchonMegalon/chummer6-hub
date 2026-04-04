@@ -62,6 +62,15 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void VerifyEntrypointRunsUiParityAudit()
+    {
+        string scriptPath = RepoPaths.FromRoot("scripts", "ai", "verify.sh");
+        string script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("bash scripts/audit-ui-parity.sh", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ParityOracleTokenListsUseCanonicalStringIds()
     {
         string oraclePath = RepoPaths.FromRoot("docs", "PARITY_ORACLE.json");
