@@ -101,7 +101,11 @@ public sealed class CampaignWorkspaceServerPlaneService
         "gmops",
         "gmop",
         "seasonops",
-        "seasonop"
+        "seasonop",
+        "leagueops",
+        "leagueop",
+        "communityops",
+        "communityop"
     ];
 
     private static readonly string[] OppositionWordTokens =
@@ -4432,6 +4436,26 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("operation");
         }
 
+        if ((tokens.Contains("league") && tokens.Contains("ops")) || (tokens.Contains("league") && tokens.Contains("op")))
+        {
+            tokens.Remove("league");
+            tokens.Remove("ops");
+            tokens.Remove("op");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if ((tokens.Contains("community") && tokens.Contains("ops")) || (tokens.Contains("community") && tokens.Contains("op")))
+        {
+            tokens.Remove("community");
+            tokens.Remove("ops");
+            tokens.Remove("op");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
         if (tokens.Contains("event") && tokens.Contains("ctrl"))
         {
             tokens.Remove("ctrl");
@@ -4538,6 +4562,38 @@ public sealed class CampaignWorkspaceServerPlaneService
         if (tokens.Contains("seasoncontrols"))
         {
             tokens.Remove("seasoncontrols");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("leagueops"))
+        {
+            tokens.Remove("leagueops");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("leagueop"))
+        {
+            tokens.Remove("leagueop");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communityops"))
+        {
+            tokens.Remove("communityops");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communityop"))
+        {
+            tokens.Remove("communityop");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");

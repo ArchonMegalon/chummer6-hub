@@ -1231,6 +1231,90 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail gmop compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gmop compact search');
 
+  await page.fill('#prepQuery', 'leagueops');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=leagueops/.test(page.url()), 'Workspace detail search should preserve the compact leagueops prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail leagueops compact search');
+  await expectBodyText(page, 'match(es) for "leagueops"', '/account/work/workspaces detail leagueops compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail leagueops compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail leagueops compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail leagueops compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail leagueops compact search');
+  const workspaceLeagueOpsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueOpsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact leagueops query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail leagueops compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leagueops compact search');
+
+  await page.fill('#prepQuery', 'league ops');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league(?:%20|\+)ops/.test(page.url()), 'Workspace detail search should preserve the split league ops prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league ops split search');
+  await expectBodyText(page, 'match(es) for "league ops"', '/account/work/workspaces detail league ops split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league ops split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league ops split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league ops split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league ops split search');
+  const workspaceLeagueOpsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueOpsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split league ops query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league ops split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league ops split search');
+
+  await page.fill('#prepQuery', 'communityops');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=communityops/.test(page.url()), 'Workspace detail search should preserve the compact communityops prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail communityops compact search');
+  await expectBodyText(page, 'match(es) for "communityops"', '/account/work/workspaces detail communityops compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail communityops compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail communityops compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail communityops compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail communityops compact search');
+  const workspaceCommunityOpsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityOpsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact communityops query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail communityops compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityops compact search');
+
+  await page.fill('#prepQuery', 'community ops');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community(?:%20|\+)ops/.test(page.url()), 'Workspace detail search should preserve the split community ops prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community ops split search');
+  await expectBodyText(page, 'match(es) for "community ops"', '/account/work/workspaces detail community ops split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community ops split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community ops split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community ops split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community ops split search');
+  const workspaceCommunityOpsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityOpsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split community ops query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community ops split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community ops split search');
+
   await page.fill('#prepQuery', 'heat');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
