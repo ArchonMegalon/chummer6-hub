@@ -299,6 +299,27 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
             + ", ".join(missing_surface_keys)
             + f" ({path})"
         )
+    required_visual_status_fields = {
+        "runtime_backed_legacy_workbench": "runtime-backed legacy workbench",
+        "legacy_dense_builder_rhythm": "legacy dense builder rhythm",
+        "legacy_creation_workflow_rhythm": "legacy creation workflow rhythm",
+        "legacy_advancement_workflow_rhythm": "legacy advancement workflow rhythm",
+        "legacy_browse_detail_confirm_rhythm": "legacy browse-detail-confirm rhythm",
+        "legacy_contacts_diary_rhythm": "legacy contacts/diary rhythm",
+        "legacy_magic_workflow_rhythm": "legacy magic workflow rhythm",
+        "legacy_matrix_workflow_rhythm": "legacy matrix workflow rhythm",
+        "legacy_gear_workflow_rhythm": "legacy gear workflow rhythm",
+        "legacy_cyberware_dialog_rhythm": "legacy cyberware dialog rhythm",
+        "legacy_vehicles_builder_rhythm": "legacy vehicles builder rhythm",
+        "legacy_contacts_workflow_rhythm": "legacy contacts workflow rhythm",
+        "legacy_diary_workflow_rhythm": "legacy diary workflow rhythm",
+        "legacy_familiarity_bridge": "legacy familiarity bridge",
+    }
+    for key, label in required_visual_status_fields.items():
+        require_pass_status(
+            evidence.get(key),
+            message=f"parity audit failed: visual receipt {label} proof is not pass-ready: {path}",
+        )
     require_empty_collection(
         evidence.get("missing_required_legacy_interaction_keys"),
         message=f"parity audit failed: visual receipt reports missing required legacy interaction keys: {path}",
