@@ -239,6 +239,13 @@ def read_int_value(
     return parsed
 
 
+def resolve_nested_receipt_path(parent_path: pathlib.Path, raw_path: str) -> pathlib.Path:
+    nested = pathlib.Path(raw_path).expanduser()
+    if not nested.is_absolute():
+        nested = (parent_path.parent / nested).resolve()
+    return nested
+
+
 def validate_timestamp_freshness(path: pathlib.Path, data: dict, evidence: dict) -> None:
     generated_at = parse_generated_at(path, data)
     max_age_seconds = read_int_value(
@@ -424,16 +431,28 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         ("chummer5a_workflow_parity", "chummer5a workflow parity"),
         ("sr4_sr6_frontier", "sr4/sr6 frontier parity"),
     ):
-        require_non_empty_string(
+        nested_path_raw = require_non_empty_string(
             evidence.get(f"{prefix}_path"),
             message=(
                 f"parity audit failed: workflow receipt {label} evidence path is missing: {path}"
             ),
         )
+        nested_path = resolve_nested_receipt_path(path, nested_path_raw)
+        nested_data = read_receipt(nested_path)
+        read_status(nested_path, nested_data)
         nested_generated_at = parse_generated_at(
             path,
             {"generatedAt": evidence.get(f"{prefix}_generated_at")},
         )
+        nested_receipt_generated_at = parse_generated_at(nested_path, nested_data)
+        if nested_receipt_generated_at != nested_generated_at:
+            raise SystemExit(
+                "parity audit failed: workflow receipt "
+                f"{label} evidence generated_at drifts from nested receipt generatedAt: {path} "
+                f"(evidence_generated_at={nested_generated_at.isoformat()}, "
+                f"nested_generated_at={nested_receipt_generated_at.isoformat()}, "
+                f"nested_receipt={nested_path})"
+            )
         nested_age_seconds = require_int_at_least(
             evidence.get(f"{prefix}_age_seconds"),
             minimum=0,
@@ -450,6 +469,7 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
             )
         now = dt.datetime.now(UTC)
         computed_age_seconds = int((now - nested_generated_at).total_seconds())
+        nested_receipt_age_seconds = int((now - nested_receipt_generated_at).total_seconds())
         if computed_age_seconds > workflow_parity_proof_max_age_seconds:
             raise SystemExit(
                 "parity audit failed: workflow receipt "
@@ -463,6 +483,22 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
                 f"{label} evidence generated_at is in the future: {path} "
                 f"(future_skew_seconds={abs(computed_age_seconds)}, "
                 f"max_future_skew_seconds={DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS})"
+            )
+        if nested_receipt_age_seconds > workflow_parity_proof_max_age_seconds:
+            raise SystemExit(
+                "parity audit failed: workflow receipt "
+                f"{label} nested receipt generatedAt is stale: {path} "
+                f"(age_seconds={nested_receipt_age_seconds}, "
+                f"max_age_seconds={workflow_parity_proof_max_age_seconds}, "
+                f"nested_receipt={nested_path})"
+            )
+        if nested_receipt_age_seconds < -DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS:
+            raise SystemExit(
+                "parity audit failed: workflow receipt "
+                f"{label} nested receipt generatedAt is in the future: {path} "
+                f"(future_skew_seconds={abs(nested_receipt_age_seconds)}, "
+                f"max_future_skew_seconds={DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS}, "
+                f"nested_receipt={nested_path})"
             )
     validate_timestamp_freshness(path, data, evidence)
 

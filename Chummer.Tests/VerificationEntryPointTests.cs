@@ -90,6 +90,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("sr4_sr6_frontier_status", script, StringComparison.Ordinal);
         Assert.Contains("workflow_parity_proof_max_age_seconds", script, StringComparison.Ordinal);
         Assert.Contains("evidence path is missing", script, StringComparison.Ordinal);
+        Assert.Contains("resolve_nested_receipt_path", script, StringComparison.Ordinal);
+        Assert.Contains("nested receipt generatedAt is stale", script, StringComparison.Ordinal);
+        Assert.Contains("nested receipt generatedAt is in the future", script, StringComparison.Ordinal);
+        Assert.Contains("generated_at drifts from nested receipt generatedAt", script, StringComparison.Ordinal);
         Assert.Contains("evidence age exceeds allowed freshness window", script, StringComparison.Ordinal);
         Assert.Contains("evidence generated_at is stale", script, StringComparison.Ordinal);
         Assert.Contains("evidence generated_at is in the future", script, StringComparison.Ordinal);
@@ -395,6 +399,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Cache-Control", audit, StringComparison.Ordinal);
         Assert.Contains("Pragma", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=seasonop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=contacts", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=diary", audit, StringComparison.Ordinal);
@@ -403,6 +408,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=roster", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=seasonop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=contacts", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=diary", audit, StringComparison.Ordinal);
@@ -440,6 +446,8 @@ public sealed class VerificationEntryPointTests
         string playwright = File.ReadAllText(playwrightPath);
         Assert.Contains("?prepQuery=seasonops", playwright, StringComparison.Ordinal);
         Assert.Contains("compact seasonops prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=seasonop", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact seasonop prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=heat", playwright, StringComparison.Ordinal);
         Assert.Contains("heat continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=contacts", playwright, StringComparison.Ordinal);
