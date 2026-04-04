@@ -1097,6 +1097,41 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineNextSessionCarryForwardFallsBackToCampaignNameWhenLeadRunMissing()
+    {
+        CampaignProjection campaign = BuildCampaignProjection(BuildWorkspaceWithRosterAndAftermath());
+        SceneProjection activeScene = new(
+            SceneId: "scene-orphaned-run",
+            RunId: "run-orphaned",
+            Title: "Fallback Scene",
+            Revision: "v7",
+            Status: "active",
+            Summary: "Scene signal arrived before run hydration.",
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+        ObjectiveProjection leadObjective = new(
+            ObjectiveId: "objective-fallback",
+            Title: "Fallback Objective",
+            Status: "open",
+            Pressure: "high",
+            Summary: "Objective signal arrived before run hydration.",
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:01:00Z"));
+
+        NextSessionCarryForwardProjection? carryForward = InvokeCampaignSpineBuildNextSessionCarryForward(
+            campaign,
+            [],
+            [],
+            [],
+            [],
+            leadRun: null,
+            activeScene: activeScene,
+            leadObjective: leadObjective);
+
+        Assert.NotNull(carryForward);
+        Assert.Contains($"{campaign.Name}", carryForward!.Summary, StringComparison.Ordinal);
+        Assert.Contains(carryForward.EvidenceLines, line => line.Contains($"{campaign.Name}", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignSpineCampaignMemoryPrefersMostRecentConsequenceRosterPrepAndTravelReceipts()
     {
         CampaignWorkspaceProjection rosterWorkspace = BuildWorkspaceWithRosterAndAftermath();
@@ -5421,7 +5456,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<CampaignConsequenceProjection> consequences,
         IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
         IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
-        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages,
+        RunProjection? leadRun = null,
+        SceneProjection? activeScene = null,
+        ObjectiveProjection? leadObjective = null)
     {
         MethodInfo method = typeof(CampaignSpineService)
             .GetMethod("BuildNextSessionCarryForward", BindingFlags.NonPublic | BindingFlags.Static)
@@ -5431,9 +5469,9 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         [
             campaign,
             "Keep return loop on governed lane.",
-            null,
-            null,
-            null,
+            leadRun,
+            activeScene,
+            leadObjective,
             consequences,
             prepLaunches,
             travelPrefetchReceipts,

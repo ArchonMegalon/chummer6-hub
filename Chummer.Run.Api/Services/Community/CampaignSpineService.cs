@@ -2483,12 +2483,14 @@ public sealed class CampaignSpineService
 
         if (activeScene is not null && leadObjective is not null)
         {
-            return $"Resume {activeScene.Title} in {leadRun!.Title} and clear {leadObjective.Title} before you advance the next recap-safe handoff.";
+            string runTitle = leadRun?.Title ?? campaign.Name;
+            return $"Resume {activeScene.Title} in {runTitle} and clear {leadObjective.Title} before you advance the next recap-safe handoff.";
         }
 
         if (activeScene is not null)
         {
-            return $"Resume {activeScene.Title} in {leadRun!.Title} and confirm the next scene-safe recap before you switch devices.";
+            string runTitle = leadRun?.Title ?? campaign.Name;
+            return $"Resume {activeScene.Title} in {runTitle} and confirm the next scene-safe recap before you switch devices.";
         }
 
         if (recapShelf.Count == 0)
@@ -2682,7 +2684,7 @@ public sealed class CampaignSpineService
         }
         else if (activeScene is not null && leadObjective is not null)
         {
-            summary = $"{activeScene.Title} and {leadObjective.Title} stay pinned as the governed next-session return for {leadRun!.Title}.";
+            summary = $"{activeScene.Title} and {leadObjective.Title} stay pinned as the governed next-session return for {leadRun?.Title ?? campaign.Name}.";
         }
         else if (leadAftermathPackage is not null)
         {
@@ -2736,7 +2738,7 @@ public sealed class CampaignSpineService
             EvidenceLines: FinalizeLines(
             [
                 continuity?.Summary ?? campaign.Summary,
-                activeScene is null ? string.Empty : $"{activeScene.Title} is live on {leadRun!.Title} at {activeScene.Revision}.",
+                activeScene is null ? string.Empty : $"{activeScene.Title} is live on {leadRun?.Title ?? campaign.Name} at {activeScene.Revision}.",
                 leadObjective is null ? string.Empty : $"{leadObjective.Title} stays {leadObjective.Status} with {leadObjective.Pressure} pressure.",
                 leadAftermathPackage is null ? string.Empty : $"{leadAftermathPackage.Title}: {leadAftermathPackage.Summary}",
                 leadConsequence?.EvidenceLines.FirstOrDefault() ?? leadConsequence?.Summary ?? string.Empty,
