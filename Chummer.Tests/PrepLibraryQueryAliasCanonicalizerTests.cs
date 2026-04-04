@@ -247,7 +247,39 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "eventcontrolbrief",
             "eventcontrolbriefs",
             "eventcontrolbrf",
-            "eventcontrolbrfs"
+            "eventcontrolbrfs",
+            "eventoppacket",
+            "eventoppackets",
+            "eventoppkt",
+            "eventoppkts",
+            "eventopbrief",
+            "eventopbriefs",
+            "eventopbrf",
+            "eventopbrfs",
+            "eventopspacket",
+            "eventopspackets",
+            "eventopspkt",
+            "eventopspkts",
+            "eventopsbrief",
+            "eventopsbriefs",
+            "eventopsbrf",
+            "eventopsbrfs",
+            "eventoperationpacket",
+            "eventoperationpackets",
+            "eventoperationpkt",
+            "eventoperationpkts",
+            "eventoperationbrief",
+            "eventoperationbriefs",
+            "eventoperationbrf",
+            "eventoperationbrfs",
+            "eventoperationspacket",
+            "eventoperationspackets",
+            "eventoperationspkt",
+            "eventoperationspkts",
+            "eventoperationsbrief",
+            "eventoperationsbriefs",
+            "eventoperationsbrf",
+            "eventoperationsbrfs"
         };
 
         PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
@@ -302,6 +334,38 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("eventcontrolbriefs", tokens);
         Assert.DoesNotContain("eventcontrolbrf", tokens);
         Assert.DoesNotContain("eventcontrolbrfs", tokens);
+        Assert.DoesNotContain("eventoppacket", tokens);
+        Assert.DoesNotContain("eventoppackets", tokens);
+        Assert.DoesNotContain("eventoppkt", tokens);
+        Assert.DoesNotContain("eventoppkts", tokens);
+        Assert.DoesNotContain("eventopbrief", tokens);
+        Assert.DoesNotContain("eventopbriefs", tokens);
+        Assert.DoesNotContain("eventopbrf", tokens);
+        Assert.DoesNotContain("eventopbrfs", tokens);
+        Assert.DoesNotContain("eventopspacket", tokens);
+        Assert.DoesNotContain("eventopspackets", tokens);
+        Assert.DoesNotContain("eventopspkt", tokens);
+        Assert.DoesNotContain("eventopspkts", tokens);
+        Assert.DoesNotContain("eventopsbrief", tokens);
+        Assert.DoesNotContain("eventopsbriefs", tokens);
+        Assert.DoesNotContain("eventopsbrf", tokens);
+        Assert.DoesNotContain("eventopsbrfs", tokens);
+        Assert.DoesNotContain("eventoperationpacket", tokens);
+        Assert.DoesNotContain("eventoperationpackets", tokens);
+        Assert.DoesNotContain("eventoperationpkt", tokens);
+        Assert.DoesNotContain("eventoperationpkts", tokens);
+        Assert.DoesNotContain("eventoperationbrief", tokens);
+        Assert.DoesNotContain("eventoperationbriefs", tokens);
+        Assert.DoesNotContain("eventoperationbrf", tokens);
+        Assert.DoesNotContain("eventoperationbrfs", tokens);
+        Assert.DoesNotContain("eventoperationspacket", tokens);
+        Assert.DoesNotContain("eventoperationspackets", tokens);
+        Assert.DoesNotContain("eventoperationspkt", tokens);
+        Assert.DoesNotContain("eventoperationspkts", tokens);
+        Assert.DoesNotContain("eventoperationsbrief", tokens);
+        Assert.DoesNotContain("eventoperationsbriefs", tokens);
+        Assert.DoesNotContain("eventoperationsbrf", tokens);
+        Assert.DoesNotContain("eventoperationsbrfs", tokens);
     }
 
     [Fact]
