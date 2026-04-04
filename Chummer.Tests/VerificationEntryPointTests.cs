@@ -58,6 +58,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("required_workflow_family_ids", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_workflow_family_ids", script, StringComparison.Ordinal);
         Assert.Contains("workflow_execution_missing_receipts", script, StringComparison.Ordinal);
+        Assert.Contains("metatype-priorities-karma-entry", script, StringComparison.Ordinal);
+        Assert.Contains("recovery-reload-migration-roundtrips", script, StringComparison.Ordinal);
         Assert.Contains("required_legacy_interaction_keys", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_legacy_interaction_keys", script, StringComparison.Ordinal);
         Assert.Contains("legacyMagicWorkflowRhythm", script, StringComparison.Ordinal);
