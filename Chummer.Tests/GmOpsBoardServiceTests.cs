@@ -1103,8 +1103,10 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse communityControlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community-control");
         GmPrepAssetListResponse rosterMoveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostermove");
         GmPrepAssetListResponse rosterMovesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostermoves");
+        GmPrepAssetListResponse rosterMoveHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster-move");
         GmPrepAssetListResponse crewMoveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmove");
         GmPrepAssetListResponse crewMovesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmoves");
+        GmPrepAssetListResponse crewMoveHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew-move");
         GmPrepAssetListResponse crewTransferMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewtransfer");
         GmPrepAssetListResponse crewTransfersMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewtransfers");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixlibrary");
@@ -1166,8 +1168,10 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(communityControlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(rosterMoveMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterMovesMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterMoveHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMoveMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovesMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewMoveHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewTransferMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewTransfersMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Empty(negativeMatches.Items);
