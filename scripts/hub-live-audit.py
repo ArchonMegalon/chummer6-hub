@@ -1512,6 +1512,62 @@ def verify_signed_in_work_audit(
     prep_library_crew_handoff = json.loads(body)
     if not (prep_library_crew_handoff.get("items") or []):
         raise AssertionError("prep-library crewhandoff search did not expose any governed packet")
+    prep_library_preplaunch_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=preplaunch"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_preplaunch_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_preplaunch_path} returned {status}, expected 200")
+
+    prep_library_preplaunch = json.loads(body)
+    if not (prep_library_preplaunch.get("items") or []):
+        raise AssertionError("prep-library preplaunch search did not expose any governed packet")
+    prep_library_preplaunches_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=preplaunches"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_preplaunches_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_preplaunches_path} returned {status}, expected 200")
+
+    prep_library_preplaunches = json.loads(body)
+    if not (prep_library_preplaunches.get("items") or []):
+        raise AssertionError("prep-library preplaunches search did not expose any governed packet")
+    prep_library_travel_prefetch_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=travelprefetch"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_travel_prefetch_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_travel_prefetch_path} returned {status}, expected 200")
+
+    prep_library_travel_prefetch = json.loads(body)
+    if not (prep_library_travel_prefetch.get("items") or []):
+        raise AssertionError("prep-library travelprefetch search did not expose any governed packet")
+    prep_library_travel_prefetches_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=travelprefetches"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_travel_prefetches_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_travel_prefetches_path} returned {status}, expected 200")
+
+    prep_library_travel_prefetches = json.loads(body)
+    if not (prep_library_travel_prefetches.get("items") or []):
+        raise AssertionError("prep-library travelprefetches search did not expose any governed packet")
 
     runs = workspaces[0].get("runs") or []
     target_run = runs[0] if runs else {}
@@ -2228,6 +2284,66 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_crew_handoff_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_crew_handoff_search_path} should return at least one governed prep packet for the crewhandoff query")
+    workspace_preplaunch_search_path = f"{workspace_path}?prepQuery=preplaunch"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_preplaunch_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_preplaunch_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_preplaunch_search_path)
+    require_snippet(body, 'match(es) for "preplaunch"', workspace_preplaunch_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_preplaunch_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_preplaunch_search_path} should return at least one governed prep packet for the preplaunch query")
+    workspace_preplaunches_search_path = f"{workspace_path}?prepQuery=preplaunches"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_preplaunches_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_preplaunches_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_preplaunches_search_path)
+    require_snippet(body, 'match(es) for "preplaunches"', workspace_preplaunches_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_preplaunches_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_preplaunches_search_path} should return at least one governed prep packet for the preplaunches query")
+    workspace_travel_prefetch_search_path = f"{workspace_path}?prepQuery=travelprefetch"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_travel_prefetch_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_travel_prefetch_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_travel_prefetch_search_path)
+    require_snippet(body, 'match(es) for "travelprefetch"', workspace_travel_prefetch_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_travel_prefetch_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_travel_prefetch_search_path} should return at least one governed prep packet for the travelprefetch query")
+    workspace_travel_prefetches_search_path = f"{workspace_path}?prepQuery=travelprefetches"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_travel_prefetches_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_travel_prefetches_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_travel_prefetches_search_path)
+    require_snippet(body, 'match(es) for "travelprefetches"', workspace_travel_prefetches_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_travel_prefetches_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_travel_prefetches_search_path} should return at least one governed prep packet for the travelprefetches query")
     publication_detail_path = extract_first_match(
         body,
         r'href="([^"]*/account/work/publications/[^"]+)"',
