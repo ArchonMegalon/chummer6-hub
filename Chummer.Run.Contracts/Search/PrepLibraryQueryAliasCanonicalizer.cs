@@ -854,6 +854,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("session");
         }
 
+        if ((tokens.Contains("return") || tokens.Contains("session")) && tokens.Contains("loops"))
+        {
+            tokens.Remove("loops");
+            tokens.Add("loop");
+        }
+
         if ((tokens.Contains("op") && tokens.Contains("for"))
             || (tokens.Contains("op") && tokens.Contains("fors"))
             || (tokens.Contains("op") && tokens.Contains("force"))
