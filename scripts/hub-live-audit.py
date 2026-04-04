@@ -1441,6 +1441,76 @@ def verify_signed_in_work_audit(
     prep_library_return = json.loads(body)
     if not (prep_library_return.get("items") or []):
         raise AssertionError("prep-library return search did not expose any governed packet")
+    prep_library_memory_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=memory"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_memory_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_memory_path} returned {status}, expected 200")
+
+    prep_library_memory = json.loads(body)
+    if not (prep_library_memory.get("items") or []):
+        raise AssertionError("prep-library memory search did not expose any governed packet")
+    prep_library_archive_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=archive"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_archive_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_archive_path} returned {status}, expected 200")
+
+    prep_library_archive = json.loads(body)
+    if not (prep_library_archive.get("items") or []):
+        raise AssertionError("prep-library archive search did not expose any governed packet")
+    prep_library_history_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=history"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_history_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_history_path} returned {status}, expected 200")
+
+    prep_library_history = json.loads(body)
+    if not (prep_library_history.get("items") or []):
+        raise AssertionError("prep-library history search did not expose any governed packet")
+    prep_library_timeline_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=timeline"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_timeline_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_timeline_path} returned {status}, expected 200")
+
+    prep_library_timeline = json.loads(body)
+    if not (prep_library_timeline.get("items") or []):
+        raise AssertionError("prep-library timeline search did not expose any governed packet")
+    prep_library_ledger_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=ledger"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_ledger_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_ledger_path} returned {status}, expected 200")
+
+    prep_library_ledger = json.loads(body)
+    if not (prep_library_ledger.get("items") or []):
+        raise AssertionError("prep-library ledger search did not expose any governed packet")
 
     prep_library_roster_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=roster"
     status, body, _, _ = fetch(
@@ -2209,6 +2279,81 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_return_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_return_search_path} should return at least one governed prep packet for the return query")
+    workspace_memory_search_path = f"{workspace_path}?prepQuery=memory"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_memory_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_memory_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_memory_search_path)
+    require_snippet(body, 'match(es) for "memory"', workspace_memory_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_memory_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_memory_search_path} should return at least one governed prep packet for the memory query")
+    workspace_archive_search_path = f"{workspace_path}?prepQuery=archive"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_archive_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_archive_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_archive_search_path)
+    require_snippet(body, 'match(es) for "archive"', workspace_archive_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_archive_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_archive_search_path} should return at least one governed prep packet for the archive query")
+    workspace_history_search_path = f"{workspace_path}?prepQuery=history"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_history_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_history_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_history_search_path)
+    require_snippet(body, 'match(es) for "history"', workspace_history_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_history_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_history_search_path} should return at least one governed prep packet for the history query")
+    workspace_timeline_search_path = f"{workspace_path}?prepQuery=timeline"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_timeline_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_timeline_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_timeline_search_path)
+    require_snippet(body, 'match(es) for "timeline"', workspace_timeline_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_timeline_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_timeline_search_path} should return at least one governed prep packet for the timeline query")
+    workspace_ledger_search_path = f"{workspace_path}?prepQuery=ledger"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_ledger_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_ledger_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_ledger_search_path)
+    require_snippet(body, 'match(es) for "ledger"', workspace_ledger_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_ledger_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_ledger_search_path} should return at least one governed prep packet for the ledger query")
     workspace_roster_search_path = f"{workspace_path}?prepQuery=roster"
     status, body, _, _ = fetch(
         base_url,
