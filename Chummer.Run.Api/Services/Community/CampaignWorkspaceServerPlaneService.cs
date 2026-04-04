@@ -275,6 +275,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static readonly string[] RosterMovementCompactWordTokens =
     [
         "rostermove",
+        "crewmove",
         "rostertransfer",
         "rosterhandoff",
         "crewhandoff",
@@ -4403,6 +4404,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         {
             tokens.Remove("crewtransfer");
             tokens.Add("crewhandoff");
+        }
+
+        if (tokens.Contains("crewmove"))
+        {
+            tokens.Remove("crewmove");
+            tokens.Add("rostermove");
         }
 
         if (tokens.Contains("seasonops"))

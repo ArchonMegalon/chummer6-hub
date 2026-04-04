@@ -497,6 +497,12 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("crewhandoff");
         }
 
+        if (tokens.Contains("crewmove"))
+        {
+            tokens.Remove("crewmove");
+            tokens.Add("rostermove");
+        }
+
         if (tokens.Contains("seasonops"))
         {
             tokens.Remove("seasonops");
@@ -1180,6 +1186,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "roster",
             "crew",
             "rostermove",
+            "crewmove",
             "rostertransfer",
             "rosterhandoff",
             "crewhandoff",

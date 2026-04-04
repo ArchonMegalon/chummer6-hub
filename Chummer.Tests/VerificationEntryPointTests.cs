@@ -446,6 +446,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=ledger", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=roster", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=rostermove", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=crewmove", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=rostertransfer", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=rosterhandoff", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=crewhandoff", audit, StringComparison.Ordinal);
@@ -484,6 +485,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=ledger", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=roster", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=rostermove", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=crewmove", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=rostertransfer", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=rosterhandoff", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=crewhandoff", audit, StringComparison.Ordinal);
@@ -580,6 +582,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("roster-movement prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=rostermove", playwright, StringComparison.Ordinal);
         Assert.Contains("compact rostermove query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=crewmove", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact crewmove prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=rostertransfer", playwright, StringComparison.Ordinal);
         Assert.Contains("compact rostertransfer prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=rosterhandoff", playwright, StringComparison.Ordinal);
