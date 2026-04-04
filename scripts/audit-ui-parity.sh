@@ -114,6 +114,15 @@ REQUIRED_LOCALIZATION_DOMAINS = (
     "data_rules_names",
     "generated_artifacts",
 )
+REQUIRED_LOCALIZATION_LOCALE_SUMMARY_ROW_KEYS = (
+    "locale",
+    "overrideCount",
+    "minimumOverrideCount",
+    "legacyXmlPresent",
+    "legacyDataXmlPresent",
+    "missingReleaseSeedKeys",
+    "untranslatedKeyCount",
+)
 DEFAULT_ALLOWED_RELEASE_PROOF_BASE_URLS = ("https://chummer.run",)
 
 
@@ -781,6 +790,23 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
                 f"{release_channel_path} (index={index})"
             ),
         )
+        row_keys = {str(key) for key in row_object.keys()}
+        missing_row_keys = sorted(
+            required_key for required_key in REQUIRED_LOCALIZATION_LOCALE_SUMMARY_ROW_KEYS if required_key not in row_keys
+        )
+        if missing_row_keys:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary rows are missing required keys: "
+                f"{release_channel_path} (index={index}, missing={', '.join(missing_row_keys)})"
+            )
+        unexpected_row_keys = sorted(
+            key for key in row_keys if key not in REQUIRED_LOCALIZATION_LOCALE_SUMMARY_ROW_KEYS
+        )
+        if unexpected_row_keys:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary rows have unexpected keys: "
+                f"{release_channel_path} (index={index}, unexpected={', '.join(unexpected_row_keys)})"
+            )
         locale = normalized_token(row_object.get("locale"))
         if not locale:
             raise SystemExit(
@@ -817,6 +843,56 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
         )
     for locale in REQUIRED_LOCALIZATION_SHIPPING_LOCALES:
         row = locale_rows[locale]
+        override_count = require_int(
+            row.get("overrideCount"),
+            message=(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary locale must include integer override count: "
+                f"{release_channel_path} ({locale})"
+            ),
+        )
+        minimum_override_count = require_int(
+            row.get("minimumOverrideCount"),
+            message=(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary locale must include integer minimum override count: "
+                f"{release_channel_path} ({locale})"
+            ),
+        )
+        if minimum_override_count < 0:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary minimumOverrideCount must be >= 0: "
+                f"{release_channel_path} ({locale}, minimum_override_count={minimum_override_count})"
+            )
+        if override_count < minimum_override_count:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary overrideCount must be >= minimumOverrideCount: "
+                f"{release_channel_path} ({locale}, override_count={override_count}, minimum_override_count={minimum_override_count})"
+            )
+        if row.get("legacyXmlPresent") is not True:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary legacyXmlPresent must be true: "
+                f"{release_channel_path} ({locale})"
+            )
+        if row.get("legacyDataXmlPresent") is not True:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary legacyDataXmlPresent must be true: "
+                f"{release_channel_path} ({locale})"
+            )
+        missing_release_seed_keys = row.get("missingReleaseSeedKeys")
+        if not isinstance(missing_release_seed_keys, list):
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary missingReleaseSeedKeys must be a list: "
+                f"{release_channel_path} ({locale})"
+            )
+        if any(not isinstance(key, str) for key in missing_release_seed_keys):
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary missingReleaseSeedKeys must be a string list: "
+                f"{release_channel_path} ({locale})"
+            )
+        if missing_release_seed_keys:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary missingReleaseSeedKeys must be an empty list: "
+                f"{release_channel_path} ({locale}, missing={', '.join(missing_release_seed_keys)})"
+            )
         untranslated_key_count = require_int(
             resolve_alias_value(
                 row,
