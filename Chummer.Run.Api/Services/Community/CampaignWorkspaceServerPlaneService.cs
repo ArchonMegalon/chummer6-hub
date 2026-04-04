@@ -1923,7 +1923,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             searchTerms = BuildSearchTerms(searchTerms, "opposition", "packet", "prep");
         }
         searchTerms = searchTerms
-            .Concat(["oppositions", "encounter", "enemy", "hostile", "adversary", "threat"])
+            .Concat(["oppositions", "encounter", "enemy", "hostile", "adversary", "threat", "opfor", "opforce"])
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
