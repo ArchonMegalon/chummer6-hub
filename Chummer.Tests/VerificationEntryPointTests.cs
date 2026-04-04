@@ -84,7 +84,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release-channel nested receipt releaseProof is required", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.status must be pass/passed/ready", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed is missing required baseline journey ids", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.journeysPassed declares unexpected journey ids", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.proofRoutes is missing required flagship routes", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.proofRoutes declares unexpected flagship routes", script, StringComparison.Ordinal);
         Assert.Contains("workflow_parity_receipt_channel_ids", script, StringComparison.Ordinal);
         Assert.Contains("milestone-2 workflow/visual release-channel ids drift", script, StringComparison.Ordinal);
         Assert.Contains("milestone-2 workflow/visual release-channel versions drift", script, StringComparison.Ordinal);
@@ -436,6 +438,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=eventcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventctrl", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=eventops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=eventop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
@@ -479,6 +483,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=eventcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventctrl", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=eventops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=eventop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
@@ -555,6 +561,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact eventcontrols prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventctrl", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventctrl prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=eventops", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact eventops prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=eventop", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact eventop prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gmops", playwright, StringComparison.Ordinal);
         Assert.Contains("compact gmops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gmop", playwright, StringComparison.Ordinal);
