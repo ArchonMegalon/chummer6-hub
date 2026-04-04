@@ -54,6 +54,26 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"].pop("baseUrl", None)
+payload["releaseProof"]["base_url"] = "ftp://chummer.run"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject non-http(s) releaseProof.base_url alias schemes." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
 payload["releaseProof"]["proofRoutes"] = ["/home/access#recap"]
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
@@ -73,12 +93,52 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"].pop("baseUrl", None)
+payload["releaseProof"]["base_url"] = "https://chummer.run/home?preview=1"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject non-origin releaseProof.base_url alias path/query segments." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
 payload["releaseProof"]["baseUrl"] = "https://example.com"
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
 if bash scripts/audit-ui-parity.sh; then
   mv "$release_channel_backup" "$release_channel_path"
   echo "verify gate failed: parity audit should reject releaseProof.baseUrl outside allowed canonical release origins." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"].pop("baseUrl", None)
+payload["releaseProof"]["base_url"] = "https://operator@chummer.run"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject userinfo credentials in releaseProof.base_url alias origins." >&2
   exit 1
 fi
 mv "$release_channel_backup" "$release_channel_path"
@@ -246,6 +306,26 @@ PY
 if bash scripts/audit-ui-parity.sh; then
   mv "$release_channel_backup" "$release_channel_path"
   echo "verify gate failed: parity audit should reject hostless releaseProof.baseUrl origins." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"].pop("baseUrl", None)
+payload["releaseProof"]["base_url"] = "https://"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject hostless releaseProof.base_url alias origins." >&2
   exit 1
 fi
 mv "$release_channel_backup" "$release_channel_path"
