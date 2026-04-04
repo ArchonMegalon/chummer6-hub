@@ -65,6 +65,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("flagship_required_desktop_heads", script, StringComparison.Ordinal);
         Assert.Contains("flagship_missing_or_not_ready_desktop_heads", script, StringComparison.Ordinal);
         Assert.Contains("workflow_execution_missing_receipts", script, StringComparison.Ordinal);
+        Assert.Contains("missing_required_workflow_family_audit_tests", script, StringComparison.Ordinal);
         Assert.Contains("sr4_workflow_parity_status", script, StringComparison.Ordinal);
         Assert.Contains("chummer5a_workflow_parity_status", script, StringComparison.Ordinal);
         Assert.Contains("sr4_sr6_frontier_status", script, StringComparison.Ordinal);

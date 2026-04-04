@@ -227,6 +227,10 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("workflow_execution_failing_receipts"),
         message=f"parity audit failed: workflow receipt reports failing execution receipts: {path}",
     )
+    require_empty_collection(
+        evidence.get("missing_required_workflow_family_audit_tests"),
+        message=f"parity audit failed: workflow receipt reports missing required workflow-family audit tests: {path}",
+    )
     require_pass_status(
         evidence.get("sr4_workflow_parity_status"),
         message=f"parity audit failed: workflow receipt sr4 parity proof is not pass-ready: {path}",
