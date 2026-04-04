@@ -2596,6 +2596,132 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail leaguectrls compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leaguectrls compact search');
 
+  await page.fill('#prepQuery', 'league ctl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league(?:%20|\+)ctl/.test(page.url()), 'Workspace detail search should preserve the split league ctl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league ctl split search');
+  await expectBodyText(page, 'match(es) for "league ctl"', '/account/work/workspaces detail league ctl split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league ctl split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league ctl split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league ctl split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league ctl split search');
+  const workspaceLeagueCtlSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueCtlSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split league ctl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league ctl split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league ctl split search');
+
+  await page.fill('#prepQuery', 'league-ctl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league-ctl/.test(page.url()), 'Workspace detail search should preserve the hyphen league-ctl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league-ctl hyphen search');
+  await expectBodyText(page, 'match(es) for "league-ctl"', '/account/work/workspaces detail league-ctl hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league-ctl hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league-ctl hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league-ctl hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league-ctl hyphen search');
+  const workspaceLeagueCtlHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueCtlHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen league-ctl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league-ctl hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league-ctl hyphen search');
+
+  await page.fill('#prepQuery', 'league ctls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league(?:%20|\+)ctls/.test(page.url()), 'Workspace detail search should preserve the split league ctls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league ctls split search');
+  await expectBodyText(page, 'match(es) for "league ctls"', '/account/work/workspaces detail league ctls split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league ctls split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league ctls split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league ctls split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league ctls split search');
+  const workspaceLeagueCtlsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueCtlsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split league ctls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league ctls split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league ctls split search');
+
+  await page.fill('#prepQuery', 'league-ctls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league-ctls/.test(page.url()), 'Workspace detail search should preserve the hyphen league-ctls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league-ctls hyphen search');
+  await expectBodyText(page, 'match(es) for "league-ctls"', '/account/work/workspaces detail league-ctls hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league-ctls hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league-ctls hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league-ctls hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league-ctls hyphen search');
+  const workspaceLeagueCtlsHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueCtlsHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen league-ctls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league-ctls hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league-ctls hyphen search');
+
+  await page.fill('#prepQuery', 'league ctrls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league(?:%20|\+)ctrls/.test(page.url()), 'Workspace detail search should preserve the split league ctrls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league ctrls split search');
+  await expectBodyText(page, 'match(es) for "league ctrls"', '/account/work/workspaces detail league ctrls split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league ctrls split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league ctrls split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league ctrls split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league ctrls split search');
+  const workspaceLeagueCtrlsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueCtrlsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split league ctrls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league ctrls split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league ctrls split search');
+
+  await page.fill('#prepQuery', 'league-ctrls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league-ctrls/.test(page.url()), 'Workspace detail search should preserve the hyphen league-ctrls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league-ctrls hyphen search');
+  await expectBodyText(page, 'match(es) for "league-ctrls"', '/account/work/workspaces detail league-ctrls hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league-ctrls hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league-ctrls hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league-ctrls hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league-ctrls hyphen search');
+  const workspaceLeagueCtrlsHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueCtrlsHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen league-ctrls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league-ctrls hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league-ctrls hyphen search');
+
   await page.fill('#prepQuery', 'league-ctrl');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -2973,6 +3099,132 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail communityctrls compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityctrls compact search');
+
+  await page.fill('#prepQuery', 'community ctl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community(?:%20|\+)ctl/.test(page.url()), 'Workspace detail search should preserve the split community ctl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community ctl split search');
+  await expectBodyText(page, 'match(es) for "community ctl"', '/account/work/workspaces detail community ctl split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community ctl split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community ctl split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community ctl split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community ctl split search');
+  const workspaceCommunityCtlSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityCtlSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split community ctl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community ctl split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community ctl split search');
+
+  await page.fill('#prepQuery', 'community-ctl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community-ctl/.test(page.url()), 'Workspace detail search should preserve the hyphen community-ctl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community-ctl hyphen search');
+  await expectBodyText(page, 'match(es) for "community-ctl"', '/account/work/workspaces detail community-ctl hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community-ctl hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community-ctl hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community-ctl hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community-ctl hyphen search');
+  const workspaceCommunityCtlHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityCtlHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen community-ctl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community-ctl hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community-ctl hyphen search');
+
+  await page.fill('#prepQuery', 'community ctls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community(?:%20|\+)ctls/.test(page.url()), 'Workspace detail search should preserve the split community ctls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community ctls split search');
+  await expectBodyText(page, 'match(es) for "community ctls"', '/account/work/workspaces detail community ctls split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community ctls split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community ctls split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community ctls split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community ctls split search');
+  const workspaceCommunityCtlsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityCtlsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split community ctls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community ctls split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community ctls split search');
+
+  await page.fill('#prepQuery', 'community-ctls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community-ctls/.test(page.url()), 'Workspace detail search should preserve the hyphen community-ctls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community-ctls hyphen search');
+  await expectBodyText(page, 'match(es) for "community-ctls"', '/account/work/workspaces detail community-ctls hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community-ctls hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community-ctls hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community-ctls hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community-ctls hyphen search');
+  const workspaceCommunityCtlsHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityCtlsHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen community-ctls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community-ctls hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community-ctls hyphen search');
+
+  await page.fill('#prepQuery', 'community ctrls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community(?:%20|\+)ctrls/.test(page.url()), 'Workspace detail search should preserve the split community ctrls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community ctrls split search');
+  await expectBodyText(page, 'match(es) for "community ctrls"', '/account/work/workspaces detail community ctrls split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community ctrls split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community ctrls split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community ctrls split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community ctrls split search');
+  const workspaceCommunityCtrlsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityCtrlsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split community ctrls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community ctrls split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community ctrls split search');
+
+  await page.fill('#prepQuery', 'community-ctrls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community-ctrls/.test(page.url()), 'Workspace detail search should preserve the hyphen community-ctrls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community-ctrls hyphen search');
+  await expectBodyText(page, 'match(es) for "community-ctrls"', '/account/work/workspaces detail community-ctrls hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community-ctrls hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community-ctrls hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community-ctrls hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community-ctrls hyphen search');
+  const workspaceCommunityCtrlsHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityCtrlsHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen community-ctrls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community-ctrls hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community-ctrls hyphen search');
 
   await page.fill('#prepQuery', 'community-ctrl');
   await Promise.all([
