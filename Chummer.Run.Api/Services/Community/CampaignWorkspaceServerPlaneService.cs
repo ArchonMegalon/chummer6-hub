@@ -2565,9 +2565,10 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
-        ObjectiveProjection[] rosterObjectives = (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
-            .Where(static objective => IsRosterObjectiveSignal(objective.Title, objective.Summary))
-            .OrderByDescending(static objective => objective.UpdatedAtUtc)
+        ObjectiveProjection[] rosterObjectives = DeduplicateIdenticalObjectiveVersions(
+                (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
+                .Where(static objective => IsRosterObjectiveSignal(objective.Title, objective.Summary))
+                .OrderByDescending(static objective => objective.UpdatedAtUtc))
             .Take(3)
             .ToArray();
         bool carryForwardRosterSignal = IsRosterObjectiveSignal(
