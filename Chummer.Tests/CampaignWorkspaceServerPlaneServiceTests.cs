@@ -1030,6 +1030,150 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineNextSessionCarryForwardPrefersMostRecentConsequencePrepAndTravelReceipts()
+    {
+        CampaignProjection campaign = BuildCampaignProjection(BuildWorkspaceWithRosterAndAftermath());
+        CampaignWorkspaceProjection eventWorkspace = BuildWorkspaceWithEventControls();
+        CampaignWorkspaceProjection opsWorkspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        CampaignConsequenceProjection consequenceSeed = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<CampaignConsequenceProjection>>(eventWorkspace.Consequences));
+        GovernedPrepLaunchProjection prepSeed = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepLaunchProjection>>(opsWorkspace.PrepLaunches));
+        TravelPrefetchReceiptProjection travelSeed = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<TravelPrefetchReceiptProjection>>(opsWorkspace.TravelPrefetches));
+        CampaignConsequenceProjection olderConsequence = consequenceSeed with
+        {
+            Label = "Older consequence",
+            Summary = "Older consequence summary.",
+            EvidenceLines = [],
+            UpdatedAtUtc = consequenceSeed.UpdatedAtUtc.AddMinutes(-15)
+        };
+        CampaignConsequenceProjection newerConsequence = olderConsequence with
+        {
+            Label = "Newer consequence",
+            Summary = "Newer consequence summary.",
+            UpdatedAtUtc = consequenceSeed.UpdatedAtUtc.AddMinutes(15)
+        };
+        GovernedPrepLaunchProjection olderPrepLaunch = prepSeed with
+        {
+            LaunchId = "launch-carry-forward-older",
+            PacketTitle = "Older prep packet",
+            TargetRunTitle = "Older run",
+            TargetSceneTitle = "Older scene",
+            LaunchedAtUtc = prepSeed.LaunchedAtUtc.AddMinutes(-10)
+        };
+        GovernedPrepLaunchProjection newerPrepLaunch = olderPrepLaunch with
+        {
+            LaunchId = "launch-carry-forward-newer",
+            PacketTitle = "Newer prep packet",
+            TargetRunTitle = "Newer run",
+            TargetSceneTitle = "Newer scene",
+            LaunchedAtUtc = prepSeed.LaunchedAtUtc.AddMinutes(10)
+        };
+        TravelPrefetchReceiptProjection olderTravel = travelSeed with
+        {
+            ReceiptId = "travel-carry-forward-older",
+            DeviceRole = "older_device_role",
+            Platform = "android",
+            StagedAtUtc = travelSeed.StagedAtUtc.AddMinutes(-5)
+        };
+        TravelPrefetchReceiptProjection newerTravel = olderTravel with
+        {
+            ReceiptId = "travel-carry-forward-newer",
+            DeviceRole = "newer_device_role",
+            Platform = "ios",
+            StagedAtUtc = travelSeed.StagedAtUtc.AddMinutes(5)
+        };
+
+        NextSessionCarryForwardProjection? carryForward = InvokeCampaignSpineBuildNextSessionCarryForward(
+            campaign,
+            [olderConsequence, newerConsequence],
+            [olderPrepLaunch, newerPrepLaunch],
+            [olderTravel, newerTravel],
+            []);
+
+        Assert.NotNull(carryForward);
+        Assert.Contains(carryForward!.EvidenceLines, line => string.Equals(line, "Newer consequence summary.", StringComparison.Ordinal));
+        Assert.Contains(carryForward.EvidenceLines, line => string.Equals(line, "Newer prep packet stays bound to Newer run / Newer scene.", StringComparison.Ordinal));
+        Assert.Contains(carryForward.EvidenceLines, line => string.Equals(line, "newer_device_role on ios already has the staged travel packet.", StringComparison.Ordinal));
+        Assert.DoesNotContain(carryForward.EvidenceLines, line => string.Equals(line, "Older consequence summary.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CampaignSpineCampaignMemoryPrefersMostRecentConsequenceRosterPrepAndTravelReceipts()
+    {
+        CampaignWorkspaceProjection rosterWorkspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceProjection opsWorkspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        CampaignWorkspaceProjection eventWorkspace = BuildWorkspaceWithEventControls();
+        CampaignProjection campaign = BuildCampaignProjection(rosterWorkspace);
+        CampaignConsequenceProjection consequenceSeed = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<CampaignConsequenceProjection>>(eventWorkspace.Consequences));
+        RosterTransferProjection transferSeed = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<RosterTransferProjection>>(rosterWorkspace.RosterTransfers));
+        GovernedPrepLaunchProjection prepSeed = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepLaunchProjection>>(opsWorkspace.PrepLaunches));
+        TravelPrefetchReceiptProjection travelSeed = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<TravelPrefetchReceiptProjection>>(opsWorkspace.TravelPrefetches));
+        CampaignConsequenceProjection olderConsequence = consequenceSeed with
+        {
+            Label = "Older consequence",
+            Summary = "Older consequence summary.",
+            UpdatedAtUtc = consequenceSeed.UpdatedAtUtc.AddMinutes(-12)
+        };
+        CampaignConsequenceProjection newerConsequence = olderConsequence with
+        {
+            Label = "Newer consequence",
+            Summary = "Newer consequence summary.",
+            UpdatedAtUtc = consequenceSeed.UpdatedAtUtc.AddMinutes(12)
+        };
+        RosterTransferProjection olderTransfer = transferSeed with
+        {
+            TransferId = "transfer-memory-older",
+            Summary = "Older roster transfer summary.",
+            TransferredAtUtc = transferSeed.TransferredAtUtc.AddMinutes(-9)
+        };
+        RosterTransferProjection newerTransfer = olderTransfer with
+        {
+            TransferId = "transfer-memory-newer",
+            Summary = "Newer roster transfer summary.",
+            TransferredAtUtc = transferSeed.TransferredAtUtc.AddMinutes(9)
+        };
+        GovernedPrepLaunchProjection olderPrepLaunch = prepSeed with
+        {
+            LaunchId = "launch-memory-older",
+            Summary = "Older prep launch summary.",
+            LaunchedAtUtc = prepSeed.LaunchedAtUtc.AddMinutes(-6)
+        };
+        GovernedPrepLaunchProjection newerPrepLaunch = olderPrepLaunch with
+        {
+            LaunchId = "launch-memory-newer",
+            Summary = "Newer prep launch summary.",
+            LaunchedAtUtc = prepSeed.LaunchedAtUtc.AddMinutes(6)
+        };
+        TravelPrefetchReceiptProjection olderTravel = travelSeed with
+        {
+            ReceiptId = "travel-memory-older",
+            PrefetchSummary = "Older travel prefetch summary.",
+            StagedAtUtc = travelSeed.StagedAtUtc.AddMinutes(-3)
+        };
+        TravelPrefetchReceiptProjection newerTravel = olderTravel with
+        {
+            ReceiptId = "travel-memory-newer",
+            PrefetchSummary = "Newer travel prefetch summary.",
+            StagedAtUtc = travelSeed.StagedAtUtc.AddMinutes(3)
+        };
+
+        CampaignMemoryProjection? memory = InvokeCampaignSpineBuildCampaignMemory(
+            campaign,
+            [olderConsequence, newerConsequence],
+            [olderTransfer, newerTransfer],
+            [olderPrepLaunch, newerPrepLaunch],
+            [olderTravel, newerTravel],
+            [],
+            null);
+
+        Assert.NotNull(memory);
+        Assert.Contains(memory!.EvidenceLines, line => string.Equals(line, "Newer consequence: Newer consequence summary.", StringComparison.Ordinal));
+        Assert.Contains(memory.EvidenceLines, line => string.Equals(line, "Newer roster transfer summary.", StringComparison.Ordinal));
+        Assert.Contains(memory.EvidenceLines, line => string.Equals(line, "Newer prep launch summary.", StringComparison.Ordinal));
+        Assert.Contains(memory.EvidenceLines, line => string.Equals(line, "Newer travel prefetch summary.", StringComparison.Ordinal));
+        Assert.DoesNotContain(memory.EvidenceLines, line => string.Equals(line, "Older roster transfer summary.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignSpineWorkspaceChangePacketsDeduplicateWhitespacePaddedAftermathPackageIds()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
@@ -5265,6 +5409,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     private static NextSessionCarryForwardProjection? InvokeCampaignSpineBuildNextSessionCarryForward(
         CampaignProjection campaign,
         IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+        => InvokeCampaignSpineBuildNextSessionCarryForward(
+            campaign,
+            Array.Empty<CampaignConsequenceProjection>(),
+            Array.Empty<GovernedPrepLaunchProjection>(),
+            Array.Empty<TravelPrefetchReceiptProjection>(),
+            aftermathPackages);
+
+    private static NextSessionCarryForwardProjection? InvokeCampaignSpineBuildNextSessionCarryForward(
+        CampaignProjection campaign,
+        IReadOnlyList<CampaignConsequenceProjection> consequences,
+        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
+        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
     {
         MethodInfo method = typeof(CampaignSpineService)
             .GetMethod("BuildNextSessionCarryForward", BindingFlags.NonPublic | BindingFlags.Static)
@@ -5277,9 +5434,9 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             null,
             null,
             null,
-            Array.Empty<CampaignConsequenceProjection>(),
-            Array.Empty<GovernedPrepLaunchProjection>(),
-            Array.Empty<TravelPrefetchReceiptProjection>(),
+            consequences,
+            prepLaunches,
+            travelPrefetchReceipts,
             aftermathPackages
         ]);
     }
@@ -5287,6 +5444,23 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     private static CampaignMemoryProjection? InvokeCampaignSpineBuildCampaignMemory(
         CampaignProjection campaign,
         IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+        => InvokeCampaignSpineBuildCampaignMemory(
+            campaign,
+            Array.Empty<CampaignConsequenceProjection>(),
+            Array.Empty<RosterTransferProjection>(),
+            Array.Empty<GovernedPrepLaunchProjection>(),
+            Array.Empty<TravelPrefetchReceiptProjection>(),
+            aftermathPackages,
+            null);
+
+    private static CampaignMemoryProjection? InvokeCampaignSpineBuildCampaignMemory(
+        CampaignProjection campaign,
+        IReadOnlyList<CampaignConsequenceProjection> consequences,
+        IReadOnlyList<RosterTransferProjection> rosterTransfers,
+        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
+        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages,
+        NextSessionCarryForwardProjection? carryForward)
     {
         MethodInfo method = typeof(CampaignSpineService)
             .GetMethod("BuildCampaignMemory", BindingFlags.NonPublic | BindingFlags.Static)
@@ -5299,12 +5473,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             null,
             null,
             null,
-            Array.Empty<CampaignConsequenceProjection>(),
-            Array.Empty<RosterTransferProjection>(),
-            Array.Empty<GovernedPrepLaunchProjection>(),
-            Array.Empty<TravelPrefetchReceiptProjection>(),
+            consequences,
+            rosterTransfers,
+            prepLaunches,
+            travelPrefetchReceipts,
             aftermathPackages,
-            null
+            carryForward
         ]);
     }
 
