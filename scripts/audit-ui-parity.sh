@@ -218,6 +218,16 @@ def parse_generated_at(path: pathlib.Path, data: dict) -> dt.datetime:
     return parsed.astimezone(UTC)
 
 
+def read_release_channel_status(path: pathlib.Path, data: dict) -> str:
+    status = str(data.get("status", "")).strip().lower()
+    if status not in {"pass", "passed", "ready", "published"}:
+        raise SystemExit(
+            "parity audit failed: release-channel receipt status must be pass/passed/ready/published: "
+            f"{path} (status={status or 'missing'})"
+        )
+    return status
+
+
 def read_int_value(
     evidence: dict,
     key: str,
@@ -321,9 +331,86 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("release_channel_version"),
         message=f"parity audit failed: workflow receipt release-channel version is missing: {path}",
     )
+    release_channel_path_raw = require_non_empty_string(
+        evidence.get("release_channel_path"),
+        message=f"parity audit failed: workflow receipt release-channel path is missing: {path}",
+    )
+    release_channel_path = resolve_nested_receipt_path(path, release_channel_path_raw)
+    release_channel_data = read_receipt(release_channel_path)
+    read_release_channel_status(release_channel_path, release_channel_data)
+    release_channel_id = require_non_empty_string(
+        release_channel_data.get("channelId"),
+        message=(
+            "parity audit failed: workflow receipt release-channel nested receipt channelId is missing: "
+            f"{path} ({release_channel_path})"
+        ),
+    )
+    workflow_release_channel_id = require_non_empty_string(
+        evidence.get("release_channel_channel_id"),
+        message=f"parity audit failed: workflow receipt release-channel channel id is missing: {path}",
+    )
+    if release_channel_id != workflow_release_channel_id:
+        raise SystemExit(
+            "parity audit failed: workflow receipt release-channel channel id drifts from nested receipt: "
+            f"{path} ({workflow_release_channel_id}) vs {release_channel_path} ({release_channel_id})"
+        )
+    release_channel_version = require_non_empty_string(
+        release_channel_data.get("version"),
+        message=(
+            "parity audit failed: workflow receipt release-channel nested receipt version is missing: "
+            f"{path} ({release_channel_path})"
+        ),
+    )
+    workflow_release_channel_version = require_non_empty_string(
+        evidence.get("release_channel_version"),
+        message=f"parity audit failed: workflow receipt release-channel version is missing: {path}",
+    )
+    if release_channel_version != workflow_release_channel_version:
+        raise SystemExit(
+            "parity audit failed: workflow receipt release-channel version drifts from nested receipt: "
+            f"{path} ({workflow_release_channel_version}) vs {release_channel_path} ({release_channel_version})"
+        )
+    workflow_release_channel_generated_at = parse_generated_at(
+        path,
+        {"generatedAt": evidence.get("release_channel_generated_at")},
+    )
+    release_channel_generated_at = parse_generated_at(release_channel_path, release_channel_data)
+    if workflow_release_channel_generated_at != release_channel_generated_at:
+        raise SystemExit(
+            "parity audit failed: workflow receipt release-channel generated_at drifts from nested receipt generatedAt: "
+            f"{path} (evidence_generated_at={workflow_release_channel_generated_at.isoformat()}, "
+            f"nested_generated_at={release_channel_generated_at.isoformat()}, "
+            f"nested_receipt={release_channel_path})"
+        )
+    now = dt.datetime.now(UTC)
+    release_channel_age_seconds = int((now - release_channel_generated_at).total_seconds())
+    max_age_seconds = read_int_value(
+        evidence,
+        "proof_freshness_max_age_seconds",
+        default_value=DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS,
+        path=path,
+    )
+    max_future_skew_seconds = read_int_value(
+        evidence,
+        "proof_freshness_max_future_skew_seconds",
+        default_value=DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS,
+        path=path,
+    )
+    if release_channel_age_seconds > max_age_seconds:
+        raise SystemExit(
+            "parity audit failed: workflow receipt release-channel nested receipt generatedAt is stale: "
+            f"{path} (age_seconds={release_channel_age_seconds}, "
+            f"max_age_seconds={max_age_seconds}, nested_receipt={release_channel_path})"
+        )
+    if release_channel_age_seconds < -max_future_skew_seconds:
+        raise SystemExit(
+            "parity audit failed: workflow receipt release-channel nested receipt generatedAt is in the future: "
+            f"{path} (future_skew_seconds={abs(release_channel_age_seconds)}, "
+            f"max_future_skew_seconds={max_future_skew_seconds}, nested_receipt={release_channel_path})"
+        )
     require_all_values_equal(
         evidence.get("workflow_parity_receipt_channel_ids"),
-        expected=release_channel_channel_id,
+        expected=workflow_release_channel_id,
         message=f"parity audit failed: workflow parity receipt channel ids drift from release-channel channel id: {path}",
     )
     require_empty_collection(
@@ -605,6 +692,83 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("release_channel_version"),
         message=f"parity audit failed: visual receipt release-channel version is missing: {path}",
     )
+    release_channel_path_raw = require_non_empty_string(
+        evidence.get("release_channel_path"),
+        message=f"parity audit failed: visual receipt release-channel path is missing: {path}",
+    )
+    release_channel_path = resolve_nested_receipt_path(path, release_channel_path_raw)
+    release_channel_data = read_receipt(release_channel_path)
+    read_release_channel_status(release_channel_path, release_channel_data)
+    release_channel_id = require_non_empty_string(
+        release_channel_data.get("channelId"),
+        message=(
+            "parity audit failed: visual receipt release-channel nested receipt channelId is missing: "
+            f"{path} ({release_channel_path})"
+        ),
+    )
+    visual_release_channel_id = require_non_empty_string(
+        evidence.get("release_channel_channel_id"),
+        message=f"parity audit failed: visual receipt release-channel channel id is missing: {path}",
+    )
+    if release_channel_id != visual_release_channel_id:
+        raise SystemExit(
+            "parity audit failed: visual receipt release-channel channel id drifts from nested receipt: "
+            f"{path} ({visual_release_channel_id}) vs {release_channel_path} ({release_channel_id})"
+        )
+    release_channel_version = require_non_empty_string(
+        release_channel_data.get("version"),
+        message=(
+            "parity audit failed: visual receipt release-channel nested receipt version is missing: "
+            f"{path} ({release_channel_path})"
+        ),
+    )
+    visual_release_channel_version = require_non_empty_string(
+        evidence.get("release_channel_version"),
+        message=f"parity audit failed: visual receipt release-channel version is missing: {path}",
+    )
+    if release_channel_version != visual_release_channel_version:
+        raise SystemExit(
+            "parity audit failed: visual receipt release-channel version drifts from nested receipt: "
+            f"{path} ({visual_release_channel_version}) vs {release_channel_path} ({release_channel_version})"
+        )
+    visual_release_channel_generated_at = parse_generated_at(
+        path,
+        {"generatedAt": evidence.get("release_channel_generated_at")},
+    )
+    release_channel_generated_at = parse_generated_at(release_channel_path, release_channel_data)
+    if visual_release_channel_generated_at != release_channel_generated_at:
+        raise SystemExit(
+            "parity audit failed: visual receipt release-channel generated_at drifts from nested receipt generatedAt: "
+            f"{path} (evidence_generated_at={visual_release_channel_generated_at.isoformat()}, "
+            f"nested_generated_at={release_channel_generated_at.isoformat()}, "
+            f"nested_receipt={release_channel_path})"
+        )
+    now = dt.datetime.now(UTC)
+    release_channel_age_seconds = int((now - release_channel_generated_at).total_seconds())
+    max_age_seconds = read_int_value(
+        evidence,
+        "proof_freshness_max_age_seconds",
+        default_value=DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS,
+        path=path,
+    )
+    max_future_skew_seconds = read_int_value(
+        evidence,
+        "proof_freshness_max_future_skew_seconds",
+        default_value=DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS,
+        path=path,
+    )
+    if release_channel_age_seconds > max_age_seconds:
+        raise SystemExit(
+            "parity audit failed: visual receipt release-channel nested receipt generatedAt is stale: "
+            f"{path} (age_seconds={release_channel_age_seconds}, "
+            f"max_age_seconds={max_age_seconds}, nested_receipt={release_channel_path})"
+        )
+    if release_channel_age_seconds < -max_future_skew_seconds:
+        raise SystemExit(
+            "parity audit failed: visual receipt release-channel nested receipt generatedAt is in the future: "
+            f"{path} (future_skew_seconds={abs(release_channel_age_seconds)}, "
+            f"max_future_skew_seconds={max_future_skew_seconds}, nested_receipt={release_channel_path})"
+        )
     require_empty_collection(
         evidence.get("flagship_gate.headProofs.status_malformed_entries"),
         message=f"parity audit failed: visual receipt has malformed flagship head proof status keys: {path}",
