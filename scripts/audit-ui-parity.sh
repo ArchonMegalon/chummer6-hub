@@ -705,6 +705,49 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("screenshots_older_than_flagship_receipt"),
         message=f"parity audit failed: visual receipt reports screenshots older than flagship receipt: {path}",
     )
+    screenshot_dir_raw = require_non_empty_string(
+        evidence.get("screenshot_dir"),
+        message=f"parity audit failed: visual receipt screenshot_dir is missing: {path}",
+    )
+    screenshot_dir = resolve_nested_receipt_path(path, screenshot_dir_raw)
+    if not screenshot_dir.is_dir():
+        raise SystemExit(
+            f"parity audit failed: visual receipt screenshot_dir does not exist: {path} ({screenshot_dir})"
+        )
+    screenshot_timestamps = require_object(
+        evidence.get("screenshot_timestamps"),
+        message=f"parity audit failed: visual receipt screenshot_timestamps must be a JSON object: {path}",
+    )
+    screenshot_receipt_skew_max_seconds = read_int_value(
+        evidence,
+        "screenshot_receipt_skew_max_seconds",
+        default_value=DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS,
+        path=path,
+    )
+    for screenshot_name in expected_required_screenshots:
+        screenshot_path = screenshot_dir / screenshot_name
+        if not screenshot_path.is_file():
+            raise SystemExit(
+                "parity audit failed: visual receipt required screenshot file is missing on disk: "
+                f"{path} ({screenshot_path})"
+            )
+        timestamp_raw = screenshot_timestamps.get(screenshot_name)
+        screenshot_timestamp = parse_generated_at(
+            path,
+            {"generatedAt": timestamp_raw},
+        )
+        screenshot_mtime = dt.datetime.fromtimestamp(
+            screenshot_path.stat().st_mtime,
+            tz=UTC,
+        )
+        timestamp_skew_seconds = abs(int((screenshot_mtime - screenshot_timestamp).total_seconds()))
+        if timestamp_skew_seconds > screenshot_receipt_skew_max_seconds:
+            raise SystemExit(
+                "parity audit failed: visual receipt screenshot timestamp drifts from on-disk file mtime: "
+                f"{path} (screenshot={screenshot_name}, "
+                f"timestamp_skew_seconds={timestamp_skew_seconds}, "
+                f"max_skew_seconds={screenshot_receipt_skew_max_seconds})"
+            )
     validate_timestamp_freshness(path, data, evidence)
 
 
