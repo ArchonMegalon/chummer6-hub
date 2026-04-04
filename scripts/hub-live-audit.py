@@ -3540,6 +3540,48 @@ def verify_signed_in_work_audit(
     prep_library_post_run_hyphen = json.loads(body)
     if not (prep_library_post_run_hyphen.get("items") or []):
         raise AssertionError("prep-library post-run search did not expose any governed packet")
+    prep_library_postgame_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=postgame"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_postgame_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_postgame_path} returned {status}, expected 200")
+
+    prep_library_postgame = json.loads(body)
+    if not (prep_library_postgame.get("items") or []):
+        raise AssertionError("prep-library postgame search did not expose any governed packet")
+    prep_library_post_game_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=post%20game"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_post_game_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_post_game_path} returned {status}, expected 200")
+
+    prep_library_post_game = json.loads(body)
+    if not (prep_library_post_game.get("items") or []):
+        raise AssertionError("prep-library post game search did not expose any governed packet")
+    prep_library_post_game_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=post-game"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_post_game_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_post_game_hyphen_path} returned {status}, expected 200")
+
+    prep_library_post_game_hyphen = json.loads(body)
+    if not (prep_library_post_game_hyphen.get("items") or []):
+        raise AssertionError("prep-library post-game search did not expose any governed packet")
     prep_library_recap_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=recap"
     status, body, _, _ = fetch(
         base_url,
@@ -7593,6 +7635,51 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_post_run_hyphen_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_post_run_hyphen_search_path} should return at least one governed prep packet for the post-run query")
+    workspace_postgame_search_path = f"{workspace_path}?prepQuery=postgame"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_postgame_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_postgame_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_postgame_search_path)
+    require_snippet(body, 'match(es) for "postgame"', workspace_postgame_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_postgame_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_postgame_search_path} should return at least one governed prep packet for the postgame query")
+    workspace_post_game_search_path = f"{workspace_path}?prepQuery=post%20game"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_post_game_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_post_game_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_post_game_search_path)
+    require_snippet(body, 'match(es) for "post game"', workspace_post_game_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_post_game_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_post_game_search_path} should return at least one governed prep packet for the post game query")
+    workspace_post_game_hyphen_search_path = f"{workspace_path}?prepQuery=post-game"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_post_game_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_post_game_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_post_game_hyphen_search_path)
+    require_snippet(body, 'match(es) for "post-game"', workspace_post_game_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_post_game_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_post_game_hyphen_search_path} should return at least one governed prep packet for the post-game query")
     workspace_recap_search_path = f"{workspace_path}?prepQuery=recap"
     status, body, _, _ = fetch(
         base_url,

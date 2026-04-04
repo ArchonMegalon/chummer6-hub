@@ -4129,6 +4129,69 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail post-run hyphen search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail post-run hyphen search');
 
+  await page.fill('#prepQuery', 'postgame');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=postgame/.test(page.url()), 'Workspace detail search should preserve the compact postgame continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail postgame compact search');
+  await expectBodyText(page, 'match(es) for "postgame"', '/account/work/workspaces detail postgame compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail postgame compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail postgame compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail postgame compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail postgame compact search');
+  const workspacePostgameCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspacePostgameCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact postgame continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail postgame compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail postgame compact search');
+
+  await page.fill('#prepQuery', 'post game');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=post(?:%20|\+)game/.test(page.url()), 'Workspace detail search should preserve the split post game continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail post game split search');
+  await expectBodyText(page, 'match(es) for "post game"', '/account/work/workspaces detail post game split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail post game split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail post game split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail post game split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail post game split search');
+  const workspacePostGameSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspacePostGameSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split post game continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail post game split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail post game split search');
+
+  await page.fill('#prepQuery', 'post-game');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=post-game/.test(page.url()), 'Workspace detail search should preserve the hyphen post-game continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail post-game hyphen search');
+  await expectBodyText(page, 'match(es) for "post-game"', '/account/work/workspaces detail post-game hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail post-game hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail post-game hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail post-game hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail post-game hyphen search');
+  const workspacePostGameHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspacePostGameHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen post-game continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail post-game hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail post-game hyphen search');
+
   await page.fill('#prepQuery', 'recap');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
