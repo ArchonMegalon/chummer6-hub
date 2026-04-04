@@ -2197,17 +2197,66 @@ public sealed class GmOpsBoardServiceTests
 
         GmPrepAssetListResponse contactUpdatesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "contact updates");
         GmPrepAssetListResponse contactsChangedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "contacts changed");
+        GmPrepAssetListResponse compactContactUpdatesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "contactupdates");
+        GmPrepAssetListResponse compactContactsChangedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "contactschanged");
         GmPrepAssetListResponse heatChangesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "heat changes");
+        GmPrepAssetListResponse compactHeatChangesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "heatchanges");
         GmPrepAssetListResponse diaryUpdateMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "diary update");
         GmPrepAssetListResponse diariesUpdatesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "diaries updates");
+        GmPrepAssetListResponse compactDiaryUpdatesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "diaryupdates");
+        GmPrepAssetListResponse compactSessionLogUpdatesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sessionlogupdates");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrix updates");
+        GmPrepAssetListResponse compactNegativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixupdates");
 
         Assert.Contains(contactUpdatesMatches.Items, item => item.AssetId == "continuity_mutation_ops");
         Assert.Contains(contactsChangedMatches.Items, item => item.AssetId == "continuity_mutation_ops");
+        Assert.Contains(compactContactUpdatesMatches.Items, item => item.AssetId == "continuity_mutation_ops");
+        Assert.Contains(compactContactsChangedMatches.Items, item => item.AssetId == "continuity_mutation_ops");
         Assert.Contains(heatChangesMatches.Items, item => item.AssetId == "continuity_mutation_ops");
+        Assert.Contains(compactHeatChangesMatches.Items, item => item.AssetId == "continuity_mutation_ops");
         Assert.Contains(diaryUpdateMatches.Items, item => item.AssetId == "continuity_mutation_ops");
         Assert.Contains(diariesUpdatesMatches.Items, item => item.AssetId == "continuity_mutation_ops");
+        Assert.Contains(compactDiaryUpdatesMatches.Items, item => item.AssetId == "continuity_mutation_ops");
+        Assert.Contains(compactSessionLogUpdatesMatches.Items, item => item.AssetId == "continuity_mutation_ops");
         Assert.Empty(negativeMatches.Items);
+        Assert.Empty(compactNegativeMatches.Items);
+    }
+
+    [Fact]
+    public void ListPrepAssets_QueryCollapsesTravelOfflineReadinessShorthand()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult import = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "travel_readiness_ops",
+                now: now,
+                title: "Travel prefetch readiness packet",
+                body: "Safehouse travel prefetch remains governed with offline continuity receipts.")
+        ]);
+
+        Assert.Equal(1, import.ImportedCount);
+        Assert.Equal(0, import.SkippedCount);
+        Assert.Empty(import.Conflicts);
+
+        GmPrepAssetListResponse offlineReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "offline readiness");
+        GmPrepAssetListResponse compactOfflineReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "offlinereadiness");
+        GmPrepAssetListResponse travelCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "travel cache");
+        GmPrepAssetListResponse compactTravelCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "travelcache");
+        GmPrepAssetListResponse safehouseStaleCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "safehouse stale cache");
+        GmPrepAssetListResponse compactSafehouseReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "safehousereadiness");
+        GmPrepAssetListResponse negativeReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrix readiness");
+        GmPrepAssetListResponse negativeCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrix cache");
+
+        Assert.Contains(offlineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactOfflineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(travelCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactTravelCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(safehouseStaleCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactSafehouseReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Empty(negativeReadinessMatches.Items);
+        Assert.Empty(negativeCacheMatches.Items);
     }
 
     [Fact]

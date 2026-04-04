@@ -6,6 +6,61 @@ public static class PrepLibraryQueryAliasCanonicalizer
     {
         ArgumentNullException.ThrowIfNull(tokens);
 
+        RewriteCompactContinuityMutationAlias(tokens, "contactupdate", "contact", "update");
+        RewriteCompactContinuityMutationAlias(tokens, "contactupdates", "contact", "updates");
+        RewriteCompactContinuityMutationAlias(tokens, "contactsupdate", "contacts", "update");
+        RewriteCompactContinuityMutationAlias(tokens, "contactsupdates", "contacts", "updates");
+        RewriteCompactContinuityMutationAlias(tokens, "contactchange", "contact", "change");
+        RewriteCompactContinuityMutationAlias(tokens, "contactchanges", "contact", "changes");
+        RewriteCompactContinuityMutationAlias(tokens, "contactchanged", "contact", "changed");
+        RewriteCompactContinuityMutationAlias(tokens, "contactschange", "contacts", "change");
+        RewriteCompactContinuityMutationAlias(tokens, "contactschanges", "contacts", "changes");
+        RewriteCompactContinuityMutationAlias(tokens, "contactschanged", "contacts", "changed");
+        RewriteCompactContinuityMutationAlias(tokens, "connectionupdate", "connection", "update");
+        RewriteCompactContinuityMutationAlias(tokens, "connectionupdates", "connection", "updates");
+        RewriteCompactContinuityMutationAlias(tokens, "connectionupdated", "connection", "updated");
+        RewriteCompactContinuityMutationAlias(tokens, "connectionchange", "connection", "change");
+        RewriteCompactContinuityMutationAlias(tokens, "connectionchanges", "connection", "changes");
+        RewriteCompactContinuityMutationAlias(tokens, "connectionchanged", "connection", "changed");
+        RewriteCompactContinuityMutationAlias(tokens, "relationshipupdate", "relationship", "update");
+        RewriteCompactContinuityMutationAlias(tokens, "relationshipupdates", "relationship", "updates");
+        RewriteCompactContinuityMutationAlias(tokens, "relationshipupdated", "relationship", "updated");
+        RewriteCompactContinuityMutationAlias(tokens, "relationshipchange", "relationship", "change");
+        RewriteCompactContinuityMutationAlias(tokens, "relationshipchanges", "relationship", "changes");
+        RewriteCompactContinuityMutationAlias(tokens, "relationshipchanged", "relationship", "changed");
+        RewriteCompactContinuityMutationAlias(tokens, "heatupdate", "heat", "update");
+        RewriteCompactContinuityMutationAlias(tokens, "heatupdates", "heat", "updates");
+        RewriteCompactContinuityMutationAlias(tokens, "heatupdated", "heat", "updated");
+        RewriteCompactContinuityMutationAlias(tokens, "heatchange", "heat", "change");
+        RewriteCompactContinuityMutationAlias(tokens, "heatchanges", "heat", "changes");
+        RewriteCompactContinuityMutationAlias(tokens, "heatchanged", "heat", "changed");
+        RewriteCompactContinuityMutationAlias(tokens, "diaryupdate", "diary", "update");
+        RewriteCompactContinuityMutationAlias(tokens, "diaryupdates", "diary", "updates");
+        RewriteCompactContinuityMutationAlias(tokens, "diaryupdated", "diary", "updated");
+        RewriteCompactContinuityMutationAlias(tokens, "diarychange", "diary", "change");
+        RewriteCompactContinuityMutationAlias(tokens, "diarychanges", "diary", "changes");
+        RewriteCompactContinuityMutationAlias(tokens, "diarychanged", "diary", "changed");
+        RewriteCompactContinuityMutationAlias(tokens, "journalupdate", "journal", "update");
+        RewriteCompactContinuityMutationAlias(tokens, "journalupdates", "journal", "updates");
+        RewriteCompactContinuityMutationAlias(tokens, "journalupdated", "journal", "updated");
+        RewriteCompactContinuityMutationAlias(tokens, "journalchange", "journal", "change");
+        RewriteCompactContinuityMutationAlias(tokens, "journalchanges", "journal", "changes");
+        RewriteCompactContinuityMutationAlias(tokens, "journalchanged", "journal", "changed");
+        RewriteCompactContinuityMutationAlias(tokens, "sessionlogupdate", "session", "log", "update");
+        RewriteCompactContinuityMutationAlias(tokens, "sessionlogupdates", "session", "log", "updates");
+        RewriteCompactContinuityMutationAlias(tokens, "sessionlogupdated", "session", "log", "updated");
+        RewriteCompactContinuityMutationAlias(tokens, "sessionlogchange", "session", "log", "change");
+        RewriteCompactContinuityMutationAlias(tokens, "sessionlogchanges", "session", "log", "changes");
+        RewriteCompactContinuityMutationAlias(tokens, "sessionlogchanged", "session", "log", "changed");
+        RewriteCompactContinuityMutationAlias(tokens, "offlinereadiness", "offline", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "travelreadiness", "travel", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "safehousereadiness", "safehouse", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "offlinecache", "offline", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "travelcache", "travel", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "safehousecache", "safehouse", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "stalecache", "stale", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "staleofflinecache", "stale", "offline", "cache");
+
         if ((tokens.Contains("gm") && tokens.Contains("ops"))
             || (tokens.Contains("gm") && tokens.Contains("op"))
             || (tokens.Contains("gm") && tokens.Contains("operation"))
@@ -968,6 +1023,19 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("log");
         }
 
+        if (tokens.Contains("sessionlog")
+            || tokens.Contains("sessionlogs")
+            || (tokens.Contains("session") && tokens.Contains("log"))
+            || (tokens.Contains("session") && tokens.Contains("logs")))
+        {
+            tokens.Remove("sessionlog");
+            tokens.Remove("sessionlogs");
+            tokens.Remove("log");
+            tokens.Remove("logs");
+            tokens.Add("session");
+            tokens.Add("diary");
+        }
+
         if (tokens.Contains("diaries"))
         {
             tokens.Remove("diaries");
@@ -1018,6 +1086,28 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Remove("shifting");
             tokens.Remove("mutation");
             tokens.Remove("mutations");
+        }
+
+        bool hasTravelOfflineScope =
+            tokens.Contains("travel")
+            || tokens.Contains("safehouse")
+            || tokens.Contains("offline")
+            || tokens.Contains("prefetch")
+            || tokens.Contains("travelprefetch")
+            || tokens.Contains("travelcache")
+            || tokens.Contains("offlinecache")
+            || tokens.Contains("safehousecache");
+        if (hasTravelOfflineScope)
+        {
+            tokens.Remove("readiness");
+            tokens.Remove("readinesses");
+            tokens.Remove("ready");
+            tokens.Remove("stale");
+            tokens.Remove("staleness");
+            tokens.Remove("cache");
+            tokens.Remove("caches");
+            tokens.Remove("cached");
+            tokens.Remove("caching");
         }
 
         if (tokens.Contains("downtimes"))
@@ -1455,6 +1545,23 @@ public static class PrepLibraryQueryAliasCanonicalizer
         {
             tokens.Remove("heats");
             tokens.Add("heat");
+        }
+    }
+
+    private static void RewriteCompactContinuityMutationAlias(
+        HashSet<string> tokens,
+        string compactToken,
+        params string[] expandedTokens)
+    {
+        if (!tokens.Contains(compactToken))
+        {
+            return;
+        }
+
+        tokens.Remove(compactToken);
+        foreach (string token in expandedTokens)
+        {
+            tokens.Add(token);
         }
     }
 }
