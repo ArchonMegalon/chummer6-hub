@@ -6018,6 +6018,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimesreturnbrief', 'compact downtimesreturnbrief continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimesreturnbriefs', 'compact downtimesreturnbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'diariesreturnloop', 'compact diariesreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'diaryreturnloop', 'compact diaryreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'diaryreturnloops', 'compact diaryreturnloops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'diaryreturnlane', 'compact diaryreturnlane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'diaryreturnlanes', 'compact diaryreturnlanes continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'diariesreturnpacket', 'compact diariesreturnpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'diariesreturnpackets', 'compact diariesreturnpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'diariesreturnbrief', 'compact diariesreturnbrief continuity prep');
@@ -6027,6 +6031,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'diaryreturnbrief', 'compact diaryreturnbrief continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'diaryreturnbriefs', 'compact diaryreturnbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'contactsreturnloop', 'compact contactsreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'contactreturnloop', 'compact contactreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'contactreturnloops', 'compact contactreturnloops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'contactreturnlane', 'compact contactreturnlane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'contactreturnlanes', 'compact contactreturnlanes continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'contactsreturnpacket', 'compact contactsreturnpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'contactsreturnpackets', 'compact contactsreturnpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'contactsreturnbrief', 'compact contactsreturnbrief continuity prep');
@@ -6036,6 +6044,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'contactreturnbrief', 'compact contactreturnbrief continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'contactreturnbriefs', 'compact contactreturnbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'heatsreturnloop', 'compact heatsreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'heatreturnloop', 'compact heatreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'heatreturnloops', 'compact heatreturnloops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'heatreturnlane', 'compact heatreturnlane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'heatreturnlanes', 'compact heatreturnlanes continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'heatsreturnpacket', 'compact heatsreturnpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'heatsreturnpackets', 'compact heatsreturnpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'heatsreturnbrief', 'compact heatsreturnbrief continuity prep');

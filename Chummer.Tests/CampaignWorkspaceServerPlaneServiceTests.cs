@@ -216,6 +216,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimesreturnbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimesreturnbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diariesreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaryreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaryreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaryreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaryreturnlanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diariesreturnpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diariesreturnpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diariesreturnbrief")));
@@ -225,6 +229,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaryreturnbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaryreturnbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactsreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactreturnlanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactsreturnpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactsreturnpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactsreturnbrief")));
@@ -234,6 +242,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactreturnbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactreturnbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("heatsreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("heatreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("heatreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("heatreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("heatreturnlanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("heatsreturnpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("heatsreturnpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("heatsreturnbrief")));
