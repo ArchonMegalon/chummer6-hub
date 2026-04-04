@@ -748,6 +748,7 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             f"{release_channel_path}"
         )
     locale_rows: dict[str, dict] = {}
+    locale_row_order: list[str] = []
     for index, row in enumerate(locale_summary):
         row_object = require_object(
             row,
@@ -768,6 +769,7 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
                 f"{release_channel_path} ({locale})"
             )
         locale_rows[locale] = row_object
+        locale_row_order.append(locale)
     missing_locale_rows = sorted(
         locale for locale in REQUIRED_LOCALIZATION_SHIPPING_LOCALES if locale not in locale_rows
     )
@@ -783,6 +785,11 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
         raise SystemExit(
             "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary has unexpected locales: "
             f"{release_channel_path} ({', '.join(unexpected_locale_rows)})"
+        )
+    if tuple(locale_row_order) != REQUIRED_LOCALIZATION_SHIPPING_LOCALES:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary must preserve canonical shipping locale ordering: "
+            f"{release_channel_path} (actual={locale_row_order}, expected={list(REQUIRED_LOCALIZATION_SHIPPING_LOCALES)})"
         )
     for locale in REQUIRED_LOCALIZATION_SHIPPING_LOCALES:
         row = locale_rows[locale]
