@@ -68,6 +68,7 @@ public sealed class TravelModeCacheFreshnessTests
         Assert.Contains("fresh staged cache", summary.CacheFreshnessSummary, StringComparison.Ordinal);
         Assert.Contains("Offline actionability is bounded but degraded across", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
         Assert.Contains("downtime/diary", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
+        Assert.Contains("return/loop", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
         Assert.Equal(5, summary.OfflineLaneCues.Count);
         Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("degraded", cue.Status));
         Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "downtime_diary" && cue.SignalCount >= 0);
@@ -100,9 +101,81 @@ public sealed class TravelModeCacheFreshnessTests
         Assert.Equal(1, summary.StaleCacheDeviceCount);
         Assert.Contains("No travel-prefetch receipt exists yet", summary.CacheFreshnessSummary, StringComparison.Ordinal);
         Assert.Contains("Offline actionability is bounded but degraded across", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
+        Assert.Contains("return/loop", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
         Assert.Equal(5, summary.OfflineLaneCues.Count);
         Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("degraded", cue.Status));
         Assert.Equal("stale", summary.Devices.Single().Status);
+    }
+
+    [Fact]
+    public void BuildTravelMode_CountsReturnLoopCarryForwardOnlyWhenCarryForwardIsReturnSignal()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        CampaignWorkspaceProjection workspace = BuildWorkspace(
+            new TravelPrefetchReceiptProjection(
+                ReceiptId: "receipt-fresh",
+                WorkspaceId: "workspace-1",
+                CampaignId: "campaign-1",
+                InstallationId: "install-fresh",
+                DeviceRole: "travel_cache",
+                Platform: "ios",
+                HeadId: "mobile",
+                Channel: "stable",
+                PrefetchSummary: "Fresh staged receipt.",
+                InventoryLines: [],
+                Boundaries: [],
+                InitiatedByUserId: "user-1",
+                StagedAtUtc: now.AddDays(-1)))
+            with
+            {
+                NextSessionCarryForward = new NextSessionCarryForwardProjection(
+                    CarryForwardId: "carry-return",
+                    Label: "Campaign return lane",
+                    Summary: "Return loop remains attached to the governed lane.",
+                    ReturnSummary: "Reopen from the same return lane next session.",
+                    NextSafeAction: "Confirm next session return lane before departure.",
+                    EvidenceLines: ["return loop remains governed"],
+                    UpdatedAtUtc: now),
+                ChangePackets =
+                [
+                    new WorkspaceChangePacketProjection(
+                        PacketId: "packet-1",
+                        Kind: "campaign_return",
+                        Label: "Campaign return packet",
+                        Summary: "Return packet remains governed.",
+                        UpdatedAtUtc: now)
+                ]
+            };
+
+        WorkspaceRestoreProjection restore = BuildRestore(
+            new ClaimedDeviceRestoreProjection(
+                InstallationId: "install-fresh",
+                DeviceRole: "travel_cache",
+                Platform: "ios",
+                HeadId: "mobile",
+                Channel: "stable",
+                HostLabel: "tablet",
+                RestoreSummary: "Bounded offline use is staged."));
+
+        TravelModeReadinessSummary summary = InvokeBuildTravelMode(workspace, restore, BuildPrepLibrary());
+        TravelOfflineLaneCue returnLoopCue = Assert.Single(summary.OfflineLaneCues, cue => cue.Lane == "return_loop");
+        Assert.Equal(2, returnLoopCue.SignalCount);
+
+        CampaignWorkspaceProjection nonReturnCarryForwardWorkspace = workspace with
+        {
+            NextSessionCarryForward = new NextSessionCarryForwardProjection(
+                CarryForwardId: "carry-non-return",
+                Label: "Schedule reminder",
+                Summary: "Review logistics before next session.",
+                ReturnSummary: "No carry-forward lane is attached.",
+                NextSafeAction: "Review prep queue.",
+                EvidenceLines: ["logistics only"],
+                UpdatedAtUtc: now)
+        };
+
+        TravelModeReadinessSummary withoutReturnCarryForwardSummary = InvokeBuildTravelMode(nonReturnCarryForwardWorkspace, restore, BuildPrepLibrary());
+        TravelOfflineLaneCue nonReturnLoopCue = Assert.Single(withoutReturnCarryForwardSummary.OfflineLaneCues, cue => cue.Lane == "return_loop");
+        Assert.Equal(1, nonReturnLoopCue.SignalCount);
     }
 
     [Fact]
