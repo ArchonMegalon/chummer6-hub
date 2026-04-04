@@ -491,6 +491,20 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("eventcontrol");
         }
 
+        if (tokens.Contains("seasonops"))
+        {
+            tokens.Remove("seasonops");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("seasonop"))
+        {
+            tokens.Remove("seasonop");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
         return tokens.ToArray();
     }
 
