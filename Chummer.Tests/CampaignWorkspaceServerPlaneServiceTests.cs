@@ -183,6 +183,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketDeduplicatesIdenticalPackageVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithAftermathSignalsOnly();
+        IReadOnlyList<AftermathRecapPackageProjection> packages =
+            Assert.IsAssignableFrom<IReadOnlyList<AftermathRecapPackageProjection>>(seed.AftermathPackages);
+        AftermathRecapPackageProjection first = packages[0];
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            AftermathPackages = [first, first]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("2 aftermath or downtime signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("aftermath downtime brief", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void AftermathPacketIncludesSignalLabelsWhenSignalSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathSignalLabelsOnly();
@@ -649,6 +670,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("2 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("heat pressure", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("fixer pressure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CampaignReturnPacketDeduplicatesIdenticalAftermathPackageVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithAftermathSignalsOnly();
+        IReadOnlyList<AftermathRecapPackageProjection> packages =
+            Assert.IsAssignableFrom<IReadOnlyList<AftermathRecapPackageProjection>>(seed.AftermathPackages);
+        AftermathRecapPackageProjection first = packages[0];
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            AftermathPackages = [first, first]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("2 diary/continuity signal(s) and 0 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("aftermath downtime brief", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
