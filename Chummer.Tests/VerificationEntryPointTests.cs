@@ -62,7 +62,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("generatedAt/generated_at is in the future", script, StringComparison.Ordinal);
         Assert.Contains("required_workflow_family_ids", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_workflow_family_ids", script, StringComparison.Ordinal);
+        Assert.Contains("flagship_required_desktop_heads", script, StringComparison.Ordinal);
+        Assert.Contains("flagship_missing_or_not_ready_desktop_heads", script, StringComparison.Ordinal);
         Assert.Contains("workflow_execution_missing_receipts", script, StringComparison.Ordinal);
+        Assert.Contains("sr4_workflow_parity_status", script, StringComparison.Ordinal);
+        Assert.Contains("chummer5a_workflow_parity_status", script, StringComparison.Ordinal);
+        Assert.Contains("sr4_sr6_frontier_status", script, StringComparison.Ordinal);
         Assert.Contains("metatype-priorities-karma-entry", script, StringComparison.Ordinal);
         Assert.Contains("recovery-reload-migration-roundtrips", script, StringComparison.Ordinal);
         Assert.Contains("required_legacy_interaction_keys", script, StringComparison.Ordinal);

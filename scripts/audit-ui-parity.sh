@@ -62,6 +62,12 @@ def require_string_list(value: object, *, message: str) -> list[str]:
     return value
 
 
+def require_pass_status(value: object, *, message: str) -> None:
+    normalized = str(value or "").strip().lower()
+    if normalized not in {"pass", "passed", "ready"}:
+        raise SystemExit(message + f" (status={normalized or 'missing'})")
+
+
 def require_empty_collection(value: object, *, message: str) -> None:
     if isinstance(value, dict):
         if value:
@@ -164,6 +170,24 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         data.get("evidence"),
         message=f"parity audit failed: workflow receipt evidence must be a JSON object: {path}",
     )
+    flagship_required_heads = set(
+        require_string_list(
+            evidence.get("flagship_required_desktop_heads"),
+            message=f"parity audit failed: workflow receipt flagship_required_desktop_heads must be a string array: {path}",
+        )
+    )
+    required_heads = {"avalonia", "blazor-desktop"}
+    missing_required_heads = sorted(required_heads.difference(flagship_required_heads))
+    if missing_required_heads:
+        raise SystemExit(
+            "parity audit failed: workflow receipt is missing required flagship desktop heads: "
+            + ", ".join(missing_required_heads)
+            + f" ({path})"
+        )
+    require_empty_collection(
+        evidence.get("flagship_missing_or_not_ready_desktop_heads"),
+        message=f"parity audit failed: workflow receipt reports missing or non-ready flagship desktop heads: {path}",
+    )
     required_families = require_string_list(
         evidence.get("required_workflow_family_ids"),
         message=f"parity audit failed: workflow receipt required_workflow_family_ids must be a string array: {path}",
@@ -202,6 +226,18 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
     require_empty_collection(
         evidence.get("workflow_execution_failing_receipts"),
         message=f"parity audit failed: workflow receipt reports failing execution receipts: {path}",
+    )
+    require_pass_status(
+        evidence.get("sr4_workflow_parity_status"),
+        message=f"parity audit failed: workflow receipt sr4 parity proof is not pass-ready: {path}",
+    )
+    require_pass_status(
+        evidence.get("chummer5a_workflow_parity_status"),
+        message=f"parity audit failed: workflow receipt chummer5a parity proof is not pass-ready: {path}",
+    )
+    require_pass_status(
+        evidence.get("sr4_sr6_frontier_status"),
+        message=f"parity audit failed: workflow receipt sr4/sr6 frontier proof is not pass-ready: {path}",
     )
     validate_timestamp_freshness(path, data, evidence)
 
