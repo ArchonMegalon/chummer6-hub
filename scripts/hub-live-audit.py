@@ -3932,6 +3932,34 @@ def verify_signed_in_work_audit(
     prep_library_lessons_learnt_split = json.loads(body)
     if not (prep_library_lessons_learnt_split.get("items") or []):
         raise AssertionError("prep-library lessons learnt search did not expose any governed packet")
+    prep_library_lesson_learnt_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=lesson-learnt"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_lesson_learnt_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_lesson_learnt_hyphen_path} returned {status}, expected 200")
+
+    prep_library_lesson_learnt_hyphen = json.loads(body)
+    if not (prep_library_lesson_learnt_hyphen.get("items") or []):
+        raise AssertionError("prep-library lesson-learnt search did not expose any governed packet")
+    prep_library_lessons_learnt_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=lessons-learnt"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_lessons_learnt_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_lessons_learnt_hyphen_path} returned {status}, expected 200")
+
+    prep_library_lessons_learnt_hyphen = json.loads(body)
+    if not (prep_library_lessons_learnt_hyphen.get("items") or []):
+        raise AssertionError("prep-library lessons-learnt search did not expose any governed packet")
     prep_library_lesson_learned_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=lesson-learned"
     status, body, _, _ = fetch(
         base_url,
@@ -8321,6 +8349,36 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_lessons_learnt_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_lessons_learnt_search_path} should return at least one governed prep packet for the lessons learnt query")
+    workspace_lesson_learnt_hyphen_search_path = f"{workspace_path}?prepQuery=lesson-learnt"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_lesson_learnt_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_lesson_learnt_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_lesson_learnt_hyphen_search_path)
+    require_snippet(body, 'match(es) for "lesson-learnt"', workspace_lesson_learnt_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_lesson_learnt_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_lesson_learnt_hyphen_search_path} should return at least one governed prep packet for the lesson-learnt query")
+    workspace_lessons_learnt_hyphen_search_path = f"{workspace_path}?prepQuery=lessons-learnt"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_lessons_learnt_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_lessons_learnt_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_lessons_learnt_hyphen_search_path)
+    require_snippet(body, 'match(es) for "lessons-learnt"', workspace_lessons_learnt_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_lessons_learnt_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_lessons_learnt_hyphen_search_path} should return at least one governed prep packet for the lessons-learnt query")
     workspace_lesson_learned_hyphen_search_path = f"{workspace_path}?prepQuery=lesson-learned"
     status, body, _, _ = fetch(
         base_url,

@@ -4717,6 +4717,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail lessons learnt split search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail lessons learnt split search');
 
+  await page.fill('#prepQuery', 'lesson-learnt');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=lesson-learnt/.test(page.url()), 'Workspace detail search should preserve the hyphen lesson-learnt continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail lesson-learnt hyphen search');
+  await expectBodyText(page, 'match(es) for "lesson-learnt"', '/account/work/workspaces detail lesson-learnt hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail lesson-learnt hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail lesson-learnt hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail lesson-learnt hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail lesson-learnt hyphen search');
+  const workspaceLessonLearntHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLessonLearntHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen lesson-learnt continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail lesson-learnt hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail lesson-learnt hyphen search');
+
+  await page.fill('#prepQuery', 'lessons-learnt');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=lessons-learnt/.test(page.url()), 'Workspace detail search should preserve the hyphen lessons-learnt continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail lessons-learnt hyphen search');
+  await expectBodyText(page, 'match(es) for "lessons-learnt"', '/account/work/workspaces detail lessons-learnt hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail lessons-learnt hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail lessons-learnt hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail lessons-learnt hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail lessons-learnt hyphen search');
+  const workspaceLessonsLearntHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLessonsLearntHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen lessons-learnt continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail lessons-learnt hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail lessons-learnt hyphen search');
+
   await page.fill('#prepQuery', 'lesson-learned');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
