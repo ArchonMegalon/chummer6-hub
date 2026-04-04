@@ -145,12 +145,16 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "mobilecompanionsreturnloops",
             "mobilecompanionreturnpacket",
             "mobilecompanionsreturnpackets",
+            "mobilecompanionreturnbrief",
+            "mobilecompanionsreturnbriefs",
             "campaignmobilecompanionreturnlane",
             "campaignmobilecompanionreturnlanes",
             "campaignmobilecompanionsreturnloop",
             "campaignmobilecompanionsreturnloops",
             "campaignmobilecompanionreturnpacket",
-            "campaignmobilecompanionsreturnpackets"
+            "campaignmobilecompanionsreturnpackets",
+            "campaignmobilecompanionreturnbrief",
+            "campaignmobilecompanionsreturnbriefs"
         };
 
         PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
@@ -167,12 +171,16 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("mobilecompanionsreturnloops", tokens);
         Assert.DoesNotContain("mobilecompanionreturnpacket", tokens);
         Assert.DoesNotContain("mobilecompanionsreturnpackets", tokens);
+        Assert.DoesNotContain("mobilecompanionreturnbrief", tokens);
+        Assert.DoesNotContain("mobilecompanionsreturnbriefs", tokens);
         Assert.DoesNotContain("campaignmobilecompanionreturnlane", tokens);
         Assert.DoesNotContain("campaignmobilecompanionreturnlanes", tokens);
         Assert.DoesNotContain("campaignmobilecompanionsreturnloop", tokens);
         Assert.DoesNotContain("campaignmobilecompanionsreturnloops", tokens);
         Assert.DoesNotContain("campaignmobilecompanionreturnpacket", tokens);
         Assert.DoesNotContain("campaignmobilecompanionsreturnpackets", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionreturnbrief", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionsreturnbriefs", tokens);
         Assert.DoesNotContain("mobile", tokens);
         Assert.DoesNotContain("companion", tokens);
         Assert.DoesNotContain("companions", tokens);

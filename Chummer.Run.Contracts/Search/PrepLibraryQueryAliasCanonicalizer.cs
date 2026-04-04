@@ -208,10 +208,18 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "mobilecompanionreturnpackets", "mobile", "companion", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "mobilecompanionsreturnpacket", "mobile", "companion", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "mobilecompanionsreturnpackets", "mobile", "companion", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilecompanionreturnbrief", "mobile", "companion", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilecompanionreturnbriefs", "mobile", "companion", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilecompanionsreturnbrief", "mobile", "companion", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilecompanionsreturnbriefs", "mobile", "companion", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "campaignmobilecompanionreturnpacket", "campaign", "mobile", "companion", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "campaignmobilecompanionreturnpackets", "campaign", "mobile", "companion", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "campaignmobilecompanionsreturnpacket", "campaign", "mobile", "companion", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "campaignmobilecompanionsreturnpackets", "campaign", "mobile", "companion", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignmobilecompanionreturnbrief", "campaign", "mobile", "companion", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignmobilecompanionreturnbriefs", "campaign", "mobile", "companion", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignmobilecompanionsreturnbrief", "campaign", "mobile", "companion", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignmobilecompanionsreturnbriefs", "campaign", "mobile", "companion", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "gamemaster", "game", "master");
         RewriteCompactContinuityMutationAlias(tokens, "gamemasters", "game", "master");
         RewriteCompactContinuityMutationAlias(tokens, "gamemasterop", "game", "master", "op");
