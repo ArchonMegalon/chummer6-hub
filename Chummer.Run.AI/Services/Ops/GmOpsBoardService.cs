@@ -99,15 +99,18 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             .Where(static item => LooksUnresolved(item.EventType, item.Payload))
             .Select(item =>
             {
+                string gmDomain = ResolveGmOpsDomain(item.EventType, item.Payload);
                 string severity = ResolveSeverity(item.EventType, item.Payload);
                 return new
                 {
                     Event = item,
+                    DomainPriority = ResolveGmOpsDomainPriority(gmDomain),
                     Severity = severity,
                     SeverityPriority = ResolveSeverityPriority(severity)
                 };
             })
             .OrderByDescending(static item => item.SeverityPriority)
+            .ThenByDescending(static item => item.DomainPriority)
             .ThenByDescending(static item => item.Event.AtUtc)
             .ThenBy(static item => item.Event.EventId, StringComparer.Ordinal)
             .Take(6)
@@ -1050,6 +1053,40 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
 
         return "low";
     }
+
+    private static string ResolveGmOpsDomain(string eventType, string payload)
+    {
+        var combined = $"{eventType} {payload}";
+        if (combined.Contains("opposition", StringComparison.OrdinalIgnoreCase))
+        {
+            return "opposition";
+        }
+
+        if (combined.Contains("event control", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("event-control", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("event_control", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("season", StringComparison.OrdinalIgnoreCase))
+        {
+            return "event_control";
+        }
+
+        if (combined.Contains("roster", StringComparison.OrdinalIgnoreCase))
+        {
+            return "roster_movement";
+        }
+
+        return "general";
+    }
+
+    private static int ResolveGmOpsDomainPriority(string domain)
+        => domain switch
+        {
+            "opposition" => 4,
+            "event_control" => 3,
+            "roster_movement" => 2,
+            "general" => 1,
+            _ => 0
+        };
 
     private static int ResolveSeverityPriority(string severity)
         => severity switch
