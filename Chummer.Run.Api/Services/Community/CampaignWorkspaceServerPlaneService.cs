@@ -981,7 +981,21 @@ public sealed class CampaignWorkspaceServerPlaneService
                 static group => group.Max(static item => item.GeneratedAtUtc),
                 StringComparer.OrdinalIgnoreCase);
         DateTimeOffset defaultUpdatedAtUtc = workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow;
-        var publicationsById = creatorPublications.ToDictionary(static item => item.PublicationId, StringComparer.OrdinalIgnoreCase);
+        var publicationsById = creatorPublications
+            .Select(static item => new
+            {
+                PublicationId = NormalizeOptional(item.PublicationId),
+                Publication = item
+            })
+            .Where(static item => item.PublicationId is not null)
+            .GroupBy(static item => item.PublicationId!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group
+                    .OrderByDescending(static item => item.Publication.UpdatedAtUtc)
+                    .First()
+                    .Publication,
+                StringComparer.OrdinalIgnoreCase);
         var publicationsByArtifactId = creatorPublications
             .Where(item => !string.IsNullOrWhiteSpace(item.ArtifactId))
             .GroupBy(item => item.ArtifactId, StringComparer.OrdinalIgnoreCase)
