@@ -81,6 +81,7 @@ DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS = 24 * 60 * 60
 DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS = 5 * 60
 DEFAULT_RELEASE_PROOF_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 DEFAULT_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS = 5 * 60
+LOCALIZATION_GATE_ALIAS_DRIFT_MARKER = "releaseProof.uiLocalizationReleaseGate alias values drift between uiLocalizationReleaseGate and ui_localization_release_gate"
 REQUIRED_RELEASE_PROOF_JOURNEYS = (
     "install_claim_restore_continue",
     "build_explain_publish",
@@ -514,6 +515,16 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.generatedAt is in the future: "
             f"{release_channel_path} (future_skew_seconds={abs(release_proof_age_seconds)}, max_future_skew_seconds={release_proof_max_future_skew_seconds})"
         )
+    if (
+        "uiLocalizationReleaseGate" in proof
+        and "ui_localization_release_gate" in proof
+        and proof.get("uiLocalizationReleaseGate") != proof.get("ui_localization_release_gate")
+    ):
+        raise SystemExit(
+            f"parity audit failed: {LOCALIZATION_GATE_ALIAS_DRIFT_MARKER}: "
+            f"{release_channel_path}"
+        )
+
     localization_gate_object = require_object(
         resolve_alias_value(
             proof,
