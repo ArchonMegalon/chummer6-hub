@@ -200,6 +200,20 @@
         => IsDiscoverablePublicCreatorPublication(publication)
             ? "Open public publication"
             : "Open publication status";
+
+    static string BuildLabOutputLaneLabel(string? kind)
+        => kind?.Trim().ToLowerInvariant() switch
+        {
+            "character_template" => "Character template",
+            "json_exchange" => "JSON exchange",
+            "foundry_exchange" => "Foundry exchange",
+            "sheet_viewer" => "Sheet viewer",
+            "print_pdf_export" => "Print/PDF export",
+            "replay_timeline" => "Replay timeline",
+            "session_recap" => "Session recap",
+            "run_module" => "Run module",
+            _ => HumanizeStatus(kind, "Governed output")
+        };
 }
 
 <section class="home-command">
@@ -931,6 +945,7 @@
                                                                         {
                                                                             <span> Output provenance: @output.ProvenanceSummary.</span>
                                                                         }
+                                                                        <span> Output lane: @BuildLabOutputLaneLabel(output.Kind).</span>
                                                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
                                                                         {
                                                                             <span> Output publication: @output.PublicationSummary.</span>
@@ -942,6 +957,14 @@
                                                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                                                         {
                                                                             <span> Output audit: @output.AuditSummary.</span>
+                                                                        }
+                                                                        @if (!string.IsNullOrWhiteSpace(output.CompatibilitySummary))
+                                                                        {
+                                                                            <span> Output compatibility: @output.CompatibilitySummary.</span>
+                                                                        }
+                                                                        @if (!string.IsNullOrWhiteSpace(output.LineageSummary))
+                                                                        {
+                                                                            <span> Output lineage: @output.LineageSummary.</span>
                                                                         }
                                                                     }
                                                                 }
