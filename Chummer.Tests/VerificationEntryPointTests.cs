@@ -259,6 +259,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject non-passing releaseProof.uiLocalizationReleaseGate.explicitFallbackRuntime status", script, StringComparison.Ordinal);
         Assert.Contains("reject non-passing releaseProof.uiLocalizationReleaseGate.signoffSmokeRunnerStatus status", script, StringComparison.Ordinal);
         Assert.Contains("reject non-passing releaseProof.uiLocalizationReleaseGate.signoff_smoke_runner_status alias status", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-integer releaseProof.uiLocalizationReleaseGate.blockingFindingsCount values", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-integer releaseProof.uiLocalizationReleaseGate.translationBacklogFindingsCount values", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.uiLocalizationReleaseGate.blockingFindings length/count mismatches", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.uiLocalizationReleaseGate.translationBacklogFindings length/count mismatches", script, StringComparison.Ordinal);
         Assert.Contains("reject non-zero releaseProof.uiLocalizationReleaseGate.localeSummary untranslatedKeyCount values", script, StringComparison.Ordinal);
