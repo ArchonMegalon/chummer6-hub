@@ -2499,6 +2499,20 @@ def verify_signed_in_work_audit(
     prep_library_leaguectls = json.loads(body)
     if not (prep_library_leaguectls.get("items") or []):
         raise AssertionError("prep-library leaguectls search did not expose any governed packet")
+    prep_library_leaguectrls_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=leaguectrls"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_leaguectrls_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_leaguectrls_path} returned {status}, expected 200")
+
+    prep_library_leaguectrls = json.loads(body)
+    if not (prep_library_leaguectrls.get("items") or []):
+        raise AssertionError("prep-library leaguectrls search did not expose any governed packet")
     prep_library_league_ctrl_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=league-ctrl"
     status, body, _, _ = fetch(
         base_url,
@@ -2737,6 +2751,20 @@ def verify_signed_in_work_audit(
     prep_library_communityctls = json.loads(body)
     if not (prep_library_communityctls.get("items") or []):
         raise AssertionError("prep-library communityctls search did not expose any governed packet")
+    prep_library_communityctrls_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=communityctrls"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_communityctrls_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_communityctrls_path} returned {status}, expected 200")
+
+    prep_library_communityctrls = json.loads(body)
+    if not (prep_library_communityctrls.get("items") or []):
+        raise AssertionError("prep-library communityctrls search did not expose any governed packet")
     prep_library_community_ctrl_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=community-ctrl"
     status, body, _, _ = fetch(
         base_url,
@@ -5771,6 +5799,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_leaguectls_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_leaguectls_search_path} should return at least one governed prep packet for the leaguectls query")
+    workspace_leaguectrls_search_path = f"{workspace_path}?prepQuery=leaguectrls"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_leaguectrls_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_leaguectrls_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_leaguectrls_search_path)
+    require_snippet(body, 'match(es) for "leaguectrls"', workspace_leaguectrls_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_leaguectrls_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_leaguectrls_search_path} should return at least one governed prep packet for the leaguectrls query")
     workspace_league_ctrl_hyphen_search_path = f"{workspace_path}?prepQuery=league-ctrl"
     status, body, _, _ = fetch(
         base_url,
@@ -6026,6 +6069,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_communityctls_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_communityctls_search_path} should return at least one governed prep packet for the communityctls query")
+    workspace_communityctrls_search_path = f"{workspace_path}?prepQuery=communityctrls"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_communityctrls_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_communityctrls_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_communityctrls_search_path)
+    require_snippet(body, 'match(es) for "communityctrls"', workspace_communityctrls_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_communityctrls_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_communityctrls_search_path} should return at least one governed prep packet for the communityctrls query")
     workspace_community_ctrl_hyphen_search_path = f"{workspace_path}?prepQuery=community-ctrl"
     status, body, _, _ = fetch(
         base_url,
