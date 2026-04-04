@@ -229,7 +229,9 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
         {
             "workspacev4",
+            "campaignworkspacev4",
             "workspacev4packets",
+            "workspacev4briefs",
             "campaignworkspacev4brief",
             "campaignworkspacev4briefs"
         };
@@ -240,7 +242,9 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.Contains("return", tokens);
         Assert.Contains("packet", tokens);
         Assert.DoesNotContain("workspacev4", tokens);
+        Assert.DoesNotContain("campaignworkspacev4", tokens);
         Assert.DoesNotContain("workspacev4packets", tokens);
+        Assert.DoesNotContain("workspacev4briefs", tokens);
         Assert.DoesNotContain("campaignworkspacev4brief", tokens);
         Assert.DoesNotContain("campaignworkspacev4briefs", tokens);
         Assert.DoesNotContain("workspace", tokens);

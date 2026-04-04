@@ -6002,8 +6002,11 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpacket', 'compact gmcontrolpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpackets', 'compact gmcontrolpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4', 'compact workspacev4 continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4', 'compact campaignworkspacev4 continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4packet', 'compact workspacev4packet continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4packets', 'compact workspacev4packets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4brief', 'compact workspacev4brief continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4briefs', 'compact workspacev4briefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4packet', 'compact campaignworkspacev4packet continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4packets', 'compact campaignworkspacev4packets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4brief', 'compact campaignworkspacev4brief continuity prep');

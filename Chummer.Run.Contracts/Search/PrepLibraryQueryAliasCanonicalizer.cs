@@ -109,6 +109,8 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "workspacev4", "workspace", "v4");
         RewriteCompactContinuityMutationAlias(tokens, "workspacev4packet", "workspace", "v4", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "workspacev4packets", "workspace", "v4", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "workspacev4brief", "workspace", "v4", "brief");
+        RewriteCompactContinuityMutationAlias(tokens, "workspacev4briefs", "workspace", "v4", "briefs");
         RewriteCompactContinuityMutationAlias(tokens, "campaignworkspacev4", "campaign", "workspace", "v4");
         RewriteCompactContinuityMutationAlias(tokens, "campaignworkspacev4packet", "campaign", "workspace", "v4", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "campaignworkspacev4packets", "campaign", "workspace", "v4", "packet");
