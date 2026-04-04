@@ -3651,32 +3651,38 @@ public sealed class CampaignSpineService
                 var (trustBand, discoverable, trustSummary, discoverySummary, moderationSummary) = BuildCreatorPublicationTrustPosture(publicationStatus, workspace.Visibility);
                 var watchouts = BuildCreatorPublicationWatchouts(workspace, leadHandoff);
                 return workspace.RecapShelf
-                    .Where(item => !string.IsNullOrWhiteSpace(item.CreatorPublicationId))
+                    .Select(item => new
+                    {
+                        Item = item,
+                        PublicationId = AccountService.NormalizeOptional(item.CreatorPublicationId)
+                    })
+                    .Where(static item => item.PublicationId is not null)
                     .Select(item =>
                     {
-                        string artifact = item.ArtifactId ?? StableId("artifact", $"{workspace.WorkspaceId}:{item.ProjectionId}");
-                        string publicationKind = NormalizeCreatorPublicationKind(item.Kind);
-                        string nextSafeAction = !string.IsNullOrWhiteSpace(item.NextSafeAction)
-                            ? item.NextSafeAction!
+                        PublicationSafeProjection recap = item.Item;
+                        string artifact = recap.ArtifactId ?? StableId("artifact", $"{workspace.WorkspaceId}:{recap.ProjectionId}");
+                        string publicationKind = NormalizeCreatorPublicationKind(recap.Kind);
+                        string nextSafeAction = !string.IsNullOrWhiteSpace(recap.NextSafeAction)
+                            ? recap.NextSafeAction!
                             : !string.IsNullOrWhiteSpace(leadHandoff?.NextSafeAction)
                                 ? leadHandoff.NextSafeAction
                                 : workspace.NextSafeAction
                                     ?? "Review the grounded publication lane, then return through the shared campaign view before you publish or export it further.";
-                        string campaignReturnSummary = DescribeSharedPublicationSummary(workspace, item);
+                        string campaignReturnSummary = DescribeSharedPublicationSummary(workspace, recap);
                         string supportClosureSummary = !string.IsNullOrWhiteSpace(leadHandoff?.SupportClosureSummary)
                             ? leadHandoff.SupportClosureSummary
                             : DescribeCreatorPublicationSupportClosure(workspace);
                         return new CreatorPublicationProjection(
-                            PublicationId: item.CreatorPublicationId!,
-                            Title: BuildCreatorPublicationTitle(workspace, dossier, item, publicationKind),
+                            PublicationId: item.PublicationId!,
+                            Title: BuildCreatorPublicationTitle(workspace, dossier, recap, publicationKind),
                             Kind: publicationKind,
-                            Summary: BuildCreatorPublicationSummary(workspace, item, publicationKind),
+                            Summary: BuildCreatorPublicationSummary(workspace, recap, publicationKind),
                             CampaignId: workspace.CampaignId,
                             DossierId: dossier?.DossierId,
                             ArtifactId: artifact,
-                            ProvenanceSummary: string.IsNullOrWhiteSpace(item.ProvenanceSummary)
-                                ? $"{workspace.RuleEnvironment.CompatibilityFingerprint} + {item.Label}"
-                                : item.ProvenanceSummary!,
+                            ProvenanceSummary: string.IsNullOrWhiteSpace(recap.ProvenanceSummary)
+                                ? $"{workspace.RuleEnvironment.CompatibilityFingerprint} + {recap.Label}"
+                                : recap.ProvenanceSummary!,
                             DiscoverySummary: discoverySummary,
                             Visibility: workspace.Visibility,
                             PublicationStatus: publicationStatus,
