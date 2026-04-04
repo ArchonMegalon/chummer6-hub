@@ -1922,6 +1922,10 @@ public sealed class CampaignWorkspaceServerPlaneService
         {
             searchTerms = BuildSearchTerms(searchTerms, "opposition", "packet", "prep");
         }
+        searchTerms = searchTerms
+            .Concat(["oppositions", "encounter", "enemy", "hostile", "adversary", "threat"])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         return new GovernedPrepPacketSummary(
             PacketId: $"opposition:{workspace.WorkspaceId}",

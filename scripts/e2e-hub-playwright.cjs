@@ -748,6 +748,132 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail search');
 
+  await page.fill('#prepQuery', 'oppositions');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=oppositions/.test(page.url()), 'Workspace detail search should preserve the oppositions prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail oppositions search');
+  await expectBodyText(page, 'match(es) for "oppositions"', '/account/work/workspaces detail oppositions search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail oppositions search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail oppositions search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail oppositions search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail oppositions search');
+  const workspaceOppositionsSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceOppositionsSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the oppositions query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail oppositions search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail oppositions search');
+
+  await page.fill('#prepQuery', 'encounter');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=encounter/.test(page.url()), 'Workspace detail search should preserve the encounter prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail encounter search');
+  await expectBodyText(page, 'match(es) for "encounter"', '/account/work/workspaces detail encounter search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail encounter search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail encounter search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail encounter search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail encounter search');
+  const workspaceEncounterSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEncounterSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the encounter query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail encounter search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail encounter search');
+
+  await page.fill('#prepQuery', 'enemy');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=enemy/.test(page.url()), 'Workspace detail search should preserve the enemy prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail enemy search');
+  await expectBodyText(page, 'match(es) for "enemy"', '/account/work/workspaces detail enemy search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail enemy search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail enemy search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail enemy search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail enemy search');
+  const workspaceEnemySearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEnemySearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the enemy query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail enemy search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail enemy search');
+
+  await page.fill('#prepQuery', 'hostile');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=hostile/.test(page.url()), 'Workspace detail search should preserve the hostile prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail hostile search');
+  await expectBodyText(page, 'match(es) for "hostile"', '/account/work/workspaces detail hostile search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail hostile search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail hostile search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail hostile search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail hostile search');
+  const workspaceHostileSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceHostileSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hostile query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail hostile search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hostile search');
+
+  await page.fill('#prepQuery', 'adversary');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=adversary/.test(page.url()), 'Workspace detail search should preserve the adversary prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail adversary search');
+  await expectBodyText(page, 'match(es) for "adversary"', '/account/work/workspaces detail adversary search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail adversary search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail adversary search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail adversary search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail adversary search');
+  const workspaceAdversarySearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAdversarySearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the adversary query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail adversary search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail adversary search');
+
+  await page.fill('#prepQuery', 'threat');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=threat/.test(page.url()), 'Workspace detail search should preserve the threat prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail threat search');
+  await expectBodyText(page, 'match(es) for "threat"', '/account/work/workspaces detail threat search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail threat search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail threat search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail threat search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail threat search');
+  const workspaceThreatSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceThreatSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the threat query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail threat search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail threat search');
+
   await page.fill('#prepQuery', 'seasonops');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
