@@ -712,6 +712,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=debriefs", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=debriefing", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=debriefings", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=postmortem", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=post%20mortem", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=post-mortem", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=recap", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=recaps", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=afteraction", audit, StringComparison.Ordinal);
@@ -876,6 +879,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=debriefs", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=debriefing", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=debriefings", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=postmortem", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=post%20mortem", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=post-mortem", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=recap", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=recaps", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=afteraction", audit, StringComparison.Ordinal);
@@ -1327,6 +1333,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("debriefing continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=debriefings", playwright, StringComparison.Ordinal);
         Assert.Contains("debriefings continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=postmortem", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact postmortem continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=post(?:%20|\\+)mortem", playwright, StringComparison.Ordinal);
+        Assert.Contains("split post mortem continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=post-mortem", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen post-mortem continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=recap", playwright, StringComparison.Ordinal);
         Assert.Contains("recap continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=recaps", playwright, StringComparison.Ordinal);
