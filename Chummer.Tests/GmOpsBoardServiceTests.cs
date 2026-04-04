@@ -272,6 +272,63 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public void ReconcilePortableAssets_DeduplicatesIdenticalDuplicateAssetVersions_WhenImportingNewAsset()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        var first = BuildPortableAsset(
+            assetId: "prep_duplicate_identical",
+            now: now,
+            title: "Portable duplicate");
+        var second = BuildPortableAsset(
+            assetId: " prep_duplicate_identical ",
+            now: now,
+            title: "Portable duplicate");
+
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([first, second]);
+
+        Assert.Equal(1, result.ImportedCount);
+        Assert.Equal(0, result.SkippedCount);
+        Assert.Empty(result.Conflicts);
+        GmPrepAssetRecord? stored = service.GetPrepAsset("prep_duplicate_identical");
+        Assert.NotNull(stored);
+        Assert.Equal("Portable duplicate", stored!.Title);
+    }
+
+    [Fact]
+    public void ReconcilePortableAssets_DeduplicatesIdenticalDuplicateAssetVersions_WhenUpdatingExistingAsset()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult seedResult = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "prep_duplicate_identical_existing",
+                now: now,
+                title: "Seed title")
+        ]);
+        Assert.Equal(1, seedResult.ImportedCount);
+
+        var updated = BuildPortableAsset(
+            assetId: "prep_duplicate_identical_existing",
+            now: now.AddMinutes(3),
+            title: "Updated title");
+        var duplicate = BuildPortableAsset(
+            assetId: " prep_duplicate_identical_existing ",
+            now: now.AddMinutes(3),
+            title: "Updated title");
+
+        OfflineSyncSurfaceMergeResult result = service.ReconcilePortableAssets([updated, duplicate]);
+
+        Assert.Equal(1, result.ImportedCount);
+        Assert.Equal(0, result.SkippedCount);
+        Assert.Empty(result.Conflicts);
+        GmPrepAssetRecord? stored = service.GetPrepAsset("prep_duplicate_identical_existing");
+        Assert.NotNull(stored);
+        Assert.Equal("Updated title", stored!.Title);
+    }
+
+    [Fact]
     public void ReconcilePortableAssets_KeepsLocalAsset_WhenCampaignDoesNotMatchExistingAsset()
     {
         var service = CreateService();
