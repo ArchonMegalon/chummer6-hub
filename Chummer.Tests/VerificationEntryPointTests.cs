@@ -440,12 +440,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasoncontrol", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=season%20control", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasoncontrols", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=event%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm%20ops", audit, StringComparison.Ordinal);
@@ -489,12 +491,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasoncontrol", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=season%20control", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasoncontrols", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=event%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm%20ops", audit, StringComparison.Ordinal);
@@ -569,6 +573,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact seasonop prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=seasoncontrol", playwright, StringComparison.Ordinal);
         Assert.Contains("compact seasoncontrol prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=season(?:%20|\\+)control", playwright, StringComparison.Ordinal);
+        Assert.Contains("split season control prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=seasoncontrols", playwright, StringComparison.Ordinal);
         Assert.Contains("compact seasoncontrols prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=seasonctrl", playwright, StringComparison.Ordinal);
@@ -581,6 +587,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact eventctrl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventops", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventops prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=event(?:%20|\\+)ops", playwright, StringComparison.Ordinal);
+        Assert.Contains("split event ops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventop", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventop prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gmops", playwright, StringComparison.Ordinal);
