@@ -34,6 +34,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("contains non-canonical token", script, StringComparison.Ordinal);
         Assert.Contains("contains duplicate normalized token", script, StringComparison.Ordinal);
         Assert.Contains("is missing required acknowledged catalog-only", script, StringComparison.Ordinal);
+        Assert.Contains("fail_on_missing_required_legacy_ids", script, StringComparison.Ordinal);
+        Assert.Contains("surface_label=\"tab\"", script, StringComparison.Ordinal);
+        Assert.Contains("surface_label=\"workspace action\"", script, StringComparison.Ordinal);
         Assert.Contains("is missing required legacy desktop control ids", script, StringComparison.Ordinal);
         Assert.Contains("dialog-factory-only desktop control", script, StringComparison.Ordinal);
         Assert.Contains("no longer catalog-only", script, StringComparison.Ordinal);
