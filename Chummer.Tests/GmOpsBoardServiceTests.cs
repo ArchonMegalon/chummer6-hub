@@ -565,6 +565,46 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatCtlShorthandAsEventControlDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:45:30Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open eventctl board remains unresolved for next season gate.",
+                AtUtc: baseTime,
+                EventId: "evt-eventctl"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open seasonctl queue remains unresolved for event-control follow-through.",
+                AtUtc: baseTime.AddMinutes(1),
+                EventId: "evt-seasonctl"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(3, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-seasonctl", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-eventctl", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[2].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatSeasonControlShorthandAsEventControlDomain()
     {
         SessionLedgerService ledger = new();
@@ -1308,6 +1348,33 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(rosterMovementHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(packetsMatches.Items, item => item.AssetId == "prep_library_ops");
         Assert.Contains(prepPacketsMatches.Items, item => item.AssetId == "prep_library_ops");
+        Assert.Empty(negativeMatches.Items);
+    }
+
+    [Fact]
+    public void ListPrepAssets_QuerySupportsCtlShorthand()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult import = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "event_ctl_ops",
+                now: now,
+                title: "Event control board",
+                body: "Season operations timeline remains governed.")
+        ]);
+
+        Assert.Equal(1, import.ImportedCount);
+        Assert.Equal(0, import.SkippedCount);
+        Assert.Empty(import.Conflicts);
+
+        GmPrepAssetListResponse eventCtlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventctl");
+        GmPrepAssetListResponse seasonCtlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasonctl");
+        GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixctl");
+
+        Assert.Contains(eventCtlMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(seasonCtlMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Empty(negativeMatches.Items);
     }
 

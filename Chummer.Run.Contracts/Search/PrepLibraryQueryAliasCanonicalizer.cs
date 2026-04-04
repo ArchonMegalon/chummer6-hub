@@ -102,9 +102,10 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("operation");
         }
 
-        if (tokens.Contains("event") && tokens.Contains("ctrl"))
+        if (tokens.Contains("event") && (tokens.Contains("ctrl") || tokens.Contains("ctl")))
         {
             tokens.Remove("ctrl");
+            tokens.Remove("ctl");
             tokens.Add("eventcontrol");
         }
 
@@ -116,9 +117,10 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("operation");
         }
 
-        if (tokens.Contains("season") && tokens.Contains("ctrl"))
+        if (tokens.Contains("season") && (tokens.Contains("ctrl") || tokens.Contains("ctl")))
         {
             tokens.Remove("ctrl");
+            tokens.Remove("ctl");
             tokens.Add("seasoncontrol");
         }
 
@@ -132,6 +134,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
         if (tokens.Contains("eventctrl"))
         {
             tokens.Remove("eventctrl");
+            tokens.Add("eventcontrol");
+        }
+
+        if (tokens.Contains("eventctl"))
+        {
+            tokens.Remove("eventctl");
             tokens.Add("eventcontrol");
         }
 
@@ -150,6 +158,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
         if (tokens.Contains("seasonctrl"))
         {
             tokens.Remove("seasonctrl");
+            tokens.Add("seasoncontrol");
+        }
+
+        if (tokens.Contains("seasonctl"))
+        {
+            tokens.Remove("seasonctl");
             tokens.Add("seasoncontrol");
         }
 
