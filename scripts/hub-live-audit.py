@@ -2603,6 +2603,34 @@ def verify_signed_in_work_audit(
     prep_library_next_session = json.loads(body)
     if not (prep_library_next_session.get("items") or []):
         raise AssertionError("prep-library nextsession search did not expose any governed packet")
+    prep_library_next_session_return_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=nextsessionreturn"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_next_session_return_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_next_session_return_path} returned {status}, expected 200")
+
+    prep_library_next_session_return = json.loads(body)
+    if not (prep_library_next_session_return.get("items") or []):
+        raise AssertionError("prep-library nextsessionreturn search did not expose any governed packet")
+    prep_library_session_return_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=sessionreturn"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_session_return_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_session_return_path} returned {status}, expected 200")
+
+    prep_library_session_return = json.loads(body)
+    if not (prep_library_session_return.get("items") or []):
+        raise AssertionError("prep-library sessionreturn search did not expose any governed packet")
     prep_library_memory_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=memory"
     status, body, _, _ = fetch(
         base_url,
@@ -5050,6 +5078,36 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_next_session_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_next_session_search_path} should return at least one governed prep packet for the nextsession query")
+    workspace_next_session_return_search_path = f"{workspace_path}?prepQuery=nextsessionreturn"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_next_session_return_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_next_session_return_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_next_session_return_search_path)
+    require_snippet(body, 'match(es) for "nextsessionreturn"', workspace_next_session_return_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_next_session_return_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_next_session_return_search_path} should return at least one governed prep packet for the nextsessionreturn query")
+    workspace_session_return_search_path = f"{workspace_path}?prepQuery=sessionreturn"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_session_return_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_session_return_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_session_return_search_path)
+    require_snippet(body, 'match(es) for "sessionreturn"', workspace_session_return_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_session_return_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_session_return_search_path} should return at least one governed prep packet for the sessionreturn query")
     workspace_memory_search_path = f"{workspace_path}?prepQuery=memory"
     status, body, _, _ = fetch(
         base_url,

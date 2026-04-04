@@ -604,6 +604,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returnloop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=nextsession", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=nextsessionreturn", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=sessionreturn", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=memory", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=archive", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=history", audit, StringComparison.Ordinal);
@@ -710,6 +712,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=return", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=returnloop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=nextsession", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=nextsessionreturn", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=sessionreturn", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=memory", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=archive", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=history", audit, StringComparison.Ordinal);
@@ -994,6 +998,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact returnloop continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=nextsession", playwright, StringComparison.Ordinal);
         Assert.Contains("compact nextsession continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=nextsessionreturn", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact nextsessionreturn continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=sessionreturn", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact sessionreturn continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=memory", playwright, StringComparison.Ordinal);
         Assert.Contains("campaign-memory prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=archive", playwright, StringComparison.Ordinal);
