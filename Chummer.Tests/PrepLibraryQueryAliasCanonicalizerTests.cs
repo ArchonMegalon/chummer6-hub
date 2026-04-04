@@ -224,7 +224,8 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         {
             "workspacev4",
             "workspacev4packets",
-            "campaignworkspacev4brief"
+            "campaignworkspacev4brief",
+            "campaignworkspacev4briefs"
         };
 
         PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
@@ -235,8 +236,10 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("workspacev4", tokens);
         Assert.DoesNotContain("workspacev4packets", tokens);
         Assert.DoesNotContain("campaignworkspacev4brief", tokens);
+        Assert.DoesNotContain("campaignworkspacev4briefs", tokens);
         Assert.DoesNotContain("workspace", tokens);
         Assert.DoesNotContain("v4", tokens);
         Assert.DoesNotContain("brief", tokens);
+        Assert.DoesNotContain("briefs", tokens);
     }
 }
