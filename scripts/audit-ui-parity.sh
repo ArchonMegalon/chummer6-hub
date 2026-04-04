@@ -193,10 +193,9 @@ def require_non_empty_string(value: object, *, message: str) -> str:
 
 
 def require_int(value: object, *, message: str) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError) as exc:
-        raise SystemExit(message) from exc
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise SystemExit(message)
+    return value
 
 
 def require_empty_collection(value: object, *, message: str) -> None:
@@ -212,10 +211,7 @@ def require_empty_collection(value: object, *, message: str) -> None:
 
 
 def require_int_at_least(value: object, *, minimum: int, message: str) -> int:
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as exc:
-        raise SystemExit(message) from exc
+    parsed = require_int(value, message=message)
     if parsed < minimum:
         raise SystemExit(f"{message} (value={parsed}, minimum={minimum})")
     return parsed
