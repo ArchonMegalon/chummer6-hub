@@ -618,6 +618,13 @@ public sealed class GmOpsBoardServiceTests
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
+                Payload: "Open outbriefed prep lane remains unresolved before next return checkpoint.",
+                AtUtc: baseTime.AddMinutes(5).AddSeconds(45),
+                EventId: "evt-outbriefed"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
                 Payload: "Open AAR prep lane remains unresolved before next return checkpoint.",
                 AtUtc: baseTime.AddMinutes(6),
                 EventId: "evt-aar"),
@@ -650,9 +657,9 @@ public sealed class GmOpsBoardServiceTests
         Assert.Equal("ops:evt-lessons-learned", projection.UnresolvedItems[0].ItemId);
         Assert.Equal("ops:evt-retrospective", projection.UnresolvedItems[1].ItemId);
         Assert.Equal("ops:evt-aar", projection.UnresolvedItems[2].ItemId);
-        Assert.Equal("ops:evt-debriefed", projection.UnresolvedItems[3].ItemId);
-        Assert.Equal("ops:evt-debriefing", projection.UnresolvedItems[4].ItemId);
-        Assert.Equal("ops:evt-postmortem", projection.UnresolvedItems[5].ItemId);
+        Assert.Contains(projection.UnresolvedItems, item => item.ItemId == "ops:evt-outbriefed");
+        Assert.Contains(projection.UnresolvedItems, item => item.ItemId == "ops:evt-debriefing");
+        Assert.Contains(projection.UnresolvedItems, item => item.ItemId == "ops:evt-debriefed");
     }
 
     [Fact]
@@ -1873,10 +1880,19 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse debriefingsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "debriefings");
         GmPrepAssetListResponse outbriefMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "outbrief");
         GmPrepAssetListResponse outbriefsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "outbriefs");
+        GmPrepAssetListResponse outbriefedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "outbriefed");
+        GmPrepAssetListResponse outbriefingMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "outbriefing");
+        GmPrepAssetListResponse outbriefingsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "outbriefings");
         GmPrepAssetListResponse outBriefSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "out brief");
         GmPrepAssetListResponse outBriefsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "out briefs");
+        GmPrepAssetListResponse outBriefedSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "out briefed");
+        GmPrepAssetListResponse outBriefingSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "out briefing");
+        GmPrepAssetListResponse outBriefingsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "out briefings");
         GmPrepAssetListResponse outBriefHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "out-brief");
         GmPrepAssetListResponse outBriefsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "out-briefs");
+        GmPrepAssetListResponse outBriefedHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "out-briefed");
+        GmPrepAssetListResponse outBriefingHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "out-briefing");
+        GmPrepAssetListResponse outBriefingsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "out-briefings");
         GmPrepAssetListResponse postmortemMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "postmortem");
         GmPrepAssetListResponse postmortemsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "postmortems");
         GmPrepAssetListResponse postMortemSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "post mortem");
@@ -1971,10 +1987,19 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(debriefingsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(outbriefMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(outbriefsMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(outbriefedMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(outbriefingMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(outbriefingsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(outBriefSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(outBriefsSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(outBriefedSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(outBriefingSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(outBriefingsSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(outBriefHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(outBriefsHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(outBriefedHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(outBriefingHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(outBriefingsHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(postmortemMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(postmortemsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(postMortemSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");

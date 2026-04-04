@@ -843,6 +843,24 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("recap");
         }
 
+        if (tokens.Contains("outbriefed"))
+        {
+            tokens.Remove("outbriefed");
+            tokens.Add("recap");
+        }
+
+        if (tokens.Contains("outbriefing"))
+        {
+            tokens.Remove("outbriefing");
+            tokens.Add("recap");
+        }
+
+        if (tokens.Contains("outbriefings"))
+        {
+            tokens.Remove("outbriefings");
+            tokens.Add("recap");
+        }
+
         if (tokens.Contains("postmortem"))
         {
             tokens.Remove("postmortem");
@@ -1057,11 +1075,14 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("recap");
         }
 
-        if (tokens.Contains("out") && (tokens.Contains("brief") || tokens.Contains("briefs")))
+        if (tokens.Contains("out") && (tokens.Contains("brief") || tokens.Contains("briefs") || tokens.Contains("briefed") || tokens.Contains("briefing") || tokens.Contains("briefings")))
         {
             tokens.Remove("out");
             tokens.Remove("brief");
             tokens.Remove("briefs");
+            tokens.Remove("briefed");
+            tokens.Remove("briefing");
+            tokens.Remove("briefings");
             tokens.Add("recap");
         }
 
