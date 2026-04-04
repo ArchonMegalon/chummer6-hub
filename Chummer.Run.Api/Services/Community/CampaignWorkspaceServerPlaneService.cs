@@ -253,7 +253,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         "aftermath",
         "downtime",
         "recap",
-        "debrief"
+        "debrief",
+        "postmortem"
     ];
 
     private static readonly string[] RosterIdentityWordTokens =
