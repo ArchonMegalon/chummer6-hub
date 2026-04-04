@@ -1645,6 +1645,12 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse rosterTransferSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster transfer");
         GmPrepAssetListResponse rosterHandoffsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster handoffs");
         GmPrepAssetListResponse rosterHandoffSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster handoff");
+        GmPrepAssetListResponse rosterHandoverCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rosterhandover");
+        GmPrepAssetListResponse rosterHandoversCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rosterhandovers");
+        GmPrepAssetListResponse rosterHandoverSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster handover");
+        GmPrepAssetListResponse rosterHandoversSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster handovers");
+        GmPrepAssetListResponse rosterHandoverHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster-handover");
+        GmPrepAssetListResponse rosterHandoversHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster-handovers");
         GmPrepAssetListResponse rosterMovesSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster moves");
         GmPrepAssetListResponse rosterMoveSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster move");
         GmPrepAssetListResponse rosterShiftsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster shifts");
@@ -1794,6 +1800,12 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(rosterTransferSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterHandoffsSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterHandoffSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterHandoverCompactMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterHandoversCompactMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterHandoverSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterHandoversSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterHandoverHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterHandoversHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterMovesSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterMoveSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterShiftsSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
