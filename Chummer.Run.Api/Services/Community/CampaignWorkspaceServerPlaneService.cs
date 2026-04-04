@@ -4386,6 +4386,20 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Remove("eventctrl");
             tokens.Add("eventcontrol");
         }
+
+        if (tokens.Contains("seasonops"))
+        {
+            tokens.Remove("seasonops");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("seasonop"))
+        {
+            tokens.Remove("seasonop");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
     }
 
     private static bool MatchesPrepLibraryQuery(

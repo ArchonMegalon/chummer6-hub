@@ -86,6 +86,29 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsSeasonOpsShorthandAcrossWhitespaceBoundaries()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "event:season",
+            Kind: "event_control_packet",
+            Title: "Dockyard season operations board",
+            Summary: "Season operations stay governed for the next launch window.",
+            BindingSummary: "Bound to campaign return and event controls.",
+            Reusable: true,
+            SearchTerms: ["season", "operations", "event"],
+            EvidenceLines: ["Season operation receipt captured for checkpoint timing."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+
+        IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("seasonops");
+        IReadOnlyList<string> compactSingularTokens = InvokeBuildTokens("seasonop");
+        IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixops");
+
+        Assert.True(InvokeMatches(packet, compactPluralTokens));
+        Assert.True(InvokeMatches(packet, compactSingularTokens));
+        Assert.False(InvokeMatches(packet, negativeTokens));
+    }
+
+    [Fact]
     public void ResolvePrepPacketNormalizesWhitespacePaddedPacketIds()
     {
         DateTimeOffset updatedAtUtc = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
