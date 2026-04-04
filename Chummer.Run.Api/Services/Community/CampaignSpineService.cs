@@ -2172,6 +2172,7 @@ public sealed class CampaignSpineService
                     .FirstOrDefault();
                 var watchout = workspace.ReadinessCues
                     .Where(static cue => NeedsAttention(cue.Severity))
+                    .OrderByDescending(static cue => ResolveReadinessAttentionPriority(cue.Severity))
                     .Select(static cue => $"{cue.Title} — {cue.Summary}")
                     .FirstOrDefault();
                 string latestEventSummary = leadChangePacket is not null
@@ -2223,7 +2224,15 @@ public sealed class CampaignSpineService
         => groupWorkspaces
             .SelectMany(workspace => workspace.ReadinessCues
                 .Where(static cue => NeedsAttention(cue.Severity))
-                .Select(cue => $"{workspace.CampaignName}: {cue.Title} — {cue.Summary}"))
+                .Select(cue => new
+                {
+                    Summary = $"{workspace.CampaignName}: {cue.Title} — {cue.Summary}",
+                    SeverityPriority = ResolveReadinessAttentionPriority(cue.Severity),
+                    WorkspaceFreshnessUtc = ResolveWorkspaceFreshnessUtc(workspace)
+                }))
+            .OrderByDescending(static item => item.SeverityPriority)
+            .ThenByDescending(static item => item.WorkspaceFreshnessUtc)
+            .Select(static item => item.Summary)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
