@@ -879,6 +879,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=preplibrarypackets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=oppositionpacket", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=oppositionpackets", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=rostermovepacket", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=rostermovepackets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=rostermovementpacket", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=rostermovementpackets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventcontrolpacket", audit, StringComparison.Ordinal);
@@ -1131,6 +1133,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("(\"preplibrarypackets\", \"preplibrarypackets\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"oppositionpacket\", \"oppositionpacket\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"oppositionpackets\", \"oppositionpackets\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"rostermovepacket\", \"rostermovepacket\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"rostermovepackets\", \"rostermovepackets\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"rostermovementpacket\", \"rostermovementpacket\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"rostermovementpackets\", \"rostermovementpackets\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"eventcontrolpacket\", \"eventcontrolpacket\")", audit, StringComparison.Ordinal);
@@ -2020,6 +2024,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'preplibrarypackets', 'compact preplibrarypackets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionpacket', 'compact oppositionpacket continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionpackets', 'compact oppositionpackets continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovepacket', 'compact rostermovepacket continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovepackets', 'compact rostermovepackets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovementpacket', 'compact rostermovementpacket continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovementpackets', 'compact rostermovementpackets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolpacket', 'compact eventcontrolpacket continuity prep');", playwright, StringComparison.Ordinal);
