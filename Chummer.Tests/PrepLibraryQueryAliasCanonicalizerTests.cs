@@ -104,4 +104,24 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("relationshipsupdate", tokens);
         Assert.DoesNotContain("relationshipschange", tokens);
     }
+
+    [Fact]
+    public void RewriteAliases_CollapsesMobileCompanionFormsIntoTravelOfflineSafehouseContinuityTokens()
+    {
+        HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "campaignmobilecompanions"
+        };
+
+        PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
+
+        Assert.Contains("campaign", tokens);
+        Assert.Contains("offline", tokens);
+        Assert.Contains("travel", tokens);
+        Assert.Contains("safehouse", tokens);
+        Assert.DoesNotContain("campaignmobilecompanions", tokens);
+        Assert.DoesNotContain("mobile", tokens);
+        Assert.DoesNotContain("companion", tokens);
+        Assert.DoesNotContain("companions", tokens);
+    }
 }

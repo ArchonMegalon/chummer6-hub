@@ -569,6 +569,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile safe house cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile safehouse cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilesafehousecache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile companion")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile companions")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilecompanion")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaign mobile companion")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignmobilecompanions")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrix readiness")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrix cache")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("mobile matrix cache")));
