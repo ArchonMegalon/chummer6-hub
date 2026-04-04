@@ -1332,6 +1332,8 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse journalsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "journals");
         GmPrepAssetListResponse downtimesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "downtimes");
         GmPrepAssetListResponse aftermathsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aftermaths");
+        GmPrepAssetListResponse debriefMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "debrief");
+        GmPrepAssetListResponse debriefsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "debriefs");
         GmPrepAssetListResponse recapsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "recaps");
         GmPrepAssetListResponse returnsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "returns");
         GmPrepAssetListResponse memoriesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "memories");
@@ -1348,6 +1350,8 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(journalsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(downtimesMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(aftermathsMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(debriefMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(debriefsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(recapsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(returnsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(memoriesMatches.Items, item => item.AssetId == "continuity_plural_ops");
