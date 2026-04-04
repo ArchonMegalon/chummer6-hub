@@ -1084,6 +1084,25 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         }
 
         if (ContainsAny(combined,
+                "schedule",
+                "schedules",
+                "scheduled",
+                "calendar",
+                "calendars")
+            && ContainsAny(combined,
+                "event",
+                "season",
+                "operation",
+                "operations",
+                "checkpoint",
+                "prep",
+                "travel",
+                "window"))
+        {
+            return "event_control";
+        }
+
+        if (ContainsAny(combined,
             "roster",
             "crew",
             "handoff",
