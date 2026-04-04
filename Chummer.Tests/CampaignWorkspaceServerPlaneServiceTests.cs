@@ -109,11 +109,13 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
 
         IReadOnlyList<string> compactTokens = InvokeBuildTokens("eventctrl");
+        IReadOnlyList<string> compactCtlTokens = InvokeBuildTokens("eventctl");
         IReadOnlyList<string> compactPluralAbbrevTokens = InvokeBuildTokens("eventctrls");
         IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("eventcontrols");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixctrl");
 
         Assert.True(InvokeMatches(packet, compactTokens));
+        Assert.True(InvokeMatches(packet, compactCtlTokens));
         Assert.True(InvokeMatches(packet, compactPluralAbbrevTokens));
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
@@ -159,12 +161,14 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> compactTokens = InvokeBuildTokens("seasoncontrol");
         IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("seasoncontrols");
         IReadOnlyList<string> compactAbbrevTokens = InvokeBuildTokens("seasonctrl");
+        IReadOnlyList<string> compactCtlTokens = InvokeBuildTokens("seasonctl");
         IReadOnlyList<string> compactAbbrevPluralTokens = InvokeBuildTokens("seasonctrls");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixcontrol");
 
         Assert.True(InvokeMatches(packet, compactTokens));
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.True(InvokeMatches(packet, compactAbbrevTokens));
+        Assert.True(InvokeMatches(packet, compactCtlTokens));
         Assert.True(InvokeMatches(packet, compactAbbrevPluralTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
     }
