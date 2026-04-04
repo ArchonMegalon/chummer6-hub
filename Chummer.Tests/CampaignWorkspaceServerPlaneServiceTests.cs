@@ -363,11 +363,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             PacketId: "continuity:plural-lane",
             Kind: "campaign_continuity_packet",
             Title: "Neon Cradle diary downtime aftermath continuity packet",
-            Summary: "Diary, downtime, aftermath, recap, return, memory, archive, history, timeline, ledger, heat, faction, and connection continuity remains governed for next-session return.",
-            BindingSummary: "Bound to campaign diary continuity, downtime follow-through, aftermath recap, return cues, memory timeline, ledger history, heat pressure, faction posture, and contact connection changes.",
+            Summary: "Diary, downtime, aftermath, recap, return, memory, archive, history, timeline, ledger, heat, faction, connection, and relationship continuity remains governed for next-session return.",
+            BindingSummary: "Bound to campaign diary continuity, downtime follow-through, aftermath recap, return cues, memory timeline, ledger history, heat pressure, faction posture, and contact connection relationship changes.",
             Reusable: true,
-            SearchTerms: ["diary", "journal", "downtime", "aftermath", "recap", "return", "memory", "archive", "history", "timeline", "ledger", "heat", "faction", "connection"],
-            EvidenceLines: ["Governed continuity lane keeps diary, downtime, aftermath, recap, return, memory, archive, history, timeline, ledger, heat, faction, and connection signals attached for next session."],
+            SearchTerms: ["diary", "journal", "downtime", "aftermath", "recap", "return", "memory", "archive", "history", "timeline", "ledger", "heat", "faction", "connection", "relationship"],
+            EvidenceLines: ["Governed continuity lane keeps diary, downtime, aftermath, recap, return, memory, archive, history, timeline, ledger, heat, faction, connection, and relationship signals attached for next session."],
             UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
 
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diary")));
@@ -395,6 +395,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("factions")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("connection")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("connections")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("relationship")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("relationships")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaftermaths")));
     }
 

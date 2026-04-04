@@ -253,6 +253,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject releaseProof.uiLocalizationReleaseGate.generated_at timestamps with excessive future skew", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.uiLocalizationReleaseGate.generatedAt timestamps with excessive future skew", script, StringComparison.Ordinal);
         Assert.Contains("reject missing releaseProof.uiLocalizationReleaseGate payloads", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-integer releaseProof.uiLocalizationReleaseGate.defaultKeyCount values", script, StringComparison.Ordinal);
         Assert.Contains("reject conflicting alias values between releaseProof.uiLocalizationReleaseGate.defaultKeyCount and releaseProof.uiLocalizationReleaseGate.default_key_count", script, StringComparison.Ordinal);
         Assert.Contains("reject non-passing releaseProof.uiLocalizationReleaseGate.explicitFallbackRuntime status", script, StringComparison.Ordinal);
         Assert.Contains("reject non-passing releaseProof.uiLocalizationReleaseGate.signoffSmokeRunnerStatus status", script, StringComparison.Ordinal);
@@ -620,6 +621,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=contacts", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=connection", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=connections", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=relationship", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=relationships", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=faction", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=factions", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=journal", audit, StringComparison.Ordinal);
@@ -754,6 +757,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=contacts", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=connection", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=connections", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=relationship", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=relationships", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=faction", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=factions", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=journal", audit, StringComparison.Ordinal);
@@ -1066,6 +1071,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("connection continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=connections", playwright, StringComparison.Ordinal);
         Assert.Contains("connections continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=relationship", playwright, StringComparison.Ordinal);
+        Assert.Contains("relationship continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=relationships", playwright, StringComparison.Ordinal);
+        Assert.Contains("relationships continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=faction", playwright, StringComparison.Ordinal);
         Assert.Contains("faction continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=factions", playwright, StringComparison.Ordinal);
