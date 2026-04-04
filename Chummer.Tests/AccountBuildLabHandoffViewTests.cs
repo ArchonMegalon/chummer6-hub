@@ -29,6 +29,9 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("selectedBuildLabHandoff.CrewFitSummary", view, StringComparison.Ordinal);
         Assert.Contains("Crew fit", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.PlannerCoverageLines.Take(5)", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
+        Assert.Contains("Planner lane:", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.RuleEnvironmentDiff.Summary", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -37,6 +40,15 @@ public sealed class AccountBuildLabHandoffViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
         string view = File.ReadAllText(viewPath);
 
+        Assert.Contains("selectedWorkspaceServerPlane.GmOperations.Status", view, StringComparison.Ordinal);
+        Assert.Contains("selectedWorkspaceServerPlane.GmOperations.Summary", view, StringComparison.Ordinal);
+        Assert.Contains("selectedWorkspaceServerPlane.GmOperations.AccountBackboneSummary", view, StringComparison.Ordinal);
+        Assert.Contains("selectedWorkspaceServerPlane.GmOperations.LaneCues.Count > 0", view, StringComparison.Ordinal);
+        Assert.Contains("gmLane.Lane.Replace('_', ' ')", view, StringComparison.Ordinal);
+        Assert.Contains("gmLane.SignalCount", view, StringComparison.Ordinal);
+        Assert.Contains("gmLane.Summary", view, StringComparison.Ordinal);
+        Assert.Contains("GM operations", view, StringComparison.Ordinal);
+        Assert.Contains("Account/audit backbone", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.OfflineActionabilitySummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.OfflineLaneCues.Count > 0", view, StringComparison.Ordinal);

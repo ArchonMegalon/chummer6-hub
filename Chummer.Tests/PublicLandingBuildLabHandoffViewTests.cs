@@ -25,6 +25,8 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("Rule diff:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.CrewFitSummary", view, StringComparison.Ordinal);
         Assert.Contains("Crew fit:", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
+        Assert.Contains("Planner lane:", view, StringComparison.Ordinal);
         Assert.Contains("Output next:", view, StringComparison.Ordinal);
         Assert.Contains("Output provenance:", view, StringComparison.Ordinal);
         Assert.Contains("Output lane:", view, StringComparison.Ordinal);

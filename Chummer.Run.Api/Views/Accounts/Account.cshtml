@@ -1380,14 +1380,26 @@
                             <details class="details-drawer">
                                 <summary>GM prep library and travel mode</summary>
                                 <div class="settings-summary-list">
-                                    <div class="settings-summary-row">
-                                        <span>Governed prep packets</span>
-                                        <strong>@selectedWorkspaceServerPlane.PrepLibrary.Packets.Count</strong>
-                                    </div>
-                                    <div class="settings-summary-row">
-                                        <span>Reusable packets</span>
-                                        <strong>@selectedWorkspaceServerPlane.PrepLibrary.ReusablePacketCount</strong>
-                                    </div>
+                                <div class="settings-summary-row">
+                                    <span>Governed prep packets</span>
+                                    <strong>@selectedWorkspaceServerPlane.PrepLibrary.Packets.Count</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>GM operations posture</span>
+                                    <strong>@HumanizeStatus(selectedWorkspaceServerPlane.GmOperations.Status, "Status")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Opposition signals</span>
+                                    <strong>@selectedWorkspaceServerPlane.GmOperations.OppositionSignalCount</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Roster movement signals</span>
+                                    <strong>@selectedWorkspaceServerPlane.GmOperations.RosterMovementSignalCount</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Reusable packets</span>
+                                    <strong>@selectedWorkspaceServerPlane.PrepLibrary.ReusablePacketCount</strong>
+                                </div>
                                 <div class="settings-summary-row">
                                     <span>Search posture</span>
                                     <strong>@selectedWorkspaceServerPlane.PrepLibrary.SearchSummary</strong>
@@ -1419,6 +1431,21 @@
                             </div>
                             <p><strong>GM prep library:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
                             <p><strong>Binding posture:</strong> @selectedWorkspaceServerPlane.PrepLibrary.BindingSummary</p>
+                            <p><strong>GM operations:</strong> @selectedWorkspaceServerPlane.GmOperations.Summary</p>
+                            <p><strong>Account/audit backbone:</strong> @selectedWorkspaceServerPlane.GmOperations.AccountBackboneSummary</p>
+                            @if (selectedWorkspaceServerPlane.GmOperations.LaneCues.Count > 0)
+                            {
+                                <div class="settings-summary-list">
+                                    @foreach (var gmLane in selectedWorkspaceServerPlane.GmOperations.LaneCues)
+                                    {
+                                        <div class="settings-summary-row">
+                                            <span>@HumanizeStatus(gmLane.Lane.Replace('_', ' '), "Lane")</span>
+                                            <strong>@($"{HumanizeStatus(gmLane.Status, "Status")} · {gmLane.SignalCount} signal(s)")</strong>
+                                        </div>
+                                        <p class="muted-copy">@gmLane.Summary</p>
+                                    }
+                                </div>
+                            }
                             <p><strong>Safehouse / travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
                             <p><strong>Prefetch inventory:</strong> @selectedWorkspaceServerPlane.TravelMode.PrefetchInventorySummary</p>
                             <p><strong>Cache freshness:</strong> @selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary</p>
@@ -2596,9 +2623,20 @@
                                     {
                                         <span> Coverage: @handoff.PlannerCoverageSummary.</span>
                                     }
+                                    @if (handoff.PlannerCoverageLines is { Count: > 0 })
+                                    {
+                                        foreach (var plannerLine in handoff.PlannerCoverageLines.Take(2))
+                                        {
+                                            <span> Planner lane: @plannerLine</span>
+                                        }
+                                    }
                                     @if (!string.IsNullOrWhiteSpace(handoff.CrewFitSummary))
                                     {
                                         <span> Crew fit: @handoff.CrewFitSummary.</span>
+                                    }
+                                    @if (handoff.RuleEnvironmentDiff is not null)
+                                    {
+                                        <span> Rule diff: @handoff.RuleEnvironmentDiff.Summary</span>
                                     }
                                     @if (handoff.Outputs.Count > 0)
                                     {
