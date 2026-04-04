@@ -702,6 +702,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("packet");
         }
 
+        if (tokens.Contains("oppositions"))
+        {
+            tokens.Remove("oppositions");
+            tokens.Add("opposition");
+        }
+
         if (tokens.Contains("contacts"))
         {
             tokens.Remove("contacts");

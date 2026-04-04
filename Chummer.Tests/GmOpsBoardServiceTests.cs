@@ -1493,6 +1493,7 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse hyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "op-force");
         GmPrepAssetListResponse splitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "op force");
         GmPrepAssetListResponse splitShortMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "op for");
+        GmPrepAssetListResponse pluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "oppositions");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixforce");
 
         Assert.Contains(compactMatches.Items, item => item.AssetId == "opfor_ops");
@@ -1500,6 +1501,7 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(hyphenMatches.Items, item => item.AssetId == "opfor_ops");
         Assert.Contains(splitMatches.Items, item => item.AssetId == "opfor_ops");
         Assert.Contains(splitShortMatches.Items, item => item.AssetId == "opfor_ops");
+        Assert.Contains(pluralMatches.Items, item => item.AssetId == "opfor_ops");
         Assert.Empty(negativeMatches.Items);
     }
 
