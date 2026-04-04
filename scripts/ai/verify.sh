@@ -1734,4 +1734,73 @@ if bash scripts/audit-ui-parity.sh; then
 fi
 mv "$release_channel_backup" "$release_channel_path"
 
+visual_receipt_path="$ROOT_DIR/../chummer6-ui/.codex-studio/published/DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json"
+if [[ ! -f "$visual_receipt_path" ]]; then
+  echo "verify gate failed: expected visual familiarity receipt at $visual_receipt_path" >&2
+  exit 1
+fi
+
+visual_receipt_backup="$(mktemp)"
+cp "$visual_receipt_path" "$visual_receipt_backup"
+python3 - "$visual_receipt_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+required_tests = list(payload.get("evidence", {}).get("required_tests") or [])
+if len(required_tests) >= 2:
+    payload["evidence"]["required_tests"] = [required_tests[1], required_tests[0], *required_tests[2:]]
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$visual_receipt_backup" "$visual_receipt_path"
+  echo "verify gate failed: parity audit should reject non-canonical required_tests ordering." >&2
+  exit 1
+fi
+mv "$visual_receipt_backup" "$visual_receipt_path"
+
+visual_receipt_backup="$(mktemp)"
+cp "$visual_receipt_path" "$visual_receipt_backup"
+python3 - "$visual_receipt_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+required_keys = list(payload.get("evidence", {}).get("required_legacy_interaction_keys") or [])
+if len(required_keys) >= 2:
+    payload["evidence"]["required_legacy_interaction_keys"] = [required_keys[1], required_keys[0], *required_keys[2:]]
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$visual_receipt_backup" "$visual_receipt_path"
+  echo "verify gate failed: parity audit should reject non-canonical required_legacy_interaction_keys ordering." >&2
+  exit 1
+fi
+mv "$visual_receipt_backup" "$visual_receipt_path"
+
+visual_receipt_backup="$(mktemp)"
+cp "$visual_receipt_path" "$visual_receipt_backup"
+python3 - "$visual_receipt_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+required_screenshots = list(payload.get("evidence", {}).get("required_screenshots") or [])
+if len(required_screenshots) >= 2:
+    payload["evidence"]["required_screenshots"] = [required_screenshots[1], required_screenshots[0], *required_screenshots[2:]]
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$visual_receipt_backup" "$visual_receipt_path"
+  echo "verify gate failed: parity audit should reject non-canonical required_screenshots ordering." >&2
+  exit 1
+fi
+mv "$visual_receipt_backup" "$visual_receipt_path"
+
 bash scripts/ai/run_services_smoke.sh
