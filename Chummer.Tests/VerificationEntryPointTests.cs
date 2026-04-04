@@ -449,6 +449,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=rostertransfer", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=rosterhandoff", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=crewhandoff", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=crewtransfer", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=preplaunch", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=preplaunches", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=travelprefetch", audit, StringComparison.Ordinal);
@@ -486,6 +487,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=rostertransfer", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=rosterhandoff", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=crewhandoff", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=crewtransfer", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=preplaunch", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=preplaunches", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=travelprefetch", audit, StringComparison.Ordinal);
@@ -584,6 +586,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact rosterhandoff prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=crewhandoff", playwright, StringComparison.Ordinal);
         Assert.Contains("compact crewhandoff prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=crewtransfer", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact crewtransfer prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=preplaunch", playwright, StringComparison.Ordinal);
         Assert.Contains("compact preplaunch prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=preplaunches", playwright, StringComparison.Ordinal);

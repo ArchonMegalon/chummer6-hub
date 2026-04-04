@@ -109,6 +109,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsCrewTransferShorthandAcrossWhitespaceBoundaries()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "roster:compact",
+            Kind: "roster_movement_packet",
+            Title: "Neon Cradle roster movement packet",
+            Summary: "Crew handoff remains governed for launch continuity.",
+            BindingSummary: "Bound to campaign return and roster receipts.",
+            Reusable: true,
+            SearchTerms: ["crew", "handoff", "roster"],
+            EvidenceLines: ["Crew handoff receipt captured for governed movement lane."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+
+        IReadOnlyList<string> compactTokens = InvokeBuildTokens("crewtransfer");
+        IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixtransfer");
+
+        Assert.True(InvokeMatches(packet, compactTokens));
+        Assert.False(InvokeMatches(packet, negativeTokens));
+    }
+
+    [Fact]
     public void ResolvePrepPacketNormalizesWhitespacePaddedPacketIds()
     {
         DateTimeOffset updatedAtUtc = DateTimeOffset.Parse("2026-04-03T00:00:00Z");

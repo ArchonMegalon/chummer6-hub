@@ -277,7 +277,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         "rostermove",
         "rostertransfer",
         "rosterhandoff",
-        "crewhandoff"
+        "crewhandoff",
+        "crewtransfer"
     ];
 
     private static readonly string[] RosterReturnWordTokens =
@@ -4396,6 +4397,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         {
             tokens.Remove("eventctrl");
             tokens.Add("eventcontrol");
+        }
+
+        if (tokens.Contains("crewtransfer"))
+        {
+            tokens.Remove("crewtransfer");
+            tokens.Add("crewhandoff");
         }
 
         if (tokens.Contains("seasonops"))
