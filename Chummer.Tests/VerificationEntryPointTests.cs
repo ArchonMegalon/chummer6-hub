@@ -1323,6 +1323,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=mobilesafehousereadinesses", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobilesafehousecache", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobilesafehousecaches", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobilecompanionreturnloop", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobilecompanionreturnloops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobilecompanionsreturnlane", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobilecompanionreturnlanes", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobilecompanionsreturnloop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobilecompanionsreturnloops", audit, StringComparison.Ordinal);
@@ -1334,6 +1337,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=mobilecompanionsreturnbriefs", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobilecompanionreturnbrf", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobilecompanionsreturnbrfs", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=campaignmobilecompanionreturnloop", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=campaignmobilecompanionreturnloops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=campaignmobilecompanionsreturnlane", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=campaignmobilecompanionreturnlane", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=campaignmobilecompanionreturnlanes", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=campaignmobilecompanionsreturnloop", audit, StringComparison.Ordinal);

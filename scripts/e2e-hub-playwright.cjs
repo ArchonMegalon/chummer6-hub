@@ -6290,6 +6290,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4packets', 'compact campaignworkspacev4packets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4brief', 'compact campaignworkspacev4brief continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4briefs', 'compact campaignworkspacev4briefs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionreturnloop', 'compact mobilecompanionreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionreturnloops', 'compact mobilecompanionreturnloops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionsreturnlane', 'compact mobilecompanionsreturnlane continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionreturnlanes', 'compact mobilecompanionreturnlanes continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionsreturnloop', 'compact mobilecompanionsreturnloop continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionsreturnloops', 'compact mobilecompanionsreturnloops continuity prep');
@@ -6301,6 +6304,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionsreturnbriefs', 'compact mobilecompanionsreturnbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionreturnbrf', 'compact mobilecompanionreturnbrf continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilecompanionsreturnbrfs', 'compact mobilecompanionsreturnbrfs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignmobilecompanionreturnloop', 'compact campaignmobilecompanionreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignmobilecompanionreturnloops', 'compact campaignmobilecompanionreturnloops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignmobilecompanionsreturnlane', 'compact campaignmobilecompanionsreturnlane continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignmobilecompanionreturnlane', 'compact campaignmobilecompanionreturnlane continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignmobilecompanionreturnlanes', 'compact campaignmobilecompanionreturnlanes continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignmobilecompanionsreturnloop', 'compact campaignmobilecompanionsreturnloop continuity prep');
