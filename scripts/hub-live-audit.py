@@ -3864,6 +3864,34 @@ def verify_signed_in_work_audit(
     prep_library_crew_moves = json.loads(body)
     if not (prep_library_crew_moves.get("items") or []):
         raise AssertionError("prep-library crewmoves search did not expose any governed packet")
+    prep_library_crew_swap_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=crewswap"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_crew_swap_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_crew_swap_path} returned {status}, expected 200")
+
+    prep_library_crew_swap = json.loads(body)
+    if not (prep_library_crew_swap.get("items") or []):
+        raise AssertionError("prep-library crewswap search did not expose any governed packet")
+    prep_library_crew_swaps_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=crewswaps"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_crew_swaps_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_crew_swaps_path} returned {status}, expected 200")
+
+    prep_library_crew_swaps = json.loads(body)
+    if not (prep_library_crew_swaps.get("items") or []):
+        raise AssertionError("prep-library crewswaps search did not expose any governed packet")
     prep_library_roster_moves_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=rostermoves"
     status, body, _, _ = fetch(
         base_url,
@@ -3878,6 +3906,34 @@ def verify_signed_in_work_audit(
     prep_library_roster_moves = json.loads(body)
     if not (prep_library_roster_moves.get("items") or []):
         raise AssertionError("prep-library rostermoves search did not expose any governed packet")
+    prep_library_roster_swap_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=rosterswap"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_roster_swap_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_roster_swap_path} returned {status}, expected 200")
+
+    prep_library_roster_swap = json.loads(body)
+    if not (prep_library_roster_swap.get("items") or []):
+        raise AssertionError("prep-library rosterswap search did not expose any governed packet")
+    prep_library_roster_swaps_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=rosterswaps"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_roster_swaps_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_roster_swaps_path} returned {status}, expected 200")
+
+    prep_library_roster_swaps = json.loads(body)
+    if not (prep_library_roster_swaps.get("items") or []):
+        raise AssertionError("prep-library rosterswaps search did not expose any governed packet")
     prep_library_roster_transfer_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=rostertransfer"
     status, body, _, _ = fetch(
         base_url,
@@ -7504,6 +7560,36 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_crew_moves_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_crew_moves_search_path} should return at least one governed prep packet for the crewmoves query")
+    workspace_crew_swap_search_path = f"{workspace_path}?prepQuery=crewswap"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_crew_swap_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_crew_swap_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_crew_swap_search_path)
+    require_snippet(body, 'match(es) for "crewswap"', workspace_crew_swap_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_crew_swap_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_crew_swap_search_path} should return at least one governed prep packet for the crewswap query")
+    workspace_crew_swaps_search_path = f"{workspace_path}?prepQuery=crewswaps"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_crew_swaps_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_crew_swaps_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_crew_swaps_search_path)
+    require_snippet(body, 'match(es) for "crewswaps"', workspace_crew_swaps_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_crew_swaps_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_crew_swaps_search_path} should return at least one governed prep packet for the crewswaps query")
     workspace_roster_moves_search_path = f"{workspace_path}?prepQuery=rostermoves"
     status, body, _, _ = fetch(
         base_url,
@@ -7519,6 +7605,36 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_roster_moves_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_roster_moves_search_path} should return at least one governed prep packet for the rostermoves query")
+    workspace_roster_swap_search_path = f"{workspace_path}?prepQuery=rosterswap"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_roster_swap_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_roster_swap_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_roster_swap_search_path)
+    require_snippet(body, 'match(es) for "rosterswap"', workspace_roster_swap_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_roster_swap_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_roster_swap_search_path} should return at least one governed prep packet for the rosterswap query")
+    workspace_roster_swaps_search_path = f"{workspace_path}?prepQuery=rosterswaps"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_roster_swaps_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_roster_swaps_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_roster_swaps_search_path)
+    require_snippet(body, 'match(es) for "rosterswaps"', workspace_roster_swaps_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_roster_swaps_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_roster_swaps_search_path} should return at least one governed prep packet for the rosterswaps query")
     workspace_roster_transfer_search_path = f"{workspace_path}?prepQuery=rostertransfer"
     status, body, _, _ = fetch(
         base_url,

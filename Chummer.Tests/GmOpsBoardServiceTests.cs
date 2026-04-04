@@ -325,6 +325,46 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatOpForcesSignalsAsOppositionDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T03:55:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open op forces board remains unresolved after rotation.",
+                AtUtc: baseTime,
+                EventId: "evt-op-forces"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open prep launch packet remains unresolved.",
+                AtUtc: baseTime.AddMinutes(1),
+                EventId: "evt-event"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(30),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(3, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-op-forces", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-event", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[2].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatCrewHandoffSignalsAsRosterMovementDomain()
     {
         SessionLedgerService ledger = new();
@@ -417,6 +457,38 @@ public sealed class GmOpsBoardServiceTests
 
         Assert.Equal(2, projection.UnresolvedItems.Count);
         Assert.Equal("ops:evt-crewmove", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatCrewSwapSignalsAsRosterMovementDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:08:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open crewswap queue remains unresolved.",
+                AtUtc: baseTime,
+                EventId: "evt-crewswap"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-crewswap", projection.UnresolvedItems[0].ItemId);
         Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
     }
 
@@ -1271,6 +1343,10 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse rosterMoveHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster-move");
         GmPrepAssetListResponse crewMoveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmove");
         GmPrepAssetListResponse crewMovesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmoves");
+        GmPrepAssetListResponse crewSwapMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewswap");
+        GmPrepAssetListResponse crewSwapsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewswaps");
+        GmPrepAssetListResponse rosterSwapMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rosterswap");
+        GmPrepAssetListResponse rosterSwapsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rosterswaps");
         GmPrepAssetListResponse crewMovementMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmovement");
         GmPrepAssetListResponse crewMovementsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmovements");
         GmPrepAssetListResponse crewMoveHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew-move");
@@ -1405,6 +1481,10 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(rosterMoveHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMoveMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovesMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewSwapMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewSwapsMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterSwapMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterSwapsMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovementMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovementsMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMoveHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
