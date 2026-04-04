@@ -96,6 +96,34 @@ def require_string_list(value: object, *, message: str) -> list[str]:
     return value
 
 
+def require_canonical_unique_string_list(
+    values: list[str],
+    *,
+    field_name: str,
+    path: pathlib.Path,
+) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for index, value in enumerate(values):
+        if value != value.strip():
+            raise SystemExit(
+                f"parity audit failed: {field_name}[{index}] must not include leading/trailing whitespace: {path}"
+            )
+        token = value.strip()
+        if not token:
+            raise SystemExit(f"parity audit failed: {field_name}[{index}] must not be blank: {path}")
+        normalized.append(token)
+        if token in seen:
+            duplicates.add(token)
+        seen.add(token)
+    if duplicates:
+        raise SystemExit(
+            f"parity audit failed: {field_name} must not contain duplicate ids: {path} ({', '.join(sorted(duplicates))})"
+        )
+    return normalized
+
+
 def require_pass_status(value: object, *, message: str) -> None:
     normalized = str(value or "").strip().lower()
     if normalized not in {"pass", "passed", "ready"}:
@@ -720,9 +748,13 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         data.get("evidence"),
         message=f"parity audit failed: visual receipt evidence must be a JSON object: {path}",
     )
-    required_tests = require_string_list(
-        evidence.get("required_tests"),
-        message=f"parity audit failed: visual receipt required_tests must be a string array: {path}",
+    required_tests = require_canonical_unique_string_list(
+        require_string_list(
+            evidence.get("required_tests"),
+            message=f"parity audit failed: visual receipt required_tests must be a string array: {path}",
+        ),
+        field_name="visual receipt required_tests",
+        path=path,
     )
     expected_required_tests = {
         "Desktop_shell_preserves_chummer5a_familiarity_cues",
@@ -763,9 +795,13 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
             + f" ({path})"
         )
     required_interaction_keys = set(
-        require_string_list(
-            evidence.get("required_legacy_interaction_keys"),
-            message=f"parity audit failed: visual receipt required_legacy_interaction_keys must be a string array: {path}",
+        require_canonical_unique_string_list(
+            require_string_list(
+                evidence.get("required_legacy_interaction_keys"),
+                message=f"parity audit failed: visual receipt required_legacy_interaction_keys must be a string array: {path}",
+            ),
+            field_name="visual receipt required_legacy_interaction_keys",
+            path=path,
         )
     )
     required_surfaces = {
@@ -969,9 +1005,13 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("missing_tests"),
         message=f"parity audit failed: visual receipt reports missing required visual tests: {path}",
     )
-    required_screenshots = require_string_list(
-        evidence.get("required_screenshots"),
-        message=f"parity audit failed: visual receipt required_screenshots must be a string array: {path}",
+    required_screenshots = require_canonical_unique_string_list(
+        require_string_list(
+            evidence.get("required_screenshots"),
+            message=f"parity audit failed: visual receipt required_screenshots must be a string array: {path}",
+        ),
+        field_name="visual receipt required_screenshots",
+        path=path,
     )
     expected_required_screenshots = {
         "01-initial-shell-light.png",
