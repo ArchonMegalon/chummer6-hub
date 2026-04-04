@@ -4994,6 +4994,18 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("recap");
         }
 
+        if (tokens.Contains("debriefing"))
+        {
+            tokens.Remove("debriefing");
+            tokens.Add("recap");
+        }
+
+        if (tokens.Contains("debriefings"))
+        {
+            tokens.Remove("debriefings");
+            tokens.Add("recap");
+        }
+
         if (tokens.Contains("recaps"))
         {
             tokens.Remove("recaps");

@@ -380,6 +380,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermaths")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("debrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("debriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("debriefing")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("debriefings")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("recaps")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("returns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("memories")));
