@@ -68,6 +68,7 @@ public sealed record TravelModeReadinessSummary(
     string Summary,
     string PrefetchInventorySummary,
     string CacheFreshnessSummary,
+    string OfflineActionabilitySummary,
     int ClaimedDeviceCount,
     int TravelReadyDeviceCount,
     int FreshCacheDeviceCount,

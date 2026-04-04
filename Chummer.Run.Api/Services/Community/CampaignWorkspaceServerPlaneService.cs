@@ -4182,6 +4182,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             staleCacheDeviceCount,
             latestPrefetchByInstallation,
             now);
+        string offlineActionabilitySummary = BuildOfflineActionabilitySummary(workspace, travelReadyDeviceCount, prepLibrary);
         string status = claimedDeviceCount == 0
             ? "warning"
             : restore.ConflictSummaries.Count > 0
@@ -4208,6 +4209,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             Summary: summary,
             PrefetchInventorySummary: prefetchInventorySummary,
             CacheFreshnessSummary: cacheFreshnessSummary,
+            OfflineActionabilitySummary: offlineActionabilitySummary,
             ClaimedDeviceCount: claimedDeviceCount,
             TravelReadyDeviceCount: travelReadyDeviceCount,
             FreshCacheDeviceCount: freshCacheDeviceCount,
@@ -4224,6 +4226,25 @@ public sealed class CampaignWorkspaceServerPlaneService
                     Summary: device.RestoreSummary))
                 .ToArray(),
             Boundaries: boundaries);
+    }
+
+    private static string BuildOfflineActionabilitySummary(
+        CampaignWorkspaceProjection workspace,
+        int travelReadyDeviceCount,
+        CampaignPrepLibrarySummary prepLibrary)
+    {
+        int diaryLaneCount = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Count(static packet => IsDiarySignalKind(packet.Kind) || IsAftermathSignalKind(packet.Kind));
+        int consequenceLaneCount = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+            .Count(static consequence => IsCampaignRelationshipSignalKind(consequence.Kind));
+        int aftermathCount = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>()).Count;
+
+        if (travelReadyDeviceCount == 0)
+        {
+            return "Offline actionability is blocked until a travel-safe claimed device is linked.";
+        }
+
+        return $"{travelReadyDeviceCount} travel-safe device(s) can continue downtime/diary ({diaryLaneCount} lane cue(s)), contacts/heat ({consequenceLaneCount} lane cue(s)), aftermath recap ({aftermathCount} package(s)), and governed prep review ({prepLibrary.Packets.Count} packet(s)) while offline.";
     }
 
     private static IReadOnlyList<string> BuildSearchTerms(params object?[] values)

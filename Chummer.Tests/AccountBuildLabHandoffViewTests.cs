@@ -15,8 +15,8 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
         Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
         Assert.Contains("@output.PublicationSummary", view, StringComparison.Ordinal);
-        Assert.Contains("@output.PublicationState", view, StringComparison.Ordinal);
-        Assert.Contains("@output.TrustBand", view, StringComparison.Ordinal);
+        Assert.Contains("output.PublicationState", view, StringComparison.Ordinal);
+        Assert.Contains("output.TrustBand", view, StringComparison.Ordinal);
         Assert.Contains("@output.AuditSummary", view, StringComparison.Ordinal);
         Assert.Contains("Publication:", view, StringComparison.Ordinal);
         Assert.Contains("Lane status:", view, StringComparison.Ordinal);

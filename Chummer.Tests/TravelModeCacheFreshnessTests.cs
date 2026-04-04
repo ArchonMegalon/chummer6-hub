@@ -66,6 +66,8 @@ public sealed class TravelModeCacheFreshnessTests
         Assert.Equal(1, summary.FreshCacheDeviceCount);
         Assert.Equal(1, summary.StaleCacheDeviceCount);
         Assert.Contains("fresh staged cache", summary.CacheFreshnessSummary, StringComparison.Ordinal);
+        Assert.Contains("while offline", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
+        Assert.Contains("downtime/diary", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
         Assert.Equal("ready", summary.Devices.First(item => item.InstallationId == "install-fresh").Status);
         Assert.Equal("stale", summary.Devices.First(item => item.InstallationId == "install-stale").Status);
     }
@@ -90,6 +92,7 @@ public sealed class TravelModeCacheFreshnessTests
         Assert.Equal(0, summary.FreshCacheDeviceCount);
         Assert.Equal(1, summary.StaleCacheDeviceCount);
         Assert.Contains("No travel-prefetch receipt exists yet", summary.CacheFreshnessSummary, StringComparison.Ordinal);
+        Assert.Contains("while offline", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
         Assert.Equal("stale", summary.Devices.Single().Status);
     }
 
