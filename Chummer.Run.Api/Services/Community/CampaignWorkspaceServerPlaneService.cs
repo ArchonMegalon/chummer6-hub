@@ -1798,9 +1798,10 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
         bool carryForwardSignal = IsContinuityCarryForwardSignal(carryForward);
-        WorkspaceChangePacketProjection[] continuitySignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsContinuitySignal(packet))
-            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+        WorkspaceChangePacketProjection[] continuitySignals = DeduplicateIdenticalChangePacketVersions(
+                (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+                .Where(static packet => IsContinuitySignal(packet))
+                .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
 
