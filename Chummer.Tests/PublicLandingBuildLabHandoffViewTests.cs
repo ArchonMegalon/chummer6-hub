@@ -1,0 +1,20 @@
+using Xunit;
+
+namespace Chummer.Tests;
+
+public sealed class PublicLandingBuildLabHandoffViewTests
+{
+    [Fact]
+    public void SignedInHomeRailRendersBuildLabOutputFollowThroughCues()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("handoff.Outputs.Count > 0", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.Outputs.Take(2)", view, StringComparison.Ordinal);
+        Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
+        Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
+        Assert.Contains("Output next:", view, StringComparison.Ordinal);
+        Assert.Contains("Output provenance:", view, StringComparison.Ordinal);
+    }
+}
