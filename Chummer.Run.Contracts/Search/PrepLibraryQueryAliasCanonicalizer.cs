@@ -1007,11 +1007,31 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("recap");
         }
 
+        if (tokens.Contains("lessonlearned"))
+        {
+            tokens.Remove("lessonlearned");
+            tokens.Add("recap");
+        }
+
+        if (tokens.Contains("lessonslearned"))
+        {
+            tokens.Remove("lessonslearned");
+            tokens.Add("recap");
+        }
+
         if (tokens.Contains("hot") && (tokens.Contains("wash") || tokens.Contains("washes")))
         {
             tokens.Remove("hot");
             tokens.Remove("wash");
             tokens.Remove("washes");
+            tokens.Add("recap");
+        }
+
+        if ((tokens.Contains("lesson") || tokens.Contains("lessons")) && tokens.Contains("learned"))
+        {
+            tokens.Remove("lesson");
+            tokens.Remove("lessons");
+            tokens.Remove("learned");
             tokens.Add("recap");
         }
 

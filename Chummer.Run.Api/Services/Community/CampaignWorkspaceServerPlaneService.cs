@@ -270,7 +270,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         "retrospective",
         "retrospectives",
         "hotwash",
-        "hotwashes"
+        "hotwashes",
+        "lessonlearned",
+        "lessonslearned"
     ];
 
     private static readonly string[] RosterIdentityWordTokens =
@@ -2600,7 +2602,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         string kind = item.Kind.Trim();
         if (ContainsAnyWordToken(kind, CampaignReturnRecapWordTokens)
             || ContainsSessionLogTokenPair(kind)
-            || ContainsAfterActionTokenPair(kind))
+            || ContainsAfterActionTokenPair(kind)
+            || ContainsLessonLearnedTokenPair(kind))
         {
             return true;
         }
@@ -2618,7 +2621,8 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return ContainsAnyWordToken(value, CampaignReturnRecapWordTokens)
             || ContainsSessionLogTokenPair(value)
-            || ContainsAfterActionTokenPair(value);
+            || ContainsAfterActionTokenPair(value)
+            || ContainsLessonLearnedTokenPair(value);
     }
 
     private static bool IsCampaignRelationshipSignalKind(string? kind)
@@ -3155,7 +3159,8 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return ContainsAnyWordToken(normalizedKind, AftermathRecapWordTokens)
             || ContainsAfterActionTokenPair(normalizedKind)
-            || ContainsPostGameTokenPair(normalizedKind);
+            || ContainsPostGameTokenPair(normalizedKind)
+            || ContainsLessonLearnedTokenPair(normalizedKind);
     }
 
     private static bool IsAftermathSignal(WorkspaceChangePacketProjection packet)
@@ -3185,7 +3190,8 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return ContainsAnyWordToken(value, AftermathRecapWordTokens)
             || ContainsAfterActionTokenPair(value)
-            || ContainsPostGameTokenPair(value);
+            || ContainsPostGameTokenPair(value)
+            || ContainsLessonLearnedTokenPair(value);
     }
 
     private static GovernedPrepPacketSummary? BuildPrepLaunchOpsPacket(
@@ -3778,6 +3784,18 @@ public sealed class CampaignWorkspaceServerPlaneService
                 && ContainsAnyWordToken(value, ["wash", "washes"]));
     }
 
+    private static bool ContainsLessonLearnedTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["lessonlearned", "lessonslearned"])
+            || (ContainsAnyWordToken(value, ["lesson", "lessons"])
+                && ContainsAnyWordToken(value, ["learned"]));
+    }
+
     private static bool ContainsSessionLogTokenPair(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -3815,7 +3833,8 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static bool IsAftermathRecapPublicationKind(string value)
         => ContainsAnyWordToken(value, ["aftermath", "recap", "debrief"])
             || ContainsAfterActionTokenPair(value)
-            || ContainsHotWashTokenPair(value);
+            || ContainsHotWashTokenPair(value)
+            || ContainsLessonLearnedTokenPair(value);
 
     private static bool IsDowntimePublicationKind(string value)
         => ContainsAnyWordToken(value, ["downtime"]);
