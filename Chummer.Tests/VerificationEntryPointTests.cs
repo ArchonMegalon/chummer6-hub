@@ -620,6 +620,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=returnloop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returnloops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=nextsession", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=nextsessions", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=nextsessionreturn", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=nextsessionreturns", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=sessionreturn", audit, StringComparison.Ordinal);
@@ -739,6 +740,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=returnloop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=returnloops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=nextsession", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=nextsessions", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=nextsessionreturn", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=nextsessionreturns", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=sessionreturn", audit, StringComparison.Ordinal);
@@ -1051,6 +1053,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact returnloops continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=nextsession", playwright, StringComparison.Ordinal);
         Assert.Contains("compact nextsession continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=nextsessions", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact nextsessions continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=nextsessionreturn", playwright, StringComparison.Ordinal);
         Assert.Contains("compact nextsessionreturn continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=nextsessionreturns", playwright, StringComparison.Ordinal);
