@@ -310,6 +310,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         "reassignment",
         "handoff",
         "handoffs",
+        "handover",
+        "handovers",
         "move",
         "moves",
         "moved",
@@ -351,8 +353,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         "rostertransfers",
         "rosterhandoff",
         "rosterhandoffs",
+        "rosterhandover",
+        "rosterhandovers",
         "crewhandoff",
         "crewhandoffs",
+        "crewhandover",
+        "crewhandovers",
         "crewtransfer",
         "crewtransfers"
     ];
@@ -2362,6 +2368,10 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
+        WorkspaceChangePacketProjection[] uniqueReturnChangeSignals = DeduplicateSemanticChangePacketVersions(
+                returnChanges.Concat(aftermathChanges)
+                    .OrderByDescending(static packet => packet.UpdatedAtUtc))
+            .ToArray();
         bool carryForwardSignal = IsCampaignReturnCarryForwardSignal(carryForward);
         bool carryForwardRelationshipSignal = IsCampaignReturnCarryForwardRelationshipSignal(carryForward);
 
@@ -2376,13 +2386,11 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         int diarySignalCount = diaryRecaps.Length
-            + returnChanges.Length
+            + uniqueReturnChangeSignals.Length
             + aftermathPackages.Length
-            + aftermathChanges.Length
             + (carryForwardSignal ? 1 : 0);
         int relationshipSignalCount = relationshipConsequences.Length
-            + returnChanges.Count(static packet => IsCampaignRelationshipSignal(packet))
-            + aftermathChanges.Count(static packet => IsCampaignRelationshipSignal(packet))
+            + uniqueReturnChangeSignals.Count(static packet => IsCampaignRelationshipSignal(packet))
             + (carryForwardRelationshipSignal ? 1 : 0);
         string summary = $"{Math.Max(1, diarySignalCount)} diary/continuity signal(s) and {relationshipSignalCount} relationship signal(s) stay on one governed return lane for downtime and next-session reopen.";
         string bindingSummary = leadRun is null
