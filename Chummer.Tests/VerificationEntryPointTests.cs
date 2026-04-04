@@ -1049,6 +1049,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=safehousereadinesses", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=offlinecache", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=offlinecaches", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=stalecache", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=staleofflinecache", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=travelcache", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=travelcaches", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=safehousecache", audit, StringComparison.Ordinal);
@@ -2204,6 +2206,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinereadinesses', 'compact offlinereadinesses continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinecache', 'compact offlinecache continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinecaches', 'compact offlinecaches continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'stalecache', 'compact stalecache continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'staleofflinecache', 'compact staleofflinecache continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadiness', 'compact travelreadiness continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadinesses', 'compact travelreadinesses continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'travelcache', 'compact travelcache continuity prep');", playwright, StringComparison.Ordinal);

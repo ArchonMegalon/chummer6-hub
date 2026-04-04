@@ -63,6 +63,8 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "safehouses",
             "travels",
             "offlines",
+            "stalecache",
+            "staleofflinecache",
             "mobileofflines",
             "mobiletravelcaches",
             "mobilesafehousereadinesses"
@@ -76,6 +78,8 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("safehouses", tokens);
         Assert.DoesNotContain("travels", tokens);
         Assert.DoesNotContain("offlines", tokens);
+        Assert.DoesNotContain("stalecache", tokens);
+        Assert.DoesNotContain("staleofflinecache", tokens);
         Assert.DoesNotContain("mobileofflines", tokens);
         Assert.DoesNotContain("mobiletravelcaches", tokens);
         Assert.DoesNotContain("mobilesafehousereadinesses", tokens);
