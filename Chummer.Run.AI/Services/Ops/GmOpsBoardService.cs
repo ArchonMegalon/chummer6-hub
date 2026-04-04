@@ -1301,7 +1301,15 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 "prepbriefing",
                 "prep brief",
                 "prep binder",
-                "prep catalog")
+                "prep catalog",
+                "postsession",
+                "postsessions",
+                "post-session",
+                "post session",
+                "postrun",
+                "postruns",
+                "post-run",
+                "post run")
             || (ContainsAny(combined,
                     "packet",
                     "packets",
