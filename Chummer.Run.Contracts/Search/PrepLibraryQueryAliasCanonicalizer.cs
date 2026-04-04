@@ -147,7 +147,9 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "safehousecache", "safehouse", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "safehousecaches", "safehouse", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "stalecache", "stale", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "stalecaches", "stale", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "staleofflinecache", "stale", "offline", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "staleofflinecaches", "stale", "offline", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "mobileofflinereadiness", "mobile", "offline", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "mobileofflinereadinesses", "mobile", "offline", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "mobiletravelreadiness", "mobile", "travel", "readiness");
