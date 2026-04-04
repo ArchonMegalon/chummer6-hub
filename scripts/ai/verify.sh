@@ -605,6 +605,30 @@ from pathlib import Path
 path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
 payload["releaseProof"]["journeysPassed"] = [
+    "install_claim_restore_continue",
+    42,
+    "campaign_session_recover_recap",
+    "report_cluster_release_notify",
+]
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject non-string releaseProof.journeysPassed entries." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["journeysPassed"] = [
     "",
     "build_explain_publish",
     "campaign_session_recover_recap",
@@ -653,6 +677,26 @@ PY
 if bash scripts/audit-ui-parity.sh; then
   mv "$release_channel_backup" "$release_channel_path"
   echo "verify gate failed: parity audit should reject stale releaseProof.generatedAt timestamps." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"].pop("generatedAt", None)
+payload["releaseProof"].pop("generated_at", None)
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject missing releaseProof.generatedAt timestamps." >&2
   exit 1
 fi
 mv "$release_channel_backup" "$release_channel_path"
