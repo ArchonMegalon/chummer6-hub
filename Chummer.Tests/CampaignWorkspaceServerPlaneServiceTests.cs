@@ -44,6 +44,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsCompactShorthandAcrossWhitespaceBoundaries()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "prep:demo",
+            Kind: "prep_launch_packet",
+            Title: "Neon Cradle prep library packet",
+            Summary: "Prep library remains governed for launch.",
+            BindingSummary: "Bound to campaign return and audit lanes.",
+            Reusable: true,
+            SearchTerms: ["prep", "library", "packet"],
+            EvidenceLines: ["GM prep library receipt captured."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+
+        IReadOnlyList<string> compactTokens = InvokeBuildTokens("preplibrary");
+        IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixlibrary");
+
+        Assert.True(InvokeMatches(packet, compactTokens));
+        Assert.False(InvokeMatches(packet, negativeTokens));
+    }
+
+    [Fact]
     public void ResolvePrepPacketNormalizesWhitespacePaddedPacketIds()
     {
         DateTimeOffset updatedAtUtc = DateTimeOffset.Parse("2026-04-03T00:00:00Z");

@@ -4376,8 +4376,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Concat(packet.EvidenceLines)
             .Where(static text => !string.IsNullOrWhiteSpace(text)))
             .ToLowerInvariant();
+        string normalizedSearchable = NormalizeSearchToken(searchable).ToLowerInvariant();
 
-        return queryTokens.All(token => searchable.Contains(token, StringComparison.OrdinalIgnoreCase));
+        return queryTokens.All(token =>
+            searchable.Contains(token, StringComparison.OrdinalIgnoreCase)
+            || normalizedSearchable.Contains(token, StringComparison.OrdinalIgnoreCase));
     }
 
     private static GovernedPrepPacketSummary ResolvePrepPacket(
