@@ -72,94 +72,7 @@ public sealed class ReleaseBundlePromotionService
             ZipFile.ExtractToDirectory(bundlePath, extractRoot);
 
             string bundleRoot = ResolveBundleRoot(extractRoot);
-            string compatibilityManifestPath = RequireSingleFile(bundleRoot, CompatibilityManifestName);
-            string canonicalManifestPath = RequireSingleFile(bundleRoot, CanonicalManifestName);
-            string filesRoot = RequireSiblingDirectory(compatibilityManifestPath, "files");
-            string? startupSmokeRoot = ResolveSiblingDirectory(compatibilityManifestPath, "startup-smoke");
-            string? promotionEvidencePath = ResolveOptionalFile(bundleRoot, PromotionEvidenceRelativePath);
-
-            PublicReleaseManifestDto incomingCompatibilityManifest = LoadCompatibilityManifest(compatibilityManifestPath);
-            JsonObject incomingCanonicalManifest = LoadJsonObject(canonicalManifestPath);
-
-            IReadOnlyList<CanonicalArtifactRecord> incomingCanonicalArtifacts = LoadCanonicalArtifacts(incomingCanonicalManifest);
-            ValidateIncomingBundle(
-                incomingCompatibilityManifest,
-                incomingCanonicalArtifacts,
-                filesRoot,
-                startupSmokeRoot,
-                promotionEvidencePath);
-
-            string liveCompatibilityManifestPath = Path.Combine(downloadsRoot, CompatibilityManifestName);
-            string liveCanonicalManifestPath = Path.Combine(downloadsRoot, CanonicalManifestName);
-            PublicReleaseManifestDto? existingCompatibilityManifest = File.Exists(liveCompatibilityManifestPath)
-                ? LoadCompatibilityManifest(liveCompatibilityManifestPath)
-                : null;
-            JsonObject? existingCanonicalManifest = File.Exists(liveCanonicalManifestPath)
-                ? LoadJsonObject(liveCanonicalManifestPath)
-                : null;
-
-            IReadOnlySet<string> incomingArtifactIds = incomingCompatibilityManifest.Downloads
-                .Select(static artifact => artifact.Id)
-                .Where(static id => !string.IsNullOrWhiteSpace(id))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            List<string> replacedFileNames = existingCompatibilityManifest?.Downloads
-                .Where(download => incomingArtifactIds.Contains(download.Id))
-                .Select(ResolveDownloadFileName)
-                .Where(static fileName => !string.IsNullOrWhiteSpace(fileName))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList()
-                ?? new List<string>();
-
-            PublicReleaseManifestDto mergedCompatibilityManifest = MergeCompatibilityManifest(existingCompatibilityManifest, incomingCompatibilityManifest);
-            JsonObject mergedCanonicalManifest = MergeCanonicalManifest(existingCanonicalManifest, incomingCanonicalManifest);
-
-            string filesDestinationRoot = Path.Combine(downloadsRoot, "files");
-            Directory.CreateDirectory(filesDestinationRoot);
-            foreach (string sourcePath in Directory.GetFiles(filesRoot))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string destinationPath = Path.Combine(filesDestinationRoot, Path.GetFileName(sourcePath));
-                File.Copy(sourcePath, destinationPath, overwrite: true);
-            }
-
-            HashSet<string> mergedFileNames = mergedCompatibilityManifest.Downloads
-                .Select(ResolveDownloadFileName)
-                .Where(static fileName => !string.IsNullOrWhiteSpace(fileName))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (string replacedFileName in replacedFileNames)
-            {
-                if (mergedFileNames.Contains(replacedFileName))
-                {
-                    continue;
-                }
-
-                string oldPath = Path.Combine(filesDestinationRoot, replacedFileName);
-                if (File.Exists(oldPath))
-                {
-                    File.Delete(oldPath);
-                }
-            }
-
-            WriteJsonAtomically(liveCompatibilityManifestPath, mergedCompatibilityManifest);
-            WriteJsonAtomically(liveCanonicalManifestPath, mergedCanonicalManifest);
-
-            IReadOnlyList<string> promotedArtifactIds = incomingCompatibilityManifest.Downloads
-                .Select(static artifact => artifact.Id)
-                .Where(static id => !string.IsNullOrWhiteSpace(id))
-                .ToArray();
-
-            string baseUrl = ResolvePublicBaseUrl();
-            return new ReleaseBundlePromotionResult(
-                Version: incomingCompatibilityManifest.Version,
-                Channel: incomingCompatibilityManifest.Channel,
-                PublishedAt: incomingCompatibilityManifest.PublishedAt,
-                PromotedArtifactIds: promotedArtifactIds,
-                DownloadsUrl: $"{baseUrl}/downloads/",
-                InstallDispatchUrls: promotedArtifactIds.Select(id => $"{baseUrl}/downloads/install/{Uri.EscapeDataString(id)}").ToArray(),
-                DirectFileUrls: incomingCompatibilityManifest.Downloads
-                    .Select(download => $"{baseUrl}{NormalizePublicPath(download.Url)}")
-                    .ToArray());
+            return await PromotePreparedBundleAsync(bundleRoot, downloadsRoot, cancellationToken);
         }
         finally
         {
@@ -175,6 +88,131 @@ public sealed class ReleaseBundlePromotionService
                 _logger.LogWarning(ex, "Release bundle promotion cleanup failed for {TempRoot}.", tempRoot);
             }
         }
+    }
+
+    public async Task<ReleaseBundlePromotionResult> PromoteDirectoryAsync(
+        string bundleRoot,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(bundleRoot))
+        {
+            throw new InvalidDataException("bundle root is required.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        string downloadsRoot = ResolveDownloadsRoot();
+        EnsureDownloadsRootWritable(downloadsRoot);
+        return await PromotePreparedBundleAsync(bundleRoot, downloadsRoot, cancellationToken);
+    }
+
+    private Task<ReleaseBundlePromotionResult> PromotePreparedBundleAsync(
+        string bundleRoot,
+        string downloadsRoot,
+        CancellationToken cancellationToken)
+    {
+        string compatibilityManifestPath = RequireSingleFile(bundleRoot, CompatibilityManifestName);
+        string canonicalManifestPath = RequireSingleFile(bundleRoot, CanonicalManifestName);
+        string filesRoot = RequireSiblingDirectory(compatibilityManifestPath, "files");
+        string? startupSmokeRoot = ResolveSiblingDirectory(compatibilityManifestPath, "startup-smoke");
+        string? promotionEvidencePath = ResolveOptionalFile(bundleRoot, PromotionEvidenceRelativePath);
+
+        PublicReleaseManifestDto incomingCompatibilityManifest = LoadCompatibilityManifest(compatibilityManifestPath);
+        JsonObject incomingCanonicalManifest = LoadJsonObject(canonicalManifestPath);
+
+        IReadOnlyList<CanonicalArtifactRecord> incomingCanonicalArtifacts = LoadCanonicalArtifacts(incomingCanonicalManifest);
+        ValidateIncomingBundle(
+            incomingCompatibilityManifest,
+            incomingCanonicalArtifacts,
+            filesRoot,
+            startupSmokeRoot,
+            promotionEvidencePath);
+
+        string liveCompatibilityManifestPath = Path.Combine(downloadsRoot, CompatibilityManifestName);
+        string liveCanonicalManifestPath = Path.Combine(downloadsRoot, CanonicalManifestName);
+        PublicReleaseManifestDto? existingCompatibilityManifest = File.Exists(liveCompatibilityManifestPath)
+            ? LoadCompatibilityManifest(liveCompatibilityManifestPath)
+            : null;
+        JsonObject? existingCanonicalManifest = File.Exists(liveCanonicalManifestPath)
+            ? LoadJsonObject(liveCanonicalManifestPath)
+            : null;
+
+        IReadOnlySet<string> incomingArtifactIds = incomingCompatibilityManifest.Downloads
+            .Select(static artifact => artifact.Id)
+            .Where(static id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        List<string> replacedFileNames = existingCompatibilityManifest?.Downloads
+            .Where(download => incomingArtifactIds.Contains(download.Id))
+            .Select(ResolveDownloadFileName)
+            .Where(static fileName => !string.IsNullOrWhiteSpace(fileName))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+            ?? new List<string>();
+
+        PublicReleaseManifestDto mergedCompatibilityManifest = MergeCompatibilityManifest(existingCompatibilityManifest, incomingCompatibilityManifest);
+        JsonObject mergedCanonicalManifest = MergeCanonicalManifest(existingCanonicalManifest, incomingCanonicalManifest);
+
+        string filesDestinationRoot = Path.Combine(downloadsRoot, "files");
+        Directory.CreateDirectory(filesDestinationRoot);
+        foreach (string sourcePath in Directory.GetFiles(filesRoot))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string destinationPath = Path.Combine(filesDestinationRoot, Path.GetFileName(sourcePath));
+            File.Copy(sourcePath, destinationPath, overwrite: true);
+        }
+
+        if (!string.IsNullOrWhiteSpace(startupSmokeRoot) && Directory.Exists(startupSmokeRoot))
+        {
+            CopyDirectoryContents(
+                startupSmokeRoot,
+                Path.Combine(downloadsRoot, "startup-smoke"),
+                cancellationToken);
+        }
+
+        HashSet<string> mergedFileNames = mergedCompatibilityManifest.Downloads
+            .Select(ResolveDownloadFileName)
+            .Where(static fileName => !string.IsNullOrWhiteSpace(fileName))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (string replacedFileName in replacedFileNames)
+        {
+            if (mergedFileNames.Contains(replacedFileName))
+            {
+                continue;
+            }
+
+            string oldPath = Path.Combine(filesDestinationRoot, replacedFileName);
+            if (File.Exists(oldPath))
+            {
+                File.Delete(oldPath);
+            }
+        }
+
+        WriteJsonAtomically(liveCompatibilityManifestPath, mergedCompatibilityManifest);
+        WriteJsonAtomically(liveCanonicalManifestPath, mergedCanonicalManifest);
+
+        IReadOnlyList<string> promotedArtifactIds = incomingCompatibilityManifest.Downloads
+            .Select(static artifact => artifact.Id)
+            .Where(static id => !string.IsNullOrWhiteSpace(id))
+            .ToArray();
+
+        string baseUrl = ResolvePublicBaseUrl();
+        PublicReleaseManifestDto publicShelfManifest = ValidatePublicShelfCoherence(
+            downloadsRoot,
+            liveCompatibilityManifestPath,
+            liveCanonicalManifestPath,
+            promotedArtifactIds);
+        ReleaseBundlePromotionResult result = new(
+            Version: incomingCompatibilityManifest.Version,
+            Channel: incomingCompatibilityManifest.Channel,
+            PublishedAt: incomingCompatibilityManifest.PublishedAt,
+            PromotedArtifactIds: promotedArtifactIds,
+            DownloadsUrl: $"{baseUrl}/downloads/",
+            InstallDispatchUrls: promotedArtifactIds.Select(id => $"{baseUrl}/downloads/install/{Uri.EscapeDataString(id)}").ToArray(),
+            DirectFileUrls: publicShelfManifest.Downloads
+                .Where(download => promotedArtifactIds.Contains(download.Id, StringComparer.OrdinalIgnoreCase))
+                .Select(download => $"{baseUrl}{NormalizePublicPath(download.Url)}")
+                .ToArray());
+        return Task.FromResult(result);
     }
 
     private string ResolveDownloadsRoot()
@@ -211,6 +249,27 @@ public sealed class ReleaseBundlePromotionService
             {
                 File.Delete(probePath);
             }
+        }
+    }
+
+    private static void CopyDirectoryContents(
+        string sourceRoot,
+        string destinationRoot,
+        CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(destinationRoot);
+        foreach (string sourcePath in Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string relativePath = Path.GetRelativePath(sourceRoot, sourcePath);
+            string destinationPath = Path.Combine(destinationRoot, relativePath);
+            string? destinationDirectory = Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrWhiteSpace(destinationDirectory))
+            {
+                Directory.CreateDirectory(destinationDirectory);
+            }
+
+            File.Copy(sourcePath, destinationPath, overwrite: true);
         }
     }
 
@@ -490,7 +549,14 @@ public sealed class ReleaseBundlePromotionService
         if (string.Equals(platform, "windows", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(artifactEvidence.SigningStatus, "pass", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidDataException($"windows promotion requires signing proof for {artifact.ArtifactId}.");
+            bool previewUnsignedAllowed =
+                string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(artifactEvidence.SigningStatus, "skipped_preview", StringComparison.OrdinalIgnoreCase);
+
+            if (!previewUnsignedAllowed)
+            {
+                throw new InvalidDataException($"windows promotion requires signing proof for {artifact.ArtifactId}.");
+            }
         }
 
         if (string.Equals(platform, "macos", StringComparison.OrdinalIgnoreCase))
@@ -716,6 +782,76 @@ public sealed class ReleaseBundlePromotionService
         using var sha = System.Security.Cryptography.SHA256.Create();
         using FileStream stream = File.OpenRead(path);
         return Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant();
+    }
+
+    private PublicReleaseManifestDto ValidatePublicShelfCoherence(
+        string downloadsRoot,
+        string liveCompatibilityManifestPath,
+        string liveCanonicalManifestPath,
+        IReadOnlyList<string> promotedArtifactIds)
+    {
+        if (!File.Exists(liveCompatibilityManifestPath))
+        {
+            throw new InvalidOperationException("promotion wrote no compatibility manifest.");
+        }
+
+        if (!File.Exists(liveCanonicalManifestPath))
+        {
+            throw new InvalidOperationException("promotion wrote no canonical manifest.");
+        }
+
+        PublicReleaseManifestDto liveCompatibilityManifest = LoadCompatibilityManifest(liveCompatibilityManifestPath);
+        HashSet<string> liveCompatibilityIds = liveCompatibilityManifest.Downloads
+            .Select(static artifact => artifact.Id)
+            .Where(static id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        JsonObject liveCanonicalManifest = LoadJsonObject(liveCanonicalManifestPath);
+        HashSet<string> liveCanonicalIds = LoadCanonicalArtifacts(liveCanonicalManifest)
+            .Select(static artifact => artifact.ArtifactId)
+            .Where(static id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (string artifactId in promotedArtifactIds)
+        {
+            if (!liveCompatibilityIds.Contains(artifactId))
+            {
+                throw new InvalidOperationException($"public compatibility manifest is missing promoted artifact {artifactId}.");
+            }
+
+            if (!liveCanonicalIds.Contains(artifactId))
+            {
+                throw new InvalidOperationException($"public canonical manifest is missing promoted artifact {artifactId}.");
+            }
+        }
+
+        string filesRoot = Path.Combine(downloadsRoot, "files");
+        foreach (PublicReleaseArtifactDto artifact in liveCompatibilityManifest.Downloads.Where(download => promotedArtifactIds.Contains(download.Id, StringComparer.OrdinalIgnoreCase)))
+        {
+            string fileName = ResolveDownloadFileName(artifact);
+            string artifactPath = Path.Combine(filesRoot, fileName);
+            if (!File.Exists(artifactPath))
+            {
+                throw new InvalidOperationException($"public downloads root is missing promoted artifact file {fileName}.");
+            }
+        }
+
+        PublicReleaseManifestService publicManifestService = new(_configuration);
+        PublicReleaseManifestDto publicManifest = publicManifestService.LoadManifest();
+        ReleaseSelectionService releaseSelection = new(new PublicCanonFileLoader(_configuration));
+        HashSet<string> publicManifestIds = publicManifest.Downloads
+            .Select(static artifact => artifact.Id)
+            .Where(static id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (string artifactId in promotedArtifactIds)
+        {
+            if (!publicManifestIds.Contains(artifactId))
+            {
+                throw new InvalidOperationException($"public downloads surface is missing promoted artifact {artifactId} after promotion.");
+            }
+        }
+
+        return releaseSelection.ApplyAccessPolicy(publicManifest);
     }
 
     private sealed record CanonicalArtifactRecord(

@@ -12,6 +12,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     private readonly PublicReleaseManifestService _releases;
     private readonly ReleaseSelectionService _releaseSelection;
     private readonly InstallLinkingService _installLinking;
+    private readonly InstallBootstrapTicketService _installBootstrapTickets;
     private readonly HubIdentityClient _identity;
     private readonly ILogger<DownloadsCompatibilityController> _logger;
 
@@ -19,12 +20,14 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         PublicReleaseManifestService releases,
         ReleaseSelectionService releaseSelection,
         InstallLinkingService installLinking,
+        InstallBootstrapTicketService installBootstrapTickets,
         HubIdentityClient identity,
         ILogger<DownloadsCompatibilityController> logger)
     {
         _releases = releases;
         _releaseSelection = releaseSelection;
         _installLinking = installLinking;
+        _installBootstrapTickets = installBootstrapTickets;
         _identity = identity;
         _logger = logger;
     }
@@ -36,11 +39,25 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         return Ok(manifest);
     }
 
+    [HttpGet("/downloads/RELEASE_CHANNEL.generated.json")]
+    public IActionResult CanonicalReleaseManifest()
+    {
+        var manifestPath = _releases.ResolveCanonicalManifestFilePath();
+        if (manifestPath is null)
+        {
+            return NotFound();
+        }
+
+        return PhysicalFile(
+            manifestPath,
+            "application/json; charset=utf-8",
+            enableRangeProcessing: false);
+    }
+
     [HttpGet("/downloads/get/{artifactId}")]
     public async Task<IActionResult> DownloadArtifact([FromRoute] string artifactId, CancellationToken cancellationToken)
     {
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var artifact = manifest.Downloads.FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
+        var (manifest, artifact) = ResolveManifestArtifact(artifactId);
         if (artifact is null)
         {
             return NotFound();
@@ -77,8 +94,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     [HttpGet("/downloads/file/{artifactId}")]
     public async Task<IActionResult> DownloadResolvedArtifactFile([FromRoute] string artifactId, CancellationToken cancellationToken)
     {
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var artifact = manifest.Downloads.FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
+        var (manifest, artifact) = ResolveManifestArtifact(artifactId);
         if (artifact is null)
         {
             return NotFound();
@@ -88,6 +104,48 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         if (filePath is null)
         {
             return NotFound();
+        }
+
+        string? bootstrapTicket = Request.Query["ticket"].ToString();
+        if (!string.IsNullOrWhiteSpace(bootstrapTicket))
+        {
+            if (_installBootstrapTickets.TryValidateForArtifact(bootstrapTicket, artifact.Id, out _))
+            {
+                Response.Headers["Cache-Control"] = "private, no-store";
+                return PhysicalFile(
+                    filePath,
+                    "application/octet-stream",
+                    artifact.FileName ?? Path.GetFileName(filePath),
+                    enableRangeProcessing: true);
+            }
+
+            Response.Headers["Cache-Control"] = "private, no-store";
+            return Unauthorized(new
+            {
+                error = "invalid_or_expired_install_ticket",
+                message = "The install command expired. Re-open the signed-in downloads handoff and copy a fresh install command."
+            });
+        }
+
+        string? claimCode = Request.Query["claimCode"].ToString();
+        if (!string.IsNullOrWhiteSpace(claimCode))
+        {
+            if (_installLinking.CanDownloadArtifactWithClaimCode(artifact.Id, claimCode))
+            {
+                Response.Headers["Cache-Control"] = "private, no-store";
+                return PhysicalFile(
+                    filePath,
+                    "application/octet-stream",
+                    artifact.FileName ?? Path.GetFileName(filePath),
+                    enableRangeProcessing: true);
+            }
+
+            Response.Headers["Cache-Control"] = "private, no-store";
+            return Unauthorized(new
+            {
+                error = "invalid_or_expired_claim_code",
+                message = "The claim code in this download handoff is no longer valid. Re-download the Mac setup script from the signed-in downloads page."
+            });
         }
 
         var subject = await TryGetOptionalSubjectAsync(cancellationToken);
@@ -112,8 +170,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return NotFound();
         }
 
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var artifact = manifest.Downloads.FirstOrDefault(item => string.Equals(item.Id, originalArtifact.Id, StringComparison.OrdinalIgnoreCase));
+        var (manifest, artifact) = ResolveManifestArtifact(originalArtifact.Id);
         if (artifact is null)
         {
             return NotFound();
@@ -123,6 +180,40 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         if (filePath is null)
         {
             return NotFound();
+        }
+
+        string? bootstrapTicket = Request.Query["ticket"].ToString();
+        if (!string.IsNullOrWhiteSpace(bootstrapTicket))
+        {
+            if (_installBootstrapTickets.TryValidateForArtifact(bootstrapTicket, artifact.Id, out _))
+            {
+                Response.Headers["Cache-Control"] = "private, no-store";
+                return PhysicalFile(filePath, "application/octet-stream", enableRangeProcessing: true);
+            }
+
+            Response.Headers["Cache-Control"] = "private, no-store";
+            return Unauthorized(new
+            {
+                error = "invalid_or_expired_install_ticket",
+                message = "The install command expired. Re-open the signed-in downloads handoff and copy a fresh install command."
+            });
+        }
+
+        string? claimCode = Request.Query["claimCode"].ToString();
+        if (!string.IsNullOrWhiteSpace(claimCode))
+        {
+            if (_installLinking.CanDownloadArtifactWithClaimCode(artifact.Id, claimCode))
+            {
+                Response.Headers["Cache-Control"] = "private, no-store";
+                return PhysicalFile(filePath, "application/octet-stream", enableRangeProcessing: true);
+            }
+
+            Response.Headers["Cache-Control"] = "private, no-store";
+            return Unauthorized(new
+            {
+                error = "invalid_or_expired_claim_code",
+                message = "The claim code in this download handoff is no longer valid. Re-download the Mac setup script from the signed-in downloads page."
+            });
         }
 
         var encodedArtifactId = Uri.EscapeDataString(artifact.Id);
@@ -142,6 +233,22 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
     private static string BuildInstallLoginHref(string encodedArtifactId)
         => $"/login?next={Uri.EscapeDataString($"/downloads/install/{encodedArtifactId}")}";
+
+    private (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto? Artifact) ResolveManifestArtifact(string artifactId)
+    {
+        PublicReleaseManifestDto rawManifest = _releases.LoadManifest();
+        PublicReleaseManifestDto publicManifest = _releaseSelection.ApplyAccessPolicy(rawManifest);
+        PublicReleaseArtifactDto? artifact = publicManifest.Downloads
+            .FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
+        if (artifact is not null)
+        {
+            return (publicManifest, artifact);
+        }
+
+        artifact = rawManifest.Downloads
+            .FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
+        return (rawManifest, artifact);
+    }
 
     private async Task<AuthenticatedHubSubject?> TryGetOptionalSubjectAsync(CancellationToken cancellationToken)
     {
