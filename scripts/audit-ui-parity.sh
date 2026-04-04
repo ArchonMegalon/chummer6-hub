@@ -96,6 +96,28 @@ def require_object(value: object, *, message: str) -> dict:
     return value
 
 
+def resolve_alias_value(
+    mapping: dict,
+    *,
+    primary_key: str,
+    secondary_key: str,
+    field_name: str,
+    source: pathlib.Path,
+) -> object:
+    has_primary = primary_key in mapping
+    has_secondary = secondary_key in mapping
+    if has_primary and has_secondary and mapping.get(primary_key) != mapping.get(secondary_key):
+        raise SystemExit(
+            "parity audit failed: "
+            f"{field_name} alias values drift between {primary_key} and {secondary_key}: {source}"
+        )
+    if has_primary:
+        return mapping.get(primary_key)
+    if has_secondary:
+        return mapping.get(secondary_key)
+    return None
+
+
 def require_string_list(value: object, *, message: str) -> list[str]:
     if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
         raise SystemExit(message)
@@ -370,7 +392,13 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             f"{release_channel_path} (status={proof_status or 'missing'})"
         )
     proof_generated_at = parse_iso_timestamp(
-        proof.get("generatedAt") or proof.get("generated_at"),
+        resolve_alias_value(
+            proof,
+            primary_key="generatedAt",
+            secondary_key="generated_at",
+            field_name="releaseProof.generatedAt",
+            source=release_channel_path,
+        ),
         field_path="releaseProof.generatedAt",
         source=release_channel_path,
     )
@@ -398,7 +426,13 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             f"{release_channel_path} (future_skew_seconds={abs(release_proof_age_seconds)}, max_future_skew_seconds={release_proof_max_future_skew_seconds})"
         )
     proof_base_url = normalize_release_proof_base_url(
-        proof.get("baseUrl") or proof.get("base_url"),
+        resolve_alias_value(
+            proof,
+            primary_key="baseUrl",
+            secondary_key="base_url",
+            field_name="releaseProof.baseUrl",
+            source=release_channel_path,
+        ),
         field_path="releaseProof.baseUrl",
         source=release_channel_path,
     )
@@ -407,7 +441,13 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.baseUrl must match an allowed canonical release origin: "
             f"{release_channel_path} (base_url={proof_base_url}, allowed={', '.join(ALLOWED_RELEASE_PROOF_BASE_URLS)})"
         )
-    journeys_passed = proof.get("journeysPassed") or proof.get("journeys_passed")
+    journeys_passed = resolve_alias_value(
+        proof,
+        primary_key="journeysPassed",
+        secondary_key="journeys_passed",
+        field_name="releaseProof.journeysPassed",
+        source=release_channel_path,
+    )
     journeys = require_string_list(
         journeys_passed,
         message=(
@@ -462,7 +502,13 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.journeysPassed declares unexpected journey ids: "
             f"{release_channel_path} ({', '.join(unexpected_journeys)})"
         )
-    proof_routes = proof.get("proofRoutes") or proof.get("proof_routes")
+    proof_routes = resolve_alias_value(
+        proof,
+        primary_key="proofRoutes",
+        secondary_key="proof_routes",
+        field_name="releaseProof.proofRoutes",
+        source=release_channel_path,
+    )
     raw_routes = require_string_list(
         proof_routes,
         message=(
