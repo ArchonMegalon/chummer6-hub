@@ -168,6 +168,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturnpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturnpackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturnbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturnbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnbrief")));
@@ -176,6 +180,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diarycontactheatpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diarycontactsheatpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathdowntimepacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsdowntimepacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsdowntimepackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelofflinepacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelofflinepackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobileofflinepacket")));
@@ -588,6 +594,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnloop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturn")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturns")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturnlanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturn")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnloop")));
@@ -600,6 +612,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturnlanes")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixcampaignreturn")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaftermathreturn")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaftermathsreturn")));
     }
 
     [Fact]
