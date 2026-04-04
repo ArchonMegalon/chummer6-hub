@@ -747,6 +747,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=aftermaths", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=debrief", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=debriefs", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=debriefed", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=debriefing", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=debriefings", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=outbrief", audit, StringComparison.Ordinal);

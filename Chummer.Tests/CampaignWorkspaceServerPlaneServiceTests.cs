@@ -726,6 +726,24 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(supported);
     }
 
+    [Theory]
+    [InlineData("debriefed")]
+    [InlineData("debriefing")]
+    [InlineData("debriefings")]
+    [InlineData("post-session")]
+    [InlineData("post-run")]
+    [InlineData("post-game")]
+    public void BoundedRecapShelfCategoryTreatsContinuityRecapShorthandKindsAsAftermath(string kind)
+    {
+        PublicationSafeProjection publication = BuildPublicationSafeProjection(kind);
+
+        string category = InvokeBoundedRecapShelfCategory(publication);
+        bool supported = InvokeSupportsCreatorShelfProjection(publication);
+
+        Assert.Equal("aftermath", category);
+        Assert.True(supported);
+    }
+
     [Fact]
     public void PrepLibraryIncludesRosterMovementPacketWhenRosterTransfersExist()
     {

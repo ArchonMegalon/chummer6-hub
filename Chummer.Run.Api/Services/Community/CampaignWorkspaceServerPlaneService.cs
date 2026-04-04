@@ -3897,8 +3897,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         => ContainsAnyWordToken(value, ["replay"]);
 
     private static bool IsAftermathRecapPublicationKind(string value)
-        => ContainsAnyWordToken(value, ["aftermath", "recap", "debrief"])
+        => ContainsAnyWordToken(value, ["aftermath", "recap", "debrief", "debriefed", "debriefing", "debriefings"])
             || ContainsAfterActionTokenPair(value)
+            || ContainsPostMortemTokenPair(value)
+            || ContainsPostSessionTokenPair(value)
+            || ContainsPostRunTokenPair(value)
+            || ContainsPostGameTokenPair(value)
             || ContainsOutBriefTokenPair(value)
             || ContainsHotWashTokenPair(value)
             || ContainsLessonLearnedTokenPair(value);
