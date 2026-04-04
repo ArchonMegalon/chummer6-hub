@@ -253,6 +253,49 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RecapShelfUsesLatestAftermathTimestamp_WhenAftermathPackageIdsRepeat()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        DateTimeOffset earlier = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        DateTimeOffset later = earlier.AddMinutes(15);
+        PublicationSafeProjection recap = new(
+            ProjectionId: "package-duplicate",
+            Kind: "downtime_brief",
+            Label: "Downtime brief",
+            Summary: "Downtime continuity recap.");
+        AftermathRecapPackageProjection packageEarlier = new(
+            PackageId: "package-duplicate",
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            RunId: "run-1",
+            RunTitle: "Dockyard pressure test",
+            PackageKind: "downtime_brief",
+            Title: "Downtime brief",
+            Summary: "Earlier package projection.",
+            ArtifactId: "artifact-1",
+            EvidenceLines: ["Earlier timeline evidence."],
+            InitiatedByUserId: "gm-1",
+            GeneratedAtUtc: earlier);
+        AftermathRecapPackageProjection packageLater = packageEarlier with
+        {
+            GeneratedAtUtc = later,
+            ArtifactId = "artifact-2",
+            Summary = "Later package projection."
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recap],
+            AftermathPackages = [packageEarlier, packageLater]
+        };
+
+        IReadOnlyList<RecapShelfEntry> shelf = InvokeBuildRecapShelf(workspace);
+
+        RecapShelfEntry entry = Assert.Single(shelf);
+        Assert.Equal("Downtime brief", entry.Label);
+        Assert.Equal(later, entry.UpdatedAtUtc);
+    }
+
+    [Fact]
     public void CampaignMemoryPacketDoesNotActivateFromCarryForwardWindowSignalsWithoutMemoryContext()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardWindowOnly();
