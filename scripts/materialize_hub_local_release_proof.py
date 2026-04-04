@@ -11,10 +11,6 @@ def iso_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def without_generated_at(payload: dict[str, object]) -> dict[str, object]:
-    return {key: value for key, value in payload.items() if key != "generated_at"}
-
-
 def main() -> int:
     if len(sys.argv) != 6:
         print(
@@ -49,16 +45,8 @@ def main() -> int:
         ],
     }
 
-    if out_path.is_file():
-        try:
-            existing_payload = json.loads(out_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            existing_payload = None
-
-        if isinstance(existing_payload, dict) and without_generated_at(existing_payload) == payload:
-            print(f"hub local proof unchanged: {out_path}")
-            return 0
-
+    # Always refresh generated_at when materializing proof so downstream freshness
+    # gates can trust an explicit local re-validation event.
     payload["generated_at"] = iso_now()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
