@@ -1645,6 +1645,20 @@ def verify_signed_in_work_audit(
     prep_library_gm_ops = json.loads(body)
     if not (prep_library_gm_ops.get("items") or []):
         raise AssertionError("prep-library gm ops search did not expose any governed packet")
+    prep_library_gm_ops_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=gm-ops"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_gm_ops_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_gm_ops_hyphen_path} returned {status}, expected 200")
+
+    prep_library_gm_ops_hyphen = json.loads(body)
+    if not (prep_library_gm_ops_hyphen.get("items") or []):
+        raise AssertionError("prep-library gm-ops search did not expose any governed packet")
     prep_library_gmop_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=gmop"
     status, body, _, _ = fetch(
         base_url,
@@ -1659,6 +1673,20 @@ def verify_signed_in_work_audit(
     prep_library_gmop = json.loads(body)
     if not (prep_library_gmop.get("items") or []):
         raise AssertionError("prep-library gmop search did not expose any governed packet")
+    prep_library_gm_op_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=gm-op"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_gm_op_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_gm_op_hyphen_path} returned {status}, expected 200")
+
+    prep_library_gm_op_hyphen = json.loads(body)
+    if not (prep_library_gm_op_hyphen.get("items") or []):
+        raise AssertionError("prep-library gm-op search did not expose any governed packet")
     prep_library_leagueops_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=leagueops"
     status, body, _, _ = fetch(
         base_url,
@@ -3568,6 +3596,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_gm_ops_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_gm_ops_search_path} should return at least one governed prep packet for the gm ops query")
+    workspace_gm_ops_hyphen_search_path = f"{workspace_path}?prepQuery=gm-ops"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_gm_ops_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_gm_ops_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_gm_ops_hyphen_search_path)
+    require_snippet(body, 'match(es) for "gm-ops"', workspace_gm_ops_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_gm_ops_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_gm_ops_hyphen_search_path} should return at least one governed prep packet for the gm-ops query")
     workspace_gmop_search_path = f"{workspace_path}?prepQuery=gmop"
     status, body, _, _ = fetch(
         base_url,
@@ -3583,6 +3626,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_gmop_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_gmop_search_path} should return at least one governed prep packet for the gmop query")
+    workspace_gm_op_hyphen_search_path = f"{workspace_path}?prepQuery=gm-op"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_gm_op_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_gm_op_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_gm_op_hyphen_search_path)
+    require_snippet(body, 'match(es) for "gm-op"', workspace_gm_op_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_gm_op_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_gm_op_hyphen_search_path} should return at least one governed prep packet for the gm-op query")
     workspace_leagueops_search_path = f"{workspace_path}?prepQuery=leagueops"
     status, body, _, _ = fetch(
         base_url,
