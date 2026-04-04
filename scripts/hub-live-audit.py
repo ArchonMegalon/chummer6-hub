@@ -1659,6 +1659,20 @@ def verify_signed_in_work_audit(
     prep_library_eventop = json.loads(body)
     if not (prep_library_eventop.get("items") or []):
         raise AssertionError("prep-library eventop search did not expose any governed packet")
+    prep_library_event_op_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=event-op"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_event_op_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_event_op_hyphen_path} returned {status}, expected 200")
+
+    prep_library_event_op_hyphen = json.loads(body)
+    if not (prep_library_event_op_hyphen.get("items") or []):
+        raise AssertionError("prep-library event-op search did not expose any governed packet")
     prep_library_event_operation_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=event-operation"
     status, body, _, _ = fetch(
         base_url,
@@ -3947,6 +3961,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_eventop_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_eventop_search_path} should return at least one governed prep packet for the eventop query")
+    workspace_event_op_hyphen_search_path = f"{workspace_path}?prepQuery=event-op"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_event_op_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_event_op_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_event_op_hyphen_search_path)
+    require_snippet(body, 'match(es) for "event-op"', workspace_event_op_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_event_op_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_event_op_hyphen_search_path} should return at least one governed prep packet for the event-op query")
     workspace_event_operation_search_path = f"{workspace_path}?prepQuery=event-operation"
     status, body, _, _ = fetch(
         base_url,

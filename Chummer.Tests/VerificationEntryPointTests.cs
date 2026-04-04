@@ -233,7 +233,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject invalid-format releaseProof.uiLocalizationReleaseGate.generatedAt timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject invalid-format releaseProof.uiLocalizationReleaseGate.generated_at timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject stale releaseProof.uiLocalizationReleaseGate.generatedAt timestamps", script, StringComparison.Ordinal);
+        Assert.Contains("reject stale releaseProof.uiLocalizationReleaseGate.generated_at timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject conflicting alias values between releaseProof.uiLocalizationReleaseGate.generatedAt and releaseProof.uiLocalizationReleaseGate.generated_at", script, StringComparison.Ordinal);
+        Assert.Contains("reject releaseProof.uiLocalizationReleaseGate.generated_at timestamps with excessive future skew", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.uiLocalizationReleaseGate.generatedAt timestamps with excessive future skew", script, StringComparison.Ordinal);
         Assert.Contains("reject missing releaseProof payloads", script, StringComparison.Ordinal);
         Assert.Contains("reject non-array releaseProof.journeysPassed payloads", script, StringComparison.Ordinal);
@@ -248,6 +250,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject stale releaseProof.generated_at timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject invalid-format releaseProof.generatedAt timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject invalid-format releaseProof.generated_at timestamps", script, StringComparison.Ordinal);
+        Assert.Contains("reject releaseProof.generated_at timestamps with excessive future skew", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.generatedAt timestamps with excessive future skew", script, StringComparison.Ordinal);
     }
 
@@ -523,6 +526,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventop", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=event-op", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event-operation", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event-operations", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmops", audit, StringComparison.Ordinal);
@@ -650,6 +654,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventop", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=event-op", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event-operation", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event-operations", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmops", audit, StringComparison.Ordinal);
@@ -824,6 +829,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("split event ops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventop", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventop prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=event-op", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen event-op prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=event-operation", playwright, StringComparison.Ordinal);
         Assert.Contains("hyphen event-operation prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=event-operations", playwright, StringComparison.Ordinal);

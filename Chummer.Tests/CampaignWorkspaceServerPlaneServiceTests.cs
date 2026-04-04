@@ -209,6 +209,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event operation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-op")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-operation")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-operations")));

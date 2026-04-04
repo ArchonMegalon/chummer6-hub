@@ -1315,6 +1315,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail event-op compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event-op compact search');
 
+  await page.fill('#prepQuery', 'event-op');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=event-op/.test(page.url()), 'Workspace detail search should preserve the hyphen event-op prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail event-op hyphen search');
+  await expectBodyText(page, 'match(es) for "event-op"', '/account/work/workspaces detail event-op hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail event-op hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail event-op hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail event-op hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail event-op hyphen search');
+  const workspaceEventOpHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEventOpHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen event-op query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail event-op hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event-op hyphen search');
+
   await page.fill('#prepQuery', 'event-operation');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
