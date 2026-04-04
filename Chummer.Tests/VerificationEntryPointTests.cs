@@ -55,6 +55,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json", script, StringComparison.Ordinal);
         Assert.Contains("required executable receipt is missing", script, StringComparison.Ordinal);
         Assert.Contains("status must be pass/passed/ready", script, StringComparison.Ordinal);
+        Assert.Contains("generatedAt/generated_at is missing", script, StringComparison.Ordinal);
+        Assert.Contains("proof_freshness_max_age_seconds", script, StringComparison.Ordinal);
+        Assert.Contains("proof_freshness_max_future_skew_seconds", script, StringComparison.Ordinal);
+        Assert.Contains("generatedAt/generated_at is stale", script, StringComparison.Ordinal);
+        Assert.Contains("generatedAt/generated_at is in the future", script, StringComparison.Ordinal);
         Assert.Contains("required_workflow_family_ids", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_workflow_family_ids", script, StringComparison.Ordinal);
         Assert.Contains("workflow_execution_missing_receipts", script, StringComparison.Ordinal);
