@@ -2591,7 +2591,31 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return ContainsAnyWordToken(value, CampaignRelationshipWordTokens);
+        return ContainsAnyWordToken(value, CampaignRelationshipWordTokens)
+            || ContainsStreetCredTokenPair(value)
+            || ContainsPublicAwarenessTokenPair(value);
+    }
+
+    private static bool ContainsStreetCredTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["street"])
+            && ContainsAnyWordToken(value, ["cred"]);
+    }
+
+    private static bool ContainsPublicAwarenessTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["public"])
+            && ContainsAnyWordToken(value, ["awareness"]);
     }
 
     private static bool ContainsCampaignRelationshipMutationToken(string? value)
