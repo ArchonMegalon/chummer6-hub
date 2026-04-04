@@ -88,6 +88,14 @@ public sealed class CampaignWorkspaceServerPlaneService
         "checkpoints"
     ];
 
+    private static readonly string[] EventControlCompactWordTokens =
+    [
+        "eventcontrol",
+        "eventcontrols",
+        "eventctrl",
+        "seasonops"
+    ];
+
     private static readonly string[] OppositionWordTokens =
     [
         "opposition",
@@ -261,6 +269,14 @@ public sealed class CampaignWorkspaceServerPlaneService
         "benches",
         "benched",
         "benching"
+    ];
+
+    private static readonly string[] RosterMovementCompactWordTokens =
+    [
+        "rostermove",
+        "rostertransfer",
+        "rosterhandoff",
+        "crewhandoff"
     ];
 
     private static readonly string[] RosterReturnWordTokens =
@@ -2832,6 +2848,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             || string.Equals(normalizedKind, "roster_move", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "crew_assignment", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "crew_handoff", StringComparison.OrdinalIgnoreCase)
+            || ContainsAnyWordToken(normalizedKind, RosterMovementCompactWordTokens)
             || ((ContainsAnyWordToken(normalizedKind, RosterIdentityWordTokens))
                 && ContainsRosterMovementToken(normalizedKind))
             || (ContainsAnyWordToken(normalizedKind, ["bench"])
@@ -2909,6 +2926,11 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         bool hasGeneralMovementToken = ContainsAnyWordToken(value, RosterMovementWordTokens);
         if (hasGeneralMovementToken)
+        {
+            return true;
+        }
+
+        if (ContainsAnyWordToken(value, RosterMovementCompactWordTokens))
         {
             return true;
         }
@@ -3467,7 +3489,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return ContainsAnyWordToken(value, EventControlWordTokens);
+        return ContainsAnyWordToken(value, EventControlWordTokens)
+            || ContainsAnyWordToken(value, EventControlCompactWordTokens);
     }
 
     private static bool ContainsOppositionToken(string? value)
@@ -3600,12 +3623,7 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static bool ContainsEventControlFallbackToken(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        return ContainsAnyWordToken(value, EventControlWordTokens);
+        return ContainsEventControlToken(value);
     }
 
     private static bool ContainsAnyWordToken(string value, IReadOnlyList<string> tokens)

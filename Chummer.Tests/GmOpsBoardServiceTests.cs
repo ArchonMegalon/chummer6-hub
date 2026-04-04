@@ -389,6 +389,54 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatCompactDomainShorthandAsGovernedOpsDomains()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:40:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open eventcontrol board remains unresolved for seasonops lane.",
+                AtUtc: baseTime,
+                EventId: "evt-eventcontrol"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open rostermove queue remains unresolved before launch.",
+                AtUtc: baseTime.AddMinutes(1),
+                EventId: "evt-rostermove"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open preplibrary packet remains unresolved for this session.",
+                AtUtc: baseTime.AddMinutes(2),
+                EventId: "evt-preplibrary"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(4, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-eventcontrol", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-preplibrary", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-rostermove", projection.UnresolvedItems[2].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[3].ItemId);
+    }
+
+    [Fact]
     public void ReconcilePortableAssets_SkipsAssets_WhenRequiredAssetFieldsAreMissing()
     {
         var service = CreateService();
