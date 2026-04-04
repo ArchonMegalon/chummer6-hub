@@ -143,6 +143,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("eventcontrol");
         }
 
+        if (tokens.Contains("eventctls"))
+        {
+            tokens.Remove("eventctls");
+            tokens.Add("eventcontrol");
+        }
+
         if (tokens.Contains("eventctrls"))
         {
             tokens.Remove("eventctrls");
@@ -165,6 +171,14 @@ public static class PrepLibraryQueryAliasCanonicalizer
         {
             tokens.Remove("seasonctl");
             tokens.Add("seasoncontrol");
+        }
+
+        if (tokens.Contains("seasonctls"))
+        {
+            tokens.Remove("seasonctls");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
         }
 
         if (tokens.Contains("seasonctrls"))

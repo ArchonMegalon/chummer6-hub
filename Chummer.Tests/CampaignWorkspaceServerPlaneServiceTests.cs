@@ -110,12 +110,14 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         IReadOnlyList<string> compactTokens = InvokeBuildTokens("eventctrl");
         IReadOnlyList<string> compactCtlTokens = InvokeBuildTokens("eventctl");
+        IReadOnlyList<string> compactCtlPluralTokens = InvokeBuildTokens("eventctls");
         IReadOnlyList<string> compactPluralAbbrevTokens = InvokeBuildTokens("eventctrls");
         IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("eventcontrols");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixctrl");
 
         Assert.True(InvokeMatches(packet, compactTokens));
         Assert.True(InvokeMatches(packet, compactCtlTokens));
+        Assert.True(InvokeMatches(packet, compactCtlPluralTokens));
         Assert.True(InvokeMatches(packet, compactPluralAbbrevTokens));
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
@@ -162,6 +164,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("seasoncontrols");
         IReadOnlyList<string> compactAbbrevTokens = InvokeBuildTokens("seasonctrl");
         IReadOnlyList<string> compactCtlTokens = InvokeBuildTokens("seasonctl");
+        IReadOnlyList<string> compactCtlPluralTokens = InvokeBuildTokens("seasonctls");
         IReadOnlyList<string> compactAbbrevPluralTokens = InvokeBuildTokens("seasonctrls");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixcontrol");
 
@@ -169,6 +172,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.True(InvokeMatches(packet, compactAbbrevTokens));
         Assert.True(InvokeMatches(packet, compactCtlTokens));
+        Assert.True(InvokeMatches(packet, compactCtlPluralTokens));
         Assert.True(InvokeMatches(packet, compactAbbrevPluralTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
     }

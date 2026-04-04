@@ -1370,11 +1370,15 @@ public sealed class GmOpsBoardServiceTests
         Assert.Empty(import.Conflicts);
 
         GmPrepAssetListResponse eventCtlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventctl");
+        GmPrepAssetListResponse eventCtlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventctls");
         GmPrepAssetListResponse seasonCtlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasonctl");
+        GmPrepAssetListResponse seasonCtlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasonctls");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixctl");
 
         Assert.Contains(eventCtlMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(eventCtlsMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Contains(seasonCtlMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(seasonCtlsMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Empty(negativeMatches.Items);
     }
 
