@@ -794,6 +794,13 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
             + ", ".join(missing_required_tests)
             + f" ({path})"
         )
+    unexpected_required_tests = sorted(set(required_tests).difference(expected_required_tests))
+    if unexpected_required_tests:
+        raise SystemExit(
+            "parity audit failed: visual receipt declares unexpected milestone-2 visual tests: "
+            + ", ".join(unexpected_required_tests)
+            + f" ({path})"
+        )
     required_interaction_keys = set(
         require_canonical_unique_string_list(
             require_string_list(
@@ -824,6 +831,13 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         raise SystemExit(
             "parity audit failed: visual receipt is missing required milestone-2 interaction keys: "
             + ", ".join(missing_surface_keys)
+            + f" ({path})"
+        )
+    unexpected_surface_keys = sorted(required_interaction_keys.difference(required_surfaces))
+    if unexpected_surface_keys:
+        raise SystemExit(
+            "parity audit failed: visual receipt declares unexpected milestone-2 interaction keys: "
+            + ", ".join(unexpected_surface_keys)
             + f" ({path})"
         )
     required_visual_status_fields = {
@@ -1035,6 +1049,13 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         raise SystemExit(
             "parity audit failed: visual receipt is missing required milestone-2 screenshots: "
             + ", ".join(missing_required_screenshots)
+            + f" ({path})"
+        )
+    unexpected_required_screenshots = sorted(set(required_screenshots).difference(expected_required_screenshots))
+    if unexpected_required_screenshots:
+        raise SystemExit(
+            "parity audit failed: visual receipt declares unexpected milestone-2 screenshots: "
+            + ", ".join(unexpected_required_screenshots)
             + f" ({path})"
         )
     require_empty_collection(
