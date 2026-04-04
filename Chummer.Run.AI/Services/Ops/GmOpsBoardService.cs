@@ -453,15 +453,22 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             string.Join(' ', item.ChecklistItems.Select(static checklist => checklist.Label)),
             string.Join(' ', item.ChecklistItems.Select(static checklist => checklist.Notes ?? string.Empty))
         });
+        var normalizedSearchable = BuildCompactSearchableText(searchable);
 
         if (searchable.Contains(queryText, StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
 
+        if (normalizedSearchable.Contains(queryText, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         foreach (var token in TokenizeQueryText(queryText))
         {
-            if (!searchable.Contains(token, StringComparison.OrdinalIgnoreCase))
+            if (!searchable.Contains(token, StringComparison.OrdinalIgnoreCase)
+                && !normalizedSearchable.Contains(token, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -472,6 +479,21 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
 
     private static string[] TokenizeQueryText(string queryText) =>
         queryText.Split([' ', '\t', '\r', '\n', ',', ';', ':', '/', '-', '_'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static string BuildCompactSearchableText(string value)
+    {
+        Span<char> buffer = stackalloc char[value.Length];
+        var index = 0;
+        foreach (char character in value)
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                buffer[index++] = char.ToLowerInvariant(character);
+            }
+        }
+
+        return index == 0 ? string.Empty : new string(buffer[..index]);
+    }
 
     public OfflineSyncSurfaceMergeResult ReconcilePortableAssets(IReadOnlyList<OfflineSyncPrepAsset> assets)
     {
