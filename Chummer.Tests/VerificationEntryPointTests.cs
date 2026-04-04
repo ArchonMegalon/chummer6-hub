@@ -74,6 +74,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release_channel_channel_id", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_version", script, StringComparison.Ordinal);
         Assert.Contains("workflow_parity_receipt_channel_ids", script, StringComparison.Ordinal);
+        Assert.Contains("milestone-2 workflow/visual release-channel ids drift", script, StringComparison.Ordinal);
+        Assert.Contains("milestone-2 workflow/visual release-channel versions drift", script, StringComparison.Ordinal);
         Assert.Contains("flagship_gate.headProofs.status_malformed_entries", script, StringComparison.Ordinal);
         Assert.Contains("flagship_gate.headProofs.status_non_canonical_keys", script, StringComparison.Ordinal);
         Assert.Contains("flagship_gate.headProofs.status_duplicate_normalized_keys", script, StringComparison.Ordinal);
@@ -407,6 +409,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventcontrol", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=contacts", audit, StringComparison.Ordinal);
@@ -419,6 +422,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventcontrol", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=contacts", audit, StringComparison.Ordinal);
@@ -462,6 +466,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact seasonop prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventcontrol", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventcontrol prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=eventcontrols", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact eventcontrols prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventctrl", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventctrl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=heat", playwright, StringComparison.Ordinal);

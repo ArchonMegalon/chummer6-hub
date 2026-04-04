@@ -1323,6 +1323,20 @@ def verify_signed_in_work_audit(
     prep_library_eventcontrol = json.loads(body)
     if not (prep_library_eventcontrol.get("items") or []):
         raise AssertionError("prep-library eventcontrol search did not expose any governed packet")
+    prep_library_eventcontrols_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=eventcontrols"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_eventcontrols_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_eventcontrols_path} returned {status}, expected 200")
+
+    prep_library_eventcontrols = json.loads(body)
+    if not (prep_library_eventcontrols.get("items") or []):
+        raise AssertionError("prep-library eventcontrols search did not expose any governed packet")
     prep_library_eventctrl_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=eventctrl"
     status, body, _, _ = fetch(
         base_url,
@@ -1977,6 +1991,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_eventcontrol_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_eventcontrol_search_path} should return at least one governed prep packet for the eventcontrol query")
+    workspace_eventcontrols_search_path = f"{workspace_path}?prepQuery=eventcontrols"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_eventcontrols_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_eventcontrols_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_eventcontrols_search_path)
+    require_snippet(body, 'match(es) for "eventcontrols"', workspace_eventcontrols_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_eventcontrols_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_eventcontrols_search_path} should return at least one governed prep packet for the eventcontrols query")
     workspace_eventctrl_search_path = f"{workspace_path}?prepQuery=eventctrl"
     status, body, _, _ = fetch(
         base_url,
