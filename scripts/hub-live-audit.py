@@ -3456,6 +3456,48 @@ def verify_signed_in_work_audit(
     prep_library_post_mortem_hyphen = json.loads(body)
     if not (prep_library_post_mortem_hyphen.get("items") or []):
         raise AssertionError("prep-library post-mortem search did not expose any governed packet")
+    prep_library_postmortems_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=postmortems"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_postmortems_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_postmortems_path} returned {status}, expected 200")
+
+    prep_library_postmortems = json.loads(body)
+    if not (prep_library_postmortems.get("items") or []):
+        raise AssertionError("prep-library postmortems search did not expose any governed packet")
+    prep_library_post_mortems_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=post%20mortems"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_post_mortems_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_post_mortems_path} returned {status}, expected 200")
+
+    prep_library_post_mortems = json.loads(body)
+    if not (prep_library_post_mortems.get("items") or []):
+        raise AssertionError("prep-library post mortems search did not expose any governed packet")
+    prep_library_post_mortems_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=post-mortems"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_post_mortems_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_post_mortems_hyphen_path} returned {status}, expected 200")
+
+    prep_library_post_mortems_hyphen = json.loads(body)
+    if not (prep_library_post_mortems_hyphen.get("items") or []):
+        raise AssertionError("prep-library post-mortems search did not expose any governed packet")
     prep_library_postsession_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=postsession"
     status, body, _, _ = fetch(
         base_url,
@@ -3498,6 +3540,48 @@ def verify_signed_in_work_audit(
     prep_library_post_session_hyphen = json.loads(body)
     if not (prep_library_post_session_hyphen.get("items") or []):
         raise AssertionError("prep-library post-session search did not expose any governed packet")
+    prep_library_postsessions_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=postsessions"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_postsessions_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_postsessions_path} returned {status}, expected 200")
+
+    prep_library_postsessions = json.loads(body)
+    if not (prep_library_postsessions.get("items") or []):
+        raise AssertionError("prep-library postsessions search did not expose any governed packet")
+    prep_library_post_sessions_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=post%20sessions"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_post_sessions_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_post_sessions_path} returned {status}, expected 200")
+
+    prep_library_post_sessions = json.loads(body)
+    if not (prep_library_post_sessions.get("items") or []):
+        raise AssertionError("prep-library post sessions search did not expose any governed packet")
+    prep_library_post_sessions_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=post-sessions"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_post_sessions_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_post_sessions_hyphen_path} returned {status}, expected 200")
+
+    prep_library_post_sessions_hyphen = json.loads(body)
+    if not (prep_library_post_sessions_hyphen.get("items") or []):
+        raise AssertionError("prep-library post-sessions search did not expose any governed packet")
     prep_library_postrun_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=postrun"
     status, body, _, _ = fetch(
         base_url,
@@ -3540,6 +3624,48 @@ def verify_signed_in_work_audit(
     prep_library_post_run_hyphen = json.loads(body)
     if not (prep_library_post_run_hyphen.get("items") or []):
         raise AssertionError("prep-library post-run search did not expose any governed packet")
+    prep_library_postruns_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=postruns"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_postruns_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_postruns_path} returned {status}, expected 200")
+
+    prep_library_postruns = json.loads(body)
+    if not (prep_library_postruns.get("items") or []):
+        raise AssertionError("prep-library postruns search did not expose any governed packet")
+    prep_library_post_runs_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=post%20runs"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_post_runs_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_post_runs_path} returned {status}, expected 200")
+
+    prep_library_post_runs = json.loads(body)
+    if not (prep_library_post_runs.get("items") or []):
+        raise AssertionError("prep-library post runs search did not expose any governed packet")
+    prep_library_post_runs_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=post-runs"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_post_runs_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_post_runs_hyphen_path} returned {status}, expected 200")
+
+    prep_library_post_runs_hyphen = json.loads(body)
+    if not (prep_library_post_runs_hyphen.get("items") or []):
+        raise AssertionError("prep-library post-runs search did not expose any governed packet")
     prep_library_postgame_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=postgame"
     status, body, _, _ = fetch(
         base_url,
@@ -7839,6 +7965,51 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_post_mortem_hyphen_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_post_mortem_hyphen_search_path} should return at least one governed prep packet for the post-mortem query")
+    workspace_postmortems_search_path = f"{workspace_path}?prepQuery=postmortems"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_postmortems_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_postmortems_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_postmortems_search_path)
+    require_snippet(body, 'match(es) for "postmortems"', workspace_postmortems_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_postmortems_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_postmortems_search_path} should return at least one governed prep packet for the postmortems query")
+    workspace_post_mortems_search_path = f"{workspace_path}?prepQuery=post%20mortems"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_post_mortems_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_post_mortems_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_post_mortems_search_path)
+    require_snippet(body, 'match(es) for "post mortems"', workspace_post_mortems_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_post_mortems_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_post_mortems_search_path} should return at least one governed prep packet for the post mortems query")
+    workspace_post_mortems_hyphen_search_path = f"{workspace_path}?prepQuery=post-mortems"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_post_mortems_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_post_mortems_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_post_mortems_hyphen_search_path)
+    require_snippet(body, 'match(es) for "post-mortems"', workspace_post_mortems_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_post_mortems_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_post_mortems_hyphen_search_path} should return at least one governed prep packet for the post-mortems query")
     workspace_postsession_search_path = f"{workspace_path}?prepQuery=postsession"
     status, body, _, _ = fetch(
         base_url,
@@ -7884,6 +8055,51 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_post_session_hyphen_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_post_session_hyphen_search_path} should return at least one governed prep packet for the post-session query")
+    workspace_postsessions_search_path = f"{workspace_path}?prepQuery=postsessions"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_postsessions_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_postsessions_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_postsessions_search_path)
+    require_snippet(body, 'match(es) for "postsessions"', workspace_postsessions_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_postsessions_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_postsessions_search_path} should return at least one governed prep packet for the postsessions query")
+    workspace_post_sessions_search_path = f"{workspace_path}?prepQuery=post%20sessions"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_post_sessions_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_post_sessions_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_post_sessions_search_path)
+    require_snippet(body, 'match(es) for "post sessions"', workspace_post_sessions_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_post_sessions_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_post_sessions_search_path} should return at least one governed prep packet for the post sessions query")
+    workspace_post_sessions_hyphen_search_path = f"{workspace_path}?prepQuery=post-sessions"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_post_sessions_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_post_sessions_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_post_sessions_hyphen_search_path)
+    require_snippet(body, 'match(es) for "post-sessions"', workspace_post_sessions_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_post_sessions_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_post_sessions_hyphen_search_path} should return at least one governed prep packet for the post-sessions query")
     workspace_postrun_search_path = f"{workspace_path}?prepQuery=postrun"
     status, body, _, _ = fetch(
         base_url,
@@ -7929,6 +8145,51 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_post_run_hyphen_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_post_run_hyphen_search_path} should return at least one governed prep packet for the post-run query")
+    workspace_postruns_search_path = f"{workspace_path}?prepQuery=postruns"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_postruns_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_postruns_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_postruns_search_path)
+    require_snippet(body, 'match(es) for "postruns"', workspace_postruns_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_postruns_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_postruns_search_path} should return at least one governed prep packet for the postruns query")
+    workspace_post_runs_search_path = f"{workspace_path}?prepQuery=post%20runs"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_post_runs_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_post_runs_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_post_runs_search_path)
+    require_snippet(body, 'match(es) for "post runs"', workspace_post_runs_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_post_runs_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_post_runs_search_path} should return at least one governed prep packet for the post runs query")
+    workspace_post_runs_hyphen_search_path = f"{workspace_path}?prepQuery=post-runs"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_post_runs_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_post_runs_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_post_runs_hyphen_search_path)
+    require_snippet(body, 'match(es) for "post-runs"', workspace_post_runs_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_post_runs_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_post_runs_hyphen_search_path} should return at least one governed prep packet for the post-runs query")
     workspace_postgame_search_path = f"{workspace_path}?prepQuery=postgame"
     status, body, _, _ = fetch(
         base_url,
