@@ -649,7 +649,9 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travel cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelcache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("stalecache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("stalecaches")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("staleofflinecache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("staleofflinecaches")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehouse stale cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehousereadiness")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("safe house readiness")));
