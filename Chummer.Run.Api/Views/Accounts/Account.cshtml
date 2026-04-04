@@ -1416,7 +1416,7 @@
                                         <select id="travelPrefetchInstallation" required>
                                             @foreach (var device in selectedWorkspaceServerPlane.TravelMode.Devices)
                                             {
-                                                <option value="@device.InstallationId">@device.DeviceRole · @device.Platform / @device.HeadId / @device.Channel</option>
+                                                <option value="@device.InstallationId">@device.DeviceRole · @device.Platform / @device.HeadId / @device.Channel · @HumanizeStatus(device.Status, "Status")</option>
                                             }
                                         </select>
                                     </div>
@@ -1545,7 +1545,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var device in selectedWorkspaceServerPlane.TravelMode.Devices)
                                         {
-                                            <li><strong>@device.DeviceRole:</strong> @device.Platform / @device.HeadId / @device.Channel. @device.Summary</li>
+                                            <li><strong>@device.DeviceRole:</strong> @device.Platform / @device.HeadId / @device.Channel · @HumanizeStatus(device.Status, "Status"). @device.Summary</li>
                                         }
                                     </ul>
                                 }
@@ -1833,6 +1833,10 @@
                                         @if (!string.IsNullOrWhiteSpace(output.ProvenanceSummary))
                                         {
                                             <span> Provenance: @output.ProvenanceSummary</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
+                                        {
+                                            <span> Audit: @output.AuditSummary</span>
                                         }
                                     </li>
                                 }
