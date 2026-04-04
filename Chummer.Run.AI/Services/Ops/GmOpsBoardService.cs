@@ -507,6 +507,22 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("operation");
         }
 
+        if (tokens.Contains("eventops"))
+        {
+            tokens.Remove("eventops");
+            tokens.Add("eventcontrol");
+            tokens.Add("event");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("eventop"))
+        {
+            tokens.Remove("eventop");
+            tokens.Add("eventcontrol");
+            tokens.Add("event");
+            tokens.Add("operation");
+        }
+
         if (tokens.Contains("crewtransfer"))
         {
             tokens.Remove("crewtransfer");
@@ -1160,6 +1176,11 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "eventcontrol",
             "eventcontrols",
             "eventctrl",
+            "eventops",
+            "eventop",
+            "event-ops",
+            "event_op",
+            "event ops",
             "gmops",
             "gmop",
             "season",

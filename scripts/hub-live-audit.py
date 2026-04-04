@@ -1463,6 +1463,34 @@ def verify_signed_in_work_audit(
     prep_library_eventctrl = json.loads(body)
     if not (prep_library_eventctrl.get("items") or []):
         raise AssertionError("prep-library eventctrl search did not expose any governed packet")
+    prep_library_eventops_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=eventops"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_eventops_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_eventops_path} returned {status}, expected 200")
+
+    prep_library_eventops = json.loads(body)
+    if not (prep_library_eventops.get("items") or []):
+        raise AssertionError("prep-library eventops search did not expose any governed packet")
+    prep_library_eventop_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=eventop"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_eventop_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_eventop_path} returned {status}, expected 200")
+
+    prep_library_eventop = json.loads(body)
+    if not (prep_library_eventop.get("items") or []):
+        raise AssertionError("prep-library eventop search did not expose any governed packet")
     prep_library_gmops_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=gmops"
     status, body, _, _ = fetch(
         base_url,
@@ -2561,6 +2589,36 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_eventctrl_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_eventctrl_search_path} should return at least one governed prep packet for the eventctrl query")
+    workspace_eventops_search_path = f"{workspace_path}?prepQuery=eventops"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_eventops_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_eventops_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_eventops_search_path)
+    require_snippet(body, 'match(es) for "eventops"', workspace_eventops_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_eventops_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_eventops_search_path} should return at least one governed prep packet for the eventops query")
+    workspace_eventop_search_path = f"{workspace_path}?prepQuery=eventop"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_eventop_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_eventop_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_eventop_search_path)
+    require_snippet(body, 'match(es) for "eventop"', workspace_eventop_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_eventop_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_eventop_search_path} should return at least one governed prep packet for the eventop query")
     workspace_gmops_search_path = f"{workspace_path}?prepQuery=gmops"
     status, body, _, _ = fetch(
         base_url,
