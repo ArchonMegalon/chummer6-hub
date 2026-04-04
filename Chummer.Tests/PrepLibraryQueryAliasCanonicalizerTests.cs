@@ -201,6 +201,9 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "gmopspacket",
             "gmoperationpackets",
             "gmcontrolpacket",
+            "gamemasteropspacket",
+            "gamemasteroperationpackets",
+            "gamemastercontrolpacket",
             "gamemasterctls",
             "gamemasterctrls"
         };
@@ -239,6 +242,9 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("gmopspacket", tokens);
         Assert.DoesNotContain("gmoperationpackets", tokens);
         Assert.DoesNotContain("gmcontrolpacket", tokens);
+        Assert.DoesNotContain("gamemasteropspacket", tokens);
+        Assert.DoesNotContain("gamemasteroperationpackets", tokens);
+        Assert.DoesNotContain("gamemastercontrolpacket", tokens);
         Assert.DoesNotContain("gamemasterctls", tokens);
         Assert.DoesNotContain("gamemasterctrls", tokens);
     }
