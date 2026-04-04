@@ -143,10 +143,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "mobilecompanionreturnlanes",
             "mobilecompanionsreturnloop",
             "mobilecompanionsreturnloops",
+            "mobilecompanionreturnpacket",
+            "mobilecompanionsreturnpackets",
             "campaignmobilecompanionreturnlane",
             "campaignmobilecompanionreturnlanes",
             "campaignmobilecompanionsreturnloop",
-            "campaignmobilecompanionsreturnloops"
+            "campaignmobilecompanionsreturnloops",
+            "campaignmobilecompanionreturnpacket",
+            "campaignmobilecompanionsreturnpackets"
         };
 
         PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
@@ -157,13 +161,18 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.Contains("safehouse", tokens);
         Assert.Contains("return", tokens);
         Assert.Contains("loop", tokens);
+        Assert.Contains("packet", tokens);
         Assert.DoesNotContain("mobilecompanionreturnlanes", tokens);
         Assert.DoesNotContain("mobilecompanionsreturnloop", tokens);
         Assert.DoesNotContain("mobilecompanionsreturnloops", tokens);
+        Assert.DoesNotContain("mobilecompanionreturnpacket", tokens);
+        Assert.DoesNotContain("mobilecompanionsreturnpackets", tokens);
         Assert.DoesNotContain("campaignmobilecompanionreturnlane", tokens);
         Assert.DoesNotContain("campaignmobilecompanionreturnlanes", tokens);
         Assert.DoesNotContain("campaignmobilecompanionsreturnloop", tokens);
         Assert.DoesNotContain("campaignmobilecompanionsreturnloops", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionreturnpacket", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionsreturnpackets", tokens);
         Assert.DoesNotContain("mobile", tokens);
         Assert.DoesNotContain("companion", tokens);
         Assert.DoesNotContain("companions", tokens);
