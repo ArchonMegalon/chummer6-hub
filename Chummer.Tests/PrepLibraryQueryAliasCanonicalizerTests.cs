@@ -248,6 +248,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "eventcontrolbriefs",
             "eventcontrolbrf",
             "eventcontrolbrfs",
+            "eventcontrolspacket",
+            "eventcontrolspackets",
+            "eventcontrolspkt",
+            "eventcontrolspkts",
+            "eventcontrolsbrief",
+            "eventcontrolsbriefs",
+            "eventcontrolsbrf",
+            "eventcontrolsbrfs",
             "eventoppacket",
             "eventoppackets",
             "eventoppkt",
@@ -334,6 +342,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("eventcontrolbriefs", tokens);
         Assert.DoesNotContain("eventcontrolbrf", tokens);
         Assert.DoesNotContain("eventcontrolbrfs", tokens);
+        Assert.DoesNotContain("eventcontrolspacket", tokens);
+        Assert.DoesNotContain("eventcontrolspackets", tokens);
+        Assert.DoesNotContain("eventcontrolspkt", tokens);
+        Assert.DoesNotContain("eventcontrolspkts", tokens);
+        Assert.DoesNotContain("eventcontrolsbrief", tokens);
+        Assert.DoesNotContain("eventcontrolsbriefs", tokens);
+        Assert.DoesNotContain("eventcontrolsbrf", tokens);
+        Assert.DoesNotContain("eventcontrolsbrfs", tokens);
         Assert.DoesNotContain("eventoppacket", tokens);
         Assert.DoesNotContain("eventoppackets", tokens);
         Assert.DoesNotContain("eventoppkt", tokens);

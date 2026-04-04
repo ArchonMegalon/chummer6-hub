@@ -195,6 +195,14 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbrf")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbrfs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolspacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolspackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolspkt")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolspkts")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolsbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolsbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolsbrf")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolsbrfs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoppacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoppackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoppkt")));
