@@ -1863,6 +1863,27 @@ if bash scripts/audit-ui-parity.sh; then
 fi
 mv "$workflow_receipt_backup" "$workflow_receipt_path"
 
+workflow_receipt_backup="$(mktemp)"
+cp "$workflow_receipt_path" "$workflow_receipt_backup"
+python3 - "$workflow_receipt_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+required_ids = list(payload.get("evidence", {}).get("required_workflow_family_ids") or [])
+required_ids.append("bonus-noncanonical-workflow-family-id")
+payload["evidence"]["required_workflow_family_ids"] = required_ids
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$workflow_receipt_backup" "$workflow_receipt_path"
+  echo "verify gate failed: parity audit should reject unexpected required_workflow_family_ids values." >&2
+  exit 1
+fi
+mv "$workflow_receipt_backup" "$workflow_receipt_path"
+
 visual_receipt_backup="$(mktemp)"
 cp "$visual_receipt_path" "$visual_receipt_backup"
 python3 - "$visual_receipt_path" <<'PY'
