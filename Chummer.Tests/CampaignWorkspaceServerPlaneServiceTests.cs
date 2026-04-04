@@ -602,6 +602,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void SupportClosuresPreferReporterActionCaseOverEarlierNonActionCase()
+    {
+        SupportCaseDigestViewModel informationalCase = BuildSupportCaseDigest(
+            caseId: "case-info",
+            releaseProgressSummary: "Informational support case is tracking in the background.");
+        SupportCaseDigestViewModel reporterActionCase = BuildSupportCaseDigest(
+            caseId: "case-reporter-action",
+            releaseProgressSummary: "Reporter action support case needs immediate follow-through.",
+            reporterActionNeeded: true);
+
+        IReadOnlyList<SupportClosureCue> closures = InvokeBuildSupportClosures([informationalCase, reporterActionCase]);
+
+        SupportClosureCue lead = Assert.IsType<SupportClosureCue>(closures.FirstOrDefault());
+        Assert.Equal("case-reporter-action", lead.CaseId);
+    }
+
+    [Fact]
+    public void KnownIssuesPreferReporterActionCaseOverEarlierCanVerifyCase()
+    {
+        SupportCaseDigestViewModel canVerifyCase = BuildSupportCaseDigest(
+            caseId: "case-can-verify",
+            releaseProgressSummary: "Fix-verify support case is ready for user confirmation.",
+            canVerifyFix: true);
+        SupportCaseDigestViewModel reporterActionCase = BuildSupportCaseDigest(
+            caseId: "case-reporter-action",
+            releaseProgressSummary: "Reporter action support case needs immediate follow-through.",
+            reporterActionNeeded: true);
+
+        IReadOnlyList<KnownIssueAffectingInstall> issues = InvokeBuildKnownIssues([canVerifyCase, reporterActionCase]);
+
+        KnownIssueAffectingInstall lead = Assert.IsType<KnownIssueAffectingInstall>(issues.FirstOrDefault());
+        Assert.Equal("case-reporter-action", lead.CaseId);
+        Assert.Equal("attention", lead.Severity);
+        Assert.Equal("warning", Assert.IsType<KnownIssueAffectingInstall>(issues[1]).Severity);
+    }
+
+    [Fact]
     public void RecapShelfDeduplicatesSemanticallyIdenticalRows_WhenProjectionIdsDiffer()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
@@ -6078,6 +6115,26 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("BuildDecisionNotices was not found.");
 
         return Assert.IsAssignableFrom<IReadOnlyList<DecisionNotice>>(method.Invoke(null, [workspace, digest, null, supportDigests, prepLibrary, null]));
+    }
+
+    private static IReadOnlyList<SupportClosureCue> InvokeBuildSupportClosures(
+        IReadOnlyList<SupportCaseDigestViewModel> supportDigests)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BuildSupportClosures", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildSupportClosures was not found.");
+
+        return Assert.IsAssignableFrom<IReadOnlyList<SupportClosureCue>>(method.Invoke(null, [supportDigests]));
+    }
+
+    private static IReadOnlyList<KnownIssueAffectingInstall> InvokeBuildKnownIssues(
+        IReadOnlyList<SupportCaseDigestViewModel> supportDigests)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BuildKnownIssues", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildKnownIssues was not found.");
+
+        return Assert.IsAssignableFrom<IReadOnlyList<KnownIssueAffectingInstall>>(method.Invoke(null, [supportDigests]));
     }
 
     private static CampaignWorkspaceDigestProjection BuildWorkspaceDigest(CampaignWorkspaceProjection workspace)

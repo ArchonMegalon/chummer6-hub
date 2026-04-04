@@ -1383,7 +1383,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     }
 
     private static IReadOnlyList<SupportClosureCue> BuildSupportClosures(IReadOnlyList<SupportCaseDigestViewModel> digests)
-        => digests
+        => OrderSupportDigestsByActionPriority(digests)
             .Take(4)
             .Select(item => new SupportClosureCue(
                 CaseId: item.CaseId,
@@ -1396,16 +1396,47 @@ public sealed class CampaignWorkspaceServerPlaneService
             .ToArray();
 
     private static IReadOnlyList<KnownIssueAffectingInstall> BuildKnownIssues(IReadOnlyList<SupportCaseDigestViewModel> digests)
-        => digests
+        => OrderSupportDigestsByActionPriority(digests)
             .Where(static item => item.ReporterActionNeeded || item.CanVerifyFix || !string.Equals(item.StageLabel, "Closed and confirmed", StringComparison.Ordinal))
             .Take(4)
             .Select(item => new KnownIssueAffectingInstall(
                 CaseId: item.CaseId,
-                Severity: item.ReporterActionNeeded ? "warning" : item.CanVerifyFix ? "attention" : "info",
+                Severity: item.ReporterActionNeeded ? "attention" : item.CanVerifyFix ? "warning" : "info",
                 Summary: item.ReleaseProgressSummary,
                 AffectedInstallSummary: item.AffectedInstallSummary,
                 DetailHref: item.DetailHref))
             .ToArray();
+
+    private static IReadOnlyList<SupportCaseDigestViewModel> OrderSupportDigestsByActionPriority(
+        IReadOnlyList<SupportCaseDigestViewModel> supportDigests)
+        => supportDigests
+            .Select(static (item, index) => new
+            {
+                Digest = item,
+                Index = index,
+                Priority = ResolveSupportDigestPriority(item)
+            })
+            .OrderByDescending(static item => item.Priority)
+            .ThenBy(static item => item.Index)
+            .Select(static item => item.Digest)
+            .ToArray();
+
+    private static int ResolveSupportDigestPriority(SupportCaseDigestViewModel digest)
+    {
+        if (digest.ReporterActionNeeded)
+        {
+            return 3;
+        }
+
+        if (digest.CanVerifyFix)
+        {
+            return 2;
+        }
+
+        return string.Equals(digest.StageLabel, "Closed and confirmed", StringComparison.OrdinalIgnoreCase)
+            ? 0
+            : 1;
+    }
 
     private static IReadOnlyList<DecisionNotice> BuildDecisionNotices(
         CampaignWorkspaceProjection workspace,
