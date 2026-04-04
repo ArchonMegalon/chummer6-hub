@@ -2,6 +2,7 @@ using Chummer.Campaign.Contracts;
 using System.Reflection;
 using Chummer.Run.Api.Contracts;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Contracts.Community;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -147,6 +148,36 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("1 publication-safe output(s)", summary.PublicationSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("1 governed consequence signal(s)", summary.PublicationSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("1 roster-transfer receipt(s)", summary.PublicationSummary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RecapShelfDeduplicatesSemanticallyIdenticalRows_WhenProjectionIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        PublicationSafeProjection recapA = new(
+            ProjectionId: "recap-semantic-a",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap-safe output remains attached to campaign continuity.");
+        PublicationSafeProjection recapB = recapA with
+        {
+            ProjectionId = "recap-semantic-b"
+        };
+        PublicationSafeProjection downtime = new(
+            ProjectionId: "downtime-1",
+            Kind: "downtime_brief",
+            Label: "Downtime brief",
+            Summary: "Downtime consequences are pinned to the same continuity lane.");
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recapA, recapB, downtime]
+        };
+
+        IReadOnlyList<RecapShelfEntry> shelf = InvokeBuildRecapShelf(workspace);
+
+        Assert.Equal(2, shelf.Count);
+        Assert.Single(shelf, item => string.Equals(item.Label, "Session recap", StringComparison.Ordinal));
+        Assert.Single(shelf, item => string.Equals(item.Label, "Downtime brief", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -3341,6 +3372,15 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("SupportsCreatorShelfProjection was not found.");
 
         return Assert.IsType<bool>(method.Invoke(null, [item]));
+    }
+
+    private static IReadOnlyList<RecapShelfEntry> InvokeBuildRecapShelf(CampaignWorkspaceProjection workspace)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BuildRecapShelf", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildRecapShelf was not found.");
+
+        return Assert.IsAssignableFrom<IReadOnlyList<RecapShelfEntry>>(method.Invoke(null, [workspace, Array.Empty<CreatorPublicationProjection>()]));
     }
 
     private static PublicationSafeProjection BuildPublicationSafeProjection(string kind)
