@@ -2786,6 +2786,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("contact", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("contacts", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("connection", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("faction", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("heat", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("recap", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("return", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
