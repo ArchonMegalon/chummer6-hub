@@ -587,12 +587,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("crewtransfers");
         IReadOnlyList<string> compactMoveTokens = InvokeBuildTokens("crewmove");
         IReadOnlyList<string> compactMovePluralTokens = InvokeBuildTokens("crewmoves");
+        IReadOnlyList<string> compactShiftTokens = InvokeBuildTokens("crewshift");
+        IReadOnlyList<string> compactShiftPluralTokens = InvokeBuildTokens("crewshifts");
         IReadOnlyList<string> compactSwapTokens = InvokeBuildTokens("crewswap");
         IReadOnlyList<string> compactSwapPluralTokens = InvokeBuildTokens("crewswaps");
         IReadOnlyList<string> compactMovementTokens = InvokeBuildTokens("crewmovement");
         IReadOnlyList<string> compactMovementPluralTokens = InvokeBuildTokens("crewmovements");
         IReadOnlyList<string> compactRosterSwapTokens = InvokeBuildTokens("rosterswap");
         IReadOnlyList<string> compactRosterSwapPluralTokens = InvokeBuildTokens("rosterswaps");
+        IReadOnlyList<string> compactRosterShiftTokens = InvokeBuildTokens("rostershift");
+        IReadOnlyList<string> compactRosterShiftPluralTokens = InvokeBuildTokens("rostershifts");
         IReadOnlyList<string> compactRosterMovePluralTokens = InvokeBuildTokens("rostermoves");
         IReadOnlyList<string> compactRosterMovementTokens = InvokeBuildTokens("rostermovement");
         IReadOnlyList<string> compactRosterMovementPluralTokens = InvokeBuildTokens("rostermovements");
@@ -606,6 +610,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> splitCrewHandoffTokens = InvokeBuildTokens("crew handoff");
         IReadOnlyList<string> splitCrewMovesTokens = InvokeBuildTokens("crew moves");
         IReadOnlyList<string> splitCrewMoveTokens = InvokeBuildTokens("crew move");
+        IReadOnlyList<string> splitCrewShiftsTokens = InvokeBuildTokens("crew shifts");
+        IReadOnlyList<string> splitCrewShiftTokens = InvokeBuildTokens("crew shift");
         IReadOnlyList<string> splitCrewMovementTokens = InvokeBuildTokens("crew movement");
         IReadOnlyList<string> splitCrewMovementsTokens = InvokeBuildTokens("crew movements");
         IReadOnlyList<string> splitRosterTransfersTokens = InvokeBuildTokens("roster transfers");
@@ -614,6 +620,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> splitRosterHandoffTokens = InvokeBuildTokens("roster handoff");
         IReadOnlyList<string> splitRosterMovesTokens = InvokeBuildTokens("roster moves");
         IReadOnlyList<string> splitRosterMoveTokens = InvokeBuildTokens("roster move");
+        IReadOnlyList<string> splitRosterShiftsTokens = InvokeBuildTokens("roster shifts");
+        IReadOnlyList<string> splitRosterShiftTokens = InvokeBuildTokens("roster shift");
         IReadOnlyList<string> splitRosterMovementTokens = InvokeBuildTokens("roster movement");
         IReadOnlyList<string> splitRosterMovementsTokens = InvokeBuildTokens("roster movements");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixtransfer");
@@ -622,12 +630,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.True(InvokeMatches(packet, compactMoveTokens));
         Assert.True(InvokeMatches(packet, compactMovePluralTokens));
+        Assert.True(InvokeMatches(packet, compactShiftTokens));
+        Assert.True(InvokeMatches(packet, compactShiftPluralTokens));
         Assert.True(InvokeMatches(packet, compactSwapTokens));
         Assert.True(InvokeMatches(packet, compactSwapPluralTokens));
         Assert.True(InvokeMatches(packet, compactMovementTokens));
         Assert.True(InvokeMatches(packet, compactMovementPluralTokens));
         Assert.True(InvokeMatches(packet, compactRosterSwapTokens));
         Assert.True(InvokeMatches(packet, compactRosterSwapPluralTokens));
+        Assert.True(InvokeMatches(packet, compactRosterShiftTokens));
+        Assert.True(InvokeMatches(packet, compactRosterShiftPluralTokens));
         Assert.True(InvokeMatches(packet, compactRosterMovePluralTokens));
         Assert.True(InvokeMatches(packet, compactRosterMovementTokens));
         Assert.True(InvokeMatches(packet, compactRosterMovementPluralTokens));
@@ -641,6 +653,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, splitCrewHandoffTokens));
         Assert.True(InvokeMatches(packet, splitCrewMovesTokens));
         Assert.True(InvokeMatches(packet, splitCrewMoveTokens));
+        Assert.True(InvokeMatches(packet, splitCrewShiftsTokens));
+        Assert.True(InvokeMatches(packet, splitCrewShiftTokens));
         Assert.True(InvokeMatches(packet, splitCrewMovementTokens));
         Assert.True(InvokeMatches(packet, splitCrewMovementsTokens));
         Assert.True(InvokeMatches(packet, splitRosterTransfersTokens));
@@ -649,6 +663,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, splitRosterHandoffTokens));
         Assert.True(InvokeMatches(packet, splitRosterMovesTokens));
         Assert.True(InvokeMatches(packet, splitRosterMoveTokens));
+        Assert.True(InvokeMatches(packet, splitRosterShiftsTokens));
+        Assert.True(InvokeMatches(packet, splitRosterShiftTokens));
         Assert.True(InvokeMatches(packet, splitRosterMovementTokens));
         Assert.True(InvokeMatches(packet, splitRosterMovementsTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
@@ -4060,6 +4076,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("session_recap", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData("debriefing")]
+    [InlineData("de-briefing")]
+    [InlineData("out-briefing")]
+    [InlineData("post-session")]
+    [InlineData("post-run")]
+    [InlineData("post-game")]
+    [InlineData("postmortem")]
+    [InlineData("afteractionreview")]
+    [InlineData("retrospective")]
+    [InlineData("hotwash")]
+    [InlineData("lessonlearned")]
+    public void CampaignReturnPacketIncludesRecapKindFallbackWhenRecapUsesContinuityShorthand(string recapKind)
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnRecapKindOnly(recapKind);
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains(recapKind, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -9614,6 +9654,41 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         PublicationSafeProjection recap = new(
             ProjectionId: "recap-1",
             Kind: "session_recap",
+            Label: "",
+            Summary: "");
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [recap],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCampaignReturnRecapKindOnly(string kind)
+    {
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-1",
+            Kind: kind,
             Label: "",
             Summary: "");
 
