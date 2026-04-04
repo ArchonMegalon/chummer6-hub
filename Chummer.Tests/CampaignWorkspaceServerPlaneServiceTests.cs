@@ -432,6 +432,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermaths")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("debrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("debriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("debriefed")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("debriefing")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("debriefings")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("outbrief")));
@@ -538,6 +539,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixretro")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixretrospective")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixoutbrief")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixdebriefed")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixhotwash")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixlessonlearned")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixlessonlearnt")));

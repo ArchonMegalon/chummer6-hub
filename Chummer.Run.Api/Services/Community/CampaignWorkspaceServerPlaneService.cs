@@ -254,6 +254,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         "downtime",
         "recap",
         "debrief",
+        "debriefed",
         "outbrief",
         "outbriefs",
         "postmortem",

@@ -3386,6 +3386,20 @@ def verify_signed_in_work_audit(
     prep_library_debriefs = json.loads(body)
     if not (prep_library_debriefs.get("items") or []):
         raise AssertionError("prep-library debriefs search did not expose any governed packet")
+    prep_library_debriefed_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=debriefed"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_debriefed_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_debriefed_path} returned {status}, expected 200")
+
+    prep_library_debriefed = json.loads(body)
+    if not (prep_library_debriefed.get("items") or []):
+        raise AssertionError("prep-library debriefed search did not expose any governed packet")
     prep_library_debriefing_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=debriefing"
     status, body, _, _ = fetch(
         base_url,
@@ -7974,6 +7988,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_debriefs_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_debriefs_search_path} should return at least one governed prep packet for the debriefs query")
+    workspace_debriefed_search_path = f"{workspace_path}?prepQuery=debriefed"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_debriefed_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_debriefed_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_debriefed_search_path)
+    require_snippet(body, 'match(es) for "debriefed"', workspace_debriefed_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_debriefed_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_debriefed_search_path} should return at least one governed prep packet for the debriefed query")
     workspace_debriefing_search_path = f"{workspace_path}?prepQuery=debriefing"
     status, body, _, _ = fetch(
         base_url,
