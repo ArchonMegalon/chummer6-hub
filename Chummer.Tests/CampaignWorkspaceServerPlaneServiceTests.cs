@@ -5366,6 +5366,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("hostile", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("adversary", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("threat", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("opfor", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("opforce", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("packet", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("opposition", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("threat", StringComparison.OrdinalIgnoreCase));
