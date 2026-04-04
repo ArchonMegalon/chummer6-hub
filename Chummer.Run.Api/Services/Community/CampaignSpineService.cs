@@ -3694,6 +3694,11 @@ public sealed class CampaignSpineService
                             ModerationSummary: moderationSummary);
                     });
             })
+            .Where(publication => !string.IsNullOrWhiteSpace(publication.PublicationId))
+            .GroupBy(static publication => publication.PublicationId, StringComparer.OrdinalIgnoreCase)
+            .Select(static group => group
+                .OrderByDescending(static publication => publication.UpdatedAtUtc)
+                .First())
             .OrderByDescending(publication => CreatorPublicationProjectionPriority(publication.Kind))
             .ThenByDescending(static publication => publication.UpdatedAtUtc)
             .ThenBy(publication => publication.Title, StringComparer.OrdinalIgnoreCase)
