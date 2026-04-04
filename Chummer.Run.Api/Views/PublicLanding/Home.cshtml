@@ -906,6 +906,10 @@
                                                                 {
                                                                     <span> Support: @handoff.SupportClosureSummary.</span>
                                                                 }
+                                                                @if (handoff.RuleEnvironmentDiff is not null)
+                                                                {
+                                                                    <span> Rule diff: @handoff.RuleEnvironmentDiff.BeforeFingerprint -> @handoff.RuleEnvironmentDiff.AfterFingerprint (@handoff.RuleEnvironmentDiff.Status).</span>
+                                                                }
                                                                 @if (handoff.Outputs.Count > 0)
                                                                 {
                                                                     <span> Outputs: @string.Join(", ", handoff.Outputs.Take(2).Select(item => item.Label)).</span>

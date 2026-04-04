@@ -1763,6 +1763,21 @@
                                     <strong>@selectedBuildLabHandoff.SupportClosureSummary</strong>
                                 </div>
                             }
+                            @if (selectedBuildLabHandoff.RuleEnvironmentDiff is not null)
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Rule diff status</span>
+                                    <strong>@selectedBuildLabHandoff.RuleEnvironmentDiff.Status</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Rule diff before</span>
+                                    <strong>@selectedBuildLabHandoff.RuleEnvironmentDiff.BeforeScope · @selectedBuildLabHandoff.RuleEnvironmentDiff.BeforeFingerprint</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Rule diff after</span>
+                                    <strong>@selectedBuildLabHandoff.RuleEnvironmentDiff.AfterScope · @selectedBuildLabHandoff.RuleEnvironmentDiff.AfterFingerprint</strong>
+                                </div>
+                            }
                             @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.PlannerCoverageSummary))
                             {
                                 <div class="settings-summary-row">
@@ -1774,6 +1789,10 @@
                         @if (selectedBuildLabHandoff.TradeoffLines.Count > 0)
                         {
                             <p><strong>Tradeoffs:</strong> @string.Join(" ", selectedBuildLabHandoff.TradeoffLines)</p>
+                        }
+                        @if (selectedBuildLabHandoff.RuleEnvironmentDiff is not null)
+                        {
+                            <p><strong>Rule diff:</strong> @selectedBuildLabHandoff.RuleEnvironmentDiff.Summary</p>
                         }
                         @if (selectedBuildLabHandoff.ProgressionOutcomes.Count > 0)
                         {

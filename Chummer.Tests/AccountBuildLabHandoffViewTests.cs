@@ -14,5 +14,8 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
         Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.ProgressionOutcomes.Take(3)", view, StringComparison.Ordinal);
+        Assert.Contains("selectedBuildLabHandoff.RuleEnvironmentDiff", view, StringComparison.Ordinal);
+        Assert.Contains("Rule diff before", view, StringComparison.Ordinal);
+        Assert.Contains("Rule diff after", view, StringComparison.Ordinal);
     }
 }

@@ -2269,7 +2269,7 @@ public sealed class CampaignSpineService
                 var explainReceiptId = $"buildlab.handoff.{dossier.DossierId}";
                 var runtimeFingerprint = workspace?.RuleEnvironment.CompatibilityFingerprint ?? dossier.RuleEnvironment.CompatibilityFingerprint;
                 var outputs = BuildBuildLabOutputs(dossier, workspace, runtimeFingerprint, explainReceiptId);
-                var ruleEnvironmentDiffSummary = DescribeBuildLabRuleEnvironmentDiff(dossier.RuleEnvironment, workspace?.RuleEnvironment);
+                var ruleEnvironmentDiff = BuildBuildLabRuleEnvironmentDiff(dossier.RuleEnvironment, workspace?.RuleEnvironment);
                 var variantLabel = workspace is null ? "Living dossier carry-forward" : "Ops-first dossier carry-forward";
                 var progressionLabel = workspace is null ? "Ready to seed into a campaign" : "25 / 50 / 100 Karma path stays attached to the campaign return";
                 var nextSafeAction = ResolveBuildLabNextSafeAction(workspace, outputs, restore);
@@ -2307,7 +2307,7 @@ public sealed class CampaignSpineService
                         workspace is null
                             ? "No campaign workspace is attached yet, so the handoff seeds the dossier first."
                             : $"Campaign workspace {workspace.CampaignName} keeps the downstream continuity target visible and the same upgrade path attached.",
-                        ruleEnvironmentDiffSummary
+                        ruleEnvironmentDiff.Summary
                     ],
                     ProgressionOutcomes:
                     [
@@ -2323,6 +2323,7 @@ public sealed class CampaignSpineService
                     RuntimeCompatibilitySummary: runtimeCompatibilitySummary,
                     CampaignReturnSummary: campaignReturnSummary,
                     SupportClosureSummary: supportClosureSummary,
+                    RuleEnvironmentDiff: ruleEnvironmentDiff,
                     Watchouts: watchouts,
                     PlannerCoverageSummary: plannerCoverageSummary,
                     PlannerCoverageLines: plannerCoverageLines);
@@ -2337,6 +2338,7 @@ public sealed class CampaignSpineService
         string runtimeFingerprint,
         string explainReceiptId)
     {
+        const int maxOutputs = 6;
         var governedExports = new[]
         {
             BuildBuildLabGovernedOutput(
@@ -2377,13 +2379,28 @@ public sealed class CampaignSpineService
                 nextSafeAction: "Open workflow.export.pdf to generate the current print-ready PDF from this handoff.")
         };
 
-        return dossier.Projections
+        var carryForwardOutputs = dossier.Projections
             .Concat(workspace?.RecapShelf ?? Array.Empty<PublicationSafeProjection>())
-            .Concat(governedExports)
+            .Where(static output => !IsBuildLabGovernedOutputKind(output.Kind))
             .Distinct()
-            .Take(6)
+            .Take(Math.Max(0, maxOutputs - governedExports.Length));
+
+        return governedExports
+            .Concat(carryForwardOutputs)
+            .Distinct()
+            .Take(maxOutputs)
             .ToArray();
     }
+
+    private static bool IsBuildLabGovernedOutputKind(string? kind)
+        => kind?.Trim().ToLowerInvariant() switch
+        {
+            "character_template" => true,
+            "foundry_exchange" => true,
+            "sheet_viewer" => true,
+            "print_pdf_export" => true,
+            _ => false
+        };
 
     private static PublicationSafeProjection BuildBuildLabGovernedOutput(
         RunnerDossierProjection dossier,
@@ -2411,13 +2428,20 @@ public sealed class CampaignSpineService
             ProvenanceSummary: $"Explain receipt {explainReceiptId} governs this build follow-through lane.",
             AuditSummary: $"rule-environment:{runtimeFingerprint}");
 
-    private static string DescribeBuildLabRuleEnvironmentDiff(
+    private static BuildLabRuleEnvironmentDiffProjection BuildBuildLabRuleEnvironmentDiff(
         RuleEnvironmentRef dossierRuleEnvironment,
         RuleEnvironmentRef? workspaceRuleEnvironment)
     {
         if (workspaceRuleEnvironment is null)
         {
-            return $"Rule-environment diff is pending: dossier is pinned to {dossierRuleEnvironment.CompatibilityFingerprint} until the first campaign workspace binds the same fingerprint.";
+            return new BuildLabRuleEnvironmentDiffProjection(
+                Status: "pending",
+                Summary: $"Rule-environment diff is pending: dossier is pinned to {dossierRuleEnvironment.CompatibilityFingerprint} until the first campaign workspace binds the same fingerprint.",
+                BeforeFingerprint: dossierRuleEnvironment.CompatibilityFingerprint,
+                AfterFingerprint: dossierRuleEnvironment.CompatibilityFingerprint,
+                BeforeScope: dossierRuleEnvironment.OwnerScope,
+                AfterScope: "campaign-pending",
+                Changed: false);
         }
 
         if (string.Equals(
@@ -2425,10 +2449,24 @@ public sealed class CampaignSpineService
                 workspaceRuleEnvironment.CompatibilityFingerprint,
                 StringComparison.OrdinalIgnoreCase))
         {
-            return $"Rule-environment diff is clear: dossier and campaign workspace both pin {workspaceRuleEnvironment.CompatibilityFingerprint}.";
+            return new BuildLabRuleEnvironmentDiffProjection(
+                Status: "clear",
+                Summary: $"Rule-environment diff is clear: dossier and campaign workspace both pin {workspaceRuleEnvironment.CompatibilityFingerprint}.",
+                BeforeFingerprint: dossierRuleEnvironment.CompatibilityFingerprint,
+                AfterFingerprint: workspaceRuleEnvironment.CompatibilityFingerprint,
+                BeforeScope: dossierRuleEnvironment.OwnerScope,
+                AfterScope: workspaceRuleEnvironment.OwnerScope,
+                Changed: false);
         }
 
-        return $"Rule-environment diff requires review: dossier pins {dossierRuleEnvironment.CompatibilityFingerprint} while campaign workspace pins {workspaceRuleEnvironment.CompatibilityFingerprint}.";
+        return new BuildLabRuleEnvironmentDiffProjection(
+            Status: "requires_review",
+            Summary: $"Rule-environment diff requires review: dossier pins {dossierRuleEnvironment.CompatibilityFingerprint} while campaign workspace pins {workspaceRuleEnvironment.CompatibilityFingerprint}.",
+            BeforeFingerprint: dossierRuleEnvironment.CompatibilityFingerprint,
+            AfterFingerprint: workspaceRuleEnvironment.CompatibilityFingerprint,
+            BeforeScope: dossierRuleEnvironment.OwnerScope,
+            AfterScope: workspaceRuleEnvironment.OwnerScope,
+            Changed: true);
     }
 
     private static string ResolveBuildLabNextSafeAction(
