@@ -619,7 +619,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceDigestProjection? digest,
         WorkspaceRestoreProjection restore)
     {
-        int recapCount = DeduplicateIdenticalPublicationRecapVersions(workspace.RecapShelf).Count();
+        int recapCount = DeduplicateSemanticPublicationRecapVersions(workspace.RecapShelf).Count();
         int consequenceCount = DeduplicateIdenticalCampaignConsequenceVersions(
                 workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
             .Count();
@@ -1809,7 +1809,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
         bool carryForwardSignal = IsContinuityCarryForwardSignal(carryForward);
-        PublicationSafeProjection[] continuityRecaps = DeduplicateIdenticalPublicationRecapVersions(
+        PublicationSafeProjection[] continuityRecaps = DeduplicateSemanticPublicationRecapVersions(
                 workspace.RecapShelf)
             .ToArray();
         WorkspaceChangePacketProjection[] continuitySignals = DeduplicateIdenticalChangePacketVersions(
@@ -2106,7 +2106,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         RunProjection? leadRun)
     {
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
-        PublicationSafeProjection[] diaryRecaps = DeduplicateIdenticalPublicationRecapVersions(
+        PublicationSafeProjection[] diaryRecaps = DeduplicateSemanticPublicationRecapVersions(
                 workspace.RecapShelf
                 .Where(static item => IsCampaignReturnRecapSignal(item)))
             .Take(4)
@@ -2786,7 +2786,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static item => item.GeneratedAtUtc))
             .Take(3)
             .ToArray();
-        PublicationSafeProjection[] recapSignals = DeduplicateIdenticalPublicationRecapVersions(
+        PublicationSafeProjection[] recapSignals = DeduplicateSemanticPublicationRecapVersions(
                 workspace.RecapShelf
                 .Where(static item => IsAftermathRecapSignal(item)))
             .Take(4)

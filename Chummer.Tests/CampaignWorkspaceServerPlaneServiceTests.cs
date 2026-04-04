@@ -151,6 +151,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignWorkspaceSummaryDeduplicatesSemanticallyIdenticalRecapRows_WhenProjectionIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        PublicationSafeProjection recapA = new(
+            ProjectionId: "recap-semantic-a",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap-safe output remains attached to campaign continuity.");
+        PublicationSafeProjection recapB = recapA with
+        {
+            ProjectionId = "recap-semantic-b"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recapA, recapB]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        CampaignWorkspaceSummary summary = InvokeBuildCampaignWorkspaceSummary(workspace, restore);
+
+        Assert.Contains("1 publication-safe output(s)", summary.PublicationSummary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void RecapShelfDeduplicatesSemanticallyIdenticalRows_WhenProjectionIdsDiffer()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
@@ -977,6 +1001,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(packet.Reusable);
         Assert.Contains("1 diary/continuity signal(s) and 0 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("session_recap", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CampaignReturnPacketDeduplicatesSemanticallyIdenticalDiaryRecapVersions_WhenProjectionIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithCampaignReturnRecapKindsOnly();
+        IReadOnlyList<PublicationSafeProjection> recaps =
+            Assert.IsAssignableFrom<IReadOnlyList<PublicationSafeProjection>>(seed.RecapShelf);
+        PublicationSafeProjection recapA = recaps[0];
+        PublicationSafeProjection recapB = recapA with
+        {
+            ProjectionId = $"{recapA.ProjectionId}-semantic-duplicate"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recapA, recapB]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 diary/continuity signal(s) and 0 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
