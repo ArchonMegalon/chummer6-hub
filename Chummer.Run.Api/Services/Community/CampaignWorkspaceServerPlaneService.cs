@@ -3648,7 +3648,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return ContainsAnyWordToken(value, ["opfor", "op-for"])
+        return ContainsAnyWordToken(value, ["opfor", "op-for", "op_for", "opforce"])
             || (ContainsAnyWordToken(value, ["op"])
             && ContainsAnyWordToken(value, ["force"]));
     }
