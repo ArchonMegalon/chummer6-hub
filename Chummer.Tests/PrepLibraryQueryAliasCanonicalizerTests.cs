@@ -192,8 +192,11 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "diarycontactheatpacket",
             "diarycontactsheatpackets",
             "aftermathdowntimepacket",
+            "travelofflinepacket",
             "travelofflinepackets",
             "mobileofflinepacket",
+            "mobileofflinepackets",
+            "safehousetravelpacket",
             "safehousetravelpackets",
             "gmopspacket",
             "gmoperationpackets",
@@ -225,8 +228,11 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("diarycontactheatpacket", tokens);
         Assert.DoesNotContain("diarycontactsheatpackets", tokens);
         Assert.DoesNotContain("aftermathdowntimepacket", tokens);
+        Assert.DoesNotContain("travelofflinepacket", tokens);
         Assert.DoesNotContain("travelofflinepackets", tokens);
         Assert.DoesNotContain("mobileofflinepacket", tokens);
+        Assert.DoesNotContain("mobileofflinepackets", tokens);
+        Assert.DoesNotContain("safehousetravelpacket", tokens);
         Assert.DoesNotContain("safehousetravelpackets", tokens);
         Assert.DoesNotContain("gmopspacket", tokens);
         Assert.DoesNotContain("gmoperationpackets", tokens);
