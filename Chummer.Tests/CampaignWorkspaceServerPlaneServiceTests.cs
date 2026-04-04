@@ -1888,6 +1888,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Equal("published", updatedRecap.PublicationState);
         Assert.Equal("verified", updatedRecap.TrustBand);
         Assert.True(updatedRecap.Discoverable);
+        Assert.Contains("stays pinned", updatedRecap.CompatibilitySummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("pub-duplicate", updatedRecap.LineageSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -2027,6 +2029,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         CampaignWorkspaceProjection updatedWorkspace = Assert.Single(updated);
         PublicationSafeProjection updatedRecap = Assert.Single(updatedWorkspace.RecapShelf);
         Assert.Equal("artifact-unlinked", updatedRecap.ArtifactId);
+        Assert.Contains("stays pinned", updatedRecap.CompatibilitySummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("artifact-unlinked", updatedRecap.LineageSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

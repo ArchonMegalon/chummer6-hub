@@ -543,7 +543,9 @@ public sealed record RecapShelfEntry(
     string? CreatorPublicationId = null,
     string? NextSafeAction = null,
     string? ProvenanceSummary = null,
-    string? AuditSummary = null);
+    string? AuditSummary = null,
+    string? CompatibilitySummary = null,
+    string? LineageSummary = null);
 
 public sealed record RestoreArtifactProjection(
     string ArtifactId,

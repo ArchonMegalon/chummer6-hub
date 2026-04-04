@@ -4404,7 +4404,9 @@ public sealed class CampaignSpineService
                                     ? DescribeRecapShelfNextSafeAction(workspace, item)
                                     : item.NextSafeAction,
                             ProvenanceSummary = DescribeRecapShelfProvenanceSummary(workspace, item, creatorPublication, creatorLinked),
-                            AuditSummary = DescribeRecapShelfAuditSummary(workspace, item, creatorPublication, creatorLinked)
+                            AuditSummary = DescribeRecapShelfAuditSummary(workspace, item, creatorPublication, creatorLinked),
+                            CompatibilitySummary = DescribeRecapShelfCompatibilitySummary(workspace, item, creatorPublication, creatorLinked),
+                            LineageSummary = DescribeRecapShelfLineageSummary(workspace, item, creatorPublication, creatorLinked)
                         };
                     })
                     .ToArray();
@@ -4747,6 +4749,52 @@ public sealed class CampaignSpineService
             ? "publication review and campaign return"
             : "campaign return";
         return $"Updated {updatedAtUtc:yyyy-MM-dd HH:mm} UTC on the governed {auditSource} lane for {workspace.CampaignName}.";
+    }
+
+    private static string DescribeRecapShelfCompatibilitySummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item,
+        CreatorPublicationProjection? creatorPublication,
+        bool creatorLinked)
+    {
+        if (!string.IsNullOrWhiteSpace(item.CompatibilitySummary))
+        {
+            return item.CompatibilitySummary!;
+        }
+
+        if (creatorLinked && creatorPublication is not null)
+        {
+            return $"{workspace.RuleEnvironment.CompatibilityFingerprint} stays pinned across {item.Label}, campaign return, and creator publication {creatorPublication.PublicationId} ({creatorPublication.PublicationStatus}).";
+        }
+
+        return $"{workspace.RuleEnvironment.CompatibilityFingerprint} stays pinned across {item.Label} and campaign return before wider publication handoff.";
+    }
+
+    private static string DescribeRecapShelfLineageSummary(
+        CampaignWorkspaceProjection workspace,
+        PublicationSafeProjection item,
+        CreatorPublicationProjection? creatorPublication,
+        bool creatorLinked)
+    {
+        if (!string.IsNullOrWhiteSpace(item.LineageSummary))
+        {
+            return item.LineageSummary!;
+        }
+
+        if (creatorLinked && !string.IsNullOrWhiteSpace(creatorPublication?.LineageSummary))
+        {
+            return creatorPublication!.LineageSummary!;
+        }
+
+        if (creatorLinked && creatorPublication is not null)
+        {
+            return $"{item.Label} keeps one lineage lane from {workspace.CampaignId} through publication {creatorPublication.PublicationId} without a shadow export copy.";
+        }
+
+        string artifactToken = string.IsNullOrWhiteSpace(item.ArtifactId)
+            ? item.ProjectionId
+            : item.ArtifactId!;
+        return $"{item.Label} keeps lineage anchored to {artifactToken} on {workspace.CampaignName} so return, replay, and recap stay on one governed truth lane.";
     }
 
     private static string DescribeRecapShelfNextSafeAction(
