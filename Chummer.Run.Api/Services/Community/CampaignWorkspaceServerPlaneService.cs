@@ -2351,14 +2351,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .DefaultIfEmpty(DateTimeOffset.UtcNow)
             .Max();
 
-        return new GovernedPrepPacketSummary(
-            PacketId: $"campaign-return:{workspace.WorkspaceId}",
-            Kind: "campaign_return_packet",
-            Title: $"{workspace.CampaignName} diary, contacts, and heat return packet",
-            Summary: summary,
-            BindingSummary: bindingSummary,
-            Reusable: true,
-            SearchTerms: BuildSearchTerms(
+        IReadOnlyList<string> searchTerms = BuildSearchTerms(
                 "diary",
                 "journal",
                 "sessionlog",
@@ -2388,7 +2381,20 @@ public sealed class CampaignWorkspaceServerPlaneService
                 relationshipConsequences.Select(static item => item.Kind),
                 relationshipConsequences.Select(static item => item.Label),
                 relationshipConsequences.Select(static item => item.State),
-                relationshipConsequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.SourceKind))),
+                relationshipConsequences.SelectMany(static item => item.Receipts.Select(static receipt => receipt.SourceKind)));
+        searchTerms = searchTerms
+            .Concat(["connection", "connections", "faction", "factions"])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return new GovernedPrepPacketSummary(
+            PacketId: $"campaign-return:{workspace.WorkspaceId}",
+            Kind: "campaign_return_packet",
+            Title: $"{workspace.CampaignName} diary, contacts, and heat return packet",
+            Summary: summary,
+            BindingSummary: bindingSummary,
+            Reusable: true,
+            SearchTerms: searchTerms,
             EvidenceLines: evidence,
             UpdatedAtUtc: updatedAtUtc);
     }
