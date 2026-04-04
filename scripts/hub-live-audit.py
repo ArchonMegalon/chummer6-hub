@@ -2009,6 +2009,20 @@ def verify_signed_in_work_audit(
     prep_library_leaguecontrol = json.loads(body)
     if not (prep_library_leaguecontrol.get("items") or []):
         raise AssertionError("prep-library leaguecontrol search did not expose any governed packet")
+    prep_library_leaguecontrols_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=leaguecontrols"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_leaguecontrols_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_leaguecontrols_path} returned {status}, expected 200")
+
+    prep_library_leaguecontrols = json.loads(body)
+    if not (prep_library_leaguecontrols.get("items") or []):
+        raise AssertionError("prep-library leaguecontrols search did not expose any governed packet")
     prep_library_league_control_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=league%20control"
     status, body, _, _ = fetch(
         base_url,
@@ -2163,6 +2177,20 @@ def verify_signed_in_work_audit(
     prep_library_communitycontrol = json.loads(body)
     if not (prep_library_communitycontrol.get("items") or []):
         raise AssertionError("prep-library communitycontrol search did not expose any governed packet")
+    prep_library_communitycontrols_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=communitycontrols"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_communitycontrols_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_communitycontrols_path} returned {status}, expected 200")
+
+    prep_library_communitycontrols = json.loads(body)
+    if not (prep_library_communitycontrols.get("items") or []):
+        raise AssertionError("prep-library communitycontrols search did not expose any governed packet")
     prep_library_community_control_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=community%20control"
     status, body, _, _ = fetch(
         base_url,
@@ -4196,6 +4224,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_leaguecontrol_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_leaguecontrol_search_path} should return at least one governed prep packet for the leaguecontrol query")
+    workspace_leaguecontrols_search_path = f"{workspace_path}?prepQuery=leaguecontrols"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_leaguecontrols_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_leaguecontrols_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_leaguecontrols_search_path)
+    require_snippet(body, 'match(es) for "leaguecontrols"', workspace_leaguecontrols_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_leaguecontrols_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_leaguecontrols_search_path} should return at least one governed prep packet for the leaguecontrols query")
     workspace_league_control_search_path = f"{workspace_path}?prepQuery=league%20control"
     status, body, _, _ = fetch(
         base_url,
@@ -4361,6 +4404,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_communitycontrol_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_communitycontrol_search_path} should return at least one governed prep packet for the communitycontrol query")
+    workspace_communitycontrols_search_path = f"{workspace_path}?prepQuery=communitycontrols"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_communitycontrols_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_communitycontrols_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_communitycontrols_search_path)
+    require_snippet(body, 'match(es) for "communitycontrols"', workspace_communitycontrols_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_communitycontrols_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_communitycontrols_search_path} should return at least one governed prep packet for the communitycontrols query")
     workspace_community_control_search_path = f"{workspace_path}?prepQuery=community%20control"
     status, body, _, _ = fetch(
         base_url,
