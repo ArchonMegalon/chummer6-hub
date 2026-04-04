@@ -2647,10 +2647,18 @@ public sealed class CampaignSpineService
         IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
     {
         ContinuitySnapshotRef? continuity = campaign.LatestContinuity;
-        CampaignConsequenceProjection? leadConsequence = consequences.FirstOrDefault();
-        GovernedPrepLaunchProjection? leadPrepLaunch = prepLaunches.FirstOrDefault();
-        TravelPrefetchReceiptProjection? leadTravelPrefetch = travelPrefetchReceipts.FirstOrDefault();
-        AftermathRecapPackageProjection? leadAftermathPackage = aftermathPackages.FirstOrDefault();
+        CampaignConsequenceProjection? leadConsequence = consequences
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        GovernedPrepLaunchProjection? leadPrepLaunch = prepLaunches
+            .OrderByDescending(static item => item.LaunchedAtUtc)
+            .FirstOrDefault();
+        TravelPrefetchReceiptProjection? leadTravelPrefetch = travelPrefetchReceipts
+            .OrderByDescending(static item => item.StagedAtUtc)
+            .FirstOrDefault();
+        AftermathRecapPackageProjection? leadAftermathPackage = aftermathPackages
+            .OrderByDescending(static item => item.GeneratedAtUtc)
+            .FirstOrDefault();
 
         if (continuity is null
             && leadConsequence is null
@@ -2753,14 +2761,25 @@ public sealed class CampaignSpineService
         NextSessionCarryForwardProjection? nextSessionCarryForward)
     {
         ContinuitySnapshotRef? continuity = campaign.LatestContinuity;
-        CampaignConsequenceProjection? leadConsequence = consequences.FirstOrDefault();
-        RosterTransferProjection? leadTransfer = rosterTransfers.FirstOrDefault();
-        GovernedPrepLaunchProjection? leadPrepLaunch = prepLaunches.FirstOrDefault();
-        TravelPrefetchReceiptProjection? leadTravelPrefetch = travelPrefetchReceipts.FirstOrDefault();
-        AftermathRecapPackageProjection? leadAftermathPackage = aftermathPackages
+        CampaignConsequenceProjection? leadConsequence = consequences
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        RosterTransferProjection? leadTransfer = rosterTransfers
+            .OrderByDescending(static item => item.TransferredAtUtc)
+            .FirstOrDefault();
+        GovernedPrepLaunchProjection? leadPrepLaunch = prepLaunches
+            .OrderByDescending(static item => item.LaunchedAtUtc)
+            .FirstOrDefault();
+        TravelPrefetchReceiptProjection? leadTravelPrefetch = travelPrefetchReceipts
+            .OrderByDescending(static item => item.StagedAtUtc)
+            .FirstOrDefault();
+        AftermathRecapPackageProjection[] orderedAftermathPackages = aftermathPackages
+            .OrderByDescending(static item => item.GeneratedAtUtc)
+            .ToArray();
+        AftermathRecapPackageProjection? leadAftermathPackage = orderedAftermathPackages
             .FirstOrDefault(item => !IsAftermathPackageKind(item, "downtime_brief"))
-            ?? aftermathPackages.FirstOrDefault();
-        AftermathRecapPackageProjection? leadDowntimePackage = aftermathPackages
+            ?? orderedAftermathPackages.FirstOrDefault();
+        AftermathRecapPackageProjection? leadDowntimePackage = orderedAftermathPackages
             .FirstOrDefault(item => IsAftermathPackageKind(item, "downtime_brief"));
         string? leadAftermathPackageId = leadAftermathPackage is null ? null : ResolveAftermathPackageIdentity(leadAftermathPackage);
         string? leadDowntimePackageId = leadDowntimePackage is null ? null : ResolveAftermathPackageIdentity(leadDowntimePackage);
