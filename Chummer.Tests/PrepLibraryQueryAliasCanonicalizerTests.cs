@@ -251,6 +251,9 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         {
             "campaignreturnpacket",
             "campaignreturnbriefs",
+            "campaignsreturnloop",
+            "campaignsreturnpacket",
+            "campaignsreturnbriefs",
             "aftermathreturnpacket",
             "aftermathreturnbrief",
             "aftermathsreturnpacket",
@@ -308,6 +311,9 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.Contains("packet", tokens);
         Assert.DoesNotContain("campaignreturnpacket", tokens);
         Assert.DoesNotContain("campaignreturnbriefs", tokens);
+        Assert.DoesNotContain("campaignsreturnloop", tokens);
+        Assert.DoesNotContain("campaignsreturnpacket", tokens);
+        Assert.DoesNotContain("campaignsreturnbriefs", tokens);
         Assert.DoesNotContain("aftermathreturnpacket", tokens);
         Assert.DoesNotContain("aftermathreturnbrief", tokens);
         Assert.DoesNotContain("aftermathsreturnpacket", tokens);

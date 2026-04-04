@@ -90,6 +90,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnloops", "campaign", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnlane", "campaign", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnlanes", "campaign", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignsreturn", "campaign", "return");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignsreturns", "campaign", "return");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignsreturnloop", "campaign", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignsreturnloops", "campaign", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignsreturnlane", "campaign", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignsreturnlanes", "campaign", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "preplibrarypacket", "prep", "library", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "preplibrarypackets", "prep", "library", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "oppositionpacket", "opposition", "packet");
@@ -112,6 +118,10 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnpackets", "campaign", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnbrief", "campaign", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnbriefs", "campaign", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignsreturnpacket", "campaign", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignsreturnpackets", "campaign", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignsreturnbrief", "campaign", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignsreturnbriefs", "campaign", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnpacket", "aftermath", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnpackets", "aftermath", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnbrief", "aftermath", "return", "packet");
