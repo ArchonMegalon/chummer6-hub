@@ -159,11 +159,13 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> compactTokens = InvokeBuildTokens("seasoncontrol");
         IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("seasoncontrols");
         IReadOnlyList<string> compactAbbrevTokens = InvokeBuildTokens("seasonctrl");
+        IReadOnlyList<string> compactAbbrevPluralTokens = InvokeBuildTokens("seasonctrls");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixcontrol");
 
         Assert.True(InvokeMatches(packet, compactTokens));
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.True(InvokeMatches(packet, compactAbbrevTokens));
+        Assert.True(InvokeMatches(packet, compactAbbrevPluralTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
     }
 

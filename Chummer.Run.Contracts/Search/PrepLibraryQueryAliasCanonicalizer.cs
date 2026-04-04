@@ -153,6 +153,14 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("seasoncontrol");
         }
 
+        if (tokens.Contains("seasonctrls"))
+        {
+            tokens.Remove("seasonctrls");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
         if (tokens.Contains("gmops"))
         {
             tokens.Remove("gmops");
