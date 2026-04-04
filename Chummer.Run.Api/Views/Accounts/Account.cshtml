@@ -1387,6 +1387,14 @@
                                     <strong>@(selectedWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready")</strong>
                                 </div>
                                 <div class="settings-summary-row">
+                                    <span>Fresh travel caches</span>
+                                    <strong>@(selectedWorkspaceServerPlane.TravelMode.FreshCacheDeviceCount == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.TravelMode.FreshCacheDeviceCount} fresh")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Stale travel caches</span>
+                                    <strong>@(selectedWorkspaceServerPlane.TravelMode.StaleCacheDeviceCount == 0 ? "None" : $"{selectedWorkspaceServerPlane.TravelMode.StaleCacheDeviceCount} stale")</strong>
+                                </div>
+                                <div class="settings-summary-row">
                                     <span>Travel prefetch receipts</span>
                                     <strong>@(selectedWorkspaceTravelPrefetches.Count == 0 ? "No staged receipts yet" : $"{selectedWorkspaceTravelPrefetches.Count} staged")</strong>
                                 </div>
@@ -1399,6 +1407,7 @@
                             <p><strong>Binding posture:</strong> @selectedWorkspaceServerPlane.PrepLibrary.BindingSummary</p>
                             <p><strong>Safehouse / travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
                             <p><strong>Prefetch inventory:</strong> @selectedWorkspaceServerPlane.TravelMode.PrefetchInventorySummary</p>
+                            <p><strong>Cache freshness:</strong> @selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary</p>
                             @if (selectedWorkspaceServerPlane.TravelMode.Devices.Count > 0)
                             {
                                 <form id="travelPrefetchForm" class="settings-form">
@@ -1813,7 +1822,7 @@
                         {
                             <p><strong>Outputs:</strong> @string.Join(", ", selectedBuildLabHandoff.Outputs.Select(item => item.Label))</p>
                             <ul class="muted-copy">
-                                @foreach (var output in selectedBuildLabHandoff.Outputs.Take(6))
+                                @foreach (var output in selectedBuildLabHandoff.Outputs.Take(8))
                                 {
                                     <li>
                                         <strong>@output.Label</strong>
@@ -1826,6 +1835,10 @@
                                             <span> Provenance: @output.ProvenanceSummary</span>
                                         }
                                     </li>
+                                }
+                                @if (selectedBuildLabHandoff.Outputs.Count > 8)
+                                {
+                                    <li>Output lanes continue: +@(selectedBuildLabHandoff.Outputs.Count - 8) more governed follow-through lane(s).</li>
                                 }
                             </ul>
                         }

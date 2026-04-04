@@ -2282,9 +2282,9 @@ public sealed class CampaignSpineService
                 };
                 var readyOutputSummary = outputs.Count switch
                 {
-                    1 => "1 dossier or campaign-safe output is already ready for export and recap follow-through.",
-                    > 1 => $"{outputs.Count} dossier or campaign-safe outputs are already ready for export and recap follow-through.",
-                    _ => "Publication-safe outputs will appear as recap and dossier cards once the first run lands."
+                    1 => "1 dossier or campaign-safe output is already ready for export, exchange, and artifact follow-through.",
+                    > 1 => $"{outputs.Count} dossier or campaign-safe outputs are already ready for export, exchange, and artifact follow-through.",
+                    _ => "Publication-safe outputs will appear as replay, recap, module, and dossier cards once the first run lands."
                 };
                 var campaignReturnSummary = workspace?.ReturnSummary
                     ?? "No campaign workspace is attached yet, so return still lands on the living dossier until the first governed campaign handoff exists.";
@@ -2316,7 +2316,7 @@ public sealed class CampaignSpineService
                             ? "25 / 50 / 100 Karma checkpoints stay attached to the living dossier until the first governed campaign workspace exists."
                             : $"25 / 50 / 100 Karma checkpoints stay attached to {workspace.CampaignName} so the return path keeps the same upgrade plan.",
                         readyOutputSummary,
-                        $"Explain receipt {explainReceiptId} stays attached across character-template, JSON exchange, Foundry-class exchange, sheet-viewer checks, and print-ready PDF export follow-through."
+                        $"Explain receipt {explainReceiptId} stays attached across character-template, JSON exchange, Foundry-class exchange, sheet-viewer checks, print-ready PDF export, replay timeline, session recap, and run-module artifact follow-through."
                     ],
                     Outputs: outputs,
                     UpdatedAtUtc: dossier.UpdatedAtUtc,
@@ -2340,7 +2340,7 @@ public sealed class CampaignSpineService
         string runtimeFingerprint,
         string explainReceiptId)
     {
-        const int maxOutputs = 6;
+        const int maxOutputs = 8;
         var governedExports = new[]
         {
             BuildBuildLabGovernedOutput(
@@ -2387,7 +2387,34 @@ public sealed class CampaignSpineService
                 summary: "Export a governed print-ready PDF from the same handoff without forking rule-environment or explain truth.",
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
-                nextSafeAction: "Open workflow.export.pdf to generate the current print-ready PDF from this handoff.")
+                nextSafeAction: "Open workflow.export.pdf to generate the current print-ready PDF from this handoff."),
+            BuildBuildLabGovernedOutput(
+                dossier,
+                projectionIdSuffix: "replay-timeline",
+                kind: "replay_timeline",
+                label: "Replay timeline artifact",
+                summary: "Generate a governed replay timeline artifact from this build handoff before contested-turn review or replay publication.",
+                runtimeFingerprint: runtimeFingerprint,
+                explainReceiptId: explainReceiptId,
+                nextSafeAction: "Open workflow.replay.timeline before publishing replay timeline artifacts."),
+            BuildBuildLabGovernedOutput(
+                dossier,
+                projectionIdSuffix: "session-recap",
+                kind: "session_recap",
+                label: "Session recap artifact",
+                summary: "Generate a governed session recap artifact from this build handoff so return, audit, and support closure keep one truth lane.",
+                runtimeFingerprint: runtimeFingerprint,
+                explainReceiptId: explainReceiptId,
+                nextSafeAction: "Open workflow.recap.session before publishing session recap artifacts."),
+            BuildBuildLabGovernedOutput(
+                dossier,
+                projectionIdSuffix: "run-module",
+                kind: "run_module",
+                label: "Run module artifact",
+                summary: "Package a governed run-module artifact from this build handoff so prep, exchange, and publication reuse one lineage.",
+                runtimeFingerprint: runtimeFingerprint,
+                explainReceiptId: explainReceiptId,
+                nextSafeAction: "Open workflow.module.run before publishing run-module artifacts.")
         };
 
         var carryForwardOutputs = dossier.Projections
@@ -2411,6 +2438,9 @@ public sealed class CampaignSpineService
             "foundry_exchange" => true,
             "sheet_viewer" => true,
             "print_pdf_export" => true,
+            "replay_timeline" => true,
+            "session_recap" => true,
+            "run_module" => true,
             _ => false
         };
 
@@ -2624,7 +2654,7 @@ public sealed class CampaignSpineService
             {
                 1 => "Outputs: 1 dossier or campaign-safe output is already attached to the handoff.",
                 > 1 => $"Outputs: {outputs.Count} dossier or campaign-safe outputs are already attached to the handoff.",
-                _ => "Outputs: no dossier or campaign-safe output is attached yet, so export and recap proof are still pending."
+                _ => "Outputs: no dossier or campaign-safe output is attached yet, so export, exchange, replay, and recap proof are still pending."
             },
             restore.ConflictSummaries.Count switch
             {
