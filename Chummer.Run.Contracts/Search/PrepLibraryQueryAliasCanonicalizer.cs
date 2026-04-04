@@ -135,6 +135,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("eventcontrol");
         }
 
+        if (tokens.Contains("eventctrls"))
+        {
+            tokens.Remove("eventctrls");
+            tokens.Add("eventcontrol");
+        }
+
         if (tokens.Contains("eventcontrols"))
         {
             tokens.Remove("eventcontrols");

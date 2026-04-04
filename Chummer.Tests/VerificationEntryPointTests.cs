@@ -556,6 +556,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=event%20ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event-ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventctrl", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=eventctrls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventop", audit, StringComparison.Ordinal);
@@ -724,6 +725,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=event%20ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event-ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventctrl", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=eventctrls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventop", audit, StringComparison.Ordinal);
@@ -936,6 +938,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("hyphen event-ctrl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventctrl", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventctrl prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=eventctrls", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact eventctrls prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventops", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=event(?:%20|\\+)ops", playwright, StringComparison.Ordinal);
