@@ -2470,6 +2470,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail leaguectrl compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leaguectrl compact search');
 
+  await page.fill('#prepQuery', 'leaguectl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=leaguectl/.test(page.url()), 'Workspace detail search should preserve the compact leaguectl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail leaguectl compact search');
+  await expectBodyText(page, 'match(es) for "leaguectl"', '/account/work/workspaces detail leaguectl compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail leaguectl compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail leaguectl compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail leaguectl compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail leaguectl compact search');
+  const workspaceLeagueCtlCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueCtlCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact leaguectl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail leaguectl compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leaguectl compact search');
+
+  await page.fill('#prepQuery', 'leaguectls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=leaguectls/.test(page.url()), 'Workspace detail search should preserve the compact leaguectls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail leaguectls compact search');
+  await expectBodyText(page, 'match(es) for "leaguectls"', '/account/work/workspaces detail leaguectls compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail leaguectls compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail leaguectls compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail leaguectls compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail leaguectls compact search');
+  const workspaceLeagueCtlsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueCtlsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact leaguectls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail leaguectls compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leaguectls compact search');
+
   await page.fill('#prepQuery', 'league-ctrl');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -2784,6 +2826,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail communityctrl compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityctrl compact search');
+
+  await page.fill('#prepQuery', 'communityctl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=communityctl/.test(page.url()), 'Workspace detail search should preserve the compact communityctl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail communityctl compact search');
+  await expectBodyText(page, 'match(es) for "communityctl"', '/account/work/workspaces detail communityctl compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail communityctl compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail communityctl compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail communityctl compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail communityctl compact search');
+  const workspaceCommunityCtlCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityCtlCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact communityctl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail communityctl compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityctl compact search');
+
+  await page.fill('#prepQuery', 'communityctls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=communityctls/.test(page.url()), 'Workspace detail search should preserve the compact communityctls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail communityctls compact search');
+  await expectBodyText(page, 'match(es) for "communityctls"', '/account/work/workspaces detail communityctls compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail communityctls compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail communityctls compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail communityctls compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail communityctls compact search');
+  const workspaceCommunityCtlsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityCtlsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact communityctls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail communityctls compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityctls compact search');
 
   await page.fill('#prepQuery', 'community-ctrl');
   await Promise.all([

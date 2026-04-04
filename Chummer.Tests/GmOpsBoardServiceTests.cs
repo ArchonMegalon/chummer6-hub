@@ -598,6 +598,20 @@ public sealed class GmOpsBoardServiceTests
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
+                Payload: "Open leaguectls lane remains unresolved before event-control checkpoint.",
+                AtUtc: baseTime.AddMinutes(3),
+                EventId: "evt-leaguectls"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open communityctls lane remains unresolved before event-control checkpoint.",
+                AtUtc: baseTime.AddMinutes(4),
+                EventId: "evt-communityctls"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
                 Payload: "Open checklist remains unresolved.",
                 AtUtc: baseTime.AddMinutes(20),
                 EventId: "evt-general")
@@ -605,11 +619,13 @@ public sealed class GmOpsBoardServiceTests
 
         OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
 
-        Assert.Equal(4, projection.UnresolvedItems.Count);
-        Assert.Equal("ops:evt-gmctls", projection.UnresolvedItems[0].ItemId);
-        Assert.Equal("ops:evt-seasonctls", projection.UnresolvedItems[1].ItemId);
-        Assert.Equal("ops:evt-eventctls", projection.UnresolvedItems[2].ItemId);
-        Assert.Equal("ops:evt-general", projection.UnresolvedItems[3].ItemId);
+        Assert.Equal(6, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-communityctls", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-leaguectls", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-gmctls", projection.UnresolvedItems[2].ItemId);
+        Assert.Equal("ops:evt-seasonctls", projection.UnresolvedItems[3].ItemId);
+        Assert.Equal("ops:evt-eventctls", projection.UnresolvedItems[4].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[5].ItemId);
     }
 
     [Fact]
@@ -1216,6 +1232,13 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse leagueControlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leaguecontrol");
         GmPrepAssetListResponse leagueControlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leaguecontrols");
         GmPrepAssetListResponse leagueCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leaguectrl");
+        GmPrepAssetListResponse leagueCtlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leaguectl");
+        GmPrepAssetListResponse leagueCtlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leaguectls");
+        GmPrepAssetListResponse leagueCtrlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leaguectrls");
+        GmPrepAssetListResponse leagueCtlSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league ctl");
+        GmPrepAssetListResponse leagueCtlsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league ctls");
+        GmPrepAssetListResponse leagueCtlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league-ctl");
+        GmPrepAssetListResponse leagueCtlsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league-ctls");
         GmPrepAssetListResponse leagueControlSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league control");
         GmPrepAssetListResponse leagueControlsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league controls");
         GmPrepAssetListResponse leagueControlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league-control");
@@ -1232,6 +1255,13 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse communityControlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communitycontrol");
         GmPrepAssetListResponse communityControlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communitycontrols");
         GmPrepAssetListResponse communityCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityctrl");
+        GmPrepAssetListResponse communityCtlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityctl");
+        GmPrepAssetListResponse communityCtlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityctls");
+        GmPrepAssetListResponse communityCtrlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityctrls");
+        GmPrepAssetListResponse communityCtlSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community ctl");
+        GmPrepAssetListResponse communityCtlsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community ctls");
+        GmPrepAssetListResponse communityCtlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community-ctl");
+        GmPrepAssetListResponse communityCtlsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community-ctls");
         GmPrepAssetListResponse communityControlSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community control");
         GmPrepAssetListResponse communityControlsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community controls");
         GmPrepAssetListResponse communityControlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community-control");
@@ -1336,6 +1366,13 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(leagueControlMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueControlsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueCtrlMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueCtlMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueCtlsMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueCtrlsMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueCtlSplitMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueCtlsSplitMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueCtlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueCtlsHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueControlSpacedMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueControlsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueControlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
@@ -1352,6 +1389,13 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(communityControlMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityControlsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityCtrlMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityCtlMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityCtlsMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityCtrlsMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityCtlSplitMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityCtlsSplitMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityCtlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityCtlsHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityControlSpacedMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityControlsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityControlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
@@ -1423,6 +1467,14 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse gmCtlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gm-ctl");
         GmPrepAssetListResponse gmCtlsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gm ctls");
         GmPrepAssetListResponse gmCtlsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gm-ctls");
+        GmPrepAssetListResponse leagueCtlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leaguectl");
+        GmPrepAssetListResponse leagueCtlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leaguectls");
+        GmPrepAssetListResponse leagueCtlSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league ctl");
+        GmPrepAssetListResponse leagueCtlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league-ctl");
+        GmPrepAssetListResponse communityCtlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityctl");
+        GmPrepAssetListResponse communityCtlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityctls");
+        GmPrepAssetListResponse communityCtlSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community ctl");
+        GmPrepAssetListResponse communityCtlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community-ctl");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixctl");
 
         Assert.Contains(eventCtlMatches.Items, item => item.AssetId == "event_ctl_ops");
@@ -1439,6 +1491,14 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(gmCtlHyphenMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Contains(gmCtlsSplitMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Contains(gmCtlsHyphenMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(leagueCtlMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(leagueCtlsMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(leagueCtlSplitMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(leagueCtlHyphenMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(communityCtlMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(communityCtlsMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(communityCtlSplitMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(communityCtlHyphenMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Empty(negativeMatches.Items);
     }
 

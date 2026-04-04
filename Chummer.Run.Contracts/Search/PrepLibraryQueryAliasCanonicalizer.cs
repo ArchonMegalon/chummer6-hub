@@ -77,6 +77,7 @@ public static class PrepLibraryQueryAliasCanonicalizer
         }
 
         if ((tokens.Contains("league") && tokens.Contains("ctrl"))
+            || (tokens.Contains("league") && tokens.Contains("ctl"))
             || (tokens.Contains("league") && tokens.Contains("control"))
             || (tokens.Contains("league") && tokens.Contains("controls"))
             || (tokens.Contains("league") && tokens.Contains("ctls"))
@@ -84,6 +85,7 @@ public static class PrepLibraryQueryAliasCanonicalizer
         {
             tokens.Remove("league");
             tokens.Remove("ctrl");
+            tokens.Remove("ctl");
             tokens.Remove("control");
             tokens.Remove("controls");
             tokens.Remove("ctls");
@@ -94,6 +96,7 @@ public static class PrepLibraryQueryAliasCanonicalizer
         }
 
         if ((tokens.Contains("community") && tokens.Contains("ctrl"))
+            || (tokens.Contains("community") && tokens.Contains("ctl"))
             || (tokens.Contains("community") && tokens.Contains("control"))
             || (tokens.Contains("community") && tokens.Contains("controls"))
             || (tokens.Contains("community") && tokens.Contains("ctls"))
@@ -101,6 +104,7 @@ public static class PrepLibraryQueryAliasCanonicalizer
         {
             tokens.Remove("community");
             tokens.Remove("ctrl");
+            tokens.Remove("ctl");
             tokens.Remove("control");
             tokens.Remove("controls");
             tokens.Remove("ctls");
@@ -567,6 +571,30 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("operation");
         }
 
+        if (tokens.Contains("leaguectl"))
+        {
+            tokens.Remove("leaguectl");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("leaguectls"))
+        {
+            tokens.Remove("leaguectls");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("leaguectrls"))
+        {
+            tokens.Remove("leaguectrls");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
         if (tokens.Contains("leaguecontrol"))
         {
             tokens.Remove("leaguecontrol");
@@ -586,6 +614,30 @@ public static class PrepLibraryQueryAliasCanonicalizer
         if (tokens.Contains("communityctrl"))
         {
             tokens.Remove("communityctrl");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communityctl"))
+        {
+            tokens.Remove("communityctl");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communityctls"))
+        {
+            tokens.Remove("communityctls");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communityctrls"))
+        {
+            tokens.Remove("communityctrls");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");
