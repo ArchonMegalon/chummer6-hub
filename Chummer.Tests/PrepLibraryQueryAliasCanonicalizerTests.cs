@@ -266,12 +266,18 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "diariesreturnloop",
             "diariesreturnpacket",
             "diariesreturnbriefs",
+            "diaryreturnpacket",
+            "diaryreturnbriefs",
             "contactsreturnloop",
             "contactsreturnpacket",
             "contactsreturnbriefs",
+            "contactreturnpacket",
+            "contactreturnbriefs",
             "heatsreturnloop",
             "heatsreturnpacket",
             "heatsreturnbriefs",
+            "heatreturnpacket",
+            "heatreturnbriefs",
             "diarycontactheatpacket",
             "diarycontactsheatpackets",
             "aftermathdowntimepacket",
@@ -341,12 +347,18 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("diariesreturnloop", tokens);
         Assert.DoesNotContain("diariesreturnpacket", tokens);
         Assert.DoesNotContain("diariesreturnbriefs", tokens);
+        Assert.DoesNotContain("diaryreturnpacket", tokens);
+        Assert.DoesNotContain("diaryreturnbriefs", tokens);
         Assert.DoesNotContain("contactsreturnloop", tokens);
         Assert.DoesNotContain("contactsreturnpacket", tokens);
         Assert.DoesNotContain("contactsreturnbriefs", tokens);
+        Assert.DoesNotContain("contactreturnpacket", tokens);
+        Assert.DoesNotContain("contactreturnbriefs", tokens);
         Assert.DoesNotContain("heatsreturnloop", tokens);
         Assert.DoesNotContain("heatsreturnpacket", tokens);
         Assert.DoesNotContain("heatsreturnbriefs", tokens);
+        Assert.DoesNotContain("heatreturnpacket", tokens);
+        Assert.DoesNotContain("heatreturnbriefs", tokens);
         Assert.DoesNotContain("diarycontactheatpacket", tokens);
         Assert.DoesNotContain("diarycontactsheatpackets", tokens);
         Assert.DoesNotContain("aftermathdowntimepacket", tokens);
