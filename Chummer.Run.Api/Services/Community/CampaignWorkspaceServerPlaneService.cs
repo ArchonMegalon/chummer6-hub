@@ -2111,7 +2111,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .Where(static item => IsCampaignReturnRecapSignal(item)))
             .Take(4)
             .ToArray();
-        AftermathRecapPackageProjection[] aftermathPackages = DeduplicateIdenticalAftermathPackageVersions(
+        AftermathRecapPackageProjection[] aftermathPackages = DeduplicateSemanticAftermathPackageVersions(
                 (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
                 .OrderByDescending(static item => item.GeneratedAtUtc))
             .Take(4)
@@ -2781,7 +2781,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         RunProjection? leadRun)
     {
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
-        AftermathRecapPackageProjection[] packages = DeduplicateIdenticalAftermathPackageVersions(
+        AftermathRecapPackageProjection[] packages = DeduplicateSemanticAftermathPackageVersions(
                 (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
                 .OrderByDescending(static item => item.GeneratedAtUtc))
             .Take(3)
@@ -2944,7 +2944,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         RunProjection? leadRun)
     {
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
-        GovernedPrepLaunchProjection[] launches = DeduplicateIdenticalPrepLaunchVersions(
+        GovernedPrepLaunchProjection[] launches = DeduplicateSemanticPrepLaunchVersions(
                 (workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>())
                 .OrderByDescending(static item => item.LaunchedAtUtc))
             .Take(4)
@@ -3109,12 +3109,12 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static transfer => transfer.TransferredAtUtc))
             .Take(3)
             .ToArray();
-        GovernedPrepLaunchProjection[] prepLaunches = DeduplicateIdenticalPrepLaunchVersions(
+        GovernedPrepLaunchProjection[] prepLaunches = DeduplicateSemanticPrepLaunchVersions(
                 (workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>())
                 .OrderByDescending(static launch => launch.LaunchedAtUtc))
             .Take(3)
             .ToArray();
-        TravelPrefetchReceiptProjection[] travelPrefetches = DeduplicateIdenticalTravelPrefetchReceiptVersions(
+        TravelPrefetchReceiptProjection[] travelPrefetches = DeduplicateSemanticTravelPrefetchReceiptVersions(
                 (workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>())
                 .OrderByDescending(static receipt => receipt.StagedAtUtc))
             .Take(3)
@@ -3535,7 +3535,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         RunProjection? leadRun)
     {
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
-        TravelPrefetchReceiptProjection[] receipts = DeduplicateIdenticalTravelPrefetchReceiptVersions(
+        TravelPrefetchReceiptProjection[] receipts = DeduplicateSemanticTravelPrefetchReceiptVersions(
                 (workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>())
                 .OrderByDescending(static item => item.StagedAtUtc))
             .Take(4)
@@ -3850,77 +3850,87 @@ public sealed class CampaignWorkspaceServerPlaneService
             NormalizeOptional(transfer.Summary) ?? string.Empty,
             transfer.TransferredAtUtc.ToUnixTimeMilliseconds().ToString());
 
-    private static IEnumerable<GovernedPrepLaunchProjection> DeduplicateIdenticalPrepLaunchVersions(
+    private static IEnumerable<GovernedPrepLaunchProjection> DeduplicateSemanticPrepLaunchVersions(
         IEnumerable<GovernedPrepLaunchProjection> launches)
     {
         HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
         foreach (GovernedPrepLaunchProjection launch in launches)
         {
-            if (seenKeys.Add(BuildPrepLaunchDedupeKey(launch)))
+            if (seenKeys.Add(BuildPrepLaunchSemanticDedupeKey(launch)))
             {
                 yield return launch;
             }
         }
     }
 
-    private static string BuildPrepLaunchDedupeKey(GovernedPrepLaunchProjection launch) =>
+    private static string BuildPrepLaunchSemanticDedupeKey(GovernedPrepLaunchProjection launch) =>
         string.Join('|',
-            NormalizeOptional(launch.LaunchId) ?? string.Empty,
+            NormalizeOptional(launch.WorkspaceId) ?? string.Empty,
+            NormalizeOptional(launch.CampaignId) ?? string.Empty,
             NormalizeOptional(launch.PacketId) ?? string.Empty,
             NormalizeOptional(launch.PacketKind) ?? string.Empty,
             NormalizeOptional(launch.PacketTitle) ?? string.Empty,
             NormalizeOptional(launch.TargetRunId) ?? string.Empty,
+            NormalizeOptional(launch.TargetRunTitle) ?? string.Empty,
             NormalizeOptional(launch.TargetSceneId) ?? string.Empty,
+            NormalizeOptional(launch.TargetSceneTitle) ?? string.Empty,
             NormalizeOptional(launch.Summary) ?? string.Empty,
+            NormalizeEvidenceLines(launch.AuditLines),
             launch.LaunchedAtUtc.ToUnixTimeMilliseconds().ToString());
 
-    private static IEnumerable<TravelPrefetchReceiptProjection> DeduplicateIdenticalTravelPrefetchReceiptVersions(
+    private static IEnumerable<TravelPrefetchReceiptProjection> DeduplicateSemanticTravelPrefetchReceiptVersions(
         IEnumerable<TravelPrefetchReceiptProjection> receipts)
     {
         HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
         foreach (TravelPrefetchReceiptProjection receipt in receipts)
         {
-            if (seenKeys.Add(BuildTravelPrefetchReceiptDedupeKey(receipt)))
+            if (seenKeys.Add(BuildTravelPrefetchReceiptSemanticDedupeKey(receipt)))
             {
                 yield return receipt;
             }
         }
     }
 
-    private static string BuildTravelPrefetchReceiptDedupeKey(TravelPrefetchReceiptProjection receipt) =>
+    private static string BuildTravelPrefetchReceiptSemanticDedupeKey(TravelPrefetchReceiptProjection receipt) =>
         string.Join('|',
-            NormalizeOptional(receipt.ReceiptId) ?? string.Empty,
+            NormalizeOptional(receipt.WorkspaceId) ?? string.Empty,
+            NormalizeOptional(receipt.CampaignId) ?? string.Empty,
             NormalizeOptional(receipt.InstallationId) ?? string.Empty,
             NormalizeOptional(receipt.DeviceRole) ?? string.Empty,
             NormalizeOptional(receipt.Platform) ?? string.Empty,
             NormalizeOptional(receipt.HeadId) ?? string.Empty,
             NormalizeOptional(receipt.Channel) ?? string.Empty,
             NormalizeOptional(receipt.PrefetchSummary) ?? string.Empty,
+            NormalizeEvidenceLines(receipt.InventoryLines),
+            NormalizeEvidenceLines(receipt.Boundaries),
             receipt.StagedAtUtc.ToUnixTimeMilliseconds().ToString());
 
-    private static IEnumerable<AftermathRecapPackageProjection> DeduplicateIdenticalAftermathPackageVersions(
+    private static IEnumerable<AftermathRecapPackageProjection> DeduplicateSemanticAftermathPackageVersions(
         IEnumerable<AftermathRecapPackageProjection> packages)
     {
         HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
         foreach (AftermathRecapPackageProjection package in packages)
         {
-            if (seenKeys.Add(BuildAftermathRecapPackageDedupeKey(package)))
+            if (seenKeys.Add(BuildAftermathRecapPackageSemanticDedupeKey(package)))
             {
                 yield return package;
             }
         }
     }
 
-    private static string BuildAftermathRecapPackageDedupeKey(AftermathRecapPackageProjection package) =>
+    private static string BuildAftermathRecapPackageSemanticDedupeKey(AftermathRecapPackageProjection package) =>
         string.Join('|',
-            NormalizeOptional(package.PackageId) ?? string.Empty,
             NormalizeOptional(package.WorkspaceId) ?? string.Empty,
             NormalizeOptional(package.CampaignId) ?? string.Empty,
             NormalizeOptional(package.RunId) ?? string.Empty,
+            NormalizeOptional(package.RunTitle) ?? string.Empty,
             NormalizeOptional(package.PackageKind) ?? string.Empty,
             NormalizeOptional(package.Title) ?? string.Empty,
             NormalizeOptional(package.Summary) ?? string.Empty,
             NormalizeOptional(package.ArtifactId) ?? string.Empty,
+            NormalizeEvidenceLines(package.EvidenceLines),
+            NormalizeOptional(package.ProvenanceSummary) ?? string.Empty,
+            NormalizeOptional(package.AuditSummary) ?? string.Empty,
             package.GeneratedAtUtc.ToUnixTimeMilliseconds().ToString());
 
     private static IEnumerable<PublicationSafeProjection> DeduplicateIdenticalPublicationRecapVersions(
