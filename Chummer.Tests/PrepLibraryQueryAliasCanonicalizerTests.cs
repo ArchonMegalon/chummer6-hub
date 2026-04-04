@@ -195,21 +195,31 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "preplaunch",
             "preplaunches",
             "preplibrarypacket",
+            "preplibrarypkt",
+            "preplibrarypkts",
             "preplibrarybrief",
             "preplibrarybriefs",
             "travelprefetch",
             "travelprefetches",
             "oppositionpacket",
             "oppositionpackets",
+            "oppositionpkt",
+            "oppositionpkts",
             "oppositionbrief",
             "oppositionbriefs",
             "rostermovepacket",
             "rostermovepackets",
+            "rostermovepkt",
+            "rostermovepkts",
             "rostermovementpacket",
+            "rostermovementpkt",
+            "rostermovementpkts",
             "rostermovebrief",
             "rostermovementbriefs",
             "eventcontrolpacket",
             "eventcontrolpackets",
+            "eventcontrolpkt",
+            "eventcontrolpkts",
             "eventcontrolbrief",
             "eventcontrolbriefs"
         };
@@ -229,21 +239,31 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("preplaunch", tokens);
         Assert.DoesNotContain("preplaunches", tokens);
         Assert.DoesNotContain("preplibrarypacket", tokens);
+        Assert.DoesNotContain("preplibrarypkt", tokens);
+        Assert.DoesNotContain("preplibrarypkts", tokens);
         Assert.DoesNotContain("preplibrarybrief", tokens);
         Assert.DoesNotContain("preplibrarybriefs", tokens);
         Assert.DoesNotContain("travelprefetch", tokens);
         Assert.DoesNotContain("travelprefetches", tokens);
         Assert.DoesNotContain("oppositionpacket", tokens);
         Assert.DoesNotContain("oppositionpackets", tokens);
+        Assert.DoesNotContain("oppositionpkt", tokens);
+        Assert.DoesNotContain("oppositionpkts", tokens);
         Assert.DoesNotContain("oppositionbrief", tokens);
         Assert.DoesNotContain("oppositionbriefs", tokens);
         Assert.DoesNotContain("rostermovepacket", tokens);
         Assert.DoesNotContain("rostermovepackets", tokens);
+        Assert.DoesNotContain("rostermovepkt", tokens);
+        Assert.DoesNotContain("rostermovepkts", tokens);
         Assert.DoesNotContain("rostermovementpacket", tokens);
+        Assert.DoesNotContain("rostermovementpkt", tokens);
+        Assert.DoesNotContain("rostermovementpkts", tokens);
         Assert.DoesNotContain("rostermovebrief", tokens);
         Assert.DoesNotContain("rostermovementbriefs", tokens);
         Assert.DoesNotContain("eventcontrolpacket", tokens);
         Assert.DoesNotContain("eventcontrolpackets", tokens);
+        Assert.DoesNotContain("eventcontrolpkt", tokens);
+        Assert.DoesNotContain("eventcontrolpkts", tokens);
         Assert.DoesNotContain("eventcontrolbrief", tokens);
         Assert.DoesNotContain("eventcontrolbriefs", tokens);
     }
