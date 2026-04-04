@@ -550,6 +550,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=seasoncontrols", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonctl", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=seasonctls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event%20control", audit, StringComparison.Ordinal);
@@ -559,6 +560,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=event-ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventctl", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=eventctls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventctrls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event%20ops", audit, StringComparison.Ordinal);
@@ -727,6 +729,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=seasoncontrols", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonctl", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=seasonctls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event%20control", audit, StringComparison.Ordinal);
@@ -736,6 +739,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=event-ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventctl", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=eventctls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventctrls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event%20ops", audit, StringComparison.Ordinal);
@@ -941,6 +945,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact seasonctrl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=seasonctl", playwright, StringComparison.Ordinal);
         Assert.Contains("compact seasonctl prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=seasonctls", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact seasonctls prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventcontrol", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventcontrol prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventcontrols", playwright, StringComparison.Ordinal);
@@ -959,6 +965,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact eventctrl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventctl", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventctl prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=eventctls", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact eventctls prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventctrls", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventctrls prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventops", playwright, StringComparison.Ordinal);

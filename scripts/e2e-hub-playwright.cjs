@@ -1189,6 +1189,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail season-ctl compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season-ctl compact search');
 
+  await page.fill('#prepQuery', 'seasonctls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=seasonctls/.test(page.url()), 'Workspace detail search should preserve the compact seasonctls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail season-ctls compact search');
+  await expectBodyText(page, 'match(es) for "seasonctls"', '/account/work/workspaces detail season-ctls compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail season-ctls compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail season-ctls compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail season-ctls compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail season-ctls compact search');
+  const workspaceSeasonCtlsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceSeasonCtlsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact seasonctls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail season-ctls compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season-ctls compact search');
+
   await page.fill('#prepQuery', 'seasonctrls');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -1398,6 +1419,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail event-ctl compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event-ctl compact search');
+
+  await page.fill('#prepQuery', 'eventctls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=eventctls/.test(page.url()), 'Workspace detail search should preserve the compact eventctls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail event-ctls compact search');
+  await expectBodyText(page, 'match(es) for "eventctls"', '/account/work/workspaces detail event-ctls compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail event-ctls compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail event-ctls compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail event-ctls compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail event-ctls compact search');
+  const workspaceEventCtlsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEventCtlsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact eventctls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail event-ctls compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event-ctls compact search');
 
   await page.fill('#prepQuery', 'eventctrls');
   await Promise.all([
