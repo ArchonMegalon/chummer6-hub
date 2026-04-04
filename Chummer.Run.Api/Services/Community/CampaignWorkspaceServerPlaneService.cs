@@ -631,7 +631,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         int rosterTransferCount = DeduplicateSemanticRosterTransferVersions(
                 workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
             .Count();
-        CampaignReadinessCue? attentionCue = workspace.ReadinessCues.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
+        CampaignReadinessCue? attentionCue = ResolvePriorityReadinessCue(workspace.ReadinessCues, requireSummary: true);
         string restorePrefetchSummary = DescribeRestorePrefetchSummary(restore);
         string restoreSummary = restore.ConflictSummaries.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item)) is { } conflictSummary
             ? $"{conflictSummary} {restorePrefetchSummary}"
@@ -745,7 +745,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                     nextSafeAction.Summary));
         }
 
-        CampaignReadinessCue? readinessAttention = workspace.ReadinessCues.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
+        CampaignReadinessCue? readinessAttention = ResolvePriorityReadinessCue(workspace.ReadinessCues, requireSummary: true);
         if (readinessAttention is not null)
         {
             return new WorkspaceStateSummary(
@@ -802,7 +802,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             ? $"{needsAttentionCount} readiness item(s) still need attention across {workspace.Dossiers.Count} dossier(s), {workspace.Crews.Count} crew(s), and {workspace.Runs.Count} run(s)."
             : $"{workspace.Dossiers.Count} dossier(s), {workspace.Crews.Count} crew(s), and {workspace.Runs.Count} run(s) are ready to reopen from the same continuity spine.";
         IReadOnlyList<string> highlights = workspace.ReadinessCues
-            .Take(4)
+            .OrderByDescending(static cue => ResolveReadinessAttentionPriority(cue.Severity))
+            .ThenBy(static cue => cue.Title, StringComparer.OrdinalIgnoreCase)
             .Select(static cue => $"{cue.Title} — {cue.Summary}")
             .Concat(
                 workspace.Consequences?
@@ -4500,6 +4501,24 @@ public sealed class CampaignWorkspaceServerPlaneService
            && !severity.Equals("info", StringComparison.OrdinalIgnoreCase)
            && !severity.Equals("ok", StringComparison.OrdinalIgnoreCase)
            && !severity.Equals("ready", StringComparison.OrdinalIgnoreCase);
+
+    private static int ResolveReadinessAttentionPriority(string? severity)
+        => severity?.Trim().ToLowerInvariant() switch
+        {
+            "attention" => 3,
+            "warning" => 2,
+            "review" => 1,
+            _ => 0
+        };
+
+    private static CampaignReadinessCue? ResolvePriorityReadinessCue(
+        IReadOnlyList<CampaignReadinessCue> readinessCues,
+        bool requireSummary = false)
+        => readinessCues
+            .Where(static cue => NeedsAttention(cue.Severity))
+            .Where(cue => !requireSummary || !string.IsNullOrWhiteSpace(cue.Summary))
+            .OrderByDescending(static cue => ResolveReadinessAttentionPriority(cue.Severity))
+            .FirstOrDefault();
 
     private static string DescribeDeviceRoleSummary(WorkspaceRestoreProjection restore)
         => restore.ClaimedDevices.Count == 0
