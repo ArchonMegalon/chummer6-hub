@@ -1771,6 +1771,76 @@ def verify_signed_in_work_audit(
     prep_library_gm_operations_hyphen = json.loads(body)
     if not (prep_library_gm_operations_hyphen.get("items") or []):
         raise AssertionError("prep-library gm-operations search did not expose any governed packet")
+    prep_library_gmcontrol_compact_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=gmcontrol"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_gmcontrol_compact_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_gmcontrol_compact_path} returned {status}, expected 200")
+
+    prep_library_gmcontrol_compact = json.loads(body)
+    if not (prep_library_gmcontrol_compact.get("items") or []):
+        raise AssertionError("prep-library gmcontrol search did not expose any governed packet")
+    prep_library_gmcontrols_compact_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=gmcontrols"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_gmcontrols_compact_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_gmcontrols_compact_path} returned {status}, expected 200")
+
+    prep_library_gmcontrols_compact = json.loads(body)
+    if not (prep_library_gmcontrols_compact.get("items") or []):
+        raise AssertionError("prep-library gmcontrols search did not expose any governed packet")
+    prep_library_gmctrl_compact_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=gmctrl"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_gmctrl_compact_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_gmctrl_compact_path} returned {status}, expected 200")
+
+    prep_library_gmctrl_compact = json.loads(body)
+    if not (prep_library_gmctrl_compact.get("items") or []):
+        raise AssertionError("prep-library gmctrl search did not expose any governed packet")
+    prep_library_gm_control_split_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=gm%20control"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_gm_control_split_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_gm_control_split_path} returned {status}, expected 200")
+
+    prep_library_gm_control_split = json.loads(body)
+    if not (prep_library_gm_control_split.get("items") or []):
+        raise AssertionError("prep-library gm control search did not expose any governed packet")
+    prep_library_gm_control_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=gm-control"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_gm_control_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_gm_control_hyphen_path} returned {status}, expected 200")
+
+    prep_library_gm_control_hyphen = json.loads(body)
+    if not (prep_library_gm_control_hyphen.get("items") or []):
+        raise AssertionError("prep-library gm-control search did not expose any governed packet")
     prep_library_leagueops_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=leagueops"
     status, body, _, _ = fetch(
         base_url,
@@ -3815,6 +3885,81 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_gm_operations_hyphen_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_gm_operations_hyphen_search_path} should return at least one governed prep packet for the gm-operations query")
+    workspace_gmcontrol_compact_search_path = f"{workspace_path}?prepQuery=gmcontrol"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_gmcontrol_compact_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_gmcontrol_compact_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_gmcontrol_compact_search_path)
+    require_snippet(body, 'match(es) for "gmcontrol"', workspace_gmcontrol_compact_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_gmcontrol_compact_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_gmcontrol_compact_search_path} should return at least one governed prep packet for the gmcontrol query")
+    workspace_gmcontrols_compact_search_path = f"{workspace_path}?prepQuery=gmcontrols"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_gmcontrols_compact_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_gmcontrols_compact_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_gmcontrols_compact_search_path)
+    require_snippet(body, 'match(es) for "gmcontrols"', workspace_gmcontrols_compact_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_gmcontrols_compact_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_gmcontrols_compact_search_path} should return at least one governed prep packet for the gmcontrols query")
+    workspace_gmctrl_compact_search_path = f"{workspace_path}?prepQuery=gmctrl"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_gmctrl_compact_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_gmctrl_compact_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_gmctrl_compact_search_path)
+    require_snippet(body, 'match(es) for "gmctrl"', workspace_gmctrl_compact_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_gmctrl_compact_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_gmctrl_compact_search_path} should return at least one governed prep packet for the gmctrl query")
+    workspace_gm_control_split_search_path = f"{workspace_path}?prepQuery=gm%20control"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_gm_control_split_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_gm_control_split_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_gm_control_split_search_path)
+    require_snippet(body, 'match(es) for "gm control"', workspace_gm_control_split_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_gm_control_split_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_gm_control_split_search_path} should return at least one governed prep packet for the gm control query")
+    workspace_gm_control_hyphen_search_path = f"{workspace_path}?prepQuery=gm-control"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_gm_control_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_gm_control_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_gm_control_hyphen_search_path)
+    require_snippet(body, 'match(es) for "gm-control"', workspace_gm_control_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_gm_control_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_gm_control_hyphen_search_path} should return at least one governed prep packet for the gm-control query")
     workspace_leagueops_search_path = f"{workspace_path}?prepQuery=leagueops"
     status, body, _, _ = fetch(
         base_url,

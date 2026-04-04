@@ -102,6 +102,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         "gmop",
         "gmoperation",
         "gmoperations",
+        "gmcontrol",
+        "gmcontrols",
+        "gmctrl",
         "seasonops",
         "seasonop",
         "leagueops",
@@ -4577,6 +4580,41 @@ public sealed class CampaignWorkspaceServerPlaneService
         if (tokens.Contains("gmoperations"))
         {
             tokens.Remove("gmoperations");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gmcontrol"))
+        {
+            tokens.Remove("gmcontrol");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gmcontrols"))
+        {
+            tokens.Remove("gmcontrols");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gmctrl"))
+        {
+            tokens.Remove("gmctrl");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gm") && (tokens.Contains("control") || tokens.Contains("controls") || tokens.Contains("ctrl")))
+        {
+            tokens.Remove("gm");
+            tokens.Remove("control");
+            tokens.Remove("controls");
+            tokens.Remove("ctrl");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");
