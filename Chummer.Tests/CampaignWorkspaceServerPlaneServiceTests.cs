@@ -123,6 +123,32 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsCompactContinuityAndGmPacketForms()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "prep:workspace-v4-compact-packets",
+            Kind: "campaign_return_packet",
+            Title: "Neon Cradle campaign return diary contacts heat aftermath downtime event control operation packet",
+            Summary: "Compact continuity and GM packet forms stay on one governed workspace v4 lane.",
+            BindingSummary: "Bound to travel/offline return continuity and GM operations receipts.",
+            Reusable: true,
+            SearchTerms: ["campaign", "return", "diary", "connection", "heat", "aftermath", "downtime", "travel", "offline", "safehouse", "eventcontrol", "season", "operation", "packet"],
+            EvidenceLines: ["Compact continuity and GM packet forms should collapse into one governed token lane."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturnpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diarycontactsheatpackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathdowntimepacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelofflinepackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobileofflinepacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehousetravelpackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmopspacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmoperationpackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmcontrolpacket")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixcontinuitypacket")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsEventCtrlShorthandAcrossWhitespaceBoundaries()
     {
         var packet = new GovernedPrepPacketSummary(

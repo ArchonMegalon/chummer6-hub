@@ -173,4 +173,47 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("rostermovementpacket", tokens);
         Assert.DoesNotContain("eventcontrolpackets", tokens);
     }
+
+    [Fact]
+    public void RewriteAliases_CollapsesCompactContinuityAndGmPacketFormsIntoUnifiedWorkspaceTokens()
+    {
+        HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "campaignreturnpacket",
+            "diarycontactsheatpackets",
+            "aftermathdowntimepacket",
+            "travelofflinepackets",
+            "mobileofflinepacket",
+            "safehousetravelpackets",
+            "gmopspacket",
+            "gmoperationpackets",
+            "gmcontrolpacket"
+        };
+
+        PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
+
+        Assert.Contains("campaign", tokens);
+        Assert.Contains("return", tokens);
+        Assert.Contains("diary", tokens);
+        Assert.Contains("connection", tokens);
+        Assert.Contains("heat", tokens);
+        Assert.Contains("aftermath", tokens);
+        Assert.Contains("downtime", tokens);
+        Assert.Contains("travel", tokens);
+        Assert.Contains("offline", tokens);
+        Assert.Contains("safehouse", tokens);
+        Assert.Contains("eventcontrol", tokens);
+        Assert.Contains("season", tokens);
+        Assert.Contains("operation", tokens);
+        Assert.Contains("packet", tokens);
+        Assert.DoesNotContain("campaignreturnpacket", tokens);
+        Assert.DoesNotContain("diarycontactsheatpackets", tokens);
+        Assert.DoesNotContain("aftermathdowntimepacket", tokens);
+        Assert.DoesNotContain("travelofflinepackets", tokens);
+        Assert.DoesNotContain("mobileofflinepacket", tokens);
+        Assert.DoesNotContain("safehousetravelpackets", tokens);
+        Assert.DoesNotContain("gmopspacket", tokens);
+        Assert.DoesNotContain("gmoperationpackets", tokens);
+        Assert.DoesNotContain("gmcontrolpacket", tokens);
+    }
 }
