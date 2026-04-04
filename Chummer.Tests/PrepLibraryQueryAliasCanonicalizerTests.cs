@@ -200,7 +200,9 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "safehousetravelpackets",
             "gmopspacket",
             "gmoperationpackets",
-            "gmcontrolpacket"
+            "gmcontrolpacket",
+            "gamemasterctls",
+            "gamemasterctrls"
         };
 
         PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
@@ -237,6 +239,8 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("gmopspacket", tokens);
         Assert.DoesNotContain("gmoperationpackets", tokens);
         Assert.DoesNotContain("gmcontrolpacket", tokens);
+        Assert.DoesNotContain("gamemasterctls", tokens);
+        Assert.DoesNotContain("gamemasterctrls", tokens);
     }
 
     [Fact]

@@ -646,6 +646,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=gmctrls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmctl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmctls", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gamemasterctls", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gamemasterctrls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm-ctl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm-ctls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm%20ctl", audit, StringComparison.Ordinal);
@@ -1103,6 +1105,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=gmctrls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmctl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmctls", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=gamemasterctls", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=gamemasterctrls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm-ctl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm-ctls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm%20ctl", audit, StringComparison.Ordinal);
@@ -2048,6 +2052,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmoperationpackets', 'compact gmoperationpackets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpacket', 'compact gmcontrolpacket continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpackets', 'compact gmcontrolpackets continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasterctls', 'compact gamemasterctls continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasterctrls', 'compact gamemasterctrls continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4', 'compact workspacev4 continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4', 'compact campaignworkspacev4 continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4packet', 'compact workspacev4packet continuity prep');", playwright, StringComparison.Ordinal);
