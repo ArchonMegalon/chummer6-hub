@@ -23,6 +23,9 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("@output.AuditSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff", view, StringComparison.Ordinal);
         Assert.Contains("Rule diff:", view, StringComparison.Ordinal);
+        Assert.Contains("Rule diff scope:", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.RuleEnvironmentDiff.BeforeScope", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.RuleEnvironmentDiff.AfterScope", view, StringComparison.Ordinal);
         Assert.Contains("handoff.CrewFitSummary", view, StringComparison.Ordinal);
         Assert.Contains("Crew fit:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.ConditionalStateSummary", view, StringComparison.Ordinal);
