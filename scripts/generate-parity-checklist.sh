@@ -182,6 +182,21 @@ def fail_on_missing_required_legacy_ids(
         )
 
 
+def fail_on_missing_milestone2_baseline_ids(
+    *,
+    surface_label: str,
+    baseline_ids: Sequence[str],
+    present_ids: Sequence[str],
+    source: str,
+) -> None:
+    missing = sorted(set(baseline_ids).difference(set(present_ids)))
+    if missing:
+        raise ValueError(
+            f"{source} is missing required milestone-2 baseline {surface_label} ids "
+            f"({', '.join(missing)})"
+        )
+
+
 def write_summary_row(kind: str, legacy_ids: Sequence[str], covered: Sequence[str], missing: Sequence[str], catalog_only: Sequence[str]) -> str:
     return f"| {kind} | {len(legacy_ids)} | {len(covered)} | {len(missing)} | {len(catalog_only)} |"
 
@@ -244,6 +259,64 @@ legacy_desktop_controls = parse_required_token_list(
     "desktopControls",
     source=display_path(parity_oracle_path),
 )
+
+required_milestone2_tabs = {
+    "tab-attributes",
+    "tab-skills",
+    "tab-qualities",
+    "tab-improvements",
+    "tab-magician",
+    "tab-technomancer",
+    "tab-gear",
+    "tab-cyberware",
+    "tab-vehicles",
+    "tab-contacts",
+    "tab-notes",
+    "tab-calendar",
+}
+required_milestone2_actions = {
+    "build",
+    "progress",
+    "attributes",
+    "skills",
+    "qualities",
+    "awakening",
+    "spells",
+    "complexforms",
+    "gear",
+    "cyberwares",
+    "vehicles",
+    "contacts",
+    "calendar",
+}
+required_milestone2_desktop_controls = {
+    "contact_add",
+    "contact_edit",
+    "gear_add",
+    "gear_edit",
+    "magic_add",
+    "magic_bind",
+    "open_notes",
+}
+fail_on_missing_milestone2_baseline_ids(
+    surface_label="tab",
+    baseline_ids=required_milestone2_tabs,
+    present_ids=legacy_tabs,
+    source=display_path(parity_oracle_path),
+)
+fail_on_missing_milestone2_baseline_ids(
+    surface_label="workspace action",
+    baseline_ids=required_milestone2_actions,
+    present_ids=legacy_actions,
+    source=display_path(parity_oracle_path),
+)
+fail_on_missing_milestone2_baseline_ids(
+    surface_label="desktop control",
+    baseline_ids=required_milestone2_desktop_controls,
+    present_ids=legacy_desktop_controls,
+    source=display_path(parity_oracle_path),
+)
+
 catalog_tabs = parse_catalog_ids(navigation_catalog_text)
 catalog_actions = parse_workspace_action_target_ids(action_catalog_text)
 catalog_desktop_controls = parse_desktop_dialog_control_ids(desktop_dialog_factory_text)
