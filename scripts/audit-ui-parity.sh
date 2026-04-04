@@ -68,6 +68,20 @@ import sys
 UTC = dt.timezone.utc
 DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS = 24 * 60 * 60
 DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS = 5 * 60
+REQUIRED_RELEASE_PROOF_JOURNEYS = (
+    "install_claim_restore_continue",
+    "build_explain_publish",
+    "campaign_session_recover_recap",
+    "report_cluster_release_notify",
+)
+REQUIRED_RELEASE_PROOF_ROUTES = (
+    "/downloads/install/avalonia-linux-x64-installer",
+    "/home/access",
+    "/home/work",
+    "/account/work",
+    "/account/support",
+    "/contact",
+)
 
 
 def require_object(value: object, *, message: str) -> dict:
@@ -152,6 +166,116 @@ def require_string_map(value: object, *, message: str) -> dict[str, str]:
             raise SystemExit(message)
         normalized[key] = parsed_value
     return normalized
+
+
+def normalized_token(value: object) -> str:
+    return str(value or "").strip().lower()
+
+
+def normalize_release_proof_route(raw_route: object, *, field_path: str, source: pathlib.Path) -> str:
+    if not isinstance(raw_route, str):
+        raise SystemExit(f"parity audit failed: {field_path} must be a string: {source}")
+    route = raw_route.strip()
+    if not route:
+        raise SystemExit(f"parity audit failed: {field_path} must not be blank: {source}")
+    if not route.startswith("/"):
+        raise SystemExit(f"parity audit failed: {field_path} must be a slash-led route path: {source}")
+    if any(character.isspace() for character in route):
+        raise SystemExit(f"parity audit failed: {field_path} must not include whitespace: {source}")
+    if "?" in route or "#" in route:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must not include query or fragment segments: {source}"
+        )
+    if "//" in route:
+        raise SystemExit(f"parity audit failed: {field_path} must not include empty path segments: {source}")
+    segments = route.split("/")
+    if any(segment in {".", ".."} for segment in segments):
+        raise SystemExit(f"parity audit failed: {field_path} must not include dot-segment traversal: {source}")
+    canonical_route = route.lower()
+    if canonical_route != "/":
+        canonical_route = canonical_route.rstrip("/")
+        if not canonical_route:
+            canonical_route = "/"
+    return canonical_route
+
+
+def validate_release_channel_proof(release_channel_path: pathlib.Path, release_channel_data: dict) -> None:
+    proof = require_object(
+        release_channel_data.get("releaseProof"),
+        message=(
+            "parity audit failed: release-channel nested receipt releaseProof is required: "
+            f"{release_channel_path}"
+        ),
+    )
+    proof_status = normalized_token(proof.get("status"))
+    if proof_status not in {"pass", "passed", "ready"}:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.status must be pass/passed/ready: "
+            f"{release_channel_path} (status={proof_status or 'missing'})"
+        )
+    journeys_passed = proof.get("journeysPassed") or proof.get("journeys_passed")
+    journeys = require_string_list(
+        journeys_passed,
+        message=(
+            "parity audit failed: release-channel nested receipt releaseProof.journeysPassed must be a string array: "
+            f"{release_channel_path}"
+        ),
+    )
+    normalized_journeys = [normalized_token(journey) for journey in journeys]
+    if any(not journey for journey in normalized_journeys):
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.journeysPassed must not contain blank ids: "
+            f"{release_channel_path}"
+        )
+    duplicate_journeys = sorted(
+        journey for journey in set(normalized_journeys) if normalized_journeys.count(journey) > 1
+    )
+    if duplicate_journeys:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.journeysPassed must not contain duplicate ids: "
+            f"{release_channel_path} ({', '.join(duplicate_journeys)})"
+        )
+    missing_required_journeys = sorted(
+        journey for journey in REQUIRED_RELEASE_PROOF_JOURNEYS if journey not in normalized_journeys
+    )
+    if missing_required_journeys:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.journeysPassed is missing required baseline journey ids: "
+            f"{release_channel_path} ({', '.join(missing_required_journeys)})"
+        )
+    proof_routes = proof.get("proofRoutes") or proof.get("proof_routes")
+    raw_routes = require_string_list(
+        proof_routes,
+        message=(
+            "parity audit failed: release-channel nested receipt releaseProof.proofRoutes must be a string array: "
+            f"{release_channel_path}"
+        ),
+    )
+    normalized_routes: list[str] = []
+    for index, raw_route in enumerate(raw_routes):
+        normalized_routes.append(
+            normalize_release_proof_route(
+                raw_route,
+                field_path=f"releaseProof.proofRoutes[{index}]",
+                source=release_channel_path,
+            )
+        )
+    duplicate_routes = sorted(
+        route for route in set(normalized_routes) if normalized_routes.count(route) > 1
+    )
+    if duplicate_routes:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.proofRoutes must not contain duplicate routes after normalization: "
+            f"{release_channel_path} ({', '.join(duplicate_routes)})"
+        )
+    missing_required_routes = sorted(
+        route for route in REQUIRED_RELEASE_PROOF_ROUTES if route not in normalized_routes
+    )
+    if missing_required_routes:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.proofRoutes is missing required flagship routes: "
+            f"{release_channel_path} ({', '.join(missing_required_routes)})"
+        )
 
 
 def require_all_values_equal(
@@ -338,6 +462,7 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
     release_channel_path = resolve_nested_receipt_path(path, release_channel_path_raw)
     release_channel_data = read_receipt(release_channel_path)
     read_release_channel_status(release_channel_path, release_channel_data)
+    validate_release_channel_proof(release_channel_path, release_channel_data)
     release_channel_id = require_non_empty_string(
         release_channel_data.get("channelId"),
         message=(
@@ -699,6 +824,7 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
     release_channel_path = resolve_nested_receipt_path(path, release_channel_path_raw)
     release_channel_data = read_receipt(release_channel_path)
     read_release_channel_status(release_channel_path, release_channel_data)
+    validate_release_channel_proof(release_channel_path, release_channel_data)
     release_channel_id = require_non_empty_string(
         release_channel_data.get("channelId"),
         message=(

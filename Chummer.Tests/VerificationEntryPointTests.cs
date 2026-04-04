@@ -81,6 +81,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release-channel generated_at drifts from nested receipt generatedAt", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt generatedAt is stale", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt generatedAt is in the future", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof is required", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.status must be pass/passed/ready", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.journeysPassed is missing required baseline journey ids", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.proofRoutes is missing required flagship routes", script, StringComparison.Ordinal);
         Assert.Contains("workflow_parity_receipt_channel_ids", script, StringComparison.Ordinal);
         Assert.Contains("milestone-2 workflow/visual release-channel ids drift", script, StringComparison.Ordinal);
         Assert.Contains("milestone-2 workflow/visual release-channel versions drift", script, StringComparison.Ordinal);
