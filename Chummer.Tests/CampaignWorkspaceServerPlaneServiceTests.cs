@@ -2221,6 +2221,72 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineBuildCreatorPublicationsComparisonSummaryCarriesBuildLabParityAndPortabilityReceipts()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-04T00:00:00Z");
+        RuleEnvironmentRef dossierEnvironment = new(
+            EnvironmentId: "env-dossier-comparison",
+            OwnerScope: "dossier",
+            CompatibilityFingerprint: "sr6-preview",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: ["reputation_house_rules"],
+            OptionToggles: []);
+        RuleEnvironmentRef workspaceEnvironment = new(
+            EnvironmentId: "env-workspace-comparison",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: ["reputation_house_rules"],
+            OptionToggles: []);
+        RunnerDossierProjection dossier = new(
+            DossierId: "dossier-creator-comparison",
+            RunnerHandle: "Ghostline",
+            DisplayName: "Ghostline",
+            Status: "active",
+            OwnerUserId: "user-1",
+            CrewId: null,
+            CampaignId: "campaign-a",
+            CurrentRunId: null,
+            CurrentSceneId: null,
+            RuleEnvironment: dossierEnvironment,
+            LatestContinuity: null,
+            BuildReceiptIds: ["receipt-1"],
+            SnapshotIds: [],
+            Projections: [],
+            CreatedAtUtc: now,
+            UpdatedAtUtc: now);
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath() with
+        {
+            CampaignId = "campaign-a",
+            RuleEnvironment = workspaceEnvironment,
+            RecapShelf =
+            [
+                new PublicationSafeProjection(
+                    ProjectionId: "recap-creator-comparison",
+                    Kind: "campaign_recap_bundle",
+                    Label: "Session recap",
+                    Summary: "Recap row",
+                    CreatorPublicationId: "pub-comparison")
+            ]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+        BuildLabHandoffProjection handoff = Assert.Single(
+            InvokeCampaignSpineBuildBuildLabHandoffs([dossier], [workspace], restore));
+
+        CreatorPublicationProjection publication = Assert.Single(
+            InvokeCampaignSpineBuildCreatorPublications(
+                [workspace],
+                [dossier],
+                [handoff]));
+
+        Assert.Contains("sheet/print/export/viewer parity lanes", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("dossier/exchange/replay/recap/module portability lanes", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("campaign-return fit", publication.ComparisonSummary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void CampaignSpineNextSessionCarryForwardTreatsWhitespacePaddedReplayPackageKindAsReplay()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
@@ -7822,12 +7888,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
     private static IReadOnlyList<CreatorPublicationProjection> InvokeCampaignSpineBuildCreatorPublications(
         IReadOnlyList<CampaignWorkspaceProjection> workspaces)
+        => InvokeCampaignSpineBuildCreatorPublications(
+            workspaces,
+            Array.Empty<RunnerDossierProjection>(),
+            Array.Empty<BuildLabHandoffProjection>());
+
+    private static IReadOnlyList<CreatorPublicationProjection> InvokeCampaignSpineBuildCreatorPublications(
+        IReadOnlyList<CampaignWorkspaceProjection> workspaces,
+        IReadOnlyList<RunnerDossierProjection> dossiers,
+        IReadOnlyList<BuildLabHandoffProjection> buildLabHandoffs)
     {
         MethodInfo method = typeof(CampaignSpineService)
             .GetMethod("BuildCreatorPublications", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException("BuildCreatorPublications was not found.");
 
-        return Assert.IsAssignableFrom<IReadOnlyList<CreatorPublicationProjection>>(method.Invoke(null, [workspaces, Array.Empty<RunnerDossierProjection>(), Array.Empty<BuildLabHandoffProjection>()]));
+        return Assert.IsAssignableFrom<IReadOnlyList<CreatorPublicationProjection>>(method.Invoke(null, [workspaces, dossiers, buildLabHandoffs]));
     }
 
     private static IReadOnlyList<PublicationSafeProjection> InvokeCampaignSpineEnrichWorkspaceRecapShelf(

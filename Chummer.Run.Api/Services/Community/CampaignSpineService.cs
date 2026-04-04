@@ -4730,9 +4730,19 @@ public sealed class CampaignSpineService
             : visibility.Trim().Replace('_', ' ').Replace('-', ' ').ToLowerInvariant();
 
     private static string DescribeCreatorPublicationComparisonSummary(BuildLabHandoffProjection? leadHandoff)
-        => !string.IsNullOrWhiteSpace(leadHandoff?.Title)
-            ? $"Compare by provenance, visibility, trust ranking, lineage, {leadHandoff.Title} receipts, and campaign-return fit instead of popularity, install counts, or shelf age."
-            : "Compare by provenance, visibility, trust ranking, lineage, and campaign-return fit instead of popularity, install counts, or shelf age.";
+    {
+        if (leadHandoff is null)
+        {
+            return "Compare by provenance, visibility, trust ranking, lineage, and campaign-return fit instead of popularity, install counts, or shelf age.";
+        }
+
+        string exchangeParity = AccountService.NormalizeOptional(leadHandoff.ExchangeParitySummary)
+            ?? "sheet/print/export/viewer parity lanes are still pending explicit readiness evidence";
+        string portabilityPillar = AccountService.NormalizeOptional(leadHandoff.PortabilityPillarSummary)
+            ?? "dossier/exchange/replay/recap/module portability lanes are still pending explicit readiness evidence";
+
+        return $"Compare by provenance, visibility, trust ranking, lineage, {leadHandoff.Title} receipts, {exchangeParity}, {portabilityPillar}, and campaign-return fit instead of popularity, install counts, or shelf age.";
+    }
 
     private static string DescribeCreatorPublicationLineage(
         string artifactId,
