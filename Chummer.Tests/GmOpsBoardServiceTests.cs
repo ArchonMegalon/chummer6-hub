@@ -1118,6 +1118,7 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse leagueControlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leaguecontrols");
         GmPrepAssetListResponse leagueCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leaguectrl");
         GmPrepAssetListResponse leagueControlSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league control");
+        GmPrepAssetListResponse leagueControlsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league controls");
         GmPrepAssetListResponse leagueControlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league-control");
         GmPrepAssetListResponse communityOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityops");
         GmPrepAssetListResponse communityOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityop");
@@ -1131,6 +1132,7 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse communityControlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communitycontrols");
         GmPrepAssetListResponse communityCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityctrl");
         GmPrepAssetListResponse communityControlSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community control");
+        GmPrepAssetListResponse communityControlsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community controls");
         GmPrepAssetListResponse communityControlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community-control");
         GmPrepAssetListResponse rosterMoveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostermove");
         GmPrepAssetListResponse rosterMovesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostermoves");
@@ -1210,6 +1212,7 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(leagueControlsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueCtrlMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueControlSpacedMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueControlsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueControlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityOpsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityOpMatches.Items, item => item.AssetId == "event_control_ops");
@@ -1223,6 +1226,7 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(communityControlsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityCtrlMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityControlSpacedMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityControlsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityControlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(rosterMoveMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterMovesMatches.Items, item => item.AssetId == "roster_move_ops");

@@ -555,21 +555,27 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("operation");
         }
 
-        if ((tokens.Contains("league") && tokens.Contains("ctrl")) || (tokens.Contains("league") && tokens.Contains("control")))
+        if ((tokens.Contains("league") && tokens.Contains("ctrl"))
+            || (tokens.Contains("league") && tokens.Contains("control"))
+            || (tokens.Contains("league") && tokens.Contains("controls")))
         {
             tokens.Remove("league");
             tokens.Remove("ctrl");
             tokens.Remove("control");
+            tokens.Remove("controls");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");
         }
 
-        if ((tokens.Contains("community") && tokens.Contains("ctrl")) || (tokens.Contains("community") && tokens.Contains("control")))
+        if ((tokens.Contains("community") && tokens.Contains("ctrl"))
+            || (tokens.Contains("community") && tokens.Contains("control"))
+            || (tokens.Contains("community") && tokens.Contains("controls")))
         {
             tokens.Remove("community");
             tokens.Remove("ctrl");
             tokens.Remove("control");
+            tokens.Remove("controls");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");
