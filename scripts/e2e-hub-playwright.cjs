@@ -5995,6 +5995,11 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignreturnpackets', 'compact campaignreturnpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignreturnbrief', 'compact campaignreturnbrief continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignreturnbriefs', 'compact campaignreturnbriefs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignsreturnloop', 'compact campaignsreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignsreturnpacket', 'compact campaignsreturnpacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignsreturnpackets', 'compact campaignsreturnpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignsreturnbrief', 'compact campaignsreturnbrief continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignsreturnbriefs', 'compact campaignsreturnbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnpacket', 'compact aftermathreturnpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnpackets', 'compact aftermathreturnpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnbrief', 'compact aftermathreturnbrief continuity prep');

@@ -193,6 +193,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturnpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturnbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturnbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignsreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignsreturnpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignsreturnpackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignsreturnbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignsreturnbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnbrief")));
