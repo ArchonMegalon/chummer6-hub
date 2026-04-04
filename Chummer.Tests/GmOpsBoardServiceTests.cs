@@ -830,6 +830,134 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatDiaryContactsDowntimeReturnSignalsAsContinuityReturnDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:25:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Campaign diary contacts downtime return lane pending for next session reopen.",
+                AtUtc: baseTime,
+                EventId: "evt-continuity-return"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(15),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-continuity-return", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatCarryForwardReturnSignalsAsContinuityReturnDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:25:30Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Campaign carry-forward return loop stays active for diary/contact reopen.",
+                AtUtc: baseTime,
+                EventId: "evt-carry-forward"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(12),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-carry-forward", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatOfflineSafehouseTravelCacheStaleSignalsAsContinuityReturnDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:26:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Campaign mobile safehouse travel cache stale before next session return checkpoint.",
+                AtUtc: baseTime,
+                EventId: "evt-offline-stale"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(10),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-offline-stale", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatOfflineSyncDriftSignalsAsContinuityReturnDomainWithoutOpenKeyword()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:26:30Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Campaign mobile offline cache sync drift blocks return lane reopen for next checkpoint.",
+                AtUtc: baseTime,
+                EventId: "evt-sync-drift"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(8),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-sync-drift", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatCompactDomainShorthandAsGovernedOpsDomains()
     {
         SessionLedgerService ledger = new();
@@ -2242,39 +2370,106 @@ public sealed class GmOpsBoardServiceTests
 
         GmPrepAssetListResponse offlineReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "offline readiness");
         GmPrepAssetListResponse compactOfflineReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "offlinereadiness");
+        GmPrepAssetListResponse hyphenOfflineReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "off-line readiness");
         GmPrepAssetListResponse travelCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "travel cache");
         GmPrepAssetListResponse compactTravelCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "travelcache");
         GmPrepAssetListResponse safehouseStaleCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "safehouse stale cache");
         GmPrepAssetListResponse compactSafehouseReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "safehousereadiness");
+        GmPrepAssetListResponse splitSafehouseReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "safe house readiness");
+        GmPrepAssetListResponse hyphenSafehouseCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "safe-house cache");
+        GmPrepAssetListResponse pluralSafehousesCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "safehouses caches");
+        GmPrepAssetListResponse pluralTravelsCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "travels caches");
+        GmPrepAssetListResponse pluralOfflinesReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "offlines readinesses");
         GmPrepAssetListResponse mobileOfflineReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile offline readiness");
         GmPrepAssetListResponse compactMobileOfflineReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobileofflinereadiness");
+        GmPrepAssetListResponse compactPluralMobileOfflinesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobileofflines");
+        GmPrepAssetListResponse mobileHyphenOfflineReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile off-line readiness");
         GmPrepAssetListResponse mobileTravelCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile travel cache");
         GmPrepAssetListResponse compactMobileTravelCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobiletravelcache");
+        GmPrepAssetListResponse compactPluralMobileTravelCachesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobiletravelcaches");
         GmPrepAssetListResponse mobileSafehouseReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile safehouse readiness");
         GmPrepAssetListResponse compactMobileSafehouseReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobilesafehousereadiness");
+        GmPrepAssetListResponse compactPluralMobileSafehouseReadinessesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobilesafehousereadinesses");
+        GmPrepAssetListResponse mobileSplitSafehouseCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile safe house cache");
         GmPrepAssetListResponse mobileSafehouseCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile safehouse cache");
         GmPrepAssetListResponse compactMobileSafehouseCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobilesafehousecache");
+        GmPrepAssetListResponse compactPluralMobileSafehousesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobilesafehouses");
+        GmPrepAssetListResponse compactPluralMobileSafehouseCachesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobilesafehousecaches");
         GmPrepAssetListResponse negativeReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrix readiness");
         GmPrepAssetListResponse negativeCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrix cache");
         GmPrepAssetListResponse negativeMobileMatrixCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile matrix cache");
 
         Assert.Contains(offlineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(compactOfflineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(hyphenOfflineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(travelCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(compactTravelCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(safehouseStaleCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(compactSafehouseReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(splitSafehouseReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(hyphenSafehouseCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(pluralSafehousesCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(pluralTravelsCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(pluralOfflinesReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(mobileOfflineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(compactMobileOfflineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactPluralMobileOfflinesMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(mobileHyphenOfflineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(mobileTravelCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(compactMobileTravelCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactPluralMobileTravelCachesMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(mobileSafehouseReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(compactMobileSafehouseReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactPluralMobileSafehouseReadinessesMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(mobileSplitSafehouseCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(mobileSafehouseCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(compactMobileSafehouseCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactPluralMobileSafehousesMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactPluralMobileSafehouseCachesMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Empty(negativeReadinessMatches.Items);
         Assert.Empty(negativeCacheMatches.Items);
         Assert.Empty(negativeMobileMatrixCacheMatches.Items);
+    }
+
+    [Fact]
+    public void ListPrepAssets_QuerySupportsGameMasterOpsShorthandAcrossWhitespaceAndPunctuation()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult import = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "event_control_gamemaster_ops",
+                now: now,
+                title: "Game-master event control board",
+                body: "Game-master operations stay governed on the season event-control lane.")
+        ]);
+
+        Assert.Equal(1, import.ImportedCount);
+        Assert.Equal(0, import.SkippedCount);
+        Assert.Empty(import.Conflicts);
+
+        GmPrepAssetListResponse gameMasterOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "game master ops");
+        GmPrepAssetListResponse gameMasterOpsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "game-master-ops");
+        GmPrepAssetListResponse compactGameMasterOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gamemasterops");
+        GmPrepAssetListResponse gameMasterOperationMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "game master operation");
+        GmPrepAssetListResponse compactGameMasterOperationMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gamemasteroperation");
+        GmPrepAssetListResponse gameMasterControlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "game master control");
+        GmPrepAssetListResponse compactGameMasterControlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gamemastercontrol");
+        GmPrepAssetListResponse gameMasterCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "game master ctrl");
+        GmPrepAssetListResponse compactGameMasterCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gamemasterctrl");
+        GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrix master ops");
+
+        Assert.Contains(gameMasterOpsMatches.Items, item => item.AssetId == "event_control_gamemaster_ops");
+        Assert.Contains(gameMasterOpsHyphenMatches.Items, item => item.AssetId == "event_control_gamemaster_ops");
+        Assert.Contains(compactGameMasterOpsMatches.Items, item => item.AssetId == "event_control_gamemaster_ops");
+        Assert.Contains(gameMasterOperationMatches.Items, item => item.AssetId == "event_control_gamemaster_ops");
+        Assert.Contains(compactGameMasterOperationMatches.Items, item => item.AssetId == "event_control_gamemaster_ops");
+        Assert.Contains(gameMasterControlMatches.Items, item => item.AssetId == "event_control_gamemaster_ops");
+        Assert.Contains(compactGameMasterControlMatches.Items, item => item.AssetId == "event_control_gamemaster_ops");
+        Assert.Contains(gameMasterCtrlMatches.Items, item => item.AssetId == "event_control_gamemaster_ops");
+        Assert.Contains(compactGameMasterCtrlMatches.Items, item => item.AssetId == "event_control_gamemaster_ops");
+        Assert.Empty(negativeMatches.Items);
     }
 
     [Fact]
