@@ -5973,6 +5973,30 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'next-session-return-lanes', 'hyphen next-session-return-lanes continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'next sessions return lanes', 'split next sessions return lanes continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'next-sessions-return-lanes', 'hyphen next-sessions-return-lanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'preplibrarypacket', 'compact preplibrarypacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'preplibrarypackets', 'compact preplibrarypackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionpackets', 'compact oppositionpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovementpacket', 'compact rostermovementpacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovementpackets', 'compact rostermovementpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolpackets', 'compact eventcontrolpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignreturnpacket', 'compact campaignreturnpacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignreturnpackets', 'compact campaignreturnpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'diarycontactsheatpacket', 'compact diarycontactsheatpacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'diarycontactsheatpackets', 'compact diarycontactsheatpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathdowntimepacket', 'compact aftermathdowntimepacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathdowntimepackets', 'compact aftermathdowntimepackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'travelofflinepacket', 'compact travelofflinepacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'travelofflinepackets', 'compact travelofflinepackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinepacket', 'compact mobileofflinepacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinepackets', 'compact mobileofflinepackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousetravelpacket', 'compact safehousetravelpacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousetravelpackets', 'compact safehousetravelpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmopspacket', 'compact gmopspacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmopspackets', 'compact gmopspackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmoperationpacket', 'compact gmoperationpacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmoperationpackets', 'compact gmoperationpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpacket', 'compact gmcontrolpacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpackets', 'compact gmcontrolpackets continuity prep');
 
   await page.fill('#prepQuery', 'sessionreturn');
   await Promise.all([
