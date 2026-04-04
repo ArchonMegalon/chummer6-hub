@@ -912,8 +912,12 @@
                                                                 }
                                                                 @if (handoff.Outputs.Count > 0)
                                                                 {
-                                                                    <span> Outputs: @string.Join(", ", handoff.Outputs.Take(2).Select(item => item.Label)).</span>
-                                                                    foreach (var output in handoff.Outputs.Take(2))
+                                                                    <span> Outputs: @string.Join(", ", handoff.Outputs.Take(6).Select(item => item.Label)).</span>
+                                                                    @if (handoff.Outputs.Count > 6)
+                                                                    {
+                                                                        <span> Output lanes continue: +@(handoff.Outputs.Count - 6) more governed follow-through lane(s).</span>
+                                                                    }
+                                                                    foreach (var output in handoff.Outputs.Take(6))
                                                                     {
                                                                         @if (!string.IsNullOrWhiteSpace(output.NextSafeAction))
                                                                         {
