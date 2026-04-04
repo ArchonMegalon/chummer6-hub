@@ -528,6 +528,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineAttachCreatorPublicationPostureNormalizesUnlinkedWhitespacePublicationIds()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-publication-unlinked-whitespace-1",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap-safe output remains attached to campaign continuity.",
+            CreatorPublicationId: "  pub-unlinked  ");
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recap]
+        };
+        CreatorPublicationProjection unrelatedPublication = new(
+            PublicationId: "pub-other",
+            Title: "Unrelated publication",
+            Kind: "campaign_recap_bundle",
+            Summary: "Unrelated publication row.",
+            CampaignId: "campaign-z",
+            DossierId: null,
+            ArtifactId: "artifact-other",
+            ProvenanceSummary: "Unrelated provenance",
+            DiscoverySummary: "Unrelated discovery",
+            Visibility: "group",
+            PublicationStatus: "review",
+            TrustBand: "bounded",
+            Discoverable: false,
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+
+        IReadOnlyList<CampaignWorkspaceProjection> updated = InvokeCampaignSpineAttachCreatorPublicationPosture([workspace], [unrelatedPublication]);
+
+        CampaignWorkspaceProjection updatedWorkspace = Assert.Single(updated);
+        PublicationSafeProjection updatedRecap = Assert.Single(updatedWorkspace.RecapShelf);
+        Assert.Equal("pub-unlinked", updatedRecap.CreatorPublicationId);
+    }
+
+    [Fact]
     public void CampaignSpineBuildCreatorPublicationsDeduplicatesRows_WhenPublicationIdsRepeat()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
