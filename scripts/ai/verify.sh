@@ -54,6 +54,46 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
+gate = payload["releaseProof"]["uiLocalizationReleaseGate"]
+gate["blockingFindingsCount"] = "0"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject non-integer releaseProof.uiLocalizationReleaseGate.blockingFindingsCount values." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+gate = payload["releaseProof"]["uiLocalizationReleaseGate"]
+gate["translationBacklogFindingsCount"] = "0"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject non-integer releaseProof.uiLocalizationReleaseGate.translationBacklogFindingsCount values." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
 payload["releaseProof"].pop("baseUrl", None)
 payload["releaseProof"]["base_url"] = "ftp://chummer.run"
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
