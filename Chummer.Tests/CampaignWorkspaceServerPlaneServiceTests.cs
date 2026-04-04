@@ -195,6 +195,38 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbrf")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbrfs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoppacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoppackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoppkt")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoppkts")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopbrf")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopbrfs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopspacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopspackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopspkt")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopspkts")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopsbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopsbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopsbrf")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventopsbrfs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationpackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationpkt")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationpkts")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationbrf")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationbrfs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationspacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationspackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationspkt")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationspkts")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationsbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationsbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationsbrf")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperationsbrfs")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpacket")));
     }
 
