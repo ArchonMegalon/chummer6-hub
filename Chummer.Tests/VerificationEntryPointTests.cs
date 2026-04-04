@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -30,6 +31,44 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("contains duplicate normalized token", script, StringComparison.Ordinal);
         Assert.Contains("is missing required acknowledged catalog-only", script, StringComparison.Ordinal);
         Assert.Contains("no longer catalog-only", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParityOracleTokenListsUseCanonicalStringIds()
+    {
+        string oraclePath = RepoPaths.FromRoot("docs", "PARITY_ORACLE.json");
+        using JsonDocument oracle = JsonDocument.Parse(File.ReadAllText(oraclePath));
+        JsonElement root = oracle.RootElement;
+
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        AssertCanonicalTokenArray(root, "tabs");
+        AssertCanonicalTokenArray(root, "workspaceActions");
+        AssertCanonicalTokenArray(root, "acknowledgedCatalogOnlyTabs");
+        AssertCanonicalTokenArray(root, "acknowledgedCatalogOnlyWorkspaceActions");
+        AssertCanonicalTokenArray(root, "desktopControls");
+    }
+
+    private static void AssertCanonicalTokenArray(JsonElement root, string propertyName)
+    {
+        Assert.True(root.TryGetProperty(propertyName, out JsonElement values), $"{propertyName} must exist");
+        Assert.Equal(JsonValueKind.Array, values.ValueKind);
+
+        HashSet<string> normalized = new(StringComparer.Ordinal);
+        int index = 0;
+        foreach (JsonElement value in values.EnumerateArray())
+        {
+            Assert.Equal(JsonValueKind.String, value.ValueKind);
+
+            string token = value.GetString() ?? string.Empty;
+            Assert.False(string.IsNullOrWhiteSpace(token), $"{propertyName}[{index}] must not be blank");
+            Assert.Equal(token.Trim(), token);
+
+            string normalizedToken = token.ToLowerInvariant();
+            Assert.True(
+                normalized.Add(normalizedToken),
+                $"{propertyName}[{index}] duplicates normalized token '{token}'");
+            index++;
+        }
     }
 
     [Fact]
