@@ -72,6 +72,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("recovery-reload-migration-roundtrips", script, StringComparison.Ordinal);
         Assert.Contains("required_legacy_interaction_keys", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_legacy_interaction_keys", script, StringComparison.Ordinal);
+        Assert.Contains("runtimeBackedLegacyWorkbench", script, StringComparison.Ordinal);
+        Assert.Contains("legacyDenseBuilderRhythm", script, StringComparison.Ordinal);
+        Assert.Contains("legacyBrowseDetailConfirmRhythm", script, StringComparison.Ordinal);
+        Assert.Contains("legacyContactsDiaryRhythm", script, StringComparison.Ordinal);
         Assert.Contains("legacyMagicWorkflowRhythm", script, StringComparison.Ordinal);
         Assert.Contains("legacyDiaryWorkflowRhythm", script, StringComparison.Ordinal);
         Assert.Contains("Parity audit passed", script, StringComparison.Ordinal);
