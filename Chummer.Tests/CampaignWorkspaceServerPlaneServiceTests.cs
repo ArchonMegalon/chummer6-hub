@@ -463,11 +463,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("contact updates")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("contacts changed")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactupdates")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("contactschanged")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("connection shifts")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("connectionupdates")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("relationshipchanges")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("heat changes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("heatchanges")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diary update")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaries updates")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaryupdates")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionlogupdates")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrix updates")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixupdates")));
+    }
+
+    [Fact]
+    public void PrepLibraryQueryMatchingCollapsesTravelOfflineReadinessShorthand()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "travel-prefetch:readiness",
+            Kind: "travel_prefetch_packet",
+            Title: "Neon Cradle travel prefetch readiness packet",
+            Summary: "Travel prefetch stays governed and offline-safe for safehouse return.",
+            BindingSummary: "Bound to the same campaign lane for travel and safehouse continuity.",
+            Reusable: true,
+            SearchTerms: ["travel", "prefetch", "offline", "safehouse", "device"],
+            EvidenceLines: ["Travel prefetch packet stays attached to governed continuity receipts."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("offline readiness")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("offlinereadiness")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travel cache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelcache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehouse stale cache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehousereadiness")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrix readiness")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrix cache")));
     }
 
     [Fact]
@@ -7113,6 +7145,72 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(packet.EvidenceLines, line => line.Contains("continuity lane remains open", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void CampaignSpineBuildLabHandoffsExposeGovernedExportTargetsAndRuleEnvironmentDiffEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-04T00:00:00Z");
+        RuleEnvironmentRef dossierEnvironment = new(
+            EnvironmentId: "env-dossier",
+            OwnerScope: "dossier",
+            CompatibilityFingerprint: "sr6-preview",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        RuleEnvironmentRef workspaceEnvironment = new(
+            EnvironmentId: "env-workspace",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        RunnerDossierProjection dossier = new(
+            DossierId: "dossier-build-1",
+            RunnerHandle: "Ghostline",
+            DisplayName: "Ghostline",
+            Status: "active",
+            OwnerUserId: "user-1",
+            CrewId: null,
+            CampaignId: "campaign-a",
+            CurrentRunId: null,
+            CurrentSceneId: null,
+            RuleEnvironment: dossierEnvironment,
+            LatestContinuity: null,
+            BuildReceiptIds: ["receipt-1"],
+            SnapshotIds: [],
+            Projections:
+            [
+                new PublicationSafeProjection(
+                    ProjectionId: "projection-build-idea",
+                    Kind: "build_idea_card",
+                    Label: "Build idea card",
+                    Summary: "Grounded build idea card is already attached.",
+                    ArtifactId: "artifact-build-idea")
+            ],
+            CreatedAtUtc: now,
+            UpdatedAtUtc: now);
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath() with
+        {
+            CampaignId = "campaign-a",
+            RuleEnvironment = workspaceEnvironment,
+            RecapShelf = []
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore() with
+        {
+            ClaimedDevices: [BuildClaimedDeviceRestore("workstation", "Claimed workstation restore lane is attached.")]
+        };
+
+        BuildLabHandoffProjection handoff = Assert.Single(
+            InvokeCampaignSpineBuildBuildLabHandoffs([dossier], [workspace], restore));
+
+        Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "character_template", StringComparison.Ordinal));
+        Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "foundry_exchange", StringComparison.Ordinal));
+        Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "sheet_viewer", StringComparison.Ordinal));
+        Assert.Contains(handoff.TradeoffLines, line => line.Contains("Rule-environment diff", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("Explain receipt", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -7207,6 +7305,18 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("BuildGroupOperatorWatchouts was not found.");
 
         return Assert.IsAssignableFrom<IReadOnlyList<string>>(method.Invoke(null, [workspaces]));
+    }
+
+    private static IReadOnlyList<BuildLabHandoffProjection> InvokeCampaignSpineBuildBuildLabHandoffs(
+        IReadOnlyList<RunnerDossierProjection> dossiers,
+        IReadOnlyList<CampaignWorkspaceProjection> workspaces,
+        WorkspaceRestoreProjection restore)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("BuildBuildLabHandoffs", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildBuildLabHandoffs was not found.");
+
+        return Assert.IsAssignableFrom<IReadOnlyList<BuildLabHandoffProjection>>(method.Invoke(null, [dossiers, workspaces, restore]));
     }
 
     private static IReadOnlyList<DecisionNotice> InvokeBuildDecisionNotices(
