@@ -42,5 +42,9 @@ public sealed class ParityAuditLocaleSummaryRowContractTests
             "verify gate failed: parity audit should reject unexpected releaseProof.uiLocalizationReleaseGate.localeSummary row keys.",
             script,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "verify gate failed: parity audit should reject conflicting alias values between releaseProof.uiLocalizationReleaseGate.localeSummary.untranslatedKeyCount and releaseProof.uiLocalizationReleaseGate.localeSummary.untranslated_key_count.",
+            script,
+            StringComparison.Ordinal);
     }
 }
