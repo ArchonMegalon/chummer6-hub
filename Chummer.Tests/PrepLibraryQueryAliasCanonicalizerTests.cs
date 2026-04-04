@@ -264,16 +264,22 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "downtimesreturnpacket",
             "downtimesreturnbriefs",
             "diariesreturnloop",
+            "diaryreturnloop",
+            "diaryreturnlane",
             "diariesreturnpacket",
             "diariesreturnbriefs",
             "diaryreturnpacket",
             "diaryreturnbriefs",
             "contactsreturnloop",
+            "contactreturnloop",
+            "contactreturnlane",
             "contactsreturnpacket",
             "contactsreturnbriefs",
             "contactreturnpacket",
             "contactreturnbriefs",
             "heatsreturnloop",
+            "heatreturnloop",
+            "heatreturnlane",
             "heatsreturnpacket",
             "heatsreturnbriefs",
             "heatreturnpacket",
@@ -345,16 +351,22 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("downtimesreturnpacket", tokens);
         Assert.DoesNotContain("downtimesreturnbriefs", tokens);
         Assert.DoesNotContain("diariesreturnloop", tokens);
+        Assert.DoesNotContain("diaryreturnloop", tokens);
+        Assert.DoesNotContain("diaryreturnlane", tokens);
         Assert.DoesNotContain("diariesreturnpacket", tokens);
         Assert.DoesNotContain("diariesreturnbriefs", tokens);
         Assert.DoesNotContain("diaryreturnpacket", tokens);
         Assert.DoesNotContain("diaryreturnbriefs", tokens);
         Assert.DoesNotContain("contactsreturnloop", tokens);
+        Assert.DoesNotContain("contactreturnloop", tokens);
+        Assert.DoesNotContain("contactreturnlane", tokens);
         Assert.DoesNotContain("contactsreturnpacket", tokens);
         Assert.DoesNotContain("contactsreturnbriefs", tokens);
         Assert.DoesNotContain("contactreturnpacket", tokens);
         Assert.DoesNotContain("contactreturnbriefs", tokens);
         Assert.DoesNotContain("heatsreturnloop", tokens);
+        Assert.DoesNotContain("heatreturnloop", tokens);
+        Assert.DoesNotContain("heatreturnlane", tokens);
         Assert.DoesNotContain("heatsreturnpacket", tokens);
         Assert.DoesNotContain("heatsreturnbriefs", tokens);
         Assert.DoesNotContain("heatreturnpacket", tokens);
