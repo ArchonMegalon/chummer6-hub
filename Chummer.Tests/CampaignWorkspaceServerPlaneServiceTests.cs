@@ -363,11 +363,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             PacketId: "continuity:plural-lane",
             Kind: "campaign_continuity_packet",
             Title: "Neon Cradle diary downtime aftermath continuity packet",
-            Summary: "Diary, downtime, aftermath, heat, faction, and connection continuity remains governed for next-session return.",
-            BindingSummary: "Bound to campaign diary continuity, downtime follow-through, aftermath recap, heat pressure, faction posture, and contact connection changes.",
+            Summary: "Diary, downtime, aftermath, recap, return, memory, archive, history, timeline, ledger, heat, faction, and connection continuity remains governed for next-session return.",
+            BindingSummary: "Bound to campaign diary continuity, downtime follow-through, aftermath recap, return cues, memory timeline, ledger history, heat pressure, faction posture, and contact connection changes.",
             Reusable: true,
-            SearchTerms: ["diary", "journal", "downtime", "aftermath", "heat", "faction", "connection", "return"],
-            EvidenceLines: ["Governed continuity lane keeps diary, downtime, aftermath, heat, faction, and connection signals attached for next session."],
+            SearchTerms: ["diary", "journal", "downtime", "aftermath", "recap", "return", "memory", "archive", "history", "timeline", "ledger", "heat", "faction", "connection"],
+            EvidenceLines: ["Governed continuity lane keeps diary, downtime, aftermath, recap, return, memory, archive, history, timeline, ledger, heat, faction, and connection signals attached for next session."],
             UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
 
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diary")));
@@ -380,6 +380,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermaths")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("recaps")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("returns")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("memories")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("archives")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("histories")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("timelines")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("ledgers")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("heat")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("heats")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("faction")));
