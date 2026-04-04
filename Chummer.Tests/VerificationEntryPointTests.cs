@@ -119,6 +119,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("missing_required_legacy_interaction_keys", script, StringComparison.Ordinal);
         Assert.Contains("reports non-pass flagship head contract markers", script, StringComparison.Ordinal);
         Assert.Contains("required_tests", script, StringComparison.Ordinal);
+        Assert.Contains("Desktop_shell_preserves_classic_dense_three_pane_workbench_posture", script, StringComparison.Ordinal);
+        Assert.Contains("Gear_builder_preserves_familiar_browse_detail_confirm_rhythm", script, StringComparison.Ordinal);
+        Assert.Contains("Cyberware_and_cyberlimb_builder_preserve_legacy_dialog_familiarity_cues", script, StringComparison.Ordinal);
+        Assert.Contains("Contacts_diary_and_support_routes_execute_with_public_path_visibility", script, StringComparison.Ordinal);
+        Assert.Contains("Loaded_runner_main_window_routes_navigation_palette_dialog_and_quick_action_surfaces_end_to_end", script, StringComparison.Ordinal);
         Assert.Contains("missing required milestone-2 visual tests", script, StringComparison.Ordinal);
         Assert.Contains("required_screenshots", script, StringComparison.Ordinal);
         Assert.Contains("missing required milestone-2 screenshots", script, StringComparison.Ordinal);
