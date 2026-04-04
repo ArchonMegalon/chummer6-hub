@@ -916,6 +916,13 @@
                                                                 {
                                                                     <span> Coverage: @handoff.PlannerCoverageSummary.</span>
                                                                 }
+                                                                @if (handoff.PlannerCoverageLines is { Count: > 0 })
+                                                                {
+                                                                    foreach (var plannerLine in handoff.PlannerCoverageLines.Take(2))
+                                                                    {
+                                                                        <span> Planner lane: @plannerLine</span>
+                                                                    }
+                                                                }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.CrewFitSummary))
                                                                 {
                                                                     <span> Crew fit: @handoff.CrewFitSummary.</span>
