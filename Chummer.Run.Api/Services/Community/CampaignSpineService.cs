@@ -3828,7 +3828,9 @@ public sealed class CampaignSpineService
                                 : string.IsNullOrWhiteSpace(item.PublicationSummary)
                                     ? DescribeSharedPublicationSummary(workspace, item)
                                     : item.PublicationSummary,
-                            CreatorPublicationId = creatorLinked ? creatorPublication!.PublicationId : item.CreatorPublicationId,
+                            CreatorPublicationId = creatorLinked
+                                ? creatorPublication!.PublicationId
+                                : AccountService.NormalizeOptional(item.CreatorPublicationId),
                             NextSafeAction = creatorLinked
                                 ? creatorPublication!.NextSafeAction ?? workspace.NextSafeAction
                                 : string.IsNullOrWhiteSpace(item.NextSafeAction)
