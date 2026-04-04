@@ -5975,6 +5975,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'next-sessions-return-lanes', 'hyphen next-sessions-return-lanes continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'preplibrarypacket', 'compact preplibrarypacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'preplibrarypackets', 'compact preplibrarypackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'preplibrarybrief', 'compact preplibrarybrief continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'preplibrarybriefs', 'compact preplibrarybriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionpacket', 'compact oppositionpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionpackets', 'compact oppositionpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionbrief', 'compact oppositionbrief continuity prep');

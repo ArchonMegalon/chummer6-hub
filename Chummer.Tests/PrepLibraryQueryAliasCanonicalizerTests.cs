@@ -195,6 +195,8 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "preplaunch",
             "preplaunches",
             "preplibrarypacket",
+            "preplibrarybrief",
+            "preplibrarybriefs",
             "travelprefetch",
             "travelprefetches",
             "oppositionpacket",
@@ -227,6 +229,8 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("preplaunch", tokens);
         Assert.DoesNotContain("preplaunches", tokens);
         Assert.DoesNotContain("preplibrarypacket", tokens);
+        Assert.DoesNotContain("preplibrarybrief", tokens);
+        Assert.DoesNotContain("preplibrarybriefs", tokens);
         Assert.DoesNotContain("travelprefetch", tokens);
         Assert.DoesNotContain("travelprefetches", tokens);
         Assert.DoesNotContain("oppositionpacket", tokens);
