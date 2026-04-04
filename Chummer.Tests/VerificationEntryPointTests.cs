@@ -212,6 +212,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("milestone-2 workflow/visual release-channel ", script, StringComparison.Ordinal);
         Assert.Contains("materialize-desktop-workflow-execution-gate.sh", script, StringComparison.Ordinal);
         Assert.Contains("verify note: rematerializing desktop workflow execution gate after milestone-2 release-channel drift.", script, StringComparison.Ordinal);
+        Assert.Contains("sync_release_channel_localization_gate_timestamp_from_ui_receipt", script, StringComparison.Ordinal);
+        Assert.Contains("UI_LOCALIZATION_RELEASE_GATE.generated.json", script, StringComparison.Ordinal);
+        Assert.Contains("UI_LOCALIZATION_GATE_TIMESTAMP_STALE_MARKER", script, StringComparison.Ordinal);
+        Assert.Contains("UI_LOCALIZATION_GATE_TIMESTAMP_STALE_ALIAS_MARKER", script, StringComparison.Ordinal);
+        Assert.Contains("UI_LOCALIZATION_GATE_TIMESTAMP_FUTURE_MARKER", script, StringComparison.Ordinal);
+        Assert.Contains("UI_LOCALIZATION_GATE_TIMESTAMP_FUTURE_ALIAS_MARKER", script, StringComparison.Ordinal);
+        Assert.Contains("verify note: syncing release-channel nested UI localization gate timestamp from canonical UI localization receipt.", script, StringComparison.Ordinal);
+        Assert.Contains("releaseProof.uiLocalizationReleaseGate", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_path", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_fixture_path", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_UI_PARITY_RELEASE_CHANNEL_PATH", script, StringComparison.Ordinal);
