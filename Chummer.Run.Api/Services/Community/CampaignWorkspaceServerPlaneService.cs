@@ -257,6 +257,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         "debriefed",
         "outbrief",
         "outbriefs",
+        "outbriefed",
+        "outbriefing",
+        "outbriefings",
         "postmortem",
         "postsession",
         "postrun",
@@ -3796,9 +3799,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return ContainsAnyWordToken(value, ["outbrief", "outbriefs"])
+        return ContainsAnyWordToken(value, ["outbrief", "outbriefs", "outbriefed", "outbriefing", "outbriefings"])
             || (ContainsAnyWordToken(value, ["out"])
-                && ContainsAnyWordToken(value, ["brief", "briefs"]));
+                && ContainsAnyWordToken(value, ["brief", "briefs", "briefed", "briefing", "briefings"]));
     }
 
     private static bool ContainsLessonLearnedTokenPair(string? value)

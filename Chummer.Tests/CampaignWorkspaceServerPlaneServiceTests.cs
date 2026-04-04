@@ -437,10 +437,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("debriefings")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("outbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("outbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("outbriefed")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("outbriefing")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("outbriefings")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("out brief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("out briefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("out briefed")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("out briefing")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("out briefings")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("out-brief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("out-briefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("out-briefed")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("out-briefing")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("out-briefings")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("postmortem")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("postmortems")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("post mortem")));
@@ -539,6 +548,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixretro")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixretrospective")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixoutbrief")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixoutbriefed")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixdebriefed")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixhotwash")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixlessonlearned")));
