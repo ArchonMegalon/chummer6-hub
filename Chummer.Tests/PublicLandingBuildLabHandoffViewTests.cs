@@ -14,6 +14,8 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("handoff.Outputs.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
         Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.RuleEnvironmentDiff", view, StringComparison.Ordinal);
+        Assert.Contains("Rule diff:", view, StringComparison.Ordinal);
         Assert.Contains("Output next:", view, StringComparison.Ordinal);
         Assert.Contains("Output provenance:", view, StringComparison.Ordinal);
     }
