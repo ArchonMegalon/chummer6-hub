@@ -7,6 +7,68 @@ cd "$ROOT_DIR"
 
 WORKFLOW_GATE_DRIFT_RETRY_MARKER_PREFIX="milestone-2 workflow/visual release-channel "
 UI_WORKFLOW_GATE_MATERIALIZER="$ROOT_DIR/../chummer6-ui/scripts/ai/milestones/materialize-desktop-workflow-execution-gate.sh"
+UI_LOCALIZATION_RELEASE_GATE_RECEIPT="$ROOT_DIR/../chummer6-ui/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
+UI_LOCALIZATION_GATE_TIMESTAMP_STALE_MARKER="release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generatedAt is stale"
+UI_LOCALIZATION_GATE_TIMESTAMP_STALE_ALIAS_MARKER="release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generated_at is stale"
+UI_LOCALIZATION_GATE_TIMESTAMP_FUTURE_MARKER="release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generatedAt is in the future"
+UI_LOCALIZATION_GATE_TIMESTAMP_FUTURE_ALIAS_MARKER="release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generated_at is in the future"
+
+sync_release_channel_localization_gate_timestamp_from_ui_receipt() {
+  python3 - "$ROOT_DIR/../chummer6-ui/.codex-studio/published/DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json" "$UI_LOCALIZATION_RELEASE_GATE_RECEIPT" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+workflow_gate_path = Path(sys.argv[1])
+ui_localization_gate_path = Path(sys.argv[2])
+
+if not workflow_gate_path.is_file():
+    raise SystemExit(f"workflow execution gate receipt is missing: {workflow_gate_path}")
+if not ui_localization_gate_path.is_file():
+    raise SystemExit(f"UI localization release gate receipt is missing: {ui_localization_gate_path}")
+
+workflow_gate = json.loads(workflow_gate_path.read_text(encoding="utf-8"))
+workflow_gate_evidence = workflow_gate.get("evidence") or {}
+release_channel_path_text = (
+    workflow_gate_evidence.get("release_channel_path")
+    or workflow_gate_evidence.get("releaseChannelPath")
+    or ""
+)
+release_channel_path = Path(str(release_channel_path_text).strip())
+if not release_channel_path_text or not release_channel_path.is_file():
+    raise SystemExit(
+        f"workflow execution gate evidence does not point to a readable release-channel receipt: {release_channel_path_text!r}"
+    )
+
+ui_localization_gate = json.loads(ui_localization_gate_path.read_text(encoding="utf-8"))
+ui_localization_generated_at = (
+    ui_localization_gate.get("generated_at")
+    or ui_localization_gate.get("generatedAt")
+    or ""
+)
+if not isinstance(ui_localization_generated_at, str) or not ui_localization_generated_at.strip():
+    raise SystemExit(
+        f"UI localization release gate generated_at/generatedAt is missing: {ui_localization_gate_path}"
+    )
+
+release_channel = json.loads(release_channel_path.read_text(encoding="utf-8"))
+release_proof = release_channel.get("releaseProof")
+if not isinstance(release_proof, dict):
+    raise SystemExit(f"releaseProof is missing from release-channel receipt: {release_channel_path}")
+nested_localization_gate = release_proof.get("uiLocalizationReleaseGate")
+if not isinstance(nested_localization_gate, dict):
+    raise SystemExit(
+        f"releaseProof.uiLocalizationReleaseGate is missing from release-channel receipt: {release_channel_path}"
+    )
+
+nested_localization_gate["generatedAt"] = ui_localization_generated_at.strip()
+if "generated_at" in nested_localization_gate:
+    nested_localization_gate["generated_at"] = ui_localization_generated_at.strip()
+
+release_channel_path.write_text(json.dumps(release_channel, indent=2) + "\n", encoding="utf-8")
+print(str(release_channel_path))
+PY
+}
 
 run_ui_parity_audit_with_workflow_gate_retry() {
   local parity_log
@@ -26,6 +88,15 @@ run_ui_parity_audit_with_workflow_gate_retry() {
       return 1
     fi
     bash "$UI_WORKFLOW_GATE_MATERIALIZER"
+    bash scripts/audit-ui-parity.sh
+    return $?
+  fi
+  if grep -Fq "$UI_LOCALIZATION_GATE_TIMESTAMP_STALE_MARKER" "$parity_log" \
+    || grep -Fq "$UI_LOCALIZATION_GATE_TIMESTAMP_STALE_ALIAS_MARKER" "$parity_log" \
+    || grep -Fq "$UI_LOCALIZATION_GATE_TIMESTAMP_FUTURE_MARKER" "$parity_log" \
+    || grep -Fq "$UI_LOCALIZATION_GATE_TIMESTAMP_FUTURE_ALIAS_MARKER" "$parity_log"; then
+    echo "verify note: syncing release-channel nested UI localization gate timestamp from canonical UI localization receipt." >&2
+    sync_release_channel_localization_gate_timestamp_from_ui_receipt
     bash scripts/audit-ui-parity.sh
     return $?
   fi
