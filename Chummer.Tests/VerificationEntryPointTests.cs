@@ -78,6 +78,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("flagship_gate.headProofs.status_non_canonical_keys", script, StringComparison.Ordinal);
         Assert.Contains("flagship_gate.headProofs.status_duplicate_normalized_keys", script, StringComparison.Ordinal);
         Assert.Contains("workflow_execution_missing_receipts", script, StringComparison.Ordinal);
+        Assert.Contains("workflow_execution_weak_receipts", script, StringComparison.Ordinal);
+        Assert.Contains("workflow_family_missing_receipts", script, StringComparison.Ordinal);
+        Assert.Contains("workflow_family_failing_receipts", script, StringComparison.Ordinal);
+        Assert.Contains("workflow_family_receipt_count_checked", script, StringComparison.Ordinal);
+        Assert.Contains("workflow_execution_receipt_count_checked", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_workflow_family_audit_tests", script, StringComparison.Ordinal);
         Assert.Contains("sr4_workflow_parity_status", script, StringComparison.Ordinal);
         Assert.Contains("chummer5a_workflow_parity_status", script, StringComparison.Ordinal);
