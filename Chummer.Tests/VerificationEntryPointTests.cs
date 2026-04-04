@@ -73,6 +73,18 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("recovery-reload-migration-roundtrips", script, StringComparison.Ordinal);
         Assert.Contains("required_legacy_interaction_keys", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_legacy_interaction_keys", script, StringComparison.Ordinal);
+        Assert.Contains("required_tests", script, StringComparison.Ordinal);
+        Assert.Contains("missing required milestone-2 visual tests", script, StringComparison.Ordinal);
+        Assert.Contains("required_screenshots", script, StringComparison.Ordinal);
+        Assert.Contains("missing required milestone-2 screenshots", script, StringComparison.Ordinal);
+        Assert.Contains("missing_screenshots", script, StringComparison.Ordinal);
+        Assert.Contains("missing_theme_tokens", script, StringComparison.Ordinal);
+        Assert.Contains("flagship_theme_readability_contrast", script, StringComparison.Ordinal);
+        Assert.Contains("flagship theme/readability proof is not pass-ready", script, StringComparison.Ordinal);
+        Assert.Contains("invalid_screenshots", script, StringComparison.Ordinal);
+        Assert.Contains("undersized_screenshots", script, StringComparison.Ordinal);
+        Assert.Contains("stale_screenshots", script, StringComparison.Ordinal);
+        Assert.Contains("screenshots_older_than_flagship_receipt", script, StringComparison.Ordinal);
         Assert.Contains("runtimeBackedLegacyWorkbench", script, StringComparison.Ordinal);
         Assert.Contains("legacyDenseBuilderRhythm", script, StringComparison.Ordinal);
         Assert.Contains("legacyBrowseDetailConfirmRhythm", script, StringComparison.Ordinal);

@@ -251,6 +251,26 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         data.get("evidence"),
         message=f"parity audit failed: visual receipt evidence must be a JSON object: {path}",
     )
+    required_tests = require_string_list(
+        evidence.get("required_tests"),
+        message=f"parity audit failed: visual receipt required_tests must be a string array: {path}",
+    )
+    expected_required_tests = {
+        "Desktop_shell_preserves_chummer5a_familiarity_cues",
+        "Loaded_runner_workbench_preserves_legacy_frmcareer_landmarks",
+        "Character_creation_preserves_familiar_dense_builder_rhythm",
+        "Advancement_and_karma_journal_workflows_preserve_familiar_progression_rhythm",
+        "Magic_workflows_execute_with_specific_dialog_fields_and_confirm_actions",
+        "Matrix_workflows_execute_with_specific_dialog_fields_and_confirm_actions",
+        "Runtime_backed_ruleset_switch_preserves_sr4_sr5_and_sr6_codex_landmarks",
+    }
+    missing_required_tests = sorted(expected_required_tests.difference(required_tests))
+    if missing_required_tests:
+        raise SystemExit(
+            "parity audit failed: visual receipt is missing required milestone-2 visual tests: "
+            + ", ".join(missing_required_tests)
+            + f" ({path})"
+        )
     required_interaction_keys = set(
         require_string_list(
             evidence.get("required_legacy_interaction_keys"),
@@ -284,8 +304,64 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         message=f"parity audit failed: visual receipt reports missing required legacy interaction keys: {path}",
     )
     require_empty_collection(
+        evidence.get("missing_theme_tokens"),
+        message=f"parity audit failed: visual receipt reports missing required legacy theme tokens: {path}",
+    )
+    require_pass_status(
+        evidence.get("flagship_theme_readability_contrast"),
+        message=f"parity audit failed: visual receipt flagship theme/readability proof is not pass-ready: {path}",
+    )
+    require_empty_collection(
         evidence.get("missing_tests"),
         message=f"parity audit failed: visual receipt reports missing required visual tests: {path}",
+    )
+    required_screenshots = require_string_list(
+        evidence.get("required_screenshots"),
+        message=f"parity audit failed: visual receipt required_screenshots must be a string array: {path}",
+    )
+    expected_required_screenshots = {
+        "01-initial-shell-light.png",
+        "02-menu-open-light.png",
+        "03-settings-open-light.png",
+        "04-loaded-runner-light.png",
+        "05-dense-section-light.png",
+        "06-dense-section-dark.png",
+        "07-loaded-runner-tabs-light.png",
+        "08-cyberware-dialog-light.png",
+        "09-vehicles-section-light.png",
+        "10-contacts-section-light.png",
+        "11-diary-dialog-light.png",
+        "12-magic-dialog-light.png",
+        "13-matrix-dialog-light.png",
+        "14-advancement-dialog-light.png",
+        "15-creation-section-light.png",
+    }
+    missing_required_screenshots = sorted(expected_required_screenshots.difference(required_screenshots))
+    if missing_required_screenshots:
+        raise SystemExit(
+            "parity audit failed: visual receipt is missing required milestone-2 screenshots: "
+            + ", ".join(missing_required_screenshots)
+            + f" ({path})"
+        )
+    require_empty_collection(
+        evidence.get("missing_screenshots"),
+        message=f"parity audit failed: visual receipt reports missing required screenshots: {path}",
+    )
+    require_empty_collection(
+        evidence.get("invalid_screenshots"),
+        message=f"parity audit failed: visual receipt reports invalid screenshots: {path}",
+    )
+    require_empty_collection(
+        evidence.get("undersized_screenshots"),
+        message=f"parity audit failed: visual receipt reports undersized screenshots: {path}",
+    )
+    require_empty_collection(
+        evidence.get("stale_screenshots"),
+        message=f"parity audit failed: visual receipt reports stale screenshots: {path}",
+    )
+    require_empty_collection(
+        evidence.get("screenshots_older_than_flagship_receipt"),
+        message=f"parity audit failed: visual receipt reports screenshots older than flagship receipt: {path}",
     )
     validate_timestamp_freshness(path, data, evidence)
 
