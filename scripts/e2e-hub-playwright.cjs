@@ -6244,8 +6244,12 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmoperationspkts', 'compact gmoperationspkts continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpacket', 'compact gmcontrolpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpackets', 'compact gmcontrolpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolspacket', 'compact gmcontrolspacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolspackets', 'compact gmcontrolspackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpkt', 'compact gmcontrolpkt continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpkts', 'compact gmcontrolpkts continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolspkt', 'compact gmcontrolspkt continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolspkts', 'compact gmcontrolspkts continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmopsbrief', 'compact gmopsbrief continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmopsbriefs', 'compact gmopsbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmopsbrf', 'compact gmopsbrf continuity prep');
@@ -6262,6 +6266,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolbriefs', 'compact gmcontrolbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolbrf', 'compact gmcontrolbrf continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolbrfs', 'compact gmcontrolbrfs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolsbrief', 'compact gmcontrolsbrief continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolsbriefs', 'compact gmcontrolsbriefs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolsbrf', 'compact gmcontrolsbrf continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolsbrfs', 'compact gmcontrolsbrfs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteropspacket', 'compact gamemasteropspacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteropspackets', 'compact gamemasteropspackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteropspkt', 'compact gamemasteropspkt continuity prep');
@@ -6276,8 +6284,12 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteroperationspkts', 'compact gamemasteroperationspkts continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolpacket', 'compact gamemastercontrolpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolpackets', 'compact gamemastercontrolpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolspacket', 'compact gamemastercontrolspacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolspackets', 'compact gamemastercontrolspackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolpkt', 'compact gamemastercontrolpkt continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolpkts', 'compact gamemastercontrolpkts continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolspkt', 'compact gamemastercontrolspkt continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolspkts', 'compact gamemastercontrolspkts continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteropsbrief', 'compact gamemasteropsbrief continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteropsbriefs', 'compact gamemasteropsbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteropsbrf', 'compact gamemasteropsbrf continuity prep');
@@ -6294,6 +6306,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolbriefs', 'compact gamemastercontrolbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolbrf', 'compact gamemastercontrolbrf continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolbrfs', 'compact gamemastercontrolbrfs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolsbrief', 'compact gamemastercontrolsbrief continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolsbriefs', 'compact gamemastercontrolsbriefs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolsbrf', 'compact gamemastercontrolsbrf continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolsbrfs', 'compact gamemastercontrolsbrfs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasterctls', 'compact gamemasterctls continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasterctrls', 'compact gamemasterctrls continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4', 'compact workspacev4 continuity prep');

@@ -1153,6 +1153,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=gmcontrolpackets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmcontrolpkt", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmcontrolpkts", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gmcontrolspacket", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gmcontrolspackets", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gmcontrolspkt", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gmcontrolspkts", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmopsbrief", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmopsbriefs", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmopsbrf", audit, StringComparison.Ordinal);
@@ -1169,6 +1173,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=gmcontrolbriefs", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmcontrolbrf", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmcontrolbrfs", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gmcontrolsbrief", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gmcontrolsbriefs", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gmcontrolsbrf", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gmcontrolsbrfs", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gamemasteropspacket", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gamemasteropspackets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gamemasteropspkt", audit, StringComparison.Ordinal);
@@ -1185,6 +1193,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=gamemastercontrolpackets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gamemastercontrolpkt", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gamemastercontrolpkts", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gamemastercontrolspacket", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gamemastercontrolspackets", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gamemastercontrolspkt", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gamemastercontrolspkts", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gamemasteropsbrief", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gamemasteropsbriefs", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gamemasteropsbrf", audit, StringComparison.Ordinal);
@@ -1201,6 +1213,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=gamemastercontrolbriefs", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gamemastercontrolbrf", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gamemastercontrolbrfs", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gamemastercontrolsbrief", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gamemastercontrolsbriefs", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gamemastercontrolsbrf", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gamemastercontrolsbrfs", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=workspacev4", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=campaignworkspacev4", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=workspacev4packet", audit, StringComparison.Ordinal);
@@ -1645,6 +1661,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("(\"gmoperationspackets\", \"gmoperationspackets\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gmcontrolpacket\", \"gmcontrolpacket\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gmcontrolpackets\", \"gmcontrolpackets\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"gmcontrolspacket\", \"gmcontrolspacket\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"gmcontrolspackets\", \"gmcontrolspackets\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gmopsbrief\", \"gmopsbrief\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gmopsbriefs\", \"gmopsbriefs\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gmoperationbrief\", \"gmoperationbrief\")", audit, StringComparison.Ordinal);
@@ -1653,6 +1671,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("(\"gmoperationsbriefs\", \"gmoperationsbriefs\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gmcontrolbrief\", \"gmcontrolbrief\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gmcontrolbriefs\", \"gmcontrolbriefs\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"gmcontrolsbrief\", \"gmcontrolsbrief\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"gmcontrolsbriefs\", \"gmcontrolsbriefs\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"oppositionbrief\", \"oppositionbrief\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"oppositionbriefs\", \"oppositionbriefs\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"oppositionbrf\", \"oppositionbrf\")", audit, StringComparison.Ordinal);
@@ -1677,6 +1697,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("(\"gamemasteroperationspackets\", \"gamemasteroperationspackets\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gamemastercontrolpacket\", \"gamemastercontrolpacket\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gamemastercontrolpackets\", \"gamemastercontrolpackets\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"gamemastercontrolspacket\", \"gamemastercontrolspacket\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"gamemastercontrolspackets\", \"gamemastercontrolspackets\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gamemasteropsbrief\", \"gamemasteropsbrief\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gamemasteropsbriefs\", \"gamemasteropsbriefs\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gamemasteroperationbrief\", \"gamemasteroperationbrief\")", audit, StringComparison.Ordinal);
@@ -1685,6 +1707,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("(\"gamemasteroperationsbriefs\", \"gamemasteroperationsbriefs\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gamemastercontrolbrief\", \"gamemastercontrolbrief\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"gamemastercontrolbriefs\", \"gamemastercontrolbriefs\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"gamemastercontrolsbrief\", \"gamemastercontrolsbrief\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"gamemastercontrolsbriefs\", \"gamemastercontrolsbriefs\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"workspacev4\", \"workspacev4\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"campaignworkspacev4\", \"campaignworkspacev4\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"workspacev4packet\", \"workspacev4packet\")", audit, StringComparison.Ordinal);
@@ -2772,6 +2796,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmoperationspackets', 'compact gmoperationspackets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpacket', 'compact gmcontrolpacket continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpackets', 'compact gmcontrolpackets continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolspacket', 'compact gmcontrolspacket continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolspackets', 'compact gmcontrolspackets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteropspacket', 'compact gamemasteropspacket continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteropspackets', 'compact gamemasteropspackets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteroperationpacket', 'compact gamemasteroperationpacket continuity prep');", playwright, StringComparison.Ordinal);
@@ -2780,6 +2806,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteroperationspackets', 'compact gamemasteroperationspackets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolpacket', 'compact gamemastercontrolpacket continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolpackets', 'compact gamemastercontrolpackets continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolspacket', 'compact gamemastercontrolspacket continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolspackets', 'compact gamemastercontrolspackets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmopsbrief', 'compact gmopsbrief continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmopsbriefs', 'compact gmopsbriefs continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmoperationbrief', 'compact gmoperationbrief continuity prep');", playwright, StringComparison.Ordinal);
@@ -2788,6 +2816,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmoperationsbriefs', 'compact gmoperationsbriefs continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolbrief', 'compact gmcontrolbrief continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolbriefs', 'compact gmcontrolbriefs continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolsbrief', 'compact gmcontrolsbrief continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolsbriefs', 'compact gmcontrolsbriefs continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteropsbrief', 'compact gamemasteropsbrief continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteropsbriefs', 'compact gamemasteropsbriefs continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteroperationbrief', 'compact gamemasteroperationbrief continuity prep');", playwright, StringComparison.Ordinal);
@@ -2796,6 +2826,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasteroperationsbriefs', 'compact gamemasteroperationsbriefs continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolbrief', 'compact gamemastercontrolbrief continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolbriefs', 'compact gamemastercontrolbriefs continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolsbrief', 'compact gamemastercontrolsbrief continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemastercontrolsbriefs', 'compact gamemastercontrolsbriefs continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasterctls', 'compact gamemasterctls continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gamemasterctrls', 'compact gamemasterctrls continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4', 'compact workspacev4 continuity prep');", playwright, StringComparison.Ordinal);
