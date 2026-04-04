@@ -6,7 +6,10 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 WORKFLOW_GATE_DRIFT_RETRY_MARKER_PREFIX="milestone-2 workflow/visual release-channel "
+WORKFLOW_EVIDENCE_TIMESTAMP_DRIFT_MARKER_PREFIX="workflow receipt "
+WORKFLOW_EVIDENCE_TIMESTAMP_DRIFT_MARKER_SUFFIX=" evidence generated_at drifts from nested receipt generatedAt"
 UI_WORKFLOW_GATE_MATERIALIZER="$ROOT_DIR/../chummer6-ui/scripts/ai/milestones/materialize-desktop-workflow-execution-gate.sh"
+UI_VISUAL_FAMILIARITY_GATE_MATERIALIZER="$ROOT_DIR/../chummer6-ui/scripts/ai/milestones/materialize-desktop-visual-familiarity-exit-gate.sh"
 UI_LOCALIZATION_RELEASE_GATE_RECEIPT="$ROOT_DIR/../chummer6-ui/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
 UI_LOCALIZATION_GATE_TIMESTAMP_STALE_MARKER="release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generatedAt is stale"
 UI_LOCALIZATION_GATE_TIMESTAMP_STALE_ALIAS_MARKER="release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generated_at is stale"
@@ -16,6 +19,76 @@ RELEASE_PROOF_TIMESTAMP_STALE_MARKER="release-channel nested receipt releaseProo
 RELEASE_PROOF_TIMESTAMP_STALE_ALIAS_MARKER="release-channel nested receipt releaseProof.generated_at is stale"
 RELEASE_PROOF_TIMESTAMP_FUTURE_MARKER="release-channel nested receipt releaseProof.generatedAt is in the future"
 RELEASE_PROOF_TIMESTAMP_FUTURE_ALIAS_MARKER="release-channel nested receipt releaseProof.generated_at is in the future"
+VISUAL_REQUIRED_TESTS_ORDER_DRIFT_MARKER="visual receipt required_tests must preserve canonical milestone-2 visual test ordering"
+VISUAL_INTERACTION_KEYS_ORDER_DRIFT_MARKER="visual receipt required_legacy_interaction_keys must preserve canonical milestone-2 interaction key ordering"
+VISUAL_SCREENSHOTS_ORDER_DRIFT_MARKER="visual receipt required_screenshots must preserve canonical milestone-2 screenshot ordering"
+
+sync_workflow_evidence_timestamps_from_nested_receipts() {
+  python3 - "$ROOT_DIR/../chummer6-ui/.codex-studio/published/DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json" <<'PY'
+import datetime as dt
+import json
+import sys
+from pathlib import Path
+
+UTC = dt.timezone.utc
+workflow_gate_path = Path(sys.argv[1])
+
+if not workflow_gate_path.is_file():
+    raise SystemExit(f"workflow execution gate receipt is missing: {workflow_gate_path}")
+
+workflow_gate = json.loads(workflow_gate_path.read_text(encoding="utf-8"))
+workflow_gate_evidence = workflow_gate.get("evidence")
+if not isinstance(workflow_gate_evidence, dict):
+    raise SystemExit(f"workflow execution gate evidence is missing: {workflow_gate_path}")
+
+updated_prefixes: list[str] = []
+for prefix in (
+    "sr4_workflow_parity",
+    "sr6_workflow_parity",
+    "chummer5a_workflow_parity",
+    "sr4_sr6_frontier",
+):
+    nested_path_raw = str(workflow_gate_evidence.get(f"{prefix}_path") or "").strip()
+    if not nested_path_raw:
+        continue
+    nested_path = Path(nested_path_raw)
+    if not nested_path.is_file():
+        raise SystemExit(
+            f"workflow execution gate evidence nested receipt is missing for {prefix}: {nested_path_raw}"
+        )
+    nested_payload = json.loads(nested_path.read_text(encoding="utf-8"))
+    nested_generated_at = (
+        nested_payload.get("generatedAt")
+        or nested_payload.get("generated_at")
+        or ""
+    )
+    if not isinstance(nested_generated_at, str) or not nested_generated_at.strip():
+        raise SystemExit(
+            f"workflow execution gate nested receipt generatedAt/generated_at is missing for {prefix}: {nested_path}"
+        )
+    workflow_gate_evidence[f"{prefix}_generated_at"] = nested_generated_at.strip()
+    try:
+        generated_at_utc = dt.datetime.fromisoformat(
+            nested_generated_at.strip().replace("Z", "+00:00")
+        ).astimezone(UTC)
+    except ValueError as exc:
+        raise SystemExit(
+            f"workflow execution gate nested receipt generatedAt/generated_at is invalid for {prefix}: "
+            f"{nested_path} ({nested_generated_at})"
+        ) from exc
+    age_seconds = int((dt.datetime.now(UTC) - generated_at_utc).total_seconds())
+    workflow_gate_evidence[f"{prefix}_age_seconds"] = max(0, age_seconds)
+    updated_prefixes.append(prefix)
+
+if not updated_prefixes:
+    raise SystemExit(
+        f"workflow execution gate evidence does not contain any nested parity receipt paths: {workflow_gate_path}"
+    )
+
+workflow_gate_path.write_text(json.dumps(workflow_gate, indent=2) + "\n", encoding="utf-8")
+print(str(workflow_gate_path))
+PY
+}
 
 sync_release_channel_localization_gate_timestamp_from_ui_receipt() {
   python3 - "$ROOT_DIR/../chummer6-ui/.codex-studio/published/DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json" "$UI_LOCALIZATION_RELEASE_GATE_RECEIPT" <<'PY'
@@ -122,6 +195,16 @@ print(str(release_channel_path))
 PY
 }
 
+run_gate_materializer_script() {
+  local script_path="$1"
+  local failure_label="$2"
+  if [[ ! -f "$script_path" || ! -r "$script_path" ]]; then
+    echo "verify gate failed: $failure_label is missing or not readable: $script_path" >&2
+    return 1
+  fi
+  bash "$script_path"
+}
+
 run_ui_parity_audit_with_workflow_gate_retry() {
   local parity_log
   parity_log="$(mktemp)"
@@ -135,11 +218,24 @@ run_ui_parity_audit_with_workflow_gate_retry() {
   cat "$parity_log" >&2
   if grep -Fq "$WORKFLOW_GATE_DRIFT_RETRY_MARKER_PREFIX" "$parity_log"; then
     echo "verify note: rematerializing desktop workflow execution gate after milestone-2 release-channel drift." >&2
-    if [[ ! -x "$UI_WORKFLOW_GATE_MATERIALIZER" ]]; then
-      echo "verify gate failed: workflow gate materializer is missing or not executable: $UI_WORKFLOW_GATE_MATERIALIZER" >&2
-      return 1
-    fi
-    bash "$UI_WORKFLOW_GATE_MATERIALIZER"
+    run_gate_materializer_script "$UI_WORKFLOW_GATE_MATERIALIZER" "workflow gate materializer"
+    bash scripts/audit-ui-parity.sh
+    return $?
+  fi
+  if grep -Fq "$VISUAL_REQUIRED_TESTS_ORDER_DRIFT_MARKER" "$parity_log" \
+    || grep -Fq "$VISUAL_INTERACTION_KEYS_ORDER_DRIFT_MARKER" "$parity_log" \
+    || grep -Fq "$VISUAL_SCREENSHOTS_ORDER_DRIFT_MARKER" "$parity_log"; then
+    echo "verify note: rematerializing desktop visual familiarity exit gate after canonical ordering drift." >&2
+    CHUMMER_DESKTOP_VISUAL_SKIP_RELEASE_GATE_LOCK_WAIT=1 run_gate_materializer_script \
+      "$UI_VISUAL_FAMILIARITY_GATE_MATERIALIZER" \
+      "visual familiarity gate materializer"
+    bash scripts/audit-ui-parity.sh
+    return $?
+  fi
+  if grep -Fq "$WORKFLOW_EVIDENCE_TIMESTAMP_DRIFT_MARKER_PREFIX" "$parity_log" \
+    && grep -Fq "$WORKFLOW_EVIDENCE_TIMESTAMP_DRIFT_MARKER_SUFFIX" "$parity_log"; then
+    echo "verify note: syncing workflow parity evidence timestamps from nested workflow receipts." >&2
+    sync_workflow_evidence_timestamps_from_nested_receipts
     bash scripts/audit-ui-parity.sh
     return $?
   fi
