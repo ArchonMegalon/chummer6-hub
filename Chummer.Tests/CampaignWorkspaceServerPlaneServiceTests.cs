@@ -7488,6 +7488,13 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("JSON exchange:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Foundry exchange:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Character template export:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("exchange/replay/recap/module portability lanes", handoff.PortabilityPillarSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(handoff.PortabilityPillarLines);
+        Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("JSON exchange:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Foundry exchange:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Replay timeline:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Session recap:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Run module:", StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)

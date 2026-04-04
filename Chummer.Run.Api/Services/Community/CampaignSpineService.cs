@@ -2301,6 +2301,8 @@ public sealed class CampaignSpineService
                 var buildSurfaceLines = BuildBuildLabSurfaceLines(dossier, workspace, ruleEnvironmentDiff);
                 var exchangeParitySummary = BuildBuildLabExchangeParitySummary(outputs);
                 var exchangeParityLines = BuildBuildLabExchangeParityLines(outputs);
+                var portabilityPillarSummary = BuildBuildLabPortabilityPillarSummary(outputs);
+                var portabilityPillarLines = BuildBuildLabPortabilityPillarLines(outputs);
                 return new BuildLabHandoffProjection(
                     HandoffId: StableId("buildlab", dossier.DossierId),
                     DossierId: dossier.DossierId,
@@ -2344,7 +2346,9 @@ public sealed class CampaignSpineService
                     BuildSurfaceSummary: buildSurfaceSummary,
                     BuildSurfaceLines: buildSurfaceLines,
                     ExchangeParitySummary: exchangeParitySummary,
-                    ExchangeParityLines: exchangeParityLines);
+                    ExchangeParityLines: exchangeParityLines,
+                    PortabilityPillarSummary: portabilityPillarSummary,
+                    PortabilityPillarLines: portabilityPillarLines);
             })
             .Take(3)
             .ToArray();
@@ -3056,6 +3060,45 @@ public sealed class CampaignSpineService
             Lane("JSON exchange", "json_exchange", outputs),
             Lane("Foundry exchange", "foundry_exchange", outputs),
             Lane("Character template export", "character_template", outputs)
+        ];
+    }
+
+    private static string BuildBuildLabPortabilityPillarSummary(IReadOnlyList<PublicationSafeProjection> outputs)
+    {
+        var lanes = ResolveBuildLabPortabilityPillar(outputs);
+        int readyCount = lanes.Count(static lane => lane.ready);
+        return $"{readyCount} of {lanes.Count} exchange/replay/recap/module portability lanes are release-ready.";
+    }
+
+    private static IReadOnlyList<string> BuildBuildLabPortabilityPillarLines(IReadOnlyList<PublicationSafeProjection> outputs)
+        => ResolveBuildLabPortabilityPillar(outputs)
+            .Select(static lane => $"{lane.label}: {(lane.ready ? "ready" : "pending")} — {lane.detail}")
+            .ToArray();
+
+    private static IReadOnlyList<(string label, bool ready, string detail)> ResolveBuildLabPortabilityPillar(IReadOnlyList<PublicationSafeProjection> outputs)
+    {
+        static (string label, bool ready, string detail) Lane(string label, string kind, IReadOnlyList<PublicationSafeProjection> outputs)
+        {
+            var output = outputs.FirstOrDefault(item => string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase));
+            if (output is null)
+            {
+                return (label, false, "Lane artifact is missing from this handoff.");
+            }
+
+            bool ready = string.Equals(output.PublicationState, "ready", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(output.TrustBand, "governed", StringComparison.OrdinalIgnoreCase);
+            return (label, ready, ready
+                ? $"Governed {label.ToLowerInvariant()} artifact is attached."
+                : $"Artifact is attached but still needs publication/trust review ({output.PublicationState ?? "unknown"} / {output.TrustBand ?? "unknown"}).");
+        }
+
+        return
+        [
+            Lane("JSON exchange", "json_exchange", outputs),
+            Lane("Foundry exchange", "foundry_exchange", outputs),
+            Lane("Replay timeline", "replay_timeline", outputs),
+            Lane("Session recap", "session_recap", outputs),
+            Lane("Run module", "run_module", outputs)
         ];
     }
 
