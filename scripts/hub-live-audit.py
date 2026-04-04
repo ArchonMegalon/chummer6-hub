@@ -1561,6 +1561,20 @@ def verify_signed_in_work_audit(
     prep_library_seasonctrl = json.loads(body)
     if not (prep_library_seasonctrl.get("items") or []):
         raise AssertionError("prep-library seasonctrl search did not expose any governed packet")
+    prep_library_seasonctrls_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=seasonctrls"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_seasonctrls_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_seasonctrls_path} returned {status}, expected 200")
+
+    prep_library_seasonctrls = json.loads(body)
+    if not (prep_library_seasonctrls.get("items") or []):
+        raise AssertionError("prep-library seasonctrls search did not expose any governed packet")
     prep_library_eventcontrol_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=eventcontrol"
     status, body, _, _ = fetch(
         base_url,
@@ -4514,6 +4528,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_seasonctrl_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_seasonctrl_search_path} should return at least one governed prep packet for the seasonctrl query")
+    workspace_seasonctrls_search_path = f"{workspace_path}?prepQuery=seasonctrls"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_seasonctrls_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_seasonctrls_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_seasonctrls_search_path)
+    require_snippet(body, 'match(es) for "seasonctrls"', workspace_seasonctrls_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_seasonctrls_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_seasonctrls_search_path} should return at least one governed prep packet for the seasonctrls query")
     workspace_eventcontrol_search_path = f"{workspace_path}?prepQuery=eventcontrol"
     status, body, _, _ = fetch(
         base_url,

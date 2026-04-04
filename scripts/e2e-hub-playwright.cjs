@@ -1168,6 +1168,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail season-ctrl compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season-ctrl compact search');
 
+  await page.fill('#prepQuery', 'seasonctrls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=seasonctrls/.test(page.url()), 'Workspace detail search should preserve the compact seasonctrls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail season-ctrls compact search');
+  await expectBodyText(page, 'match(es) for "seasonctrls"', '/account/work/workspaces detail season-ctrls compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail season-ctrls compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail season-ctrls compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail season-ctrls compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail season-ctrls compact search');
+  const workspaceSeasonCtrlsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceSeasonCtrlsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact seasonctrls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail season-ctrls compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season-ctrls compact search');
+
   await page.fill('#prepQuery', 'eventcontrol');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
