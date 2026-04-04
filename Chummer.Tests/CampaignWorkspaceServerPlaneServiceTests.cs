@@ -5403,6 +5403,33 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLaunchPacketFallsBackToCompactPrepLaunchSignalsWhenCanonicalTermsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCompactPrepLaunchAndTravelPrefetchSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("preplaunch", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketFallsBackToCompactPrepLaunchAndTravelPrefetchSignalsWhenCanonicalTermsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCompactPrepLaunchAndTravelPrefetchSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("preplaunch", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("travelprefetch", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void OppositionPacketActivatesFromCarryForwardOppositionSignalsWhenOtherFamiliesLag()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionCarryForwardSignalsOnly();
@@ -12179,6 +12206,50 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [seasonOpCompact],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCompactPrepLaunchAndTravelPrefetchSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection compactPrepLaunch = new(
+            PacketId: "packet-compact-preplaunch",
+            Kind: "preplaunch_window",
+            Label: "Preplaunch window",
+            Summary: "Preplaunch queue remains governed while canonical launch receipts hydrate.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        WorkspaceChangePacketProjection compactTravelPrefetch = new(
+            PacketId: "packet-compact-travelprefetch",
+            Kind: "travelprefetch_window",
+            Label: "Travelprefetch window",
+            Summary: "Travelprefetch queue remains governed for return-device staging.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-compact-preplaunch-travelprefetch-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [compactPrepLaunch, compactTravelPrefetch],
             Consequences: [],
             PrepLaunches: [],
             TravelPrefetches: []);

@@ -1113,8 +1113,12 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "operations",
             "prep launch",
             "prep_launch",
+            "preplaunch",
+            "preplaunches",
             "travel prefetch",
-            "travel_prefetch"))
+            "travel_prefetch",
+            "travelprefetch",
+            "travelprefetches"))
         {
             return "event_control";
         }
