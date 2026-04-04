@@ -186,7 +186,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Summary: "Compact continuity and GM packet forms stay on one governed workspace v4 lane.",
             BindingSummary: "Bound to travel/offline return continuity and GM operations receipts.",
             Reusable: true,
-            SearchTerms: ["campaign", "return", "diary", "connection", "heat", "aftermath", "downtime", "travel", "offline", "safehouse", "eventcontrol", "season", "operation", "packet"],
+            SearchTerms: ["campaign", "return", "loop", "diary", "connection", "heat", "aftermath", "downtime", "travel", "offline", "safehouse", "eventcontrol", "season", "operation", "packet"],
             EvidenceLines: ["Compact continuity and GM packet forms should collapse into one governed token lane."],
             UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
 
@@ -205,6 +205,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimesreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimesreturnpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimesreturnpackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimesreturnbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimesreturnbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diarycontactheatpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diarycontactheatpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diarycontactsheatpackets")));
