@@ -941,6 +941,95 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineNextSessionCarryForwardPrefersMostRecentAftermathPackage()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        AftermathRecapPackageProjection olderAftermath = new(
+            PackageId: "package-aftermath-older",
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            RunId: "run-1",
+            RunTitle: "Dockyard pressure test",
+            PackageKind: "after_action_report",
+            Title: "Older after-action report",
+            Summary: "Older summary should not drive carry-forward output.",
+            ArtifactId: "artifact-aftermath-older",
+            EvidenceLines: ["Older aftermath evidence line."],
+            InitiatedByUserId: "gm-1",
+            GeneratedAtUtc: now.AddMinutes(-30));
+        AftermathRecapPackageProjection newerAftermath = olderAftermath with
+        {
+            PackageId = "package-aftermath-newer",
+            Title = "Newer after-action report",
+            Summary = "Newer summary should drive carry-forward output.",
+            ArtifactId = "artifact-aftermath-newer",
+            GeneratedAtUtc = now.AddMinutes(30)
+        };
+
+        NextSessionCarryForwardProjection? carryForward = InvokeCampaignSpineBuildNextSessionCarryForward(campaign, [olderAftermath, newerAftermath]);
+
+        Assert.NotNull(carryForward);
+        Assert.Contains("Newer after-action report", carryForward!.Summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Older after-action report", carryForward.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CampaignSpineCampaignMemoryPrefersMostRecentAftermathAndDowntimePackages()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        AftermathRecapPackageProjection olderAftermath = new(
+            PackageId: "package-memory-aftermath-older",
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            RunId: "run-1",
+            RunTitle: "Dockyard pressure test",
+            PackageKind: "after_action_report",
+            Title: "Older after-action report",
+            Summary: "Older after-action summary.",
+            ArtifactId: "artifact-memory-aftermath-older",
+            EvidenceLines: ["Older aftermath evidence line."],
+            InitiatedByUserId: "gm-1",
+            GeneratedAtUtc: now.AddMinutes(-40));
+        AftermathRecapPackageProjection newerAftermath = olderAftermath with
+        {
+            PackageId = "package-memory-aftermath-newer",
+            Title = "Newer after-action report",
+            Summary = "Newer after-action summary.",
+            ArtifactId = "artifact-memory-aftermath-newer",
+            GeneratedAtUtc = now.AddMinutes(40)
+        };
+        AftermathRecapPackageProjection olderDowntime = olderAftermath with
+        {
+            PackageId = "package-memory-downtime-older",
+            PackageKind = "downtime_brief",
+            Title = "Older downtime brief",
+            Summary = "Older downtime summary.",
+            ArtifactId = "artifact-memory-downtime-older",
+            GeneratedAtUtc = now.AddMinutes(-20)
+        };
+        AftermathRecapPackageProjection newerDowntime = olderDowntime with
+        {
+            PackageId = "package-memory-downtime-newer",
+            Title = "Newer downtime brief",
+            Summary = "Newer downtime summary.",
+            ArtifactId = "artifact-memory-downtime-newer",
+            GeneratedAtUtc = now.AddMinutes(20)
+        };
+
+        CampaignMemoryProjection? memory = InvokeCampaignSpineBuildCampaignMemory(campaign, [olderAftermath, olderDowntime, newerAftermath, newerDowntime]);
+
+        Assert.NotNull(memory);
+        Assert.Contains(memory!.EvidenceLines, line => string.Equals(line, "Newer after-action report: Newer after-action summary.", StringComparison.Ordinal));
+        Assert.Contains(memory.EvidenceLines, line => string.Equals(line, "Newer downtime brief: Newer downtime summary.", StringComparison.Ordinal));
+        Assert.DoesNotContain(memory.EvidenceLines, line => string.Equals(line, "Older after-action report: Older after-action summary.", StringComparison.Ordinal));
+        Assert.DoesNotContain(memory.EvidenceLines, line => string.Equals(line, "Older downtime brief: Older downtime summary.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignSpineWorkspaceChangePacketsDeduplicateWhitespacePaddedAftermathPackageIds()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
