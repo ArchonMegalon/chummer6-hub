@@ -1022,6 +1022,10 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse eventOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventop");
         GmPrepAssetListResponse eventOpsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event ops");
         GmPrepAssetListResponse eventOpsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event-ops");
+        GmPrepAssetListResponse eventOperationSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event operation");
+        GmPrepAssetListResponse eventOperationHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event-operation");
+        GmPrepAssetListResponse eventOperationsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event operations");
+        GmPrepAssetListResponse eventOperationsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event-operations");
         GmPrepAssetListResponse gmOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gmops");
         GmPrepAssetListResponse gmOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gmop");
         GmPrepAssetListResponse gmOpsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gm ops");
@@ -1030,6 +1034,10 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse seasonOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasonop");
         GmPrepAssetListResponse seasonOpsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season ops");
         GmPrepAssetListResponse seasonOpsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season-ops");
+        GmPrepAssetListResponse seasonOperationSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season operation");
+        GmPrepAssetListResponse seasonOperationHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season-operation");
+        GmPrepAssetListResponse seasonOperationsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season operations");
+        GmPrepAssetListResponse seasonOperationsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season-operations");
         GmPrepAssetListResponse seasonControlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasoncontrol");
         GmPrepAssetListResponse seasonControlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasoncontrols");
         GmPrepAssetListResponse seasonCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasonctrl");
@@ -1074,6 +1082,10 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(eventOpMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventOpsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventOpsHyphenMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(eventOperationSpacedMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(eventOperationHyphenMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(eventOperationsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(eventOperationsHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(gmOpsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(gmOpMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(gmOpsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
@@ -1082,6 +1094,10 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(seasonOpMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(seasonOpsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(seasonOpsHyphenMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(seasonOperationSpacedMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(seasonOperationHyphenMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(seasonOperationsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(seasonOperationsHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(seasonControlMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(seasonControlsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(seasonCtrlMatches.Items, item => item.AssetId == "event_control_ops");

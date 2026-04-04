@@ -958,6 +958,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail season singular search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season singular search');
 
+  await page.fill('#prepQuery', 'season-operation');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=season-operation/.test(page.url()), 'Workspace detail search should preserve the hyphen season-operation prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail season-operation hyphen search');
+  await expectBodyText(page, 'match(es) for "season-operation"', '/account/work/workspaces detail season-operation hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail season-operation hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail season-operation hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail season-operation hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail season-operation hyphen search');
+  const workspaceSeasonOperationHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceSeasonOperationHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen season-operation query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail season-operation hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season-operation hyphen search');
+
+  await page.fill('#prepQuery', 'season-operations');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=season-operations/.test(page.url()), 'Workspace detail search should preserve the hyphen season-operations prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail season-operations hyphen search');
+  await expectBodyText(page, 'match(es) for "season-operations"', '/account/work/workspaces detail season-operations hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail season-operations hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail season-operations hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail season-operations hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail season-operations hyphen search');
+  const workspaceSeasonOperationsHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceSeasonOperationsHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen season-operations query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail season-operations hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season-operations hyphen search');
+
   await page.fill('#prepQuery', 'seasoncontrol');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -1167,6 +1209,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail event-op compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event-op compact search');
+
+  await page.fill('#prepQuery', 'event-operation');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=event-operation/.test(page.url()), 'Workspace detail search should preserve the hyphen event-operation prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail event-operation hyphen search');
+  await expectBodyText(page, 'match(es) for "event-operation"', '/account/work/workspaces detail event-operation hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail event-operation hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail event-operation hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail event-operation hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail event-operation hyphen search');
+  const workspaceEventOperationHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEventOperationHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen event-operation query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail event-operation hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event-operation hyphen search');
+
+  await page.fill('#prepQuery', 'event-operations');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=event-operations/.test(page.url()), 'Workspace detail search should preserve the hyphen event-operations prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail event-operations hyphen search');
+  await expectBodyText(page, 'match(es) for "event-operations"', '/account/work/workspaces detail event-operations hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail event-operations hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail event-operations hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail event-operations hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail event-operations hyphen search');
+  const workspaceEventOperationsHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEventOperationsHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen event-operations query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail event-operations hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event-operations hyphen search');
 
   await page.fill('#prepQuery', 'gmops');
   await Promise.all([
