@@ -1065,6 +1065,9 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "encounters",
             "enemy",
             "enemies",
+            "opfor",
+            "op-force",
+            "op force",
             "threat"))
         {
             return "opposition";
