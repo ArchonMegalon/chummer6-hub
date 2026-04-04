@@ -265,6 +265,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-control")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event ctrl")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-ctrl")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("event ctls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-ctls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("event ctrls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-ctrls")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm operation")));
@@ -277,6 +281,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-controls")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ctrl")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-ctrl")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ctls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-ctls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ctrls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-ctrls")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season operation")));
@@ -285,6 +293,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season control")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-control")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season ctls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-ctls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season ctrls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-ctrls")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leagueops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leagueop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("league-op")));

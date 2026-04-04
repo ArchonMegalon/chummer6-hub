@@ -78,12 +78,16 @@ public static class PrepLibraryQueryAliasCanonicalizer
 
         if ((tokens.Contains("league") && tokens.Contains("ctrl"))
             || (tokens.Contains("league") && tokens.Contains("control"))
-            || (tokens.Contains("league") && tokens.Contains("controls")))
+            || (tokens.Contains("league") && tokens.Contains("controls"))
+            || (tokens.Contains("league") && tokens.Contains("ctls"))
+            || (tokens.Contains("league") && tokens.Contains("ctrls")))
         {
             tokens.Remove("league");
             tokens.Remove("ctrl");
             tokens.Remove("control");
             tokens.Remove("controls");
+            tokens.Remove("ctls");
+            tokens.Remove("ctrls");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");
@@ -91,21 +95,31 @@ public static class PrepLibraryQueryAliasCanonicalizer
 
         if ((tokens.Contains("community") && tokens.Contains("ctrl"))
             || (tokens.Contains("community") && tokens.Contains("control"))
-            || (tokens.Contains("community") && tokens.Contains("controls")))
+            || (tokens.Contains("community") && tokens.Contains("controls"))
+            || (tokens.Contains("community") && tokens.Contains("ctls"))
+            || (tokens.Contains("community") && tokens.Contains("ctrls")))
         {
             tokens.Remove("community");
             tokens.Remove("ctrl");
             tokens.Remove("control");
             tokens.Remove("controls");
+            tokens.Remove("ctls");
+            tokens.Remove("ctrls");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");
         }
 
-        if (tokens.Contains("event") && (tokens.Contains("ctrl") || tokens.Contains("ctl")))
+        if (tokens.Contains("event")
+            && (tokens.Contains("ctrl")
+                || tokens.Contains("ctl")
+                || tokens.Contains("ctls")
+                || tokens.Contains("ctrls")))
         {
             tokens.Remove("ctrl");
             tokens.Remove("ctl");
+            tokens.Remove("ctls");
+            tokens.Remove("ctrls");
             tokens.Add("eventcontrol");
         }
 
@@ -117,10 +131,16 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("operation");
         }
 
-        if (tokens.Contains("season") && (tokens.Contains("ctrl") || tokens.Contains("ctl")))
+        if (tokens.Contains("season")
+            && (tokens.Contains("ctrl")
+                || tokens.Contains("ctl")
+                || tokens.Contains("ctls")
+                || tokens.Contains("ctrls")))
         {
             tokens.Remove("ctrl");
             tokens.Remove("ctl");
+            tokens.Remove("ctls");
+            tokens.Remove("ctrls");
             tokens.Add("seasoncontrol");
         }
 
@@ -245,12 +265,37 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("operation");
         }
 
-        if (tokens.Contains("gm") && (tokens.Contains("control") || tokens.Contains("controls") || tokens.Contains("ctrl")))
+        if (tokens.Contains("gmctls"))
+        {
+            tokens.Remove("gmctls");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gmctrls"))
+        {
+            tokens.Remove("gmctrls");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gm")
+            && (tokens.Contains("control")
+                || tokens.Contains("controls")
+                || tokens.Contains("ctrl")
+                || tokens.Contains("ctl")
+                || tokens.Contains("ctls")
+                || tokens.Contains("ctrls")))
         {
             tokens.Remove("gm");
             tokens.Remove("control");
             tokens.Remove("controls");
             tokens.Remove("ctrl");
+            tokens.Remove("ctl");
+            tokens.Remove("ctls");
+            tokens.Remove("ctrls");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");

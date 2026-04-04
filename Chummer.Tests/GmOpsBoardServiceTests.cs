@@ -577,16 +577,23 @@ public sealed class GmOpsBoardServiceTests
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
-                Payload: "Open eventctl board remains unresolved for next season gate.",
+                Payload: "Open eventctls board remains unresolved for next season gate.",
                 AtUtc: baseTime,
-                EventId: "evt-eventctl"),
+                EventId: "evt-eventctls"),
             new SessionEventEnvelope(
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
-                Payload: "Open seasonctl queue remains unresolved for event-control follow-through.",
+                Payload: "Open seasonctls queue remains unresolved for event-control follow-through.",
                 AtUtc: baseTime.AddMinutes(1),
-                EventId: "evt-seasonctl"),
+                EventId: "evt-seasonctls"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open gmctls lane remains unresolved before event-control checkpoint.",
+                AtUtc: baseTime.AddMinutes(2),
+                EventId: "evt-gmctls"),
             new SessionEventEnvelope(
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
@@ -598,10 +605,11 @@ public sealed class GmOpsBoardServiceTests
 
         OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
 
-        Assert.Equal(3, projection.UnresolvedItems.Count);
-        Assert.Equal("ops:evt-seasonctl", projection.UnresolvedItems[0].ItemId);
-        Assert.Equal("ops:evt-eventctl", projection.UnresolvedItems[1].ItemId);
-        Assert.Equal("ops:evt-general", projection.UnresolvedItems[2].ItemId);
+        Assert.Equal(4, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-gmctls", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-seasonctls", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-eventctls", projection.UnresolvedItems[2].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[3].ItemId);
     }
 
     [Fact]
@@ -1371,14 +1379,28 @@ public sealed class GmOpsBoardServiceTests
 
         GmPrepAssetListResponse eventCtlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventctl");
         GmPrepAssetListResponse eventCtlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventctls");
+        GmPrepAssetListResponse eventCtlsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event ctls");
+        GmPrepAssetListResponse eventCtlsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event-ctls");
         GmPrepAssetListResponse seasonCtlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasonctl");
         GmPrepAssetListResponse seasonCtlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasonctls");
+        GmPrepAssetListResponse seasonCtlsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season ctls");
+        GmPrepAssetListResponse seasonCtlsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season-ctls");
+        GmPrepAssetListResponse gmCtlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gmctls");
+        GmPrepAssetListResponse gmCtlsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gm ctls");
+        GmPrepAssetListResponse gmCtlsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gm-ctls");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixctl");
 
         Assert.Contains(eventCtlMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Contains(eventCtlsMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(eventCtlsSplitMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(eventCtlsHyphenMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Contains(seasonCtlMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Contains(seasonCtlsMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(seasonCtlsSplitMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(seasonCtlsHyphenMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(gmCtlsMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(gmCtlsSplitMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(gmCtlsHyphenMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Empty(negativeMatches.Items);
     }
 
