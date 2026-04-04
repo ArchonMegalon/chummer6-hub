@@ -5424,6 +5424,19 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketFallsBackToCompactEventCtrlSignalWhenEventControlWordIsAbbreviated()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCompactEventCtrlSignalOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("eventctrl", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void PrepLaunchPacketFallsBackToCompactPrepLaunchSignalsWhenCanonicalTermsAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCompactPrepLaunchAndTravelPrefetchSignalsOnly();
@@ -12227,6 +12240,44 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [seasonOpCompact],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCompactEventCtrlSignalOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection eventCtrlCompact = new(
+            PacketId: "packet-compact-eventctrl",
+            Kind: "eventctrl_checkpoint",
+            Label: "Eventctrl checkpoint",
+            Summary: "Eventctrl board remains governed for the next launch gate.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-compact-eventctrl-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [eventCtrlCompact],
             Consequences: [],
             PrepLaunches: [],
             TravelPrefetches: []);
