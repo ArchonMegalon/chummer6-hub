@@ -1273,6 +1273,69 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail league ops split search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league ops split search');
 
+  await page.fill('#prepQuery', 'leaguecontrol');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=leaguecontrol/.test(page.url()), 'Workspace detail search should preserve the compact leaguecontrol prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail leaguecontrol compact search');
+  await expectBodyText(page, 'match(es) for "leaguecontrol"', '/account/work/workspaces detail leaguecontrol compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail leaguecontrol compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail leaguecontrol compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail leaguecontrol compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail leaguecontrol compact search');
+  const workspaceLeagueControlCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueControlCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact leaguecontrol query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail leaguecontrol compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leaguecontrol compact search');
+
+  await page.fill('#prepQuery', 'league control');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league(?:%20|\+)control/.test(page.url()), 'Workspace detail search should preserve the split league control prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league control split search');
+  await expectBodyText(page, 'match(es) for "league control"', '/account/work/workspaces detail league control split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league control split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league control split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league control split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league control split search');
+  const workspaceLeagueControlSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueControlSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split league control query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league control split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league control split search');
+
+  await page.fill('#prepQuery', 'leaguectrl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=leaguectrl/.test(page.url()), 'Workspace detail search should preserve the compact leaguectrl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail leaguectrl compact search');
+  await expectBodyText(page, 'match(es) for "leaguectrl"', '/account/work/workspaces detail leaguectrl compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail leaguectrl compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail leaguectrl compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail leaguectrl compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail leaguectrl compact search');
+  const workspaceLeagueCtrlCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueCtrlCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact leaguectrl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail leaguectrl compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leaguectrl compact search');
+
   await page.fill('#prepQuery', 'communityops');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -1314,6 +1377,69 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail community ops split search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community ops split search');
+
+  await page.fill('#prepQuery', 'communitycontrol');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=communitycontrol/.test(page.url()), 'Workspace detail search should preserve the compact communitycontrol prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail communitycontrol compact search');
+  await expectBodyText(page, 'match(es) for "communitycontrol"', '/account/work/workspaces detail communitycontrol compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail communitycontrol compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail communitycontrol compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail communitycontrol compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail communitycontrol compact search');
+  const workspaceCommunityControlCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityControlCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact communitycontrol query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail communitycontrol compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communitycontrol compact search');
+
+  await page.fill('#prepQuery', 'community control');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community(?:%20|\+)control/.test(page.url()), 'Workspace detail search should preserve the split community control prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community control split search');
+  await expectBodyText(page, 'match(es) for "community control"', '/account/work/workspaces detail community control split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community control split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community control split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community control split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community control split search');
+  const workspaceCommunityControlSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityControlSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split community control query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community control split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community control split search');
+
+  await page.fill('#prepQuery', 'communityctrl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=communityctrl/.test(page.url()), 'Workspace detail search should preserve the compact communityctrl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail communityctrl compact search');
+  await expectBodyText(page, 'match(es) for "communityctrl"', '/account/work/workspaces detail communityctrl compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail communityctrl compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail communityctrl compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail communityctrl compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail communityctrl compact search');
+  const workspaceCommunityCtrlCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityCtrlCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact communityctrl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail communityctrl compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityctrl compact search');
 
   await page.fill('#prepQuery', 'heat');
   await Promise.all([
