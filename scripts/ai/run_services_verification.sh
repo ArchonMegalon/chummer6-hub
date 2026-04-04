@@ -5,9 +5,10 @@ source "$(dirname "$0")/_env.sh"
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-TMP_DIR="${ROOT_DIR}/.tmp/run-services-verification"
-mkdir -p "$TMP_DIR"
-find "$TMP_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+TMP_ROOT="${ROOT_DIR}/.tmp"
+mkdir -p "$TMP_ROOT"
+TMP_DIR="$(mktemp -d "${TMP_ROOT}/run-services-verification.XXXXXX")"
+trap 'rm -rf "$TMP_DIR"' EXIT
 
 if [ ! -f Chummer.Play.Contracts/Chummer.Play.Contracts.csproj ]; then
   echo "Chummer.Play.Contracts project is missing." >&2

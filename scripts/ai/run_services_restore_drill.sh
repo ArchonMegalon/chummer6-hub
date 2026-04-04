@@ -5,9 +5,10 @@ source "$(dirname "$0")/_env.sh"
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-TMP_DIR="${ROOT_DIR}/.tmp/run-services-restore-drill"
-mkdir -p "$TMP_DIR"
-find "$TMP_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+TMP_ROOT="${ROOT_DIR}/.tmp"
+mkdir -p "$TMP_ROOT"
+TMP_DIR="$(mktemp -d "${TMP_ROOT}/run-services-restore-drill.XXXXXX")"
+trap 'rm -rf "$TMP_DIR"' EXIT
 
 scripts/ai/build_r1_cleanroom.sh >/dev/null
 
