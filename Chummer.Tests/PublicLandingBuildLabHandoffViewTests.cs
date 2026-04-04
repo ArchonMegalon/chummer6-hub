@@ -16,9 +16,10 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("handoff.Outputs.Count - 8", view, StringComparison.Ordinal);
         Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
         Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
+        Assert.Contains("BuildLabOutputLaneLabel(output.Kind)", view, StringComparison.Ordinal);
         Assert.Contains("@output.PublicationSummary", view, StringComparison.Ordinal);
-        Assert.Contains("@output.PublicationState", view, StringComparison.Ordinal);
-        Assert.Contains("@output.TrustBand", view, StringComparison.Ordinal);
+        Assert.Contains("output.PublicationState", view, StringComparison.Ordinal);
+        Assert.Contains("output.TrustBand", view, StringComparison.Ordinal);
         Assert.Contains("@output.AuditSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff", view, StringComparison.Ordinal);
         Assert.Contains("Rule diff:", view, StringComparison.Ordinal);
@@ -26,6 +27,7 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("Crew fit:", view, StringComparison.Ordinal);
         Assert.Contains("Output next:", view, StringComparison.Ordinal);
         Assert.Contains("Output provenance:", view, StringComparison.Ordinal);
+        Assert.Contains("Output lane:", view, StringComparison.Ordinal);
         Assert.Contains("Output publication:", view, StringComparison.Ordinal);
         Assert.Contains("Output lane status:", view, StringComparison.Ordinal);
         Assert.Contains("Output audit:", view, StringComparison.Ordinal);
