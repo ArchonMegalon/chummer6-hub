@@ -154,12 +154,18 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> compactSingularTokens = InvokeBuildTokens("gmop");
         IReadOnlyList<string> compactOperationTokens = InvokeBuildTokens("gmoperation");
         IReadOnlyList<string> compactOperationsTokens = InvokeBuildTokens("gmoperations");
+        IReadOnlyList<string> compactControlTokens = InvokeBuildTokens("gmcontrol");
+        IReadOnlyList<string> compactControlsTokens = InvokeBuildTokens("gmcontrols");
+        IReadOnlyList<string> compactCtrlTokens = InvokeBuildTokens("gmctrl");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("gmatrix");
 
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.True(InvokeMatches(packet, compactSingularTokens));
         Assert.True(InvokeMatches(packet, compactOperationTokens));
         Assert.True(InvokeMatches(packet, compactOperationsTokens));
+        Assert.True(InvokeMatches(packet, compactControlTokens));
+        Assert.True(InvokeMatches(packet, compactControlsTokens));
+        Assert.True(InvokeMatches(packet, compactCtrlTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
     }
 
@@ -212,6 +218,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-operation")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-operations")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm control")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-control")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm controls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-controls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ctrl")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-ctrl")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season operation")));

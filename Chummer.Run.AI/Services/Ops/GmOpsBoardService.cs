@@ -644,6 +644,41 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("operation");
         }
 
+        if (tokens.Contains("gmcontrol"))
+        {
+            tokens.Remove("gmcontrol");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gmcontrols"))
+        {
+            tokens.Remove("gmcontrols");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gmctrl"))
+        {
+            tokens.Remove("gmctrl");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gm") && (tokens.Contains("control") || tokens.Contains("controls") || tokens.Contains("ctrl")))
+        {
+            tokens.Remove("gm");
+            tokens.Remove("control");
+            tokens.Remove("controls");
+            tokens.Remove("ctrl");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
         if (tokens.Contains("eventops"))
         {
             tokens.Remove("eventops");
@@ -1528,6 +1563,12 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "gm ops",
             "gm-ops",
             "gm_op",
+            "gmcontrol",
+            "gmcontrols",
+            "gmctrl",
+            "gm control",
+            "gm-control",
+            "gm_control",
             "leagueops",
             "leagueop",
             "leagueoperation",

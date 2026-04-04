@@ -1483,6 +1483,111 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail gm-operations hyphen search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gm-operations hyphen search');
 
+  await page.fill('#prepQuery', 'gmcontrol');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gmcontrol/.test(page.url()), 'Workspace detail search should preserve the compact gmcontrol prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gmcontrol compact search');
+  await expectBodyText(page, 'match(es) for "gmcontrol"', '/account/work/workspaces detail gmcontrol compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gmcontrol compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gmcontrol compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gmcontrol compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gmcontrol compact search');
+  const workspaceGmControlCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmControlCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact gmcontrol query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gmcontrol compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gmcontrol compact search');
+
+  await page.fill('#prepQuery', 'gmcontrols');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gmcontrols/.test(page.url()), 'Workspace detail search should preserve the compact gmcontrols prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gmcontrols compact search');
+  await expectBodyText(page, 'match(es) for "gmcontrols"', '/account/work/workspaces detail gmcontrols compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gmcontrols compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gmcontrols compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gmcontrols compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gmcontrols compact search');
+  const workspaceGmControlsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmControlsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact gmcontrols query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gmcontrols compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gmcontrols compact search');
+
+  await page.fill('#prepQuery', 'gmctrl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gmctrl/.test(page.url()), 'Workspace detail search should preserve the compact gmctrl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gmctrl compact search');
+  await expectBodyText(page, 'match(es) for "gmctrl"', '/account/work/workspaces detail gmctrl compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gmctrl compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gmctrl compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gmctrl compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gmctrl compact search');
+  const workspaceGmCtrlCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmCtrlCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact gmctrl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gmctrl compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gmctrl compact search');
+
+  await page.fill('#prepQuery', 'gm control');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gm(?:%20|\+)control/.test(page.url()), 'Workspace detail search should preserve the split gm control prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gm control split search');
+  await expectBodyText(page, 'match(es) for "gm control"', '/account/work/workspaces detail gm control split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gm control split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gm control split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gm control split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gm control split search');
+  const workspaceGmControlSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmControlSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split gm control query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gm control split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gm control split search');
+
+  await page.fill('#prepQuery', 'gm-control');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gm-control/.test(page.url()), 'Workspace detail search should preserve the hyphen gm-control prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gm-control hyphen search');
+  await expectBodyText(page, 'match(es) for "gm-control"', '/account/work/workspaces detail gm-control hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gm-control hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gm-control hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gm-control hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gm-control hyphen search');
+  const workspaceGmControlHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmControlHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen gm-control query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gm-control hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gm-control hyphen search');
+
   await page.fill('#prepQuery', 'leagueops');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
