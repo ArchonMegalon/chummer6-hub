@@ -711,6 +711,26 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["uiLocalizationReleaseGate"].pop("generatedAt", None)
+payload["releaseProof"]["uiLocalizationReleaseGate"]["generated_at"] = "2000-01-01T00:00:00Z"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject stale releaseProof.uiLocalizationReleaseGate.generated_at timestamps." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
 payload["releaseProof"]["uiLocalizationReleaseGate"]["generatedAt"] = "2026-01-01T00:00:00Z"
 payload["releaseProof"]["uiLocalizationReleaseGate"]["generated_at"] = "2026-01-01T00:05:00Z"
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -718,6 +738,26 @@ PY
 if bash scripts/audit-ui-parity.sh; then
   mv "$release_channel_backup" "$release_channel_path"
   echo "verify gate failed: parity audit should reject conflicting alias values between releaseProof.uiLocalizationReleaseGate.generatedAt and releaseProof.uiLocalizationReleaseGate.generated_at." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["uiLocalizationReleaseGate"].pop("generatedAt", None)
+payload["releaseProof"]["uiLocalizationReleaseGate"]["generated_at"] = "2099-01-01T00:00:00Z"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject releaseProof.uiLocalizationReleaseGate.generated_at timestamps with excessive future skew." >&2
   exit 1
 fi
 mv "$release_channel_backup" "$release_channel_path"
@@ -1003,6 +1043,26 @@ PY
 if bash scripts/audit-ui-parity.sh; then
   mv "$release_channel_backup" "$release_channel_path"
   echo "verify gate failed: parity audit should reject invalid-format releaseProof.generated_at timestamps." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"].pop("generatedAt", None)
+payload["releaseProof"]["generated_at"] = "2099-01-01T00:00:00Z"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject releaseProof.generated_at timestamps with excessive future skew." >&2
   exit 1
 fi
 mv "$release_channel_backup" "$release_channel_path"
