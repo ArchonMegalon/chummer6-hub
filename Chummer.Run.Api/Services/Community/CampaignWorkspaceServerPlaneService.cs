@@ -260,7 +260,11 @@ public sealed class CampaignWorkspaceServerPlaneService
         "afteractionreport",
         "afteractionreports",
         "aar",
-        "aars"
+        "aars",
+        "retro",
+        "retros",
+        "retrospective",
+        "retrospectives"
     ];
 
     private static readonly string[] RosterIdentityWordTokens =

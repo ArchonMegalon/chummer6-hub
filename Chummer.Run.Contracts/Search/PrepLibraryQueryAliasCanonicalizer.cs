@@ -937,6 +937,30 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("recap");
         }
 
+        if (tokens.Contains("retro"))
+        {
+            tokens.Remove("retro");
+            tokens.Add("recap");
+        }
+
+        if (tokens.Contains("retros"))
+        {
+            tokens.Remove("retros");
+            tokens.Add("recap");
+        }
+
+        if (tokens.Contains("retrospective"))
+        {
+            tokens.Remove("retrospective");
+            tokens.Add("recap");
+        }
+
+        if (tokens.Contains("retrospectives"))
+        {
+            tokens.Remove("retrospectives");
+            tokens.Add("recap");
+        }
+
         if (tokens.Contains("returns"))
         {
             tokens.Remove("returns");
