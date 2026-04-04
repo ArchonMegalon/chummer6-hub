@@ -613,6 +613,38 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatCompactGmCtlShorthandAsEventControlDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:45:45Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open gmctl lane remains unresolved before event-control checkpoint.",
+                AtUtc: baseTime,
+                EventId: "evt-gmctl"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-gmctl", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatSeasonControlShorthandAsEventControlDomain()
     {
         SessionLedgerService ledger = new();
@@ -1385,7 +1417,10 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse seasonCtlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasonctls");
         GmPrepAssetListResponse seasonCtlsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season ctls");
         GmPrepAssetListResponse seasonCtlsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season-ctls");
+        GmPrepAssetListResponse gmCtlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gmctl");
         GmPrepAssetListResponse gmCtlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gmctls");
+        GmPrepAssetListResponse gmCtlSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gm ctl");
+        GmPrepAssetListResponse gmCtlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gm-ctl");
         GmPrepAssetListResponse gmCtlsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gm ctls");
         GmPrepAssetListResponse gmCtlsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "gm-ctls");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixctl");
@@ -1398,7 +1433,10 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(seasonCtlsMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Contains(seasonCtlsSplitMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Contains(seasonCtlsHyphenMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(gmCtlMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Contains(gmCtlsMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(gmCtlSplitMatches.Items, item => item.AssetId == "event_ctl_ops");
+        Assert.Contains(gmCtlHyphenMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Contains(gmCtlsSplitMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Contains(gmCtlsHyphenMatches.Items, item => item.AssetId == "event_ctl_ops");
         Assert.Empty(negativeMatches.Items);

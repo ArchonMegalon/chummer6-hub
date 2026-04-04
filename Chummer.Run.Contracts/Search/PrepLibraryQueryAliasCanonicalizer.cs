@@ -265,6 +265,14 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("operation");
         }
 
+        if (tokens.Contains("gmctl"))
+        {
+            tokens.Remove("gmctl");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
         if (tokens.Contains("gmctls"))
         {
             tokens.Remove("gmctls");
