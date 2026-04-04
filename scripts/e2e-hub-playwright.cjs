@@ -6004,6 +6004,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnpackets', 'compact aftermathreturnpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnbrief', 'compact aftermathreturnbrief continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnbriefs', 'compact aftermathreturnbriefs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnlane', 'compact aftermathreturnlane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnlanes', 'compact aftermathreturnlanes continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathsreturnpacket', 'compact aftermathsreturnpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathsreturnpackets', 'compact aftermathsreturnpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathsreturnbrief', 'compact aftermathsreturnbrief continuity prep');
@@ -6012,6 +6014,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimereturnpackets', 'compact downtimereturnpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimereturnbrief', 'compact downtimereturnbrief continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimereturnbriefs', 'compact downtimereturnbriefs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimereturnlane', 'compact downtimereturnlane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimereturnlanes', 'compact downtimereturnlanes continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimesreturnloop', 'compact downtimesreturnloop continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimesreturnpacket', 'compact downtimesreturnpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimesreturnpackets', 'compact downtimesreturnpackets continuity prep');

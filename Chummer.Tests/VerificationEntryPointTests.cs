@@ -872,8 +872,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returns", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermathreturn", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=aftermathreturnlane", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=aftermathreturnlanes", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermathsreturn", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=downtimereturn", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=downtimereturnlane", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=downtimereturnlanes", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=campaignreturn", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=campaignreturnlane", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=preplibrarypacket", audit, StringComparison.Ordinal);
@@ -907,6 +911,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=aftermathreturnpackets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermathreturnbrief", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermathreturnbriefs", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=aftermathreturnlane", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=aftermathreturnlanes", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermathsreturnpacket", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermathsreturnpackets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermathsreturnbrief", audit, StringComparison.Ordinal);
@@ -915,6 +921,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=downtimereturnpackets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=downtimereturnbrief", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=downtimereturnbriefs", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=downtimereturnlane", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=downtimereturnlanes", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=downtimesreturnloop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=downtimesreturnpacket", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=downtimesreturnpackets", audit, StringComparison.Ordinal);
