@@ -1408,6 +1408,7 @@
                             <p><strong>Safehouse / travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
                             <p><strong>Prefetch inventory:</strong> @selectedWorkspaceServerPlane.TravelMode.PrefetchInventorySummary</p>
                             <p><strong>Cache freshness:</strong> @selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary</p>
+                            <p><strong>Offline actionability:</strong> @selectedWorkspaceServerPlane.TravelMode.OfflineActionabilitySummary</p>
                             @if (selectedWorkspaceServerPlane.TravelMode.Devices.Count > 0)
                             {
                                 <form id="travelPrefetchForm" class="settings-form">
@@ -1833,6 +1834,14 @@
                                         @if (!string.IsNullOrWhiteSpace(output.ProvenanceSummary))
                                         {
                                             <span> Provenance: @output.ProvenanceSummary</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
+                                        {
+                                            <span> Publication: @output.PublicationSummary</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(output.PublicationState) || !string.IsNullOrWhiteSpace(output.TrustBand))
+                                        {
+                                            <span> Lane status: @HumanizeStatus(output.PublicationState, "Ready") · @HumanizeStatus(output.TrustBand, "Governed")</span>
                                         }
                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                         {
