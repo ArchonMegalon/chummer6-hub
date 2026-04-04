@@ -7257,16 +7257,26 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinereadiness', 'compact offlinereadiness continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinereadinesses', 'compact offlinereadinesses continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinecache', 'compact offlinecache continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinecaches', 'compact offlinecaches continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadiness', 'compact travelreadiness continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadinesses', 'compact travelreadinesses continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'travelcache', 'compact travelcache continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'travelcaches', 'compact travelcaches continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousereadiness', 'compact safehousereadiness continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousereadinesses', 'compact safehousereadinesses continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousecache', 'compact safehousecache continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousecaches', 'compact safehousecaches continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinereadiness', 'compact mobileofflinereadiness continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinereadinesses', 'compact mobileofflinereadinesses continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinecache', 'compact mobileofflinecache continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinecaches', 'compact mobileofflinecaches continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobiletravelcache', 'compact mobiletravelcache continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobiletravelcaches', 'compact mobiletravelcaches continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousereadiness', 'compact mobilesafehousereadiness continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousereadinesses', 'compact mobilesafehousereadinesses continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousecache', 'compact mobilesafehousecache continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousecaches', 'compact mobilesafehousecaches continuity prep');
 
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),

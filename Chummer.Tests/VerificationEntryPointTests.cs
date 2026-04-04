@@ -941,12 +941,22 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=travelreadinesses", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=safehousereadiness", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=safehousereadinesses", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=offlinecache", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=offlinecaches", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=travelcache", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=travelcaches", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=safehousecache", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=safehousecaches", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobileofflinereadiness", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobileofflinereadinesses", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobileofflinecache", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobileofflinecaches", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobiletravelcache", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobiletravelcaches", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobilesafehousereadiness", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=mobilesafehousereadinesses", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobilesafehousecache", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobilesafehousecaches", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=season-operation", audit, StringComparison.Ordinal);
@@ -1950,16 +1960,26 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact travelprefetches prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinereadiness', 'compact offlinereadiness continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinereadinesses', 'compact offlinereadinesses continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinecache', 'compact offlinecache continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinecaches', 'compact offlinecaches continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadiness', 'compact travelreadiness continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadinesses', 'compact travelreadinesses continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'travelcache', 'compact travelcache continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'travelcaches', 'compact travelcaches continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousereadiness', 'compact safehousereadiness continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousereadinesses', 'compact safehousereadinesses continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousecache', 'compact safehousecache continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousecaches', 'compact safehousecaches continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinereadiness', 'compact mobileofflinereadiness continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinereadinesses', 'compact mobileofflinereadinesses continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinecache', 'compact mobileofflinecache continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinecaches', 'compact mobileofflinecaches continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobiletravelcache', 'compact mobiletravelcache continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobiletravelcaches', 'compact mobiletravelcaches continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousereadiness', 'compact mobilesafehousereadiness continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousereadinesses', 'compact mobilesafehousereadinesses continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousecache', 'compact mobilesafehousecache continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousecaches', 'compact mobilesafehousecaches continuity prep');", playwright, StringComparison.Ordinal);
     }
 
     [Fact]
