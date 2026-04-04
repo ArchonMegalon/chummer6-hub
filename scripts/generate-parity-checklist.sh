@@ -169,6 +169,19 @@ def fail_on_unacknowledged_catalog_only(
         )
 
 
+def fail_on_missing_required_legacy_ids(
+    *,
+    surface_label: str,
+    missing_ids: Sequence[str],
+    source: str,
+) -> None:
+    if missing_ids:
+        raise ValueError(
+            f"{source} is missing required legacy {surface_label} ids "
+            f"({', '.join(missing_ids)})"
+        )
+
+
 def write_summary_row(kind: str, legacy_ids: Sequence[str], covered: Sequence[str], missing: Sequence[str], catalog_only: Sequence[str]) -> str:
     return f"| {kind} | {len(legacy_ids)} | {len(covered)} | {len(missing)} | {len(catalog_only)} |"
 
@@ -257,6 +270,16 @@ fail_on_unacknowledged_catalog_only(
     surface_label="dialog-factory-only desktop control",
     catalog_only_ids=catalog_only_desktop_controls,
     acknowledged_ids=acknowledged_dialog_factory_only_desktop_controls,
+    source=display_path(parity_oracle_path),
+)
+fail_on_missing_required_legacy_ids(
+    surface_label="tab",
+    missing_ids=missing_tabs,
+    source=display_path(parity_oracle_path),
+)
+fail_on_missing_required_legacy_ids(
+    surface_label="workspace action",
+    missing_ids=missing_actions,
     source=display_path(parity_oracle_path),
 )
 if missing_desktop_controls:
