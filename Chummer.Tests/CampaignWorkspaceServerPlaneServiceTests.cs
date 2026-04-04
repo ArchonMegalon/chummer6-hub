@@ -296,6 +296,53 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RecapShelfUsesLatestCreatorPublication_WhenPublicationIdsRepeat()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-publication-1",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap-safe output remains attached to campaign continuity.",
+            CreatorPublicationId: "pub-duplicate");
+        CreatorPublicationProjection older = new(
+            PublicationId: "pub-duplicate",
+            Title: "Session recap older projection",
+            Kind: "campaign_recap_bundle",
+            Summary: "Older publication row.",
+            CampaignId: "campaign-a",
+            DossierId: null,
+            ArtifactId: "artifact-old",
+            ProvenanceSummary: "Older provenance",
+            DiscoverySummary: "Older discovery",
+            Visibility: "group",
+            PublicationStatus: "review",
+            TrustBand: "bounded",
+            Discoverable: false,
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+        CreatorPublicationProjection newer = older with
+        {
+            ArtifactId = "artifact-new",
+            PublicationStatus = "published",
+            TrustBand = "verified",
+            Discoverable = true,
+            UpdatedAtUtc = DateTimeOffset.Parse("2026-04-03T00:10:00Z")
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recap]
+        };
+
+        IReadOnlyList<RecapShelfEntry> shelf = InvokeBuildRecapShelf(workspace, [older, newer]);
+
+        RecapShelfEntry entry = Assert.Single(shelf);
+        Assert.Equal("pub-duplicate", entry.CreatorPublicationId);
+        Assert.Equal("published", entry.PublicationState);
+        Assert.Equal("verified", entry.TrustBand);
+        Assert.True(entry.Discoverable);
+    }
+
+    [Fact]
     public void CampaignMemoryPacketDoesNotActivateFromCarryForwardWindowSignalsWithoutMemoryContext()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardWindowOnly();
@@ -3906,12 +3953,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     private static IReadOnlyList<RecapShelfEntry> InvokeBuildRecapShelf(CampaignWorkspaceProjection workspace)
+        => InvokeBuildRecapShelf(workspace, Array.Empty<CreatorPublicationProjection>());
+
+    private static IReadOnlyList<RecapShelfEntry> InvokeBuildRecapShelf(
+        CampaignWorkspaceProjection workspace,
+        IReadOnlyList<CreatorPublicationProjection> creatorPublications)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
             .GetMethod("BuildRecapShelf", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException("BuildRecapShelf was not found.");
 
-        return Assert.IsAssignableFrom<IReadOnlyList<RecapShelfEntry>>(method.Invoke(null, [workspace, Array.Empty<CreatorPublicationProjection>()]));
+        return Assert.IsAssignableFrom<IReadOnlyList<RecapShelfEntry>>(method.Invoke(null, [workspace, creatorPublications]));
     }
 
     private static PublicationSafeProjection BuildPublicationSafeProjection(string kind)
