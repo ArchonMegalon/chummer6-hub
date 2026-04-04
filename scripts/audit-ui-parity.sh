@@ -224,6 +224,10 @@ def normalize_release_proof_route(raw_route: object, *, field_path: str, source:
         raise SystemExit(
             f"parity audit failed: {field_path} must not include query or fragment segments: {source}"
         )
+    if "%" in route or "\\" in route:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must not include percent-encoded or escaped path characters: {source}"
+        )
     if "//" in route:
         raise SystemExit(f"parity audit failed: {field_path} must not include empty path segments: {source}")
     segments = route.split("/")

@@ -101,6 +101,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release-channel nested receipt releaseProof.proofRoutes is missing required flagship routes", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.proofRoutes declares unexpected flagship routes", script, StringComparison.Ordinal);
         Assert.Contains("must use canonical lowercase route casing", script, StringComparison.Ordinal);
+        Assert.Contains("must not include percent-encoded or escaped path characters", script, StringComparison.Ordinal);
         Assert.Contains("workflow_parity_receipt_channel_ids", script, StringComparison.Ordinal);
         Assert.Contains("milestone-2 workflow/visual release-channel ids drift", script, StringComparison.Ordinal);
         Assert.Contains("milestone-2 workflow/visual release-channel versions drift", script, StringComparison.Ordinal);
