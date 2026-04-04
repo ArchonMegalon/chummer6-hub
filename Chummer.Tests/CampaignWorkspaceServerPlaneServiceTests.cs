@@ -700,6 +700,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnloop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnlanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturn")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsreturnloop")));
@@ -710,6 +712,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnloop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnlanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturn")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturnloop")));

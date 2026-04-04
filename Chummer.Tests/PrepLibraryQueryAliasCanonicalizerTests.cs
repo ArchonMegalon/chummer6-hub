@@ -256,11 +256,15 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "campaignsreturnbriefs",
             "aftermathreturnpacket",
             "aftermathreturnbrief",
+            "aftermathreturnlane",
+            "aftermathreturnlanes",
             "aftermathsreturnpacket",
             "aftermathsreturnbriefs",
             "downtimesreturnloop",
             "downtimereturnpackets",
             "downtimereturnbriefs",
+            "downtimereturnlane",
+            "downtimereturnlanes",
             "downtimesreturnpacket",
             "downtimesreturnbriefs",
             "diariesreturnloop",
@@ -351,11 +355,15 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("campaignsreturnbriefs", tokens);
         Assert.DoesNotContain("aftermathreturnpacket", tokens);
         Assert.DoesNotContain("aftermathreturnbrief", tokens);
+        Assert.DoesNotContain("aftermathreturnlane", tokens);
+        Assert.DoesNotContain("aftermathreturnlanes", tokens);
         Assert.DoesNotContain("aftermathsreturnpacket", tokens);
         Assert.DoesNotContain("aftermathsreturnbriefs", tokens);
         Assert.DoesNotContain("downtimesreturnloop", tokens);
         Assert.DoesNotContain("downtimereturnpackets", tokens);
         Assert.DoesNotContain("downtimereturnbriefs", tokens);
+        Assert.DoesNotContain("downtimereturnlane", tokens);
+        Assert.DoesNotContain("downtimereturnlanes", tokens);
         Assert.DoesNotContain("downtimesreturnpacket", tokens);
         Assert.DoesNotContain("downtimesreturnbriefs", tokens);
         Assert.DoesNotContain("diariesreturnloop", tokens);

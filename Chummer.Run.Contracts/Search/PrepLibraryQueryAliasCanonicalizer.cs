@@ -72,12 +72,16 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturns", "aftermath", "return");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnloop", "aftermath", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnloops", "aftermath", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnlane", "aftermath", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnlanes", "aftermath", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnlane", "aftermath", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathsreturnlanes", "aftermath", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturn", "downtime", "return");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturns", "downtime", "return");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturnloop", "downtime", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturnloops", "downtime", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "downtimereturnlane", "downtime", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "downtimereturnlanes", "downtime", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "downtimesreturn", "downtime", "return");
         RewriteCompactContinuityMutationAlias(tokens, "downtimesreturns", "downtime", "return");
         RewriteCompactContinuityMutationAlias(tokens, "downtimesreturnloop", "downtime", "return", "loop");
