@@ -3122,6 +3122,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void ContinuityPacketDeduplicatesIdenticalRecapSignalVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithContinuityRecapKindsOnly();
+        IReadOnlyList<PublicationSafeProjection> recaps =
+            Assert.IsAssignableFrom<IReadOnlyList<PublicationSafeProjection>>(seed.RecapShelf);
+        PublicationSafeProjection recap = Assert.Single(recaps);
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recap, recap]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "continuity_packet", StringComparison.Ordinal));
+        Assert.False(packet.Reusable);
+        Assert.Contains("1 recap-safe output(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("session_recap", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void ContinuityPacketIncludesKindFallbackWhenSignalsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithContinuitySignalKindsOnly();

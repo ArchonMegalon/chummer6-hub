@@ -1800,6 +1800,9 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
         bool carryForwardSignal = IsContinuityCarryForwardSignal(carryForward);
+        PublicationSafeProjection[] continuityRecaps = DeduplicateIdenticalPublicationRecapVersions(
+                workspace.RecapShelf)
+            .ToArray();
         WorkspaceChangePacketProjection[] continuitySignals = DeduplicateIdenticalChangePacketVersions(
                 (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
                 .Where(static packet => IsContinuitySignal(packet))
@@ -1808,7 +1811,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             .ToArray();
 
         if (workspace.LatestContinuity is null
-            && workspace.RecapShelf.Count == 0
+            && continuityRecaps.Length == 0
             && workspace.Dossiers.Count == 0
             && continuitySignals.Length == 0
             && !carryForwardSignal)
@@ -1818,7 +1821,7 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         IReadOnlyList<string> evidence = BuildEvidenceLines(
             continuitySignals.Select(static packet => DescribeSignalLabel(packet.Label, packet.Kind, "continuity signal")),
-            workspace.RecapShelf.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "continuity signal")),
+            continuityRecaps.Select(static item => DescribeSignalLabel(item.Label, item.Kind, "continuity signal")),
             workspace.LatestContinuity?.Summary,
             carryForwardSignal ? carryForward?.Label : null,
             carryForwardSignal ? carryForward?.Summary : null,
@@ -1827,17 +1830,17 @@ public sealed class CampaignWorkspaceServerPlaneService
             carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>(),
             continuitySignals.Select(static packet => packet.Summary),
             continuitySignals.Select(static packet => packet.Label),
-            workspace.RecapShelf.Select(static item => item.Summary),
-            workspace.RecapShelf.Select(static item => item.Label),
+            continuityRecaps.Select(static item => item.Summary),
+            continuityRecaps.Select(static item => item.Label),
             workspace.Dossiers.Select(static item => item.LatestContinuity?.Summary));
         int continuitySignalCount = (workspace.LatestContinuity is null ? 0 : 1)
-            + workspace.RecapShelf.Count
+            + continuityRecaps.Length
             + workspace.Dossiers.Count
             + continuitySignals.Length
             + (carryForwardSignal ? 1 : 0);
-        string summary = workspace.RecapShelf.Count == 0 && workspace.LatestContinuity is null
+        string summary = continuityRecaps.Length == 0 && workspace.LatestContinuity is null
             ? $"{Math.Max(1, continuitySignalCount)} continuity signal(s) stay attached to the shared return lane even before recap-safe output is published."
-            : $"{workspace.RecapShelf.Count} recap-safe output(s) stay attached to the same shared continuity spine.";
+            : $"{continuityRecaps.Length} recap-safe output(s) stay attached to the same shared continuity spine.";
         DateTimeOffset updatedAtUtc = new[]
             {
                 workspace.LatestContinuity?.CapturedAtUtc,
@@ -1865,8 +1868,8 @@ public sealed class CampaignWorkspaceServerPlaneService
                 carryForwardSignal ? carryForward?.ReturnSummary : null,
                 carryForwardSignal ? carryForward?.NextSafeAction : null,
                 carryForwardSignal ? carryForward?.EvidenceLines : Array.Empty<string>(),
-                workspace.RecapShelf.Select(static item => item.Label),
-                workspace.RecapShelf.Select(static item => item.Kind),
+                continuityRecaps.Select(static item => item.Label),
+                continuityRecaps.Select(static item => item.Kind),
                 workspace.Dossiers.Select(static item => item.RunnerHandle),
                 continuitySignals.Select(static packet => packet.Kind),
                 continuitySignals.Select(static packet => packet.Label)),
