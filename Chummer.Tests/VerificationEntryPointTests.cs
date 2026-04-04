@@ -87,6 +87,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.status must be pass/passed/ready", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generatedAt is stale", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generatedAt is in the future", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.defaultKeyCount must be an integer", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.defaultKeyCount must be positive", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.shippingLocales must equal required flagship locales", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.acceptanceGates is missing required gate ids", script, StringComparison.Ordinal);
