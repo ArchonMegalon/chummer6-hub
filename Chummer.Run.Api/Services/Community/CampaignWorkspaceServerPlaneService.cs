@@ -4398,7 +4398,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             staleCacheDeviceCount,
             latestPrefetchByInstallation,
             now);
-        IReadOnlyList<TravelOfflineLaneCue> offlineLaneCues = BuildTravelOfflineLaneCues(workspace, travelReadyDeviceCount, prepLibrary);
+        IReadOnlyList<TravelOfflineLaneCue> offlineLaneCues = BuildTravelOfflineLaneCues(
+            workspace,
+            travelReadyDeviceCount,
+            freshCacheDeviceCount,
+            staleCacheDeviceCount,
+            prepLibrary);
         string offlineActionabilitySummary = BuildOfflineActionabilitySummary(offlineLaneCues);
         string status = claimedDeviceCount == 0
             ? "warning"
@@ -4449,6 +4454,8 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static IReadOnlyList<TravelOfflineLaneCue> BuildTravelOfflineLaneCues(
         CampaignWorkspaceProjection workspace,
         int travelReadyDeviceCount,
+        int freshCacheDeviceCount,
+        int staleCacheDeviceCount,
         CampaignPrepLibrarySummary prepLibrary)
     {
         int downtimeDiarySignalCount = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
@@ -4457,8 +4464,17 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Count(static consequence => IsCampaignRelationshipSignalKind(consequence.Kind));
         int aftermathPackageCount = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>()).Count;
         int prepPacketCount = prepLibrary.Packets.Count;
-        string laneStatus = travelReadyDeviceCount == 0 ? "blocked" : "ready";
+        string laneStatus = travelReadyDeviceCount == 0
+            ? "blocked"
+            : staleCacheDeviceCount > 0
+                ? "degraded"
+                : "ready";
         string blockedTail = " until a travel-safe claimed device is linked.";
+        string degradedTail = staleCacheDeviceCount == 0
+            ? string.Empty
+            : freshCacheDeviceCount == 0
+                ? " but all staged travel caches are stale; stage a new travel prefetch receipt before relying on offline continuity."
+                : $" but {staleCacheDeviceCount} staged cache(s) are stale; refresh before departure.";
 
         return
         [
@@ -4468,28 +4484,36 @@ public sealed class CampaignWorkspaceServerPlaneService
                 SignalCount: downtimeDiarySignalCount,
                 Summary: travelReadyDeviceCount == 0
                     ? $"Downtime and diary continuity is blocked{blockedTail}"
-                    : $"{travelReadyDeviceCount} travel-safe device(s) can continue downtime/diary with {downtimeDiarySignalCount} governed cue(s) while offline."),
+                    : staleCacheDeviceCount > 0
+                        ? $"{travelReadyDeviceCount} travel-safe device(s) can continue downtime/diary with {downtimeDiarySignalCount} governed cue(s) while offline{degradedTail}"
+                        : $"{travelReadyDeviceCount} travel-safe device(s) can continue downtime/diary with {downtimeDiarySignalCount} governed cue(s) while offline."),
             new TravelOfflineLaneCue(
                 Lane: "contacts_heat",
                 Status: laneStatus,
                 SignalCount: contactsHeatSignalCount,
                 Summary: travelReadyDeviceCount == 0
                     ? $"Contacts and heat consequence follow-through is blocked{blockedTail}"
-                    : $"{travelReadyDeviceCount} travel-safe device(s) can continue contacts/heat consequence follow-through with {contactsHeatSignalCount} governed cue(s) while offline."),
+                    : staleCacheDeviceCount > 0
+                        ? $"{travelReadyDeviceCount} travel-safe device(s) can continue contacts/heat consequence follow-through with {contactsHeatSignalCount} governed cue(s) while offline{degradedTail}"
+                        : $"{travelReadyDeviceCount} travel-safe device(s) can continue contacts/heat consequence follow-through with {contactsHeatSignalCount} governed cue(s) while offline."),
             new TravelOfflineLaneCue(
                 Lane: "aftermath_recap",
                 Status: laneStatus,
                 SignalCount: aftermathPackageCount,
                 Summary: travelReadyDeviceCount == 0
                     ? $"Aftermath recap review is blocked{blockedTail}"
-                    : $"{travelReadyDeviceCount} travel-safe device(s) can review {aftermathPackageCount} aftermath package(s) while offline."),
+                    : staleCacheDeviceCount > 0
+                        ? $"{travelReadyDeviceCount} travel-safe device(s) can review {aftermathPackageCount} aftermath package(s) while offline{degradedTail}"
+                        : $"{travelReadyDeviceCount} travel-safe device(s) can review {aftermathPackageCount} aftermath package(s) while offline."),
             new TravelOfflineLaneCue(
                 Lane: "prep_review",
                 Status: laneStatus,
                 SignalCount: prepPacketCount,
                 Summary: travelReadyDeviceCount == 0
                     ? $"Governed prep review is blocked{blockedTail}"
-                    : $"{travelReadyDeviceCount} travel-safe device(s) can review {prepPacketCount} governed prep packet(s) while offline.")
+                    : staleCacheDeviceCount > 0
+                        ? $"{travelReadyDeviceCount} travel-safe device(s) can review {prepPacketCount} governed prep packet(s) while offline{degradedTail}"
+                        : $"{travelReadyDeviceCount} travel-safe device(s) can review {prepPacketCount} governed prep packet(s) while offline.")
         ];
     }
 
@@ -4506,9 +4530,20 @@ public sealed class CampaignWorkspaceServerPlaneService
             return "Offline actionability is blocked until a travel-safe claimed device is linked.";
         }
 
+        IReadOnlyList<TravelOfflineLaneCue> degradedLanes = offlineLaneCues
+            .Where(static cue => string.Equals(cue.Status, "degraded", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
         IReadOnlyList<TravelOfflineLaneCue> readyLanes = offlineLaneCues
             .Where(static cue => string.Equals(cue.Status, "ready", StringComparison.OrdinalIgnoreCase))
             .ToArray();
+        if (degradedLanes.Count > 0)
+        {
+            string degradedLaneSummary = string.Join(", ", degradedLanes.Select(static cue => $"{cue.Lane.Replace('_', '/')}: {cue.SignalCount}"));
+            return readyLanes.Count == 0
+                ? $"Offline actionability is bounded but degraded across {degradedLanes.Count} lane(s): {degradedLaneSummary}. Stage a fresh travel prefetch receipt before departure."
+                : $"Offline actionability is explicit across {readyLanes.Count} ready lane(s) and {degradedLanes.Count} degraded lane(s). Stage a fresh travel prefetch receipt before departure.";
+        }
+
         string laneSummary = string.Join(", ", readyLanes.Select(static cue => $"{cue.Lane.Replace('_', '/')}: {cue.SignalCount}"));
         return $"Offline actionability is explicit across {readyLanes.Count} lane(s): {laneSummary}.";
     }
