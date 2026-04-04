@@ -95,6 +95,19 @@ REQUIRED_RELEASE_PROOF_ROUTES = (
     "/account/support",
     "/contact",
 )
+ALLOWED_RELEASE_PROOF_KEYS = (
+    "status",
+    "generatedAt",
+    "generated_at",
+    "uiLocalizationReleaseGate",
+    "ui_localization_release_gate",
+    "baseUrl",
+    "base_url",
+    "journeysPassed",
+    "journeys_passed",
+    "proofRoutes",
+    "proof_routes",
+)
 REQUIRED_LOCALIZATION_SHIPPING_LOCALES = ("en-us", "de-de", "fr-fr", "ja-jp", "pt-br", "zh-cn")
 REQUIRED_LOCALIZATION_ACCEPTANCE_GATES = (
     "pseudo_localization",
@@ -453,6 +466,14 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             f"{release_channel_path}"
         ),
     )
+    unexpected_release_proof_keys = sorted(
+        key for key in proof.keys() if str(key) not in ALLOWED_RELEASE_PROOF_KEYS
+    )
+    if unexpected_release_proof_keys:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof has unexpected keys: "
+            f"{release_channel_path} ({', '.join(str(key) for key in unexpected_release_proof_keys)})"
+        )
     proof_status = normalized_token(proof.get("status"))
     if proof_status not in {"pass", "passed", "ready"}:
         raise SystemExit(
@@ -494,7 +515,13 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             f"{release_channel_path} (future_skew_seconds={abs(release_proof_age_seconds)}, max_future_skew_seconds={release_proof_max_future_skew_seconds})"
         )
     localization_gate_object = require_object(
-        proof.get("uiLocalizationReleaseGate"),
+        resolve_alias_value(
+            proof,
+            primary_key="uiLocalizationReleaseGate",
+            secondary_key="ui_localization_release_gate",
+            field_name="releaseProof.uiLocalizationReleaseGate",
+            source=release_channel_path,
+        ),
         message=(
             "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate must be an object: "
             f"{release_channel_path}"
