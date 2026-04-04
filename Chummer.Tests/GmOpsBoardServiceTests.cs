@@ -557,7 +557,7 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
-    public async Task GetProjection_UnresolvedItemsTreatPostSessionPostRunAndAfterActionReportSignalsAsPrepLibraryDomain()
+    public async Task GetProjection_UnresolvedItemsTreatRecapContinuityShorthandAsPrepLibraryDomain()
     {
         SessionLedgerService ledger = new();
         var service = CreateService(ledger);
@@ -590,6 +590,20 @@ public sealed class GmOpsBoardServiceTests
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
+                Payload: "Open postmortem prep lane remains unresolved before next return checkpoint.",
+                AtUtc: baseTime.AddMinutes(3),
+                EventId: "evt-postmortem"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open debriefing prep lane remains unresolved before next return checkpoint.",
+                AtUtc: baseTime.AddMinutes(4),
+                EventId: "evt-debriefing"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
                 Payload: "Open checklist remains unresolved.",
                 AtUtc: baseTime.AddMinutes(21),
                 EventId: "evt-general")
@@ -597,11 +611,13 @@ public sealed class GmOpsBoardServiceTests
 
         OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
 
-        Assert.Equal(4, projection.UnresolvedItems.Count);
-        Assert.Equal("ops:evt-after-action-report", projection.UnresolvedItems[0].ItemId);
-        Assert.Equal("ops:evt-post-run", projection.UnresolvedItems[1].ItemId);
-        Assert.Equal("ops:evt-postsession", projection.UnresolvedItems[2].ItemId);
-        Assert.Equal("ops:evt-general", projection.UnresolvedItems[3].ItemId);
+        Assert.Equal(6, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-debriefing", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-postmortem", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-after-action-report", projection.UnresolvedItems[2].ItemId);
+        Assert.Equal("ops:evt-post-run", projection.UnresolvedItems[3].ItemId);
+        Assert.Equal("ops:evt-postsession", projection.UnresolvedItems[4].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[5].ItemId);
     }
 
     [Fact]
