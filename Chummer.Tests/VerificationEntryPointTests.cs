@@ -14,6 +14,20 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void ParityChecklistGeneratorFailClosesMalformedParityTokens()
+    {
+        string scriptPath = RepoPaths.FromRoot("scripts", "generate-parity-checklist.sh");
+        string script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("normalize_required_token", script, StringComparison.Ordinal);
+        Assert.Contains("parse_required_token_list", script, StringComparison.Ordinal);
+        Assert.Contains("parse_catalog_token_matches", script, StringComparison.Ordinal);
+        Assert.Contains("must not contain blank token values", script, StringComparison.Ordinal);
+        Assert.Contains("contains whitespace-padded token", script, StringComparison.Ordinal);
+        Assert.Contains("contains duplicate normalized token", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SupportVerificationGuardAvoidsUnmatchedInstallFallback()
     {
         string presenterPath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Support", "SupportCasePresentationService.cs");
