@@ -2953,8 +2953,11 @@ public sealed class CampaignSpineService
         RosterTransferProjection? rosterTransfer = rosterTransfers.FirstOrDefault();
         if (rosterTransfer is not null)
         {
+            string rosterTransferId = ResolveChangePacketIdentity(
+                rosterTransfer.TransferId,
+                StableId("transfer", campaign.CampaignId));
             packets.Add(new WorkspaceChangePacketProjection(
-                PacketId: StableId("packet", $"{campaign.CampaignId}:transfer:{rosterTransfer.TransferId}"),
+                PacketId: StableId("packet", $"{campaign.CampaignId}:transfer:{rosterTransferId}"),
                 Kind: "roster_transfer",
                 Label: "Roster transfer",
                 Summary: rosterTransfer.Summary,
@@ -2964,8 +2967,11 @@ public sealed class CampaignSpineService
         GovernedPrepLaunchProjection? prepLaunch = prepLaunches.FirstOrDefault();
         if (prepLaunch is not null)
         {
+            string prepLaunchId = ResolveChangePacketIdentity(
+                prepLaunch.LaunchId,
+                StableId("prep-launch", campaign.CampaignId));
             packets.Add(new WorkspaceChangePacketProjection(
-                PacketId: StableId("packet", $"{campaign.CampaignId}:prep-launch:{prepLaunch.LaunchId}"),
+                PacketId: StableId("packet", $"{campaign.CampaignId}:prep-launch:{prepLaunchId}"),
                 Kind: "prep_launch",
                 Label: "GM prep launch",
                 Summary: prepLaunch.Summary,
@@ -2975,8 +2981,11 @@ public sealed class CampaignSpineService
         TravelPrefetchReceiptProjection? travelPrefetch = travelPrefetchReceipts.FirstOrDefault();
         if (travelPrefetch is not null)
         {
+            string travelPrefetchReceiptId = ResolveChangePacketIdentity(
+                travelPrefetch.ReceiptId,
+                StableId("travel-prefetch", campaign.CampaignId));
             packets.Add(new WorkspaceChangePacketProjection(
-                PacketId: StableId("packet", $"{campaign.CampaignId}:travel-prefetch:{travelPrefetch.ReceiptId}"),
+                PacketId: StableId("packet", $"{campaign.CampaignId}:travel-prefetch:{travelPrefetchReceiptId}"),
                 Kind: "travel_prefetch",
                 Label: "Travel prefetch staged",
                 Summary: travelPrefetch.PrefetchSummary,

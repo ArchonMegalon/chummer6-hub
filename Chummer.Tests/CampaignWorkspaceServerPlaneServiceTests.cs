@@ -1022,6 +1022,111 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineWorkspaceChangePacketsNormalizeWhitespacePaddedRosterTransferIdsBeforePacketProjection()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        IReadOnlyList<RosterTransferProjection> rosterTransfers = Assert.IsAssignableFrom<IReadOnlyList<RosterTransferProjection>>(workspace.RosterTransfers);
+        RosterTransferProjection transfer = Assert.Single(rosterTransfers);
+        RosterTransferProjection paddedTransfer = transfer with
+        {
+            TransferId = "  transfer-1  "
+        };
+
+        IReadOnlyList<WorkspaceChangePacketProjection> canonicalPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [transfer],
+            [],
+            []);
+        IReadOnlyList<WorkspaceChangePacketProjection> paddedPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [paddedTransfer],
+            [],
+            []);
+
+        WorkspaceChangePacketProjection canonicalPacket = Assert.Single(canonicalPackets);
+        WorkspaceChangePacketProjection paddedPacket = Assert.Single(paddedPackets);
+        Assert.Equal("roster_transfer", canonicalPacket.Kind);
+        Assert.Equal(canonicalPacket.PacketId, paddedPacket.PacketId);
+    }
+
+    [Fact]
+    public void CampaignSpineWorkspaceChangePacketsNormalizeWhitespacePaddedPrepLaunchIdsBeforePacketProjection()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches = Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepLaunchProjection>>(workspace.PrepLaunches);
+        GovernedPrepLaunchProjection prepLaunch = Assert.Single(prepLaunches);
+        GovernedPrepLaunchProjection paddedPrepLaunch = prepLaunch with
+        {
+            LaunchId = "  launch-1  "
+        };
+
+        IReadOnlyList<WorkspaceChangePacketProjection> canonicalPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [prepLaunch],
+            []);
+        IReadOnlyList<WorkspaceChangePacketProjection> paddedPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [paddedPrepLaunch],
+            []);
+
+        WorkspaceChangePacketProjection canonicalPacket = Assert.Single(canonicalPackets);
+        WorkspaceChangePacketProjection paddedPacket = Assert.Single(paddedPackets);
+        Assert.Equal("prep_launch", canonicalPacket.Kind);
+        Assert.Equal(canonicalPacket.PacketId, paddedPacket.PacketId);
+    }
+
+    [Fact]
+    public void CampaignSpineWorkspaceChangePacketsNormalizeWhitespacePaddedTravelPrefetchReceiptIdsBeforePacketProjection()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetches = Assert.IsAssignableFrom<IReadOnlyList<TravelPrefetchReceiptProjection>>(workspace.TravelPrefetches);
+        TravelPrefetchReceiptProjection prefetch = Assert.Single(travelPrefetches);
+        TravelPrefetchReceiptProjection paddedPrefetch = prefetch with
+        {
+            ReceiptId = "  prefetch-1  "
+        };
+
+        IReadOnlyList<WorkspaceChangePacketProjection> canonicalPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [],
+            [prefetch]);
+        IReadOnlyList<WorkspaceChangePacketProjection> paddedPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [],
+            [paddedPrefetch]);
+
+        WorkspaceChangePacketProjection canonicalPacket = Assert.Single(canonicalPackets);
+        WorkspaceChangePacketProjection paddedPacket = Assert.Single(paddedPackets);
+        Assert.Equal("travel_prefetch", canonicalPacket.Kind);
+        Assert.Equal(canonicalPacket.PacketId, paddedPacket.PacketId);
+    }
+
+    [Fact]
     public void CampaignMemoryPacketDoesNotActivateFromCarryForwardWindowSignalsWithoutMemoryContext()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardWindowOnly();
@@ -4756,6 +4861,23 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<PublicationSafeProjection> recapShelf,
         IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages,
         NextSessionCarryForwardProjection? carryForward)
+        => InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            recapShelf,
+            aftermathPackages,
+            carryForward,
+            [],
+            [],
+            []);
+
+    private static IReadOnlyList<WorkspaceChangePacketProjection> InvokeCampaignSpineBuildWorkspaceChangePackets(
+        CampaignProjection campaign,
+        IReadOnlyList<PublicationSafeProjection> recapShelf,
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages,
+        NextSessionCarryForwardProjection? carryForward,
+        IReadOnlyList<RosterTransferProjection> rosterTransfers,
+        IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
+        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts)
     {
         MethodInfo method = typeof(CampaignSpineService)
             .GetMethod("BuildWorkspaceChangePackets", BindingFlags.NonPublic | BindingFlags.Static)
@@ -4768,9 +4890,9 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             null,
             null,
             null,
-            Array.Empty<RosterTransferProjection>(),
-            Array.Empty<GovernedPrepLaunchProjection>(),
-            Array.Empty<TravelPrefetchReceiptProjection>(),
+            rosterTransfers,
+            prepLaunches,
+            travelPrefetchReceipts,
             aftermathPackages,
             carryForward
         ]));
