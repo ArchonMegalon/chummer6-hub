@@ -137,6 +137,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
 
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturnpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diarycontactheatpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diarycontactheatpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diarycontactsheatpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathdowntimepacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelofflinepackets")));
