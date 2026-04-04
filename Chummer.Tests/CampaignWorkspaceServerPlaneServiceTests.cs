@@ -273,6 +273,83 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignWorkspaceSummarySessionReadinessPrefersAttentionCueOverEarlierReviewCue()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        CampaignReadinessCue reviewCue = new(
+            CueId: "cue-review-1",
+            Severity: "review",
+            Title: "Rule environment review",
+            Summary: "Ruleset should be reviewed.");
+        CampaignReadinessCue attentionCue = new(
+            CueId: "cue-attention-1",
+            Severity: "attention",
+            Title: "Open objective pressure",
+            Summary: "Objective pressure remains high.");
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ReadinessCues = [reviewCue, attentionCue]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        CampaignWorkspaceSummary summary = InvokeBuildCampaignWorkspaceSummary(workspace, restore);
+
+        Assert.Equal("Open objective pressure: Objective pressure remains high.", summary.SessionReadinessSummary);
+        Assert.DoesNotContain("Rule environment review", summary.SessionReadinessSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CampaignWorkspaceSummarySessionReadinessPrefersWarningCueOverEarlierReviewCue()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        CampaignReadinessCue reviewCue = new(
+            CueId: "cue-review-1",
+            Severity: "review",
+            Title: "Rule environment review",
+            Summary: "Ruleset should be reviewed.");
+        CampaignReadinessCue warningCue = new(
+            CueId: "cue-warning-1",
+            Severity: "warning",
+            Title: "Continuity gap detected",
+            Summary: "At least one dossier is missing continuity.");
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ReadinessCues = [reviewCue, warningCue]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        CampaignWorkspaceSummary summary = InvokeBuildCampaignWorkspaceSummary(workspace, restore);
+
+        Assert.Equal("Continuity gap detected: At least one dossier is missing continuity.", summary.SessionReadinessSummary);
+        Assert.DoesNotContain("Rule environment review", summary.SessionReadinessSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RosterReadinessHighlightsPreferAttentionCueOverEarlierReviewCue()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        CampaignReadinessCue reviewCue = new(
+            CueId: "cue-review-1",
+            Severity: "review",
+            Title: "Rule environment review",
+            Summary: "Ruleset should be reviewed.");
+        CampaignReadinessCue attentionCue = new(
+            CueId: "cue-attention-1",
+            Severity: "attention",
+            Title: "Open objective pressure",
+            Summary: "Objective pressure remains high.");
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ReadinessCues = [reviewCue, attentionCue]
+        };
+
+        RosterReadinessSummary summary = InvokeBuildRosterReadinessSummary(workspace);
+
+        string highlight = Assert.IsType<string>(summary.Highlights.FirstOrDefault());
+        Assert.Contains("Open objective pressure", highlight, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RecapShelfDeduplicatesSemanticallyIdenticalRows_WhenProjectionIdsDiffer()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
@@ -5990,6 +6067,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("BuildCampaignWorkspaceSummary was not found.");
 
         return Assert.IsType<CampaignWorkspaceSummary>(method.Invoke(null, [workspace, null, restore]));
+    }
+
+    private static RosterReadinessSummary InvokeBuildRosterReadinessSummary(
+        CampaignWorkspaceProjection workspace)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BuildRosterReadinessSummary", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildRosterReadinessSummary was not found.");
+
+        return Assert.IsType<RosterReadinessSummary>(method.Invoke(null, [workspace]));
     }
 
     private static RunboardSummary? InvokeBuildRunboardSummary(
