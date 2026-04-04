@@ -885,6 +885,20 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("opfor");
         }
 
+        if (tokens.Contains("oppositionwindow") || tokens.Contains("oppositionwindows"))
+        {
+            tokens.Remove("oppositionwindow");
+            tokens.Remove("oppositionwindows");
+            tokens.Add("opposition");
+        }
+
+        if (tokens.Contains("oppositioncontrol") || tokens.Contains("oppositioncontrols"))
+        {
+            tokens.Remove("oppositioncontrol");
+            tokens.Remove("oppositioncontrols");
+            tokens.Add("opposition");
+        }
+
         if (tokens.Contains("sessionlogs"))
         {
             tokens.Remove("sessionlogs");
