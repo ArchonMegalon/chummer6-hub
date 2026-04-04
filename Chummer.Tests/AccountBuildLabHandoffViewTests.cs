@@ -22,4 +22,16 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("Crew fit", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.PlannerCoverageLines.Take(5)", view, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void AccountWorkspaceTravelModeRendersCacheFreshnessCues()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary", view, StringComparison.Ordinal);
+        Assert.Contains("selectedWorkspaceServerPlane.TravelMode.FreshCacheDeviceCount", view, StringComparison.Ordinal);
+        Assert.Contains("selectedWorkspaceServerPlane.TravelMode.StaleCacheDeviceCount", view, StringComparison.Ordinal);
+        Assert.Contains("Cache freshness", view, StringComparison.Ordinal);
+    }
 }

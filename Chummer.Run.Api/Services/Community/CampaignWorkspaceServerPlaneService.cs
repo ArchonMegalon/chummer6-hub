@@ -4149,7 +4149,39 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         int claimedDeviceCount = restore.ClaimedDevices.Count;
         int travelReadyDeviceCount = restore.ClaimedDevices.Count(IsTravelReadyDevice);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        Dictionary<string, DateTimeOffset> latestPrefetchByInstallation = (workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>())
+            .GroupBy(static receipt => receipt.InstallationId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.Max(static receipt => receipt.StagedAtUtc),
+                StringComparer.OrdinalIgnoreCase);
+        int freshCacheDeviceCount = 0;
+        int staleCacheDeviceCount = 0;
+        foreach (ClaimedDeviceRestoreProjection device in restore.ClaimedDevices)
+        {
+            if (!IsTravelReadyDevice(device))
+            {
+                continue;
+            }
+
+            if (IsTravelCacheStale(device, latestPrefetchByInstallation, now))
+            {
+                staleCacheDeviceCount++;
+            }
+            else
+            {
+                freshCacheDeviceCount++;
+            }
+        }
+
         string prefetchInventorySummary = $"{DescribeRestorePrefetchInventory(restore.RecentDossiers.Count, restore.RecentCampaigns.Count, restore.RecentRuleEnvironments.Count, restore.RecentArtifacts.Count)} plus {prepLibrary.Packets.Count} governed prep packet(s)";
+        string cacheFreshnessSummary = BuildTravelCacheFreshnessSummary(
+            travelReadyDeviceCount,
+            freshCacheDeviceCount,
+            staleCacheDeviceCount,
+            latestPrefetchByInstallation,
+            now);
         string status = claimedDeviceCount == 0
             ? "warning"
             : restore.ConflictSummaries.Count > 0
@@ -4175,8 +4207,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             Status: status,
             Summary: summary,
             PrefetchInventorySummary: prefetchInventorySummary,
+            CacheFreshnessSummary: cacheFreshnessSummary,
             ClaimedDeviceCount: claimedDeviceCount,
             TravelReadyDeviceCount: travelReadyDeviceCount,
+            FreshCacheDeviceCount: freshCacheDeviceCount,
+            StaleCacheDeviceCount: staleCacheDeviceCount,
             Devices: restore.ClaimedDevices
                 .Take(4)
                 .Select(device => new TravelModeDeviceReadinessCue(
@@ -4185,7 +4220,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                     Platform: device.Platform,
                     HeadId: device.HeadId,
                     Channel: device.Channel,
-                    Status: ResolveTravelDeviceStatus(device, restore.ConflictSummaries.Count > 0),
+                    Status: ResolveTravelDeviceStatus(device, restore.ConflictSummaries.Count > 0, IsTravelCacheStale(device, latestPrefetchByInstallation, now)),
                     Summary: device.RestoreSummary))
                 .ToArray(),
             Boundaries: boundaries);
@@ -4826,14 +4861,64 @@ public sealed class CampaignWorkspaceServerPlaneService
             && ContainsAnyWordToken(value, UseWordTokens);
     }
 
-    private static string ResolveTravelDeviceStatus(ClaimedDeviceRestoreProjection device, bool hasConflicts)
+    private static string ResolveTravelDeviceStatus(ClaimedDeviceRestoreProjection device, bool hasConflicts, bool staleCache)
     {
         if (hasConflicts)
         {
             return "attention";
         }
 
-        return IsTravelReadyDevice(device) ? "ready" : "review";
+        if (!IsTravelReadyDevice(device))
+        {
+            return "review";
+        }
+
+        return staleCache ? "stale" : "ready";
+    }
+
+    private static bool IsTravelCacheStale(
+        ClaimedDeviceRestoreProjection device,
+        IReadOnlyDictionary<string, DateTimeOffset> latestPrefetchByInstallation,
+        DateTimeOffset now)
+    {
+        if (!IsTravelReadyDevice(device))
+        {
+            return false;
+        }
+
+        if (!latestPrefetchByInstallation.TryGetValue(device.InstallationId, out DateTimeOffset stagedAtUtc))
+        {
+            return true;
+        }
+
+        return now - stagedAtUtc > TimeSpan.FromDays(14);
+    }
+
+    private static string BuildTravelCacheFreshnessSummary(
+        int travelReadyDeviceCount,
+        int freshCacheDeviceCount,
+        int staleCacheDeviceCount,
+        IReadOnlyDictionary<string, DateTimeOffset> latestPrefetchByInstallation,
+        DateTimeOffset now)
+    {
+        if (travelReadyDeviceCount == 0)
+        {
+            return "No travel-safe claimed devices are ready yet, so cache freshness cannot be established.";
+        }
+
+        if (latestPrefetchByInstallation.Count == 0)
+        {
+            return "No travel-prefetch receipt exists yet, so staged cache freshness is stale until the first governed prefetch run.";
+        }
+
+        DateTimeOffset latestPrefetch = latestPrefetchByInstallation.Values.Max();
+        string recencyLabel = $"{Math.Max(0, (int)Math.Floor((now - latestPrefetch).TotalDays))} day(s) since the newest staged receipt";
+        if (staleCacheDeviceCount > 0)
+        {
+            return $"{freshCacheDeviceCount} ready device(s) have fresh staged cache and {staleCacheDeviceCount} are stale ({recencyLabel}).";
+        }
+
+        return $"{freshCacheDeviceCount} ready device(s) have fresh staged cache ({recencyLabel}).";
     }
 
     private static IReadOnlyList<SupportCaseProjection> SelectRelevantSupportCases(
