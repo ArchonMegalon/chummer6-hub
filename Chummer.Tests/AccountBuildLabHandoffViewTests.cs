@@ -28,6 +28,9 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("Rule diff after", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.CrewFitSummary", view, StringComparison.Ordinal);
         Assert.Contains("Crew fit", view, StringComparison.Ordinal);
+        Assert.Contains("selectedBuildLabHandoff.ConditionalStateSummary", view, StringComparison.Ordinal);
+        Assert.Contains("selectedBuildLabHandoff.ConditionalStateLines.Take(3)", view, StringComparison.Ordinal);
+        Assert.Contains("Conditional rail:", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.PlannerCoverageLines.Take(5)", view, StringComparison.Ordinal);
         Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Planner lane:", view, StringComparison.Ordinal);

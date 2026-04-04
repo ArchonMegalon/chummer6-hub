@@ -927,6 +927,17 @@
                                                                 {
                                                                     <span> Crew fit: @handoff.CrewFitSummary.</span>
                                                                 }
+                                                                @if (!string.IsNullOrWhiteSpace(handoff.ConditionalStateSummary))
+                                                                {
+                                                                    <span> Conditional state: @handoff.ConditionalStateSummary.</span>
+                                                                }
+                                                                @if (handoff.ConditionalStateLines is { Count: > 0 })
+                                                                {
+                                                                    foreach (var conditionalLine in handoff.ConditionalStateLines.Take(2))
+                                                                    {
+                                                                        <span> Conditional lane: @conditionalLine</span>
+                                                                    }
+                                                                }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SupportClosureSummary))
                                                                 {
                                                                     <span> Support: @handoff.SupportClosureSummary.</span>

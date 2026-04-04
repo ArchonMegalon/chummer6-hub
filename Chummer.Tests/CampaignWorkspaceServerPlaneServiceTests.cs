@@ -7371,7 +7371,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ApprovalState: "approved",
             SourcePacks: ["sr6-core"],
             HouseRulePacks: [],
-            OptionToggles: []);
+            OptionToggles: ["drug_modifiers", "foci_bonding", "sustained_effects", "reputation_spend"]);
         RuleEnvironmentRef workspaceEnvironment = new(
             EnvironmentId: "env-workspace",
             OwnerScope: "campaign",
@@ -7379,7 +7379,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ApprovalState: "approved",
             SourcePacks: ["sr6-core"],
             HouseRulePacks: [],
-            OptionToggles: []);
+            OptionToggles: ["drug_modifiers", "foci_bonding", "sustained_effects", "reputation_spend"]);
         RunnerDossierProjection dossier = new(
             DossierId: "dossier-build-1",
             RunnerHandle: "Ghostline",
@@ -7459,6 +7459,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("foundry-exchange=ready", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("print-pdf-export=ready", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("crew-fit", handoff.CrewFitSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("conditional state rail", handoff.ConditionalStateSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(handoff.ConditionalStateLines);
+        Assert.Contains(handoff.ConditionalStateLines!, line => line.Contains("drug", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.ConditionalStateLines!, line => line.Contains("focus", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.ConditionalStateLines!, line => line.Contains("sustained", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.ConditionalStateLines!, line => line.Contains("reputation", StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)

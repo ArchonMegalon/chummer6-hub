@@ -58,7 +58,9 @@ public sealed record PublicationSafeProjection(
     string? CreatorPublicationId = null,
     string? NextSafeAction = null,
     string? ProvenanceSummary = null,
-    string? AuditSummary = null);
+    string? AuditSummary = null,
+    string? CompatibilitySummary = null,
+    string? LineageSummary = null);
 
 public sealed record CampaignConsequenceReceipt(
     string ReceiptId,
@@ -588,7 +590,9 @@ public sealed record BuildLabHandoffProjection(
     IReadOnlyList<string>? Watchouts = null,
     string? PlannerCoverageSummary = null,
     IReadOnlyList<string>? PlannerCoverageLines = null,
-    string? CrewFitSummary = null);
+    string? CrewFitSummary = null,
+    string? ConditionalStateSummary = null,
+    IReadOnlyList<string>? ConditionalStateLines = null);
 
 public sealed record BuildLabRuleEnvironmentDiffProjection(
     string Status,

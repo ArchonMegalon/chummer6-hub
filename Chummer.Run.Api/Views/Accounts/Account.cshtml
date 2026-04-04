@@ -1856,6 +1856,13 @@
                                     <strong>@selectedBuildLabHandoff.CrewFitSummary</strong>
                                 </div>
                             }
+                            @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.ConditionalStateSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Conditional state</span>
+                                    <strong>@selectedBuildLabHandoff.ConditionalStateSummary</strong>
+                                </div>
+                            }
                         </div>
                         @if (selectedBuildLabHandoff.TradeoffLines.Count > 0)
                         {
@@ -1872,6 +1879,10 @@
                         @if (selectedBuildLabHandoff.PlannerCoverageLines is { Count: > 0 })
                         {
                             <p><strong>Coverage:</strong> @string.Join(" ", selectedBuildLabHandoff.PlannerCoverageLines.Take(5))</p>
+                        }
+                        @if (selectedBuildLabHandoff.ConditionalStateLines is { Count: > 0 })
+                        {
+                            <p><strong>Conditional rail:</strong> @string.Join(" ", selectedBuildLabHandoff.ConditionalStateLines.Take(3))</p>
                         }
                         @if (selectedBuildLabHandoff.Outputs.Count > 0)
                         {
