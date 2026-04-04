@@ -216,9 +216,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject non-canonical lowercase releaseProof.journeysPassed journey ids", script, StringComparison.Ordinal);
         Assert.Contains("reject non-canonical token shape in releaseProof.journeysPassed journey ids", script, StringComparison.Ordinal);
         Assert.Contains("reject non-passing releaseProof.status values", script, StringComparison.Ordinal);
+        Assert.Contains("reject missing releaseProof payloads", script, StringComparison.Ordinal);
         Assert.Contains("reject non-array releaseProof.journeysPassed payloads", script, StringComparison.Ordinal);
         Assert.Contains("reject non-array releaseProof.proofRoutes payloads", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-string releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
         Assert.Contains("reject whitespace-padded releaseProof.journeysPassed journey ids", script, StringComparison.Ordinal);
+        Assert.Contains("reject blank releaseProof.journeysPassed journey ids", script, StringComparison.Ordinal);
         Assert.Contains("reject stale releaseProof.generatedAt timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.generatedAt timestamps with excessive future skew", script, StringComparison.Ordinal);
     }
