@@ -1246,6 +1246,46 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatGameMasterPacketShorthandAsEventControlDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:47:10Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open gamemasteropspacket remains unresolved before next checkpoint.",
+                AtUtc: baseTime,
+                EventId: "evt-gamemasterops-packet"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open game master control packet remains unresolved for event lane follow-through.",
+                AtUtc: baseTime.AddMinutes(1),
+                EventId: "evt-game-master-control-packet"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(3, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-game-master-control-packet", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-gamemasterops-packet", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[2].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatSplitGmOpsShorthandAsEventControlDomain()
     {
         SessionLedgerService ledger = new();
