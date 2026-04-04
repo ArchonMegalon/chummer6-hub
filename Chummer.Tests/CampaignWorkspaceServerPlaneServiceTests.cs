@@ -45,6 +45,28 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsOpForShorthandAcrossWhitespaceAndPunctuation()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "opposition:opfor",
+            Kind: "opposition_packet",
+            Title: "Neon Cradle opfor packet",
+            Summary: "Opposition pressure stays tied to the governed event lane.",
+            BindingSummary: "Bound to campaign return and opposition control receipts.",
+            Reusable: true,
+            SearchTerms: ["opfor", "opposition", "threat"],
+            EvidenceLines: ["Opfor opposition board remains active for the next launch window."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("opfor")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("opforce")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("op-for")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("op force")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("op_force")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixforce")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsCompactShorthandAcrossWhitespaceBoundaries()
     {
         var packet = new GovernedPrepPacketSummary(

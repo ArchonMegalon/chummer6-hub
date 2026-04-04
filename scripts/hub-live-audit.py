@@ -1392,6 +1392,34 @@ def verify_signed_in_work_audit(
     prep_library_opforce = json.loads(body)
     if not (prep_library_opforce.get("items") or []):
         raise AssertionError("prep-library opforce search did not expose any governed packet")
+    prep_library_op_force_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=op-force"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_op_force_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_op_force_path} returned {status}, expected 200")
+
+    prep_library_op_force = json.loads(body)
+    if not (prep_library_op_force.get("items") or []):
+        raise AssertionError("prep-library op-force search did not expose any governed packet")
+    prep_library_op_space_force_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=op%20force"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_op_space_force_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_op_space_force_path} returned {status}, expected 200")
+
+    prep_library_op_space_force = json.loads(body)
+    if not (prep_library_op_space_force.get("items") or []):
+        raise AssertionError("prep-library op force search did not expose any governed packet")
 
     prep_library_season_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=seasonops"
     status, body, _, _ = fetch(
@@ -3844,6 +3872,36 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_opforce_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_opforce_search_path} should return at least one governed prep packet for the opforce query")
+    workspace_op_force_search_path = f"{workspace_path}?prepQuery=op-force"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_op_force_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_op_force_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_op_force_search_path)
+    require_snippet(body, 'match(es) for "op-force"', workspace_op_force_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_op_force_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_op_force_search_path} should return at least one governed prep packet for the op-force query")
+    workspace_op_space_force_search_path = f"{workspace_path}?prepQuery=op%20force"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_op_space_force_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_op_space_force_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_op_space_force_search_path)
+    require_snippet(body, 'match(es) for "op force"', workspace_op_space_force_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_op_space_force_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_op_space_force_search_path} should return at least one governed prep packet for the op force query")
     workspace_season_search_path = f"{workspace_path}?prepQuery=seasonops"
     status, body, _, _ = fetch(
         base_url,

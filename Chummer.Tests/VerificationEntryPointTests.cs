@@ -598,6 +598,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=threat", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=opfor", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=opforce", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=op-force", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=op%20force", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=contact", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=contacts", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=connection", audit, StringComparison.Ordinal);
@@ -708,6 +710,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=threat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=opfor", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=opforce", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=op-force", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=op%20force", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=contact", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=contacts", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=connection", audit, StringComparison.Ordinal);
@@ -989,6 +993,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("opfor prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=opforce", playwright, StringComparison.Ordinal);
         Assert.Contains("opforce prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=op-force", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen op-force prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=op(?:%20|\\+)force", playwright, StringComparison.Ordinal);
+        Assert.Contains("split op force prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=contact", playwright, StringComparison.Ordinal);
         Assert.Contains("contact continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=contacts", playwright, StringComparison.Ordinal);

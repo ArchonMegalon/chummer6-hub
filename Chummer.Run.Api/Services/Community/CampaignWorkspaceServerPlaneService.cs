@@ -4929,6 +4929,21 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("session");
         }
 
+        if ((tokens.Contains("op") && tokens.Contains("for"))
+            || (tokens.Contains("op") && tokens.Contains("force")))
+        {
+            tokens.Remove("op");
+            tokens.Remove("for");
+            tokens.Remove("force");
+            tokens.Add("opfor");
+        }
+
+        if (tokens.Contains("opforce"))
+        {
+            tokens.Remove("opforce");
+            tokens.Add("opfor");
+        }
+
         if (tokens.Contains("sessionlogs"))
         {
             tokens.Remove("sessionlogs");

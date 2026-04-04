@@ -916,6 +916,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail opforce search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail opforce search');
 
+  await page.fill('#prepQuery', 'op-force');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=op-force/.test(page.url()), 'Workspace detail search should preserve the hyphen op-force prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail op-force search');
+  await expectBodyText(page, 'match(es) for "op-force"', '/account/work/workspaces detail op-force search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail op-force search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail op-force search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail op-force search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail op-force search');
+  const workspaceOpForceSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceOpForceSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen op-force query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail op-force search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail op-force search');
+
+  await page.fill('#prepQuery', 'op force');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=op(?:%20|\+)force/.test(page.url()), 'Workspace detail search should preserve the split op force prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail op force search');
+  await expectBodyText(page, 'match(es) for "op force"', '/account/work/workspaces detail op force search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail op force search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail op force search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail op force search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail op force search');
+  const workspaceOpSpaceForceSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceOpSpaceForceSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split op force query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail op force search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail op force search');
+
   await page.fill('#prepQuery', 'seasonops');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
