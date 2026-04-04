@@ -2639,6 +2639,20 @@ def verify_signed_in_work_audit(
     prep_library_league_ctrls_hyphen = json.loads(body)
     if not (prep_library_league_ctrls_hyphen.get("items") or []):
         raise AssertionError("prep-library league-ctrls search did not expose any governed packet")
+    prep_library_league_ctrl_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=league%20ctrl"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_league_ctrl_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_league_ctrl_path} returned {status}, expected 200")
+
+    prep_library_league_ctrl = json.loads(body)
+    if not (prep_library_league_ctrl.get("items") or []):
+        raise AssertionError("prep-library league ctrl search did not expose any governed packet")
     prep_library_league_ctrl_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=league-ctrl"
     status, body, _, _ = fetch(
         base_url,
@@ -2989,6 +3003,20 @@ def verify_signed_in_work_audit(
     prep_library_community_ctrls_hyphen = json.loads(body)
     if not (prep_library_community_ctrls_hyphen.get("items") or []):
         raise AssertionError("prep-library community-ctrls search did not expose any governed packet")
+    prep_library_community_ctrl_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=community%20ctrl"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_community_ctrl_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_community_ctrl_path} returned {status}, expected 200")
+
+    prep_library_community_ctrl = json.loads(body)
+    if not (prep_library_community_ctrl.get("items") or []):
+        raise AssertionError("prep-library community ctrl search did not expose any governed packet")
     prep_library_community_ctrl_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=community-ctrl"
     status, body, _, _ = fetch(
         base_url,
