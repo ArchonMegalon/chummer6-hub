@@ -516,10 +516,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessions")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturn")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturns")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionsreturn")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionsreturns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturnloop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionsreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionsreturnloops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturnlane")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturnlanes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionsreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionsreturnlanes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionloop")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionloops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("next-session")));
