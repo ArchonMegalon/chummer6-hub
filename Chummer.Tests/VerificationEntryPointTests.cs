@@ -219,6 +219,13 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("UI_LOCALIZATION_GATE_TIMESTAMP_FUTURE_MARKER", script, StringComparison.Ordinal);
         Assert.Contains("UI_LOCALIZATION_GATE_TIMESTAMP_FUTURE_ALIAS_MARKER", script, StringComparison.Ordinal);
         Assert.Contains("verify note: syncing release-channel nested UI localization gate timestamp from canonical UI localization receipt.", script, StringComparison.Ordinal);
+        Assert.Contains("RELEASE_PROOF_TIMESTAMP_STALE_MARKER", script, StringComparison.Ordinal);
+        Assert.Contains("RELEASE_PROOF_TIMESTAMP_STALE_ALIAS_MARKER", script, StringComparison.Ordinal);
+        Assert.Contains("RELEASE_PROOF_TIMESTAMP_FUTURE_MARKER", script, StringComparison.Ordinal);
+        Assert.Contains("RELEASE_PROOF_TIMESTAMP_FUTURE_ALIAS_MARKER", script, StringComparison.Ordinal);
+        Assert.Contains("sync_release_channel_proof_timestamp_from_release_channel_receipt", script, StringComparison.Ordinal);
+        Assert.Contains("verify note: syncing release-channel nested release proof timestamp from canonical release-channel generated_at.", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel generated_at/generatedAt is missing", script, StringComparison.Ordinal);
         Assert.Contains("releaseProof.uiLocalizationReleaseGate", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_path", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_fixture_path", script, StringComparison.Ordinal);
