@@ -209,6 +209,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject non-http(s) releaseProof.baseUrl schemes", script, StringComparison.Ordinal);
         Assert.Contains("reject non-origin releaseProof.baseUrl path/query segments", script, StringComparison.Ordinal);
         Assert.Contains("reject hostless releaseProof.baseUrl origins", script, StringComparison.Ordinal);
+        Assert.Contains("reject hostless releaseProof.base_url alias origins", script, StringComparison.Ordinal);
         Assert.Contains("reject userinfo credentials in releaseProof.baseUrl origins", script, StringComparison.Ordinal);
         Assert.Contains("reject whitespace-padded releaseProof.baseUrl values", script, StringComparison.Ordinal);
         Assert.Contains("reject whitespace-padded releaseProof.base_url alias values", script, StringComparison.Ordinal);
@@ -601,6 +602,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=aftermath", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=recap", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=returnloop", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=nextsession", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=memory", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=archive", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=history", audit, StringComparison.Ordinal);
@@ -705,6 +708,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=aftermath", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=recap", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=return", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=returnloop", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=nextsession", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=memory", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=archive", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=history", audit, StringComparison.Ordinal);
@@ -985,6 +990,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("recap continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=return", playwright, StringComparison.Ordinal);
         Assert.Contains("return-loop continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=returnloop", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact returnloop continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=nextsession", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact nextsession continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=memory", playwright, StringComparison.Ordinal);
         Assert.Contains("campaign-memory prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=archive", playwright, StringComparison.Ordinal);
