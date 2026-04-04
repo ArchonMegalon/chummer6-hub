@@ -1250,6 +1250,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("opfor");
         }
 
+        if (tokens.Contains("opfor"))
+        {
+            tokens.Remove("opfor");
+            tokens.Add("opposition");
+        }
+
         if (tokens.Contains("oppositionwindow") || tokens.Contains("oppositionwindows"))
         {
             tokens.Remove("oppositionwindow");

@@ -356,4 +356,24 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("nextsessionsreturnlane", tokens);
         Assert.DoesNotContain("nextsessionsreturnlanes", tokens);
     }
+
+    [Fact]
+    public void RewriteAliases_CollapsesOpForShorthandIntoOppositionTokens()
+    {
+        HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "opfor",
+            "opforce",
+            "opforces",
+            "opfors"
+        };
+
+        PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
+
+        Assert.Contains("opposition", tokens);
+        Assert.DoesNotContain("opfor", tokens);
+        Assert.DoesNotContain("opforce", tokens);
+        Assert.DoesNotContain("opforces", tokens);
+        Assert.DoesNotContain("opfors", tokens);
+    }
 }
