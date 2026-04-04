@@ -254,6 +254,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         "downtime",
         "recap",
         "debrief",
+        "outbrief",
+        "outbriefs",
         "postmortem",
         "postsession",
         "postrun",
@@ -3786,6 +3788,18 @@ public sealed class CampaignWorkspaceServerPlaneService
                 && ContainsAnyWordToken(value, ["wash", "washes"]));
     }
 
+    private static bool ContainsOutBriefTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["outbrief", "outbriefs"])
+            || (ContainsAnyWordToken(value, ["out"])
+                && ContainsAnyWordToken(value, ["brief", "briefs"]));
+    }
+
     private static bool ContainsLessonLearnedTokenPair(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -3835,6 +3849,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static bool IsAftermathRecapPublicationKind(string value)
         => ContainsAnyWordToken(value, ["aftermath", "recap", "debrief"])
             || ContainsAfterActionTokenPair(value)
+            || ContainsOutBriefTokenPair(value)
             || ContainsHotWashTokenPair(value)
             || ContainsLessonLearnedTokenPair(value);
 
