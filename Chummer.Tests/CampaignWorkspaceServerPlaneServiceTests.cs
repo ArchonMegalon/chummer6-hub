@@ -464,6 +464,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-actions")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-action report")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-action reports")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aar")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aars")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("recaps")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("returns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("memories")));
@@ -491,6 +493,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaftermaths")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixafteraction")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixafteractionreport")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaar")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostmortem")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostsession")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostrun")));
