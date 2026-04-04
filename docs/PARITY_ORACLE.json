@@ -67,6 +67,14 @@
     "weaponlocations",
     "weapons"
   ],
+  "acknowledgedCatalogOnlyTabs": [
+    "tab-create",
+    "tab-rules"
+  ],
+  "acknowledgedCatalogOnlyWorkspaceActions": [
+    "build-lab",
+    "data_exporter"
+  ],
   "desktopControls": [
     "combat_add_armor",
     "combat_add_weapon",

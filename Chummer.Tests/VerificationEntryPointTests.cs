@@ -22,9 +22,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("normalize_required_token", script, StringComparison.Ordinal);
         Assert.Contains("parse_required_token_list", script, StringComparison.Ordinal);
         Assert.Contains("parse_catalog_token_matches", script, StringComparison.Ordinal);
+        Assert.Contains("fail_on_unacknowledged_catalog_only", script, StringComparison.Ordinal);
+        Assert.Contains("acknowledgedCatalogOnlyTabs", script, StringComparison.Ordinal);
+        Assert.Contains("acknowledgedCatalogOnlyWorkspaceActions", script, StringComparison.Ordinal);
         Assert.Contains("must not contain blank token values", script, StringComparison.Ordinal);
         Assert.Contains("contains whitespace-padded token", script, StringComparison.Ordinal);
         Assert.Contains("contains duplicate normalized token", script, StringComparison.Ordinal);
+        Assert.Contains("is missing required acknowledged catalog-only", script, StringComparison.Ordinal);
+        Assert.Contains("no longer catalog-only", script, StringComparison.Ordinal);
     }
 
     [Fact]
