@@ -726,10 +726,25 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("move");
         }
 
+        if (tokens.Contains("rostertransfer"))
+        {
+            tokens.Remove("rostertransfer");
+            tokens.Add("roster");
+            tokens.Add("move");
+        }
+
         if (tokens.Contains("rostertransfers"))
         {
             tokens.Remove("rostertransfers");
-            tokens.Add("rostertransfer");
+            tokens.Add("roster");
+            tokens.Add("move");
+        }
+
+        if (tokens.Contains("rosterhandoff"))
+        {
+            tokens.Remove("rosterhandoff");
+            tokens.Add("roster");
+            tokens.Add("handoff");
         }
 
         if (tokens.Contains("roster") && (tokens.Contains("transfer") || tokens.Contains("transfers")))
