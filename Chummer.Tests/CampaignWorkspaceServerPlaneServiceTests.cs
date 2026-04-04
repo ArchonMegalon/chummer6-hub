@@ -1127,6 +1127,118 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineWorkspaceChangePacketsNormalizeWhitespacePaddedSceneIdsBeforePacketProjection()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        ObjectiveProjection leadObjective = new(
+            ObjectiveId: "objective-1",
+            Title: "Lead objective",
+            Status: "open",
+            Pressure: "medium",
+            Summary: "Objective summary",
+            UpdatedAtUtc: now.AddMinutes(2));
+        RunProjection leadRun = new(
+            RunId: "run-1",
+            CampaignId: campaign.CampaignId,
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "Run summary",
+            ActiveSceneId: "scene-1",
+            Objectives: [leadObjective],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(3));
+        SceneProjection canonicalScene = new(
+            SceneId: "scene-1",
+            RunId: leadRun.RunId,
+            Title: "Dockyard checkpoint",
+            Revision: "r3",
+            Status: "active",
+            Summary: "Scene summary",
+            UpdatedAtUtc: now.AddMinutes(4));
+        SceneProjection paddedScene = canonicalScene with
+        {
+            SceneId = "  scene-1  "
+        };
+
+        IReadOnlyList<WorkspaceChangePacketProjection> canonicalPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [],
+            [],
+            leadRun,
+            canonicalScene);
+        IReadOnlyList<WorkspaceChangePacketProjection> paddedPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [],
+            [],
+            leadRun,
+            paddedScene);
+
+        WorkspaceChangePacketProjection canonicalPacket = Assert.Single(canonicalPackets);
+        WorkspaceChangePacketProjection paddedPacket = Assert.Single(paddedPackets);
+        Assert.Equal("scene", canonicalPacket.Kind);
+        Assert.Equal(canonicalPacket.PacketId, paddedPacket.PacketId);
+    }
+
+    [Fact]
+    public void CampaignSpineWorkspaceChangePacketsNormalizeWhitespacePaddedObjectiveIdsBeforePacketProjection()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        ObjectiveProjection canonicalObjective = new(
+            ObjectiveId: "objective-1",
+            Title: "Lead objective",
+            Status: "open",
+            Pressure: "medium",
+            Summary: "Objective summary",
+            UpdatedAtUtc: now.AddMinutes(2));
+        ObjectiveProjection paddedObjective = canonicalObjective with
+        {
+            ObjectiveId = "  objective-1  "
+        };
+
+        IReadOnlyList<WorkspaceChangePacketProjection> canonicalPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [],
+            [],
+            null,
+            null,
+            canonicalObjective);
+        IReadOnlyList<WorkspaceChangePacketProjection> paddedPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [],
+            [],
+            null,
+            null,
+            paddedObjective);
+
+        WorkspaceChangePacketProjection canonicalPacket = Assert.Single(canonicalPackets);
+        WorkspaceChangePacketProjection paddedPacket = Assert.Single(paddedPackets);
+        Assert.Equal("objective", canonicalPacket.Kind);
+        Assert.Equal(canonicalPacket.PacketId, paddedPacket.PacketId);
+    }
+
+    [Fact]
     public void CampaignMemoryPacketDoesNotActivateFromCarryForwardWindowSignalsWithoutMemoryContext()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardWindowOnly();
@@ -4877,7 +4989,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         NextSessionCarryForwardProjection? carryForward,
         IReadOnlyList<RosterTransferProjection> rosterTransfers,
         IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
-        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts)
+        IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
+        RunProjection? leadRun = null,
+        SceneProjection? activeScene = null,
+        ObjectiveProjection? leadObjective = null)
     {
         MethodInfo method = typeof(CampaignSpineService)
             .GetMethod("BuildWorkspaceChangePackets", BindingFlags.NonPublic | BindingFlags.Static)
@@ -4887,9 +5002,9 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         [
             campaign,
             recapShelf,
-            null,
-            null,
-            null,
+            leadRun,
+            activeScene,
+            leadObjective,
             rosterTransfers,
             prepLaunches,
             travelPrefetchReceipts,
