@@ -198,6 +198,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> compactControlTokens = InvokeBuildTokens("gmcontrol");
         IReadOnlyList<string> compactControlsTokens = InvokeBuildTokens("gmcontrols");
         IReadOnlyList<string> compactCtrlTokens = InvokeBuildTokens("gmctrl");
+        IReadOnlyList<string> compactCtlTokens = InvokeBuildTokens("gmctl");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("gmatrix");
 
         Assert.True(InvokeMatches(packet, compactPluralTokens));
@@ -207,6 +208,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, compactControlTokens));
         Assert.True(InvokeMatches(packet, compactControlsTokens));
         Assert.True(InvokeMatches(packet, compactCtrlTokens));
+        Assert.True(InvokeMatches(packet, compactCtlTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
     }
 
@@ -281,6 +283,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-controls")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ctrl")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-ctrl")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ctl")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-ctl")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ctls")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-ctls")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ctrls")));
