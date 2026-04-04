@@ -184,8 +184,11 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
         {
             "campaignreturnpacket",
+            "campaignreturnbriefs",
             "aftermathreturnpacket",
+            "aftermathreturnbrief",
             "downtimereturnpackets",
+            "downtimereturnbriefs",
             "diarycontactheatpacket",
             "diarycontactsheatpackets",
             "aftermathdowntimepacket",
@@ -214,8 +217,11 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.Contains("operation", tokens);
         Assert.Contains("packet", tokens);
         Assert.DoesNotContain("campaignreturnpacket", tokens);
+        Assert.DoesNotContain("campaignreturnbriefs", tokens);
         Assert.DoesNotContain("aftermathreturnpacket", tokens);
+        Assert.DoesNotContain("aftermathreturnbrief", tokens);
         Assert.DoesNotContain("downtimereturnpackets", tokens);
+        Assert.DoesNotContain("downtimereturnbriefs", tokens);
         Assert.DoesNotContain("diarycontactheatpacket", tokens);
         Assert.DoesNotContain("diarycontactsheatpackets", tokens);
         Assert.DoesNotContain("aftermathdowntimepacket", tokens);
