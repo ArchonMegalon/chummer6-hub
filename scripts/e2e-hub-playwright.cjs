@@ -2449,6 +2449,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail league ops split search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league ops split search');
 
+  await page.fill('#prepQuery', 'league op');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league(?:%20|\+)op/.test(page.url()), 'Workspace detail search should preserve the split league op prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league op split search');
+  await expectBodyText(page, 'match(es) for "league op"', '/account/work/workspaces detail league op split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league op split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league op split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league op split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league op split search');
+  const workspaceLeagueOpSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueOpSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split league op query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league op split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league op split search');
+
   await page.fill('#prepQuery', 'league-ops');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -2994,6 +3015,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail community ops split search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community ops split search');
+
+  await page.fill('#prepQuery', 'community op');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community(?:%20|\+)op/.test(page.url()), 'Workspace detail search should preserve the split community op prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community op split search');
+  await expectBodyText(page, 'match(es) for "community op"', '/account/work/workspaces detail community op split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community op split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community op split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community op split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community op split search');
+  const workspaceCommunityOpSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityOpSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split community op query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community op split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community op split search');
 
   await page.fill('#prepQuery', 'community-ops');
   await Promise.all([
