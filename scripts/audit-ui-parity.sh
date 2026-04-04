@@ -401,6 +401,10 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         message=f"parity audit failed: workflow receipt sr4 parity proof is not pass-ready: {path}",
     )
     require_pass_status(
+        evidence.get("sr6_workflow_parity_status"),
+        message=f"parity audit failed: workflow receipt sr6 parity proof is not pass-ready: {path}",
+    )
+    require_pass_status(
         evidence.get("chummer5a_workflow_parity_status"),
         message=f"parity audit failed: workflow receipt chummer5a parity proof is not pass-ready: {path}",
     )
