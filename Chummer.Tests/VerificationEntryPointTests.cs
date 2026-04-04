@@ -55,6 +55,13 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json", script, StringComparison.Ordinal);
         Assert.Contains("required executable receipt is missing", script, StringComparison.Ordinal);
         Assert.Contains("status must be pass/passed/ready", script, StringComparison.Ordinal);
+        Assert.Contains("required_workflow_family_ids", script, StringComparison.Ordinal);
+        Assert.Contains("missing_required_workflow_family_ids", script, StringComparison.Ordinal);
+        Assert.Contains("workflow_execution_missing_receipts", script, StringComparison.Ordinal);
+        Assert.Contains("required_legacy_interaction_keys", script, StringComparison.Ordinal);
+        Assert.Contains("missing_required_legacy_interaction_keys", script, StringComparison.Ordinal);
+        Assert.Contains("legacyMagicWorkflowRhythm", script, StringComparison.Ordinal);
+        Assert.Contains("legacyDiaryWorkflowRhythm", script, StringComparison.Ordinal);
         Assert.Contains("Parity audit passed", script, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer.Web/wwwroot/index.html", script, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer/Forms/ChummerMainForm.Designer.cs", script, StringComparison.Ordinal);
