@@ -2,95 +2,42 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WEB_INDEX="$ROOT/Chummer.Web/wwwroot/index.html"
-DESIGNER="$ROOT/Chummer/Forms/ChummerMainForm.Designer.cs"
+PARITY_CHECKLIST="$ROOT/docs/PARITY_CHECKLIST.md"
+PARITY_GENERATOR="$ROOT/scripts/generate-parity-checklist.sh"
 
-if [[ ! -f "$WEB_INDEX" || ! -f "$DESIGNER" ]]; then
-  echo "required files missing" >&2
+if [[ ! -x "$PARITY_GENERATOR" ]]; then
+  echo "parity generator script is missing or not executable: $PARITY_GENERATOR" >&2
   exit 2
 fi
 
-web_commands=$(rg -No '^[[:space:]]*[a-z_]+[[:space:]]*:' "$WEB_INDEX" | sed -E 's/^\s*([a-z_]+)\s*:.*/\1/' | sort -u)
-web_menus=$(rg -No 'data-command="[a-z_]+"' "$WEB_INDEX" | sed -E 's/.*data-command="([a-z_]+)".*/\1/' | sort -u)
-
-# Curated desktop command set from ChummerMainForm and common utility forms.
-desktop_expected=$(cat <<'CMDS'
-file
-edit
-special
-tools
-windows
-help
-new_character
-new_critter
-open_character
-open_for_printing
-open_for_export
-save_character
-save_character_as
-print_character
-print_multiple
-print_setup
-export_character
-copy
-paste
-dice_roller
-global_settings
-character_settings
-translator
-xml_editor
-hero_lab_importer
-master_index
-character_roster
-data_exporter
-update
-restart
-report_bug
-new_window
-close_window
-close_all
-wiki
-discord
-revision_history
-dumpshock
-about
-CMDS
-)
-
-missing_handlers=()
-while IFS= read -r cmd; do
-  [[ -z "$cmd" ]] && continue
-  if ! grep -qx "$cmd" <<<"$web_commands"; then
-    missing_handlers+=("$cmd")
-  fi
-done <<<"$desktop_expected"
-
-placeholder_handlers=$(rg -No '^[[:space:]]*[a-z_]+[[:space:]]*:[[:space:]]*\(\)[[:space:]]*=>[[:space:]]*(showNote|window\.print|location\.reload)' "$WEB_INDEX" \
-  | sed -E 's/^\s*([a-z_]+)\s*:.*/\1/' | sort -u || true)
-
-cat <<REPORT
-UI Parity Audit
-==============
-Web command handlers: $(wc -l <<<"$web_commands" | tr -d ' ')
-Menu/toolbar command ids: $(wc -l <<<"$web_menus" | tr -d ' ')
-Desktop expected commands: $(wc -l <<<"$desktop_expected" | tr -d ' ')
-
-Missing desktop command handlers: ${#missing_handlers[@]}
-REPORT
-
-if [[ ${#missing_handlers[@]} -gt 0 ]]; then
-  printf '  - %s\n' "${missing_handlers[@]}"
+if ! command -v rg >/dev/null 2>&1; then
+  echo "ripgrep (rg) is required for parity auditing." >&2
+  exit 2
 fi
 
-echo
-echo "Handlers still mapped to placeholder behavior:"
-if [[ -n "$placeholder_handlers" ]]; then
-  sed 's/^/  - /' <<<"$placeholder_handlers"
-else
-  echo "  - none"
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is required for parity auditing." >&2
+  exit 2
 fi
 
-# Fail audit when key desktop commands are missing.
-if [[ ${#missing_handlers[@]} -gt 0 ]]; then
+if ! bash "$PARITY_GENERATOR"; then
+  echo "parity audit failed: parity checklist generation reported drift." >&2
   exit 1
 fi
+
+if [[ ! -f "$PARITY_CHECKLIST" ]]; then
+  echo "parity audit failed: generated checklist is missing at $PARITY_CHECKLIST" >&2
+  exit 1
+fi
+
+summary_block="$(awk '/^## Summary/{flag=1; next} /^## /{if(flag){exit}} flag {print}' "$PARITY_CHECKLIST")"
+if [[ -z "$summary_block" ]]; then
+  echo "parity audit failed: summary block missing in $PARITY_CHECKLIST" >&2
+  exit 1
+fi
+
+echo "UI Parity Audit"
+echo "==============="
+echo "$summary_block" | sed '/^[[:space:]]*$/d'
+echo
+echo "Parity audit passed: parity oracle coverage is synchronized with current catalogs."
