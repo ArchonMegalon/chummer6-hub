@@ -1382,6 +1382,62 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineBuildWorkspaceRulesNavigatorDiffsPrefersAttentionCueOverEarlierReviewCue()
+    {
+        CampaignReadinessCue reviewCue = new(
+            CueId: "cue-review-1",
+            Severity: "review",
+            Title: "Rule environment review",
+            Summary: "Ruleset should be reviewed.");
+        CampaignReadinessCue attentionCue = new(
+            CueId: "cue-attention-1",
+            Severity: "attention",
+            Title: "Open objective pressure",
+            Summary: "Objective pressure remains high.");
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath() with
+        {
+            ReadinessCues = [reviewCue, attentionCue]
+        };
+
+        IReadOnlyList<dynamic> diffs = InvokeCampaignSpineBuildWorkspaceRulesNavigatorDiffs(workspace);
+        dynamic readinessDiff = Assert.Single(
+            diffs,
+            diff => string.Equals((string)diff.Label, "Campaign readiness", StringComparison.Ordinal));
+        string reasonSummary = Assert.IsType<string>(readinessDiff.ReasonSummary);
+
+        Assert.Equal("Objective pressure remains high.", reasonSummary);
+        Assert.DoesNotContain("Ruleset should be reviewed", reasonSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CampaignSpineBuildWorkspaceRulesNavigatorDiffsPrefersWarningCueOverEarlierReviewCue()
+    {
+        CampaignReadinessCue reviewCue = new(
+            CueId: "cue-review-1",
+            Severity: "review",
+            Title: "Rule environment review",
+            Summary: "Ruleset should be reviewed.");
+        CampaignReadinessCue warningCue = new(
+            CueId: "cue-warning-1",
+            Severity: "warning",
+            Title: "Continuity gap detected",
+            Summary: "At least one dossier is missing continuity.");
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath() with
+        {
+            ReadinessCues = [reviewCue, warningCue]
+        };
+
+        IReadOnlyList<dynamic> diffs = InvokeCampaignSpineBuildWorkspaceRulesNavigatorDiffs(workspace);
+        dynamic readinessDiff = Assert.Single(
+            diffs,
+            diff => string.Equals((string)diff.Label, "Campaign readiness", StringComparison.Ordinal));
+        string reasonSummary = Assert.IsType<string>(readinessDiff.ReasonSummary);
+
+        Assert.Equal("At least one dossier is missing continuity.", reasonSummary);
+        Assert.DoesNotContain("Ruleset should be reviewed", reasonSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CampaignSpineCampaignMemoryPrefersMostRecentConsequenceRosterPrepAndTravelReceipts()
     {
         CampaignWorkspaceProjection rosterWorkspace = BuildWorkspaceWithRosterAndAftermath();
@@ -5830,6 +5886,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         CampaignProjection campaign,
         IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
         => InvokeCampaignSpineBuildWorkspaceChangePackets(campaign, [], aftermathPackages, null);
+
+    private static IReadOnlyList<dynamic> InvokeCampaignSpineBuildWorkspaceRulesNavigatorDiffs(
+        CampaignWorkspaceProjection workspace)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("BuildWorkspaceRulesNavigatorDiffs", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildWorkspaceRulesNavigatorDiffs was not found.");
+        object? value = method.Invoke(null, [workspace]);
+        IEnumerable<object> projection = Assert.IsAssignableFrom<IEnumerable<object>>(value);
+        return projection.Cast<dynamic>().ToArray();
+    }
 
     private static IReadOnlyList<WorkspaceChangePacketProjection> InvokeCampaignSpineBuildWorkspaceChangePackets(
         CampaignProjection campaign,
