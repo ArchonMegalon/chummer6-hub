@@ -391,6 +391,33 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineBuildCreatorPublicationsDeduplicatesRows_WhenPublicationIdsRepeat()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        PublicationSafeProjection recapA = new(
+            ProjectionId: "recap-publication-dedupe-a",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap A",
+            Summary: "Recap row A",
+            CreatorPublicationId: "pub-duplicate");
+        PublicationSafeProjection recapB = recapA with
+        {
+            ProjectionId = "recap-publication-dedupe-b",
+            Label = "Session recap B",
+            Summary = "Recap row B"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recapA, recapB]
+        };
+
+        IReadOnlyList<CreatorPublicationProjection> publications = InvokeCampaignSpineBuildCreatorPublications([workspace]);
+
+        CreatorPublicationProjection publication = Assert.Single(publications);
+        Assert.Equal("pub-duplicate", publication.PublicationId);
+    }
+
+    [Fact]
     public void CampaignMemoryPacketDoesNotActivateFromCarryForwardWindowSignalsWithoutMemoryContext()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardWindowOnly();
@@ -4009,6 +4036,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("AttachCreatorPublicationPosture was not found.");
 
         return Assert.IsAssignableFrom<IReadOnlyList<CampaignWorkspaceProjection>>(method.Invoke(null, [workspaces, creatorPublications]));
+    }
+
+    private static IReadOnlyList<CreatorPublicationProjection> InvokeCampaignSpineBuildCreatorPublications(
+        IReadOnlyList<CampaignWorkspaceProjection> workspaces)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("BuildCreatorPublications", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildCreatorPublications was not found.");
+
+        return Assert.IsAssignableFrom<IReadOnlyList<CreatorPublicationProjection>>(method.Invoke(null, [workspaces, Array.Empty<RunnerDossierProjection>(), Array.Empty<BuildLabHandoffProjection>()]));
     }
 
     private static IReadOnlyList<RecapShelfEntry> InvokeBuildRecapShelf(CampaignWorkspaceProjection workspace)
