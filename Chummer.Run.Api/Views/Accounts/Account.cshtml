@@ -1786,6 +1786,22 @@
                         @if (selectedBuildLabHandoff.Outputs.Count > 0)
                         {
                             <p><strong>Outputs:</strong> @string.Join(", ", selectedBuildLabHandoff.Outputs.Select(item => item.Label))</p>
+                            <ul class="muted-copy">
+                                @foreach (var output in selectedBuildLabHandoff.Outputs.Take(3))
+                                {
+                                    <li>
+                                        <strong>@output.Label</strong>
+                                        @if (!string.IsNullOrWhiteSpace(output.NextSafeAction))
+                                        {
+                                            <span> Next: @output.NextSafeAction</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(output.ProvenanceSummary))
+                                        {
+                                            <span> Provenance: @output.ProvenanceSummary</span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
                         }
                         @if (selectedBuildLabHandoff.Watchouts is { Count: > 0 })
                         {

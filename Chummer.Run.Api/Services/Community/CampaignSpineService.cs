@@ -2274,16 +2274,16 @@ public sealed class CampaignSpineService
                 var progressionLabel = workspace is null ? "Ready to seed into a campaign" : "25 / 50 / 100 Karma path stays attached to the campaign return";
                 var nextSafeAction = ResolveBuildLabNextSafeAction(workspace, outputs, restore);
                 var runtimeCompatibilitySummary = DescribeBuildLabRuntimeCompatibility(runtimeFingerprint, workspace, restore);
-                var attachedOutputSummary = outputs.Length switch
+                var attachedOutputSummary = outputs.Count switch
                 {
                     1 => "1 dossier or campaign-safe output is already attached to this handoff.",
-                    > 1 => $"{outputs.Length} dossier or campaign-safe outputs are already attached to this handoff.",
+                    > 1 => $"{outputs.Count} dossier or campaign-safe outputs are already attached to this handoff.",
                     _ => null
                 };
-                var readyOutputSummary = outputs.Length switch
+                var readyOutputSummary = outputs.Count switch
                 {
                     1 => "1 dossier or campaign-safe output is already ready for export and recap follow-through.",
-                    > 1 => $"{outputs.Length} dossier or campaign-safe outputs are already ready for export and recap follow-through.",
+                    > 1 => $"{outputs.Count} dossier or campaign-safe outputs are already ready for export and recap follow-through.",
                     _ => "Publication-safe outputs will appear as recap and dossier cards once the first run lands."
                 };
                 var campaignReturnSummary = workspace?.ReturnSummary
