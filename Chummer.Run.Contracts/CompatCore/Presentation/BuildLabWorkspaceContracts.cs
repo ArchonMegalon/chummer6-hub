@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Chummer.Contracts.Presentation;
 
 public sealed record BuildLabConceptIntakeProjection(
@@ -23,6 +25,7 @@ public sealed record BuildLabConceptIntakeProjection(
     string? RuntimeCompatibilitySummary = null,
     string? CampaignFitSummary = null,
     string? SupportClosureSummary = null,
+    BuildLabRuleEnvironmentDiffProjection? RuleEnvironmentDiff = null,
     IReadOnlyList<string>? Watchouts = null,
     BuildLabTeamCoverageProjection? TeamCoverage = null);
 
@@ -60,6 +63,7 @@ public sealed record BuildLabVariantProjection(
     IReadOnlyList<BuildLabActionDescriptor> Actions,
     string? ExplainEntryId = null);
 
+[method: JsonConstructor]
 public sealed record BuildLabVariantMetric(
     string MetricId,
     string Label,
@@ -93,6 +97,15 @@ public sealed record BuildLabTeamCoverageProjection(
     IReadOnlyList<string>? CoveredRoleTags = null,
     IReadOnlyList<string>? DuplicateRoleTags = null,
     string? ExplainEntryId = null);
+
+public sealed record BuildLabRuleEnvironmentDiffProjection(
+    string Status,
+    string Summary,
+    string BeforeFingerprint,
+    string AfterFingerprint,
+    string BeforeScope,
+    string AfterScope,
+    bool Changed);
 
 public sealed record BuildLabProgressionTimeline(
     string TimelineId,
