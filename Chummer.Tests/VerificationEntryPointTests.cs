@@ -371,7 +371,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Cache-Control", audit, StringComparison.Ordinal);
         Assert.Contains("Pragma", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -402,6 +404,8 @@ public sealed class VerificationEntryPointTests
         string playwright = File.ReadAllText(playwrightPath);
         Assert.Contains("?prepQuery=seasonops", playwright, StringComparison.Ordinal);
         Assert.Contains("compact seasonops prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=heat", playwright, StringComparison.Ordinal);
+        Assert.Contains("heat continuity prep query", playwright, StringComparison.Ordinal);
     }
 
     [Fact]

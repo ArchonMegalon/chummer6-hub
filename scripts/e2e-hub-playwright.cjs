@@ -769,6 +769,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail season search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season search');
 
+  await page.fill('#prepQuery', 'heat');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=heat/.test(page.url()), 'Workspace detail search should preserve the heat continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail heat search');
+  await expectBodyText(page, 'match(es) for "heat"', '/account/work/workspaces detail heat search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail heat search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail heat search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail heat search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail heat search');
+  const workspaceHeatSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceHeatSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the heat continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail heat search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail heat search');
+
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
     page.locator('a[href*="/account/work/publications/"]').first().click()
