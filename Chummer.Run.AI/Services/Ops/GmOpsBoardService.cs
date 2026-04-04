@@ -1057,15 +1057,28 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
     private static string ResolveGmOpsDomain(string eventType, string payload)
     {
         var combined = $"{eventType} {payload}";
-        if (combined.Contains("opposition", StringComparison.OrdinalIgnoreCase))
+        if (ContainsAny(combined,
+            "opposition",
+            "hostile",
+            "adversary",
+            "threat"))
         {
             return "opposition";
         }
 
-        if (combined.Contains("event control", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("event-control", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("event_control", StringComparison.OrdinalIgnoreCase)
-            || combined.Contains("season", StringComparison.OrdinalIgnoreCase))
+        if (ContainsAny(combined,
+            "event control",
+            "event-control",
+            "event_control",
+            "season",
+            "checkpoint",
+            "timeline",
+            "operation",
+            "operations",
+            "prep launch",
+            "prep_launch",
+            "travel prefetch",
+            "travel_prefetch"))
         {
             return "event_control";
         }
@@ -1077,6 +1090,9 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
 
         return "general";
     }
+
+    private static bool ContainsAny(string value, params string[] candidates) =>
+        candidates.Any(candidate => value.Contains(candidate, StringComparison.OrdinalIgnoreCase));
 
     private static int ResolveGmOpsDomainPriority(string domain)
         => domain switch

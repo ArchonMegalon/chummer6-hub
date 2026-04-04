@@ -93,6 +93,86 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatPrepLaunchAndTravelPrefetchSignalsAsEventControlDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T02:00:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open prep_launch packet remains unresolved for event lane handoff.",
+                AtUtc: baseTime,
+                EventId: "evt-prep-launch"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open travel_prefetch request remains unresolved for event controls.",
+                AtUtc: baseTime.AddMinutes(1),
+                EventId: "evt-travel-prefetch"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(30),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(3, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-travel-prefetch", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-prep-launch", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[2].ItemId);
+    }
+
+    [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatHostileSignalsAsOppositionDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T03:00:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open hostile window remains unresolved.",
+                AtUtc: baseTime,
+                EventId: "evt-hostile"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open prep launch packet remains unresolved.",
+                AtUtc: baseTime.AddMinutes(1),
+                EventId: "evt-event"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(30),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(3, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-hostile", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-event", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[2].ItemId);
+    }
+
+    [Fact]
     public void ReconcilePortableAssets_SkipsAssets_WhenRequiredAssetFieldsAreMissing()
     {
         var service = CreateService();
