@@ -215,6 +215,11 @@ acknowledged_catalog_only_actions = parse_required_token_list(
     "acknowledgedCatalogOnlyWorkspaceActions",
     source=display_path(parity_oracle_path),
 )
+acknowledged_dialog_factory_only_desktop_controls = parse_required_token_list(
+    parity_oracle,
+    "acknowledgedDialogFactoryOnlyDesktopControls",
+    source=display_path(parity_oracle_path),
+)
 legacy_desktop_controls = parse_required_token_list(
     parity_oracle,
     "desktopControls",
@@ -242,6 +247,12 @@ fail_on_unacknowledged_catalog_only(
     acknowledged_ids=acknowledged_catalog_only_actions,
     source=display_path(parity_oracle_path),
 )
+fail_on_unacknowledged_catalog_only(
+    surface_label="dialog-factory-only desktop control",
+    catalog_only_ids=catalog_only_desktop_controls,
+    acknowledged_ids=acknowledged_dialog_factory_only_desktop_controls,
+    source=display_path(parity_oracle_path),
+)
 if missing_desktop_controls:
     raise ValueError(
         f"{display_path(parity_oracle_path)} is missing required legacy desktop control ids in "
@@ -261,6 +272,7 @@ output_lines: list[str] = [
     "- Workspace Actions coverage compares parity-oracle action IDs to action `TargetId` values.",
     "- Catalog-only IDs must be acknowledged explicitly in `docs/PARITY_ORACLE.json`.",
     "- Desktop Controls coverage compares parity-oracle control IDs to dialog control IDs in `DesktopDialogFactory`.",
+    "- Dialog-factory-only desktop controls must be acknowledged explicitly in `docs/PARITY_ORACLE.json`.",
     "",
     "## Summary",
     "",
@@ -286,7 +298,7 @@ output_lines.extend(
         covered_desktop_controls,
         missing_desktop_controls,
         catalog_only_desktop_controls,
-        catalog_only_status="present_in_dialog_factory_only",
+        catalog_only_status="present_in_dialog_factory_acknowledged",
     )
 )
 
