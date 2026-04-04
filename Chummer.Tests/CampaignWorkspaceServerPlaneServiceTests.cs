@@ -555,6 +555,34 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineBuildCreatorPublicationsDeduplicatesRows_WhenPublicationIdsHaveWhitespacePadding()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        PublicationSafeProjection recapA = new(
+            ProjectionId: "recap-publication-dedupe-whitespace-a",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap A",
+            Summary: "Recap row A",
+            CreatorPublicationId: "  pub-duplicate  ");
+        PublicationSafeProjection recapB = recapA with
+        {
+            ProjectionId = "recap-publication-dedupe-whitespace-b",
+            CreatorPublicationId = "pub-duplicate",
+            Label = "Session recap B",
+            Summary = "Recap row B"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recapA, recapB]
+        };
+
+        IReadOnlyList<CreatorPublicationProjection> publications = InvokeCampaignSpineBuildCreatorPublications([workspace]);
+
+        CreatorPublicationProjection publication = Assert.Single(publications);
+        Assert.Equal("pub-duplicate", publication.PublicationId);
+    }
+
+    [Fact]
     public void CampaignMemoryPacketDoesNotActivateFromCarryForwardWindowSignalsWithoutMemoryContext()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardWindowOnly();
