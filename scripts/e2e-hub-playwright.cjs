@@ -5977,6 +5977,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'preplibrarypackets', 'compact preplibrarypackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionpacket', 'compact oppositionpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'oppositionpackets', 'compact oppositionpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovepacket', 'compact rostermovepacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovepackets', 'compact rostermovepackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovementpacket', 'compact rostermovementpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'rostermovementpackets', 'compact rostermovementpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolpacket', 'compact eventcontrolpacket continuity prep');

@@ -160,6 +160,8 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "preplibrarypacket",
             "oppositionpacket",
             "oppositionpackets",
+            "rostermovepacket",
+            "rostermovepackets",
             "rostermovementpacket",
             "eventcontrolpacket",
             "eventcontrolpackets"
@@ -177,6 +179,8 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("preplibrarypacket", tokens);
         Assert.DoesNotContain("oppositionpacket", tokens);
         Assert.DoesNotContain("oppositionpackets", tokens);
+        Assert.DoesNotContain("rostermovepacket", tokens);
+        Assert.DoesNotContain("rostermovepackets", tokens);
         Assert.DoesNotContain("rostermovementpacket", tokens);
         Assert.DoesNotContain("eventcontrolpacket", tokens);
         Assert.DoesNotContain("eventcontrolpackets", tokens);
