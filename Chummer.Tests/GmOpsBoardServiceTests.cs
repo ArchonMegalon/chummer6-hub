@@ -2250,6 +2250,10 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse compactMobileOfflineReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobileofflinereadiness");
         GmPrepAssetListResponse mobileTravelCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile travel cache");
         GmPrepAssetListResponse compactMobileTravelCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobiletravelcache");
+        GmPrepAssetListResponse mobileSafehouseReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile safehouse readiness");
+        GmPrepAssetListResponse compactMobileSafehouseReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobilesafehousereadiness");
+        GmPrepAssetListResponse mobileSafehouseCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile safehouse cache");
+        GmPrepAssetListResponse compactMobileSafehouseCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobilesafehousecache");
         GmPrepAssetListResponse negativeReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrix readiness");
         GmPrepAssetListResponse negativeCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrix cache");
         GmPrepAssetListResponse negativeMobileMatrixCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile matrix cache");
@@ -2264,6 +2268,10 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(compactMobileOfflineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(mobileTravelCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(compactMobileTravelCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(mobileSafehouseReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactMobileSafehouseReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(mobileSafehouseCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactMobileSafehouseCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Empty(negativeReadinessMatches.Items);
         Assert.Empty(negativeCacheMatches.Items);
         Assert.Empty(negativeMobileMatrixCacheMatches.Items);
@@ -2388,6 +2396,47 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(hyphenNextSessionsReturnLanePluralMatches.Items, item => item.AssetId == "return_loop_ops");
         Assert.Empty(negativeMatches.Items);
         Assert.Empty(laneNegativeMatches.Items);
+    }
+
+    [Fact]
+    public void ListPrepAssets_QuerySupportsCompactCampaignAftermathAndDowntimeReturnShorthand()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult import = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "aftermath_return_ops",
+                now: now,
+                title: "Campaign aftermath and downtime return packet",
+                body: "Campaign return loop stays governed across aftermath, downtime, and recap follow-through.")
+        ]);
+
+        Assert.Equal(1, import.ImportedCount);
+        Assert.Equal(0, import.SkippedCount);
+        Assert.Empty(import.Conflicts);
+
+        GmPrepAssetListResponse aftermathReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aftermathreturn");
+        GmPrepAssetListResponse aftermathReturnPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aftermathreturns");
+        GmPrepAssetListResponse aftermathReturnLoopMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aftermathreturnloop");
+        GmPrepAssetListResponse downtimeReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "downtimereturn");
+        GmPrepAssetListResponse downtimeReturnLoopMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "downtimereturnloop");
+        GmPrepAssetListResponse campaignReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "campaignreturn");
+        GmPrepAssetListResponse campaignReturnLoopMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "campaignreturnloop");
+        GmPrepAssetListResponse campaignReturnLaneMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "campaignreturnlane");
+        GmPrepAssetListResponse negativeCampaignMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixcampaignreturn");
+        GmPrepAssetListResponse negativeAftermathMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixaftermathreturn");
+
+        Assert.Contains(aftermathReturnMatches.Items, item => item.AssetId == "aftermath_return_ops");
+        Assert.Contains(aftermathReturnPluralMatches.Items, item => item.AssetId == "aftermath_return_ops");
+        Assert.Contains(aftermathReturnLoopMatches.Items, item => item.AssetId == "aftermath_return_ops");
+        Assert.Contains(downtimeReturnMatches.Items, item => item.AssetId == "aftermath_return_ops");
+        Assert.Contains(downtimeReturnLoopMatches.Items, item => item.AssetId == "aftermath_return_ops");
+        Assert.Contains(campaignReturnMatches.Items, item => item.AssetId == "aftermath_return_ops");
+        Assert.Contains(campaignReturnLoopMatches.Items, item => item.AssetId == "aftermath_return_ops");
+        Assert.Contains(campaignReturnLaneMatches.Items, item => item.AssetId == "aftermath_return_ops");
+        Assert.Empty(negativeCampaignMatches.Items);
+        Assert.Empty(negativeAftermathMatches.Items);
     }
 
     [Fact]
