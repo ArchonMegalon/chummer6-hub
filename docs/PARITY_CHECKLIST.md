@@ -4,8 +4,8 @@ Generated automatically from the parity oracle and current contracts catalogs.
 
 - Regenerate command: `RUNBOOK_MODE=parity-checklist bash scripts/runbook.sh`
 - Parity oracle source: `docs/PARITY_ORACLE.json`
-- Tab catalog source: `Chummer.Rulesets.Hosting/Presentation/NavigationTabCatalog.cs`
-- Action catalog source: `Chummer.Rulesets.Hosting/Presentation/WorkspaceSurfaceActionCatalog.cs`
+- Tab catalog source: `../chummer-core-engine/Chummer.Rulesets.Hosting/Presentation/NavigationTabCatalog.cs`
+- Action catalog source: `../chummer-core-engine/Chummer.Rulesets.Hosting/Presentation/WorkspaceSurfaceActionCatalog.cs`
 - Workspace Actions coverage compares parity-oracle action IDs to action `TargetId` values.
 - Legacy desktop control parity is enforced by dialog-template compliance tests, not by a shared control catalog.
 
@@ -13,8 +13,8 @@ Generated automatically from the parity oracle and current contracts catalogs.
 
 | Surface | Legacy IDs | Covered | Missing In Catalog | Catalog Only |
 | --- | ---: | ---: | ---: | ---: |
-| Tabs | 17 | 17 | 0 | 1 |
-| Workspace Actions | 47 | 47 | 0 | 1 |
+| Tabs | 17 | 17 | 0 | 2 |
+| Workspace Actions | 47 | 47 | 0 | 2 |
 
 ## Tabs Coverage
 
@@ -37,6 +37,7 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `tab-skills` | covered |
 | `tab-technomancer` | covered |
 | `tab-vehicles` | covered |
+| `tab-create` | catalog_only |
 | `tab-rules` | catalog_only |
 
 ## Workspace Actions Coverage
@@ -90,4 +91,5 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `weaponaccessories` | covered |
 | `weaponlocations` | covered |
 | `weapons` | covered |
+| `build-lab` | catalog_only |
 | `data_exporter` | catalog_only |
