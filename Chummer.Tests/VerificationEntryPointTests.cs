@@ -395,12 +395,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=diary", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=downtime", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermath", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=contacts", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=diary", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=downtime", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=aftermath", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=return", audit, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -441,6 +443,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("downtime continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=aftermath", playwright, StringComparison.Ordinal);
         Assert.Contains("aftermath continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=return", playwright, StringComparison.Ordinal);
+        Assert.Contains("return-loop continuity prep query", playwright, StringComparison.Ordinal);
     }
 
     [Fact]

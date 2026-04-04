@@ -1371,6 +1371,21 @@ def verify_signed_in_work_audit(
     if not (prep_library_aftermath.get("items") or []):
         raise AssertionError("prep-library aftermath search did not expose any governed packet")
 
+    prep_library_return_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=return"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_return_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_return_path} returned {status}, expected 200")
+
+    prep_library_return = json.loads(body)
+    if not (prep_library_return.get("items") or []):
+        raise AssertionError("prep-library return search did not expose any governed packet")
+
     runs = workspaces[0].get("runs") or []
     target_run = runs[0] if runs else {}
     prep_launch_body = json.dumps(
@@ -1936,6 +1951,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_aftermath_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_aftermath_search_path} should return at least one governed prep packet for the aftermath query")
+    workspace_return_search_path = f"{workspace_path}?prepQuery=return"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_return_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_return_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_return_search_path)
+    require_snippet(body, 'match(es) for "return"', workspace_return_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_return_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_return_search_path} should return at least one governed prep packet for the return query")
     publication_detail_path = extract_first_match(
         body,
         r'href="([^"]*/account/work/publications/[^"]+)"',
