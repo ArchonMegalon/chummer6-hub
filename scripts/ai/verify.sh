@@ -1836,6 +1836,33 @@ if [[ ! -f "$visual_receipt_path" ]]; then
   exit 1
 fi
 
+workflow_receipt_path="$ROOT_DIR/../chummer6-ui/.codex-studio/published/DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json"
+if [[ ! -f "$workflow_receipt_path" ]]; then
+  echo "verify gate failed: expected workflow execution receipt at $workflow_receipt_path" >&2
+  exit 1
+fi
+
+workflow_receipt_backup="$(mktemp)"
+cp "$workflow_receipt_path" "$workflow_receipt_backup"
+python3 - "$workflow_receipt_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+required_ids = list(payload.get("evidence", {}).get("required_workflow_family_ids") or [])
+if len(required_ids) >= 2:
+    payload["evidence"]["required_workflow_family_ids"] = [required_ids[1], required_ids[0], *required_ids[2:]]
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$workflow_receipt_backup" "$workflow_receipt_path"
+  echo "verify gate failed: parity audit should reject non-canonical required_workflow_family_ids ordering." >&2
+  exit 1
+fi
+mv "$workflow_receipt_backup" "$workflow_receipt_path"
+
 visual_receipt_backup="$(mktemp)"
 cp "$visual_receipt_path" "$visual_receipt_backup"
 python3 - "$visual_receipt_path" <<'PY'

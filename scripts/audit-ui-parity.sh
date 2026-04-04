@@ -1246,11 +1246,15 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("flagship_gate.headProofs.status_duplicate_normalized_keys"),
         message=f"parity audit failed: workflow receipt has duplicate normalized flagship head proof status keys: {path}",
     )
-    required_families = require_string_list(
-        evidence.get("required_workflow_family_ids"),
-        message=f"parity audit failed: workflow receipt required_workflow_family_ids must be a string array: {path}",
+    required_families = require_canonical_unique_string_list(
+        require_string_list(
+            evidence.get("required_workflow_family_ids"),
+            message=f"parity audit failed: workflow receipt required_workflow_family_ids must be a string array: {path}",
+        ),
+        field_name="workflow receipt required_workflow_family_ids",
+        path=path,
     )
-    required_families = set(required_families)
+    required_family_set = set(required_families)
     expected_families = load_required_family_ids(
         workflow_ledger_sr4_path,
         edition_label="SR4",
@@ -1260,12 +1264,25 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
             edition_label="SR6",
         )
     )
-    missing_expected = sorted(expected_families.difference(required_families))
+    missing_expected = sorted(expected_families.difference(required_family_set))
     if missing_expected:
         raise SystemExit(
             "parity audit failed: workflow receipt is missing required milestone-2 family ids: "
             + ", ".join(missing_expected)
             + f" ({path})"
+        )
+    unexpected_families = sorted(required_family_set.difference(expected_families))
+    if unexpected_families:
+        raise SystemExit(
+            "parity audit failed: workflow receipt declares unexpected milestone-2 family ids: "
+            + ", ".join(unexpected_families)
+            + f" ({path})"
+        )
+    expected_required_families = tuple(sorted(expected_families))
+    if tuple(required_families) != expected_required_families:
+        raise SystemExit(
+            "parity audit failed: workflow receipt required_workflow_family_ids must preserve canonical milestone-2 family ordering: "
+            f"{path} (actual={required_families}, expected={list(expected_required_families)})"
         )
     require_empty_collection(
         evidence.get("missing_required_workflow_family_ids"),

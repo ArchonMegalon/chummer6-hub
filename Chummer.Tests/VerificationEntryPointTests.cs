@@ -139,6 +139,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("nested receipt generatedAt is stale", script, StringComparison.Ordinal);
         Assert.Contains("nested receipt generatedAt is in the future", script, StringComparison.Ordinal);
         Assert.Contains("generated_at drifts from nested receipt generatedAt", script, StringComparison.Ordinal);
+        Assert.Contains("workflow receipt declares unexpected milestone-2 family ids", script, StringComparison.Ordinal);
+        Assert.Contains("workflow receipt required_workflow_family_ids must preserve canonical milestone-2 family ordering", script, StringComparison.Ordinal);
         Assert.Contains("evidence age exceeds allowed freshness window", script, StringComparison.Ordinal);
         Assert.Contains("evidence generated_at is stale", script, StringComparison.Ordinal);
         Assert.Contains("evidence generated_at is in the future", script, StringComparison.Ordinal);
@@ -323,6 +325,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject invalid-format releaseProof.generated_at timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.generated_at timestamps with excessive future skew", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.generatedAt timestamps with excessive future skew", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-canonical required_workflow_family_ids ordering", script, StringComparison.Ordinal);
         Assert.Contains("reject non-canonical required_tests ordering", script, StringComparison.Ordinal);
         Assert.Contains("reject non-canonical required_legacy_interaction_keys ordering", script, StringComparison.Ordinal);
         Assert.Contains("reject non-canonical required_screenshots ordering", script, StringComparison.Ordinal);
