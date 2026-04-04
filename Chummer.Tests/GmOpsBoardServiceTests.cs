@@ -2246,8 +2246,13 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse compactTravelCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "travelcache");
         GmPrepAssetListResponse safehouseStaleCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "safehouse stale cache");
         GmPrepAssetListResponse compactSafehouseReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "safehousereadiness");
+        GmPrepAssetListResponse mobileOfflineReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile offline readiness");
+        GmPrepAssetListResponse compactMobileOfflineReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobileofflinereadiness");
+        GmPrepAssetListResponse mobileTravelCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile travel cache");
+        GmPrepAssetListResponse compactMobileTravelCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobiletravelcache");
         GmPrepAssetListResponse negativeReadinessMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrix readiness");
         GmPrepAssetListResponse negativeCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrix cache");
+        GmPrepAssetListResponse negativeMobileMatrixCacheMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "mobile matrix cache");
 
         Assert.Contains(offlineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(compactOfflineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
@@ -2255,8 +2260,13 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(compactTravelCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(safehouseStaleCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Contains(compactSafehouseReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(mobileOfflineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactMobileOfflineReadinessMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(mobileTravelCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
+        Assert.Contains(compactMobileTravelCacheMatches.Items, item => item.AssetId == "travel_readiness_ops");
         Assert.Empty(negativeReadinessMatches.Items);
         Assert.Empty(negativeCacheMatches.Items);
+        Assert.Empty(negativeMobileMatrixCacheMatches.Items);
     }
 
     [Fact]
