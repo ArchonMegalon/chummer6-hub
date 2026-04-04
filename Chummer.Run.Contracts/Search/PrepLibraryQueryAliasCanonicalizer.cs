@@ -634,6 +634,18 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("connection");
         }
 
+        if (tokens.Contains("contacts"))
+        {
+            tokens.Remove("contacts");
+            tokens.Add("connection");
+        }
+
+        if (tokens.Contains("contact"))
+        {
+            tokens.Remove("contact");
+            tokens.Add("connection");
+        }
+
         if (tokens.Contains("relationships"))
         {
             tokens.Remove("relationships");
