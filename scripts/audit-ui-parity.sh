@@ -4,9 +4,29 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PARITY_CHECKLIST="$ROOT/docs/PARITY_CHECKLIST.md"
 PARITY_GENERATOR="$ROOT/scripts/generate-parity-checklist.sh"
-UI_PUBLISHED_DIR="${CHUMMER_UI_PUBLISHED_DIR:-$ROOT/../chummer-presentation/.codex-studio/published}"
-WORKFLOW_GATE_RECEIPT="$UI_PUBLISHED_DIR/DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json"
-VISUAL_FAMILIARITY_RECEIPT="$UI_PUBLISHED_DIR/DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json"
+DEFAULT_UI_PUBLISHED_DIR="$ROOT/../chummer6-ui/.codex-studio/published"
+LEGACY_UI_PUBLISHED_DIR="$ROOT/../chummer-presentation/.codex-studio/published"
+UI_PUBLISHED_DIR="${CHUMMER_UI_PUBLISHED_DIR:-$DEFAULT_UI_PUBLISHED_DIR}"
+
+resolve_receipt_path() {
+  local file_name="$1"
+  local primary="$UI_PUBLISHED_DIR/$file_name"
+  if [[ -f "$primary" ]]; then
+    echo "$primary"
+    return 0
+  fi
+  if [[ -z "${CHUMMER_UI_PUBLISHED_DIR:-}" ]]; then
+    local legacy="$LEGACY_UI_PUBLISHED_DIR/$file_name"
+    if [[ -f "$legacy" ]]; then
+      echo "$legacy"
+      return 0
+    fi
+  fi
+  echo "$primary"
+}
+
+WORKFLOW_GATE_RECEIPT="$(resolve_receipt_path "DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json")"
+VISUAL_FAMILIARITY_RECEIPT="$(resolve_receipt_path "DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json")"
 
 if [[ ! -x "$PARITY_GENERATOR" ]]; then
   echo "parity generator script is missing or not executable: $PARITY_GENERATOR" >&2
@@ -78,6 +98,43 @@ def require_empty_collection(value: object, *, message: str) -> None:
             raise SystemExit(message)
         return
     raise SystemExit(message)
+
+
+def require_empty_problem_map(value: object, *, message: str) -> None:
+    if not isinstance(value, dict):
+        raise SystemExit(message)
+    for _, nested in value.items():
+        if isinstance(nested, dict):
+            if nested:
+                raise SystemExit(message)
+            continue
+        if isinstance(nested, list):
+            if nested:
+                raise SystemExit(message)
+            continue
+        if nested not in (None, ""):
+            raise SystemExit(message)
+
+
+def require_true_bool(value: object, *, message: str) -> None:
+    if value is not True:
+        raise SystemExit(message)
+
+
+def require_head_marker_statuses_pass(value: object, *, message: str) -> None:
+    marker_statuses = require_object(value, message=message)
+    for head, markers in marker_statuses.items():
+        if not isinstance(head, str):
+            raise SystemExit(message)
+        marker_map = require_object(markers, message=message)
+        for marker, status in marker_map.items():
+            if not isinstance(marker, str):
+                raise SystemExit(message)
+            normalized = str(status or "").strip().lower()
+            if normalized != "pass":
+                raise SystemExit(
+                    f"{message}: {head}.{marker}={normalized or 'missing'}"
+                )
 
 
 def read_receipt(path: pathlib.Path) -> dict:
@@ -187,6 +244,22 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
     require_empty_collection(
         evidence.get("flagship_missing_or_not_ready_desktop_heads"),
         message=f"parity audit failed: workflow receipt reports missing or non-ready flagship desktop heads: {path}",
+    )
+    require_empty_collection(
+        evidence.get("flagship_missing_canonical_required_desktop_heads"),
+        message=f"parity audit failed: workflow receipt reports missing canonical required desktop heads: {path}",
+    )
+    require_empty_problem_map(
+        evidence.get("flagship_head_missing_contract_markers"),
+        message=f"parity audit failed: workflow receipt reports missing flagship head contract markers: {path}",
+    )
+    require_head_marker_statuses_pass(
+        evidence.get("flagship_head_contract_marker_statuses"),
+        message=f"parity audit failed: workflow receipt reports non-pass flagship head contract markers: {path}",
+    )
+    require_true_bool(
+        evidence.get("release_channel_receipt_exists"),
+        message=f"parity audit failed: workflow receipt reports missing release-channel evidence receipt: {path}",
     )
     required_families = require_string_list(
         evidence.get("required_workflow_family_ids"),
@@ -323,6 +396,22 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
     require_empty_collection(
         evidence.get("missing_required_legacy_interaction_keys"),
         message=f"parity audit failed: visual receipt reports missing required legacy interaction keys: {path}",
+    )
+    require_empty_collection(
+        evidence.get("flagship_missing_canonical_required_desktop_heads"),
+        message=f"parity audit failed: visual receipt reports missing canonical required desktop heads: {path}",
+    )
+    require_empty_problem_map(
+        evidence.get("flagship_head_missing_contract_markers"),
+        message=f"parity audit failed: visual receipt reports missing flagship head contract markers: {path}",
+    )
+    require_head_marker_statuses_pass(
+        evidence.get("flagship_head_contract_marker_statuses"),
+        message=f"parity audit failed: visual receipt reports non-pass flagship head contract markers: {path}",
+    )
+    require_true_bool(
+        evidence.get("release_channel_receipt_exists"),
+        message=f"parity audit failed: visual receipt reports missing release-channel evidence receipt: {path}",
     )
     require_empty_collection(
         evidence.get("missing_theme_tokens"),
