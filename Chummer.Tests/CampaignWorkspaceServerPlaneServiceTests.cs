@@ -7290,6 +7290,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("Explain receipt", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("JSON exchange", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("print-ready PDF", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("4 of 5 build follow-through checkpoints are already grounded.", handoff.PlannerCoverageSummary);
+        Assert.NotNull(handoff.PlannerCoverageLines);
+        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("Crew-fit:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("crew-fit", handoff.CrewFitSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)

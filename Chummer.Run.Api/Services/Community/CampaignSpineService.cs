@@ -2290,8 +2290,9 @@ public sealed class CampaignSpineService
                     ?? "No campaign workspace is attached yet, so return still lands on the living dossier until the first governed campaign handoff exists.";
                 var supportClosureSummary = DescribeBuildLabSupportClosure(runtimeFingerprint, restore);
                 var watchouts = BuildBuildLabWatchouts(workspace, outputs, restore);
-                var plannerCoverageSummary = BuildBuildLabPlannerCoverageSummary(workspace, outputs, restore);
-                var plannerCoverageLines = BuildBuildLabPlannerCoverageLines(workspace, outputs, restore);
+                var crewFitSummary = BuildBuildLabCrewFitSummary(dossier, workspace);
+                var plannerCoverageSummary = BuildBuildLabPlannerCoverageSummary(dossier, workspace, outputs, restore);
+                var plannerCoverageLines = BuildBuildLabPlannerCoverageLines(dossier, workspace, outputs, restore);
                 return new BuildLabHandoffProjection(
                     HandoffId: StableId("buildlab", dossier.DossierId),
                     DossierId: dossier.DossierId,
@@ -2326,7 +2327,8 @@ public sealed class CampaignSpineService
                     RuleEnvironmentDiff: ruleEnvironmentDiff,
                     Watchouts: watchouts,
                     PlannerCoverageSummary: plannerCoverageSummary,
-                    PlannerCoverageLines: plannerCoverageLines);
+                    PlannerCoverageLines: plannerCoverageLines,
+                    CrewFitSummary: crewFitSummary);
             })
             .Take(3)
             .ToArray();
@@ -2541,12 +2543,36 @@ public sealed class CampaignSpineService
         return $"Support can anchor closure on {artifact.Channel} {artifact.Version ?? "current"} for {artifact.Label} and the same runtime fingerprint ({runtimeFingerprint}).";
     }
 
+    private static string BuildBuildLabCrewFitSummary(
+        RunnerDossierProjection dossier,
+        CampaignWorkspaceProjection? workspace)
+    {
+        if (workspace is null)
+        {
+            return "Crew-fit is pending: attach this build path to a governed campaign workspace before role-overlap and roster-fit checks can be grounded.";
+        }
+
+        int crewCount = workspace.Crews.Count;
+        int crewMemberCount = workspace.Crews.Sum(static crew => crew.Members.Count);
+        bool dossierAssigned = workspace.Crews
+            .SelectMany(static crew => crew.Members)
+            .Any(member => string.Equals(member.DossierId, dossier.DossierId, StringComparison.OrdinalIgnoreCase));
+
+        if (!dossierAssigned)
+        {
+            return $"{dossier.DisplayName} is not yet assigned to a governed crew lane in {workspace.CampaignName}, so crew-fit still needs review.";
+        }
+
+        return $"{dossier.DisplayName} is assigned across {crewCount} crew lane(s) with {crewMemberCount} governed assignment(s) in {workspace.CampaignName}.";
+    }
+
     private static string BuildBuildLabPlannerCoverageSummary(
+        RunnerDossierProjection dossier,
         CampaignWorkspaceProjection? workspace,
         IReadOnlyList<PublicationSafeProjection> outputs,
         WorkspaceRestoreProjection restore)
     {
-        const int totalCheckpoints = 4;
+        const int totalCheckpoints = 5;
         var coveredCheckpoints = 0;
 
         if (workspace is not null)
@@ -2569,14 +2595,26 @@ public sealed class CampaignSpineService
             coveredCheckpoints++;
         }
 
+        if (workspace is not null
+            && workspace.Crews.SelectMany(static crew => crew.Members)
+                .Any(member => string.Equals(member.DossierId, dossier.DossierId, StringComparison.OrdinalIgnoreCase)))
+        {
+            coveredCheckpoints++;
+        }
+
         return $"{coveredCheckpoints} of {totalCheckpoints} build follow-through checkpoints are already grounded.";
     }
 
     private static IReadOnlyList<string> BuildBuildLabPlannerCoverageLines(
+        RunnerDossierProjection dossier,
         CampaignWorkspaceProjection? workspace,
         IReadOnlyList<PublicationSafeProjection> outputs,
         WorkspaceRestoreProjection restore)
     {
+        bool dossierAssignedToCrew = workspace is not null
+            && workspace.Crews.SelectMany(static crew => crew.Members)
+                .Any(member => string.Equals(member.DossierId, dossier.DossierId, StringComparison.OrdinalIgnoreCase));
+
         List<string> lines =
         [
             workspace is null
@@ -2599,7 +2637,12 @@ public sealed class CampaignSpineService
                 0 => "Claimed install: no linked device is attached yet for install-aware follow-through.",
                 1 => "Claimed install: 1 linked device is already attached for install-aware follow-through.",
                 _ => $"Claimed install: {restore.ClaimedDevices.Count} linked devices are already attached for install-aware follow-through."
-            }
+            },
+            workspace is null
+                ? "Crew-fit: no campaign workspace is attached yet, so role-overlap and roster-fit grounding are still pending."
+                : dossierAssignedToCrew
+                    ? $"Crew-fit: {dossier.DisplayName} is already assigned to a governed crew lane in {workspace.CampaignName}."
+                    : $"Crew-fit: {dossier.DisplayName} is not yet assigned to a governed crew lane in {workspace.CampaignName}."
         ];
 
         return lines
