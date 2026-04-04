@@ -31,9 +31,14 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("selectedBuildLabHandoff.ConditionalStateSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.ConditionalStateLines.Take(3)", view, StringComparison.Ordinal);
         Assert.Contains("Conditional rail:", view, StringComparison.Ordinal);
+        Assert.Contains("selectedBuildLabHandoff.SourceHintSummary", view, StringComparison.Ordinal);
+        Assert.Contains("selectedBuildLabHandoff.SourceHintLines.Take(3)", view, StringComparison.Ordinal);
+        Assert.Contains("Source-linked hints:", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.PlannerCoverageLines.Take(5)", view, StringComparison.Ordinal);
         Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Planner lane:", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.SourceHintLines.Take(2)", view, StringComparison.Ordinal);
+        Assert.Contains("Source hint:", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff.Summary", view, StringComparison.Ordinal);
     }
 

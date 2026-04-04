@@ -938,6 +938,17 @@
                                                                         <span> Conditional lane: @conditionalLine</span>
                                                                     }
                                                                 }
+                                                                @if (!string.IsNullOrWhiteSpace(handoff.SourceHintSummary))
+                                                                {
+                                                                    <span> Source-linked hints: @handoff.SourceHintSummary.</span>
+                                                                }
+                                                                @if (handoff.SourceHintLines is { Count: > 0 })
+                                                                {
+                                                                    foreach (var sourceHintLine in handoff.SourceHintLines.Take(2))
+                                                                    {
+                                                                        <span> Source hint: @sourceHintLine</span>
+                                                                    }
+                                                                }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SupportClosureSummary))
                                                                 {
                                                                     <span> Support: @handoff.SupportClosureSummary.</span>

@@ -2295,6 +2295,8 @@ public sealed class CampaignSpineService
                 var plannerCoverageLines = BuildBuildLabPlannerCoverageLines(dossier, workspace, outputs, restore);
                 var conditionalStateSummary = BuildBuildLabConditionalStateSummary(dossier, workspace);
                 var conditionalStateLines = BuildBuildLabConditionalStateLines(dossier, workspace);
+                var sourceHintSummary = BuildBuildLabSourceHintSummary(dossier, workspace);
+                var sourceHintLines = BuildBuildLabSourceHintLines(dossier, workspace);
                 return new BuildLabHandoffProjection(
                     HandoffId: StableId("buildlab", dossier.DossierId),
                     DossierId: dossier.DossierId,
@@ -2332,7 +2334,9 @@ public sealed class CampaignSpineService
                     PlannerCoverageLines: plannerCoverageLines,
                     CrewFitSummary: crewFitSummary,
                     ConditionalStateSummary: conditionalStateSummary,
-                    ConditionalStateLines: conditionalStateLines);
+                    ConditionalStateLines: conditionalStateLines,
+                    SourceHintSummary: sourceHintSummary,
+                    SourceHintLines: sourceHintLines);
             })
             .Take(3)
             .ToArray();
@@ -2786,6 +2790,75 @@ public sealed class CampaignSpineService
         }
 
         return signals;
+    }
+
+    private static string BuildBuildLabSourceHintSummary(
+        RunnerDossierProjection dossier,
+        CampaignWorkspaceProjection? workspace)
+    {
+        var activeEnvironment = workspace?.RuleEnvironment ?? dossier.RuleEnvironment;
+        IReadOnlyList<string> sourcePacks = NormalizeBuildLabHintValues(activeEnvironment.SourcePacks);
+        IReadOnlyList<string> houseRulePacks = NormalizeBuildLabHintValues(activeEnvironment.HouseRulePacks);
+        if (sourcePacks.Count == 0 && houseRulePacks.Count == 0)
+        {
+            return workspace is null
+                ? "Source-linked hints are pending: attach a campaign workspace to confirm source packs and house-rule overlays before final export."
+                : $"Source-linked hints in {workspace.CampaignName} need review: no active source packs or house-rule overlays are pinned yet.";
+        }
+
+        return workspace is null
+            ? $"Source-linked hints on the living dossier pin {sourcePacks.Count} source pack(s) and {houseRulePacks.Count} house-rule overlay(s)."
+            : $"Source-linked hints in {workspace.CampaignName} pin {sourcePacks.Count} source pack(s) and {houseRulePacks.Count} house-rule overlay(s).";
+    }
+
+    private static IReadOnlyList<string> BuildBuildLabSourceHintLines(
+        RunnerDossierProjection dossier,
+        CampaignWorkspaceProjection? workspace)
+    {
+        var activeEnvironment = workspace?.RuleEnvironment ?? dossier.RuleEnvironment;
+        IReadOnlyList<string> sourcePacks = NormalizeBuildLabHintValues(activeEnvironment.SourcePacks);
+        IReadOnlyList<string> houseRulePacks = NormalizeBuildLabHintValues(activeEnvironment.HouseRulePacks);
+
+        List<string> lines =
+        [
+            workspace is null
+                ? $"Source-linked lane: living dossier is pinned to {activeEnvironment.CompatibilityFingerprint} before campaign return binds."
+                : $"Source-linked lane: {workspace.CampaignName} is pinned to {activeEnvironment.CompatibilityFingerprint} for governed return and export."
+        ];
+
+        if (sourcePacks.Count > 0)
+        {
+            lines.Add($"Source-linked hint: source packs -> {DescribeBuildLabHintValues(sourcePacks)}.");
+        }
+
+        if (houseRulePacks.Count > 0)
+        {
+            lines.Add($"Source-linked hint: house-rule overlays -> {DescribeBuildLabHintValues(houseRulePacks)}.");
+        }
+
+        if (sourcePacks.Count == 0 && houseRulePacks.Count == 0)
+        {
+            lines.Add("Source-linked hint: no source packs or house-rule overlays are active yet.");
+        }
+
+        return lines;
+    }
+
+    private static IReadOnlyList<string> NormalizeBuildLabHintValues(IReadOnlyList<string> values)
+        => values
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static string DescribeBuildLabHintValues(IReadOnlyList<string> values)
+    {
+        if (values.Count <= 3)
+        {
+            return string.Join(", ", values);
+        }
+
+        return $"{string.Join(", ", values.Take(3))} (+{values.Count - 3} more)";
     }
 
     private static IReadOnlyList<string> BuildBuildLabPlannerCoverageLines(

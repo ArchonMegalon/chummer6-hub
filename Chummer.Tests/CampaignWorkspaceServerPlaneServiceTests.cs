@@ -7370,7 +7370,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             CompatibilityFingerprint: "sr6-preview",
             ApprovalState: "approved",
             SourcePacks: ["sr6-core"],
-            HouseRulePacks: [],
+            HouseRulePacks: ["reputation_house_rules"],
             OptionToggles: ["drug_modifiers", "foci_bonding", "sustained_effects", "reputation_spend"]);
         RuleEnvironmentRef workspaceEnvironment = new(
             EnvironmentId: "env-workspace",
@@ -7378,7 +7378,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             CompatibilityFingerprint: "sr6-mainline",
             ApprovalState: "approved",
             SourcePacks: ["sr6-core"],
-            HouseRulePacks: [],
+            HouseRulePacks: ["reputation_house_rules"],
             OptionToggles: ["drug_modifiers", "foci_bonding", "sustained_effects", "reputation_spend"]);
         RunnerDossierProjection dossier = new(
             DossierId: "dossier-build-1",
@@ -7465,6 +7465,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.ConditionalStateLines!, line => line.Contains("focus", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ConditionalStateLines!, line => line.Contains("sustained", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ConditionalStateLines!, line => line.Contains("reputation", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("source-linked hints", handoff.SourceHintSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(handoff.SourceHintLines);
+        Assert.Contains(handoff.SourceHintLines!, line => line.Contains("source packs", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.SourceHintLines!, line => line.Contains("house-rule", StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
