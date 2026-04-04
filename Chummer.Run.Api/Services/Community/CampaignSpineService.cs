@@ -2453,6 +2453,20 @@ public sealed class CampaignSpineService
             _ => false
         };
 
+    private static string BuildBuildLabOutputLaneLabel(string? kind)
+        => kind?.Trim().ToLowerInvariant() switch
+        {
+            "character_template" => "character-template",
+            "json_exchange" => "json-exchange",
+            "foundry_exchange" => "foundry-exchange",
+            "sheet_viewer" => "sheet-viewer",
+            "print_pdf_export" => "print-pdf-export",
+            "replay_timeline" => "replay-timeline",
+            "session_recap" => "session-recap",
+            "run_module" => "run-module",
+            _ => "governed-output"
+        };
+
     private static PublicationSafeProjection BuildBuildLabGovernedOutput(
         RunnerDossierProjection dossier,
         string projectionIdSuffix,
@@ -2463,7 +2477,9 @@ public sealed class CampaignSpineService
         string explainReceiptId,
         BuildLabRuleEnvironmentDiffProjection ruleEnvironmentDiff,
         string nextSafeAction)
-        => new(
+    {
+        string laneLabel = BuildBuildLabOutputLaneLabel(kind);
+        return new PublicationSafeProjection(
             ProjectionId: StableId("buildlab-output", $"{dossier.DossierId}:{projectionIdSuffix}"),
             Kind: kind,
             Label: label,
@@ -2474,11 +2490,14 @@ public sealed class CampaignSpineService
             PublicationState: "ready",
             TrustBand: "governed",
             Discoverable: true,
-            PublicationSummary: $"Ready on {runtimeFingerprint} with explain receipt {explainReceiptId}; rule diff {ruleEnvironmentDiff.BeforeFingerprint} -> {ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}).",
+            PublicationSummary: $"Lane {laneLabel} is ready on {runtimeFingerprint} with explain receipt {explainReceiptId}; rule diff {ruleEnvironmentDiff.BeforeFingerprint} -> {ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}).",
             CreatorPublicationId: null,
             NextSafeAction: nextSafeAction,
             ProvenanceSummary: $"Explain receipt {explainReceiptId} governs this build follow-through lane.",
-            AuditSummary: $"rule-environment:{ruleEnvironmentDiff.BeforeFingerprint}->{ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}); runtime:{runtimeFingerprint}; explain:{explainReceiptId}");
+            AuditSummary: $"lane:{kind}; rule-environment:{ruleEnvironmentDiff.BeforeFingerprint}->{ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}); runtime:{runtimeFingerprint}; explain:{explainReceiptId}",
+            CompatibilitySummary: $"Compatibility stays pinned to {runtimeFingerprint} with rule diff {ruleEnvironmentDiff.BeforeFingerprint} -> {ruleEnvironmentDiff.AfterFingerprint} ({ruleEnvironmentDiff.Status}).",
+            LineageSummary: $"{dossier.DossierId} keeps {kind} on the governed build lane with explain receipt {explainReceiptId}.");
+    }
 
     private static BuildLabRuleEnvironmentDiffProjection BuildBuildLabRuleEnvironmentDiff(
         RuleEnvironmentRef dossierRuleEnvironment,
