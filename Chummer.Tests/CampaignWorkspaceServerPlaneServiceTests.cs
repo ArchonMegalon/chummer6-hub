@@ -2,6 +2,7 @@ using Chummer.Campaign.Contracts;
 using System.Reflection;
 using Chummer.Run.Api.Contracts;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Xunit;
 
@@ -429,6 +430,62 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         Assert.Equal(4, watchouts.Count);
         Assert.Contains("Attention lane: Open objective pressure — Objective pressure remains high.", watchouts, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void WorkspaceStateSummaryPrefersAttentionContinuityConflictOverEarlierReviewConflict()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        var reviewConflict = new ContinuityConflictCue(
+            CueId: "conflict-review-1",
+            Severity: "review",
+            Summary: "Review continuity note.",
+            ResolutionAction: "Review roster notes.");
+        var attentionConflict = new ContinuityConflictCue(
+            CueId: "conflict-attention-1",
+            Severity: "attention",
+            Summary: "Active continuity conflict needs immediate reconciliation.",
+            ResolutionAction: "Resolve restore ownership mismatch.");
+
+        WorkspaceStateSummary summary = InvokeBuildWorkspaceStateSummary(
+            workspace,
+            ruleEnvironmentHealth: [],
+            continuityConflicts: [reviewConflict, attentionConflict],
+            supportDigests: [],
+            travelMode: BuildTravelModeReadinessSummary(),
+            nextSafeAction: InvokeBuildNextSafeActionCue(workspace));
+
+        Assert.Equal("restore_conflict_present", summary.Status);
+        Assert.Contains("Active continuity conflict needs immediate reconciliation.", summary.Summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Review continuity note.", summary.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WorkspaceStateSummaryPrefersWarningRuleCueOverEarlierReviewCue()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        var reviewRuleCue = new RuleEnvironmentHealthCue(
+            EnvironmentId: "env-1",
+            Severity: "review",
+            Title: "Rule environment review",
+            Summary: "Ruleset should be reviewed.");
+        var warningRuleCue = new RuleEnvironmentHealthCue(
+            EnvironmentId: "env-1",
+            Severity: "warning",
+            Title: "Rule mismatch warning",
+            Summary: "One runner uses a stale compatibility fingerprint.");
+
+        WorkspaceStateSummary summary = InvokeBuildWorkspaceStateSummary(
+            workspace,
+            ruleEnvironmentHealth: [reviewRuleCue, warningRuleCue],
+            continuityConflicts: [],
+            supportDigests: [],
+            travelMode: BuildTravelModeReadinessSummary(),
+            nextSafeAction: InvokeBuildNextSafeActionCue(workspace));
+
+        Assert.Equal("rule_environment_mismatch", summary.Status);
+        Assert.Contains("One runner uses a stale compatibility fingerprint.", summary.Summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Ruleset should be reviewed.", summary.Summary, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -5897,6 +5954,31 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         return Assert.IsAssignableFrom<IReadOnlyList<string>>(method.Invoke(null, [workspaces]));
     }
 
+    private static WorkspaceStateSummary InvokeBuildWorkspaceStateSummary(
+        CampaignWorkspaceProjection workspace,
+        IReadOnlyList<RuleEnvironmentHealthCue> ruleEnvironmentHealth,
+        IReadOnlyList<ContinuityConflictCue> continuityConflicts,
+        IReadOnlyList<SupportCaseDigestViewModel> supportDigests,
+        TravelModeReadinessSummary travelMode,
+        object nextSafeAction)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BuildWorkspaceStateSummary", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildWorkspaceStateSummary was not found.");
+
+        return Assert.IsType<WorkspaceStateSummary>(method.Invoke(null, [workspace, null, ruleEnvironmentHealth, continuityConflicts, supportDigests, travelMode, nextSafeAction]));
+    }
+
+    private static object InvokeBuildNextSafeActionCue(CampaignWorkspaceProjection workspace)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BuildNextSafeActionCue", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildNextSafeActionCue was not found.");
+
+        object? cue = method.Invoke(null, [workspace, null, Array.Empty<SupportCaseDigestViewModel>()]);
+        return cue ?? throw new InvalidOperationException("BuildNextSafeActionCue returned null.");
+    }
+
     private static string InvokeCampaignSpineResolveWorkspaceNextSafeAction(
         CampaignProjection campaign,
         WorkspaceRestoreProjection restore,
@@ -6180,6 +6262,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         return Assert.IsType<RosterReadinessSummary>(method.Invoke(null, [workspace]));
     }
+
+    private static TravelModeReadinessSummary BuildTravelModeReadinessSummary()
+        => new(
+            Status: "ready",
+            Summary: "Travel readiness is green.",
+            PrefetchInventorySummary: "Prefetch inventory is attached.",
+            ClaimedDeviceCount: 1,
+            TravelReadyDeviceCount: 1,
+            Devices: [],
+            Boundaries: []);
 
     private static RunboardSummary? InvokeBuildRunboardSummary(
         CampaignWorkspaceProjection workspace,
