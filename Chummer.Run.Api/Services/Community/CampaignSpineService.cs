@@ -2932,8 +2932,11 @@ public sealed class CampaignSpineService
 
         if (activeScene is not null && leadRun is not null)
         {
+            string activeSceneId = ResolveChangePacketIdentity(
+                activeScene.SceneId,
+                StableId("scene", campaign.CampaignId));
             packets.Add(new WorkspaceChangePacketProjection(
-                PacketId: StableId("packet", $"{campaign.CampaignId}:scene:{activeScene.SceneId}"),
+                PacketId: StableId("packet", $"{campaign.CampaignId}:scene:{activeSceneId}"),
                 Kind: "scene",
                 Label: "Active scene",
                 Summary: $"{activeScene.Title} is live on {leadRun.Title} at {activeScene.Revision}.",
@@ -2942,8 +2945,11 @@ public sealed class CampaignSpineService
 
         if (leadObjective is not null)
         {
+            string leadObjectiveId = ResolveChangePacketIdentity(
+                leadObjective.ObjectiveId,
+                StableId("objective", campaign.CampaignId));
             packets.Add(new WorkspaceChangePacketProjection(
-                PacketId: StableId("packet", $"{campaign.CampaignId}:objective:{leadObjective.ObjectiveId}"),
+                PacketId: StableId("packet", $"{campaign.CampaignId}:objective:{leadObjectiveId}"),
                 Kind: "objective",
                 Label: "Objective pressure",
                 Summary: $"{leadObjective.Title} remains {leadObjective.Status} with {leadObjective.Pressure} pressure.",
