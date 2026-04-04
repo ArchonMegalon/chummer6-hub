@@ -102,6 +102,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingCollapsesCompactPrepLaunchAndTravelPrefetchPluralForms()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "prep:compact-launch-prefetch",
+            Kind: "prep_launch_packet",
+            Title: "Neon Cradle prep launch travel prefetch packet",
+            Summary: "Compact launch and travel prefetch forms stay on one governed prep lane.",
+            BindingSummary: "Bound to campaign return continuity and travel/offline readiness receipts.",
+            Reusable: true,
+            SearchTerms: ["prep", "launch", "travel", "prefetch", "packet"],
+            EvidenceLines: ["Compact preplaunch and travelprefetch forms should resolve onto governed prep tokens."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplaunch")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplaunches")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelprefetch")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelprefetches")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixprefetches")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsCompactGovernedPacketForms()
     {
         var packet = new GovernedPrepPacketSummary(

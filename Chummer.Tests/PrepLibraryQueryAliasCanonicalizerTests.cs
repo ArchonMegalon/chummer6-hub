@@ -163,7 +163,11 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
     {
         HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
         {
+            "preplaunch",
+            "preplaunches",
             "preplibrarypacket",
+            "travelprefetch",
+            "travelprefetches",
             "oppositionpacket",
             "oppositionpackets",
             "rostermovepacket",
@@ -176,13 +180,20 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
 
         Assert.Contains("prep", tokens);
+        Assert.Contains("launch", tokens);
         Assert.Contains("library", tokens);
+        Assert.Contains("travel", tokens);
+        Assert.Contains("prefetch", tokens);
         Assert.Contains("opposition", tokens);
         Assert.Contains("roster", tokens);
         Assert.Contains("move", tokens);
         Assert.Contains("eventcontrol", tokens);
         Assert.Contains("packet", tokens);
+        Assert.DoesNotContain("preplaunch", tokens);
+        Assert.DoesNotContain("preplaunches", tokens);
         Assert.DoesNotContain("preplibrarypacket", tokens);
+        Assert.DoesNotContain("travelprefetch", tokens);
+        Assert.DoesNotContain("travelprefetches", tokens);
         Assert.DoesNotContain("oppositionpacket", tokens);
         Assert.DoesNotContain("oppositionpackets", tokens);
         Assert.DoesNotContain("rostermovepacket", tokens);
