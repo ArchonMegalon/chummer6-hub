@@ -301,6 +301,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         "launching"
     ];
 
+    private static readonly string[] PrepLaunchCompactWordTokens =
+    [
+        "preplaunch",
+        "preplaunches"
+    ];
+
     private static readonly string[] TravelPrefetchWordTokens =
     [
         "travel",
@@ -313,6 +319,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         "prefetches",
         "prefetched",
         "prefetching"
+    ];
+
+    private static readonly string[] TravelPrefetchCompactWordTokens =
+    [
+        "travelprefetch",
+        "travelprefetches"
     ];
 
     private static readonly string[] BoundedWordTokens =
@@ -3237,6 +3249,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
+        if (ContainsAnyWordToken(value, PrepLaunchCompactWordTokens))
+        {
+            return true;
+        }
+
         return ContainsAnyWordToken(value, PrepLaunchWordTokens)
             && ContainsAnyWordToken(value, PrepLaunchActionWordTokens);
     }
@@ -3841,6 +3858,11 @@ public sealed class CampaignWorkspaceServerPlaneService
         if (string.IsNullOrWhiteSpace(value))
         {
             return false;
+        }
+
+        if (ContainsAnyWordToken(value, TravelPrefetchCompactWordTokens))
+        {
+            return true;
         }
 
         return ContainsAnyWordToken(value, TravelPrefetchWordTokens)
