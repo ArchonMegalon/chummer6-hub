@@ -326,6 +326,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject releaseProof.generated_at timestamps with excessive future skew", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.generatedAt timestamps with excessive future skew", script, StringComparison.Ordinal);
         Assert.Contains("reject non-canonical required_workflow_family_ids ordering", script, StringComparison.Ordinal);
+        Assert.Contains("reject unexpected required_workflow_family_ids values", script, StringComparison.Ordinal);
         Assert.Contains("reject non-canonical required_tests ordering", script, StringComparison.Ordinal);
         Assert.Contains("reject non-canonical required_legacy_interaction_keys ordering", script, StringComparison.Ordinal);
         Assert.Contains("reject non-canonical required_screenshots ordering", script, StringComparison.Ordinal);
@@ -744,6 +745,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=postrun", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=post%20run", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=post-run", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=postgame", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=post%20game", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=post-game", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=recap", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=recaps", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=afteraction", audit, StringComparison.Ordinal);
@@ -935,6 +939,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=postrun", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=post%20run", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=post-run", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=postgame", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=post%20game", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=post-game", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=recap", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=recaps", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=afteraction", audit, StringComparison.Ordinal);
@@ -1422,6 +1429,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("split post run continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=post-run", playwright, StringComparison.Ordinal);
         Assert.Contains("hyphen post-run continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=postgame", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact postgame continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=post(?:%20|\\+)game", playwright, StringComparison.Ordinal);
+        Assert.Contains("split post game continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=post-game", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen post-game continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=recap", playwright, StringComparison.Ordinal);
         Assert.Contains("recap continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=recaps", playwright, StringComparison.Ordinal);

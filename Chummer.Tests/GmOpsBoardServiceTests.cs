@@ -642,6 +642,38 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatPostGameContinuityShorthandAsPrepLibraryDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:23:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open post-game prep lane remains unresolved before next return checkpoint.",
+                AtUtc: baseTime,
+                EventId: "evt-post-game"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-post-game", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatCompactDomainShorthandAsGovernedOpsDomains()
     {
         SessionLedgerService ledger = new();
@@ -1740,6 +1772,12 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse postrunMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "postrun");
         GmPrepAssetListResponse postRunSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "post run");
         GmPrepAssetListResponse postRunHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "post-run");
+        GmPrepAssetListResponse postgameMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "postgame");
+        GmPrepAssetListResponse postgamesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "postgames");
+        GmPrepAssetListResponse postGameSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "post game");
+        GmPrepAssetListResponse postGamesSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "post games");
+        GmPrepAssetListResponse postGameHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "post-game");
+        GmPrepAssetListResponse postGamesHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "post-games");
         GmPrepAssetListResponse afterActionCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteraction");
         GmPrepAssetListResponse afterActionsCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteractions");
         GmPrepAssetListResponse afterActionReportCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteractionreport");
@@ -1807,6 +1845,12 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(postrunMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(postRunSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(postRunHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(postgameMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(postgamesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(postGameSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(postGamesSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(postGameHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(postGamesHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionsCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionReportCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");

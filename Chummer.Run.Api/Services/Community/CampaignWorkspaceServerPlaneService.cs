@@ -257,6 +257,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         "postmortem",
         "postsession",
         "postrun",
+        "postgame",
+        "postgames",
         "afteractionreport",
         "afteractionreports",
         "afteractionreview",
@@ -3150,7 +3152,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(normalizedKind, AftermathRecapWordTokens)
-            || ContainsAfterActionTokenPair(normalizedKind);
+            || ContainsAfterActionTokenPair(normalizedKind)
+            || ContainsPostGameTokenPair(normalizedKind);
     }
 
     private static bool IsAftermathSignal(WorkspaceChangePacketProjection packet)
@@ -3179,7 +3182,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(value, AftermathRecapWordTokens)
-            || ContainsAfterActionTokenPair(value);
+            || ContainsAfterActionTokenPair(value)
+            || ContainsPostGameTokenPair(value);
     }
 
     private static GovernedPrepPacketSummary? BuildPrepLaunchOpsPacket(
@@ -3746,6 +3750,18 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return ContainsAnyWordToken(value, ["after"])
             && ContainsAnyWordToken(value, ["action"]);
+    }
+
+    private static bool ContainsPostGameTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["postgame", "postgames"])
+            || (ContainsAnyWordToken(value, ["post"])
+                && ContainsAnyWordToken(value, ["game", "games"]));
     }
 
     private static bool ContainsSessionLogTokenPair(string? value)

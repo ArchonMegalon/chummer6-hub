@@ -452,6 +452,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("post runs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("post-run")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("post-runs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("postgame")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("postgames")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("post game")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("post games")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("post-game")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("post-games")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteraction")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteractions")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteractionreport")));
@@ -510,6 +516,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostmortem")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostsession")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostrun")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostgame")));
     }
 
     [Fact]
