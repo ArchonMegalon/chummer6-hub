@@ -1254,6 +1254,135 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineWorkspaceChangePacketsPreferMostRecentRosterTransferReceipt()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        RosterTransferProjection transfer = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<RosterTransferProjection>>(workspace.RosterTransfers));
+        RosterTransferProjection olderTransfer = transfer with
+        {
+            TransferId = "transfer-oldest",
+            Summary = "Older roster transfer summary.",
+            TransferredAtUtc = transfer.TransferredAtUtc.AddMinutes(-30)
+        };
+        RosterTransferProjection newerTransfer = transfer with
+        {
+            TransferId = "transfer-newest",
+            Summary = "Newest roster transfer summary.",
+            TransferredAtUtc = transfer.TransferredAtUtc.AddMinutes(30)
+        };
+
+        IReadOnlyList<WorkspaceChangePacketProjection> mixedPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [olderTransfer, newerTransfer],
+            [],
+            []);
+        IReadOnlyList<WorkspaceChangePacketProjection> newestOnlyPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [newerTransfer],
+            [],
+            []);
+
+        WorkspaceChangePacketProjection mixedPacket = Assert.Single(mixedPackets);
+        WorkspaceChangePacketProjection newestOnlyPacket = Assert.Single(newestOnlyPackets);
+        Assert.Equal("roster_transfer", mixedPacket.Kind);
+        Assert.Equal(newestOnlyPacket.PacketId, mixedPacket.PacketId);
+        Assert.Equal("Newest roster transfer summary.", mixedPacket.Summary);
+    }
+
+    [Fact]
+    public void CampaignSpineWorkspaceChangePacketsPreferMostRecentPrepLaunchReceipt()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        GovernedPrepLaunchProjection prepLaunch = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepLaunchProjection>>(workspace.PrepLaunches));
+        GovernedPrepLaunchProjection olderLaunch = prepLaunch with
+        {
+            LaunchId = "launch-oldest",
+            Summary = "Older prep launch summary.",
+            LaunchedAtUtc = prepLaunch.LaunchedAtUtc.AddMinutes(-45)
+        };
+        GovernedPrepLaunchProjection newerLaunch = prepLaunch with
+        {
+            LaunchId = "launch-newest",
+            Summary = "Newest prep launch summary.",
+            LaunchedAtUtc = prepLaunch.LaunchedAtUtc.AddMinutes(45)
+        };
+
+        IReadOnlyList<WorkspaceChangePacketProjection> mixedPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [olderLaunch, newerLaunch],
+            []);
+        IReadOnlyList<WorkspaceChangePacketProjection> newestOnlyPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [newerLaunch],
+            []);
+
+        WorkspaceChangePacketProjection mixedPacket = Assert.Single(mixedPackets);
+        WorkspaceChangePacketProjection newestOnlyPacket = Assert.Single(newestOnlyPackets);
+        Assert.Equal("prep_launch", mixedPacket.Kind);
+        Assert.Equal(newestOnlyPacket.PacketId, mixedPacket.PacketId);
+        Assert.Equal("Newest prep launch summary.", mixedPacket.Summary);
+    }
+
+    [Fact]
+    public void CampaignSpineWorkspaceChangePacketsPreferMostRecentTravelPrefetchReceipt()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        TravelPrefetchReceiptProjection prefetch = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<TravelPrefetchReceiptProjection>>(workspace.TravelPrefetches));
+        TravelPrefetchReceiptProjection olderPrefetch = prefetch with
+        {
+            ReceiptId = "prefetch-oldest",
+            PrefetchSummary = "Older travel prefetch summary.",
+            StagedAtUtc = prefetch.StagedAtUtc.AddMinutes(-20)
+        };
+        TravelPrefetchReceiptProjection newerPrefetch = prefetch with
+        {
+            ReceiptId = "prefetch-newest",
+            PrefetchSummary = "Newest travel prefetch summary.",
+            StagedAtUtc = prefetch.StagedAtUtc.AddMinutes(20)
+        };
+
+        IReadOnlyList<WorkspaceChangePacketProjection> mixedPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [],
+            [olderPrefetch, newerPrefetch]);
+        IReadOnlyList<WorkspaceChangePacketProjection> newestOnlyPackets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            null,
+            [],
+            [],
+            [newerPrefetch]);
+
+        WorkspaceChangePacketProjection mixedPacket = Assert.Single(mixedPackets);
+        WorkspaceChangePacketProjection newestOnlyPacket = Assert.Single(newestOnlyPackets);
+        Assert.Equal("travel_prefetch", mixedPacket.Kind);
+        Assert.Equal(newestOnlyPacket.PacketId, mixedPacket.PacketId);
+        Assert.Equal("Newest travel prefetch summary.", mixedPacket.Summary);
+    }
+
+    [Fact]
     public void CampaignSpineWorkspaceChangePacketsNormalizeWhitespacePaddedSceneIdsBeforePacketProjection()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
