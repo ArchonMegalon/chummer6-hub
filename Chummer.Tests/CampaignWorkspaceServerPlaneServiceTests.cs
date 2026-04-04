@@ -733,6 +733,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     [InlineData("post-session")]
     [InlineData("post-run")]
     [InlineData("post-game")]
+    [InlineData("aar")]
+    [InlineData("aars")]
+    [InlineData("retro")]
+    [InlineData("retrospectives")]
+    [InlineData("afteractionreview")]
     public void BoundedRecapShelfCategoryTreatsContinuityRecapShorthandKindsAsAftermath(string kind)
     {
         PublicationSafeProjection publication = BuildPublicationSafeProjection(kind);
@@ -741,6 +746,18 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         bool supported = InvokeSupportsCreatorShelfProjection(publication);
 
         Assert.Equal("aftermath", category);
+        Assert.True(supported);
+    }
+
+    [Fact]
+    public void BoundedRecapShelfCategoryKeepsDowntimeClassification()
+    {
+        PublicationSafeProjection publication = BuildPublicationSafeProjection("downtime");
+
+        string category = InvokeBoundedRecapShelfCategory(publication);
+        bool supported = InvokeSupportsCreatorShelfProjection(publication);
+
+        Assert.Equal("downtime", category);
         Assert.True(supported);
     }
 
