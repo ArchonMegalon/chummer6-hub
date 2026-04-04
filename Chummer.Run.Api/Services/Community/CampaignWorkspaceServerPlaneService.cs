@@ -4465,7 +4465,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         int aftermathPackageCount = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>()).Count;
         int returnLoopSignalCount = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
             .Count(static packet => IsCampaignReturnSignal(packet))
-            + (workspace.NextSessionCarryForward is null ? 0 : 1);
+            + (IsCampaignReturnCarryForwardSignal(workspace.NextSessionCarryForward) ? 1 : 0);
         int prepPacketCount = prepLibrary.Packets.Count;
         string laneStatus = travelReadyDeviceCount == 0
             ? "blocked"
