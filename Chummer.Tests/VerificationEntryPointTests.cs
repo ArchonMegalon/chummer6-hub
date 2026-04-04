@@ -257,6 +257,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject non-passing releaseProof.uiLocalizationReleaseGate.explicitFallbackRuntime status", script, StringComparison.Ordinal);
         Assert.Contains("reject non-passing releaseProof.uiLocalizationReleaseGate.signoffSmokeRunnerStatus status", script, StringComparison.Ordinal);
         Assert.Contains("reject non-passing releaseProof.uiLocalizationReleaseGate.signoff_smoke_runner_status alias status", script, StringComparison.Ordinal);
+        Assert.Contains("reject releaseProof.uiLocalizationReleaseGate.blockingFindings length/count mismatches", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.uiLocalizationReleaseGate.translationBacklogFindings length/count mismatches", script, StringComparison.Ordinal);
         Assert.Contains("reject non-zero releaseProof.uiLocalizationReleaseGate.localeSummary untranslatedKeyCount values", script, StringComparison.Ordinal);
         Assert.Contains("reject missing releaseProof payloads", script, StringComparison.Ordinal);
@@ -634,6 +635,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=aftermaths", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=debrief", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=debriefs", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=debriefing", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=debriefings", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=recap", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=recaps", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
@@ -766,6 +769,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=aftermaths", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=debrief", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=debriefs", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=debriefing", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=debriefings", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=recap", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=recaps", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=return", audit, StringComparison.Ordinal);
@@ -1091,6 +1096,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("debrief continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=debriefs", playwright, StringComparison.Ordinal);
         Assert.Contains("debriefs continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=debriefing", playwright, StringComparison.Ordinal);
+        Assert.Contains("debriefing continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=debriefings", playwright, StringComparison.Ordinal);
+        Assert.Contains("debriefings continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=recap", playwright, StringComparison.Ordinal);
         Assert.Contains("recap continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=recaps", playwright, StringComparison.Ordinal);
