@@ -207,6 +207,11 @@ public sealed class VerificationEntryPointTests
         string script = File.ReadAllText(scriptPath);
 
         Assert.Contains("bash scripts/audit-ui-parity.sh", script, StringComparison.Ordinal);
+        Assert.Contains("run_ui_parity_audit_with_workflow_gate_retry", script, StringComparison.Ordinal);
+        Assert.Contains("WORKFLOW_GATE_DRIFT_RETRY_MARKER", script, StringComparison.Ordinal);
+        Assert.Contains("milestone-2 workflow/visual release-channel generated_at drift", script, StringComparison.Ordinal);
+        Assert.Contains("materialize-desktop-workflow-execution-gate.sh", script, StringComparison.Ordinal);
+        Assert.Contains("verify note: rematerializing desktop workflow execution gate after generated_at drift.", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_path", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_fixture_path", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_UI_PARITY_RELEASE_CHANNEL_PATH", script, StringComparison.Ordinal);
@@ -586,16 +591,19 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=gmcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmctrl", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gmctrls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmctl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmctls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm%20ctl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm%20ctls", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gm%20ctrls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm%20control", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm-control", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm%20controls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm-controls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm%20ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gm-ctrl", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gm-ctrls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=leagueops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=league-op", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=leagueoperation", audit, StringComparison.Ordinal);
@@ -775,16 +783,19 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=gmcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmctrl", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=gmctrls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmctl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmctls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm%20ctl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm%20ctls", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=gm%20ctrls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm%20control", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm-control", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm%20controls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm-controls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm%20ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm-ctrl", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=gm-ctrls", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heats", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=oppositions", audit, StringComparison.Ordinal);
@@ -1037,6 +1048,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact gmcontrols prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gmctrl", playwright, StringComparison.Ordinal);
         Assert.Contains("compact gmctrl prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=gmctrls", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact gmctrls prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gmctl", playwright, StringComparison.Ordinal);
         Assert.Contains("compact gmctl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gmctls", playwright, StringComparison.Ordinal);
@@ -1045,6 +1058,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("split gm ctl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gm(?:%20|\\+)ctls", playwright, StringComparison.Ordinal);
         Assert.Contains("split gm ctls prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=gm(?:%20|\\+)ctrls", playwright, StringComparison.Ordinal);
+        Assert.Contains("split gm ctrls prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gm(?:%20|\\+)control", playwright, StringComparison.Ordinal);
         Assert.Contains("split gm control prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gm-control", playwright, StringComparison.Ordinal);
@@ -1057,6 +1072,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("split gm ctrl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gm-ctrl", playwright, StringComparison.Ordinal);
         Assert.Contains("hyphen gm-ctrl prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=gm-ctrls", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen gm-ctrls prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=leagueops", playwright, StringComparison.Ordinal);
         Assert.Contains("compact leagueops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=league-op", playwright, StringComparison.Ordinal);
