@@ -512,6 +512,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "travelofflinebriefs",
             "travelofflinebrf",
             "travelofflinebrfs",
+            "travelsofflinepacket",
+            "travelsofflinepackets",
+            "travelsofflinepkt",
+            "travelsofflinepkts",
+            "travelsofflinebrief",
+            "travelsofflinebriefs",
+            "travelsofflinebrf",
+            "travelsofflinebrfs",
             "mobileofflinepacket",
             "mobileofflinepackets",
             "mobileofflinepkt",
@@ -528,6 +536,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "safehousetravelbriefs",
             "safehousetravelbrf",
             "safehousetravelbrfs",
+            "safehousestravelpacket",
+            "safehousestravelpackets",
+            "safehousestravelpkt",
+            "safehousestravelpkts",
+            "safehousestravelbrief",
+            "safehousestravelbriefs",
+            "safehousestravelbrf",
+            "safehousestravelbrfs",
             "safehouseofflinepacket",
             "safehouseofflinepackets",
             "safehouseofflinepkt",
@@ -536,6 +552,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "safehouseofflinebriefs",
             "safehouseofflinebrf",
             "safehouseofflinebrfs",
+            "safehousesofflinepacket",
+            "safehousesofflinepackets",
+            "safehousesofflinepkt",
+            "safehousesofflinepkts",
+            "safehousesofflinebrief",
+            "safehousesofflinebriefs",
+            "safehousesofflinebrf",
+            "safehousesofflinebrfs",
             "mobilesafehouseofflinepacket",
             "mobilesafehouseofflinepackets",
             "mobilesafehouseofflinepkt",
@@ -544,6 +568,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "mobilesafehouseofflinebriefs",
             "mobilesafehouseofflinebrf",
             "mobilesafehouseofflinebrfs",
+            "mobilesafehousesofflinepacket",
+            "mobilesafehousesofflinepackets",
+            "mobilesafehousesofflinepkt",
+            "mobilesafehousesofflinepkts",
+            "mobilesafehousesofflinebrief",
+            "mobilesafehousesofflinebriefs",
+            "mobilesafehousesofflinebrf",
+            "mobilesafehousesofflinebrfs",
             "gmopspacket",
             "gmoperationpackets",
             "gmoperationspacket",
@@ -683,6 +715,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("travelofflinebriefs", tokens);
         Assert.DoesNotContain("travelofflinebrf", tokens);
         Assert.DoesNotContain("travelofflinebrfs", tokens);
+        Assert.DoesNotContain("travelsofflinepacket", tokens);
+        Assert.DoesNotContain("travelsofflinepackets", tokens);
+        Assert.DoesNotContain("travelsofflinepkt", tokens);
+        Assert.DoesNotContain("travelsofflinepkts", tokens);
+        Assert.DoesNotContain("travelsofflinebrief", tokens);
+        Assert.DoesNotContain("travelsofflinebriefs", tokens);
+        Assert.DoesNotContain("travelsofflinebrf", tokens);
+        Assert.DoesNotContain("travelsofflinebrfs", tokens);
         Assert.DoesNotContain("mobileofflinepacket", tokens);
         Assert.DoesNotContain("mobileofflinepackets", tokens);
         Assert.DoesNotContain("mobileofflinepkt", tokens);
@@ -699,6 +739,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("safehousetravelbriefs", tokens);
         Assert.DoesNotContain("safehousetravelbrf", tokens);
         Assert.DoesNotContain("safehousetravelbrfs", tokens);
+        Assert.DoesNotContain("safehousestravelpacket", tokens);
+        Assert.DoesNotContain("safehousestravelpackets", tokens);
+        Assert.DoesNotContain("safehousestravelpkt", tokens);
+        Assert.DoesNotContain("safehousestravelpkts", tokens);
+        Assert.DoesNotContain("safehousestravelbrief", tokens);
+        Assert.DoesNotContain("safehousestravelbriefs", tokens);
+        Assert.DoesNotContain("safehousestravelbrf", tokens);
+        Assert.DoesNotContain("safehousestravelbrfs", tokens);
         Assert.DoesNotContain("safehouseofflinepacket", tokens);
         Assert.DoesNotContain("safehouseofflinepackets", tokens);
         Assert.DoesNotContain("safehouseofflinepkt", tokens);
@@ -707,6 +755,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("safehouseofflinebriefs", tokens);
         Assert.DoesNotContain("safehouseofflinebrf", tokens);
         Assert.DoesNotContain("safehouseofflinebrfs", tokens);
+        Assert.DoesNotContain("safehousesofflinepacket", tokens);
+        Assert.DoesNotContain("safehousesofflinepackets", tokens);
+        Assert.DoesNotContain("safehousesofflinepkt", tokens);
+        Assert.DoesNotContain("safehousesofflinepkts", tokens);
+        Assert.DoesNotContain("safehousesofflinebrief", tokens);
+        Assert.DoesNotContain("safehousesofflinebriefs", tokens);
+        Assert.DoesNotContain("safehousesofflinebrf", tokens);
+        Assert.DoesNotContain("safehousesofflinebrfs", tokens);
         Assert.DoesNotContain("mobilesafehouseofflinepacket", tokens);
         Assert.DoesNotContain("mobilesafehouseofflinepackets", tokens);
         Assert.DoesNotContain("mobilesafehouseofflinepkt", tokens);
@@ -715,6 +771,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("mobilesafehouseofflinebriefs", tokens);
         Assert.DoesNotContain("mobilesafehouseofflinebrf", tokens);
         Assert.DoesNotContain("mobilesafehouseofflinebrfs", tokens);
+        Assert.DoesNotContain("mobilesafehousesofflinepacket", tokens);
+        Assert.DoesNotContain("mobilesafehousesofflinepackets", tokens);
+        Assert.DoesNotContain("mobilesafehousesofflinepkt", tokens);
+        Assert.DoesNotContain("mobilesafehousesofflinepkts", tokens);
+        Assert.DoesNotContain("mobilesafehousesofflinebrief", tokens);
+        Assert.DoesNotContain("mobilesafehousesofflinebriefs", tokens);
+        Assert.DoesNotContain("mobilesafehousesofflinebrf", tokens);
+        Assert.DoesNotContain("mobilesafehousesofflinebrfs", tokens);
         Assert.DoesNotContain("gmopspacket", tokens);
         Assert.DoesNotContain("gmoperationpackets", tokens);
         Assert.DoesNotContain("gmoperationspacket", tokens);
