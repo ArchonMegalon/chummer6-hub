@@ -220,6 +220,32 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsGameMasterOpsShorthandAcrossWhitespaceAndPunctuation()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "event:gamemasterops",
+            Kind: "event_control_packet",
+            Title: "Dockyard event control board",
+            Summary: "Game-master operations stay governed for the next launch window.",
+            BindingSummary: "Bound to campaign return and event controls.",
+            Reusable: true,
+            SearchTerms: ["event", "control", "season", "operations"],
+            EvidenceLines: ["Game-master operations checkpoint receipt captured for event-control lane."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("game master ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("game-master-ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemasterops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("game master operation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemasteroperation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("game master control")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemastercontrol")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("game master ctrl")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemasterctrl")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrix master ops")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsEventOpsShorthandAcrossWhitespaceBoundaries()
     {
         var packet = new GovernedPrepPacketSummary(
@@ -526,16 +552,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("offline readiness")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("offlinereadiness")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("off-line readiness")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travel cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelcache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehouse stale cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehousereadiness")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("safe house readiness")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("safe-house cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile offline readiness")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobileofflinereadiness")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile off-line readiness")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile travel cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobiletravelcache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile safehouse readiness")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilesafehousereadiness")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile safe house cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile safehouse cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilesafehousecache")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrix readiness")));
@@ -7246,6 +7277,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             InvokeCampaignSpineBuildBuildLabHandoffs([dossier], [workspace], restore));
 
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "character_template", StringComparison.Ordinal));
+        Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "json_exchange", StringComparison.Ordinal));
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "foundry_exchange", StringComparison.Ordinal));
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "sheet_viewer", StringComparison.Ordinal));
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "print_pdf_export", StringComparison.Ordinal));
@@ -7256,6 +7288,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Equal("sr6-mainline", handoff.RuleEnvironmentDiff.AfterFingerprint);
         Assert.True(handoff.RuleEnvironmentDiff.Changed);
         Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("Explain receipt", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("JSON exchange", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("print-ready PDF", StringComparison.OrdinalIgnoreCase));
     }
 
