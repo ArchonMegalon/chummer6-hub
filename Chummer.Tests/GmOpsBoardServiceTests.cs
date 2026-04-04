@@ -920,6 +920,7 @@ public sealed class GmOpsBoardServiceTests
 
         GmPrepAssetListResponse prepLibraryMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "preplibrary");
         GmPrepAssetListResponse eventControlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventcontrol");
+        GmPrepAssetListResponse eventControlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventcontrols");
         GmPrepAssetListResponse eventCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventctrl");
         GmPrepAssetListResponse eventOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventops");
         GmPrepAssetListResponse eventOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventop");
@@ -937,6 +938,7 @@ public sealed class GmOpsBoardServiceTests
 
         Assert.Contains(prepLibraryMatches.Items, item => item.AssetId == "prep_library_ops");
         Assert.Contains(eventControlMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(eventControlsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventCtrlMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventOpsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventOpMatches.Items, item => item.AssetId == "event_control_ops");
