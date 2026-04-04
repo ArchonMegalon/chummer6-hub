@@ -651,6 +651,19 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("crewhandoff");
         }
 
+        if (tokens.Contains("crew") && (tokens.Contains("transfer") || tokens.Contains("transfers")))
+        {
+            tokens.Remove("transfer");
+            tokens.Remove("transfers");
+            tokens.Add("handoff");
+        }
+
+        if (tokens.Contains("crew") && tokens.Contains("handoffs"))
+        {
+            tokens.Remove("handoffs");
+            tokens.Add("handoff");
+        }
+
         if (tokens.Contains("crewmove"))
         {
             tokens.Remove("crewmove");
@@ -669,10 +682,23 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("rostermove");
         }
 
+        if (tokens.Contains("crew") && tokens.Contains("moves"))
+        {
+            tokens.Remove("moves");
+            tokens.Add("move");
+        }
+
         if (tokens.Contains("rostertransfers"))
         {
             tokens.Remove("rostertransfers");
             tokens.Add("rostertransfer");
+        }
+
+        if (tokens.Contains("roster") && (tokens.Contains("transfer") || tokens.Contains("transfers")))
+        {
+            tokens.Remove("transfer");
+            tokens.Remove("transfers");
+            tokens.Add("move");
         }
 
         if (tokens.Contains("rosterhandoffs"))
@@ -681,10 +707,22 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("rosterhandoff");
         }
 
+        if (tokens.Contains("roster") && tokens.Contains("handoffs"))
+        {
+            tokens.Remove("handoffs");
+            tokens.Add("handoff");
+        }
+
         if (tokens.Contains("crewhandoffs"))
         {
             tokens.Remove("crewhandoffs");
             tokens.Add("crewhandoff");
+        }
+
+        if (tokens.Contains("roster") && tokens.Contains("moves"))
+        {
+            tokens.Remove("moves");
+            tokens.Add("move");
         }
 
         if (tokens.Contains("seasonops"))

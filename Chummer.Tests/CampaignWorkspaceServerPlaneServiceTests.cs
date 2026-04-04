@@ -261,6 +261,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> compactRosterMovePluralTokens = InvokeBuildTokens("rostermoves");
         IReadOnlyList<string> hyphenCrewMoveTokens = InvokeBuildTokens("crew-move");
         IReadOnlyList<string> hyphenRosterMoveTokens = InvokeBuildTokens("roster-move");
+        IReadOnlyList<string> splitCrewTransfersTokens = InvokeBuildTokens("crew transfers");
+        IReadOnlyList<string> splitCrewHandoffsTokens = InvokeBuildTokens("crew handoffs");
+        IReadOnlyList<string> splitCrewMovesTokens = InvokeBuildTokens("crew moves");
+        IReadOnlyList<string> splitRosterTransfersTokens = InvokeBuildTokens("roster transfers");
+        IReadOnlyList<string> splitRosterHandoffsTokens = InvokeBuildTokens("roster handoffs");
+        IReadOnlyList<string> splitRosterMovesTokens = InvokeBuildTokens("roster moves");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixtransfer");
 
         Assert.True(InvokeMatches(packet, compactTokens));
@@ -270,6 +276,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, compactRosterMovePluralTokens));
         Assert.True(InvokeMatches(packet, hyphenCrewMoveTokens));
         Assert.True(InvokeMatches(packet, hyphenRosterMoveTokens));
+        Assert.True(InvokeMatches(packet, splitCrewTransfersTokens));
+        Assert.True(InvokeMatches(packet, splitCrewHandoffsTokens));
+        Assert.True(InvokeMatches(packet, splitCrewMovesTokens));
+        Assert.True(InvokeMatches(packet, splitRosterTransfersTokens));
+        Assert.True(InvokeMatches(packet, splitRosterHandoffsTokens));
+        Assert.True(InvokeMatches(packet, splitRosterMovesTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
     }
 
