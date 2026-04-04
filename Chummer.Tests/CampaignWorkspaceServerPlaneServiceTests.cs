@@ -367,11 +367,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             PacketId: "continuity:plural-lane",
             Kind: "campaign_continuity_packet",
             Title: "Neon Cradle diary downtime aftermath continuity packet",
-            Summary: "Diary, downtime, aftermath, recap, return, memory, archive, history, timeline, ledger, heat, faction, connection, and relationship continuity remains governed for next-session return.",
-            BindingSummary: "Bound to campaign diary continuity, downtime follow-through, aftermath recap, return cues, memory timeline, ledger history, heat pressure, faction posture, and contact connection relationship changes.",
+            Summary: "Diary, downtime, aftermath, recap, return, memory, archive, history, timeline, ledger, lifestyle, license, SIN, heat, faction, connection, and relationship continuity remains governed for next-session return.",
+            BindingSummary: "Bound to campaign diary continuity, downtime follow-through, aftermath recap, return cues, memory timeline, ledger history, lifestyle shifts, license posture, SIN handling, heat pressure, faction posture, and contact connection relationship changes.",
             Reusable: true,
-            SearchTerms: ["diary", "journal", "downtime", "aftermath", "recap", "return", "memory", "archive", "history", "timeline", "ledger", "heat", "faction", "connection", "relationship"],
-            EvidenceLines: ["Governed continuity lane keeps diary, downtime, aftermath, recap, return, memory, archive, history, timeline, ledger, heat, faction, connection, and relationship signals attached for next session."],
+            SearchTerms: ["diary", "journal", "downtime", "aftermath", "recap", "return", "memory", "archive", "history", "timeline", "ledger", "lifestyle", "license", "sin", "heat", "faction", "connection", "relationship"],
+            EvidenceLines: ["Governed continuity lane keeps diary, downtime, aftermath, recap, return, memory, archive, history, timeline, ledger, lifestyle, license, SIN, heat, faction, connection, and relationship signals attached for next session."],
             UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
 
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diary")));
@@ -393,6 +393,13 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("histories")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("timelines")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("ledgers")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("lifestyle")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("lifestyles")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("license")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("licenses")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("licences")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("sin")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("sins")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("heat")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("heats")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("faction")));
@@ -424,42 +431,62 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("crewtransfers");
         IReadOnlyList<string> compactMoveTokens = InvokeBuildTokens("crewmove");
         IReadOnlyList<string> compactMovePluralTokens = InvokeBuildTokens("crewmoves");
+        IReadOnlyList<string> compactMovementTokens = InvokeBuildTokens("crewmovement");
+        IReadOnlyList<string> compactMovementPluralTokens = InvokeBuildTokens("crewmovements");
         IReadOnlyList<string> compactRosterMovePluralTokens = InvokeBuildTokens("rostermoves");
+        IReadOnlyList<string> compactRosterMovementTokens = InvokeBuildTokens("rostermovement");
+        IReadOnlyList<string> compactRosterMovementPluralTokens = InvokeBuildTokens("rostermovements");
         IReadOnlyList<string> hyphenCrewMoveTokens = InvokeBuildTokens("crew-move");
+        IReadOnlyList<string> hyphenCrewMovementTokens = InvokeBuildTokens("crew-movement");
         IReadOnlyList<string> hyphenRosterMoveTokens = InvokeBuildTokens("roster-move");
+        IReadOnlyList<string> hyphenRosterMovementTokens = InvokeBuildTokens("roster-movement");
         IReadOnlyList<string> splitCrewTransfersTokens = InvokeBuildTokens("crew transfers");
         IReadOnlyList<string> splitCrewTransferTokens = InvokeBuildTokens("crew transfer");
         IReadOnlyList<string> splitCrewHandoffsTokens = InvokeBuildTokens("crew handoffs");
         IReadOnlyList<string> splitCrewHandoffTokens = InvokeBuildTokens("crew handoff");
         IReadOnlyList<string> splitCrewMovesTokens = InvokeBuildTokens("crew moves");
         IReadOnlyList<string> splitCrewMoveTokens = InvokeBuildTokens("crew move");
+        IReadOnlyList<string> splitCrewMovementTokens = InvokeBuildTokens("crew movement");
+        IReadOnlyList<string> splitCrewMovementsTokens = InvokeBuildTokens("crew movements");
         IReadOnlyList<string> splitRosterTransfersTokens = InvokeBuildTokens("roster transfers");
         IReadOnlyList<string> splitRosterTransferTokens = InvokeBuildTokens("roster transfer");
         IReadOnlyList<string> splitRosterHandoffsTokens = InvokeBuildTokens("roster handoffs");
         IReadOnlyList<string> splitRosterHandoffTokens = InvokeBuildTokens("roster handoff");
         IReadOnlyList<string> splitRosterMovesTokens = InvokeBuildTokens("roster moves");
         IReadOnlyList<string> splitRosterMoveTokens = InvokeBuildTokens("roster move");
+        IReadOnlyList<string> splitRosterMovementTokens = InvokeBuildTokens("roster movement");
+        IReadOnlyList<string> splitRosterMovementsTokens = InvokeBuildTokens("roster movements");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixtransfer");
 
         Assert.True(InvokeMatches(packet, compactTokens));
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.True(InvokeMatches(packet, compactMoveTokens));
         Assert.True(InvokeMatches(packet, compactMovePluralTokens));
+        Assert.True(InvokeMatches(packet, compactMovementTokens));
+        Assert.True(InvokeMatches(packet, compactMovementPluralTokens));
         Assert.True(InvokeMatches(packet, compactRosterMovePluralTokens));
+        Assert.True(InvokeMatches(packet, compactRosterMovementTokens));
+        Assert.True(InvokeMatches(packet, compactRosterMovementPluralTokens));
         Assert.True(InvokeMatches(packet, hyphenCrewMoveTokens));
+        Assert.True(InvokeMatches(packet, hyphenCrewMovementTokens));
         Assert.True(InvokeMatches(packet, hyphenRosterMoveTokens));
+        Assert.True(InvokeMatches(packet, hyphenRosterMovementTokens));
         Assert.True(InvokeMatches(packet, splitCrewTransfersTokens));
         Assert.True(InvokeMatches(packet, splitCrewTransferTokens));
         Assert.True(InvokeMatches(packet, splitCrewHandoffsTokens));
         Assert.True(InvokeMatches(packet, splitCrewHandoffTokens));
         Assert.True(InvokeMatches(packet, splitCrewMovesTokens));
         Assert.True(InvokeMatches(packet, splitCrewMoveTokens));
+        Assert.True(InvokeMatches(packet, splitCrewMovementTokens));
+        Assert.True(InvokeMatches(packet, splitCrewMovementsTokens));
         Assert.True(InvokeMatches(packet, splitRosterTransfersTokens));
         Assert.True(InvokeMatches(packet, splitRosterTransferTokens));
         Assert.True(InvokeMatches(packet, splitRosterHandoffsTokens));
         Assert.True(InvokeMatches(packet, splitRosterHandoffTokens));
         Assert.True(InvokeMatches(packet, splitRosterMovesTokens));
         Assert.True(InvokeMatches(packet, splitRosterMoveTokens));
+        Assert.True(InvokeMatches(packet, splitRosterMovementTokens));
+        Assert.True(InvokeMatches(packet, splitRosterMovementsTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
     }
 
