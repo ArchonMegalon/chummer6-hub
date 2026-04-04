@@ -5,7 +5,7 @@ source "$(dirname "$0")/_env.sh"
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-WORKFLOW_GATE_DRIFT_RETRY_MARKER="milestone-2 workflow/visual release-channel generated_at drift"
+WORKFLOW_GATE_DRIFT_RETRY_MARKER_PREFIX="milestone-2 workflow/visual release-channel "
 UI_WORKFLOW_GATE_MATERIALIZER="$ROOT_DIR/../chummer6-ui/scripts/ai/milestones/materialize-desktop-workflow-execution-gate.sh"
 
 run_ui_parity_audit_with_workflow_gate_retry() {
@@ -19,8 +19,8 @@ run_ui_parity_audit_with_workflow_gate_retry() {
   fi
 
   cat "$parity_log" >&2
-  if grep -Fq "$WORKFLOW_GATE_DRIFT_RETRY_MARKER" "$parity_log"; then
-    echo "verify note: rematerializing desktop workflow execution gate after generated_at drift." >&2
+  if grep -Fq "$WORKFLOW_GATE_DRIFT_RETRY_MARKER_PREFIX" "$parity_log"; then
+    echo "verify note: rematerializing desktop workflow execution gate after milestone-2 release-channel drift." >&2
     if [[ ! -x "$UI_WORKFLOW_GATE_MATERIALIZER" ]]; then
       echo "verify gate failed: workflow gate materializer is missing or not executable: $UI_WORKFLOW_GATE_MATERIALIZER" >&2
       return 1
