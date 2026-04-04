@@ -256,6 +256,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketDeduplicatesIdenticalRecapSignalVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithAftermathRecapKindsOnly();
+        IReadOnlyList<PublicationSafeProjection> recaps =
+            Assert.IsAssignableFrom<IReadOnlyList<PublicationSafeProjection>>(seed.RecapShelf);
+        PublicationSafeProjection first = recaps[0];
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [first, first]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 aftermath or downtime signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("downtime_brief", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void AftermathPacketFallsBackToRecapLabelWhenRecapKindIsSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathRecapLabelOnly();
@@ -869,6 +890,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("session_recap", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CampaignReturnPacketDeduplicatesIdenticalDiaryRecapVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithCampaignReturnRecapKindsOnly();
+        IReadOnlyList<PublicationSafeProjection> recaps =
+            Assert.IsAssignableFrom<IReadOnlyList<PublicationSafeProjection>>(seed.RecapShelf);
+        PublicationSafeProjection first = recaps[0];
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [first, first]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 diary/continuity signal(s) and 0 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("session_recap", StringComparison.OrdinalIgnoreCase));
     }
 

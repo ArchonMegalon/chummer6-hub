@@ -2093,8 +2093,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         RunProjection? leadRun)
     {
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
-        PublicationSafeProjection[] diaryRecaps = workspace.RecapShelf
-            .Where(static item => IsCampaignReturnRecapSignal(item))
+        PublicationSafeProjection[] diaryRecaps = DeduplicateIdenticalPublicationRecapVersions(
+                workspace.RecapShelf
+                .Where(static item => IsCampaignReturnRecapSignal(item)))
             .Take(4)
             .ToArray();
         AftermathRecapPackageProjection[] aftermathPackages = DeduplicateIdenticalAftermathPackageVersions(
@@ -2771,8 +2772,9 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static item => item.GeneratedAtUtc))
             .Take(3)
             .ToArray();
-        PublicationSafeProjection[] recapSignals = workspace.RecapShelf
-            .Where(static item => IsAftermathRecapSignal(item))
+        PublicationSafeProjection[] recapSignals = DeduplicateIdenticalPublicationRecapVersions(
+                workspace.RecapShelf
+                .Where(static item => IsAftermathRecapSignal(item)))
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] aftermathSignals = DeduplicateIdenticalChangePacketVersions(
@@ -3907,6 +3909,26 @@ public sealed class CampaignWorkspaceServerPlaneService
             NormalizeOptional(package.Summary) ?? string.Empty,
             NormalizeOptional(package.ArtifactId) ?? string.Empty,
             package.GeneratedAtUtc.ToUnixTimeMilliseconds().ToString());
+
+    private static IEnumerable<PublicationSafeProjection> DeduplicateIdenticalPublicationRecapVersions(
+        IEnumerable<PublicationSafeProjection> recaps)
+    {
+        HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
+        foreach (PublicationSafeProjection recap in recaps)
+        {
+            if (seenKeys.Add(BuildPublicationRecapDedupeKey(recap)))
+            {
+                yield return recap;
+            }
+        }
+    }
+
+    private static string BuildPublicationRecapDedupeKey(PublicationSafeProjection recap) =>
+        string.Join('|',
+            NormalizeOptional(recap.ProjectionId) ?? string.Empty,
+            NormalizeOptional(recap.Kind) ?? string.Empty,
+            NormalizeOptional(recap.Label) ?? string.Empty,
+            NormalizeOptional(recap.Summary) ?? string.Empty);
 
     private static IEnumerable<CampaignConsequenceProjection> DeduplicateIdenticalCampaignConsequenceVersions(
         IEnumerable<CampaignConsequenceProjection> consequences)
