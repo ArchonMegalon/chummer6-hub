@@ -7291,8 +7291,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
                 Assert.Equal("ready", output.PublicationState);
                 Assert.Equal("governed", output.TrustBand);
                 Assert.NotNull(output.PublicationSummary);
+                Assert.Contains(output.Kind.Replace('_', '-'), output.PublicationSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("rule diff", output.PublicationSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.NotNull(output.AuditSummary);
+                Assert.Contains($"lane:{output.Kind}", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("rule-environment:sr6-preview->sr6-mainline", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
             });
         Assert.Contains(handoff.TradeoffLines, line => line.Contains("Rule-environment diff", StringComparison.OrdinalIgnoreCase));
