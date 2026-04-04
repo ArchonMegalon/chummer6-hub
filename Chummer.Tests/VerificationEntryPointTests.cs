@@ -797,6 +797,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=lessons%20learnt", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=lesson-learned", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=lessons-learned", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=lesson-learnt", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=lessons-learnt", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returns", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returnloop", audit, StringComparison.Ordinal);
@@ -1010,6 +1012,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=lessons%20learnt", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=lesson-learned", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=lessons-learned", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=lesson-learnt", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=lessons-learnt", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=return", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=returns", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=returnloop", audit, StringComparison.Ordinal);
@@ -1563,6 +1567,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("split lesson learnt continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=lessons(?:%20|\\+)learnt", playwright, StringComparison.Ordinal);
         Assert.Contains("split lessons learnt continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=lesson-learnt", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen lesson-learnt continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=lessons-learnt", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen lessons-learnt continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=lesson-learned", playwright, StringComparison.Ordinal);
         Assert.Contains("hyphen lesson-learned continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=lessons-learned", playwright, StringComparison.Ordinal);
