@@ -412,6 +412,58 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("sr4_sr6_frontier_status"),
         message=f"parity audit failed: workflow receipt sr4/sr6 frontier proof is not pass-ready: {path}",
     )
+    workflow_parity_proof_max_age_seconds = read_int_value(
+        evidence,
+        "workflow_parity_proof_max_age_seconds",
+        default_value=DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS,
+        path=path,
+    )
+    for prefix, label in (
+        ("sr4_workflow_parity", "sr4 workflow parity"),
+        ("sr6_workflow_parity", "sr6 workflow parity"),
+        ("chummer5a_workflow_parity", "chummer5a workflow parity"),
+        ("sr4_sr6_frontier", "sr4/sr6 frontier parity"),
+    ):
+        require_non_empty_string(
+            evidence.get(f"{prefix}_path"),
+            message=(
+                f"parity audit failed: workflow receipt {label} evidence path is missing: {path}"
+            ),
+        )
+        nested_generated_at = parse_generated_at(
+            path,
+            {"generatedAt": evidence.get(f"{prefix}_generated_at")},
+        )
+        nested_age_seconds = require_int_at_least(
+            evidence.get(f"{prefix}_age_seconds"),
+            minimum=0,
+            message=(
+                f"parity audit failed: workflow receipt {label} evidence age must be an integer >= 0: {path}"
+            ),
+        )
+        if nested_age_seconds > workflow_parity_proof_max_age_seconds:
+            raise SystemExit(
+                "parity audit failed: workflow receipt "
+                f"{label} evidence age exceeds allowed freshness window: {path} "
+                f"(age_seconds={nested_age_seconds}, "
+                f"max_age_seconds={workflow_parity_proof_max_age_seconds})"
+            )
+        now = dt.datetime.now(UTC)
+        computed_age_seconds = int((now - nested_generated_at).total_seconds())
+        if computed_age_seconds > workflow_parity_proof_max_age_seconds:
+            raise SystemExit(
+                "parity audit failed: workflow receipt "
+                f"{label} evidence generated_at is stale: {path} "
+                f"(age_seconds={computed_age_seconds}, "
+                f"max_age_seconds={workflow_parity_proof_max_age_seconds})"
+            )
+        if computed_age_seconds < -DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS:
+            raise SystemExit(
+                "parity audit failed: workflow receipt "
+                f"{label} evidence generated_at is in the future: {path} "
+                f"(future_skew_seconds={abs(computed_age_seconds)}, "
+                f"max_future_skew_seconds={DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS})"
+            )
     validate_timestamp_freshness(path, data, evidence)
 
 

@@ -88,6 +88,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("sr6_workflow_parity_status", script, StringComparison.Ordinal);
         Assert.Contains("chummer5a_workflow_parity_status", script, StringComparison.Ordinal);
         Assert.Contains("sr4_sr6_frontier_status", script, StringComparison.Ordinal);
+        Assert.Contains("workflow_parity_proof_max_age_seconds", script, StringComparison.Ordinal);
+        Assert.Contains("evidence path is missing", script, StringComparison.Ordinal);
+        Assert.Contains("evidence age exceeds allowed freshness window", script, StringComparison.Ordinal);
+        Assert.Contains("evidence generated_at is stale", script, StringComparison.Ordinal);
+        Assert.Contains("evidence generated_at is in the future", script, StringComparison.Ordinal);
         Assert.Contains("metatype-priorities-karma-entry", script, StringComparison.Ordinal);
         Assert.Contains("recovery-reload-migration-roundtrips", script, StringComparison.Ordinal);
         Assert.Contains("required_legacy_interaction_keys", script, StringComparison.Ordinal);
@@ -396,6 +401,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=downtime", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermath", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=roster", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=contacts", audit, StringComparison.Ordinal);
@@ -403,6 +409,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=downtime", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=aftermath", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=return", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=roster", audit, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -445,6 +452,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("aftermath continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=return", playwright, StringComparison.Ordinal);
         Assert.Contains("return-loop continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=roster", playwright, StringComparison.Ordinal);
+        Assert.Contains("roster-movement prep query", playwright, StringComparison.Ordinal);
     }
 
     [Fact]
