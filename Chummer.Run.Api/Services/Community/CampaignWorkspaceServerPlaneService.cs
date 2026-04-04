@@ -2539,8 +2539,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
     {
-        RosterTransferProjection[] transfers = (workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
-            .OrderByDescending(static item => item.TransferredAtUtc)
+        RosterTransferProjection[] transfers = DeduplicateIdenticalRosterTransferVersions(
+                (workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
+                .OrderByDescending(static item => item.TransferredAtUtc))
             .Take(3)
             .ToArray();
         CampaignConsequenceProjection[] rosterConsequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
@@ -2921,8 +2922,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         RunProjection? leadRun)
     {
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
-        GovernedPrepLaunchProjection[] launches = (workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>())
-            .OrderByDescending(static item => item.LaunchedAtUtc)
+        GovernedPrepLaunchProjection[] launches = DeduplicateIdenticalPrepLaunchVersions(
+                (workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>())
+                .OrderByDescending(static item => item.LaunchedAtUtc))
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] launchSignals = DeduplicateIdenticalChangePacketVersions(
@@ -3079,16 +3081,19 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
             .Take(3)
             .ToArray();
-        RosterTransferProjection[] rosterTransfers = (workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
-            .OrderByDescending(static transfer => transfer.TransferredAtUtc)
+        RosterTransferProjection[] rosterTransfers = DeduplicateIdenticalRosterTransferVersions(
+                (workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
+                .OrderByDescending(static transfer => transfer.TransferredAtUtc))
             .Take(3)
             .ToArray();
-        GovernedPrepLaunchProjection[] prepLaunches = (workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>())
-            .OrderByDescending(static launch => launch.LaunchedAtUtc)
+        GovernedPrepLaunchProjection[] prepLaunches = DeduplicateIdenticalPrepLaunchVersions(
+                (workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>())
+                .OrderByDescending(static launch => launch.LaunchedAtUtc))
             .Take(3)
             .ToArray();
-        TravelPrefetchReceiptProjection[] travelPrefetches = (workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>())
-            .OrderByDescending(static receipt => receipt.StagedAtUtc)
+        TravelPrefetchReceiptProjection[] travelPrefetches = DeduplicateIdenticalTravelPrefetchReceiptVersions(
+                (workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>())
+                .OrderByDescending(static receipt => receipt.StagedAtUtc))
             .Take(3)
             .ToArray();
         ObjectiveProjection[] eventObjectives = (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
@@ -3506,8 +3511,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         RunProjection? leadRun)
     {
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
-        TravelPrefetchReceiptProjection[] receipts = (workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>())
-            .OrderByDescending(static item => item.StagedAtUtc)
+        TravelPrefetchReceiptProjection[] receipts = DeduplicateIdenticalTravelPrefetchReceiptVersions(
+                (workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>())
+                .OrderByDescending(static item => item.StagedAtUtc))
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] prefetchSignals = DeduplicateIdenticalChangePacketVersions(
@@ -3794,6 +3800,81 @@ public sealed class CampaignWorkspaceServerPlaneService
             NormalizeOptional(packet.Label) ?? string.Empty,
             NormalizeOptional(packet.Summary) ?? string.Empty,
             packet.UpdatedAtUtc.ToUnixTimeMilliseconds().ToString());
+
+    private static IEnumerable<RosterTransferProjection> DeduplicateIdenticalRosterTransferVersions(
+        IEnumerable<RosterTransferProjection> transfers)
+    {
+        HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
+        foreach (RosterTransferProjection transfer in transfers)
+        {
+            if (seenKeys.Add(BuildRosterTransferDedupeKey(transfer)))
+            {
+                yield return transfer;
+            }
+        }
+    }
+
+    private static string BuildRosterTransferDedupeKey(RosterTransferProjection transfer) =>
+        string.Join('|',
+            NormalizeOptional(transfer.TransferId) ?? string.Empty,
+            NormalizeOptional(transfer.DossierId) ?? string.Empty,
+            NormalizeOptional(transfer.RunnerHandle) ?? string.Empty,
+            NormalizeOptional(transfer.SourceGroupId) ?? string.Empty,
+            NormalizeOptional(transfer.SourceCampaignId) ?? string.Empty,
+            NormalizeOptional(transfer.SourceCrewId) ?? string.Empty,
+            NormalizeOptional(transfer.TargetGroupId) ?? string.Empty,
+            NormalizeOptional(transfer.TargetCampaignId) ?? string.Empty,
+            NormalizeOptional(transfer.TargetCrewId) ?? string.Empty,
+            NormalizeOptional(transfer.Summary) ?? string.Empty,
+            transfer.TransferredAtUtc.ToUnixTimeMilliseconds().ToString());
+
+    private static IEnumerable<GovernedPrepLaunchProjection> DeduplicateIdenticalPrepLaunchVersions(
+        IEnumerable<GovernedPrepLaunchProjection> launches)
+    {
+        HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
+        foreach (GovernedPrepLaunchProjection launch in launches)
+        {
+            if (seenKeys.Add(BuildPrepLaunchDedupeKey(launch)))
+            {
+                yield return launch;
+            }
+        }
+    }
+
+    private static string BuildPrepLaunchDedupeKey(GovernedPrepLaunchProjection launch) =>
+        string.Join('|',
+            NormalizeOptional(launch.LaunchId) ?? string.Empty,
+            NormalizeOptional(launch.PacketId) ?? string.Empty,
+            NormalizeOptional(launch.PacketKind) ?? string.Empty,
+            NormalizeOptional(launch.PacketTitle) ?? string.Empty,
+            NormalizeOptional(launch.TargetRunId) ?? string.Empty,
+            NormalizeOptional(launch.TargetSceneId) ?? string.Empty,
+            NormalizeOptional(launch.Summary) ?? string.Empty,
+            launch.LaunchedAtUtc.ToUnixTimeMilliseconds().ToString());
+
+    private static IEnumerable<TravelPrefetchReceiptProjection> DeduplicateIdenticalTravelPrefetchReceiptVersions(
+        IEnumerable<TravelPrefetchReceiptProjection> receipts)
+    {
+        HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
+        foreach (TravelPrefetchReceiptProjection receipt in receipts)
+        {
+            if (seenKeys.Add(BuildTravelPrefetchReceiptDedupeKey(receipt)))
+            {
+                yield return receipt;
+            }
+        }
+    }
+
+    private static string BuildTravelPrefetchReceiptDedupeKey(TravelPrefetchReceiptProjection receipt) =>
+        string.Join('|',
+            NormalizeOptional(receipt.ReceiptId) ?? string.Empty,
+            NormalizeOptional(receipt.InstallationId) ?? string.Empty,
+            NormalizeOptional(receipt.DeviceRole) ?? string.Empty,
+            NormalizeOptional(receipt.Platform) ?? string.Empty,
+            NormalizeOptional(receipt.HeadId) ?? string.Empty,
+            NormalizeOptional(receipt.Channel) ?? string.Empty,
+            NormalizeOptional(receipt.PrefetchSummary) ?? string.Empty,
+            receipt.StagedAtUtc.ToUnixTimeMilliseconds().ToString());
 
     private static string DescribeSignalLabel(string? preferredLabel, string? firstFallback, string? secondFallback)
     {

@@ -851,6 +851,48 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLaunchPacketDeduplicatesIdenticalLaunchVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        IReadOnlyList<GovernedPrepLaunchProjection> launches =
+            Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepLaunchProjection>>(seed.PrepLaunches);
+        GovernedPrepLaunchProjection launch = Assert.Single(launches);
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            PrepLaunches = [launch, launch],
+            TravelPrefetches = []
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "prep_launch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 prep-launch signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TravelPrefetchPacketDeduplicatesIdenticalReceiptVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        IReadOnlyList<TravelPrefetchReceiptProjection> prefetches =
+            Assert.IsAssignableFrom<IReadOnlyList<TravelPrefetchReceiptProjection>>(seed.TravelPrefetches);
+        TravelPrefetchReceiptProjection prefetch = Assert.Single(prefetches);
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            PrepLaunches = [],
+            TravelPrefetches = [prefetch, prefetch]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 travel-prefetch signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PrepLaunchPacketIncludesFallbackEvidenceWhenLaunchReceiptsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithSparseOpsReceipts();
@@ -1152,6 +1194,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("2 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("season operation label", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("contact pressure label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketDeduplicatesIdenticalPrepAndTravelReceiptVersions_WhenPayloadRepeatsSameRows()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
+        IReadOnlyList<GovernedPrepLaunchProjection> launches =
+            Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepLaunchProjection>>(seed.PrepLaunches);
+        IReadOnlyList<TravelPrefetchReceiptProjection> prefetches =
+            Assert.IsAssignableFrom<IReadOnlyList<TravelPrefetchReceiptProjection>>(seed.TravelPrefetches);
+        GovernedPrepLaunchProjection launch = Assert.Single(launches);
+        TravelPrefetchReceiptProjection prefetch = Assert.Single(prefetches);
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            PrepLaunches = [launch, launch],
+            TravelPrefetches = [prefetch, prefetch]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("2 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
