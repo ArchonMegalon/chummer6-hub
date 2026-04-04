@@ -278,11 +278,10 @@ from pathlib import Path
 path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
 payload["releaseProof"]["journeysPassed"] = [
-    "launch-and-link",
-    "create-and-advance-character",
-    "run-and-log-session",
-    "publish-and-install-content",
-    "recover-and-resync",
+    "install_claim_restore_continue",
+    "build_explain_publish",
+    "campaign_session_recover_recap",
+    "report_cluster_release_notify",
     "bonus-noncanonical-journey",
 ]
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
