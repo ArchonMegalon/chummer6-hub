@@ -7198,7 +7198,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         };
         WorkspaceRestoreProjection restore = BuildEmptyRestore() with
         {
-            ClaimedDevices: [BuildClaimedDeviceRestore("workstation", "Claimed workstation restore lane is attached.")]
+            ClaimedDevices = [BuildClaimedDeviceRestore("workstation", "Claimed workstation restore lane is attached.")]
         };
 
         BuildLabHandoffProjection handoff = Assert.Single(
