@@ -343,6 +343,53 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RecapShelfUsesLatestCreatorPublication_WhenRecapPublicationIdHasWhitespacePadding()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-publication-whitespace-1",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap-safe output remains attached to campaign continuity.",
+            CreatorPublicationId: "  pub-duplicate  ");
+        CreatorPublicationProjection older = new(
+            PublicationId: "pub-duplicate",
+            Title: "Session recap older projection",
+            Kind: "campaign_recap_bundle",
+            Summary: "Older publication row.",
+            CampaignId: "campaign-a",
+            DossierId: null,
+            ArtifactId: "artifact-old",
+            ProvenanceSummary: "Older provenance",
+            DiscoverySummary: "Older discovery",
+            Visibility: "group",
+            PublicationStatus: "review",
+            TrustBand: "bounded",
+            Discoverable: false,
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+        CreatorPublicationProjection newer = older with
+        {
+            ArtifactId = "artifact-new",
+            PublicationStatus = "published",
+            TrustBand = "verified",
+            Discoverable = true,
+            UpdatedAtUtc = DateTimeOffset.Parse("2026-04-03T00:10:00Z")
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recap]
+        };
+
+        IReadOnlyList<RecapShelfEntry> shelf = InvokeBuildRecapShelf(workspace, [older, newer]);
+
+        RecapShelfEntry entry = Assert.Single(shelf);
+        Assert.Equal("pub-duplicate", entry.CreatorPublicationId);
+        Assert.Equal("published", entry.PublicationState);
+        Assert.Equal("verified", entry.TrustBand);
+        Assert.True(entry.Discoverable);
+    }
+
+    [Fact]
     public void CampaignSpineAttachCreatorPublicationPostureUsesLatestPublication_WhenPublicationIdsRepeat()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
@@ -385,6 +432,53 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         CampaignWorkspaceProjection updatedWorkspace = Assert.Single(updated);
         PublicationSafeProjection updatedRecap = Assert.Single(updatedWorkspace.RecapShelf);
         Assert.Equal("pub-duplicate", updatedRecap.CreatorPublicationId);
+        Assert.Equal("published", updatedRecap.PublicationState);
+        Assert.Equal("verified", updatedRecap.TrustBand);
+        Assert.True(updatedRecap.Discoverable);
+    }
+
+    [Fact]
+    public void CampaignSpineAttachCreatorPublicationPostureUsesLatestPublication_WhenRecapArtifactIdHasWhitespacePadding()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-publication-artifact-whitespace-1",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap-safe output remains attached to campaign continuity.",
+            ArtifactId: "  artifact-match  ");
+        CreatorPublicationProjection older = new(
+            PublicationId: "pub-artifact",
+            Title: "Session recap older projection",
+            Kind: "campaign_recap_bundle",
+            Summary: "Older publication row.",
+            CampaignId: "campaign-a",
+            DossierId: null,
+            ArtifactId: "artifact-match",
+            ProvenanceSummary: "Older provenance",
+            DiscoverySummary: "Older discovery",
+            Visibility: "group",
+            PublicationStatus: "review",
+            TrustBand: "bounded",
+            Discoverable: false,
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+        CreatorPublicationProjection newer = older with
+        {
+            PublicationStatus = "published",
+            TrustBand = "verified",
+            Discoverable = true,
+            UpdatedAtUtc = DateTimeOffset.Parse("2026-04-03T00:10:00Z")
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recap]
+        };
+
+        IReadOnlyList<CampaignWorkspaceProjection> updated = InvokeCampaignSpineAttachCreatorPublicationPosture([workspace], [older, newer]);
+
+        CampaignWorkspaceProjection updatedWorkspace = Assert.Single(updated);
+        PublicationSafeProjection updatedRecap = Assert.Single(updatedWorkspace.RecapShelf);
+        Assert.Equal("pub-artifact", updatedRecap.CreatorPublicationId);
         Assert.Equal("published", updatedRecap.PublicationState);
         Assert.Equal("verified", updatedRecap.TrustBand);
         Assert.True(updatedRecap.Discoverable);
