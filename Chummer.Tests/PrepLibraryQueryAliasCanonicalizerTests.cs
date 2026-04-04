@@ -145,16 +145,24 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "mobilecompanionsreturnloops",
             "mobilecompanionreturnpacket",
             "mobilecompanionsreturnpackets",
+            "mobilecompanionreturnpkt",
+            "mobilecompanionsreturnpkts",
             "mobilecompanionreturnbrief",
             "mobilecompanionsreturnbriefs",
+            "mobilecompanionreturnbrf",
+            "mobilecompanionsreturnbrfs",
             "campaignmobilecompanionreturnlane",
             "campaignmobilecompanionreturnlanes",
             "campaignmobilecompanionsreturnloop",
             "campaignmobilecompanionsreturnloops",
             "campaignmobilecompanionreturnpacket",
             "campaignmobilecompanionsreturnpackets",
+            "campaignmobilecompanionreturnpkt",
+            "campaignmobilecompanionsreturnpkts",
             "campaignmobilecompanionreturnbrief",
-            "campaignmobilecompanionsreturnbriefs"
+            "campaignmobilecompanionsreturnbriefs",
+            "campaignmobilecompanionreturnbrf",
+            "campaignmobilecompanionsreturnbrfs"
         };
 
         PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
@@ -171,16 +179,24 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("mobilecompanionsreturnloops", tokens);
         Assert.DoesNotContain("mobilecompanionreturnpacket", tokens);
         Assert.DoesNotContain("mobilecompanionsreturnpackets", tokens);
+        Assert.DoesNotContain("mobilecompanionreturnpkt", tokens);
+        Assert.DoesNotContain("mobilecompanionsreturnpkts", tokens);
         Assert.DoesNotContain("mobilecompanionreturnbrief", tokens);
         Assert.DoesNotContain("mobilecompanionsreturnbriefs", tokens);
+        Assert.DoesNotContain("mobilecompanionreturnbrf", tokens);
+        Assert.DoesNotContain("mobilecompanionsreturnbrfs", tokens);
         Assert.DoesNotContain("campaignmobilecompanionreturnlane", tokens);
         Assert.DoesNotContain("campaignmobilecompanionreturnlanes", tokens);
         Assert.DoesNotContain("campaignmobilecompanionsreturnloop", tokens);
         Assert.DoesNotContain("campaignmobilecompanionsreturnloops", tokens);
         Assert.DoesNotContain("campaignmobilecompanionreturnpacket", tokens);
         Assert.DoesNotContain("campaignmobilecompanionsreturnpackets", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionreturnpkt", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionsreturnpkts", tokens);
         Assert.DoesNotContain("campaignmobilecompanionreturnbrief", tokens);
         Assert.DoesNotContain("campaignmobilecompanionsreturnbriefs", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionreturnbrf", tokens);
+        Assert.DoesNotContain("campaignmobilecompanionsreturnbrfs", tokens);
         Assert.DoesNotContain("mobile", tokens);
         Assert.DoesNotContain("companion", tokens);
         Assert.DoesNotContain("companions", tokens);
@@ -338,24 +354,44 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "aftermathsdowntimepackets",
             "travelofflinepacket",
             "travelofflinepackets",
+            "travelofflinepkt",
+            "travelofflinepkts",
             "travelofflinebrief",
             "travelofflinebriefs",
+            "travelofflinebrf",
+            "travelofflinebrfs",
             "mobileofflinepacket",
             "mobileofflinepackets",
+            "mobileofflinepkt",
+            "mobileofflinepkts",
             "mobileofflinebrief",
             "mobileofflinebriefs",
+            "mobileofflinebrf",
+            "mobileofflinebrfs",
             "safehousetravelpacket",
             "safehousetravelpackets",
+            "safehousetravelpkt",
+            "safehousetravelpkts",
             "safehousetravelbrief",
             "safehousetravelbriefs",
+            "safehousetravelbrf",
+            "safehousetravelbrfs",
             "safehouseofflinepacket",
             "safehouseofflinepackets",
+            "safehouseofflinepkt",
+            "safehouseofflinepkts",
             "safehouseofflinebrief",
             "safehouseofflinebriefs",
+            "safehouseofflinebrf",
+            "safehouseofflinebrfs",
             "mobilesafehouseofflinepacket",
             "mobilesafehouseofflinepackets",
+            "mobilesafehouseofflinepkt",
+            "mobilesafehouseofflinepkts",
             "mobilesafehouseofflinebrief",
             "mobilesafehouseofflinebriefs",
+            "mobilesafehouseofflinebrf",
+            "mobilesafehouseofflinebrfs",
             "gmopspacket",
             "gmoperationpackets",
             "gmcontrolpacket",
@@ -437,24 +473,44 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("aftermathsdowntimepackets", tokens);
         Assert.DoesNotContain("travelofflinepacket", tokens);
         Assert.DoesNotContain("travelofflinepackets", tokens);
+        Assert.DoesNotContain("travelofflinepkt", tokens);
+        Assert.DoesNotContain("travelofflinepkts", tokens);
         Assert.DoesNotContain("travelofflinebrief", tokens);
         Assert.DoesNotContain("travelofflinebriefs", tokens);
+        Assert.DoesNotContain("travelofflinebrf", tokens);
+        Assert.DoesNotContain("travelofflinebrfs", tokens);
         Assert.DoesNotContain("mobileofflinepacket", tokens);
         Assert.DoesNotContain("mobileofflinepackets", tokens);
+        Assert.DoesNotContain("mobileofflinepkt", tokens);
+        Assert.DoesNotContain("mobileofflinepkts", tokens);
         Assert.DoesNotContain("mobileofflinebrief", tokens);
         Assert.DoesNotContain("mobileofflinebriefs", tokens);
+        Assert.DoesNotContain("mobileofflinebrf", tokens);
+        Assert.DoesNotContain("mobileofflinebrfs", tokens);
         Assert.DoesNotContain("safehousetravelpacket", tokens);
         Assert.DoesNotContain("safehousetravelpackets", tokens);
+        Assert.DoesNotContain("safehousetravelpkt", tokens);
+        Assert.DoesNotContain("safehousetravelpkts", tokens);
         Assert.DoesNotContain("safehousetravelbrief", tokens);
         Assert.DoesNotContain("safehousetravelbriefs", tokens);
+        Assert.DoesNotContain("safehousetravelbrf", tokens);
+        Assert.DoesNotContain("safehousetravelbrfs", tokens);
         Assert.DoesNotContain("safehouseofflinepacket", tokens);
         Assert.DoesNotContain("safehouseofflinepackets", tokens);
+        Assert.DoesNotContain("safehouseofflinepkt", tokens);
+        Assert.DoesNotContain("safehouseofflinepkts", tokens);
         Assert.DoesNotContain("safehouseofflinebrief", tokens);
         Assert.DoesNotContain("safehouseofflinebriefs", tokens);
+        Assert.DoesNotContain("safehouseofflinebrf", tokens);
+        Assert.DoesNotContain("safehouseofflinebrfs", tokens);
         Assert.DoesNotContain("mobilesafehouseofflinepacket", tokens);
         Assert.DoesNotContain("mobilesafehouseofflinepackets", tokens);
+        Assert.DoesNotContain("mobilesafehouseofflinepkt", tokens);
+        Assert.DoesNotContain("mobilesafehouseofflinepkts", tokens);
         Assert.DoesNotContain("mobilesafehouseofflinebrief", tokens);
         Assert.DoesNotContain("mobilesafehouseofflinebriefs", tokens);
+        Assert.DoesNotContain("mobilesafehouseofflinebrf", tokens);
+        Assert.DoesNotContain("mobilesafehouseofflinebrfs", tokens);
         Assert.DoesNotContain("gmopspacket", tokens);
         Assert.DoesNotContain("gmoperationpackets", tokens);
         Assert.DoesNotContain("gmcontrolpacket", tokens);
