@@ -228,6 +228,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject blank releaseProof.journeysPassed journey ids", script, StringComparison.Ordinal);
         Assert.Contains("reject missing releaseProof.generatedAt timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject stale releaseProof.generatedAt timestamps", script, StringComparison.Ordinal);
+        Assert.Contains("reject invalid-format releaseProof.generatedAt timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.generatedAt timestamps with excessive future skew", script, StringComparison.Ordinal);
     }
 
