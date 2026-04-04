@@ -121,6 +121,16 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
     }
 
+    [Fact]
+    public async Task DirectFileRouteDoesNotExposeWithheldMacArtifact()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-osx-x64-installer.dmg", CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root;
