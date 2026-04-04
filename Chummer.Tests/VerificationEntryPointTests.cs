@@ -94,6 +94,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.acceptanceGates is missing required gate ids", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.domainCoverage is missing required domains", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary must have zero untranslated keys", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeSummary must preserve canonical shipping locale ordering", script, StringComparison.Ordinal);
         Assert.Contains("alias values drift between", script, StringComparison.Ordinal);
         Assert.Contains("must be an ISO timestamp", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_UI_PARITY_RELEASE_PROOF_MAX_AGE_SECONDS", script, StringComparison.Ordinal);
@@ -314,6 +315,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject releaseProof.uiLocalizationReleaseGate.blockingFindings length/count mismatches", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.uiLocalizationReleaseGate.translationBacklogFindings length/count mismatches", script, StringComparison.Ordinal);
         Assert.Contains("reject non-zero releaseProof.uiLocalizationReleaseGate.localeSummary untranslatedKeyCount values", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-canonical releaseProof.uiLocalizationReleaseGate.localeSummary ordering", script, StringComparison.Ordinal);
         Assert.Contains("reject missing releaseProof payloads", script, StringComparison.Ordinal);
         Assert.Contains("reject non-array releaseProof.journeysPassed payloads", script, StringComparison.Ordinal);
         Assert.Contains("reject non-array releaseProof.proofRoutes payloads", script, StringComparison.Ordinal);
