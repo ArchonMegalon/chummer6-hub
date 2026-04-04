@@ -2708,6 +2708,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RosterMovementPacketDeduplicatesIdenticalRunPressureObjectiveVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterSignalsOnly();
+        RunProjection run = Assert.Single(seed.Runs);
+        ObjectiveProjection objective = Assert.Single(run.Objectives);
+        RunProjection updatedRun = run with
+        {
+            Objectives = [objective, objective]
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            Runs = [updatedRun]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, updatedRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("3 roster movement signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("roster-change packets", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void RosterMovementPacketFallsBackToChangeAndCarryForwardSignalsWhenTransfersAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterSignalsOnly();
