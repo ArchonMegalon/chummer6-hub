@@ -610,6 +610,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=league%20control", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=league-control", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=leaguectrl", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=leaguectl", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=leaguectls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=league-ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=communityops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community-op", audit, StringComparison.Ordinal);
@@ -625,6 +627,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=community%20control", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community-control", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=communityctrl", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=communityctl", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=communityctls", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community-ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heats", audit, StringComparison.Ordinal);

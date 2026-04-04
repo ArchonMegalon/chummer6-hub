@@ -2429,6 +2429,34 @@ def verify_signed_in_work_audit(
     prep_library_leaguectrl = json.loads(body)
     if not (prep_library_leaguectrl.get("items") or []):
         raise AssertionError("prep-library leaguectrl search did not expose any governed packet")
+    prep_library_leaguectl_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=leaguectl"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_leaguectl_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_leaguectl_path} returned {status}, expected 200")
+
+    prep_library_leaguectl = json.loads(body)
+    if not (prep_library_leaguectl.get("items") or []):
+        raise AssertionError("prep-library leaguectl search did not expose any governed packet")
+    prep_library_leaguectls_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=leaguectls"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_leaguectls_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_leaguectls_path} returned {status}, expected 200")
+
+    prep_library_leaguectls = json.loads(body)
+    if not (prep_library_leaguectls.get("items") or []):
+        raise AssertionError("prep-library leaguectls search did not expose any governed packet")
     prep_library_league_ctrl_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=league-ctrl"
     status, body, _, _ = fetch(
         base_url,
@@ -2639,6 +2667,34 @@ def verify_signed_in_work_audit(
     prep_library_communityctrl = json.loads(body)
     if not (prep_library_communityctrl.get("items") or []):
         raise AssertionError("prep-library communityctrl search did not expose any governed packet")
+    prep_library_communityctl_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=communityctl"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_communityctl_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_communityctl_path} returned {status}, expected 200")
+
+    prep_library_communityctl = json.loads(body)
+    if not (prep_library_communityctl.get("items") or []):
+        raise AssertionError("prep-library communityctl search did not expose any governed packet")
+    prep_library_communityctls_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=communityctls"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_communityctls_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_communityctls_path} returned {status}, expected 200")
+
+    prep_library_communityctls = json.loads(body)
+    if not (prep_library_communityctls.get("items") or []):
+        raise AssertionError("prep-library communityctls search did not expose any governed packet")
     prep_library_community_ctrl_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=community-ctrl"
     status, body, _, _ = fetch(
         base_url,
