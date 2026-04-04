@@ -3414,6 +3414,90 @@ def verify_signed_in_work_audit(
     prep_library_debriefings = json.loads(body)
     if not (prep_library_debriefings.get("items") or []):
         raise AssertionError("prep-library debriefings search did not expose any governed packet")
+    prep_library_outbrief_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=outbrief"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_outbrief_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_outbrief_path} returned {status}, expected 200")
+
+    prep_library_outbrief = json.loads(body)
+    if not (prep_library_outbrief.get("items") or []):
+        raise AssertionError("prep-library outbrief search did not expose any governed packet")
+    prep_library_outbriefs_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=outbriefs"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_outbriefs_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_outbriefs_path} returned {status}, expected 200")
+
+    prep_library_outbriefs = json.loads(body)
+    if not (prep_library_outbriefs.get("items") or []):
+        raise AssertionError("prep-library outbriefs search did not expose any governed packet")
+    prep_library_out_brief_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=out%20brief"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_out_brief_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_out_brief_path} returned {status}, expected 200")
+
+    prep_library_out_brief = json.loads(body)
+    if not (prep_library_out_brief.get("items") or []):
+        raise AssertionError("prep-library out brief search did not expose any governed packet")
+    prep_library_out_briefs_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=out%20briefs"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_out_briefs_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_out_briefs_path} returned {status}, expected 200")
+
+    prep_library_out_briefs = json.loads(body)
+    if not (prep_library_out_briefs.get("items") or []):
+        raise AssertionError("prep-library out briefs search did not expose any governed packet")
+    prep_library_out_brief_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=out-brief"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_out_brief_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_out_brief_hyphen_path} returned {status}, expected 200")
+
+    prep_library_out_brief_hyphen = json.loads(body)
+    if not (prep_library_out_brief_hyphen.get("items") or []):
+        raise AssertionError("prep-library out-brief search did not expose any governed packet")
+    prep_library_out_briefs_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=out-briefs"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_out_briefs_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_out_briefs_hyphen_path} returned {status}, expected 200")
+
+    prep_library_out_briefs_hyphen = json.loads(body)
+    if not (prep_library_out_briefs_hyphen.get("items") or []):
+        raise AssertionError("prep-library out-briefs search did not expose any governed packet")
     prep_library_postmortem_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=postmortem"
     status, body, _, _ = fetch(
         base_url,
@@ -7920,6 +8004,96 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_debriefings_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_debriefings_search_path} should return at least one governed prep packet for the debriefings query")
+    workspace_outbrief_search_path = f"{workspace_path}?prepQuery=outbrief"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_outbrief_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_outbrief_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_outbrief_search_path)
+    require_snippet(body, 'match(es) for "outbrief"', workspace_outbrief_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_outbrief_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_outbrief_search_path} should return at least one governed prep packet for the outbrief query")
+    workspace_outbriefs_search_path = f"{workspace_path}?prepQuery=outbriefs"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_outbriefs_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_outbriefs_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_outbriefs_search_path)
+    require_snippet(body, 'match(es) for "outbriefs"', workspace_outbriefs_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_outbriefs_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_outbriefs_search_path} should return at least one governed prep packet for the outbriefs query")
+    workspace_out_brief_search_path = f"{workspace_path}?prepQuery=out%20brief"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_out_brief_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_out_brief_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_out_brief_search_path)
+    require_snippet(body, 'match(es) for "out brief"', workspace_out_brief_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_out_brief_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_out_brief_search_path} should return at least one governed prep packet for the out brief query")
+    workspace_out_briefs_search_path = f"{workspace_path}?prepQuery=out%20briefs"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_out_briefs_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_out_briefs_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_out_briefs_search_path)
+    require_snippet(body, 'match(es) for "out briefs"', workspace_out_briefs_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_out_briefs_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_out_briefs_search_path} should return at least one governed prep packet for the out briefs query")
+    workspace_out_brief_hyphen_search_path = f"{workspace_path}?prepQuery=out-brief"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_out_brief_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_out_brief_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_out_brief_hyphen_search_path)
+    require_snippet(body, 'match(es) for "out-brief"', workspace_out_brief_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_out_brief_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_out_brief_hyphen_search_path} should return at least one governed prep packet for the out-brief query")
+    workspace_out_briefs_hyphen_search_path = f"{workspace_path}?prepQuery=out-briefs"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_out_briefs_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_out_briefs_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_out_briefs_hyphen_search_path)
+    require_snippet(body, 'match(es) for "out-briefs"', workspace_out_briefs_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_out_briefs_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_out_briefs_hyphen_search_path} should return at least one governed prep packet for the out-briefs query")
     workspace_postmortem_search_path = f"{workspace_path}?prepQuery=postmortem"
     status, body, _, _ = fetch(
         base_url,

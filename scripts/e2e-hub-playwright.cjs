@@ -3940,6 +3940,132 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail debriefings search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail debriefings search');
 
+  await page.fill('#prepQuery', 'outbrief');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=outbrief/.test(page.url()), 'Workspace detail search should preserve the outbrief continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail outbrief search');
+  await expectBodyText(page, 'match(es) for "outbrief"', '/account/work/workspaces detail outbrief search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail outbrief search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail outbrief search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail outbrief search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail outbrief search');
+  const workspaceOutbriefSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceOutbriefSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the outbrief continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail outbrief search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail outbrief search');
+
+  await page.fill('#prepQuery', 'outbriefs');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=outbriefs/.test(page.url()), 'Workspace detail search should preserve the outbriefs continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail outbriefs search');
+  await expectBodyText(page, 'match(es) for "outbriefs"', '/account/work/workspaces detail outbriefs search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail outbriefs search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail outbriefs search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail outbriefs search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail outbriefs search');
+  const workspaceOutbriefsSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceOutbriefsSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the outbriefs continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail outbriefs search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail outbriefs search');
+
+  await page.fill('#prepQuery', 'out brief');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=out(?:%20|\+)brief/.test(page.url()), 'Workspace detail search should preserve the split out brief continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail out brief split search');
+  await expectBodyText(page, 'match(es) for "out brief"', '/account/work/workspaces detail out brief split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail out brief split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail out brief split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail out brief split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail out brief split search');
+  const workspaceOutBriefSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceOutBriefSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split out brief continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail out brief split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail out brief split search');
+
+  await page.fill('#prepQuery', 'out briefs');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=out(?:%20|\+)briefs/.test(page.url()), 'Workspace detail search should preserve the split out briefs continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail out briefs split search');
+  await expectBodyText(page, 'match(es) for "out briefs"', '/account/work/workspaces detail out briefs split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail out briefs split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail out briefs split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail out briefs split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail out briefs split search');
+  const workspaceOutBriefsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceOutBriefsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split out briefs continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail out briefs split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail out briefs split search');
+
+  await page.fill('#prepQuery', 'out-brief');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=out-brief/.test(page.url()), 'Workspace detail search should preserve the hyphen out-brief continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail out-brief hyphen search');
+  await expectBodyText(page, 'match(es) for "out-brief"', '/account/work/workspaces detail out-brief hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail out-brief hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail out-brief hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail out-brief hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail out-brief hyphen search');
+  const workspaceOutBriefHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceOutBriefHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen out-brief continuity prep query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail out-brief hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail out-brief hyphen search');
+
+  await page.fill('#prepQuery', 'out-briefs');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=out-briefs/.test(page.url()), 'Workspace detail search should preserve the hyphen out-briefs continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail out-briefs hyphen search');
+  await expectBodyText(page, 'match(es) for "out-briefs"', '/account/work/workspaces detail out-briefs hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail out-briefs hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail out-briefs hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail out-briefs hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail out-briefs hyphen search');
+  const workspaceOutBriefsHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceOutBriefsHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen out-briefs continuity prep query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail out-briefs hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail out-briefs hyphen search');
+
   await page.fill('#prepQuery', 'postmortem');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
