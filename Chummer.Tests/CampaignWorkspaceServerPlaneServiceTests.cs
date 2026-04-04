@@ -7475,6 +7475,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.NotNull(handoff.SourceHintLines);
         Assert.Contains(handoff.SourceHintLines!, line => line.Contains("source packs", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.SourceHintLines!, line => line.Contains("house-rule", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("build-surface lanes", handoff.BuildSurfaceSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(handoff.BuildSurfaceLines);
+        Assert.Contains(handoff.BuildSurfaceLines!, line => line.Contains("Creation lane:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.BuildSurfaceLines!, line => line.Contains("Compare lane:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.BuildSurfaceLines!, line => line.Contains("Advancement lane:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.BuildSurfaceLines!, line => line.Contains("Crew-fit lane:", StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)

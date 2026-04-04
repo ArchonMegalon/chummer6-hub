@@ -34,6 +34,9 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("selectedBuildLabHandoff.SourceHintSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.SourceHintLines.Take(3)", view, StringComparison.Ordinal);
         Assert.Contains("Source-linked hints:", view, StringComparison.Ordinal);
+        Assert.Contains("selectedBuildLabHandoff.BuildSurfaceSummary", view, StringComparison.Ordinal);
+        Assert.Contains("selectedBuildLabHandoff.BuildSurfaceLines.Take(4)", view, StringComparison.Ordinal);
+        Assert.Contains("Build surface:", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.PlannerCoverageLines.Take(5)", view, StringComparison.Ordinal);
         Assert.Contains("handoff.PlannerCoverageLines.Take(2)", view, StringComparison.Ordinal);
         Assert.Contains("Planner lane:", view, StringComparison.Ordinal);

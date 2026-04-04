@@ -950,11 +950,22 @@
                                                                 {
                                                                     <span> Source-linked hints: @handoff.SourceHintSummary.</span>
                                                                 }
+                                                                @if (!string.IsNullOrWhiteSpace(handoff.BuildSurfaceSummary))
+                                                                {
+                                                                    <span> Build surface: @handoff.BuildSurfaceSummary.</span>
+                                                                }
                                                                 @if (handoff.SourceHintLines is { Count: > 0 })
                                                                 {
                                                                     foreach (var sourceHintLine in handoff.SourceHintLines.Take(2))
                                                                     {
                                                                         <span> Source hint: @sourceHintLine</span>
+                                                                    }
+                                                                }
+                                                                @if (handoff.BuildSurfaceLines is { Count: > 0 })
+                                                                {
+                                                                    foreach (var buildSurfaceLine in handoff.BuildSurfaceLines.Take(2))
+                                                                    {
+                                                                        <span> Build lane: @buildSurfaceLine</span>
                                                                     }
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SupportClosureSummary))
