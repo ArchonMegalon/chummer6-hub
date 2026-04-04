@@ -3596,6 +3596,62 @@ def verify_signed_in_work_audit(
     prep_library_aars = json.loads(body)
     if not (prep_library_aars.get("items") or []):
         raise AssertionError("prep-library aars search did not expose any governed packet")
+    prep_library_retro_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=retro"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_retro_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_retro_path} returned {status}, expected 200")
+
+    prep_library_retro = json.loads(body)
+    if not (prep_library_retro.get("items") or []):
+        raise AssertionError("prep-library retro search did not expose any governed packet")
+    prep_library_retros_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=retros"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_retros_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_retros_path} returned {status}, expected 200")
+
+    prep_library_retros = json.loads(body)
+    if not (prep_library_retros.get("items") or []):
+        raise AssertionError("prep-library retros search did not expose any governed packet")
+    prep_library_retrospective_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=retrospective"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_retrospective_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_retrospective_path} returned {status}, expected 200")
+
+    prep_library_retrospective = json.loads(body)
+    if not (prep_library_retrospective.get("items") or []):
+        raise AssertionError("prep-library retrospective search did not expose any governed packet")
+    prep_library_retrospectives_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=retrospectives"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_retrospectives_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_retrospectives_path} returned {status}, expected 200")
+
+    prep_library_retrospectives = json.loads(body)
+    if not (prep_library_retrospectives.get("items") or []):
+        raise AssertionError("prep-library retrospectives search did not expose any governed packet")
     prep_library_afteraction_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=afteraction"
     status, body, _, _ = fetch(
         base_url,
@@ -7513,6 +7569,66 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_aars_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_aars_search_path} should return at least one governed prep packet for the aars query")
+    workspace_retro_search_path = f"{workspace_path}?prepQuery=retro"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_retro_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_retro_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_retro_search_path)
+    require_snippet(body, 'match(es) for "retro"', workspace_retro_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_retro_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_retro_search_path} should return at least one governed prep packet for the retro query")
+    workspace_retros_search_path = f"{workspace_path}?prepQuery=retros"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_retros_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_retros_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_retros_search_path)
+    require_snippet(body, 'match(es) for "retros"', workspace_retros_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_retros_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_retros_search_path} should return at least one governed prep packet for the retros query")
+    workspace_retrospective_search_path = f"{workspace_path}?prepQuery=retrospective"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_retrospective_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_retrospective_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_retrospective_search_path)
+    require_snippet(body, 'match(es) for "retrospective"', workspace_retrospective_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_retrospective_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_retrospective_search_path} should return at least one governed prep packet for the retrospective query")
+    workspace_retrospectives_search_path = f"{workspace_path}?prepQuery=retrospectives"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_retrospectives_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_retrospectives_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_retrospectives_search_path)
+    require_snippet(body, 'match(es) for "retrospectives"', workspace_retrospectives_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_retrospectives_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_retrospectives_search_path} should return at least one governed prep packet for the retrospectives query")
     workspace_afteraction_search_path = f"{workspace_path}?prepQuery=afteraction"
     status, body, _, _ = fetch(
         base_url,

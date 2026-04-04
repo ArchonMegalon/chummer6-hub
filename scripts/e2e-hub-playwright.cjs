@@ -4213,6 +4213,90 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail aars compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail aars compact search');
 
+  await page.fill('#prepQuery', 'retro');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=retro/.test(page.url()), 'Workspace detail search should preserve the compact retro continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail retro compact search');
+  await expectBodyText(page, 'match(es) for "retro"', '/account/work/workspaces detail retro compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail retro compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail retro compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail retro compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail retro compact search');
+  const workspaceRetroCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceRetroCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact retro continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail retro compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail retro compact search');
+
+  await page.fill('#prepQuery', 'retros');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=retros/.test(page.url()), 'Workspace detail search should preserve the compact retros continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail retros compact search');
+  await expectBodyText(page, 'match(es) for "retros"', '/account/work/workspaces detail retros compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail retros compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail retros compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail retros compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail retros compact search');
+  const workspaceRetrosCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceRetrosCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact retros continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail retros compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail retros compact search');
+
+  await page.fill('#prepQuery', 'retrospective');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=retrospective/.test(page.url()), 'Workspace detail search should preserve the compact retrospective continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail retrospective compact search');
+  await expectBodyText(page, 'match(es) for "retrospective"', '/account/work/workspaces detail retrospective compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail retrospective compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail retrospective compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail retrospective compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail retrospective compact search');
+  const workspaceRetrospectiveCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceRetrospectiveCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact retrospective continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail retrospective compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail retrospective compact search');
+
+  await page.fill('#prepQuery', 'retrospectives');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=retrospectives/.test(page.url()), 'Workspace detail search should preserve the compact retrospectives continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail retrospectives compact search');
+  await expectBodyText(page, 'match(es) for "retrospectives"', '/account/work/workspaces detail retrospectives compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail retrospectives compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail retrospectives compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail retrospectives compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail retrospectives compact search');
+  const workspaceRetrospectivesCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceRetrospectivesCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact retrospectives continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail retrospectives compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail retrospectives compact search');
+
   await page.fill('#prepQuery', 'afteraction');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),

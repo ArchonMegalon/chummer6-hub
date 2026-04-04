@@ -225,6 +225,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("materialize-desktop-workflow-execution-gate.sh", script, StringComparison.Ordinal);
         Assert.Contains("verify note: rematerializing desktop workflow execution gate after milestone-2 release-channel drift.", script, StringComparison.Ordinal);
         Assert.Contains("verify note: rematerializing desktop visual familiarity exit gate after canonical ordering drift.", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_DESKTOP_VISUAL_SKIP_RELEASE_GATE_LOCK_WAIT=1", script, StringComparison.Ordinal);
         Assert.Contains("is missing or not readable", script, StringComparison.Ordinal);
         Assert.Contains("sync_workflow_evidence_timestamps_from_nested_receipts", script, StringComparison.Ordinal);
         Assert.Contains("verify note: syncing workflow parity evidence timestamps from nested workflow receipts.", script, StringComparison.Ordinal);
@@ -756,6 +757,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=after-action%20reports", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aar", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aars", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=retro", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=retros", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=retrospective", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=retrospectives", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returns", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returnloop", audit, StringComparison.Ordinal);
@@ -937,6 +942,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=after-action%20reports", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=aar", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=aars", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=retro", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=retros", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=retrospective", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=retrospectives", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=return", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=returns", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=returnloop", audit, StringComparison.Ordinal);
@@ -1430,6 +1439,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact aar continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=aars", playwright, StringComparison.Ordinal);
         Assert.Contains("compact aars continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=retro", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact retro continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=retros", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact retros continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=retrospective", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact retrospective continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=retrospectives", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact retrospectives continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=return", playwright, StringComparison.Ordinal);
         Assert.Contains("return-loop continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=returns", playwright, StringComparison.Ordinal);
