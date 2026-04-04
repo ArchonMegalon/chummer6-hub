@@ -31,6 +31,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("desktopControls", script, StringComparison.Ordinal);
         Assert.Contains("must not contain blank token values", script, StringComparison.Ordinal);
         Assert.Contains("contains whitespace-padded token", script, StringComparison.Ordinal);
+        Assert.Contains("contains non-canonical token", script, StringComparison.Ordinal);
         Assert.Contains("contains duplicate normalized token", script, StringComparison.Ordinal);
         Assert.Contains("is missing required acknowledged catalog-only", script, StringComparison.Ordinal);
         Assert.Contains("is missing required legacy desktop control ids", script, StringComparison.Ordinal);
@@ -68,6 +69,7 @@ public sealed class VerificationEntryPointTests
             string token = value.GetString() ?? string.Empty;
             Assert.False(string.IsNullOrWhiteSpace(token), $"{propertyName}[{index}] must not be blank");
             Assert.Equal(token.Trim(), token);
+            Assert.Equal(token.ToLowerInvariant(), token);
 
             string normalizedToken = token.ToLowerInvariant();
             Assert.True(

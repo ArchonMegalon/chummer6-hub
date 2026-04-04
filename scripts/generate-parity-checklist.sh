@@ -65,6 +65,12 @@ def normalize_required_token(raw_value: object, *, source: str) -> str:
         raise ValueError(f"{source} must not contain blank token values")
     if token != raw_value:
         raise ValueError(f"{source} contains whitespace-padded token '{raw_value}'")
+    canonical_token = token.lower()
+    if token != canonical_token:
+        raise ValueError(
+            f"{source} contains non-canonical token '{raw_value}' "
+            f"(expected '{canonical_token}')"
+        )
     return token
 
 
