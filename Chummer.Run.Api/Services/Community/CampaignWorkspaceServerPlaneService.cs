@@ -319,6 +319,10 @@ public sealed class CampaignWorkspaceServerPlaneService
         "swaps",
         "swapped",
         "swapping",
+        "shift",
+        "shifts",
+        "shifted",
+        "shifting",
         "rotate",
         "rotates",
         "rotated",
@@ -335,10 +339,14 @@ public sealed class CampaignWorkspaceServerPlaneService
         "rostermoves",
         "rosterswap",
         "rosterswaps",
+        "rostershift",
+        "rostershifts",
         "crewmove",
         "crewmoves",
         "crewswap",
         "crewswaps",
+        "crewshift",
+        "crewshifts",
         "rostertransfer",
         "rostertransfers",
         "rosterhandoff",
@@ -2614,6 +2622,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         string kind = item.Kind.Trim();
         if (ContainsAnyWordToken(kind, CampaignReturnRecapWordTokens)
+            || ContainsAftermathRecapToken(kind)
             || ContainsSessionLogTokenPair(kind)
             || ContainsAfterActionTokenPair(kind)
             || ContainsLessonLearnedTokenPair(kind))
@@ -2633,6 +2642,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(value, CampaignReturnRecapWordTokens)
+            || ContainsAftermathRecapToken(value)
             || ContainsSessionLogTokenPair(value)
             || ContainsAfterActionTokenPair(value)
             || ContainsLessonLearnedTokenPair(value);
