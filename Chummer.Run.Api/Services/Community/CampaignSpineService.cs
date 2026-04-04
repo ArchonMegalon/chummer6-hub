@@ -2998,13 +2998,16 @@ public sealed class CampaignSpineService
                 UpdatedAtUtc: travelPrefetch.StagedAtUtc));
         }
 
-        AftermathRecapPackageProjection? replayPackage = aftermathPackages
+        AftermathRecapPackageProjection[] orderedAftermathPackages = aftermathPackages
+            .OrderByDescending(static item => item.GeneratedAtUtc)
+            .ToArray();
+        AftermathRecapPackageProjection? replayPackage = orderedAftermathPackages
             .FirstOrDefault(item => IsAftermathPackageKind(item, "replay_timeline"));
-        AftermathRecapPackageProjection? nonReplayPackage = aftermathPackages
+        AftermathRecapPackageProjection? nonReplayPackage = orderedAftermathPackages
             .FirstOrDefault(item => !IsAftermathPackageKind(item, "replay_timeline"));
-        AftermathRecapPackageProjection? downtimePackage = aftermathPackages
+        AftermathRecapPackageProjection? downtimePackage = orderedAftermathPackages
             .FirstOrDefault(item => IsAftermathPackageKind(item, "downtime_brief"));
-        AftermathRecapPackageProjection? aftermathPackage = aftermathPackages
+        AftermathRecapPackageProjection? aftermathPackage = orderedAftermathPackages
             .FirstOrDefault(item =>
                 !IsAftermathPackageKind(item, "replay_timeline")
                 && !IsAftermathPackageKind(item, "downtime_brief"));

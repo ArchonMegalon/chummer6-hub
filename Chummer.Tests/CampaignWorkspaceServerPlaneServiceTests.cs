@@ -1018,6 +1018,88 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineWorkspaceChangePacketsPreferMostRecentPackagePerAftermathCategory()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        AftermathRecapPackageProjection replayOlder = new(
+            PackageId: "package-replay-older",
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            RunId: null,
+            RunTitle: null,
+            PackageKind: "replay_timeline",
+            Title: "Replay timeline older",
+            Summary: "Older replay packet.",
+            ArtifactId: "artifact-replay-older",
+            EvidenceLines: ["Replay evidence line."],
+            InitiatedByUserId: "gm-1",
+            GeneratedAtUtc: now.AddMinutes(-30));
+        AftermathRecapPackageProjection replayNewer = replayOlder with
+        {
+            PackageId = "package-replay-newer",
+            Title = "Replay timeline newer",
+            Summary = "Newer replay packet.",
+            GeneratedAtUtc = now
+        };
+        AftermathRecapPackageProjection downtimeOlder = replayOlder with
+        {
+            PackageId = "package-downtime-older",
+            PackageKind = "downtime_brief",
+            Title = "Downtime brief older",
+            Summary = "Older downtime packet.",
+            GeneratedAtUtc = now.AddMinutes(-20)
+        };
+        AftermathRecapPackageProjection downtimeNewer = downtimeOlder with
+        {
+            PackageId = "package-downtime-newer",
+            Title = "Downtime brief newer",
+            Summary = "Newer downtime packet.",
+            GeneratedAtUtc = now.AddMinutes(-2)
+        };
+        AftermathRecapPackageProjection afterActionOlder = replayOlder with
+        {
+            PackageId = "package-after-action-older",
+            PackageKind = "after_action_report",
+            Title = "After-action report older",
+            Summary = "Older after-action packet.",
+            GeneratedAtUtc = now.AddMinutes(-10)
+        };
+        AftermathRecapPackageProjection afterActionNewer = afterActionOlder with
+        {
+            PackageId = "package-after-action-newer",
+            Title = "After-action report newer",
+            Summary = "Newer after-action packet.",
+            GeneratedAtUtc = now.AddMinutes(-1)
+        };
+
+        IReadOnlyList<WorkspaceChangePacketProjection> packets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [
+                afterActionOlder,
+                replayOlder,
+                downtimeOlder,
+                replayNewer,
+                afterActionNewer,
+                downtimeNewer
+            ]);
+
+        Assert.Contains(packets, item => string.Equals(item.Kind, "replay_package", StringComparison.Ordinal)
+                                         && string.Equals(item.Summary, "Newer replay packet.", StringComparison.Ordinal)
+                                         && item.UpdatedAtUtc == now);
+        Assert.Contains(packets, item => string.Equals(item.Label, "Downtime brief", StringComparison.Ordinal)
+                                         && string.Equals(item.Summary, "Newer downtime packet.", StringComparison.Ordinal)
+                                         && item.UpdatedAtUtc == now.AddMinutes(-2));
+        Assert.Contains(packets, item => string.Equals(item.Label, "After-action report", StringComparison.Ordinal)
+                                         && string.Equals(item.Summary, "Newer after-action packet.", StringComparison.Ordinal)
+                                         && item.UpdatedAtUtc == now.AddMinutes(-1));
+        Assert.DoesNotContain(packets, item => string.Equals(item.Summary, "Older replay packet.", StringComparison.Ordinal));
+        Assert.DoesNotContain(packets, item => string.Equals(item.Summary, "Older downtime packet.", StringComparison.Ordinal));
+        Assert.DoesNotContain(packets, item => string.Equals(item.Summary, "Older after-action packet.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignSpineWorkspaceChangePacketsTrimWhitespacePaddedCarryForwardPacketId()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
