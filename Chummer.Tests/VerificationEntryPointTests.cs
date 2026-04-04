@@ -212,9 +212,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("bash scripts/audit-ui-parity.sh", script, StringComparison.Ordinal);
         Assert.Contains("run_ui_parity_audit_with_workflow_gate_retry", script, StringComparison.Ordinal);
         Assert.Contains("WORKFLOW_GATE_DRIFT_RETRY_MARKER_PREFIX", script, StringComparison.Ordinal);
+        Assert.Contains("WORKFLOW_EVIDENCE_TIMESTAMP_DRIFT_MARKER_PREFIX", script, StringComparison.Ordinal);
+        Assert.Contains("WORKFLOW_EVIDENCE_TIMESTAMP_DRIFT_MARKER_SUFFIX", script, StringComparison.Ordinal);
         Assert.Contains("milestone-2 workflow/visual release-channel ", script, StringComparison.Ordinal);
+        Assert.Contains("evidence generated_at drifts from nested receipt generatedAt", script, StringComparison.Ordinal);
         Assert.Contains("materialize-desktop-workflow-execution-gate.sh", script, StringComparison.Ordinal);
         Assert.Contains("verify note: rematerializing desktop workflow execution gate after milestone-2 release-channel drift.", script, StringComparison.Ordinal);
+        Assert.Contains("sync_workflow_evidence_timestamps_from_nested_receipts", script, StringComparison.Ordinal);
+        Assert.Contains("verify note: syncing workflow parity evidence timestamps from nested workflow receipts.", script, StringComparison.Ordinal);
         Assert.Contains("sync_release_channel_localization_gate_timestamp_from_ui_receipt", script, StringComparison.Ordinal);
         Assert.Contains("UI_LOCALIZATION_RELEASE_GATE.generated.json", script, StringComparison.Ordinal);
         Assert.Contains("UI_LOCALIZATION_GATE_TIMESTAMP_STALE_MARKER", script, StringComparison.Ordinal);
@@ -309,6 +314,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject invalid-format releaseProof.generated_at timestamps", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.generated_at timestamps with excessive future skew", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.generatedAt timestamps with excessive future skew", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-canonical required_tests ordering", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-canonical required_legacy_interaction_keys ordering", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-canonical required_screenshots ordering", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -728,10 +736,16 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=recaps", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=afteraction", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=afteractions", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=afteractionreport", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=afteractionreports", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=after%20action", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=after%20actions", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=after%20action%20report", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=after%20action%20reports", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=after-action", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=after-actions", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=after-action%20report", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=after-action%20reports", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returns", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returnloop", audit, StringComparison.Ordinal);
@@ -901,10 +915,16 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=recaps", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=afteraction", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=afteractions", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=afteractionreport", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=afteractionreports", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=after%20action", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=after%20actions", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=after%20action%20report", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=after%20action%20reports", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=after-action", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=after-actions", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=after-action%20report", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=after-action%20reports", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=return", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=returns", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=returnloop", audit, StringComparison.Ordinal);
@@ -1374,14 +1394,26 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact afteraction continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=afteractions", playwright, StringComparison.Ordinal);
         Assert.Contains("compact afteractions continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=afteractionreport", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact afteractionreport continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=afteractionreports", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact afteractionreports continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=after(?:%20|\\+)action", playwright, StringComparison.Ordinal);
         Assert.Contains("split after action continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=after(?:%20|\\+)actions", playwright, StringComparison.Ordinal);
         Assert.Contains("split after actions continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=after(?:%20|\\+)action(?:%20|\\+)report", playwright, StringComparison.Ordinal);
+        Assert.Contains("split after action report continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=after(?:%20|\\+)action(?:%20|\\+)reports", playwright, StringComparison.Ordinal);
+        Assert.Contains("split after action reports continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=after-action", playwright, StringComparison.Ordinal);
         Assert.Contains("hyphen after-action continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=after-actions", playwright, StringComparison.Ordinal);
         Assert.Contains("hyphen after-actions continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=after-action(?:%20|\\+)report", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen after-action report continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=after-action(?:%20|\\+)reports", playwright, StringComparison.Ordinal);
+        Assert.Contains("hyphen after-action reports continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=return", playwright, StringComparison.Ordinal);
         Assert.Contains("return-loop continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=returns", playwright, StringComparison.Ordinal);

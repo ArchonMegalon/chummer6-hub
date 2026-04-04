@@ -454,10 +454,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("post-runs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteraction")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteractions")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteractionreport")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteractionreports")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after action")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after actions")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("after action report")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("after action reports")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-action")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-actions")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-action report")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-action reports")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("recaps")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("returns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("memories")));
@@ -484,6 +490,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("relationships")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaftermaths")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixafteraction")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixafteractionreport")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostmortem")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostsession")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostrun")));
