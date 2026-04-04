@@ -85,6 +85,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("workflow_execution_receipt_count_checked", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_workflow_family_audit_tests", script, StringComparison.Ordinal);
         Assert.Contains("sr4_workflow_parity_status", script, StringComparison.Ordinal);
+        Assert.Contains("sr6_workflow_parity_status", script, StringComparison.Ordinal);
         Assert.Contains("chummer5a_workflow_parity_status", script, StringComparison.Ordinal);
         Assert.Contains("sr4_sr6_frontier_status", script, StringComparison.Ordinal);
         Assert.Contains("metatype-priorities-karma-entry", script, StringComparison.Ordinal);
@@ -392,10 +393,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=contacts", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=diary", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=downtime", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=aftermath", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=contacts", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=diary", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=downtime", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=aftermath", audit, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -432,6 +437,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("contacts continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=diary", playwright, StringComparison.Ordinal);
         Assert.Contains("diary continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=downtime", playwright, StringComparison.Ordinal);
+        Assert.Contains("downtime continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=aftermath", playwright, StringComparison.Ordinal);
+        Assert.Contains("aftermath continuity prep query", playwright, StringComparison.Ordinal);
     }
 
     [Fact]
