@@ -1577,6 +1577,25 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void DecisionNoticesIncludeTravelCacheRefreshWhenTravelCachesAreStale()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceDigestProjection digest = BuildWorkspaceDigest(workspace);
+        CampaignPrepLibrarySummary prepLibrary = BuildEmptyPrepLibrary();
+
+        IReadOnlyList<DecisionNotice> notices = InvokeBuildDecisionNotices(
+            workspace,
+            digest,
+            supportDigests: [],
+            prepLibrary: prepLibrary,
+            gmOperations: BuildGovernedGmOperationsReadiness(),
+            travelMode: BuildTravelModeReadinessSummaryWithStaleCache());
+
+        DecisionNotice travelNotice = Assert.Single(notices, notice => string.Equals(notice.Kind, "travel_cache_refresh", StringComparison.Ordinal));
+        Assert.Contains("fresh staged cache", travelNotice.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void SupportClosuresPreferReporterActionCaseOverEarlierNonActionCase()
     {
         SupportCaseDigestViewModel informationalCase = BuildSupportCaseDigest(
@@ -7555,13 +7574,14 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         CampaignWorkspaceDigestProjection digest,
         IReadOnlyList<SupportCaseDigestViewModel> supportDigests,
         CampaignPrepLibrarySummary prepLibrary,
-        GmOperationsReadinessSummary? gmOperations = null)
+        GmOperationsReadinessSummary? gmOperations = null,
+        TravelModeReadinessSummary? travelMode = null)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
             .GetMethod("BuildDecisionNotices", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException("BuildDecisionNotices was not found.");
 
-        return Assert.IsAssignableFrom<IReadOnlyList<DecisionNotice>>(method.Invoke(null, [workspace, digest, null, supportDigests, prepLibrary, gmOperations ?? BuildMissingGmOperationsReadiness(), null]));
+        return Assert.IsAssignableFrom<IReadOnlyList<DecisionNotice>>(method.Invoke(null, [workspace, digest, null, supportDigests, prepLibrary, gmOperations ?? BuildMissingGmOperationsReadiness(), travelMode ?? BuildTravelModeReadinessSummary(), null]));
     }
 
     private static IReadOnlyList<SupportClosureCue> InvokeBuildSupportClosures(
@@ -8021,6 +8041,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             1,
             1,
             0,
+            [],
+            []);
+
+    private static TravelModeReadinessSummary BuildTravelModeReadinessSummaryWithStaleCache()
+        => new TravelModeReadinessSummary(
+            "ready",
+            "Travel readiness is green.",
+            "Prefetch inventory is attached.",
+            "1 ready device has a fresh staged cache and 1 ready device has a stale cache.",
+            "Offline actionability remains explicit.",
+            [
+                new TravelOfflineLaneCue(
+                    Lane: "downtime_diary",
+                    Status: "ready",
+                    SignalCount: 1,
+                    Summary: "Downtime and diary continuity stays explicit while offline.")
+            ],
+            2,
+            2,
+            1,
+            1,
             [],
             []);
 

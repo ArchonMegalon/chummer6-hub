@@ -491,7 +491,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<ContinuityConflictCue> continuityConflicts = BuildContinuityConflicts(context.Workspace, context.Restore);
         IReadOnlyList<SupportClosureCue> supportClosures = BuildSupportClosures(context.SupportDigests);
         IReadOnlyList<KnownIssueAffectingInstall> knownIssues = BuildKnownIssues(context.SupportDigests);
-        IReadOnlyList<DecisionNotice> decisionNotices = BuildDecisionNotices(context.Workspace, context.Digest, installLinking, context.SupportDigests, prepLibrary, gmOperations, context.LeadRun);
+        IReadOnlyList<DecisionNotice> decisionNotices = BuildDecisionNotices(context.Workspace, context.Digest, installLinking, context.SupportDigests, prepLibrary, gmOperations, travelMode, context.LeadRun);
         NextSafeActionCue nextSafeAction = BuildNextSafeActionCue(context.Workspace, installLinking, context.SupportDigests);
         WorkspaceStateSummary workspaceState = BuildWorkspaceStateSummary(
             context.Workspace,
@@ -1697,6 +1697,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<SupportCaseDigestViewModel> supportDigests,
         CampaignPrepLibrarySummary prepLibrary,
         GmOperationsReadinessSummary gmOperations,
+        TravelModeReadinessSummary travelMode,
         RunProjection? leadRun)
     {
         List<DecisionNotice> notices = [];
@@ -1727,6 +1728,11 @@ public sealed class CampaignWorkspaceServerPlaneService
         if (!string.Equals(gmOperations.Status, "governed", StringComparison.OrdinalIgnoreCase))
         {
             notices.Add(BuildGmOperationsDecisionNotice(workspace, gmOperations));
+        }
+
+        if (travelMode.StaleCacheDeviceCount > 0)
+        {
+            notices.Add(BuildTravelCacheRefreshDecisionNotice(workspace, travelMode));
         }
 
         if ((digest?.Watchouts.Count ?? 0) > 0)
@@ -1772,6 +1778,19 @@ public sealed class CampaignWorkspaceServerPlaneService
             Summary: summary,
             ActionLabel: "Open GM operations",
             ActionHref: $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#prep-launches");
+    }
+
+    private static DecisionNotice BuildTravelCacheRefreshDecisionNotice(
+        CampaignWorkspaceProjection workspace,
+        TravelModeReadinessSummary travelMode)
+    {
+        string summary = $"{travelMode.CacheFreshnessSummary} Stage a new travel prefetch receipt before departure so offline continuity stays bounded and explicit.";
+        return new DecisionNotice(
+            NoticeId: $"travel-cache:{workspace.WorkspaceId}",
+            Kind: "travel_cache_refresh",
+            Summary: summary,
+            ActionLabel: "Stage travel prefetch",
+            ActionHref: $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#travel-prefetches");
     }
 
     private static DecisionNotice BuildPortableExchangeDecisionNotice(
