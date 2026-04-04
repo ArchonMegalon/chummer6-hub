@@ -973,6 +973,51 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineWorkspaceChangePacketsProjectDowntimeAndAfterActionSignalsWhenBothExist()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        AftermathRecapPackageProjection replayPackage = new(
+            PackageId: "package-replay",
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            RunId: null,
+            RunTitle: null,
+            PackageKind: "replay_timeline",
+            Title: "Replay timeline",
+            Summary: "Replay packet stays attached to continuity.",
+            ArtifactId: "artifact-replay",
+            EvidenceLines: ["Replay evidence line."],
+            InitiatedByUserId: "gm-1",
+            GeneratedAtUtc: now);
+        AftermathRecapPackageProjection downtimePackage = replayPackage with
+        {
+            PackageId = "package-downtime",
+            PackageKind = "downtime_brief",
+            Title = "Downtime brief",
+            Summary = "Downtime obligations remain attached to return lane."
+        };
+        AftermathRecapPackageProjection afterActionPackage = replayPackage with
+        {
+            PackageId = "package-after-action",
+            PackageKind = "after_action_report",
+            Title = "After-action report",
+            Summary = "After-action recap packet remains attached to return lane."
+        };
+
+        IReadOnlyList<WorkspaceChangePacketProjection> packets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [replayPackage, downtimePackage, afterActionPackage]);
+
+        Assert.Equal(3, packets.Count);
+        Assert.Contains(packets, item => string.Equals(item.Kind, "replay_package", StringComparison.Ordinal));
+        Assert.Equal(2, packets.Count(item => string.Equals(item.Kind, "aftermath_recap", StringComparison.Ordinal)));
+        Assert.Contains(packets, item => string.Equals(item.Label, "Downtime brief", StringComparison.Ordinal));
+        Assert.Contains(packets, item => string.Equals(item.Label, "After-action report", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CampaignSpineWorkspaceChangePacketsTrimWhitespacePaddedCarryForwardPacketId()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();

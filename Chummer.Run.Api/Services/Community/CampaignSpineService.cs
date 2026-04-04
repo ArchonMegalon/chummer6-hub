@@ -3000,9 +3000,15 @@ public sealed class CampaignSpineService
 
         AftermathRecapPackageProjection? replayPackage = aftermathPackages
             .FirstOrDefault(item => IsAftermathPackageKind(item, "replay_timeline"));
-        AftermathRecapPackageProjection? aftermathPackage = aftermathPackages
+        AftermathRecapPackageProjection? nonReplayPackage = aftermathPackages
             .FirstOrDefault(item => !IsAftermathPackageKind(item, "replay_timeline"));
-        foreach (AftermathRecapPackageProjection package in new[] { replayPackage, aftermathPackage }
+        AftermathRecapPackageProjection? downtimePackage = aftermathPackages
+            .FirstOrDefault(item => IsAftermathPackageKind(item, "downtime_brief"));
+        AftermathRecapPackageProjection? aftermathPackage = aftermathPackages
+            .FirstOrDefault(item =>
+                !IsAftermathPackageKind(item, "replay_timeline")
+                && !IsAftermathPackageKind(item, "downtime_brief"));
+        foreach (AftermathRecapPackageProjection package in new[] { replayPackage, downtimePackage, aftermathPackage }
                      .Where(static item => item is not null)
                      .Cast<AftermathRecapPackageProjection>()
                      .DistinctBy(static package => ResolveAftermathPackageIdentity(package), StringComparer.OrdinalIgnoreCase))
@@ -3017,7 +3023,7 @@ public sealed class CampaignSpineService
         }
 
         PublicationSafeProjection? recap = recapShelf.FirstOrDefault();
-        if (recap is not null && aftermathPackage is null)
+        if (recap is not null && nonReplayPackage is null)
         {
             string recapProjectionId = ResolveChangePacketIdentity(
                 recap.ProjectionId,
