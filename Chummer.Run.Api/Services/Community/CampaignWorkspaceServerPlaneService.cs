@@ -93,7 +93,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         "eventcontrol",
         "eventcontrols",
         "eventctrl",
-        "seasonops"
+        "seasonops",
+        "seasonop"
     ];
 
     private static readonly string[] OppositionWordTokens =
