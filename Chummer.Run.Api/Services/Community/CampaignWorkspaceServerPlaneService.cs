@@ -268,7 +268,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         "retro",
         "retros",
         "retrospective",
-        "retrospectives"
+        "retrospectives",
+        "hotwash",
+        "hotwashes"
     ];
 
     private static readonly string[] RosterIdentityWordTokens =
@@ -3764,6 +3766,18 @@ public sealed class CampaignWorkspaceServerPlaneService
                 && ContainsAnyWordToken(value, ["game", "games"]));
     }
 
+    private static bool ContainsHotWashTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["hotwash", "hotwashes"])
+            || (ContainsAnyWordToken(value, ["hot"])
+                && ContainsAnyWordToken(value, ["wash", "washes"]));
+    }
+
     private static bool ContainsSessionLogTokenPair(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -3800,7 +3814,8 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static bool IsAftermathRecapPublicationKind(string value)
         => ContainsAnyWordToken(value, ["aftermath", "recap", "debrief"])
-            || ContainsAfterActionTokenPair(value);
+            || ContainsAfterActionTokenPair(value)
+            || ContainsHotWashTokenPair(value);
 
     private static bool IsDowntimePublicationKind(string value)
         => ContainsAnyWordToken(value, ["downtime"]);
