@@ -1166,6 +1166,8 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse rosterHandoffSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster handoff");
         GmPrepAssetListResponse rosterMovesSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster moves");
         GmPrepAssetListResponse rosterMoveSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster move");
+        GmPrepAssetListResponse packetsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "packets");
+        GmPrepAssetListResponse prepPacketsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "prep packets");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixlibrary");
 
         Assert.Contains(prepLibraryMatches.Items, item => item.AssetId == "prep_library_ops");
@@ -1272,6 +1274,8 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(rosterHandoffSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterMovesSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterMoveSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(packetsMatches.Items, item => item.AssetId == "prep_library_ops");
+        Assert.Contains(prepPacketsMatches.Items, item => item.AssetId == "prep_library_ops");
         Assert.Empty(negativeMatches.Items);
     }
 
