@@ -300,6 +300,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "safehousetravelpackets",
             "safehousetravelbrief",
             "safehousetravelbriefs",
+            "safehouseofflinepacket",
+            "safehouseofflinepackets",
+            "safehouseofflinebrief",
+            "safehouseofflinebriefs",
+            "mobilesafehouseofflinepacket",
+            "mobilesafehouseofflinepackets",
+            "mobilesafehouseofflinebrief",
+            "mobilesafehouseofflinebriefs",
             "gmopspacket",
             "gmoperationpackets",
             "gmcontrolpacket",
@@ -387,6 +395,14 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("safehousetravelpackets", tokens);
         Assert.DoesNotContain("safehousetravelbrief", tokens);
         Assert.DoesNotContain("safehousetravelbriefs", tokens);
+        Assert.DoesNotContain("safehouseofflinepacket", tokens);
+        Assert.DoesNotContain("safehouseofflinepackets", tokens);
+        Assert.DoesNotContain("safehouseofflinebrief", tokens);
+        Assert.DoesNotContain("safehouseofflinebriefs", tokens);
+        Assert.DoesNotContain("mobilesafehouseofflinepacket", tokens);
+        Assert.DoesNotContain("mobilesafehouseofflinepackets", tokens);
+        Assert.DoesNotContain("mobilesafehouseofflinebrief", tokens);
+        Assert.DoesNotContain("mobilesafehouseofflinebriefs", tokens);
         Assert.DoesNotContain("gmopspacket", tokens);
         Assert.DoesNotContain("gmoperationpackets", tokens);
         Assert.DoesNotContain("gmcontrolpacket", tokens);
