@@ -637,7 +637,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Summary: "Travel prefetch stays governed and offline-safe for safehouse return.",
             BindingSummary: "Bound to the same campaign lane for travel and safehouse continuity.",
             Reusable: true,
-            SearchTerms: ["travel", "prefetch", "offline", "safehouse", "device"],
+            SearchTerms: ["travel", "prefetch", "offline", "safehouse", "stale", "cache", "device"],
             EvidenceLines: ["Travel prefetch packet stays attached to governed continuity receipts."],
             UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
 
@@ -646,6 +646,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("off-line readiness")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travel cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelcache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("stalecache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("staleofflinecache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehouse stale cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehousereadiness")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("safe house readiness")));

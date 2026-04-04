@@ -7327,6 +7327,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinereadinesses', 'compact offlinereadinesses continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinecache', 'compact offlinecache continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinecaches', 'compact offlinecaches continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'stalecache', 'compact stalecache continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'staleofflinecache', 'compact staleofflinecache continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadiness', 'compact travelreadiness continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadinesses', 'compact travelreadinesses continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'travelcache', 'compact travelcache continuity prep');
