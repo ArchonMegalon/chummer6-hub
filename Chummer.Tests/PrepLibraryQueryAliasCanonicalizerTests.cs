@@ -248,6 +248,22 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "rostermovebrfs",
             "rostermovementbrf",
             "rostermovementbrfs",
+            "rostersmovepacket",
+            "rostersmovepackets",
+            "rostersmovepkt",
+            "rostersmovepkts",
+            "rostersmovementpacket",
+            "rostersmovementpackets",
+            "rostersmovementpkt",
+            "rostersmovementpkts",
+            "rostersmovebrief",
+            "rostersmovebriefs",
+            "rostersmovebrf",
+            "rostersmovebrfs",
+            "rostersmovementbrief",
+            "rostersmovementbriefs",
+            "rostersmovementbrf",
+            "rostersmovementbrfs",
             "eventcontrolpacket",
             "eventcontrolpackets",
             "eventcontrolpkt",
@@ -350,6 +366,22 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("rostermovebrfs", tokens);
         Assert.DoesNotContain("rostermovementbrf", tokens);
         Assert.DoesNotContain("rostermovementbrfs", tokens);
+        Assert.DoesNotContain("rostersmovepacket", tokens);
+        Assert.DoesNotContain("rostersmovepackets", tokens);
+        Assert.DoesNotContain("rostersmovepkt", tokens);
+        Assert.DoesNotContain("rostersmovepkts", tokens);
+        Assert.DoesNotContain("rostersmovementpacket", tokens);
+        Assert.DoesNotContain("rostersmovementpackets", tokens);
+        Assert.DoesNotContain("rostersmovementpkt", tokens);
+        Assert.DoesNotContain("rostersmovementpkts", tokens);
+        Assert.DoesNotContain("rostersmovebrief", tokens);
+        Assert.DoesNotContain("rostersmovebriefs", tokens);
+        Assert.DoesNotContain("rostersmovebrf", tokens);
+        Assert.DoesNotContain("rostersmovebrfs", tokens);
+        Assert.DoesNotContain("rostersmovementbrief", tokens);
+        Assert.DoesNotContain("rostersmovementbriefs", tokens);
+        Assert.DoesNotContain("rostersmovementbrf", tokens);
+        Assert.DoesNotContain("rostersmovementbrfs", tokens);
         Assert.DoesNotContain("eventcontrolpacket", tokens);
         Assert.DoesNotContain("eventcontrolpackets", tokens);
         Assert.DoesNotContain("eventcontrolpkt", tokens);
