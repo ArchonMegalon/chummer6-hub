@@ -1357,6 +1357,132 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail gm-op hyphen search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gm-op hyphen search');
 
+  await page.fill('#prepQuery', 'gmoperation');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gmoperation/.test(page.url()), 'Workspace detail search should preserve the compact gmoperation prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gmoperation compact search');
+  await expectBodyText(page, 'match(es) for "gmoperation"', '/account/work/workspaces detail gmoperation compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gmoperation compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gmoperation compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gmoperation compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gmoperation compact search');
+  const workspaceGmOperationCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmOperationCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact gmoperation query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gmoperation compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gmoperation compact search');
+
+  await page.fill('#prepQuery', 'gmoperations');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gmoperations/.test(page.url()), 'Workspace detail search should preserve the compact gmoperations prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gmoperations compact search');
+  await expectBodyText(page, 'match(es) for "gmoperations"', '/account/work/workspaces detail gmoperations compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gmoperations compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gmoperations compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gmoperations compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gmoperations compact search');
+  const workspaceGmOperationsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmOperationsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact gmoperations query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gmoperations compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gmoperations compact search');
+
+  await page.fill('#prepQuery', 'gm operation');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gm(?:%20|\+)operation/.test(page.url()), 'Workspace detail search should preserve the split gm operation prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gm operation split search');
+  await expectBodyText(page, 'match(es) for "gm operation"', '/account/work/workspaces detail gm operation split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gm operation split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gm operation split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gm operation split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gm operation split search');
+  const workspaceGmOperationSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmOperationSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split gm operation query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gm operation split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gm operation split search');
+
+  await page.fill('#prepQuery', 'gm-operation');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gm-operation/.test(page.url()), 'Workspace detail search should preserve the hyphen gm-operation prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gm-operation hyphen search');
+  await expectBodyText(page, 'match(es) for "gm-operation"', '/account/work/workspaces detail gm-operation hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gm-operation hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gm-operation hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gm-operation hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gm-operation hyphen search');
+  const workspaceGmOperationHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmOperationHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen gm-operation query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gm-operation hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gm-operation hyphen search');
+
+  await page.fill('#prepQuery', 'gm operations');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gm(?:%20|\+)operations/.test(page.url()), 'Workspace detail search should preserve the split gm operations prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gm operations split search');
+  await expectBodyText(page, 'match(es) for "gm operations"', '/account/work/workspaces detail gm operations split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gm operations split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gm operations split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gm operations split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gm operations split search');
+  const workspaceGmOperationsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmOperationsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split gm operations query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gm operations split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gm operations split search');
+
+  await page.fill('#prepQuery', 'gm-operations');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gm-operations/.test(page.url()), 'Workspace detail search should preserve the hyphen gm-operations prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gm-operations hyphen search');
+  await expectBodyText(page, 'match(es) for "gm-operations"', '/account/work/workspaces detail gm-operations hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gm-operations hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gm-operations hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gm-operations hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gm-operations hyphen search');
+  const workspaceGmOperationsHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmOperationsHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen gm-operations query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gm-operations hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gm-operations hyphen search');
+
   await page.fill('#prepQuery', 'leagueops');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),

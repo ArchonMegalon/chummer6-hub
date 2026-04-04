@@ -152,10 +152,14 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("gmops");
         IReadOnlyList<string> compactSingularTokens = InvokeBuildTokens("gmop");
+        IReadOnlyList<string> compactOperationTokens = InvokeBuildTokens("gmoperation");
+        IReadOnlyList<string> compactOperationsTokens = InvokeBuildTokens("gmoperations");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("gmatrix");
 
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.True(InvokeMatches(packet, compactSingularTokens));
+        Assert.True(InvokeMatches(packet, compactOperationTokens));
+        Assert.True(InvokeMatches(packet, compactOperationsTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
     }
 
@@ -204,6 +208,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm operation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-operation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm operations")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season operation")));

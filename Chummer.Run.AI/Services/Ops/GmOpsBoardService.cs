@@ -485,11 +485,16 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             .Select(static token => token.Trim().ToLowerInvariant())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        if ((tokens.Contains("gm") && tokens.Contains("ops")) || (tokens.Contains("gm") && tokens.Contains("op")))
+        if ((tokens.Contains("gm") && tokens.Contains("ops"))
+            || (tokens.Contains("gm") && tokens.Contains("op"))
+            || (tokens.Contains("gm") && tokens.Contains("operation"))
+            || (tokens.Contains("gm") && tokens.Contains("operations")))
         {
             tokens.Remove("gm");
             tokens.Remove("ops");
             tokens.Remove("op");
+            tokens.Remove("operation");
+            tokens.Remove("operations");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");
@@ -618,6 +623,22 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         if (tokens.Contains("gmop"))
         {
             tokens.Remove("gmop");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gmoperation"))
+        {
+            tokens.Remove("gmoperation");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gmoperations"))
+        {
+            tokens.Remove("gmoperations");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");
