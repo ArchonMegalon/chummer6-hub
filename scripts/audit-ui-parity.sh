@@ -88,6 +88,13 @@ def require_pass_status(value: object, *, message: str) -> None:
         raise SystemExit(message + f" (status={normalized or 'missing'})")
 
 
+def require_non_empty_string(value: object, *, message: str) -> str:
+    parsed = str(value or "").strip()
+    if not parsed:
+        raise SystemExit(message)
+    return parsed
+
+
 def require_empty_collection(value: object, *, message: str) -> None:
     if isinstance(value, dict):
         if value:
@@ -119,6 +126,34 @@ def require_empty_problem_map(value: object, *, message: str) -> None:
 def require_true_bool(value: object, *, message: str) -> None:
     if value is not True:
         raise SystemExit(message)
+
+
+def require_string_map(value: object, *, message: str) -> dict[str, str]:
+    mapping = require_object(value, message=message)
+    normalized: dict[str, str] = {}
+    for raw_key, raw_value in mapping.items():
+        if not isinstance(raw_key, str):
+            raise SystemExit(message)
+        key = raw_key.strip()
+        if not key:
+            raise SystemExit(message)
+        parsed_value = str(raw_value or "").strip()
+        if not parsed_value:
+            raise SystemExit(message)
+        normalized[key] = parsed_value
+    return normalized
+
+
+def require_all_values_equal(
+    value: object,
+    *,
+    expected: str,
+    message: str,
+) -> None:
+    mapping = require_string_map(value, message=message)
+    for key, item in mapping.items():
+        if item != expected:
+            raise SystemExit(f"{message}: {key}={item!r}, expected={expected!r}")
 
 
 def require_head_marker_statuses_pass(value: object, *, message: str) -> None:
@@ -260,6 +295,31 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
     require_true_bool(
         evidence.get("release_channel_receipt_exists"),
         message=f"parity audit failed: workflow receipt reports missing release-channel evidence receipt: {path}",
+    )
+    release_channel_channel_id = require_non_empty_string(
+        evidence.get("release_channel_channel_id"),
+        message=f"parity audit failed: workflow receipt release-channel channel id is missing: {path}",
+    )
+    require_non_empty_string(
+        evidence.get("release_channel_version"),
+        message=f"parity audit failed: workflow receipt release-channel version is missing: {path}",
+    )
+    require_all_values_equal(
+        evidence.get("workflow_parity_receipt_channel_ids"),
+        expected=release_channel_channel_id,
+        message=f"parity audit failed: workflow parity receipt channel ids drift from release-channel channel id: {path}",
+    )
+    require_empty_collection(
+        evidence.get("flagship_gate.headProofs.status_malformed_entries"),
+        message=f"parity audit failed: workflow receipt has malformed flagship head proof status keys: {path}",
+    )
+    require_empty_collection(
+        evidence.get("flagship_gate.headProofs.status_non_canonical_keys"),
+        message=f"parity audit failed: workflow receipt has non-canonical flagship head proof status keys: {path}",
+    )
+    require_empty_collection(
+        evidence.get("flagship_gate.headProofs.status_duplicate_normalized_keys"),
+        message=f"parity audit failed: workflow receipt has duplicate normalized flagship head proof status keys: {path}",
     )
     required_families = require_string_list(
         evidence.get("required_workflow_family_ids"),
@@ -413,6 +473,26 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("release_channel_receipt_exists"),
         message=f"parity audit failed: visual receipt reports missing release-channel evidence receipt: {path}",
     )
+    require_non_empty_string(
+        evidence.get("release_channel_channel_id"),
+        message=f"parity audit failed: visual receipt release-channel channel id is missing: {path}",
+    )
+    require_non_empty_string(
+        evidence.get("release_channel_version"),
+        message=f"parity audit failed: visual receipt release-channel version is missing: {path}",
+    )
+    require_empty_collection(
+        evidence.get("flagship_gate.headProofs.status_malformed_entries"),
+        message=f"parity audit failed: visual receipt has malformed flagship head proof status keys: {path}",
+    )
+    require_empty_collection(
+        evidence.get("flagship_gate.headProofs.status_non_canonical_keys"),
+        message=f"parity audit failed: visual receipt has non-canonical flagship head proof status keys: {path}",
+    )
+    require_empty_collection(
+        evidence.get("flagship_gate.headProofs.status_duplicate_normalized_keys"),
+        message=f"parity audit failed: visual receipt has duplicate normalized flagship head proof status keys: {path}",
+    )
     require_empty_collection(
         evidence.get("missing_theme_tokens"),
         message=f"parity audit failed: visual receipt reports missing required legacy theme tokens: {path}",
@@ -420,6 +500,34 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
     require_pass_status(
         evidence.get("flagship_theme_readability_contrast"),
         message=f"parity audit failed: visual receipt flagship theme/readability proof is not pass-ready: {path}",
+    )
+    require_pass_status(
+        evidence.get("runtime_backed_shell_menu"),
+        message=f"parity audit failed: visual receipt runtime-backed shell menu proof is not pass-ready: {path}",
+    )
+    require_pass_status(
+        evidence.get("runtime_backed_menu_bar_labels"),
+        message=f"parity audit failed: visual receipt runtime-backed menu bar labels proof is not pass-ready: {path}",
+    )
+    require_pass_status(
+        evidence.get("runtime_backed_toolstrip_actions"),
+        message=f"parity audit failed: visual receipt runtime-backed toolstrip actions proof is not pass-ready: {path}",
+    )
+    require_pass_status(
+        evidence.get("runtime_backed_tab_panel_only_header"),
+        message=f"parity audit failed: visual receipt runtime-backed tab panel header proof is not pass-ready: {path}",
+    )
+    require_pass_status(
+        evidence.get("runtime_backed_clickable_primary_menus"),
+        message=f"parity audit failed: visual receipt runtime-backed clickable menu proof is not pass-ready: {path}",
+    )
+    require_true_bool(
+        evidence.get("loaded_runner_tab_strip_control_present"),
+        message=f"parity audit failed: visual receipt loaded runner tab-strip control proof is missing: {path}",
+    )
+    require_true_bool(
+        evidence.get("loaded_runner_tab_posture_control_present"),
+        message=f"parity audit failed: visual receipt loaded runner tab-posture control proof is missing: {path}",
     )
     require_empty_collection(
         evidence.get("missing_tests"),
