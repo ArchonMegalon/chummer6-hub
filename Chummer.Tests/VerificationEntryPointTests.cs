@@ -56,6 +56,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("resolve_receipt_path", script, StringComparison.Ordinal);
         Assert.Contains("DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json", script, StringComparison.Ordinal);
         Assert.Contains("DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_UI_PARITY_RELEASE_CHANNEL_PATH", script, StringComparison.Ordinal);
         Assert.Contains("required executable receipt is missing", script, StringComparison.Ordinal);
         Assert.Contains("status must be pass/passed/ready", script, StringComparison.Ordinal);
         Assert.Contains("generatedAt/generated_at is missing", script, StringComparison.Ordinal);
@@ -207,6 +208,8 @@ public sealed class VerificationEntryPointTests
 
         Assert.Contains("bash scripts/audit-ui-parity.sh", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_path", script, StringComparison.Ordinal);
+        Assert.Contains("release_channel_fixture_path", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_UI_PARITY_RELEASE_CHANNEL_PATH", script, StringComparison.Ordinal);
         Assert.Contains("DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json", script, StringComparison.Ordinal);
         Assert.Contains("reject releaseProof.baseUrl outside allowed canonical release origins", script, StringComparison.Ordinal);
         Assert.Contains("reject conflicting alias values between releaseProof.baseUrl and releaseProof.base_url", script, StringComparison.Ordinal);

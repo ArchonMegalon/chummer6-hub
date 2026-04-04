@@ -1055,6 +1055,26 @@ def resolve_nested_receipt_path(parent_path: pathlib.Path, raw_path: str) -> pat
     return nested
 
 
+def resolve_release_channel_receipt_path(parent_path: pathlib.Path, evidence: dict) -> pathlib.Path:
+    release_channel_path_raw = require_non_empty_string(
+        evidence.get("release_channel_path"),
+        message=f"parity audit failed: executable receipt release-channel path is missing: {parent_path}",
+    )
+    resolved_path = resolve_nested_receipt_path(parent_path, release_channel_path_raw)
+    override_raw_path = str(os.environ.get("CHUMMER_UI_PARITY_RELEASE_CHANNEL_PATH") or "").strip()
+    if not override_raw_path:
+        return resolved_path
+    override_path = pathlib.Path(override_raw_path).expanduser()
+    if not override_path.is_absolute():
+        override_path = (pathlib.Path.cwd() / override_path).resolve()
+    if not override_path.is_file():
+        raise SystemExit(
+            "parity audit failed: CHUMMER_UI_PARITY_RELEASE_CHANNEL_PATH must point to an existing release-channel receipt file: "
+            f"{override_path}"
+        )
+    return override_path
+
+
 def validate_timestamp_freshness(path: pathlib.Path, data: dict, evidence: dict) -> None:
     generated_at = parse_generated_at(path, data)
     max_age_seconds = read_int_value(
@@ -1130,11 +1150,7 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("release_channel_version"),
         message=f"parity audit failed: workflow receipt release-channel version is missing: {path}",
     )
-    release_channel_path_raw = require_non_empty_string(
-        evidence.get("release_channel_path"),
-        message=f"parity audit failed: workflow receipt release-channel path is missing: {path}",
-    )
-    release_channel_path = resolve_nested_receipt_path(path, release_channel_path_raw)
+    release_channel_path = resolve_release_channel_receipt_path(path, evidence)
     release_channel_data = read_receipt(release_channel_path)
     read_release_channel_status(release_channel_path, release_channel_data)
     validate_release_channel_proof(release_channel_path, release_channel_data)
@@ -1534,11 +1550,7 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("release_channel_version"),
         message=f"parity audit failed: visual receipt release-channel version is missing: {path}",
     )
-    release_channel_path_raw = require_non_empty_string(
-        evidence.get("release_channel_path"),
-        message=f"parity audit failed: visual receipt release-channel path is missing: {path}",
-    )
-    release_channel_path = resolve_nested_receipt_path(path, release_channel_path_raw)
+    release_channel_path = resolve_release_channel_receipt_path(path, evidence)
     release_channel_data = read_receipt(release_channel_path)
     read_release_channel_status(release_channel_path, release_channel_data)
     validate_release_channel_proof(release_channel_path, release_channel_data)
@@ -1811,20 +1823,8 @@ def validate_cross_receipt_alignment(
             f"{workflow_path} ({workflow_release_version}) vs "
             f"{visual_path} ({visual_release_version})"
         )
-    workflow_release_channel_path = resolve_nested_receipt_path(
-        workflow_path,
-        require_non_empty_string(
-            workflow_evidence.get("release_channel_path"),
-            message=f"parity audit failed: workflow receipt release-channel path is missing: {workflow_path}",
-        ),
-    )
-    visual_release_channel_path = resolve_nested_receipt_path(
-        visual_path,
-        require_non_empty_string(
-            visual_evidence.get("release_channel_path"),
-            message=f"parity audit failed: visual receipt release-channel path is missing: {visual_path}",
-        ),
-    )
+    workflow_release_channel_path = resolve_release_channel_receipt_path(workflow_path, workflow_evidence)
+    visual_release_channel_path = resolve_release_channel_receipt_path(visual_path, visual_evidence)
     if workflow_release_channel_path != visual_release_channel_path:
         raise SystemExit(
             "parity audit failed: milestone-2 workflow/visual release-channel nested receipt paths drift: "
