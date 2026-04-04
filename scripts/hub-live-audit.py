@@ -4700,6 +4700,10 @@ def verify_signed_in_work_audit(
         ("queryText=gmoperationpackets", "gmoperationpackets"),
         ("queryText=gmcontrolpacket", "gmcontrolpacket"),
         ("queryText=gmcontrolpackets", "gmcontrolpackets"),
+        ("queryText=workspacev4", "workspacev4"),
+        ("queryText=workspacev4packet", "workspacev4packet"),
+        ("queryText=campaignworkspacev4packet", "campaignworkspacev4packet"),
+        ("queryText=campaignworkspacev4brief", "campaignworkspacev4brief"),
         ("queryText=return", "return"),
         ("queryText=returns", "returns"),
         ("queryText=returnloop", "returnloop"),
@@ -9837,6 +9841,10 @@ def verify_signed_in_work_audit(
         ("gmoperationpackets", "gmoperationpackets"),
         ("gmcontrolpacket", "gmcontrolpacket"),
         ("gmcontrolpackets", "gmcontrolpackets"),
+        ("workspacev4", "workspacev4"),
+        ("workspacev4packet", "workspacev4packet"),
+        ("campaignworkspacev4packet", "campaignworkspacev4packet"),
+        ("campaignworkspacev4brief", "campaignworkspacev4brief"),
     ]:
         assert_workspace_prep_query_has_items(prep_query_value, label)
 

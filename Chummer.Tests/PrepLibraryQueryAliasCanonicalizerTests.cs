@@ -216,4 +216,27 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("gmoperationpackets", tokens);
         Assert.DoesNotContain("gmcontrolpacket", tokens);
     }
+
+    [Fact]
+    public void RewriteAliases_CollapsesWorkspaceV4CompactFormsIntoCampaignReturnPacketTokens()
+    {
+        HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "workspacev4",
+            "workspacev4packets",
+            "campaignworkspacev4brief"
+        };
+
+        PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
+
+        Assert.Contains("campaign", tokens);
+        Assert.Contains("return", tokens);
+        Assert.Contains("packet", tokens);
+        Assert.DoesNotContain("workspacev4", tokens);
+        Assert.DoesNotContain("workspacev4packets", tokens);
+        Assert.DoesNotContain("campaignworkspacev4brief", tokens);
+        Assert.DoesNotContain("workspace", tokens);
+        Assert.DoesNotContain("v4", tokens);
+        Assert.DoesNotContain("brief", tokens);
+    }
 }

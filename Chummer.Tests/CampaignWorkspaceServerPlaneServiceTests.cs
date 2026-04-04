@@ -145,6 +145,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmopspacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmoperationpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gmcontrolpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("workspacev4")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("workspacev4packet")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignworkspacev4packet")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignworkspacev4brief")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixcontinuitypacket")));
     }
 
