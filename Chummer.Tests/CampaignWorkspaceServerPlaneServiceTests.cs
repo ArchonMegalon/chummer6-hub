@@ -435,6 +435,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("debriefed")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("debriefing")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("debriefings")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("de brief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("de briefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("de briefed")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("de briefing")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("de briefings")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("de-brief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("de-briefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("de-briefed")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("de-briefing")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("de-briefings")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("outbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("outbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("outbriefed")));
@@ -730,6 +740,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     [InlineData("debriefed")]
     [InlineData("debriefing")]
     [InlineData("debriefings")]
+    [InlineData("de-briefing")]
     [InlineData("post-session")]
     [InlineData("post-run")]
     [InlineData("post-game")]

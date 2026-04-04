@@ -3169,6 +3169,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(normalizedKind, AftermathRecapWordTokens)
+            || ContainsDeBriefTokenPair(normalizedKind)
             || ContainsAfterActionTokenPair(normalizedKind)
             || ContainsPostMortemTokenPair(normalizedKind)
             || ContainsPostSessionTokenPair(normalizedKind)
@@ -3205,6 +3206,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return ContainsAnyWordToken(value, AftermathRecapWordTokens)
+            || ContainsDeBriefTokenPair(value)
             || ContainsAfterActionTokenPair(value)
             || ContainsPostMortemTokenPair(value)
             || ContainsPostSessionTokenPair(value)
@@ -3779,6 +3781,18 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return ContainsAnyWordToken(value, ["after"])
             && ContainsAnyWordToken(value, ["action"]);
+    }
+
+    private static bool ContainsDeBriefTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["debrief", "debriefs", "debriefed", "debriefing", "debriefings"])
+            || (ContainsAnyWordToken(value, ["de"])
+                && ContainsAnyWordToken(value, ["brief", "briefs", "briefed", "briefing", "briefings"]));
     }
 
     private static bool ContainsPostGameTokenPair(string? value)
