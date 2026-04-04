@@ -20,6 +20,17 @@ BANNED_COPY = re.compile(r"\b(Read the linked detail|Read more|Learn more)\b", r
 SUPPORT_AUDIT_TITLE = "Live audit support verification case"
 SUPPORT_AUDIT_SUMMARY = "Signed-in live audit is verifying the assistant-led fix verification lane."
 SUPPORT_AUDIT_DETAIL_PREFIX = "Signed-in live audit is verifying the assistant-led fix verification lane on the rebuilt local edge."
+DEFAULT_REQUEST_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/135.0.0.0 Safari/537.36 ChummerHubLiveAudit/1.0"
+    ),
+    "Accept": "text/html,application/json,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+}
 
 
 @dataclass
@@ -84,7 +95,7 @@ def fetch(
     attempt = 0
     while True:
         url = urljoin(base_url, path)
-        headers = {"User-Agent": "chummer-hub-live-audit"}
+        headers = dict(DEFAULT_REQUEST_HEADERS)
         if public_host:
             headers["Host"] = public_host
         if forwarded_proto:
@@ -1270,6 +1281,21 @@ def verify_signed_in_work_audit(
     if not prep_items:
         raise AssertionError("prep-library search did not expose any governed packet to launch")
 
+    prep_library_season_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=seasonops"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_season_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_season_path} returned {status}, expected 200")
+
+    prep_library_season = json.loads(body)
+    if not (prep_library_season.get("items") or []):
+        raise AssertionError("prep-library seasonops search did not expose any governed packet")
+
     runs = workspaces[0].get("runs") or []
     target_run = runs[0] if runs else {}
     prep_launch_body = json.dumps(
@@ -1745,6 +1771,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Next-session carry-forward", workspace_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_search_path} should return at least one governed prep packet for the opposition query")
+    workspace_season_search_path = f"{workspace_path}?prepQuery=seasonops"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_season_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_season_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_season_search_path)
+    require_snippet(body, 'match(es) for "seasonops"', workspace_season_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_season_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_season_search_path} should return at least one governed prep packet for the seasonops query")
     publication_detail_path = extract_first_match(
         body,
         r'href="([^"]*/account/work/publications/[^"]+)"',
