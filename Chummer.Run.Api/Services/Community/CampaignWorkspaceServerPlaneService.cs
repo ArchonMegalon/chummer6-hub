@@ -92,6 +92,10 @@ public sealed class CampaignWorkspaceServerPlaneService
     [
         "opposition",
         "oppositions",
+        "encounter",
+        "encounters",
+        "enemy",
+        "enemies",
         "hostile",
         "hostiles",
         "adversary",
@@ -104,6 +108,10 @@ public sealed class CampaignWorkspaceServerPlaneService
     [
         "opposition",
         "oppositions",
+        "encounter",
+        "encounters",
+        "enemy",
+        "enemies",
         "hostile",
         "hostiles",
         "adversary",
@@ -3469,7 +3477,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return ContainsAnyWordToken(value, OppositionWordTokens);
+        return ContainsAnyWordToken(value, OppositionWordTokens)
+            || ContainsOpforTokenPair(value);
     }
 
     private static bool IsEventControlConsequenceSignal(CampaignConsequenceProjection consequence)
@@ -3495,7 +3504,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             return true;
         }
 
-        return ContainsAnyWordToken(normalizedKind, OppositionWordTokens);
+        return ContainsAnyWordToken(normalizedKind, OppositionWordTokens)
+            || ContainsOpforTokenPair(normalizedKind);
     }
 
     private static bool IsOppositionConsequenceSignal(CampaignConsequenceProjection consequence)
@@ -3542,7 +3552,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        if (ContainsAnyWordToken(value, OppositionIdentityWordTokens))
+        if (ContainsAnyWordToken(value, OppositionIdentityWordTokens)
+            || ContainsOpforTokenPair(value))
         {
             return true;
         }
@@ -3609,6 +3620,18 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return false;
+    }
+
+    private static bool ContainsOpforTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["opfor", "op-for"])
+            || (ContainsAnyWordToken(value, ["op"])
+            && ContainsAnyWordToken(value, ["force"]));
     }
 
     private static bool ContainsAfterActionTokenPair(string? value)

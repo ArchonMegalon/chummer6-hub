@@ -5293,6 +5293,40 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void OppositionPacketFallsBackToEncounterEnemyAndOpforSignalsWhenCanonicalOppositionTermsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEncounterEnemyAndOpforSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("opposition", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("opfor", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("encounter", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("enemy", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("opfor", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketFallsBackToEncounterEnemyAndOpforSignalsWhenCanonicalOppositionTermsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEncounterEnemyAndOpforSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("opposition", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("opfor", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("encounter", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("enemy", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("opfor", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void OppositionPacketActivatesFromCarryForwardOppositionSignalsWhenOtherFamiliesLag()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionCarryForwardSignalsOnly();
@@ -12892,6 +12926,69 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "Return lane summary",
             ChangePackets: [oppositionWindow, threatLane],
+            Consequences: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithEncounterEnemyAndOpforSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection encounterWindow = new(
+            PacketId: "packet-encounter",
+            Kind: "encounter_window_shift",
+            Label: "Encounter window shift",
+            Summary: "Encounter command board stays active while receipts hydrate.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        WorkspaceChangePacketProjection opforWindow = new(
+            PacketId: "packet-opfor",
+            Kind: "opfor_window_shift",
+            Label: "Opfor lane shift",
+            Summary: "Opfor enemy window remains active for the next control reopen.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-enemy-1",
+            Title: "Enemy response window",
+            Status: "open",
+            Pressure: "high",
+            Summary: "Enemy pressure remains active until the board reopens.",
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        RunProjection run = new(
+            RunId: "run-encounter-opfor-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard encounter pressure",
+            Status: "active",
+            Summary: "Current run remains active under encounter and opfor pressure.",
+            ActiveSceneId: null,
+            Objectives: [objective],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-encounter-opfor-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [encounterWindow, opforWindow],
             Consequences: []);
     }
 
