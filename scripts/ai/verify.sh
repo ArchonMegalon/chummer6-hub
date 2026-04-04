@@ -197,4 +197,49 @@ if bash scripts/audit-ui-parity.sh; then
 fi
 mv "$release_channel_backup" "$release_channel_path"
 
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["journeysPassed"] = ["launch-and-link"]
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject missing required releaseProof.journeysPassed baseline journey ids." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["journeysPassed"] = [
+    "launch-and-link",
+    "create-and-advance-character",
+    "run-and-log-session",
+    "publish-and-install-content",
+    "recover-and-resync",
+    "bonus-noncanonical-journey",
+]
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject unexpected releaseProof.journeysPassed journey ids." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
 bash scripts/ai/run_services_smoke.sh

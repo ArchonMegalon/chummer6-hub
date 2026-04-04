@@ -204,6 +204,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject dot-segment traversal releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
         Assert.Contains("reject duplicate-normalized releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
         Assert.Contains("reject missing required releaseProof.proofRoutes flagship routes", script, StringComparison.Ordinal);
+        Assert.Contains("reject missing required releaseProof.journeysPassed baseline journey ids", script, StringComparison.Ordinal);
+        Assert.Contains("reject unexpected releaseProof.journeysPassed journey ids", script, StringComparison.Ordinal);
     }
 
     [Fact]
