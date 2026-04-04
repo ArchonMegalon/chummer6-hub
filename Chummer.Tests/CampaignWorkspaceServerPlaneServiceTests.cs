@@ -2732,6 +2732,24 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RunboardSummaryDeduplicatesIdenticalOpenObjectiveVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterSignalsOnly();
+        RunProjection run = Assert.Single(seed.Runs);
+        ObjectiveProjection objective = Assert.Single(run.Objectives);
+        RunProjection updatedRun = run with
+        {
+            Objectives = [objective, objective]
+        };
+
+        RunboardSummary? summary = InvokeBuildRunboardSummary(seed, updatedRun);
+        Assert.NotNull(summary);
+
+        Assert.Contains("1 objective(s) still need attention", summary!.ObjectiveSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(summary.Blockers);
+    }
+
+    [Fact]
     public void RosterMovementPacketFallsBackToChangeAndCarryForwardSignalsWhenTransfersAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterSignalsOnly();
@@ -3313,6 +3331,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("BuildPrepPackets was not found.");
 
         return Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepPacketSummary>>(method.Invoke(null, [workspace, restore, leadRun]));
+    }
+
+    private static RunboardSummary? InvokeBuildRunboardSummary(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? leadRun)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BuildRunboardSummary", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildRunboardSummary was not found.");
+
+        return (RunboardSummary?)method.Invoke(null, [workspace, leadRun]);
     }
 
     private static bool InvokeIsTravelReadyDevice(ClaimedDeviceRestoreProjection device)
