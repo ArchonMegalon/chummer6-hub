@@ -1671,9 +1671,10 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
-        CampaignConsequenceProjection[] consequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
-            .Where(static consequence => IsOppositionConsequenceSignal(consequence))
-            .OrderByDescending(static item => item.UpdatedAtUtc)
+        CampaignConsequenceProjection[] consequences = DeduplicateIdenticalCampaignConsequenceVersions(
+                (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+                .Where(static consequence => IsOppositionConsequenceSignal(consequence))
+                .OrderByDescending(static item => item.UpdatedAtUtc))
             .Take(3)
             .ToArray();
         ObjectiveProjection[] objectiveSignals = (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
@@ -1955,9 +1956,10 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
-        CampaignConsequenceProjection[] memoryConsequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
-            .Where(static consequence => IsCampaignMemoryConsequenceSignal(consequence))
-            .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
+        CampaignConsequenceProjection[] memoryConsequences = DeduplicateIdenticalCampaignConsequenceVersions(
+                (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+                .Where(static consequence => IsCampaignMemoryConsequenceSignal(consequence))
+                .OrderByDescending(static consequence => consequence.UpdatedAtUtc))
             .Take(4)
             .ToArray();
         bool carryForwardSignal = IsCampaignMemoryCarryForwardSignal(carryForward);
@@ -2099,9 +2101,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static item => item.GeneratedAtUtc)
             .Take(4)
             .ToArray();
-        CampaignConsequenceProjection[] relationshipConsequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
-            .Where(static consequence => IsCampaignRelationshipConsequenceSignal(consequence))
-            .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
+        CampaignConsequenceProjection[] relationshipConsequences = DeduplicateIdenticalCampaignConsequenceVersions(
+                (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+                .Where(static consequence => IsCampaignRelationshipConsequenceSignal(consequence))
+                .OrderByDescending(static consequence => consequence.UpdatedAtUtc))
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] returnChanges = DeduplicateIdenticalChangePacketVersions(
@@ -2544,9 +2547,10 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static item => item.TransferredAtUtc))
             .Take(3)
             .ToArray();
-        CampaignConsequenceProjection[] rosterConsequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
-            .Where(static consequence => IsRosterConsequenceSignal(consequence))
-            .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
+        CampaignConsequenceProjection[] rosterConsequences = DeduplicateIdenticalCampaignConsequenceVersions(
+                (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+                .Where(static consequence => IsRosterConsequenceSignal(consequence))
+                .OrderByDescending(static consequence => consequence.UpdatedAtUtc))
             .Take(4)
             .ToArray();
         WorkspaceChangePacketProjection[] rosterChangeSignals = DeduplicateIdenticalChangePacketVersions(
@@ -3076,9 +3080,10 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
-        CampaignConsequenceProjection[] consequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
-            .Where(static consequence => IsEventControlConsequenceSignal(consequence))
-            .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
+        CampaignConsequenceProjection[] consequences = DeduplicateIdenticalCampaignConsequenceVersions(
+                (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+                .Where(static consequence => IsEventControlConsequenceSignal(consequence))
+                .OrderByDescending(static consequence => consequence.UpdatedAtUtc))
             .Take(3)
             .ToArray();
         RosterTransferProjection[] rosterTransfers = DeduplicateIdenticalRosterTransferVersions(
@@ -3875,6 +3880,28 @@ public sealed class CampaignWorkspaceServerPlaneService
             NormalizeOptional(receipt.Channel) ?? string.Empty,
             NormalizeOptional(receipt.PrefetchSummary) ?? string.Empty,
             receipt.StagedAtUtc.ToUnixTimeMilliseconds().ToString());
+
+    private static IEnumerable<CampaignConsequenceProjection> DeduplicateIdenticalCampaignConsequenceVersions(
+        IEnumerable<CampaignConsequenceProjection> consequences)
+    {
+        HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
+        foreach (CampaignConsequenceProjection consequence in consequences)
+        {
+            if (seenKeys.Add(BuildCampaignConsequenceDedupeKey(consequence)))
+            {
+                yield return consequence;
+            }
+        }
+    }
+
+    private static string BuildCampaignConsequenceDedupeKey(CampaignConsequenceProjection consequence) =>
+        string.Join('|',
+            NormalizeOptional(consequence.ConsequenceId) ?? string.Empty,
+            NormalizeOptional(consequence.Kind) ?? string.Empty,
+            NormalizeOptional(consequence.Label) ?? string.Empty,
+            NormalizeOptional(consequence.State) ?? string.Empty,
+            NormalizeOptional(consequence.Summary) ?? string.Empty,
+            consequence.UpdatedAtUtc.ToUnixTimeMilliseconds().ToString());
 
     private static string DescribeSignalLabel(string? preferredLabel, string? firstFallback, string? secondFallback)
     {
