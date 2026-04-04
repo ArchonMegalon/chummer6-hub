@@ -600,6 +600,20 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("operation");
         }
 
+        if (tokens.Contains("seasonoperation"))
+        {
+            tokens.Remove("seasonoperation");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("seasonoperations"))
+        {
+            tokens.Remove("seasonoperations");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
         if (tokens.Contains("seasoncontrol"))
         {
             tokens.Remove("seasoncontrol");
