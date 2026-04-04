@@ -2097,8 +2097,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Where(static item => IsCampaignReturnRecapSignal(item))
             .Take(4)
             .ToArray();
-        AftermathRecapPackageProjection[] aftermathPackages = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
-            .OrderByDescending(static item => item.GeneratedAtUtc)
+        AftermathRecapPackageProjection[] aftermathPackages = DeduplicateIdenticalAftermathPackageVersions(
+                (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
+                .OrderByDescending(static item => item.GeneratedAtUtc))
             .Take(4)
             .ToArray();
         CampaignConsequenceProjection[] relationshipConsequences = DeduplicateIdenticalCampaignConsequenceVersions(
@@ -2765,8 +2766,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         RunProjection? leadRun)
     {
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
-        AftermathRecapPackageProjection[] packages = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
-            .OrderByDescending(static item => item.GeneratedAtUtc)
+        AftermathRecapPackageProjection[] packages = DeduplicateIdenticalAftermathPackageVersions(
+                (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
+                .OrderByDescending(static item => item.GeneratedAtUtc))
             .Take(3)
             .ToArray();
         PublicationSafeProjection[] recapSignals = workspace.RecapShelf
@@ -3880,6 +3882,31 @@ public sealed class CampaignWorkspaceServerPlaneService
             NormalizeOptional(receipt.Channel) ?? string.Empty,
             NormalizeOptional(receipt.PrefetchSummary) ?? string.Empty,
             receipt.StagedAtUtc.ToUnixTimeMilliseconds().ToString());
+
+    private static IEnumerable<AftermathRecapPackageProjection> DeduplicateIdenticalAftermathPackageVersions(
+        IEnumerable<AftermathRecapPackageProjection> packages)
+    {
+        HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
+        foreach (AftermathRecapPackageProjection package in packages)
+        {
+            if (seenKeys.Add(BuildAftermathRecapPackageDedupeKey(package)))
+            {
+                yield return package;
+            }
+        }
+    }
+
+    private static string BuildAftermathRecapPackageDedupeKey(AftermathRecapPackageProjection package) =>
+        string.Join('|',
+            NormalizeOptional(package.PackageId) ?? string.Empty,
+            NormalizeOptional(package.WorkspaceId) ?? string.Empty,
+            NormalizeOptional(package.CampaignId) ?? string.Empty,
+            NormalizeOptional(package.RunId) ?? string.Empty,
+            NormalizeOptional(package.PackageKind) ?? string.Empty,
+            NormalizeOptional(package.Title) ?? string.Empty,
+            NormalizeOptional(package.Summary) ?? string.Empty,
+            NormalizeOptional(package.ArtifactId) ?? string.Empty,
+            package.GeneratedAtUtc.ToUnixTimeMilliseconds().ToString());
 
     private static IEnumerable<CampaignConsequenceProjection> DeduplicateIdenticalCampaignConsequenceVersions(
         IEnumerable<CampaignConsequenceProjection> consequences)
