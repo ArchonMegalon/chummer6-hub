@@ -60,6 +60,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "safehousecache", "safehouse", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "stalecache", "stale", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "staleofflinecache", "stale", "offline", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "mobileofflinereadiness", "mobile", "offline", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "mobiletravelreadiness", "mobile", "travel", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "mobileofflinecache", "mobile", "offline", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "mobiletravelcache", "mobile", "travel", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "mobiletravel", "mobile", "travel");
+        RewriteCompactContinuityMutationAlias(tokens, "mobileoffline", "mobile", "offline");
 
         if ((tokens.Contains("gm") && tokens.Contains("ops"))
             || (tokens.Contains("gm") && tokens.Contains("op"))
@@ -1097,6 +1103,17 @@ public static class PrepLibraryQueryAliasCanonicalizer
             || tokens.Contains("travelcache")
             || tokens.Contains("offlinecache")
             || tokens.Contains("safehousecache");
+        if (tokens.Contains("mobile")
+            && (tokens.Contains("travel")
+                || tokens.Contains("safehouse")
+                || tokens.Contains("offline")
+                || tokens.Contains("prefetch")
+                || tokens.Contains("travelprefetch")))
+        {
+            tokens.Remove("mobile");
+            hasTravelOfflineScope = true;
+        }
+
         if (hasTravelOfflineScope)
         {
             tokens.Remove("readiness");
