@@ -93,6 +93,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         "eventcontrol",
         "eventcontrols",
         "eventctrl",
+        "gmops",
+        "gmop",
         "seasonops",
         "seasonop"
     ];
@@ -4404,6 +4406,22 @@ public sealed class CampaignWorkspaceServerPlaneService
         {
             tokens.Remove("eventctrl");
             tokens.Add("eventcontrol");
+        }
+
+        if (tokens.Contains("gmops"))
+        {
+            tokens.Remove("gmops");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("gmop"))
+        {
+            tokens.Remove("gmop");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
         }
 
         if (tokens.Contains("crewtransfer"))
