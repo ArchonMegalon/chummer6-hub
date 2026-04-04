@@ -580,6 +580,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingCollapsesCompactMobileCompanionReturnLoopForms()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "travel-prefetch:return-loop",
+            Kind: "campaign_return_packet",
+            Title: "Neon Cradle mobile companion return loop packet",
+            Summary: "Mobile companion continuity keeps travel, safehouse, offline, and return-loop posture on one governed lane.",
+            BindingSummary: "Bound to the same campaign lane for mobile companion travel continuity and next-session return.",
+            Reusable: true,
+            SearchTerms: ["campaign", "travel", "offline", "safehouse", "return", "loop"],
+            EvidenceLines: ["Compact mobile companion return loop terms resolve onto the governed continuity lane."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilecompanionreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilecompanionreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignmobilecompanionreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignmobilecompanionsreturnlanes")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixreturnloop")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsContinuityPluralShorthandAcrossWhitespaceAndPunctuation()
     {
         var packet = new GovernedPrepPacketSummary(
