@@ -277,6 +277,31 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsNextSessionReturnLoopShorthandAcrossWhitespaceAndPunctuation()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "return:next-session",
+            Kind: "campaign_return_packet",
+            Title: "Neon Cradle return-loop packet",
+            Summary: "Next-session return loop stays governed from downtime through recap.",
+            BindingSummary: "Bound to campaign return, memory timeline, and next-session carry-forward.",
+            Reusable: true,
+            SearchTerms: ["next", "session", "return", "loop", "downtime", "recap"],
+            EvidenceLines: ["Next-session carry-forward keeps the return-loop lane reviewable."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsession")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessions")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("next-session")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("next session")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("returnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("returnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("return-loop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("return loop")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixloop")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsCrewTransferShorthandAcrossWhitespaceBoundaries()
     {
         var packet = new GovernedPrepPacketSummary(

@@ -4893,6 +4893,24 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("season");
             tokens.Add("operation");
         }
+
+        if (tokens.Contains("nextsession") || tokens.Contains("nextsessions"))
+        {
+            tokens.Remove("nextsession");
+            tokens.Remove("nextsessions");
+            tokens.Add("next");
+            tokens.Add("session");
+            tokens.Add("return");
+        }
+
+        if (tokens.Contains("returnloop") || tokens.Contains("returnloops"))
+        {
+            tokens.Remove("returnloop");
+            tokens.Remove("returnloops");
+            tokens.Add("return");
+            tokens.Add("loop");
+            tokens.Add("session");
+        }
     }
 
     private static bool MatchesPrepLibraryQuery(
