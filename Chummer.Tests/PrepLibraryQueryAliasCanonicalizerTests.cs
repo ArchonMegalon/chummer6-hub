@@ -755,7 +755,31 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "nextsessionsreturnloop",
             "nextsessionsreturnloops",
             "nextsessionsreturnlane",
-            "nextsessionsreturnlanes"
+            "nextsessionsreturnlanes",
+            "nextsessionreturnpacket",
+            "nextsessionreturnpackets",
+            "nextsessionreturnpkt",
+            "nextsessionreturnpkts",
+            "nextsessionreturnbrief",
+            "nextsessionreturnbriefs",
+            "nextsessionreturnbrf",
+            "nextsessionreturnbrfs",
+            "nextsessionsreturnpacket",
+            "nextsessionsreturnpackets",
+            "nextsessionsreturnpkt",
+            "nextsessionsreturnpkts",
+            "nextsessionsreturnbrief",
+            "nextsessionsreturnbriefs",
+            "nextsessionsreturnbrf",
+            "nextsessionsreturnbrfs",
+            "sessionreturnpacket",
+            "sessionreturnpackets",
+            "sessionreturnpkt",
+            "sessionreturnpkts",
+            "sessionreturnbrief",
+            "sessionreturnbriefs",
+            "sessionreturnbrf",
+            "sessionreturnbrfs"
         };
 
         PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
@@ -764,12 +788,37 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.Contains("session", tokens);
         Assert.Contains("return", tokens);
         Assert.Contains("loop", tokens);
+        Assert.Contains("packet", tokens);
         Assert.DoesNotContain("nextsessionsreturn", tokens);
         Assert.DoesNotContain("nextsessionsreturns", tokens);
         Assert.DoesNotContain("nextsessionsreturnloop", tokens);
         Assert.DoesNotContain("nextsessionsreturnloops", tokens);
         Assert.DoesNotContain("nextsessionsreturnlane", tokens);
         Assert.DoesNotContain("nextsessionsreturnlanes", tokens);
+        Assert.DoesNotContain("nextsessionreturnpacket", tokens);
+        Assert.DoesNotContain("nextsessionreturnpackets", tokens);
+        Assert.DoesNotContain("nextsessionreturnpkt", tokens);
+        Assert.DoesNotContain("nextsessionreturnpkts", tokens);
+        Assert.DoesNotContain("nextsessionreturnbrief", tokens);
+        Assert.DoesNotContain("nextsessionreturnbriefs", tokens);
+        Assert.DoesNotContain("nextsessionreturnbrf", tokens);
+        Assert.DoesNotContain("nextsessionreturnbrfs", tokens);
+        Assert.DoesNotContain("nextsessionsreturnpacket", tokens);
+        Assert.DoesNotContain("nextsessionsreturnpackets", tokens);
+        Assert.DoesNotContain("nextsessionsreturnpkt", tokens);
+        Assert.DoesNotContain("nextsessionsreturnpkts", tokens);
+        Assert.DoesNotContain("nextsessionsreturnbrief", tokens);
+        Assert.DoesNotContain("nextsessionsreturnbriefs", tokens);
+        Assert.DoesNotContain("nextsessionsreturnbrf", tokens);
+        Assert.DoesNotContain("nextsessionsreturnbrfs", tokens);
+        Assert.DoesNotContain("sessionreturnpacket", tokens);
+        Assert.DoesNotContain("sessionreturnpackets", tokens);
+        Assert.DoesNotContain("sessionreturnpkt", tokens);
+        Assert.DoesNotContain("sessionreturnpkts", tokens);
+        Assert.DoesNotContain("sessionreturnbrief", tokens);
+        Assert.DoesNotContain("sessionreturnbriefs", tokens);
+        Assert.DoesNotContain("sessionreturnbrf", tokens);
+        Assert.DoesNotContain("sessionreturnbrfs", tokens);
     }
 
     [Fact]
