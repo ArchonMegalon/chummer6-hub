@@ -419,15 +419,27 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "gmopspacket",
             "gmoperationpackets",
             "gmcontrolpacket",
+            "gmopspkt",
+            "gmoperationpkts",
+            "gmcontrolpkt",
             "gmopsbriefs",
             "gmoperationbrief",
             "gmcontrolbriefs",
+            "gmopsbrf",
+            "gmoperationbrfs",
+            "gmcontrolbrf",
             "gamemasteropspacket",
             "gamemasteroperationpackets",
             "gamemastercontrolpacket",
+            "gamemasteropspkt",
+            "gamemasteroperationpkts",
+            "gamemastercontrolpkt",
             "gamemasteropsbriefs",
             "gamemasteroperationbrief",
             "gamemastercontrolbriefs",
+            "gamemasteropsbrf",
+            "gamemasteroperationbrfs",
+            "gamemastercontrolbrf",
             "rostertransfer",
             "rostertransfers",
             "rosterhandoff",
@@ -562,15 +574,27 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("gmopspacket", tokens);
         Assert.DoesNotContain("gmoperationpackets", tokens);
         Assert.DoesNotContain("gmcontrolpacket", tokens);
+        Assert.DoesNotContain("gmopspkt", tokens);
+        Assert.DoesNotContain("gmoperationpkts", tokens);
+        Assert.DoesNotContain("gmcontrolpkt", tokens);
         Assert.DoesNotContain("gmopsbriefs", tokens);
         Assert.DoesNotContain("gmoperationbrief", tokens);
         Assert.DoesNotContain("gmcontrolbriefs", tokens);
+        Assert.DoesNotContain("gmopsbrf", tokens);
+        Assert.DoesNotContain("gmoperationbrfs", tokens);
+        Assert.DoesNotContain("gmcontrolbrf", tokens);
         Assert.DoesNotContain("gamemasteropspacket", tokens);
         Assert.DoesNotContain("gamemasteroperationpackets", tokens);
         Assert.DoesNotContain("gamemastercontrolpacket", tokens);
+        Assert.DoesNotContain("gamemasteropspkt", tokens);
+        Assert.DoesNotContain("gamemasteroperationpkts", tokens);
+        Assert.DoesNotContain("gamemastercontrolpkt", tokens);
         Assert.DoesNotContain("gamemasteropsbriefs", tokens);
         Assert.DoesNotContain("gamemasteroperationbrief", tokens);
         Assert.DoesNotContain("gamemastercontrolbriefs", tokens);
+        Assert.DoesNotContain("gamemasteropsbrf", tokens);
+        Assert.DoesNotContain("gamemasteroperationbrfs", tokens);
+        Assert.DoesNotContain("gamemastercontrolbrf", tokens);
         Assert.DoesNotContain("rostertransfer", tokens);
         Assert.DoesNotContain("rostertransfers", tokens);
         Assert.DoesNotContain("rosterhandoff", tokens);
