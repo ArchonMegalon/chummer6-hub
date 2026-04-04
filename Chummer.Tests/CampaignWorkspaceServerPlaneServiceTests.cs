@@ -393,6 +393,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("heats")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("faction")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("factions")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("contact")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("contacts")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("connection")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("connections")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("relationship")));
