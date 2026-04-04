@@ -310,44 +310,68 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
         {
             "campaignreturnpacket",
+            "campaignreturnpkt",
             "campaignreturnbriefs",
+            "campaignreturnbrfs",
             "campaignsreturnloop",
             "campaignsreturnpacket",
+            "campaignsreturnpkts",
             "campaignsreturnbriefs",
+            "campaignsreturnbrf",
             "aftermathreturnpacket",
+            "aftermathreturnpkt",
             "aftermathreturnbrief",
+            "aftermathreturnbrf",
             "aftermathreturnlane",
             "aftermathreturnlanes",
             "aftermathsreturnpacket",
+            "aftermathsreturnpkts",
             "aftermathsreturnbriefs",
+            "aftermathsreturnbrf",
             "downtimesreturnloop",
             "downtimereturnpackets",
+            "downtimereturnpkt",
             "downtimereturnbriefs",
+            "downtimereturnbrf",
             "downtimereturnlane",
             "downtimereturnlanes",
             "downtimesreturnpacket",
+            "downtimesreturnpkts",
             "downtimesreturnbriefs",
+            "downtimesreturnbrf",
             "diariesreturnloop",
             "diaryreturnloop",
             "diaryreturnlane",
             "diariesreturnpacket",
+            "diariesreturnpkts",
             "diariesreturnbriefs",
+            "diariesreturnbrf",
             "diaryreturnpacket",
+            "diaryreturnpkt",
             "diaryreturnbriefs",
+            "diaryreturnbrf",
             "contactsreturnloop",
             "contactreturnloop",
             "contactreturnlane",
             "contactsreturnpacket",
+            "contactsreturnpkts",
             "contactsreturnbriefs",
+            "contactsreturnbrf",
             "contactreturnpacket",
+            "contactreturnpkt",
             "contactreturnbriefs",
+            "contactreturnbrf",
             "heatsreturnloop",
             "heatreturnloop",
             "heatreturnlane",
             "heatsreturnpacket",
+            "heatsreturnpkts",
             "heatsreturnbriefs",
+            "heatsreturnbrf",
             "heatreturnpacket",
+            "heatreturnpkt",
             "heatreturnbriefs",
+            "heatreturnbrf",
             "diarycontactheatpacket",
             "diarycontactsheatpackets",
             "aftermathdowntimepacket",
@@ -429,44 +453,68 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.Contains("operation", tokens);
         Assert.Contains("packet", tokens);
         Assert.DoesNotContain("campaignreturnpacket", tokens);
+        Assert.DoesNotContain("campaignreturnpkt", tokens);
         Assert.DoesNotContain("campaignreturnbriefs", tokens);
+        Assert.DoesNotContain("campaignreturnbrfs", tokens);
         Assert.DoesNotContain("campaignsreturnloop", tokens);
         Assert.DoesNotContain("campaignsreturnpacket", tokens);
+        Assert.DoesNotContain("campaignsreturnpkts", tokens);
         Assert.DoesNotContain("campaignsreturnbriefs", tokens);
+        Assert.DoesNotContain("campaignsreturnbrf", tokens);
         Assert.DoesNotContain("aftermathreturnpacket", tokens);
+        Assert.DoesNotContain("aftermathreturnpkt", tokens);
         Assert.DoesNotContain("aftermathreturnbrief", tokens);
+        Assert.DoesNotContain("aftermathreturnbrf", tokens);
         Assert.DoesNotContain("aftermathreturnlane", tokens);
         Assert.DoesNotContain("aftermathreturnlanes", tokens);
         Assert.DoesNotContain("aftermathsreturnpacket", tokens);
+        Assert.DoesNotContain("aftermathsreturnpkts", tokens);
         Assert.DoesNotContain("aftermathsreturnbriefs", tokens);
+        Assert.DoesNotContain("aftermathsreturnbrf", tokens);
         Assert.DoesNotContain("downtimesreturnloop", tokens);
         Assert.DoesNotContain("downtimereturnpackets", tokens);
+        Assert.DoesNotContain("downtimereturnpkt", tokens);
         Assert.DoesNotContain("downtimereturnbriefs", tokens);
+        Assert.DoesNotContain("downtimereturnbrf", tokens);
         Assert.DoesNotContain("downtimereturnlane", tokens);
         Assert.DoesNotContain("downtimereturnlanes", tokens);
         Assert.DoesNotContain("downtimesreturnpacket", tokens);
+        Assert.DoesNotContain("downtimesreturnpkts", tokens);
         Assert.DoesNotContain("downtimesreturnbriefs", tokens);
+        Assert.DoesNotContain("downtimesreturnbrf", tokens);
         Assert.DoesNotContain("diariesreturnloop", tokens);
         Assert.DoesNotContain("diaryreturnloop", tokens);
         Assert.DoesNotContain("diaryreturnlane", tokens);
         Assert.DoesNotContain("diariesreturnpacket", tokens);
+        Assert.DoesNotContain("diariesreturnpkts", tokens);
         Assert.DoesNotContain("diariesreturnbriefs", tokens);
+        Assert.DoesNotContain("diariesreturnbrf", tokens);
         Assert.DoesNotContain("diaryreturnpacket", tokens);
+        Assert.DoesNotContain("diaryreturnpkt", tokens);
         Assert.DoesNotContain("diaryreturnbriefs", tokens);
+        Assert.DoesNotContain("diaryreturnbrf", tokens);
         Assert.DoesNotContain("contactsreturnloop", tokens);
         Assert.DoesNotContain("contactreturnloop", tokens);
         Assert.DoesNotContain("contactreturnlane", tokens);
         Assert.DoesNotContain("contactsreturnpacket", tokens);
+        Assert.DoesNotContain("contactsreturnpkts", tokens);
         Assert.DoesNotContain("contactsreturnbriefs", tokens);
+        Assert.DoesNotContain("contactsreturnbrf", tokens);
         Assert.DoesNotContain("contactreturnpacket", tokens);
+        Assert.DoesNotContain("contactreturnpkt", tokens);
         Assert.DoesNotContain("contactreturnbriefs", tokens);
+        Assert.DoesNotContain("contactreturnbrf", tokens);
         Assert.DoesNotContain("heatsreturnloop", tokens);
         Assert.DoesNotContain("heatreturnloop", tokens);
         Assert.DoesNotContain("heatreturnlane", tokens);
         Assert.DoesNotContain("heatsreturnpacket", tokens);
+        Assert.DoesNotContain("heatsreturnpkts", tokens);
         Assert.DoesNotContain("heatsreturnbriefs", tokens);
+        Assert.DoesNotContain("heatsreturnbrf", tokens);
         Assert.DoesNotContain("heatreturnpacket", tokens);
+        Assert.DoesNotContain("heatreturnpkt", tokens);
         Assert.DoesNotContain("heatreturnbriefs", tokens);
+        Assert.DoesNotContain("heatreturnbrf", tokens);
         Assert.DoesNotContain("diarycontactheatpacket", tokens);
         Assert.DoesNotContain("diarycontactsheatpackets", tokens);
         Assert.DoesNotContain("aftermathdowntimepacket", tokens);
