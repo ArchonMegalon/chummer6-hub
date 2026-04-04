@@ -425,6 +425,38 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsCompactCampaignAftermathAndDowntimeReturnShorthand()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "aftermath:return-lane",
+            Kind: "aftermath_packet",
+            Title: "Neon Cradle aftermath and downtime return packet",
+            Summary: "Aftermath, downtime, and campaign return remain governed on one continuity loop.",
+            BindingSummary: "Bound to campaign return and recap-safe continuity cues.",
+            Reusable: true,
+            SearchTerms: ["aftermath", "downtime", "campaign", "return", "session", "loop", "recap"],
+            EvidenceLines: ["Aftermath and downtime cues stay attached to the campaign return loop."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturn")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturns")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturn")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturns")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimereturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturn")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturns")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturnloops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturnlane")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("campaignreturnlanes")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixcampaignreturn")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaftermathreturn")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsSessionLogPluralShorthandAcrossWhitespaceAndPunctuation()
     {
         var packet = new GovernedPrepPacketSummary(
@@ -502,6 +534,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobileofflinereadiness")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile travel cache")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobiletravelcache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile safehouse readiness")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilesafehousereadiness")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobile safehouse cache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobilesafehousecache")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrix readiness")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrix cache")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("mobile matrix cache")));
@@ -7214,6 +7250,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "sheet_viewer", StringComparison.Ordinal));
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "print_pdf_export", StringComparison.Ordinal));
         Assert.Contains(handoff.TradeoffLines, line => line.Contains("Rule-environment diff", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(handoff.RuleEnvironmentDiff);
+        Assert.Equal("requires_review", handoff.RuleEnvironmentDiff!.Status);
+        Assert.Equal("sr6-preview", handoff.RuleEnvironmentDiff.BeforeFingerprint);
+        Assert.Equal("sr6-mainline", handoff.RuleEnvironmentDiff.AfterFingerprint);
+        Assert.True(handoff.RuleEnvironmentDiff.Changed);
         Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("Explain receipt", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("print-ready PDF", StringComparison.OrdinalIgnoreCase));
     }

@@ -52,6 +52,20 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "sessionlogchange", "session", "log", "change");
         RewriteCompactContinuityMutationAlias(tokens, "sessionlogchanges", "session", "log", "changes");
         RewriteCompactContinuityMutationAlias(tokens, "sessionlogchanged", "session", "log", "changed");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathreturn", "aftermath", "return");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathreturns", "aftermath", "return");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnloop", "aftermath", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnloops", "aftermath", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "downtimereturn", "downtime", "return");
+        RewriteCompactContinuityMutationAlias(tokens, "downtimereturns", "downtime", "return");
+        RewriteCompactContinuityMutationAlias(tokens, "downtimereturnloop", "downtime", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "downtimereturnloops", "downtime", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignreturn", "campaign", "return");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignreturns", "campaign", "return");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignreturnloop", "campaign", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignreturnloops", "campaign", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignreturnlane", "campaign", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignreturnlanes", "campaign", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "offlinereadiness", "offline", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "travelreadiness", "travel", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "safehousereadiness", "safehouse", "readiness");
@@ -62,8 +76,11 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "staleofflinecache", "stale", "offline", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "mobileofflinereadiness", "mobile", "offline", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "mobiletravelreadiness", "mobile", "travel", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilesafehousereadiness", "mobile", "safehouse", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "mobileofflinecache", "mobile", "offline", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "mobiletravelcache", "mobile", "travel", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilesafehousecache", "mobile", "safehouse", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilesafehouse", "mobile", "safehouse");
         RewriteCompactContinuityMutationAlias(tokens, "mobiletravel", "mobile", "travel");
         RewriteCompactContinuityMutationAlias(tokens, "mobileoffline", "mobile", "offline");
 
