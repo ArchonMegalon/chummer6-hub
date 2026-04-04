@@ -2673,6 +2673,20 @@ def verify_signed_in_work_audit(
     prep_library_return_loop = json.loads(body)
     if not (prep_library_return_loop.get("items") or []):
         raise AssertionError("prep-library returnloop search did not expose any governed packet")
+    prep_library_return_loops_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=returnloops"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_return_loops_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_return_loops_path} returned {status}, expected 200")
+
+    prep_library_return_loops = json.loads(body)
+    if not (prep_library_return_loops.get("items") or []):
+        raise AssertionError("prep-library returnloops search did not expose any governed packet")
     prep_library_next_session_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=nextsession"
     status, body, _, _ = fetch(
         base_url,
@@ -2701,6 +2715,20 @@ def verify_signed_in_work_audit(
     prep_library_next_session_return = json.loads(body)
     if not (prep_library_next_session_return.get("items") or []):
         raise AssertionError("prep-library nextsessionreturn search did not expose any governed packet")
+    prep_library_next_session_returns_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=nextsessionreturns"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_next_session_returns_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_next_session_returns_path} returned {status}, expected 200")
+
+    prep_library_next_session_returns = json.loads(body)
+    if not (prep_library_next_session_returns.get("items") or []):
+        raise AssertionError("prep-library nextsessionreturns search did not expose any governed packet")
     prep_library_session_return_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=sessionreturn"
     status, body, _, _ = fetch(
         base_url,
@@ -2715,6 +2743,20 @@ def verify_signed_in_work_audit(
     prep_library_session_return = json.loads(body)
     if not (prep_library_session_return.get("items") or []):
         raise AssertionError("prep-library sessionreturn search did not expose any governed packet")
+    prep_library_session_returns_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=sessionreturns"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_session_returns_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_session_returns_path} returned {status}, expected 200")
+
+    prep_library_session_returns = json.loads(body)
+    if not (prep_library_session_returns.get("items") or []):
+        raise AssertionError("prep-library sessionreturns search did not expose any governed packet")
     prep_library_memory_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=memory"
     status, body, _, _ = fetch(
         base_url,
@@ -5237,6 +5279,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_return_loop_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_return_loop_search_path} should return at least one governed prep packet for the returnloop query")
+    workspace_return_loops_search_path = f"{workspace_path}?prepQuery=returnloops"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_return_loops_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_return_loops_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_return_loops_search_path)
+    require_snippet(body, 'match(es) for "returnloops"', workspace_return_loops_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_return_loops_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_return_loops_search_path} should return at least one governed prep packet for the returnloops query")
     workspace_next_session_search_path = f"{workspace_path}?prepQuery=nextsession"
     status, body, _, _ = fetch(
         base_url,
@@ -5267,6 +5324,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_next_session_return_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_next_session_return_search_path} should return at least one governed prep packet for the nextsessionreturn query")
+    workspace_next_session_returns_search_path = f"{workspace_path}?prepQuery=nextsessionreturns"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_next_session_returns_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_next_session_returns_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_next_session_returns_search_path)
+    require_snippet(body, 'match(es) for "nextsessionreturns"', workspace_next_session_returns_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_next_session_returns_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_next_session_returns_search_path} should return at least one governed prep packet for the nextsessionreturns query")
     workspace_session_return_search_path = f"{workspace_path}?prepQuery=sessionreturn"
     status, body, _, _ = fetch(
         base_url,
@@ -5282,6 +5354,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_session_return_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_session_return_search_path} should return at least one governed prep packet for the sessionreturn query")
+    workspace_session_returns_search_path = f"{workspace_path}?prepQuery=sessionreturns"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_session_returns_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_session_returns_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_session_returns_search_path)
+    require_snippet(body, 'match(es) for "sessionreturns"', workspace_session_returns_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_session_returns_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_session_returns_search_path} should return at least one governed prep packet for the sessionreturns query")
     workspace_memory_search_path = f"{workspace_path}?prepQuery=memory"
     status, body, _, _ = fetch(
         base_url,
