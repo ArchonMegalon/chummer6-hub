@@ -51,6 +51,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("scripts/generate-parity-checklist.sh", script, StringComparison.Ordinal);
         Assert.Contains("docs/PARITY_CHECKLIST.md", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_UI_PUBLISHED_DIR", script, StringComparison.Ordinal);
+        Assert.Contains("chummer6-ui/.codex-studio/published", script, StringComparison.Ordinal);
+        Assert.Contains("chummer-presentation/.codex-studio/published", script, StringComparison.Ordinal);
+        Assert.Contains("resolve_receipt_path", script, StringComparison.Ordinal);
         Assert.Contains("DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json", script, StringComparison.Ordinal);
         Assert.Contains("DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json", script, StringComparison.Ordinal);
         Assert.Contains("required executable receipt is missing", script, StringComparison.Ordinal);
@@ -64,6 +67,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("missing_required_workflow_family_ids", script, StringComparison.Ordinal);
         Assert.Contains("flagship_required_desktop_heads", script, StringComparison.Ordinal);
         Assert.Contains("flagship_missing_or_not_ready_desktop_heads", script, StringComparison.Ordinal);
+        Assert.Contains("flagship_missing_canonical_required_desktop_heads", script, StringComparison.Ordinal);
+        Assert.Contains("flagship_head_missing_contract_markers", script, StringComparison.Ordinal);
+        Assert.Contains("flagship_head_contract_marker_statuses", script, StringComparison.Ordinal);
+        Assert.Contains("release_channel_receipt_exists", script, StringComparison.Ordinal);
         Assert.Contains("workflow_execution_missing_receipts", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_workflow_family_audit_tests", script, StringComparison.Ordinal);
         Assert.Contains("sr4_workflow_parity_status", script, StringComparison.Ordinal);
@@ -73,6 +80,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("recovery-reload-migration-roundtrips", script, StringComparison.Ordinal);
         Assert.Contains("required_legacy_interaction_keys", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_legacy_interaction_keys", script, StringComparison.Ordinal);
+        Assert.Contains("reports non-pass flagship head contract markers", script, StringComparison.Ordinal);
         Assert.Contains("required_tests", script, StringComparison.Ordinal);
         Assert.Contains("missing required milestone-2 visual tests", script, StringComparison.Ordinal);
         Assert.Contains("required_screenshots", script, StringComparison.Ordinal);
@@ -362,6 +370,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Accept-Language", audit, StringComparison.Ordinal);
         Assert.Contains("Cache-Control", audit, StringComparison.Ordinal);
         Assert.Contains("Pragma", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=seasonops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -387,6 +397,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("--public-host", cleanup, StringComparison.Ordinal);
         Assert.Contains("--forwarded-proto", cleanup, StringComparison.Ordinal);
         Assert.Contains("X-Forwarded-Proto", cleanup, StringComparison.Ordinal);
+
+        string playwrightPath = RepoPaths.FromRoot("scripts", "e2e-hub-playwright.cjs");
+        string playwright = File.ReadAllText(playwrightPath);
+        Assert.Contains("?prepQuery=seasonops", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact seasonops prep query", playwright, StringComparison.Ordinal);
     }
 
     [Fact]
