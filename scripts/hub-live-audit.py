@@ -2394,6 +2394,90 @@ def verify_signed_in_work_audit(
     prep_library_crew_transfers = json.loads(body)
     if not (prep_library_crew_transfers.get("items") or []):
         raise AssertionError("prep-library crewtransfers search did not expose any governed packet")
+    prep_library_roster_move_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=roster-move"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_roster_move_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_roster_move_hyphen_path} returned {status}, expected 200")
+
+    prep_library_roster_move_hyphen = json.loads(body)
+    if not (prep_library_roster_move_hyphen.get("items") or []):
+        raise AssertionError("prep-library roster-move search did not expose any governed packet")
+    prep_library_crew_move_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=crew-move"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_crew_move_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_crew_move_hyphen_path} returned {status}, expected 200")
+
+    prep_library_crew_move_hyphen = json.loads(body)
+    if not (prep_library_crew_move_hyphen.get("items") or []):
+        raise AssertionError("prep-library crew-move search did not expose any governed packet")
+    prep_library_roster_transfer_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=roster-transfer"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_roster_transfer_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_roster_transfer_hyphen_path} returned {status}, expected 200")
+
+    prep_library_roster_transfer_hyphen = json.loads(body)
+    if not (prep_library_roster_transfer_hyphen.get("items") or []):
+        raise AssertionError("prep-library roster-transfer search did not expose any governed packet")
+    prep_library_crew_transfer_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=crew-transfer"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_crew_transfer_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_crew_transfer_hyphen_path} returned {status}, expected 200")
+
+    prep_library_crew_transfer_hyphen = json.loads(body)
+    if not (prep_library_crew_transfer_hyphen.get("items") or []):
+        raise AssertionError("prep-library crew-transfer search did not expose any governed packet")
+    prep_library_roster_handoff_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=roster-handoff"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_roster_handoff_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_roster_handoff_hyphen_path} returned {status}, expected 200")
+
+    prep_library_roster_handoff_hyphen = json.loads(body)
+    if not (prep_library_roster_handoff_hyphen.get("items") or []):
+        raise AssertionError("prep-library roster-handoff search did not expose any governed packet")
+    prep_library_crew_handoff_hyphen_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=crew-handoff"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_crew_handoff_hyphen_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_crew_handoff_hyphen_path} returned {status}, expected 200")
+
+    prep_library_crew_handoff_hyphen = json.loads(body)
+    if not (prep_library_crew_handoff_hyphen.get("items") or []):
+        raise AssertionError("prep-library crew-handoff search did not expose any governed packet")
     prep_library_preplaunch_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=preplaunch"
     status, body, _, _ = fetch(
         base_url,
@@ -4111,6 +4195,96 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_crew_transfers_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_crew_transfers_search_path} should return at least one governed prep packet for the crewtransfers query")
+    workspace_roster_move_hyphen_search_path = f"{workspace_path}?prepQuery=roster-move"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_roster_move_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_roster_move_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_roster_move_hyphen_search_path)
+    require_snippet(body, 'match(es) for "roster-move"', workspace_roster_move_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_roster_move_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_roster_move_hyphen_search_path} should return at least one governed prep packet for the roster-move query")
+    workspace_crew_move_hyphen_search_path = f"{workspace_path}?prepQuery=crew-move"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_crew_move_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_crew_move_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_crew_move_hyphen_search_path)
+    require_snippet(body, 'match(es) for "crew-move"', workspace_crew_move_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_crew_move_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_crew_move_hyphen_search_path} should return at least one governed prep packet for the crew-move query")
+    workspace_roster_transfer_hyphen_search_path = f"{workspace_path}?prepQuery=roster-transfer"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_roster_transfer_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_roster_transfer_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_roster_transfer_hyphen_search_path)
+    require_snippet(body, 'match(es) for "roster-transfer"', workspace_roster_transfer_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_roster_transfer_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_roster_transfer_hyphen_search_path} should return at least one governed prep packet for the roster-transfer query")
+    workspace_crew_transfer_hyphen_search_path = f"{workspace_path}?prepQuery=crew-transfer"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_crew_transfer_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_crew_transfer_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_crew_transfer_hyphen_search_path)
+    require_snippet(body, 'match(es) for "crew-transfer"', workspace_crew_transfer_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_crew_transfer_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_crew_transfer_hyphen_search_path} should return at least one governed prep packet for the crew-transfer query")
+    workspace_roster_handoff_hyphen_search_path = f"{workspace_path}?prepQuery=roster-handoff"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_roster_handoff_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_roster_handoff_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_roster_handoff_hyphen_search_path)
+    require_snippet(body, 'match(es) for "roster-handoff"', workspace_roster_handoff_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_roster_handoff_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_roster_handoff_hyphen_search_path} should return at least one governed prep packet for the roster-handoff query")
+    workspace_crew_handoff_hyphen_search_path = f"{workspace_path}?prepQuery=crew-handoff"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_crew_handoff_hyphen_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_crew_handoff_hyphen_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_crew_handoff_hyphen_search_path)
+    require_snippet(body, 'match(es) for "crew-handoff"', workspace_crew_handoff_hyphen_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_crew_handoff_hyphen_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_crew_handoff_hyphen_search_path} should return at least one governed prep packet for the crew-handoff query")
     workspace_preplaunch_search_path = f"{workspace_path}?prepQuery=preplaunch"
     status, body, _, _ = fetch(
         base_url,

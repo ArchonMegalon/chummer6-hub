@@ -259,6 +259,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> compactMoveTokens = InvokeBuildTokens("crewmove");
         IReadOnlyList<string> compactMovePluralTokens = InvokeBuildTokens("crewmoves");
         IReadOnlyList<string> compactRosterMovePluralTokens = InvokeBuildTokens("rostermoves");
+        IReadOnlyList<string> hyphenCrewMoveTokens = InvokeBuildTokens("crew-move");
+        IReadOnlyList<string> hyphenRosterMoveTokens = InvokeBuildTokens("roster-move");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixtransfer");
 
         Assert.True(InvokeMatches(packet, compactTokens));
@@ -266,6 +268,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, compactMoveTokens));
         Assert.True(InvokeMatches(packet, compactMovePluralTokens));
         Assert.True(InvokeMatches(packet, compactRosterMovePluralTokens));
+        Assert.True(InvokeMatches(packet, hyphenCrewMoveTokens));
+        Assert.True(InvokeMatches(packet, hyphenRosterMoveTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
     }
 

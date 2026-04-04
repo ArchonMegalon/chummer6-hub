@@ -2407,6 +2407,132 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail crew-transfers compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail crew-transfers compact search');
 
+  await page.fill('#prepQuery', 'roster-move');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=roster-move/.test(page.url()), 'Workspace detail search should preserve the hyphen roster-move prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail roster-move hyphen search');
+  await expectBodyText(page, 'match(es) for "roster-move"', '/account/work/workspaces detail roster-move hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail roster-move hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail roster-move hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail roster-move hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail roster-move hyphen search');
+  const workspaceRosterMoveHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceRosterMoveHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen roster-move query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail roster-move hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail roster-move hyphen search');
+
+  await page.fill('#prepQuery', 'crew-move');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=crew-move/.test(page.url()), 'Workspace detail search should preserve the hyphen crew-move prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail crew-move hyphen search');
+  await expectBodyText(page, 'match(es) for "crew-move"', '/account/work/workspaces detail crew-move hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail crew-move hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail crew-move hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail crew-move hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail crew-move hyphen search');
+  const workspaceCrewMoveHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCrewMoveHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen crew-move query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail crew-move hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail crew-move hyphen search');
+
+  await page.fill('#prepQuery', 'roster-transfer');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=roster-transfer/.test(page.url()), 'Workspace detail search should preserve the hyphen roster-transfer prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail roster-transfer hyphen search');
+  await expectBodyText(page, 'match(es) for "roster-transfer"', '/account/work/workspaces detail roster-transfer hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail roster-transfer hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail roster-transfer hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail roster-transfer hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail roster-transfer hyphen search');
+  const workspaceRosterTransferHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceRosterTransferHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen roster-transfer query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail roster-transfer hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail roster-transfer hyphen search');
+
+  await page.fill('#prepQuery', 'crew-transfer');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=crew-transfer/.test(page.url()), 'Workspace detail search should preserve the hyphen crew-transfer prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail crew-transfer hyphen search');
+  await expectBodyText(page, 'match(es) for "crew-transfer"', '/account/work/workspaces detail crew-transfer hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail crew-transfer hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail crew-transfer hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail crew-transfer hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail crew-transfer hyphen search');
+  const workspaceCrewTransferHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCrewTransferHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen crew-transfer query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail crew-transfer hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail crew-transfer hyphen search');
+
+  await page.fill('#prepQuery', 'roster-handoff');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=roster-handoff/.test(page.url()), 'Workspace detail search should preserve the hyphen roster-handoff prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail roster-handoff hyphen search');
+  await expectBodyText(page, 'match(es) for "roster-handoff"', '/account/work/workspaces detail roster-handoff hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail roster-handoff hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail roster-handoff hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail roster-handoff hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail roster-handoff hyphen search');
+  const workspaceRosterHandoffHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceRosterHandoffHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen roster-handoff query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail roster-handoff hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail roster-handoff hyphen search');
+
+  await page.fill('#prepQuery', 'crew-handoff');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=crew-handoff/.test(page.url()), 'Workspace detail search should preserve the hyphen crew-handoff prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail crew-handoff hyphen search');
+  await expectBodyText(page, 'match(es) for "crew-handoff"', '/account/work/workspaces detail crew-handoff hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail crew-handoff hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail crew-handoff hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail crew-handoff hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail crew-handoff hyphen search');
+  const workspaceCrewHandoffHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCrewHandoffHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen crew-handoff query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail crew-handoff hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail crew-handoff hyphen search');
+
   await page.fill('#prepQuery', 'preplaunch');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
