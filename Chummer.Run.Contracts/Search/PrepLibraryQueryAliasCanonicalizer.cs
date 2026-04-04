@@ -88,10 +88,16 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "eventcontrolpackets", "event", "control", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnpacket", "campaign", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnpackets", "campaign", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignreturnbrief", "campaign", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignreturnbriefs", "campaign", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnpacket", "aftermath", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnpackets", "aftermath", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnbrief", "aftermath", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "aftermathreturnbriefs", "aftermath", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturnpacket", "downtime", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "downtimereturnpackets", "downtime", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "downtimereturnbrief", "downtime", "return", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "downtimereturnbriefs", "downtime", "return", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "diarycontactheatpacket", "diary", "contact", "heat", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "diarycontactheatpackets", "diary", "contact", "heat", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "diarycontactsheatpacket", "diary", "contacts", "heat", "packet");

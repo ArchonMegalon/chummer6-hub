@@ -5983,10 +5983,16 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolpackets', 'compact eventcontrolpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignreturnpacket', 'compact campaignreturnpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignreturnpackets', 'compact campaignreturnpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignreturnbrief', 'compact campaignreturnbrief continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignreturnbriefs', 'compact campaignreturnbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnpacket', 'compact aftermathreturnpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnpackets', 'compact aftermathreturnpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnbrief', 'compact aftermathreturnbrief continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'aftermathreturnbriefs', 'compact aftermathreturnbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimereturnpacket', 'compact downtimereturnpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimereturnpackets', 'compact downtimereturnpackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimereturnbrief', 'compact downtimereturnbrief continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'downtimereturnbriefs', 'compact downtimereturnbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'diarycontactheatpacket', 'compact diarycontactheatpacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'diarycontactheatpackets', 'compact diarycontactheatpackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'diarycontactsheatpacket', 'compact diarycontactsheatpacket continuity prep');
