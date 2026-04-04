@@ -1083,7 +1083,15 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             return "event_control";
         }
 
-        if (combined.Contains("roster", StringComparison.OrdinalIgnoreCase))
+        if (ContainsAny(combined,
+            "roster",
+            "crew",
+            "handoff",
+            "transfer",
+            "assignment",
+            "reassign",
+            "bench",
+            "rotation"))
         {
             return "roster_movement";
         }
