@@ -2737,6 +2737,22 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketCountsRelationshipSignalsFromFavorAndLoyaltyMutations()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithFavorAndLoyaltyRelationshipSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("and 0 relationship signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("favor", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("loyalty", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void CampaignReturnPacketFallsBackToReturnSignalVariantsWhenOtherReceiptsAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnVariantSignalsOnly();
@@ -7272,6 +7288,43 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Kind: "heat_relationship_shift",
             Label: "Relationship change",
             Summary: "Relationship update keeps contact and heat posture on the return lane before consequence receipts land.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [relationshipChange],
+            Consequences: [],
+            AftermathPackages: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithFavorAndLoyaltyRelationshipSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection relationshipChange = new(
+            PacketId: "packet-1",
+            Kind: "contact_favor_shift",
+            Label: "Fixer favor shift",
+            Summary: "Loyalty changed after downtime follow-through and stays on the return lane.",
             UpdatedAtUtc: now.AddMinutes(4));
 
         return new CampaignWorkspaceProjection(

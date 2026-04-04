@@ -15,6 +15,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         "contact",
         "contacts",
         "heat",
+        "favor",
+        "favors",
+        "favour",
+        "favours",
+        "loyalty",
+        "notoriety",
         "reputation",
         "faction",
         "factions"
