@@ -799,6 +799,8 @@ public sealed class CampaignSpineService
         watchouts.AddRange(
             workspace.ReadinessCues
                 .Where(static cue => NeedsAttention(cue.Severity))
+                .OrderByDescending(static cue => ResolveReadinessAttentionPriority(cue.Severity))
+                .ThenBy(static cue => cue.Title, StringComparer.OrdinalIgnoreCase)
                 .Select(static cue => $"{cue.Title}: {cue.Summary}"));
         watchouts.AddRange(summary.Restore.ConflictSummaries);
         watchouts.AddRange(summary.Restore.LocalOnlyNotes);

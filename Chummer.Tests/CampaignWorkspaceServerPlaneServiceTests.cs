@@ -433,6 +433,70 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineWorkspaceDigestWatchoutsPreferAttentionCueOverEarlierReviewCue()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ReadinessCues =
+            [
+                new CampaignReadinessCue("cue-review-1", "review", "Rule environment review", "Ruleset should be reviewed."),
+                new CampaignReadinessCue("cue-attention-1", "attention", "Open objective pressure", "Objective pressure remains high.")
+            ]
+        };
+        AccountCampaignSummary summary = new(
+            Dossiers: [],
+            Campaigns: [],
+            Runs: [],
+            Crews: [],
+            Workspaces: [workspace],
+            CommunityOperations: [],
+            BuildLabHandoffs: [],
+            RulesNavigator: [],
+            MigrationReceipts: [],
+            CreatorPublications: [],
+            Restore: BuildEmptyRestore());
+
+        CampaignWorkspaceDigestProjection digest = InvokeCampaignSpineBuildWorkspaceDigest(summary, workspace);
+
+        string watchout = Assert.IsType<string>(digest.Watchouts.FirstOrDefault());
+        Assert.Contains("Open objective pressure", watchout, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule environment review", watchout, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CampaignSpineWorkspaceDigestWatchoutsPreferWarningCueOverEarlierReviewCue()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ReadinessCues =
+            [
+                new CampaignReadinessCue("cue-review-1", "review", "Rule environment review", "Ruleset should be reviewed."),
+                new CampaignReadinessCue("cue-warning-1", "warning", "Continuity gap detected", "At least one dossier is missing continuity.")
+            ]
+        };
+        AccountCampaignSummary summary = new(
+            Dossiers: [],
+            Campaigns: [],
+            Runs: [],
+            Crews: [],
+            Workspaces: [workspace],
+            CommunityOperations: [],
+            BuildLabHandoffs: [],
+            RulesNavigator: [],
+            MigrationReceipts: [],
+            CreatorPublications: [],
+            Restore: BuildEmptyRestore());
+
+        CampaignWorkspaceDigestProjection digest = InvokeCampaignSpineBuildWorkspaceDigest(summary, workspace);
+
+        string watchout = Assert.IsType<string>(digest.Watchouts.FirstOrDefault());
+        Assert.Contains("Continuity gap detected", watchout, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule environment review", watchout, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WorkspaceStateSummaryPrefersAttentionContinuityConflictOverEarlierReviewConflict()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
@@ -5952,6 +6016,17 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("BuildGroupOperatorWatchouts was not found.");
 
         return Assert.IsAssignableFrom<IReadOnlyList<string>>(method.Invoke(null, [workspaces]));
+    }
+
+    private static CampaignWorkspaceDigestProjection InvokeCampaignSpineBuildWorkspaceDigest(
+        AccountCampaignSummary summary,
+        CampaignWorkspaceProjection workspace)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("BuildWorkspaceDigest", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildWorkspaceDigest was not found.");
+
+        return Assert.IsType<CampaignWorkspaceDigestProjection>(method.Invoke(null, [summary, workspace]));
     }
 
     private static WorkspaceStateSummary InvokeBuildWorkspaceStateSummary(
