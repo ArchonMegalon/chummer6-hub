@@ -1885,6 +1885,13 @@
                                     <strong>@selectedBuildLabHandoff.BuildSurfaceSummary</strong>
                                 </div>
                             }
+                            @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.ExchangeParitySummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Exchange parity</span>
+                                    <strong>@selectedBuildLabHandoff.ExchangeParitySummary</strong>
+                                </div>
+                            }
                         </div>
                         @if (selectedBuildLabHandoff.TradeoffLines.Count > 0)
                         {
@@ -1913,6 +1920,10 @@
                         @if (selectedBuildLabHandoff.BuildSurfaceLines is { Count: > 0 })
                         {
                             <p><strong>Build surface:</strong> @string.Join(" ", selectedBuildLabHandoff.BuildSurfaceLines.Take(4))</p>
+                        }
+                        @if (selectedBuildLabHandoff.ExchangeParityLines is { Count: > 0 })
+                        {
+                            <p><strong>Exchange parity:</strong> @string.Join(" ", selectedBuildLabHandoff.ExchangeParityLines.Take(5))</p>
                         }
                         @if (selectedBuildLabHandoff.Outputs.Count > 0)
                         {
