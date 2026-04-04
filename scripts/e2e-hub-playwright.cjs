@@ -1840,6 +1840,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail leaguecontrol compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leaguecontrol compact search');
 
+  await page.fill('#prepQuery', 'league controls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league(?:%20|\+)controls/.test(page.url()), 'Workspace detail search should preserve the split league controls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league controls split search');
+  await expectBodyText(page, 'match(es) for "league controls"', '/account/work/workspaces detail league controls split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league controls split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league controls split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league controls split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league controls split search');
+  const workspaceLeagueControlsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueControlsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split league controls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league controls split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league controls split search');
+
   await page.fill('#prepQuery', 'leaguecontrols');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -2091,6 +2112,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail communitycontrol compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communitycontrol compact search');
+
+  await page.fill('#prepQuery', 'community controls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community(?:%20|\+)controls/.test(page.url()), 'Workspace detail search should preserve the split community controls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community controls split search');
+  await expectBodyText(page, 'match(es) for "community controls"', '/account/work/workspaces detail community controls split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community controls split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community controls split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community controls split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community controls split search');
+  const workspaceCommunityControlsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityControlsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split community controls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community controls split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community controls split search');
 
   await page.fill('#prepQuery', 'communitycontrols');
   await Promise.all([

@@ -241,6 +241,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("league operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("league-operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("league control")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("league controls")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("league-control")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leaguecontrol")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leaguecontrols")));
@@ -254,6 +255,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("community operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("community-operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("community control")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("community controls")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("community-control")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("communitycontrol")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("communitycontrols")));
