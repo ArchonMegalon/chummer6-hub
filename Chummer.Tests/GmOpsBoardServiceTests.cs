@@ -3,12 +3,47 @@ using Chummer.Run.AI.Services.Ops;
 using Chummer.Run.AI.Services.Session;
 using Chummer.Run.AI.Services.Spider;
 using Chummer.Run.Contracts.Ops;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Chummer.Tests;
 
 public sealed class GmOpsBoardServiceTests
 {
+    [Fact]
+    public async Task GetProjection_UnresolvedItemsPrioritizeHighSeverityBeforeNewerLowSeverity()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T00:00:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Threat tracker unresolved and still active.",
+                AtUtc: baseTime,
+                EventId: "evt-high"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist item remains unresolved.",
+                AtUtc: baseTime.AddMinutes(10),
+                EventId: "evt-low")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-high", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("high", projection.UnresolvedItems[0].Severity);
+        Assert.Equal("ops:evt-low", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("low", projection.UnresolvedItems[1].Severity);
+    }
+
     [Fact]
     public void ReconcilePortableAssets_SkipsAssets_WhenRequiredAssetFieldsAreMissing()
     {
@@ -532,11 +567,10 @@ public sealed class GmOpsBoardServiceTests
     }
 
     private static GmOpsBoardService CreateService()
-    {
-        var ledger = new SessionLedgerService();
-        var outbox = new DeliveryOutboxService();
-        return new GmOpsBoardService(ledger, outbox);
-    }
+        => CreateService(new SessionLedgerService());
+
+    private static GmOpsBoardService CreateService(SessionLedgerService ledger)
+        => new(ledger, new DeliveryOutboxService());
 
     private static OfflineSyncPrepAsset BuildPortableAsset(
         string assetId,
