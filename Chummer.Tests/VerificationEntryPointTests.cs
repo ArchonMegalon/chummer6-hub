@@ -83,7 +83,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release-channel nested receipt generatedAt is in the future", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof is required", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.status must be pass/passed/ready", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_UI_PARITY_ALLOWED_RELEASE_PROOF_BASE_URLS", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_ALLOWED_RELEASE_PROOF_BASE_URLS", script, StringComparison.Ordinal);
         Assert.Contains("must use canonical origin form with no trailing slash", script, StringComparison.Ordinal);
+        Assert.Contains("must match an allowed canonical release origin", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed is missing required baseline journey ids", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed declares unexpected journey ids", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed must use canonical lowercase journey ids", script, StringComparison.Ordinal);
@@ -539,6 +542,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=preplaunches", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=travelprefetch", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=travelprefetches", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=leagueops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=league%20ops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=communityops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=community%20ops", audit, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -597,6 +604,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("split gm ops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gmop", playwright, StringComparison.Ordinal);
         Assert.Contains("compact gmop prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=leagueops", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact leagueops prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=league(?:%20|\\+)ops", playwright, StringComparison.Ordinal);
+        Assert.Contains("split league ops prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=communityops", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact communityops prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=community(?:%20|\\+)ops", playwright, StringComparison.Ordinal);
+        Assert.Contains("split community ops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=heat", playwright, StringComparison.Ordinal);
         Assert.Contains("heat continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=oppositions", playwright, StringComparison.Ordinal);
