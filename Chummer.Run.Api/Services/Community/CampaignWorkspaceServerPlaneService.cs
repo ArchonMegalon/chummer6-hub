@@ -484,6 +484,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
+        GmOperationsReadinessSummary gmOperations = BuildGmOperationsReadiness(context.Workspace, prepLibrary, context.LeadRun);
         TravelModeReadinessSummary travelMode = BuildTravelMode(context.Workspace, context.Restore, prepLibrary);
         IReadOnlyList<DossierFreshnessCue> dossierFreshness = BuildDossierFreshness(context.Workspace);
         IReadOnlyList<RuleEnvironmentHealthCue> ruleEnvironmentHealth = BuildRuleEnvironmentHealth(context.Workspace, context.Restore);
@@ -518,6 +519,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             SupportClosures: supportClosures,
             KnownIssues: knownIssues,
             DecisionNotices: decisionNotices,
+            GmOperations: gmOperations,
             PrepLibrary: prepLibrary,
             PrepLaunches: context.Workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>(),
             TravelMode: travelMode,
@@ -528,6 +530,128 @@ public sealed class CampaignWorkspaceServerPlaneService
             NextSessionCarryForward: context.Workspace.NextSessionCarryForward,
             NextSafeAction: nextSafeAction,
             GeneratedAtUtc: context.GeneratedAtUtc);
+    }
+
+    private static GmOperationsReadinessSummary BuildGmOperationsReadiness(
+        CampaignWorkspaceProjection workspace,
+        CampaignPrepLibrarySummary prepLibrary,
+        RunProjection? leadRun)
+    {
+        WorkspaceChangePacketProjection[] changePackets = DeduplicateSemanticChangePacketVersions(
+                (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+                .OrderByDescending(static packet => packet.UpdatedAtUtc))
+            .ToArray();
+        CampaignConsequenceProjection[] consequences = DeduplicateSemanticCampaignConsequenceVersions(
+                (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+                .OrderByDescending(static consequence => consequence.UpdatedAtUtc))
+            .ToArray();
+        ObjectiveProjection[] activeObjectives = DeduplicateSemanticObjectiveVersions(
+                (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
+                .Where(static objective =>
+                    !string.Equals(objective.Status, "closed", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(objective.Status, "done", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static objective => objective.UpdatedAtUtc))
+            .ToArray();
+        bool oppositionCarryForwardSignal = IsOppositionCarryForwardSignal(workspace.NextSessionCarryForward);
+        bool rosterCarryForwardSignal = IsRosterObjectiveSignal(workspace.NextSessionCarryForward?.Label, workspace.NextSessionCarryForward?.Summary)
+            || IsRosterObjectiveSignal(workspace.NextSessionCarryForward?.ReturnSummary, workspace.NextSessionCarryForward?.NextSafeAction)
+            || ContainsRosterSplitTokenSignalFromCandidates(workspace.NextSessionCarryForward?.EvidenceLines ?? Array.Empty<string>());
+        bool eventControlCarryForwardSignal = IsEventControlCarryForwardSignal(workspace.NextSessionCarryForward);
+
+        int oppositionSignalCount = changePackets.Count(static packet => IsOppositionSignal(packet))
+            + consequences.Count(static consequence => IsOppositionConsequenceSignal(consequence))
+            + activeObjectives.Count(static objective => IsOppositionObjectiveSignal(objective.Title, objective.Summary, objective.Pressure))
+            + (oppositionCarryForwardSignal ? 1 : 0);
+        int rosterMovementSignalCount = DeduplicateSemanticRosterTransferVersions(
+                workspace.RosterTransfers ?? Array.Empty<RosterTransferProjection>())
+            .Count()
+            + changePackets.Count(static packet => IsRosterMovementSignal(packet))
+            + consequences.Count(static consequence => IsRosterConsequenceSignal(consequence))
+            + (rosterCarryForwardSignal ? 1 : 0);
+        int prepPacketCount = prepLibrary.Packets.Count;
+        int prepLaunchCount = DeduplicateSemanticPrepLaunchVersions(
+                workspace.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>())
+            .Count();
+        int eventControlSignalCount = changePackets.Count(static packet => IsEventControlSignal(packet))
+            + consequences.Count(static consequence => IsEventControlConsequenceSignal(consequence))
+            + activeObjectives.Count(static objective => IsEventControlObjectiveSignal(objective.Title, objective.Summary))
+            + (eventControlCarryForwardSignal ? 1 : 0);
+
+        string oppositionStatus = ResolveSignalLaneStatus(oppositionSignalCount, governedThreshold: 1);
+        string rosterStatus = ResolveSignalLaneStatus(rosterMovementSignalCount, governedThreshold: 1);
+        string prepStatus = prepPacketCount > 0 && prepLaunchCount > 0
+            ? "governed"
+            : prepPacketCount > 0 || prepLaunchCount > 0
+                ? "partial"
+                : "missing";
+        string eventControlStatus = ResolveSignalLaneStatus(eventControlSignalCount, governedThreshold: 1);
+
+        IReadOnlyList<GmOperationsLaneCue> laneCues =
+        [
+            new GmOperationsLaneCue(
+                Lane: "opposition_packets",
+                Status: oppositionStatus,
+                SignalCount: oppositionSignalCount,
+                Summary: oppositionSignalCount == 0
+                    ? "Opposition packets are not yet attached to governed campaign signals."
+                    : $"{oppositionSignalCount} opposition signal(s) are attached to governed packet and event-control lanes."),
+            new GmOperationsLaneCue(
+                Lane: "roster_movement",
+                Status: rosterStatus,
+                SignalCount: rosterMovementSignalCount,
+                Summary: rosterMovementSignalCount == 0
+                    ? "Roster movement receipts are not yet attached to governed campaign operations."
+                    : $"{rosterMovementSignalCount} roster movement signal(s) keep ownership changes reviewable on one lane."),
+            new GmOperationsLaneCue(
+                Lane: "prep_library_launch",
+                Status: prepStatus,
+                SignalCount: prepPacketCount + prepLaunchCount,
+                Summary: prepPacketCount == 0 && prepLaunchCount == 0
+                    ? "Prep library packets and launch receipts are still missing."
+                    : $"{prepPacketCount} governed prep packet(s) and {prepLaunchCount} prep-launch receipt(s) stay on the same account rail."),
+            new GmOperationsLaneCue(
+                Lane: "event_controls",
+                Status: eventControlStatus,
+                SignalCount: eventControlSignalCount,
+                Summary: eventControlSignalCount == 0
+                    ? "Event and season controls are not yet anchored to governed receipts."
+                    : $"{eventControlSignalCount} event-control signal(s) keep season operations and return-loop governance aligned.")
+        ];
+
+        bool allMissing = laneCues.All(static cue => string.Equals(cue.Status, "missing", StringComparison.OrdinalIgnoreCase));
+        bool allGoverned = laneCues.All(static cue => string.Equals(cue.Status, "governed", StringComparison.OrdinalIgnoreCase));
+        string status = allMissing
+            ? "missing"
+            : allGoverned
+                ? "governed"
+                : "partial";
+        string summary = status switch
+        {
+            "governed" => "GM operations are fully attached to governed opposition, roster movement, prep, and event-control lanes.",
+            "missing" => "GM operations still need governed opposition, roster movement, prep, and event-control receipts.",
+            _ => "GM operations are partially governed; one or more opposition, roster, prep, or event-control lanes still need stronger receipt coverage."
+        };
+
+        return new GmOperationsReadinessSummary(
+            Status: status,
+            Summary: summary,
+            AccountBackboneSummary: "Operator actions stay on the same account, audit, support, and campaign-return backbone as normal user flows.",
+            OppositionSignalCount: oppositionSignalCount,
+            RosterMovementSignalCount: rosterMovementSignalCount,
+            PrepPacketCount: prepPacketCount,
+            PrepLaunchCount: prepLaunchCount,
+            EventControlSignalCount: eventControlSignalCount,
+            LaneCues: laneCues);
+    }
+
+    private static string ResolveSignalLaneStatus(int signalCount, int governedThreshold)
+    {
+        if (signalCount >= governedThreshold)
+        {
+            return "governed";
+        }
+
+        return signalCount > 0 ? "partial" : "missing";
     }
 
     public CampaignPrepLibrarySearchResponse? GetWorkspacePrepLibrary(

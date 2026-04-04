@@ -1020,6 +1020,95 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void GmOperationsReadinessMarksGovernedWhenOppositionRosterPrepAndEventLanesAreCovered()
+    {
+        CampaignWorkspaceProjection rosterWorkspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlOppositionSignalsOnly() with
+        {
+            RosterTransfers = rosterWorkspace.RosterTransfers,
+            PrepLaunches =
+            [
+                new GovernedPrepLaunchProjection(
+                    LaunchId: "launch-1",
+                    WorkspaceId: "workspace-1",
+                    CampaignId: "campaign-a",
+                    PacketId: "event-control:workspace-1",
+                    PacketKind: "event_control_packet",
+                    PacketTitle: "Neon Cradle event and season controls",
+                    TargetRunId: "run-1",
+                    TargetRunTitle: "Dockyard pressure test",
+                    TargetSceneId: "scene-1",
+                    TargetSceneTitle: "Dockyard opposition board",
+                    InitiatedByUserId: "gm-1",
+                    Summary: "Event controls launch stays on governed campaign truth.",
+                    AuditLines: ["Launch receipt keeps GM operations on account and audit rails."],
+                    LaunchedAtUtc: DateTimeOffset.Parse("2026-04-03T00:06:00Z"))
+            ]
+        };
+        RunProjection? leadRun = workspace.Runs.OrderByDescending(static run => run.UpdatedAtUtc).FirstOrDefault();
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, BuildEmptyRestore(), leadRun);
+        CampaignPrepLibrarySummary prepLibrary = new(
+            Summary: "Prep library summary.",
+            BindingSummary: "Prep library binding summary.",
+            SearchSummary: "Prep library search summary.",
+            ReusablePacketCount: packets.Count(static packet => packet.Reusable),
+            SearchablePacketCount: packets.Count,
+            Packets: packets);
+
+        GmOperationsReadinessSummary readiness = InvokeBuildGmOperationsReadiness(workspace, prepLibrary, leadRun);
+
+        Assert.Equal("governed", readiness.Status);
+        Assert.True(readiness.OppositionSignalCount > 0);
+        Assert.True(readiness.RosterMovementSignalCount > 0);
+        Assert.True(readiness.PrepPacketCount > 0);
+        Assert.True(readiness.PrepLaunchCount > 0);
+        Assert.True(readiness.EventControlSignalCount > 0);
+        Assert.All(readiness.LaneCues, cue => Assert.Equal("governed", cue.Status));
+    }
+
+    [Fact]
+    public void GmOperationsReadinessMarksMissingWhenNoGovernedOperatorSignalsExist()
+    {
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-empty-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        CampaignWorkspaceProjection workspace = new(
+            WorkspaceId: "workspace-empty-1",
+            CampaignId: "campaign-empty-1",
+            CampaignName: "Quiet Campaign",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "No active operator lane yet.",
+            ChangePackets: [],
+            Consequences: [],
+            RosterTransfers: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+        CampaignPrepLibrarySummary prepLibrary = BuildEmptyPrepLibrary();
+
+        GmOperationsReadinessSummary readiness = InvokeBuildGmOperationsReadiness(workspace, prepLibrary, leadRun: null);
+
+        Assert.Equal("missing", readiness.Status);
+        Assert.Equal(0, readiness.OppositionSignalCount);
+        Assert.Equal(0, readiness.RosterMovementSignalCount);
+        Assert.Equal(0, readiness.PrepPacketCount);
+        Assert.Equal(0, readiness.PrepLaunchCount);
+        Assert.Equal(0, readiness.EventControlSignalCount);
+        Assert.All(readiness.LaneCues, cue => Assert.Equal("missing", cue.Status));
+    }
+
+    [Fact]
     public void CampaignWorkspaceSummaryDeduplicatesIdenticalPublicationFamilies_WhenPayloadRepeatsSameRows()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
@@ -7312,6 +7401,9 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Equal("4 of 5 build follow-through checkpoints are already grounded.", handoff.PlannerCoverageSummary);
         Assert.NotNull(handoff.PlannerCoverageLines);
         Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("Crew-fit:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("Output lane coverage:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("foundry-exchange=ready", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("print-pdf-export=ready", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("crew-fit", handoff.CrewFitSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -7806,6 +7898,18 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("BuildPrepPackets was not found.");
 
         return Assert.IsAssignableFrom<IReadOnlyList<GovernedPrepPacketSummary>>(method.Invoke(null, [workspace, restore, leadRun]));
+    }
+
+    private static GmOperationsReadinessSummary InvokeBuildGmOperationsReadiness(
+        CampaignWorkspaceProjection workspace,
+        CampaignPrepLibrarySummary prepLibrary,
+        RunProjection? leadRun)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BuildGmOperationsReadiness", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildGmOperationsReadiness was not found.");
+
+        return Assert.IsType<GmOperationsReadinessSummary>(method.Invoke(null, [workspace, prepLibrary, leadRun]));
     }
 
     private static CampaignWorkspaceSummary InvokeBuildCampaignWorkspaceSummary(
