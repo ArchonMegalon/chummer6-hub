@@ -1311,6 +1311,35 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public void ListPrepAssets_QuerySupportsContinuityPluralShorthand()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult import = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "continuity_plural_ops",
+                now: now,
+                title: "Diary downtime aftermath continuity packet",
+                body: "Diary downtime aftermath continuity remains governed for next-session return.")
+        ]);
+
+        Assert.Equal(1, import.ImportedCount);
+        Assert.Equal(0, import.SkippedCount);
+        Assert.Empty(import.Conflicts);
+
+        GmPrepAssetListResponse diariesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "diaries");
+        GmPrepAssetListResponse downtimesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "downtimes");
+        GmPrepAssetListResponse aftermathsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aftermaths");
+        GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixaftermaths");
+
+        Assert.Contains(diariesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(downtimesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(aftermathsMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Empty(negativeMatches.Items);
+    }
+
+    [Fact]
     public void ListPrepAssets_QuerySupportsNextSessionReturnLoopPluralShorthandAcrossWhitespaceAndPunctuation()
     {
         var service = CreateService();

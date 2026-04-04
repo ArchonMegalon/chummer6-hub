@@ -357,6 +357,29 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsContinuityPluralShorthandAcrossWhitespaceAndPunctuation()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "continuity:plural-lane",
+            Kind: "campaign_continuity_packet",
+            Title: "Neon Cradle diary downtime aftermath continuity packet",
+            Summary: "Diary, downtime, and aftermath continuity remains governed for next-session return.",
+            BindingSummary: "Bound to campaign diary continuity, downtime follow-through, and aftermath recap.",
+            Reusable: true,
+            SearchTerms: ["diary", "downtime", "aftermath", "return"],
+            EvidenceLines: ["Governed continuity lane keeps diary, downtime, and aftermath signals attached for next session."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diary")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaries")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtime")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimes")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermath")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermaths")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaftermaths")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsCrewTransferShorthandAcrossWhitespaceBoundaries()
     {
         var packet = new GovernedPrepPacketSummary(
