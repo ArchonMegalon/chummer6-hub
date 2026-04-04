@@ -2905,8 +2905,11 @@ public sealed class CampaignSpineService
         List<WorkspaceChangePacketProjection> packets = [];
         if (nextSessionCarryForward is not null)
         {
+            string carryForwardPacketId = ResolveChangePacketIdentity(
+                nextSessionCarryForward.CarryForwardId,
+                StableId("packet", $"{campaign.CampaignId}:carry-forward"));
             packets.Add(new WorkspaceChangePacketProjection(
-                PacketId: nextSessionCarryForward.CarryForwardId,
+                PacketId: carryForwardPacketId,
                 Kind: "next_session_carry_forward",
                 Label: nextSessionCarryForward.Label,
                 Summary: nextSessionCarryForward.Summary,
@@ -2997,8 +3000,11 @@ public sealed class CampaignSpineService
         PublicationSafeProjection? recap = recapShelf.FirstOrDefault();
         if (recap is not null && aftermathPackage is null)
         {
+            string recapProjectionId = ResolveChangePacketIdentity(
+                recap.ProjectionId,
+                StableId("projection", campaign.CampaignId));
             packets.Add(new WorkspaceChangePacketProjection(
-                PacketId: StableId("packet", $"{campaign.CampaignId}:recap:{recap.ProjectionId}"),
+                PacketId: StableId("packet", $"{campaign.CampaignId}:recap:{recapProjectionId}"),
                 Kind: "artifact",
                 Label: recap.Label,
                 Summary: recap.Summary,
@@ -3090,6 +3096,9 @@ public sealed class CampaignSpineService
 
     private static bool IsAftermathPackageKind(AftermathRecapPackageProjection package, string kind)
         => string.Equals(NormalizeAftermathPackageKind(package.PackageKind), kind, StringComparison.OrdinalIgnoreCase);
+
+    private static string ResolveChangePacketIdentity(string? identity, string fallback)
+        => AccountService.NormalizeOptional(identity) ?? fallback;
 
     private static string ResolveAftermathPackageIdentity(AftermathRecapPackageProjection package)
     {

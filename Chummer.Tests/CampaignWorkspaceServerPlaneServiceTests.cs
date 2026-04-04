@@ -699,6 +699,55 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineWorkspaceChangePacketsTrimWhitespacePaddedCarryForwardPacketId()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "  carry-forward-whitespace-id  ",
+            Label: "Carry-forward label",
+            Summary: "Carry-forward summary",
+            ReturnSummary: "Carry-forward return summary",
+            NextSafeAction: "Carry-forward next safe action",
+            EvidenceLines: ["Carry-forward evidence."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+
+        IReadOnlyList<WorkspaceChangePacketProjection> packets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [],
+            [],
+            carryForward);
+
+        WorkspaceChangePacketProjection packet = Assert.Single(packets);
+        Assert.Equal("carry-forward-whitespace-id", packet.PacketId);
+        Assert.Equal("next_session_carry_forward", packet.Kind);
+    }
+
+    [Fact]
+    public void CampaignSpineWorkspaceChangePacketsTrimWhitespacePaddedRecapProjectionIdsWhenAftermathIsMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        PublicationSafeProjection recap = new(
+            ProjectionId: "  recap-projection-whitespace-id  ",
+            Kind: "campaign_recap_bundle",
+            Label: "Recap label",
+            Summary: "Recap summary");
+
+        IReadOnlyList<WorkspaceChangePacketProjection> packets = InvokeCampaignSpineBuildWorkspaceChangePackets(
+            campaign,
+            [recap],
+            [],
+            null);
+
+        WorkspaceChangePacketProjection packet = Assert.Single(packets);
+        Assert.StartsWith("packet-", packet.PacketId, StringComparison.Ordinal);
+        Assert.DoesNotContain(" ", packet.PacketId, StringComparison.Ordinal);
+        Assert.DoesNotContain("recap-projection-whitespace-id  ", packet.PacketId, StringComparison.Ordinal);
+        Assert.Equal("artifact", packet.Kind);
+    }
+
+    [Fact]
     public void CampaignMemoryPacketDoesNotActivateFromCarryForwardWindowSignalsWithoutMemoryContext()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardWindowOnly();
@@ -4378,6 +4427,13 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     private static IReadOnlyList<WorkspaceChangePacketProjection> InvokeCampaignSpineBuildWorkspaceChangePackets(
         CampaignProjection campaign,
         IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+        => InvokeCampaignSpineBuildWorkspaceChangePackets(campaign, [], aftermathPackages, null);
+
+    private static IReadOnlyList<WorkspaceChangePacketProjection> InvokeCampaignSpineBuildWorkspaceChangePackets(
+        CampaignProjection campaign,
+        IReadOnlyList<PublicationSafeProjection> recapShelf,
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages,
+        NextSessionCarryForwardProjection? carryForward)
     {
         MethodInfo method = typeof(CampaignSpineService)
             .GetMethod("BuildWorkspaceChangePackets", BindingFlags.NonPublic | BindingFlags.Static)
@@ -4386,7 +4442,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         return Assert.IsAssignableFrom<IReadOnlyList<WorkspaceChangePacketProjection>>(method.Invoke(null,
         [
             campaign,
-            Array.Empty<PublicationSafeProjection>(),
+            recapShelf,
             null,
             null,
             null,
@@ -4394,7 +4450,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Array.Empty<GovernedPrepLaunchProjection>(),
             Array.Empty<TravelPrefetchReceiptProjection>(),
             aftermathPackages,
-            null
+            carryForward
         ]));
     }
 
