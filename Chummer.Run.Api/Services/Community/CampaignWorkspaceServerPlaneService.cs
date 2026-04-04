@@ -1031,9 +1031,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                     Label: item.Label,
                     Summary: item.Summary,
                     ArtifactId: item.ArtifactId,
-                    UpdatedAtUtc: aftermathTimes.TryGetValue(item.ProjectionId, out DateTimeOffset updatedAtUtc)
-                        ? updatedAtUtc
-                        : defaultUpdatedAtUtc,
+                    UpdatedAtUtc: ResolveBoundedRecapShelfUpdatedAt(item, aftermathTimes, defaultUpdatedAtUtc),
                     Audience: creatorLinked
                         ? DescribeRecapShelfAudience(item, creatorLinked)
                         : string.IsNullOrWhiteSpace(item.Audience)
@@ -1118,9 +1116,13 @@ public sealed class CampaignWorkspaceServerPlaneService
         PublicationSafeProjection item,
         IReadOnlyDictionary<string, DateTimeOffset> aftermathTimes,
         DateTimeOffset defaultUpdatedAtUtc)
-        => aftermathTimes.TryGetValue(item.ProjectionId, out DateTimeOffset updatedAtUtc)
+    {
+        string? normalizedProjectionId = NormalizeOptional(item.ProjectionId);
+        return normalizedProjectionId is not null
+            && aftermathTimes.TryGetValue(normalizedProjectionId, out DateTimeOffset updatedAtUtc)
             ? updatedAtUtc
             : defaultUpdatedAtUtc;
+    }
 
     private static string BoundedRecapShelfCategory(PublicationSafeProjection item)
     {
