@@ -238,10 +238,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermathsdowntimepackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelofflinepacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelofflinepackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelofflinebrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelofflinebriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobileofflinepacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobileofflinepackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobileofflinebrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("mobileofflinebriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehousetravelpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehousetravelpackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehousetravelbrief")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehousetravelbriefs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travel offline packet")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travel offline packets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("travel-offline-packet")));

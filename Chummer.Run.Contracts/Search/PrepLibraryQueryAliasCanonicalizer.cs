@@ -182,10 +182,16 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "travelprefetches", "travel", "prefetch");
         RewriteCompactContinuityMutationAlias(tokens, "travelofflinepacket", "travel", "offline", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "travelofflinepackets", "travel", "offline", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "travelofflinebrief", "travel", "offline", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "travelofflinebriefs", "travel", "offline", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "mobileofflinepacket", "mobile", "offline", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "mobileofflinepackets", "mobile", "offline", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "mobileofflinebrief", "mobile", "offline", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "mobileofflinebriefs", "mobile", "offline", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "safehousetravelpacket", "safehouse", "travel", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "safehousetravelpackets", "safehouse", "travel", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "safehousetravelbrief", "safehouse", "travel", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "safehousetravelbriefs", "safehouse", "travel", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "gmopspacket", "gm", "ops", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "gmopspackets", "gm", "ops", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "gmopsbrief", "gm", "ops", "packet");
