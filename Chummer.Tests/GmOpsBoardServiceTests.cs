@@ -493,6 +493,38 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatCrewShiftSignalsAsRosterMovementDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:08:30Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open crewshift queue remains unresolved.",
+                AtUtc: baseTime,
+                EventId: "evt-crewshift"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-crewshift", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatPluralCompactRosterSignalsAsRosterMovementDomain()
     {
         SessionLedgerService ledger = new();
@@ -1584,13 +1616,18 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse rosterMoveHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster-move");
         GmPrepAssetListResponse crewMoveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmove");
         GmPrepAssetListResponse crewMovesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmoves");
+        GmPrepAssetListResponse crewShiftMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewshift");
+        GmPrepAssetListResponse crewShiftsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewshifts");
         GmPrepAssetListResponse crewSwapMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewswap");
         GmPrepAssetListResponse crewSwapsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewswaps");
         GmPrepAssetListResponse rosterSwapMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rosterswap");
         GmPrepAssetListResponse rosterSwapsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rosterswaps");
+        GmPrepAssetListResponse rosterShiftMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostershift");
+        GmPrepAssetListResponse rosterShiftsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostershifts");
         GmPrepAssetListResponse crewMovementMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmovement");
         GmPrepAssetListResponse crewMovementsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmovements");
         GmPrepAssetListResponse crewMoveHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew-move");
+        GmPrepAssetListResponse crewShiftHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew-shift");
         GmPrepAssetListResponse crewMovementHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew-movement");
         GmPrepAssetListResponse crewTransferMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewtransfer");
         GmPrepAssetListResponse crewTransfersMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewtransfers");
@@ -1600,12 +1637,16 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse crewHandoffSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew handoff");
         GmPrepAssetListResponse crewMovesSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew moves");
         GmPrepAssetListResponse crewMoveSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew move");
+        GmPrepAssetListResponse crewShiftsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew shifts");
+        GmPrepAssetListResponse crewShiftSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew shift");
         GmPrepAssetListResponse rosterTransfersSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster transfers");
         GmPrepAssetListResponse rosterTransferSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster transfer");
         GmPrepAssetListResponse rosterHandoffsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster handoffs");
         GmPrepAssetListResponse rosterHandoffSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster handoff");
         GmPrepAssetListResponse rosterMovesSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster moves");
         GmPrepAssetListResponse rosterMoveSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster move");
+        GmPrepAssetListResponse rosterShiftsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster shifts");
+        GmPrepAssetListResponse rosterShiftSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster shift");
         GmPrepAssetListResponse crewMovementSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew movement");
         GmPrepAssetListResponse crewMovementsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew movements");
         GmPrepAssetListResponse rosterMovementCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostermovement");
@@ -1722,13 +1763,18 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(rosterMoveHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMoveMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovesMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewShiftMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewShiftsMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewSwapMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewSwapsMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterSwapMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterSwapsMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterShiftMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterShiftsMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovementMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovementsMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMoveHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewShiftHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovementHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewTransferMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewTransfersMatches.Items, item => item.AssetId == "roster_move_ops");
@@ -1738,12 +1784,16 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(crewHandoffSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovesSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMoveSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewShiftsSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewShiftSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterTransfersSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterTransferSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterHandoffsSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterHandoffSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterMovesSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterMoveSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterShiftsSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterShiftSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovementSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovementsSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterMovementCompactMatches.Items, item => item.AssetId == "roster_move_ops");
@@ -2133,6 +2183,10 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse nextSessionPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsessions");
         GmPrepAssetListResponse nextSessionReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsessionreturn");
         GmPrepAssetListResponse nextSessionReturnPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsessionreturns");
+        GmPrepAssetListResponse nextSessionReturnLoopMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsessionreturnloop");
+        GmPrepAssetListResponse nextSessionReturnLoopPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsessionreturnloops");
+        GmPrepAssetListResponse nextSessionLoopMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsessionloop");
+        GmPrepAssetListResponse nextSessionLoopPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsessionloops");
         GmPrepAssetListResponse sessionReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sessionreturn");
         GmPrepAssetListResponse sessionReturnPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sessionreturns");
         GmPrepAssetListResponse returnLoopMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "returnloop");
@@ -2151,6 +2205,10 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(nextSessionPluralMatches.Items, item => item.AssetId == "return_loop_ops");
         Assert.Contains(nextSessionReturnMatches.Items, item => item.AssetId == "return_loop_ops");
         Assert.Contains(nextSessionReturnPluralMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(nextSessionReturnLoopMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(nextSessionReturnLoopPluralMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(nextSessionLoopMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(nextSessionLoopPluralMatches.Items, item => item.AssetId == "return_loop_ops");
         Assert.Contains(sessionReturnMatches.Items, item => item.AssetId == "return_loop_ops");
         Assert.Contains(sessionReturnPluralMatches.Items, item => item.AssetId == "return_loop_ops");
         Assert.Contains(returnLoopMatches.Items, item => item.AssetId == "return_loop_ops");

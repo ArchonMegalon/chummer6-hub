@@ -785,6 +785,26 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("return");
         }
 
+        if (tokens.Contains("nextsessionreturnloop") || tokens.Contains("nextsessionreturnloops"))
+        {
+            tokens.Remove("nextsessionreturnloop");
+            tokens.Remove("nextsessionreturnloops");
+            tokens.Add("next");
+            tokens.Add("session");
+            tokens.Add("return");
+            tokens.Add("loop");
+        }
+
+        if (tokens.Contains("nextsessionloop") || tokens.Contains("nextsessionloops"))
+        {
+            tokens.Remove("nextsessionloop");
+            tokens.Remove("nextsessionloops");
+            tokens.Add("next");
+            tokens.Add("session");
+            tokens.Add("return");
+            tokens.Add("loop");
+        }
+
         if (tokens.Contains("sessionreturn") || tokens.Contains("sessionreturns"))
         {
             tokens.Remove("sessionreturn");
