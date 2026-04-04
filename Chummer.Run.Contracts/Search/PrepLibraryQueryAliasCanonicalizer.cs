@@ -825,6 +825,12 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("recap");
         }
 
+        if (tokens.Contains("debriefed"))
+        {
+            tokens.Remove("debriefed");
+            tokens.Add("recap");
+        }
+
         if (tokens.Contains("outbrief"))
         {
             tokens.Remove("outbrief");

@@ -1322,6 +1322,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 "post mortem",
                 "debrief",
                 "debriefs",
+                "debriefed",
                 "debriefing",
                 "debriefings",
                 "outbrief",

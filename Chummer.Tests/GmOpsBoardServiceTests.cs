@@ -611,6 +611,13 @@ public sealed class GmOpsBoardServiceTests
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
+                Payload: "Open debriefed prep lane remains unresolved before next return checkpoint.",
+                AtUtc: baseTime.AddMinutes(5).AddSeconds(30),
+                EventId: "evt-debriefed"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
                 Payload: "Open AAR prep lane remains unresolved before next return checkpoint.",
                 AtUtc: baseTime.AddMinutes(6),
                 EventId: "evt-aar"),
@@ -643,9 +650,9 @@ public sealed class GmOpsBoardServiceTests
         Assert.Equal("ops:evt-lessons-learned", projection.UnresolvedItems[0].ItemId);
         Assert.Equal("ops:evt-retrospective", projection.UnresolvedItems[1].ItemId);
         Assert.Equal("ops:evt-aar", projection.UnresolvedItems[2].ItemId);
-        Assert.Equal("ops:evt-debriefing", projection.UnresolvedItems[3].ItemId);
-        Assert.Equal("ops:evt-postmortem", projection.UnresolvedItems[4].ItemId);
-        Assert.Equal("ops:evt-after-action-review", projection.UnresolvedItems[5].ItemId);
+        Assert.Equal("ops:evt-debriefed", projection.UnresolvedItems[3].ItemId);
+        Assert.Equal("ops:evt-debriefing", projection.UnresolvedItems[4].ItemId);
+        Assert.Equal("ops:evt-postmortem", projection.UnresolvedItems[5].ItemId);
     }
 
     [Fact]
@@ -1861,6 +1868,7 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse aftermathsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aftermaths");
         GmPrepAssetListResponse debriefMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "debrief");
         GmPrepAssetListResponse debriefsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "debriefs");
+        GmPrepAssetListResponse debriefedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "debriefed");
         GmPrepAssetListResponse debriefingMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "debriefing");
         GmPrepAssetListResponse debriefingsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "debriefings");
         GmPrepAssetListResponse outbriefMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "outbrief");
@@ -1958,6 +1966,7 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(aftermathsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(debriefMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(debriefsMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(debriefedMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(debriefingMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(debriefingsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(outbriefMatches.Items, item => item.AssetId == "continuity_plural_ops");
