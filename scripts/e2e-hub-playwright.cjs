@@ -2029,6 +2029,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail gmctls compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gmctls compact search');
 
+  await page.fill('#prepQuery', 'gm-ctls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gm-ctls/.test(page.url()), 'Workspace detail search should preserve the hyphen gm-ctls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gm-ctls hyphen search');
+  await expectBodyText(page, 'match(es) for "gm-ctls"', '/account/work/workspaces detail gm-ctls hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gm-ctls hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gm-ctls hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gm-ctls hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gm-ctls hyphen search');
+  const workspaceGmCtlsHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmCtlsHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen gm-ctls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gm-ctls hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gm-ctls hyphen search');
+
   await page.fill('#prepQuery', 'gm ctls');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -2091,6 +2112,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail gm ctl split search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gm ctl split search');
+
+  await page.fill('#prepQuery', 'gm-ctl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=gm-ctl/.test(page.url()), 'Workspace detail search should preserve the hyphen gm-ctl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail gm-ctl hyphen search');
+  await expectBodyText(page, 'match(es) for "gm-ctl"', '/account/work/workspaces detail gm-ctl hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail gm-ctl hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail gm-ctl hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail gm-ctl hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail gm-ctl hyphen search');
+  const workspaceGmCtlHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceGmCtlHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen gm-ctl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail gm-ctl hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail gm-ctl hyphen search');
 
   await page.fill('#prepQuery', 'gm control');
   await Promise.all([
