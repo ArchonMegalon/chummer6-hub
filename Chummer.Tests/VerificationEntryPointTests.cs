@@ -427,6 +427,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=diary", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=downtime", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermath", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=recap", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=memory", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=archive", audit, StringComparison.Ordinal);
@@ -455,6 +456,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=diary", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=downtime", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=aftermath", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=recap", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=return", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=memory", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=archive", audit, StringComparison.Ordinal);
@@ -524,6 +526,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("downtime continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=aftermath", playwright, StringComparison.Ordinal);
         Assert.Contains("aftermath continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=recap", playwright, StringComparison.Ordinal);
+        Assert.Contains("recap continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=return", playwright, StringComparison.Ordinal);
         Assert.Contains("return-loop continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=memory", playwright, StringComparison.Ordinal);
