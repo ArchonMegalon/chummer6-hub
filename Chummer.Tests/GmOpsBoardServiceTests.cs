@@ -285,6 +285,46 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatOpForSignalsAsOppositionDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T03:50:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open op_for board remains unresolved after rotation.",
+                AtUtc: baseTime,
+                EventId: "evt-op-for"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open prep launch packet remains unresolved.",
+                AtUtc: baseTime.AddMinutes(1),
+                EventId: "evt-event"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(30),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(3, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-op-for", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-event", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[2].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatCrewHandoffSignalsAsRosterMovementDomain()
     {
         SessionLedgerService ledger = new();
