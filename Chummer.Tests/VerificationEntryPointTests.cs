@@ -90,6 +90,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generatedAt is in the future", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.defaultKeyCount must be an integer", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.defaultKeyCount must be positive", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate has unexpected keys", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.shippingLocales must equal required flagship locales", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.acceptanceGates is missing required gate ids", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.uiLocalizationReleaseGate.domainCoverage is missing required domains", script, StringComparison.Ordinal);
@@ -318,6 +319,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject releaseProof.uiLocalizationReleaseGate.translationBacklogFindings length/count mismatches", script, StringComparison.Ordinal);
         Assert.Contains("reject non-zero releaseProof.uiLocalizationReleaseGate.localeSummary untranslatedKeyCount values", script, StringComparison.Ordinal);
         Assert.Contains("reject non-canonical releaseProof.uiLocalizationReleaseGate.localeSummary ordering", script, StringComparison.Ordinal);
+        Assert.Contains("reject unexpected releaseProof.uiLocalizationReleaseGate keys", script, StringComparison.Ordinal);
         Assert.Contains("reject missing releaseProof payloads", script, StringComparison.Ordinal);
         Assert.Contains("reject non-array releaseProof.journeysPassed payloads", script, StringComparison.Ordinal);
         Assert.Contains("reject non-array releaseProof.proofRoutes payloads", script, StringComparison.Ordinal);

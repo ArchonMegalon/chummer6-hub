@@ -123,6 +123,35 @@ REQUIRED_LOCALIZATION_LOCALE_SUMMARY_ROW_KEYS = (
     "missingReleaseSeedKeys",
     "untranslatedKeyCount",
 )
+ALLOWED_LOCALIZATION_GATE_KEYS = (
+    "status",
+    "generatedAt",
+    "generated_at",
+    "defaultKeyCount",
+    "default_key_count",
+    "explicitFallbackRuntime",
+    "explicit_fallback_runtime",
+    "signoffSmokeRunnerStatus",
+    "signoff_smoke_runner_status",
+    "shippingLocales",
+    "shipping_locales",
+    "acceptanceGates",
+    "acceptance_gates",
+    "domainCoverage",
+    "domain_coverage",
+    "localeDomainCoverage",
+    "locale_domain_coverage",
+    "blockingFindingsCount",
+    "blocking_findings_count",
+    "blockingFindings",
+    "blocking_findings",
+    "translationBacklogFindingsCount",
+    "translation_backlog_findings_count",
+    "translationBacklogFindings",
+    "translation_backlog_findings",
+    "localeSummary",
+    "locale_summary",
+)
 DEFAULT_ALLOWED_RELEASE_PROOF_BASE_URLS = ("https://chummer.run",)
 
 
@@ -471,6 +500,14 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             f"{release_channel_path}"
         ),
     )
+    unexpected_localization_gate_keys = sorted(
+        key for key in localization_gate_object.keys() if str(key) not in ALLOWED_LOCALIZATION_GATE_KEYS
+    )
+    if unexpected_localization_gate_keys:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate has unexpected keys: "
+            f"{release_channel_path} ({', '.join(str(key) for key in unexpected_localization_gate_keys)})"
+        )
     localization_gate_status = normalized_token(localization_gate_object.get("status"))
     if localization_gate_status not in {"pass", "passed", "ready"}:
         raise SystemExit(
