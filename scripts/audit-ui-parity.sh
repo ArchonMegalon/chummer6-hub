@@ -666,6 +666,22 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
                 f"{release_channel_path} ({locale})"
             ),
         )
+        missing_locale_domains = sorted(
+            domain for domain in REQUIRED_LOCALIZATION_DOMAINS if domain not in locale_domain_map
+        )
+        if missing_locale_domains:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeDomainCoverage locale is missing required domains: "
+                f"{release_channel_path} ({locale}: {', '.join(missing_locale_domains)})"
+            )
+        unexpected_locale_domains = sorted(
+            domain for domain in locale_domain_map if domain not in REQUIRED_LOCALIZATION_DOMAINS
+        )
+        if unexpected_locale_domains:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeDomainCoverage locale has unexpected domains: "
+                f"{release_channel_path} ({locale}: {', '.join(unexpected_locale_domains)})"
+            )
         for domain in REQUIRED_LOCALIZATION_DOMAINS:
             status = normalized_token(locale_domain_map.get(domain))
             if status not in {"pass", "passed", "ready"}:
