@@ -1321,7 +1321,7 @@ public sealed class GmOpsBoardServiceTests
                 assetId: "continuity_plural_ops",
                 now: now,
                 title: "Diary downtime aftermath continuity packet",
-                body: "Diary downtime aftermath connection continuity remains governed for next-session return.")
+                body: "Diary journal downtime aftermath heat connection continuity remains governed for next-session return.")
         ]);
 
         Assert.Equal(1, import.ImportedCount);
@@ -1329,14 +1329,18 @@ public sealed class GmOpsBoardServiceTests
         Assert.Empty(import.Conflicts);
 
         GmPrepAssetListResponse diariesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "diaries");
+        GmPrepAssetListResponse journalsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "journals");
         GmPrepAssetListResponse downtimesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "downtimes");
         GmPrepAssetListResponse aftermathsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aftermaths");
+        GmPrepAssetListResponse heatsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "heats");
         GmPrepAssetListResponse connectionsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "connections");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixaftermaths");
 
         Assert.Contains(diariesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(journalsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(downtimesMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(aftermathsMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(heatsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(connectionsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Empty(negativeMatches.Items);
     }

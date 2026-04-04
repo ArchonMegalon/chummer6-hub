@@ -590,6 +590,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=communityctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community-ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=heats", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=oppositions", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=encounter", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=enemy", audit, StringComparison.Ordinal);
@@ -606,6 +607,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=connections", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=faction", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=journal", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=journals", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=sessionlog", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=sessionlogs", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=session%20logs", audit, StringComparison.Ordinal);
@@ -710,6 +712,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=gm%20ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gm-ctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=heats", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=oppositions", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=encounter", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=enemy", audit, StringComparison.Ordinal);
@@ -726,6 +729,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=connections", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=faction", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=journal", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=journals", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=sessionlog", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=sessionlogs", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=session%20logs", audit, StringComparison.Ordinal);
@@ -993,6 +997,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("hyphen community-ctrl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=heat", playwright, StringComparison.Ordinal);
         Assert.Contains("heat continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=heats", playwright, StringComparison.Ordinal);
+        Assert.Contains("heats continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=oppositions", playwright, StringComparison.Ordinal);
         Assert.Contains("oppositions prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=encounter", playwright, StringComparison.Ordinal);
@@ -1025,6 +1031,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("faction continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=journal", playwright, StringComparison.Ordinal);
         Assert.Contains("journal continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=journals", playwright, StringComparison.Ordinal);
+        Assert.Contains("journals continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=sessionlog", playwright, StringComparison.Ordinal);
         Assert.Contains("sessionlog continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=sessionlogs", playwright, StringComparison.Ordinal);

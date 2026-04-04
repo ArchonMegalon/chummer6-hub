@@ -363,19 +363,23 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             PacketId: "continuity:plural-lane",
             Kind: "campaign_continuity_packet",
             Title: "Neon Cradle diary downtime aftermath continuity packet",
-            Summary: "Diary, downtime, aftermath, and connection continuity remains governed for next-session return.",
-            BindingSummary: "Bound to campaign diary continuity, downtime follow-through, aftermath recap, and contact connection changes.",
+            Summary: "Diary, downtime, aftermath, heat, and connection continuity remains governed for next-session return.",
+            BindingSummary: "Bound to campaign diary continuity, downtime follow-through, aftermath recap, heat pressure, and contact connection changes.",
             Reusable: true,
-            SearchTerms: ["diary", "downtime", "aftermath", "connection", "return"],
-            EvidenceLines: ["Governed continuity lane keeps diary, downtime, aftermath, and connection signals attached for next session."],
+            SearchTerms: ["diary", "journal", "downtime", "aftermath", "heat", "connection", "return"],
+            EvidenceLines: ["Governed continuity lane keeps diary, downtime, aftermath, heat, and connection signals attached for next session."],
             UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
 
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diary")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaries")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("journal")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("journals")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtime")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("downtimes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermath")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aftermaths")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("heat")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("heats")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("connection")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("connections")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaftermaths")));

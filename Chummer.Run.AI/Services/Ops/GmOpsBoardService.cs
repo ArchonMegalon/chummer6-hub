@@ -759,6 +759,13 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("diary");
         }
 
+        if (tokens.Contains("journals"))
+        {
+            tokens.Remove("journals");
+            tokens.Add("journal");
+            tokens.Add("diary");
+        }
+
         if (tokens.Contains("downtimes"))
         {
             tokens.Remove("downtimes");
@@ -775,6 +782,12 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         {
             tokens.Remove("connections");
             tokens.Add("connection");
+        }
+
+        if (tokens.Contains("heats"))
+        {
+            tokens.Remove("heats");
+            tokens.Add("heat");
         }
 
         if (tokens.Contains("crewtransfer"))
