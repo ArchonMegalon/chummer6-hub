@@ -360,6 +360,29 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
+proof_routes = payload["releaseProof"]["proofRoutes"]
+if not isinstance(proof_routes, list) or len(proof_routes) < 2:
+    raise SystemExit("releaseProof.proofRoutes is missing or too short for canonical ordering mutation")
+proof_routes[0], proof_routes[1] = proof_routes[1], proof_routes[0]
+payload["releaseProof"]["proofRoutes"] = proof_routes
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject non-canonical releaseProof.proofRoutes ordering." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
 gate = payload["releaseProof"]["uiLocalizationReleaseGate"]
 gate["translationBacklogFindingsCount"] = "0"
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -387,6 +410,29 @@ PY
 if bash scripts/audit-ui-parity.sh; then
   mv "$release_channel_backup" "$release_channel_path"
   echo "verify gate failed: parity audit should reject non-http(s) releaseProof.base_url alias schemes." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+journeys = payload["releaseProof"]["journeysPassed"]
+if not isinstance(journeys, list) or len(journeys) < 2:
+    raise SystemExit("releaseProof.journeysPassed is missing or too short for canonical ordering mutation")
+journeys[0], journeys[1] = journeys[1], journeys[0]
+payload["releaseProof"]["journeysPassed"] = journeys
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject non-canonical releaseProof.journeysPassed ordering." >&2
   exit 1
 fi
 mv "$release_channel_backup" "$release_channel_path"
