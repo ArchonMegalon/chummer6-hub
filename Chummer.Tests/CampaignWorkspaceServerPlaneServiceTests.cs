@@ -7281,6 +7281,9 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "foundry_exchange", StringComparison.Ordinal));
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "sheet_viewer", StringComparison.Ordinal));
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "print_pdf_export", StringComparison.Ordinal));
+        Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "replay_timeline", StringComparison.Ordinal));
+        Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "session_recap", StringComparison.Ordinal));
+        Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "run_module", StringComparison.Ordinal));
         Assert.Contains(handoff.TradeoffLines, line => line.Contains("Rule-environment diff", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(handoff.RuleEnvironmentDiff);
         Assert.Equal("requires_review", handoff.RuleEnvironmentDiff!.Status);
@@ -7290,6 +7293,9 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("Explain receipt", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("JSON exchange", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("print-ready PDF", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("replay timeline", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("session recap", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("run-module", StringComparison.OrdinalIgnoreCase));
         Assert.Equal("4 of 5 build follow-through checkpoints are already grounded.", handoff.PlannerCoverageSummary);
         Assert.NotNull(handoff.PlannerCoverageLines);
         Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("Crew-fit:", StringComparison.OrdinalIgnoreCase));
@@ -7815,8 +7821,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             Status: "ready",
             Summary: "Travel readiness is green.",
             PrefetchInventorySummary: "Prefetch inventory is attached.",
+            CacheFreshnessSummary: "1 ready device has a fresh staged cache.",
             ClaimedDeviceCount: 1,
             TravelReadyDeviceCount: 1,
+            FreshCacheDeviceCount: 1,
+            StaleCacheDeviceCount: 0,
             Devices: [],
             Boundaries: []);
 
