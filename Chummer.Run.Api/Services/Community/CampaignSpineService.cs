@@ -3838,6 +3838,7 @@ public sealed class CampaignSpineService
                                 : string.IsNullOrWhiteSpace(item.PublicationSummary)
                                     ? DescribeSharedPublicationSummary(workspace, item)
                                     : item.PublicationSummary,
+                            ArtifactId = AccountService.NormalizeOptional(item.ArtifactId),
                             CreatorPublicationId = creatorLinked
                                 ? creatorPublication!.PublicationId
                                 : AccountService.NormalizeOptional(item.CreatorPublicationId),
