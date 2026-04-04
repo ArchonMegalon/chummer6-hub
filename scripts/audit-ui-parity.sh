@@ -254,8 +254,12 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         )
     )
     required_surfaces = {
+        "runtimeBackedLegacyWorkbench",
+        "legacyDenseBuilderRhythm",
         "legacyCreationWorkflowRhythm",
         "legacyAdvancementWorkflowRhythm",
+        "legacyBrowseDetailConfirmRhythm",
+        "legacyContactsDiaryRhythm",
         "legacyMagicWorkflowRhythm",
         "legacyMatrixWorkflowRhythm",
         "legacyGearWorkflowRhythm",
