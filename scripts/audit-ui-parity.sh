@@ -65,6 +65,7 @@ import json
 import pathlib
 import re
 import sys
+import urllib.parse
 
 UTC = dt.timezone.utc
 DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS = 24 * 60 * 60
@@ -236,6 +237,50 @@ def normalize_release_proof_route(raw_route: object, *, field_path: str, source:
     return canonical_route
 
 
+def normalize_release_proof_base_url(raw_base_url: object, *, field_path: str, source: pathlib.Path) -> str:
+    if not isinstance(raw_base_url, str):
+        raise SystemExit(f"parity audit failed: {field_path} must be a string: {source}")
+    base_url = raw_base_url.strip()
+    if not base_url:
+        raise SystemExit(f"parity audit failed: {field_path} must not be blank: {source}")
+    if base_url != raw_base_url:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must not include leading/trailing whitespace: {source}"
+        )
+    parsed = urllib.parse.urlsplit(base_url)
+    scheme = parsed.scheme.lower()
+    if scheme not in {"http", "https"}:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must use http/https scheme: {source}"
+        )
+    if parsed.query or parsed.fragment:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must not include query or fragment segments: {source}"
+        )
+    if parsed.path not in {"", "/"}:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must be origin-only with no path segments: {source}"
+        )
+    if not parsed.netloc:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must include authority host: {source}"
+        )
+    if parsed.username or parsed.password:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must not include userinfo credentials: {source}"
+        )
+    if parsed.netloc != parsed.netloc.lower():
+        raise SystemExit(
+            f"parity audit failed: {field_path} must use canonical lowercase authority casing: {source}"
+        )
+    canonical_base_url = f"{scheme}://{parsed.netloc.lower()}"
+    if base_url != canonical_base_url:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must use canonical origin form with no trailing slash: {source}"
+        )
+    return canonical_base_url
+
+
 def validate_release_channel_proof(release_channel_path: pathlib.Path, release_channel_data: dict) -> None:
     proof = require_object(
         release_channel_data.get("releaseProof"),
@@ -250,6 +295,11 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.status must be pass/passed/ready: "
             f"{release_channel_path} (status={proof_status or 'missing'})"
         )
+    normalize_release_proof_base_url(
+        proof.get("baseUrl") or proof.get("base_url"),
+        field_path="releaseProof.baseUrl",
+        source=release_channel_path,
+    )
     journeys_passed = proof.get("journeysPassed") or proof.get("journeys_passed")
     journeys = require_string_list(
         journeys_passed,
