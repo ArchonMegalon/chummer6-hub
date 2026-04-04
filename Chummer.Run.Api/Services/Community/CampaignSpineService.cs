@@ -2266,12 +2266,10 @@ public sealed class CampaignSpineService
             .Select(dossier =>
             {
                 var workspace = workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, dossier.CampaignId, StringComparison.OrdinalIgnoreCase));
-                var outputs = dossier.Projections
-                    .Concat(workspace?.RecapShelf ?? Array.Empty<PublicationSafeProjection>())
-                    .Distinct()
-                    .Take(3)
-                    .ToArray();
+                var explainReceiptId = $"buildlab.handoff.{dossier.DossierId}";
                 var runtimeFingerprint = workspace?.RuleEnvironment.CompatibilityFingerprint ?? dossier.RuleEnvironment.CompatibilityFingerprint;
+                var outputs = BuildBuildLabOutputs(dossier, workspace, runtimeFingerprint, explainReceiptId);
+                var ruleEnvironmentDiffSummary = DescribeBuildLabRuleEnvironmentDiff(dossier.RuleEnvironment, workspace?.RuleEnvironment);
                 var variantLabel = workspace is null ? "Living dossier carry-forward" : "Ops-first dossier carry-forward";
                 var progressionLabel = workspace is null ? "Ready to seed into a campaign" : "25 / 50 / 100 Karma path stays attached to the campaign return";
                 var nextSafeAction = ResolveBuildLabNextSafeAction(workspace, outputs, restore);
@@ -2302,20 +2300,22 @@ public sealed class CampaignSpineService
                     Summary: "The chosen build lane now lands in living dossier and campaign return truth instead of a disposable comparison card.",
                     VariantLabel: variantLabel,
                     ProgressionLabel: progressionLabel,
-                    ExplainEntryId: $"buildlab.handoff.{dossier.DossierId}",
+                    ExplainEntryId: explainReceiptId,
                     TradeoffLines:
                     [
                         attachedOutputSummary ?? "Role overlap stays explicit before the handoff leaves build comparison.",
                         workspace is null
                             ? "No campaign workspace is attached yet, so the handoff seeds the dossier first."
-                            : $"Campaign workspace {workspace.CampaignName} keeps the downstream continuity target visible and the same upgrade path attached."
+                            : $"Campaign workspace {workspace.CampaignName} keeps the downstream continuity target visible and the same upgrade path attached.",
+                        ruleEnvironmentDiffSummary
                     ],
                     ProgressionOutcomes:
                     [
                         workspace is null
                             ? "25 / 50 / 100 Karma checkpoints stay attached to the living dossier until the first governed campaign workspace exists."
                             : $"25 / 50 / 100 Karma checkpoints stay attached to {workspace.CampaignName} so the return path keeps the same upgrade plan.",
-                        readyOutputSummary
+                        readyOutputSummary,
+                        $"Explain receipt {explainReceiptId} stays attached across character-template, Foundry-class exchange, and sheet-viewer export follow-through."
                     ],
                     Outputs: outputs,
                     UpdatedAtUtc: dossier.UpdatedAtUtc,
@@ -2329,6 +2329,97 @@ public sealed class CampaignSpineService
             })
             .Take(3)
             .ToArray();
+    }
+
+    private static IReadOnlyList<PublicationSafeProjection> BuildBuildLabOutputs(
+        RunnerDossierProjection dossier,
+        CampaignWorkspaceProjection? workspace,
+        string runtimeFingerprint,
+        string explainReceiptId)
+    {
+        var governedExports = new[]
+        {
+            BuildBuildLabGovernedOutput(
+                dossier,
+                projectionIdSuffix: "character-template",
+                kind: "character_template",
+                label: "Character template export",
+                summary: "Save this build lane as a reusable character template without forking dossier truth.",
+                runtimeFingerprint: runtimeFingerprint,
+                explainReceiptId: explainReceiptId,
+                nextSafeAction: "Open workflow.templates.character to save a governed character-template export."),
+            BuildBuildLabGovernedOutput(
+                dossier,
+                projectionIdSuffix: "foundry-export",
+                kind: "foundry_exchange",
+                label: "Foundry-class exchange export",
+                summary: "Prepare a governed Foundry-class exchange payload from this build handoff.",
+                runtimeFingerprint: runtimeFingerprint,
+                explainReceiptId: explainReceiptId,
+                nextSafeAction: "Open workflow.exchange.foundry before publishing exchange payloads."),
+            BuildBuildLabGovernedOutput(
+                dossier,
+                projectionIdSuffix: "sheet-viewer",
+                kind: "sheet_viewer",
+                label: "Sheet viewer export check",
+                summary: "Review the same handoff in the governed sheet viewer before print/export decisions.",
+                runtimeFingerprint: runtimeFingerprint,
+                explainReceiptId: explainReceiptId,
+                nextSafeAction: "Open workflow.viewer.sheet and confirm the current handoff posture before print/export.")
+        };
+
+        return dossier.Projections
+            .Concat(workspace?.RecapShelf ?? Array.Empty<PublicationSafeProjection>())
+            .Concat(governedExports)
+            .Distinct()
+            .Take(6)
+            .ToArray();
+    }
+
+    private static PublicationSafeProjection BuildBuildLabGovernedOutput(
+        RunnerDossierProjection dossier,
+        string projectionIdSuffix,
+        string kind,
+        string label,
+        string summary,
+        string runtimeFingerprint,
+        string explainReceiptId,
+        string nextSafeAction)
+        => new(
+            ProjectionId: StableId("buildlab-output", $"{dossier.DossierId}:{projectionIdSuffix}"),
+            Kind: kind,
+            Label: label,
+            Summary: summary,
+            ArtifactId: null,
+            Audience: "campaign",
+            OwnershipSummary: "build-lab-governed",
+            PublicationState: "ready",
+            TrustBand: "governed",
+            Discoverable: true,
+            PublicationSummary: $"Anchored on {runtimeFingerprint} with explain receipt {explainReceiptId}.",
+            CreatorPublicationId: null,
+            NextSafeAction: nextSafeAction,
+            ProvenanceSummary: $"Explain receipt {explainReceiptId} governs this build follow-through lane.",
+            AuditSummary: $"rule-environment:{runtimeFingerprint}");
+
+    private static string DescribeBuildLabRuleEnvironmentDiff(
+        RuleEnvironmentRef dossierRuleEnvironment,
+        RuleEnvironmentRef? workspaceRuleEnvironment)
+    {
+        if (workspaceRuleEnvironment is null)
+        {
+            return $"Rule-environment diff is pending: dossier is pinned to {dossierRuleEnvironment.CompatibilityFingerprint} until the first campaign workspace binds the same fingerprint.";
+        }
+
+        if (string.Equals(
+                dossierRuleEnvironment.CompatibilityFingerprint,
+                workspaceRuleEnvironment.CompatibilityFingerprint,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Rule-environment diff is clear: dossier and campaign workspace both pin {workspaceRuleEnvironment.CompatibilityFingerprint}.";
+        }
+
+        return $"Rule-environment diff requires review: dossier pins {dossierRuleEnvironment.CompatibilityFingerprint} while campaign workspace pins {workspaceRuleEnvironment.CompatibilityFingerprint}.";
     }
 
     private static string ResolveBuildLabNextSafeAction(
