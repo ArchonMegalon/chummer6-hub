@@ -10,7 +10,7 @@ public sealed class AccountBuildLabHandoffViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("selectedBuildLabHandoff.Outputs.Take(4)", view, StringComparison.Ordinal);
+        Assert.Contains("selectedBuildLabHandoff.Outputs.Take(6)", view, StringComparison.Ordinal);
         Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
         Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.ProgressionOutcomes.Take(3)", view, StringComparison.Ordinal);
