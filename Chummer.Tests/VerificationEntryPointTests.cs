@@ -83,6 +83,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release-channel nested receipt generatedAt is in the future", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof is required", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.status must be pass/passed/ready", script, StringComparison.Ordinal);
+        Assert.Contains("must use canonical origin form with no trailing slash", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed is missing required baseline journey ids", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed declares unexpected journey ids", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed must use canonical lowercase journey ids", script, StringComparison.Ordinal);
@@ -447,6 +448,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gm%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=oppositions", audit, StringComparison.Ordinal);
@@ -495,6 +497,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=gm%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=gmop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=oppositions", audit, StringComparison.Ordinal);
@@ -582,6 +585,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact eventop prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gmops", playwright, StringComparison.Ordinal);
         Assert.Contains("compact gmops prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=gm(?:%20|\\+)ops", playwright, StringComparison.Ordinal);
+        Assert.Contains("split gm ops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=gmop", playwright, StringComparison.Ordinal);
         Assert.Contains("compact gmop prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=heat", playwright, StringComparison.Ordinal);

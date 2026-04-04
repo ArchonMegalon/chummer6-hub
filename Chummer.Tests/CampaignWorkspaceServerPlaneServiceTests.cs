@@ -18,7 +18,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         Assert.Contains("opposition", tokens);
         Assert.Contains("season", tokens);
-        Assert.Contains("control", tokens);
+        Assert.Contains("eventcontrol", tokens);
+        Assert.Contains("operation", tokens);
         Assert.Contains("audit", tokens);
     }
 
@@ -179,6 +180,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.True(InvokeMatches(packet, compactSingularTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
+    }
+
+    [Fact]
+    public void PrepLibraryQueryMatchingSupportsSplitOpsAndControlShorthandAcrossWhitespaceAndPunctuation()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "event:split-ops",
+            Kind: "event_control_packet",
+            Title: "Dockyard event control board",
+            Summary: "Season operations stay governed for the next launch window.",
+            BindingSummary: "Bound to campaign return and event controls.",
+            Reusable: true,
+            SearchTerms: ["event", "control", "season", "operations"],
+            EvidenceLines: ["GM operations checkpoint receipt captured for event-control lane."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("event ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gm-ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season control")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-control")));
     }
 
     [Fact]
