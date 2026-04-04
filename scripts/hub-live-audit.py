@@ -2529,6 +2529,34 @@ def verify_signed_in_work_audit(
     prep_library_sessionlog = json.loads(body)
     if not (prep_library_sessionlog.get("items") or []):
         raise AssertionError("prep-library sessionlog search did not expose any governed packet")
+    prep_library_sessionlogs_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=sessionlogs"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_sessionlogs_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_sessionlogs_path} returned {status}, expected 200")
+
+    prep_library_sessionlogs = json.loads(body)
+    if not (prep_library_sessionlogs.get("items") or []):
+        raise AssertionError("prep-library sessionlogs search did not expose any governed packet")
+    prep_library_session_logs_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=session%20logs"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_session_logs_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_session_logs_path} returned {status}, expected 200")
+
+    prep_library_session_logs = json.loads(body)
+    if not (prep_library_session_logs.get("items") or []):
+        raise AssertionError("prep-library session logs search did not expose any governed packet")
 
     prep_library_diary_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=diary"
     status, body, _, _ = fetch(
@@ -5031,6 +5059,36 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_sessionlog_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_sessionlog_search_path} should return at least one governed prep packet for the sessionlog query")
+    workspace_sessionlogs_search_path = f"{workspace_path}?prepQuery=sessionlogs"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_sessionlogs_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_sessionlogs_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_sessionlogs_search_path)
+    require_snippet(body, 'match(es) for "sessionlogs"', workspace_sessionlogs_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_sessionlogs_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_sessionlogs_search_path} should return at least one governed prep packet for the sessionlogs query")
+    workspace_session_logs_search_path = f"{workspace_path}?prepQuery=session%20logs"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_session_logs_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_session_logs_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_session_logs_search_path)
+    require_snippet(body, 'match(es) for "session logs"', workspace_session_logs_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_session_logs_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_session_logs_search_path} should return at least one governed prep packet for the session logs query")
     workspace_diary_search_path = f"{workspace_path}?prepQuery=diary"
     status, body, _, _ = fetch(
         base_url,

@@ -4928,6 +4928,19 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("loop");
             tokens.Add("session");
         }
+
+        if (tokens.Contains("sessionlogs"))
+        {
+            tokens.Remove("sessionlogs");
+            tokens.Add("session");
+            tokens.Add("log");
+        }
+
+        if (tokens.Contains("session") && tokens.Contains("logs"))
+        {
+            tokens.Remove("logs");
+            tokens.Add("log");
+        }
     }
 
     private static bool MatchesPrepLibraryQuery(

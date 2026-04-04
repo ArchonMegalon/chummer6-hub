@@ -312,6 +312,29 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsSessionLogPluralShorthandAcrossWhitespaceAndPunctuation()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "diary:session-log",
+            Kind: "campaign_diary_packet",
+            Title: "Neon Cradle session log packet",
+            Summary: "Session log continuity stays governed from diary through return.",
+            BindingSummary: "Bound to campaign diary continuity and next-session return.",
+            Reusable: true,
+            SearchTerms: ["session", "log", "diary", "return"],
+            EvidenceLines: ["Session log lane remains attached to governed continuity receipts."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionlog")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionlogs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("session log")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("session logs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("session-log")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("session-logs")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixlogs")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsCrewTransferShorthandAcrossWhitespaceBoundaries()
     {
         var packet = new GovernedPrepPacketSummary(
