@@ -751,6 +751,50 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
     validate_timestamp_freshness(path, data, evidence)
 
 
+def validate_cross_receipt_alignment(
+    workflow_path: pathlib.Path,
+    workflow_data: dict,
+    visual_path: pathlib.Path,
+    visual_data: dict,
+) -> None:
+    workflow_evidence = require_object(
+        workflow_data.get("evidence"),
+        message=f"parity audit failed: workflow receipt evidence must be a JSON object: {workflow_path}",
+    )
+    visual_evidence = require_object(
+        visual_data.get("evidence"),
+        message=f"parity audit failed: visual receipt evidence must be a JSON object: {visual_path}",
+    )
+    workflow_release_channel_id = require_non_empty_string(
+        workflow_evidence.get("release_channel_channel_id"),
+        message=f"parity audit failed: workflow receipt release-channel channel id is missing: {workflow_path}",
+    )
+    visual_release_channel_id = require_non_empty_string(
+        visual_evidence.get("release_channel_channel_id"),
+        message=f"parity audit failed: visual receipt release-channel channel id is missing: {visual_path}",
+    )
+    if workflow_release_channel_id != visual_release_channel_id:
+        raise SystemExit(
+            "parity audit failed: milestone-2 workflow/visual release-channel ids drift: "
+            f"{workflow_path} ({workflow_release_channel_id}) vs "
+            f"{visual_path} ({visual_release_channel_id})"
+        )
+    workflow_release_version = require_non_empty_string(
+        workflow_evidence.get("release_channel_version"),
+        message=f"parity audit failed: workflow receipt release-channel version is missing: {workflow_path}",
+    )
+    visual_release_version = require_non_empty_string(
+        visual_evidence.get("release_channel_version"),
+        message=f"parity audit failed: visual receipt release-channel version is missing: {visual_path}",
+    )
+    if workflow_release_version != visual_release_version:
+        raise SystemExit(
+            "parity audit failed: milestone-2 workflow/visual release-channel versions drift: "
+            f"{workflow_path} ({workflow_release_version}) vs "
+            f"{visual_path} ({visual_release_version})"
+        )
+
+
 workflow_path = pathlib.Path(sys.argv[1])
 visual_path = pathlib.Path(sys.argv[2])
 workflow_data = read_receipt(workflow_path)
@@ -761,6 +805,7 @@ results = [
 ]
 validate_workflow_contract(workflow_path, workflow_data)
 validate_visual_contract(visual_path, visual_data)
+validate_cross_receipt_alignment(workflow_path, workflow_data, visual_path, visual_data)
 for path, status in results:
     print(f"receipt ok: {path.name} (status={status})")
 PY
