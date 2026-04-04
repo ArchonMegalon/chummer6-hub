@@ -62,6 +62,7 @@ fi
 if ! python3 - "$WORKFLOW_GATE_RECEIPT" "$VISUAL_FAMILIARITY_RECEIPT" <<'PY'
 import datetime as dt
 import json
+import os
 import pathlib
 import re
 import sys
@@ -84,6 +85,7 @@ REQUIRED_RELEASE_PROOF_ROUTES = (
     "/account/support",
     "/contact",
 )
+DEFAULT_ALLOWED_RELEASE_PROOF_BASE_URLS = ("https://chummer.run",)
 
 
 def require_object(value: object, *, message: str) -> dict:
@@ -281,6 +283,37 @@ def normalize_release_proof_base_url(raw_base_url: object, *, field_path: str, s
     return canonical_base_url
 
 
+def parse_allowed_release_proof_base_urls(raw_value: object) -> tuple[str, ...]:
+    if raw_value in (None, ""):
+        return DEFAULT_ALLOWED_RELEASE_PROOF_BASE_URLS
+    raw_values = [item.strip() for item in str(raw_value).split(",")]
+    allowed: list[str] = []
+    seen: set[str] = set()
+    for index, raw_url in enumerate(raw_values):
+        if not raw_url:
+            continue
+        canonical_url = normalize_release_proof_base_url(
+            raw_url,
+            field_path=f"allowedReleaseProofBaseUrls[{index}]",
+            source=pathlib.Path("<parity-audit-config>"),
+        )
+        if canonical_url in seen:
+            continue
+        seen.add(canonical_url)
+        allowed.append(canonical_url)
+    if not allowed:
+        raise SystemExit(
+            "parity audit failed: allowed release proof base URL set must contain at least one canonical origin"
+        )
+    return tuple(allowed)
+
+
+ALLOWED_RELEASE_PROOF_BASE_URLS = parse_allowed_release_proof_base_urls(
+    os.environ.get("CHUMMER_UI_PARITY_ALLOWED_RELEASE_PROOF_BASE_URLS")
+    or os.environ.get("CHUMMER_ALLOWED_RELEASE_PROOF_BASE_URLS")
+)
+
+
 def validate_release_channel_proof(release_channel_path: pathlib.Path, release_channel_data: dict) -> None:
     proof = require_object(
         release_channel_data.get("releaseProof"),
@@ -295,11 +328,16 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.status must be pass/passed/ready: "
             f"{release_channel_path} (status={proof_status or 'missing'})"
         )
-    normalize_release_proof_base_url(
+    proof_base_url = normalize_release_proof_base_url(
         proof.get("baseUrl") or proof.get("base_url"),
         field_path="releaseProof.baseUrl",
         source=release_channel_path,
     )
+    if proof_base_url not in ALLOWED_RELEASE_PROOF_BASE_URLS:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.baseUrl must match an allowed canonical release origin: "
+            f"{release_channel_path} (base_url={proof_base_url}, allowed={', '.join(ALLOWED_RELEASE_PROOF_BASE_URLS)})"
+        )
     journeys_passed = proof.get("journeysPassed") or proof.get("journeys_passed")
     journeys = require_string_list(
         journeys_passed,
