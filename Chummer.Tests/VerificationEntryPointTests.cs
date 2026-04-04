@@ -106,6 +106,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("missing required milestone-2 visual tests", script, StringComparison.Ordinal);
         Assert.Contains("required_screenshots", script, StringComparison.Ordinal);
         Assert.Contains("missing required milestone-2 screenshots", script, StringComparison.Ordinal);
+        Assert.Contains("screenshot_dir is missing", script, StringComparison.Ordinal);
+        Assert.Contains("screenshot_dir does not exist", script, StringComparison.Ordinal);
+        Assert.Contains("screenshot_timestamps must be a JSON object", script, StringComparison.Ordinal);
+        Assert.Contains("screenshot timestamp drifts from on-disk file mtime", script, StringComparison.Ordinal);
+        Assert.Contains("screenshot_receipt_skew_max_seconds", script, StringComparison.Ordinal);
+        Assert.Contains("required screenshot file is missing on disk", script, StringComparison.Ordinal);
         Assert.Contains("missing_screenshots", script, StringComparison.Ordinal);
         Assert.Contains("missing_theme_tokens", script, StringComparison.Ordinal);
         Assert.Contains("flagship_theme_readability_contrast", script, StringComparison.Ordinal);
@@ -407,6 +413,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=aftermath", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=roster", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=rostermove", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
@@ -416,6 +423,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=aftermath", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=return", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=roster", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=rostermove", audit, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -462,6 +470,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("return-loop continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=roster", playwright, StringComparison.Ordinal);
         Assert.Contains("roster-movement prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=rostermove", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact rostermove query", playwright, StringComparison.Ordinal);
     }
 
     [Fact]
