@@ -3725,13 +3725,19 @@ public sealed class CampaignSpineService
                     .Publication,
                 StringComparer.OrdinalIgnoreCase);
         var publicationsByArtifactId = creatorPublications
-            .Where(item => !string.IsNullOrWhiteSpace(item.ArtifactId))
-            .GroupBy(item => item.ArtifactId, StringComparer.OrdinalIgnoreCase)
+            .Select(item => new
+            {
+                ArtifactId = AccountService.NormalizeOptional(item.ArtifactId),
+                Publication = item
+            })
+            .Where(static item => item.ArtifactId is not null)
+            .GroupBy(static item => item.ArtifactId!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 static group => group.Key,
                 static group => group
-                    .OrderByDescending(static item => item.UpdatedAtUtc)
-                    .First(),
+                    .OrderByDescending(static item => item.Publication.UpdatedAtUtc)
+                    .First()
+                    .Publication,
                 StringComparer.OrdinalIgnoreCase);
         return workspaces
             .Select(workspace =>
@@ -3964,14 +3970,16 @@ public sealed class CampaignSpineService
         IReadOnlyDictionary<string, CreatorPublicationProjection> publicationsById,
         IReadOnlyDictionary<string, CreatorPublicationProjection> publicationsByArtifactId)
     {
-        if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId)
-            && publicationsById.TryGetValue(item.CreatorPublicationId, out CreatorPublicationProjection? creatorPublicationById))
+        string? publicationId = AccountService.NormalizeOptional(item.CreatorPublicationId);
+        if (publicationId is not null
+            && publicationsById.TryGetValue(publicationId, out CreatorPublicationProjection? creatorPublicationById))
         {
             return creatorPublicationById;
         }
 
-        if (!string.IsNullOrWhiteSpace(item.ArtifactId)
-            && publicationsByArtifactId.TryGetValue(item.ArtifactId, out CreatorPublicationProjection? creatorPublicationByArtifact))
+        string? artifactId = AccountService.NormalizeOptional(item.ArtifactId);
+        if (artifactId is not null
+            && publicationsByArtifactId.TryGetValue(artifactId, out CreatorPublicationProjection? creatorPublicationByArtifact))
         {
             return creatorPublicationByArtifact;
         }

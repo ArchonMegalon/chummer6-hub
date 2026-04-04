@@ -547,12 +547,21 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
+        HashSet<string> recapArtifactIds = workspace.RecapShelf
+            .Select(static recap => NormalizeOptional(recap.ArtifactId))
+            .Where(static item => item is not null)
+            .Select(static item => item!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> recapPublicationIds = workspace.RecapShelf
+            .Select(static recap => NormalizeOptional(recap.CreatorPublicationId))
+            .Where(static item => item is not null)
+            .Select(static item => item!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         IReadOnlyList<CreatorPublicationProjection> creatorPublications = accountSummary.CreatorPublications
             .Where(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase)
-                || (!string.IsNullOrWhiteSpace(item.ArtifactId)
-                    && workspace.RecapShelf.Any(recap => string.Equals(recap.ArtifactId, item.ArtifactId, StringComparison.OrdinalIgnoreCase)))
-                || (!string.IsNullOrWhiteSpace(item.PublicationId)
-                    && workspace.RecapShelf.Any(recap => string.Equals(recap.CreatorPublicationId, item.PublicationId, StringComparison.OrdinalIgnoreCase))))
+                || (NormalizeOptional(item.ArtifactId) is string artifactId && recapArtifactIds.Contains(artifactId))
+                || (NormalizeOptional(item.PublicationId) is string publicationId && recapPublicationIds.Contains(publicationId)))
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .ToArray();
 
@@ -997,13 +1006,19 @@ public sealed class CampaignWorkspaceServerPlaneService
                     .Publication,
                 StringComparer.OrdinalIgnoreCase);
         var publicationsByArtifactId = creatorPublications
-            .Where(item => !string.IsNullOrWhiteSpace(item.ArtifactId))
-            .GroupBy(item => item.ArtifactId, StringComparer.OrdinalIgnoreCase)
+            .Select(static item => new
+            {
+                ArtifactId = NormalizeOptional(item.ArtifactId),
+                Publication = item
+            })
+            .Where(static item => item.ArtifactId is not null)
+            .GroupBy(static item => item.ArtifactId!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 static group => group.Key,
                 static group => group
-                    .OrderByDescending(static item => item.UpdatedAtUtc)
-                    .First(),
+                    .OrderByDescending(static item => item.Publication.UpdatedAtUtc)
+                    .First()
+                    .Publication,
                 StringComparer.OrdinalIgnoreCase);
         return SelectBoundedRecapShelfItems(recapShelf, aftermathTimes, defaultUpdatedAtUtc)
             .Select(item =>
@@ -1180,14 +1195,16 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyDictionary<string, CreatorPublicationProjection> publicationsById,
         IReadOnlyDictionary<string, CreatorPublicationProjection> publicationsByArtifactId)
     {
-        if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId)
-            && publicationsById.TryGetValue(item.CreatorPublicationId, out CreatorPublicationProjection? creatorPublicationById))
+        string? publicationId = NormalizeOptional(item.CreatorPublicationId);
+        if (publicationId is not null
+            && publicationsById.TryGetValue(publicationId, out CreatorPublicationProjection? creatorPublicationById))
         {
             return creatorPublicationById;
         }
 
-        if (!string.IsNullOrWhiteSpace(item.ArtifactId)
-            && publicationsByArtifactId.TryGetValue(item.ArtifactId, out CreatorPublicationProjection? creatorPublicationByArtifact))
+        string? artifactId = NormalizeOptional(item.ArtifactId);
+        if (artifactId is not null
+            && publicationsByArtifactId.TryGetValue(artifactId, out CreatorPublicationProjection? creatorPublicationByArtifact))
         {
             return creatorPublicationByArtifact;
         }
