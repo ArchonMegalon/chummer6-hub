@@ -50,6 +50,11 @@ public sealed class VerificationEntryPointTests
 
         Assert.Contains("scripts/generate-parity-checklist.sh", script, StringComparison.Ordinal);
         Assert.Contains("docs/PARITY_CHECKLIST.md", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_UI_PUBLISHED_DIR", script, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json", script, StringComparison.Ordinal);
+        Assert.Contains("DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json", script, StringComparison.Ordinal);
+        Assert.Contains("required executable receipt is missing", script, StringComparison.Ordinal);
+        Assert.Contains("status must be pass/passed/ready", script, StringComparison.Ordinal);
         Assert.Contains("Parity audit passed", script, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer.Web/wwwroot/index.html", script, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer/Forms/ChummerMainForm.Designer.cs", script, StringComparison.Ordinal);
