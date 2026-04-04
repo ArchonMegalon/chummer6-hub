@@ -583,6 +583,69 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineEnrichWorkspaceRecapShelfUsesCanonicalProjectionIdForFallbackPublicationId()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        PublicationSafeProjection recapWithWhitespaceProjection = new(
+            ProjectionId: "  recap-projection-canonical  ",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap summary",
+            CreatorPublicationId: null);
+        PublicationSafeProjection recapWithCanonicalProjection = recapWithWhitespaceProjection with
+        {
+            ProjectionId = "recap-projection-canonical"
+        };
+
+        IReadOnlyList<PublicationSafeProjection> whitespaceResult = InvokeCampaignSpineEnrichWorkspaceRecapShelf(
+            campaign,
+            workspace.WorkspaceId,
+            [recapWithWhitespaceProjection]);
+        IReadOnlyList<PublicationSafeProjection> canonicalResult = InvokeCampaignSpineEnrichWorkspaceRecapShelf(
+            campaign,
+            workspace.WorkspaceId,
+            [recapWithCanonicalProjection]);
+
+        PublicationSafeProjection whitespaceRecap = Assert.Single(whitespaceResult);
+        PublicationSafeProjection canonicalRecap = Assert.Single(canonicalResult);
+        Assert.Equal(canonicalRecap.CreatorPublicationId, whitespaceRecap.CreatorPublicationId);
+        Assert.NotNull(whitespaceRecap.CreatorPublicationId);
+    }
+
+    [Fact]
+    public void CampaignSpineBuildCreatorPublicationsUsesCanonicalProjectionIdForFallbackArtifactId()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        PublicationSafeProjection recapWithWhitespaceProjection = new(
+            ProjectionId: "  recap-artifact-canonical  ",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap summary",
+            CreatorPublicationId: "pub-canonical-artifact");
+        PublicationSafeProjection recapWithCanonicalProjection = recapWithWhitespaceProjection with
+        {
+            ProjectionId = "recap-artifact-canonical"
+        };
+        CampaignWorkspaceProjection whitespaceWorkspace = seed with
+        {
+            RecapShelf = [recapWithWhitespaceProjection]
+        };
+        CampaignWorkspaceProjection canonicalWorkspace = seed with
+        {
+            RecapShelf = [recapWithCanonicalProjection]
+        };
+
+        CreatorPublicationProjection whitespacePublication = Assert.Single(
+            InvokeCampaignSpineBuildCreatorPublications([whitespaceWorkspace]));
+        CreatorPublicationProjection canonicalPublication = Assert.Single(
+            InvokeCampaignSpineBuildCreatorPublications([canonicalWorkspace]));
+
+        Assert.Equal(canonicalPublication.ArtifactId, whitespacePublication.ArtifactId);
+        Assert.StartsWith("artifact-", whitespacePublication.ArtifactId, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CampaignSpineNextSessionCarryForwardTreatsWhitespacePaddedReplayPackageKindAsReplay()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
@@ -4376,6 +4439,25 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("BuildCreatorPublications was not found.");
 
         return Assert.IsAssignableFrom<IReadOnlyList<CreatorPublicationProjection>>(method.Invoke(null, [workspaces, Array.Empty<RunnerDossierProjection>(), Array.Empty<BuildLabHandoffProjection>()]));
+    }
+
+    private static IReadOnlyList<PublicationSafeProjection> InvokeCampaignSpineEnrichWorkspaceRecapShelf(
+        CampaignProjection campaign,
+        string workspaceId,
+        IReadOnlyList<PublicationSafeProjection> recapShelf)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("EnrichWorkspaceRecapShelf", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("EnrichWorkspaceRecapShelf was not found.");
+
+        return Assert.IsAssignableFrom<IReadOnlyList<PublicationSafeProjection>>(method.Invoke(
+            null,
+            [
+                campaign,
+                workspaceId,
+                recapShelf,
+                "Keep return loop on governed lane."
+            ]));
     }
 
     private static NextSessionCarryForwardProjection? InvokeCampaignSpineBuildNextSessionCarryForward(
