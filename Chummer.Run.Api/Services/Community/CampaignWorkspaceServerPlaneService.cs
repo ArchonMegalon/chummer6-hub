@@ -1674,7 +1674,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
     {
-        WorkspaceChangePacketProjection[] oppositionSignals = DeduplicateIdenticalChangePacketVersions(
+        WorkspaceChangePacketProjection[] oppositionSignals = DeduplicateSemanticChangePacketVersions(
                 (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
                 .Where(static packet => IsOppositionSignal(packet))
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
@@ -1812,7 +1812,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         PublicationSafeProjection[] continuityRecaps = DeduplicateSemanticPublicationRecapVersions(
                 workspace.RecapShelf)
             .ToArray();
-        WorkspaceChangePacketProjection[] continuitySignals = DeduplicateIdenticalChangePacketVersions(
+        WorkspaceChangePacketProjection[] continuitySignals = DeduplicateSemanticChangePacketVersions(
                 (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
                 .Where(static packet => IsContinuitySignal(packet))
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
@@ -1963,7 +1963,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         CampaignMemoryProjection? campaignMemory = workspace.CampaignMemory;
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
-        WorkspaceChangePacketProjection[] memorySignals = DeduplicateIdenticalChangePacketVersions(
+        WorkspaceChangePacketProjection[] memorySignals = DeduplicateSemanticChangePacketVersions(
                 (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
                 .Where(static packet => IsCampaignMemorySignal(packet))
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
@@ -2122,13 +2122,13 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static consequence => consequence.UpdatedAtUtc))
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] returnChanges = DeduplicateIdenticalChangePacketVersions(
+        WorkspaceChangePacketProjection[] returnChanges = DeduplicateSemanticChangePacketVersions(
                 (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
                 .Where(static packet => IsCampaignReturnSignal(packet))
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] aftermathChanges = DeduplicateIdenticalChangePacketVersions(
+        WorkspaceChangePacketProjection[] aftermathChanges = DeduplicateSemanticChangePacketVersions(
                 (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
                 .Where(static packet => IsAftermathSignal(packet))
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
@@ -2568,7 +2568,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static consequence => consequence.UpdatedAtUtc))
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] rosterChangeSignals = DeduplicateIdenticalChangePacketVersions(
+        WorkspaceChangePacketProjection[] rosterChangeSignals = DeduplicateSemanticChangePacketVersions(
                 (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
                 .Where(static packet => IsRosterMovementSignal(packet))
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
@@ -2791,7 +2791,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .Where(static item => IsAftermathRecapSignal(item)))
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] aftermathSignals = DeduplicateIdenticalChangePacketVersions(
+        WorkspaceChangePacketProjection[] aftermathSignals = DeduplicateSemanticChangePacketVersions(
                 (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
                 .Where(static packet => IsAftermathSignal(packet))
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
@@ -2949,7 +2949,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static item => item.LaunchedAtUtc))
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] launchSignals = DeduplicateIdenticalChangePacketVersions(
+        WorkspaceChangePacketProjection[] launchSignals = DeduplicateSemanticChangePacketVersions(
                 (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
                 .Where(static packet => IsPrepLaunchSignal(packet))
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
@@ -3092,7 +3092,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
     {
-        WorkspaceChangePacketProjection[] eventPackets = DeduplicateIdenticalChangePacketVersions(
+        WorkspaceChangePacketProjection[] eventPackets = DeduplicateSemanticChangePacketVersions(
                 (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
                 .Where(static packet => IsEventControlSignal(packet))
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
@@ -3540,7 +3540,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static item => item.StagedAtUtc))
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] prefetchSignals = DeduplicateIdenticalChangePacketVersions(
+        WorkspaceChangePacketProjection[] prefetchSignals = DeduplicateSemanticChangePacketVersions(
                 (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
                 .Where(static packet => IsTravelPrefetchSignal(packet))
                 .OrderByDescending(static packet => packet.UpdatedAtUtc))
@@ -3804,22 +3804,21 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Take(4)
             .ToArray();
 
-    private static IEnumerable<WorkspaceChangePacketProjection> DeduplicateIdenticalChangePacketVersions(
+    private static IEnumerable<WorkspaceChangePacketProjection> DeduplicateSemanticChangePacketVersions(
         IEnumerable<WorkspaceChangePacketProjection> packets)
     {
         HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
         foreach (WorkspaceChangePacketProjection packet in packets)
         {
-            if (seenKeys.Add(BuildChangePacketDedupeKey(packet)))
+            if (seenKeys.Add(BuildChangePacketSemanticDedupeKey(packet)))
             {
                 yield return packet;
             }
         }
     }
 
-    private static string BuildChangePacketDedupeKey(WorkspaceChangePacketProjection packet) =>
+    private static string BuildChangePacketSemanticDedupeKey(WorkspaceChangePacketProjection packet) =>
         string.Join('|',
-            NormalizeOptional(packet.PacketId) ?? string.Empty,
             NormalizeOptional(packet.Kind) ?? string.Empty,
             NormalizeOptional(packet.Label) ?? string.Empty,
             NormalizeOptional(packet.Summary) ?? string.Empty,

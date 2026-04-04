@@ -760,6 +760,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDeduplicatesSemanticallyIdenticalSignalVersions_WhenProjectionIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithCampaignReturnSignalLabelsOnly();
+        IReadOnlyList<WorkspaceChangePacketProjection> seedPackets =
+            Assert.IsAssignableFrom<IReadOnlyList<WorkspaceChangePacketProjection>>(seed.ChangePackets);
+        WorkspaceChangePacketProjection first = seedPackets[0];
+        WorkspaceChangePacketProjection duplicateWithDifferentId = first with
+        {
+            PacketId = "packet-1-semantic-dup"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ChangePackets = [first, duplicateWithDifferentId]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 diary/continuity signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void CampaignReturnPacketDeduplicatesIdenticalRelationshipConsequenceVersions_WhenPayloadRepeatsSameRow()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithCampaignReturnRelationshipConsequenceVariantsOnly();
@@ -1438,6 +1462,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("2 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("season operation label", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("contact pressure label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void EventControlPacketDeduplicatesSemanticallyIdenticalSignalVersions_WhenProjectionIdsDiffer()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithEventControlSignalLabelsOnly();
+        IReadOnlyList<WorkspaceChangePacketProjection> seedPackets =
+            Assert.IsAssignableFrom<IReadOnlyList<WorkspaceChangePacketProjection>>(seed.ChangePackets);
+        WorkspaceChangePacketProjection first = seedPackets[0];
+        WorkspaceChangePacketProjection duplicateWithDifferentId = first with
+        {
+            PacketId = "packet-1-semantic-dup"
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ChangePackets = [first, duplicateWithDifferentId]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("1 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
