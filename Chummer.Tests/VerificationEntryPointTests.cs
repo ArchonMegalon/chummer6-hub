@@ -935,6 +935,18 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=preplaunches", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=travelprefetch", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=travelprefetches", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=offlinereadiness", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=offlinereadinesses", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=travelreadiness", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=travelreadinesses", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=safehousereadiness", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=safehousereadinesses", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobileofflinereadiness", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobileofflinereadinesses", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobiletravelcache", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobiletravelcaches", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobilesafehousereadiness", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=mobilesafehousereadinesses", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=season-operation", audit, StringComparison.Ordinal);
@@ -1936,6 +1948,18 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact travelprefetch prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=travelprefetches", playwright, StringComparison.Ordinal);
         Assert.Contains("compact travelprefetches prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinereadiness', 'compact offlinereadiness continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'offlinereadinesses', 'compact offlinereadinesses continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadiness', 'compact travelreadiness continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'travelreadinesses', 'compact travelreadinesses continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousereadiness', 'compact safehousereadiness continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'safehousereadinesses', 'compact safehousereadinesses continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinereadiness', 'compact mobileofflinereadiness continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobileofflinereadinesses', 'compact mobileofflinereadinesses continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobiletravelcache', 'compact mobiletravelcache continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobiletravelcaches', 'compact mobiletravelcaches continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousereadiness', 'compact mobilesafehousereadiness continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'mobilesafehousereadinesses', 'compact mobilesafehousereadinesses continuity prep');", playwright, StringComparison.Ordinal);
     }
 
     [Fact]
