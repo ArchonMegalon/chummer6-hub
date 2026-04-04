@@ -4650,6 +4650,22 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("operation");
         }
 
+        if (tokens.Contains("eventoperation"))
+        {
+            tokens.Remove("eventoperation");
+            tokens.Add("eventcontrol");
+            tokens.Add("event");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("eventoperations"))
+        {
+            tokens.Remove("eventoperations");
+            tokens.Add("eventcontrol");
+            tokens.Add("event");
+            tokens.Add("operation");
+        }
+
         if (tokens.Contains("crewtransfer"))
         {
             tokens.Remove("crewtransfer");

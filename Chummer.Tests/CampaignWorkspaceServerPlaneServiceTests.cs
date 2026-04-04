@@ -185,10 +185,14 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("eventops");
         IReadOnlyList<string> compactSingularTokens = InvokeBuildTokens("eventop");
+        IReadOnlyList<string> compactOperationTokens = InvokeBuildTokens("eventoperation");
+        IReadOnlyList<string> compactOperationsTokens = InvokeBuildTokens("eventoperations");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixops");
 
         Assert.True(InvokeMatches(packet, compactPluralTokens));
         Assert.True(InvokeMatches(packet, compactSingularTokens));
+        Assert.True(InvokeMatches(packet, compactOperationTokens));
+        Assert.True(InvokeMatches(packet, compactOperationsTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
     }
 
@@ -209,9 +213,11 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event operation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperation")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-op")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-operation")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event operations")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventoperations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event-operations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event control")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("event controls")));

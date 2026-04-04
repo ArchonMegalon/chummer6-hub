@@ -1315,6 +1315,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail event-op compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event-op compact search');
 
+  await page.fill('#prepQuery', 'eventoperation');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=eventoperation/.test(page.url()), 'Workspace detail search should preserve the compact eventoperation prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail eventoperation compact search');
+  await expectBodyText(page, 'match(es) for "eventoperation"', '/account/work/workspaces detail eventoperation compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail eventoperation compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail eventoperation compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail eventoperation compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail eventoperation compact search');
+  const workspaceEventOperationCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEventOperationCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact eventoperation query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail eventoperation compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail eventoperation compact search');
+
+  await page.fill('#prepQuery', 'eventoperations');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=eventoperations/.test(page.url()), 'Workspace detail search should preserve the compact eventoperations prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail eventoperations compact search');
+  await expectBodyText(page, 'match(es) for "eventoperations"', '/account/work/workspaces detail eventoperations compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail eventoperations compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail eventoperations compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail eventoperations compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail eventoperations compact search');
+  const workspaceEventOperationsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEventOperationsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact eventoperations query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail eventoperations compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail eventoperations compact search');
+
   await page.fill('#prepQuery', 'event-op');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
