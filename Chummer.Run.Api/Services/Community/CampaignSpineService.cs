@@ -3066,9 +3066,9 @@ public sealed class CampaignSpineService
                 PublicationSummary = string.IsNullOrWhiteSpace(item.PublicationSummary)
                     ? publicationSummary
                     : item.PublicationSummary,
-                CreatorPublicationId = string.IsNullOrWhiteSpace(item.CreatorPublicationId)
-                    ? StableId("publication", $"{workspaceId}:{ResolveRecapProjectionIdentity(item)}")
-                    : item.CreatorPublicationId,
+                CreatorPublicationId = ResolveChangePacketIdentity(
+                    item.CreatorPublicationId,
+                    StableId("publication", $"{workspaceId}:{ResolveRecapProjectionIdentity(item)}")),
                 NextSafeAction = string.IsNullOrWhiteSpace(item.NextSafeAction)
                     ? nextSafeAction
                     : item.NextSafeAction,
@@ -3705,7 +3705,8 @@ public sealed class CampaignSpineService
                     .Select(item =>
                     {
                         PublicationSafeProjection recap = item.Item;
-                        string artifact = recap.ArtifactId ?? StableId("artifact", $"{workspace.WorkspaceId}:{ResolveRecapProjectionIdentity(recap)}");
+                        string artifact = AccountService.NormalizeOptional(recap.ArtifactId)
+                            ?? StableId("artifact", $"{workspace.WorkspaceId}:{ResolveRecapProjectionIdentity(recap)}");
                         string publicationKind = NormalizeCreatorPublicationKind(recap.Kind);
                         string nextSafeAction = !string.IsNullOrWhiteSpace(recap.NextSafeAction)
                             ? recap.NextSafeAction!
@@ -3795,7 +3796,16 @@ public sealed class CampaignSpineService
             {
                 if (creatorPublications.Count == 0)
                 {
-                    return workspace;
+                    return workspace with
+                    {
+                        RecapShelf = workspace.RecapShelf
+                            .Select(item => item with
+                            {
+                                CreatorPublicationId = AccountService.NormalizeOptional(item.CreatorPublicationId),
+                                ArtifactId = AccountService.NormalizeOptional(item.ArtifactId)
+                            })
+                            .ToArray()
+                    };
                 }
 
                 var recapShelf = workspace.RecapShelf
