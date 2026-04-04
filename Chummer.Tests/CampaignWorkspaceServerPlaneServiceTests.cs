@@ -744,6 +744,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     [InlineData("post-session")]
     [InlineData("post-run")]
     [InlineData("post-game")]
+    [InlineData("afteraction")]
+    [InlineData("afteractions")]
     [InlineData("aar")]
     [InlineData("aars")]
     [InlineData("retro")]

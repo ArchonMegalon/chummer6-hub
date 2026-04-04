@@ -268,6 +268,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         "postrun",
         "postgame",
         "postgames",
+        "afteraction",
+        "afteractions",
         "afteractionreport",
         "afteractionreports",
         "afteractionreview",
