@@ -490,10 +490,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("hot-washes")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("lessonlearned")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("lessonslearned")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("lessonlearnt")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("lessonslearnt")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("lesson learned")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("lessons learned")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("lesson learnt")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("lessons learnt")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("lesson-learned")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("lessons-learned")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("lesson-learnt")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("lessons-learnt")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("recaps")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("returns")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("memories")));
@@ -527,6 +533,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixretrospective")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixhotwash")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixlessonlearned")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixlessonlearnt")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostmortem")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostsession")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpostrun")));

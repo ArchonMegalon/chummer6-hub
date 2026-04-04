@@ -1019,6 +1019,18 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("recap");
         }
 
+        if (tokens.Contains("lessonlearnt"))
+        {
+            tokens.Remove("lessonlearnt");
+            tokens.Add("recap");
+        }
+
+        if (tokens.Contains("lessonslearnt"))
+        {
+            tokens.Remove("lessonslearnt");
+            tokens.Add("recap");
+        }
+
         if (tokens.Contains("hot") && (tokens.Contains("wash") || tokens.Contains("washes")))
         {
             tokens.Remove("hot");
@@ -1032,6 +1044,14 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Remove("lesson");
             tokens.Remove("lessons");
             tokens.Remove("learned");
+            tokens.Add("recap");
+        }
+
+        if ((tokens.Contains("lesson") || tokens.Contains("lessons")) && tokens.Contains("learnt"))
+        {
+            tokens.Remove("lesson");
+            tokens.Remove("lessons");
+            tokens.Remove("learnt");
             tokens.Add("recap");
         }
 
