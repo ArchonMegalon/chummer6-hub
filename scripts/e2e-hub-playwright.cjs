@@ -1840,6 +1840,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail leagueoperation compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leagueoperation compact search');
 
+  await page.fill('#prepQuery', 'league-op');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=league-op/.test(page.url()), 'Workspace detail search should preserve the hyphen league-op prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail league-op hyphen search');
+  await expectBodyText(page, 'match(es) for "league-op"', '/account/work/workspaces detail league-op hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail league-op hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail league-op hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail league-op hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail league-op hyphen search');
+  const workspaceLeagueOpHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueOpHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen league-op query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail league-op hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail league-op hyphen search');
+
   await page.fill('#prepQuery', 'league-operation');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -2112,6 +2133,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail communityoperation compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityoperation compact search');
+
+  await page.fill('#prepQuery', 'community-op');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=community-op/.test(page.url()), 'Workspace detail search should preserve the hyphen community-op prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail community-op hyphen search');
+  await expectBodyText(page, 'match(es) for "community-op"', '/account/work/workspaces detail community-op hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail community-op hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail community-op hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail community-op hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail community-op hyphen search');
+  const workspaceCommunityOpHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityOpHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen community-op query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail community-op hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail community-op hyphen search');
 
   await page.fill('#prepQuery', 'community-operation');
   await Promise.all([

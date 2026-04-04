@@ -1114,6 +1114,7 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse seasonControlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season-control");
         GmPrepAssetListResponse leagueOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leagueops");
         GmPrepAssetListResponse leagueOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leagueop");
+        GmPrepAssetListResponse leagueOpHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league-op");
         GmPrepAssetListResponse leagueOperationMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leagueoperation");
         GmPrepAssetListResponse leagueOperationsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leagueoperations");
         GmPrepAssetListResponse leagueOpsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league ops");
@@ -1128,6 +1129,7 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse leagueControlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league-control");
         GmPrepAssetListResponse communityOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityops");
         GmPrepAssetListResponse communityOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityop");
+        GmPrepAssetListResponse communityOpHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community-op");
         GmPrepAssetListResponse communityOperationMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityoperation");
         GmPrepAssetListResponse communityOperationsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityoperations");
         GmPrepAssetListResponse communityOpsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community ops");
@@ -1214,6 +1216,7 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(seasonControlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueOpsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueOpMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueOpHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueOperationMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueOperationsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(leagueOpsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
@@ -1228,6 +1231,7 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(leagueControlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityOpsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityOpMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityOpHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityOperationMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityOperationsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(communityOpsSpacedMatches.Items, item => item.AssetId == "event_control_ops");

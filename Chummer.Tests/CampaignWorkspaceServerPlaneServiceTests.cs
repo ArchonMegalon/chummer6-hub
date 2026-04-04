@@ -240,6 +240,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-control")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leagueops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leagueop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("league-op")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leagueoperation")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leagueoperations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("league ops")));
@@ -254,6 +255,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leaguectrl")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("communityops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("communityop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("community-op")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("communityoperation")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("communityoperations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("community ops")));
