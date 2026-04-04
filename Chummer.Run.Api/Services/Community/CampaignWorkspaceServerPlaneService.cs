@@ -4463,6 +4463,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         int contactsHeatSignalCount = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
             .Count(static consequence => IsCampaignRelationshipSignalKind(consequence.Kind));
         int aftermathPackageCount = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>()).Count;
+        int returnLoopSignalCount = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+            .Count(static packet => IsCampaignReturnSignal(packet))
+            + (workspace.NextSessionCarryForward is null ? 0 : 1);
         int prepPacketCount = prepLibrary.Packets.Count;
         string laneStatus = travelReadyDeviceCount == 0
             ? "blocked"
@@ -4505,6 +4508,15 @@ public sealed class CampaignWorkspaceServerPlaneService
                     : staleCacheDeviceCount > 0
                         ? $"{travelReadyDeviceCount} travel-safe device(s) can review {aftermathPackageCount} aftermath package(s) while offline{degradedTail}"
                         : $"{travelReadyDeviceCount} travel-safe device(s) can review {aftermathPackageCount} aftermath package(s) while offline."),
+            new TravelOfflineLaneCue(
+                Lane: "return_loop",
+                Status: laneStatus,
+                SignalCount: returnLoopSignalCount,
+                Summary: travelReadyDeviceCount == 0
+                    ? $"Campaign return loop follow-through is blocked{blockedTail}"
+                    : staleCacheDeviceCount > 0
+                        ? $"{travelReadyDeviceCount} travel-safe device(s) can continue campaign return-loop follow-through with {returnLoopSignalCount} governed cue(s) while offline{degradedTail}"
+                        : $"{travelReadyDeviceCount} travel-safe device(s) can continue campaign return-loop follow-through with {returnLoopSignalCount} governed cue(s) while offline."),
             new TravelOfflineLaneCue(
                 Lane: "prep_review",
                 Status: laneStatus,
