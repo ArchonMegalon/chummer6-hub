@@ -154,8 +154,10 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
         {
             "preplibrarypacket",
+            "oppositionpacket",
             "oppositionpackets",
             "rostermovementpacket",
+            "eventcontrolpacket",
             "eventcontrolpackets"
         };
 
@@ -169,8 +171,10 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.Contains("eventcontrol", tokens);
         Assert.Contains("packet", tokens);
         Assert.DoesNotContain("preplibrarypacket", tokens);
+        Assert.DoesNotContain("oppositionpacket", tokens);
         Assert.DoesNotContain("oppositionpackets", tokens);
         Assert.DoesNotContain("rostermovementpacket", tokens);
+        Assert.DoesNotContain("eventcontrolpacket", tokens);
         Assert.DoesNotContain("eventcontrolpackets", tokens);
     }
 
