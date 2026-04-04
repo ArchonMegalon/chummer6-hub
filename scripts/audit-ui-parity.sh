@@ -957,6 +957,40 @@ def validate_cross_receipt_alignment(
             f"{workflow_path} ({workflow_release_version}) vs "
             f"{visual_path} ({visual_release_version})"
         )
+    workflow_release_channel_path = resolve_nested_receipt_path(
+        workflow_path,
+        require_non_empty_string(
+            workflow_evidence.get("release_channel_path"),
+            message=f"parity audit failed: workflow receipt release-channel path is missing: {workflow_path}",
+        ),
+    )
+    visual_release_channel_path = resolve_nested_receipt_path(
+        visual_path,
+        require_non_empty_string(
+            visual_evidence.get("release_channel_path"),
+            message=f"parity audit failed: visual receipt release-channel path is missing: {visual_path}",
+        ),
+    )
+    if workflow_release_channel_path != visual_release_channel_path:
+        raise SystemExit(
+            "parity audit failed: milestone-2 workflow/visual release-channel nested receipt paths drift: "
+            f"{workflow_path} ({workflow_release_channel_path}) vs "
+            f"{visual_path} ({visual_release_channel_path})"
+        )
+    workflow_release_channel_generated_at = parse_generated_at(
+        workflow_path,
+        {"generatedAt": workflow_evidence.get("release_channel_generated_at")},
+    )
+    visual_release_channel_generated_at = parse_generated_at(
+        visual_path,
+        {"generatedAt": visual_evidence.get("release_channel_generated_at")},
+    )
+    if workflow_release_channel_generated_at != visual_release_channel_generated_at:
+        raise SystemExit(
+            "parity audit failed: milestone-2 workflow/visual release-channel generated_at drift: "
+            f"{workflow_path} ({workflow_release_channel_generated_at.isoformat()}) vs "
+            f"{visual_path} ({visual_release_channel_generated_at.isoformat()})"
+        )
 
 
 workflow_path = pathlib.Path(sys.argv[1])
