@@ -949,6 +949,108 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"].pop("uiLocalizationReleaseGate", None)
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject missing releaseProof.uiLocalizationReleaseGate payloads." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+gate = payload["releaseProof"]["uiLocalizationReleaseGate"]
+gate["defaultKeyCount"] = 383
+gate["default_key_count"] = 384
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject conflicting alias values between releaseProof.uiLocalizationReleaseGate.defaultKeyCount and releaseProof.uiLocalizationReleaseGate.default_key_count." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["releaseProof"]["uiLocalizationReleaseGate"]["explicitFallbackRuntime"] = "failed"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject non-passing releaseProof.uiLocalizationReleaseGate.explicitFallbackRuntime status." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+gate = payload["releaseProof"]["uiLocalizationReleaseGate"]
+gate["translationBacklogFindingsCount"] = 1
+gate["translationBacklogFindings"] = []
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject releaseProof.uiLocalizationReleaseGate.translationBacklogFindings length/count mismatches." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+for row in payload["releaseProof"]["uiLocalizationReleaseGate"]["localeSummary"]:
+    if isinstance(row, dict) and row.get("locale") == "de-de":
+        row["untranslatedKeyCount"] = 1
+        break
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+if bash scripts/audit-ui-parity.sh; then
+  mv "$release_channel_backup" "$release_channel_path"
+  echo "verify gate failed: parity audit should reject non-zero releaseProof.uiLocalizationReleaseGate.localeSummary untranslatedKeyCount values." >&2
+  exit 1
+fi
+mv "$release_channel_backup" "$release_channel_path"
+
+release_channel_backup="$(mktemp)"
+cp "$release_channel_path" "$release_channel_backup"
+python3 - "$release_channel_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
 payload.pop("releaseProof", None)
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
