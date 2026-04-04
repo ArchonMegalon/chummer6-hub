@@ -2315,7 +2315,7 @@ public sealed class CampaignSpineService
                             ? "25 / 50 / 100 Karma checkpoints stay attached to the living dossier until the first governed campaign workspace exists."
                             : $"25 / 50 / 100 Karma checkpoints stay attached to {workspace.CampaignName} so the return path keeps the same upgrade plan.",
                         readyOutputSummary,
-                        $"Explain receipt {explainReceiptId} stays attached across character-template, Foundry-class exchange, and sheet-viewer export follow-through."
+                        $"Explain receipt {explainReceiptId} stays attached across character-template, Foundry-class exchange, sheet-viewer checks, and print-ready PDF export follow-through."
                     ],
                     Outputs: outputs,
                     UpdatedAtUtc: dossier.UpdatedAtUtc,
@@ -2365,7 +2365,16 @@ public sealed class CampaignSpineService
                 summary: "Review the same handoff in the governed sheet viewer before print/export decisions.",
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
-                nextSafeAction: "Open workflow.viewer.sheet and confirm the current handoff posture before print/export.")
+                nextSafeAction: "Open workflow.viewer.sheet and confirm the current handoff posture before print/export."),
+            BuildBuildLabGovernedOutput(
+                dossier,
+                projectionIdSuffix: "print-pdf-export",
+                kind: "print_pdf_export",
+                label: "Print-ready PDF export",
+                summary: "Export a governed print-ready PDF from the same handoff without forking rule-environment or explain truth.",
+                runtimeFingerprint: runtimeFingerprint,
+                explainReceiptId: explainReceiptId,
+                nextSafeAction: "Open workflow.export.pdf to generate the current print-ready PDF from this handoff.")
         };
 
         return dossier.Projections

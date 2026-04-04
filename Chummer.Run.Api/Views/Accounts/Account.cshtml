@@ -1777,7 +1777,7 @@
                         }
                         @if (selectedBuildLabHandoff.ProgressionOutcomes.Count > 0)
                         {
-                            <p><strong>Outcome:</strong> @string.Join(" ", selectedBuildLabHandoff.ProgressionOutcomes.Take(2))</p>
+                            <p><strong>Outcome:</strong> @string.Join(" ", selectedBuildLabHandoff.ProgressionOutcomes.Take(3))</p>
                         }
                         @if (selectedBuildLabHandoff.PlannerCoverageLines is { Count: > 0 })
                         {
@@ -1787,7 +1787,7 @@
                         {
                             <p><strong>Outputs:</strong> @string.Join(", ", selectedBuildLabHandoff.Outputs.Select(item => item.Label))</p>
                             <ul class="muted-copy">
-                                @foreach (var output in selectedBuildLabHandoff.Outputs.Take(3))
+                                @foreach (var output in selectedBuildLabHandoff.Outputs.Take(4))
                                 {
                                     <li>
                                         <strong>@output.Label</strong>
