@@ -1066,6 +1066,9 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse eventControlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventcontrol");
         GmPrepAssetListResponse eventControlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventcontrols");
         GmPrepAssetListResponse eventCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventctrl");
+        GmPrepAssetListResponse eventControlSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event control");
+        GmPrepAssetListResponse eventControlsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event controls");
+        GmPrepAssetListResponse eventControlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event-control");
         GmPrepAssetListResponse eventOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventops");
         GmPrepAssetListResponse eventOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventop");
         GmPrepAssetListResponse eventOpsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "event ops");
@@ -1160,6 +1163,9 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(eventControlMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventControlsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventCtrlMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(eventControlSpacedMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(eventControlsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(eventControlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventOpsMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventOpMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(eventOpsSpacedMatches.Items, item => item.AssetId == "event_control_ops");

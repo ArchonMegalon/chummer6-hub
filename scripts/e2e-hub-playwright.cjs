@@ -1126,6 +1126,69 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail event-controls compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event-controls compact search');
 
+  await page.fill('#prepQuery', 'event control');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=event(?:%20|\+)control/.test(page.url()), 'Workspace detail search should preserve the split event control prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail event control split search');
+  await expectBodyText(page, 'match(es) for "event control"', '/account/work/workspaces detail event control split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail event control split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail event control split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail event control split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail event control split search');
+  const workspaceEventControlSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEventControlSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split event control query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail event control split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event control split search');
+
+  await page.fill('#prepQuery', 'event controls');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=event(?:%20|\+)controls/.test(page.url()), 'Workspace detail search should preserve the split event controls prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail event controls split search');
+  await expectBodyText(page, 'match(es) for "event controls"', '/account/work/workspaces detail event controls split search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail event controls split search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail event controls split search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail event controls split search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail event controls split search');
+  const workspaceEventControlsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEventControlsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split event controls query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail event controls split search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event controls split search');
+
+  await page.fill('#prepQuery', 'event-control');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=event-control/.test(page.url()), 'Workspace detail search should preserve the hyphen event-control prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail event-control hyphen search');
+  await expectBodyText(page, 'match(es) for "event-control"', '/account/work/workspaces detail event-control hyphen search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail event-control hyphen search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail event-control hyphen search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail event-control hyphen search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail event-control hyphen search');
+  const workspaceEventControlHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceEventControlHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen event-control query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail event-control hyphen search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail event-control hyphen search');
+
   await page.fill('#prepQuery', 'eventctrl');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
