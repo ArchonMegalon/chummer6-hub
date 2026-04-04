@@ -11,7 +11,9 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("handoff.Outputs.Count > 0", view, StringComparison.Ordinal);
-        Assert.Contains("handoff.Outputs.Take(2)", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.Outputs.Take(6)", view, StringComparison.Ordinal);
+        Assert.Contains("Output lanes continue:", view, StringComparison.Ordinal);
+        Assert.Contains("handoff.Outputs.Count - 6", view, StringComparison.Ordinal);
         Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
         Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
         Assert.Contains("handoff.RuleEnvironmentDiff", view, StringComparison.Ordinal);
