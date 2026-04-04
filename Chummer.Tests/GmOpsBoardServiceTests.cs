@@ -317,6 +317,38 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatPrepLibraryPacketSignalsAsPrepLibraryDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:20:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open prep library packet briefing remains unresolved for campaign return lane.",
+                AtUtc: baseTime,
+                EventId: "evt-prep-library"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-prep-library", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
     public void ReconcilePortableAssets_SkipsAssets_WhenRequiredAssetFieldsAreMissing()
     {
         var service = CreateService();
