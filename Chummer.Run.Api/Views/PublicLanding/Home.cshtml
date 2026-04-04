@@ -986,6 +986,7 @@
                                                                 @if (handoff.RuleEnvironmentDiff is not null)
                                                                 {
                                                                     <span> Rule diff: @handoff.RuleEnvironmentDiff.BeforeFingerprint -> @handoff.RuleEnvironmentDiff.AfterFingerprint (@handoff.RuleEnvironmentDiff.Status).</span>
+                                                                    <span> Rule diff scope: @handoff.RuleEnvironmentDiff.BeforeScope -> @handoff.RuleEnvironmentDiff.AfterScope.</span>
                                                                 }
                                                                 @if (handoff.Outputs.Count > 0)
                                                                 {
