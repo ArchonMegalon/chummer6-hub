@@ -4772,6 +4772,13 @@ def verify_signed_in_work_audit(
         ("queryText=campaignworkspacev4packets", "campaignworkspacev4packets"),
         ("queryText=campaignworkspacev4brief", "campaignworkspacev4brief"),
         ("queryText=campaignworkspacev4briefs", "campaignworkspacev4briefs"),
+        ("queryText=mobilecompanionreturnlanes", "mobilecompanionreturnlanes"),
+        ("queryText=mobilecompanionsreturnloop", "mobilecompanionsreturnloop"),
+        ("queryText=mobilecompanionsreturnloops", "mobilecompanionsreturnloops"),
+        ("queryText=campaignmobilecompanionreturnlane", "campaignmobilecompanionreturnlane"),
+        ("queryText=campaignmobilecompanionreturnlanes", "campaignmobilecompanionreturnlanes"),
+        ("queryText=campaignmobilecompanionsreturnloop", "campaignmobilecompanionsreturnloop"),
+        ("queryText=campaignmobilecompanionsreturnloops", "campaignmobilecompanionsreturnloops"),
         ("queryText=return", "return"),
         ("queryText=returns", "returns"),
         ("queryText=returnloop", "returnloop"),
@@ -9995,6 +10002,13 @@ def verify_signed_in_work_audit(
         ("campaignworkspacev4packets", "campaignworkspacev4packets"),
         ("campaignworkspacev4brief", "campaignworkspacev4brief"),
         ("campaignworkspacev4briefs", "campaignworkspacev4briefs"),
+        ("mobilecompanionreturnlanes", "mobilecompanionreturnlanes"),
+        ("mobilecompanionsreturnloop", "mobilecompanionsreturnloop"),
+        ("mobilecompanionsreturnloops", "mobilecompanionsreturnloops"),
+        ("campaignmobilecompanionreturnlane", "campaignmobilecompanionreturnlane"),
+        ("campaignmobilecompanionreturnlanes", "campaignmobilecompanionreturnlanes"),
+        ("campaignmobilecompanionsreturnloop", "campaignmobilecompanionsreturnloop"),
+        ("campaignmobilecompanionsreturnloops", "campaignmobilecompanionsreturnloops"),
     ]:
         assert_workspace_prep_query_has_items(prep_query_value, label)
 
