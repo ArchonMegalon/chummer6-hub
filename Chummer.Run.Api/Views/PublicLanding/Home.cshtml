@@ -646,6 +646,14 @@
                                                                     {
                                                                         <span> Audit: @leadAftermathShelfEntry.AuditSummary</span>
                                                                     }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.CompatibilitySummary))
+                                                                    {
+                                                                        <span> Compatibility: @leadAftermathShelfEntry.CompatibilitySummary</span>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.LineageSummary))
+                                                                    {
+                                                                        <span> Lineage: @leadAftermathShelfEntry.LineageSummary</span>
+                                                                    }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationState))
                                                                     {
                                                                         <span> State: @HumanizeStatus(leadAftermathShelfEntry.PublicationState, "Ready").</span>

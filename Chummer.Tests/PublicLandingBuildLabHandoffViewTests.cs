@@ -41,4 +41,14 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("Output lane status:", view, StringComparison.Ordinal);
         Assert.Contains("Output audit:", view, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void SignedInHomeAftermathRailRendersRecapShelfCompatibilityAndLineageCues()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("Compatibility: @leadAftermathShelfEntry.CompatibilitySummary", view, StringComparison.Ordinal);
+        Assert.Contains("Lineage: @leadAftermathShelfEntry.LineageSummary", view, StringComparison.Ordinal);
+    }
 }

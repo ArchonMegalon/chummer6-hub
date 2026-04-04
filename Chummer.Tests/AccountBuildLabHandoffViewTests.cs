@@ -69,4 +69,14 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("Cache freshness", view, StringComparison.Ordinal);
         Assert.Contains("Offline actionability", view, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void AccountRecapShelfRendersCompatibilityAndLineageCues()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("Compatibility: @item.CompatibilitySummary", view, StringComparison.Ordinal);
+        Assert.Contains("Lineage: @item.LineageSummary", view, StringComparison.Ordinal);
+    }
 }
