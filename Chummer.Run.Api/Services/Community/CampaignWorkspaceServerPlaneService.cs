@@ -3167,6 +3167,9 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return ContainsAnyWordToken(normalizedKind, AftermathRecapWordTokens)
             || ContainsAfterActionTokenPair(normalizedKind)
+            || ContainsPostMortemTokenPair(normalizedKind)
+            || ContainsPostSessionTokenPair(normalizedKind)
+            || ContainsPostRunTokenPair(normalizedKind)
             || ContainsPostGameTokenPair(normalizedKind)
             || ContainsOutBriefTokenPair(normalizedKind)
             || ContainsHotWashTokenPair(normalizedKind)
@@ -3200,6 +3203,9 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return ContainsAnyWordToken(value, AftermathRecapWordTokens)
             || ContainsAfterActionTokenPair(value)
+            || ContainsPostMortemTokenPair(value)
+            || ContainsPostSessionTokenPair(value)
+            || ContainsPostRunTokenPair(value)
             || ContainsPostGameTokenPair(value)
             || ContainsOutBriefTokenPair(value)
             || ContainsHotWashTokenPair(value)
@@ -3782,6 +3788,42 @@ public sealed class CampaignWorkspaceServerPlaneService
         return ContainsAnyWordToken(value, ["postgame", "postgames"])
             || (ContainsAnyWordToken(value, ["post"])
                 && ContainsAnyWordToken(value, ["game", "games"]));
+    }
+
+    private static bool ContainsPostMortemTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["postmortem", "postmortems"])
+            || (ContainsAnyWordToken(value, ["post"])
+                && ContainsAnyWordToken(value, ["mortem", "mortems"]));
+    }
+
+    private static bool ContainsPostSessionTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["postsession", "postsessions"])
+            || (ContainsAnyWordToken(value, ["post"])
+                && ContainsAnyWordToken(value, ["session", "sessions"]));
+    }
+
+    private static bool ContainsPostRunTokenPair(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsAnyWordToken(value, ["postrun", "postruns"])
+            || (ContainsAnyWordToken(value, ["post"])
+                && ContainsAnyWordToken(value, ["run", "runs"]));
     }
 
     private static bool ContainsHotWashTokenPair(string? value)

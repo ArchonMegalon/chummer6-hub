@@ -5577,6 +5577,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void AftermathPacketActivatesFromPostMortemCarryForwardSplitTokensWhenOtherFamiliesLag()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathPostMortemCarryForwardSplitTokensOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("post mortem", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("review recap board", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void AftermathPacketActivatesFromCarryForwardEvidenceLinesWhenPrimaryFieldsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathCarryForwardEvidenceSignalsOnly();
@@ -5602,6 +5616,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(packet.Reusable);
         Assert.Contains("aftermath", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("hot-wash", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void AftermathPacketActivatesFromPostSessionAndPostRunCarryForwardEvidenceSplitTokensWhenPrimaryFieldsAreSparse()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithAftermathPostSessionAndPostRunCarryForwardEvidenceSplitTokensOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "aftermath_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("aftermath", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("post-session", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("post run", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -12118,6 +12147,90 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Campaign return handoff remains tracked.",
             NextSafeAction: "Review operator checklist.",
             EvidenceLines: ["Hot-wash fallout remains pinned for recap before table reopen."],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathPostMortemCarryForwardSplitTokensOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-post-mortem-1",
+            Label: "Post mortem carry-forward",
+            Summary: "",
+            ReturnSummary: "Post-mortems stay attached to the governed return lane.",
+            NextSafeAction: "Review recap board before table return.",
+            EvidenceLines: [],
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "",
+            ChangePackets: [],
+            Consequences: [],
+            NextSessionCarryForward: carryForward,
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithAftermathPostSessionAndPostRunCarryForwardEvidenceSplitTokensOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-post-session-run-1",
+            Label: "Operator queue note",
+            Summary: "Release checklist remains pending.",
+            ReturnSummary: "Campaign return handoff remains tracked.",
+            NextSafeAction: "Review operator checklist.",
+            EvidenceLines:
+            [
+                "Post-session fallout remains pinned for recap before table reopen.",
+                "Post run follow-through remains governed until return is confirmed."
+            ],
             UpdatedAtUtc: now.AddMinutes(2));
 
         return new CampaignWorkspaceProjection(
