@@ -42,6 +42,56 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void ResolvePrepPacketNormalizesWhitespacePaddedPacketIds()
+    {
+        DateTimeOffset updatedAtUtc = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "packet-1",
+            Kind: "campaign_return_packet",
+            Title: "Return packet",
+            Summary: "Campaign return packet summary.",
+            BindingSummary: "Binding summary",
+            Reusable: true,
+            SearchTerms: ["return"],
+            EvidenceLines: ["evidence"],
+            UpdatedAtUtc: updatedAtUtc);
+        var prepLibrary = new CampaignPrepLibrarySummary(
+            Summary: "summary",
+            BindingSummary: "binding",
+            SearchSummary: "search",
+            ReusablePacketCount: 1,
+            SearchablePacketCount: 1,
+            Packets: [packet]);
+
+        GovernedPrepPacketSummary resolved = InvokeResolvePrepPacket(prepLibrary, "  packet-1  ");
+
+        Assert.Equal(packet.PacketId, resolved.PacketId);
+    }
+
+    [Fact]
+    public void ResolveTravelPrefetchDeviceNormalizesWhitespacePaddedInstallationIds()
+    {
+        WorkspaceRestoreProjection restore = BuildEmptyRestore() with
+        {
+            ClaimedDevices =
+            [
+                new ClaimedDeviceRestoreProjection(
+                    InstallationId: "install-1",
+                    DeviceRole: "travel_cache",
+                    Platform: "windows",
+                    HeadId: "avalonia",
+                    Channel: "stable",
+                    HostLabel: "travel-kit",
+                    RestoreSummary: "Device restore summary")
+            ]
+        };
+
+        ClaimedDeviceRestoreProjection resolved = InvokeResolveTravelPrefetchDevice(restore, "  install-1  ");
+
+        Assert.Equal("install-1", resolved.InstallationId);
+    }
+
+    [Fact]
     public void BoundedRecapShelfCategoryDoesNotActivateFromRecapitalizationKindWithoutRecapIdentity()
     {
         PublicationSafeProjection publication = BuildPublicationSafeProjection("recapitalization_signal");
@@ -4543,6 +4593,26 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("MatchesPrepLibraryQuery was not found.");
 
         return Assert.IsType<bool>(method.Invoke(null, [packet, queryTokens]));
+    }
+
+    private static GovernedPrepPacketSummary InvokeResolvePrepPacket(CampaignPrepLibrarySummary prepLibrary, string requestedPacketId)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("ResolvePrepPacket", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("ResolvePrepPacket was not found.");
+
+        return Assert.IsType<GovernedPrepPacketSummary>(method.Invoke(null, [prepLibrary, requestedPacketId]));
+    }
+
+    private static ClaimedDeviceRestoreProjection InvokeResolveTravelPrefetchDevice(
+        WorkspaceRestoreProjection restore,
+        string requestedInstallationId)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("ResolveTravelPrefetchDevice", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("ResolveTravelPrefetchDevice was not found.");
+
+        return Assert.IsType<ClaimedDeviceRestoreProjection>(method.Invoke(null, [restore, requestedInstallationId]));
     }
 
     private static string InvokeBoundedRecapShelfCategory(PublicationSafeProjection item)

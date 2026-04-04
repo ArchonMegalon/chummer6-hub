@@ -447,9 +447,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
-        GovernedPrepPacketSummary packet = prepLibrary.Packets
-            .FirstOrDefault(item => string.Equals(item.PacketId, request.PacketId, StringComparison.OrdinalIgnoreCase))
-            ?? throw new KeyNotFoundException($"Unknown governed prep packet: {request.PacketId}");
+        GovernedPrepPacketSummary packet = ResolvePrepPacket(prepLibrary, request.PacketId);
 
         RunProjection? targetRun = ResolvePrepLaunchRun(context.Workspace, context.LeadRun, request.TargetRunId);
         SceneProjection? targetScene = ResolvePrepLaunchScene(targetRun, request.TargetSceneId);
@@ -480,9 +478,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
-        ClaimedDeviceRestoreProjection device = context.Restore.ClaimedDevices
-            .FirstOrDefault(item => string.Equals(item.InstallationId, request.InstallationId, StringComparison.OrdinalIgnoreCase))
-            ?? throw new KeyNotFoundException($"Unknown claimed device: {request.InstallationId}");
+        ClaimedDeviceRestoreProjection device = ResolveTravelPrefetchDevice(context.Restore, request.InstallationId);
         CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
         IReadOnlyList<string> inventoryLines = BuildTravelPrefetchInventoryLines(context.Workspace, context.Restore, prepLibrary, device);
         string prefetchSummary = BuildTravelPrefetchSummary(context.Workspace, device, prepLibrary);
@@ -4247,6 +4243,36 @@ public sealed class CampaignWorkspaceServerPlaneService
             .ToLowerInvariant();
 
         return queryTokens.All(token => searchable.Contains(token, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static GovernedPrepPacketSummary ResolvePrepPacket(
+        CampaignPrepLibrarySummary prepLibrary,
+        string? requestedPacketId)
+    {
+        string? normalizedPacketId = NormalizeOptional(requestedPacketId);
+        if (normalizedPacketId is null)
+        {
+            throw new KeyNotFoundException($"Unknown governed prep packet: {requestedPacketId}");
+        }
+
+        return prepLibrary.Packets
+            .FirstOrDefault(item => string.Equals(NormalizeOptional(item.PacketId), normalizedPacketId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new KeyNotFoundException($"Unknown governed prep packet: {normalizedPacketId}");
+    }
+
+    private static ClaimedDeviceRestoreProjection ResolveTravelPrefetchDevice(
+        WorkspaceRestoreProjection restore,
+        string? requestedInstallationId)
+    {
+        string? normalizedInstallationId = NormalizeOptional(requestedInstallationId);
+        if (normalizedInstallationId is null)
+        {
+            throw new KeyNotFoundException($"Unknown claimed device: {requestedInstallationId}");
+        }
+
+        return restore.ClaimedDevices
+            .FirstOrDefault(item => string.Equals(NormalizeOptional(item.InstallationId), normalizedInstallationId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new KeyNotFoundException($"Unknown claimed device: {normalizedInstallationId}");
     }
 
     private static RunProjection? ResolvePrepLaunchRun(
