@@ -38,6 +38,10 @@ public sealed class InteropExportService : IInteropExportService
         string DisplayName,
         string PayloadJson);
 
+    private sealed record SessionBindingResolution(
+        string? SessionId,
+        bool Inferred);
+
     private readonly ConcurrentDictionary<string, StoredAsset> _assets = new(StringComparer.OrdinalIgnoreCase);
     private readonly IGmOpsBoardService _opsBoard;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
@@ -66,22 +70,25 @@ public sealed class InteropExportService : IInteropExportService
             .Where(item => assetIdFilter is null || assetIdFilter.Contains(item.AssetId))
             .OrderBy(item => item.AssetKind)
             .ThenBy(item => item.AssetId, StringComparer.Ordinal)
+            .ToArray();
+        var sessionBinding = ResolveSessionBinding(sessionId, assets);
+        var documents = assets
             .Select(item => ToDocument(item, request, roundTripId, exportedAtUtc))
             .ToArray();
 
-        var manifest = BuildManifest(assets);
-        var compatibility = BuildExportCompatibilityReceipt(campaignId, sessionId, request, manifest);
+        var manifest = BuildManifest(documents);
+        var compatibility = BuildExportCompatibilityReceipt(campaignId, sessionBinding, request, manifest);
         return new InteropContracts.InteropExportPackage(
             PackageId: packageId,
             CampaignId: campaignId,
-            SessionId: sessionId,
+            SessionId: sessionBinding.SessionId,
             ContractFamily: request.ContractFamily,
             SchemaVersion: request.SchemaVersion,
             ExportedAtUtc: exportedAtUtc,
             ExportedBy: request.RequestedBy,
             Manifest: manifest,
             Compatibility: compatibility,
-            Assets: assets);
+            Assets: documents);
     }
 
     public InteropContracts.InteropImportResult Import(InteropContracts.InteropImportRequest request)
@@ -260,6 +267,17 @@ public sealed class InteropExportService : IInteropExportService
         DateTimeOffset exportedAtUtc)
     {
         var payloadSha = ComputeSha256Hex(asset.PayloadJson);
+        var pointers = new List<InteropContracts.InteropProvenancePointer>
+        {
+            new("campaign", asset.CampaignId, "campaign scope"),
+            new("asset-kind", asset.AssetKind.ToString(), "interop export kind")
+        };
+        var sessionId = NormalizeOptional(asset.SessionId);
+        if (sessionId is not null)
+        {
+            pointers.Add(new InteropContracts.InteropProvenancePointer("session", sessionId, "session continuity binding"));
+        }
+
         return new InteropContracts.InteropAssetDocument(
             AssetKind: asset.AssetKind,
             AssetId: asset.AssetId,
@@ -274,11 +292,39 @@ public sealed class InteropExportService : IInteropExportService
                 ExportedAtUtc: exportedAtUtc,
                 ExportedBy: request.RequestedBy,
                 RoundTripId: roundTripId,
-                Pointers:
-                [
-                    new InteropContracts.InteropProvenancePointer("campaign", asset.CampaignId, "campaign scope"),
-                    new InteropContracts.InteropProvenancePointer("asset-kind", asset.AssetKind.ToString(), "interop export kind")
-                ]));
+                Pointers: pointers));
+    }
+
+    private static SessionBindingResolution ResolveSessionBinding(
+        string? requestedSessionId,
+        IReadOnlyList<StoredAsset> assets)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedSessionId))
+        {
+            return new SessionBindingResolution(requestedSessionId, Inferred: false);
+        }
+
+        string[] sessionCandidates = assets
+            .Select(static item => NormalizeOptional(item.SessionId))
+            .Where(static item => item is not null)
+            .Select(static item => item!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (sessionCandidates.Length != 1)
+        {
+            return new SessionBindingResolution(null, Inferred: false);
+        }
+
+        bool hasSessionEvidence = assets.Any(static item => item.AssetKind is
+            InteropContracts.InteropAssetKind.Session
+            or InteropContracts.InteropAssetKind.Encounter
+            or InteropContracts.InteropAssetKind.Prep);
+        if (!hasSessionEvidence)
+        {
+            return new SessionBindingResolution(null, Inferred: false);
+        }
+
+        return new SessionBindingResolution(sessionCandidates[0], Inferred: true);
     }
 
     private static InteropContracts.InteropExportManifest BuildManifest(IReadOnlyList<InteropContracts.InteropAssetDocument> assets)
@@ -296,10 +342,11 @@ public sealed class InteropExportService : IInteropExportService
 
     private static InteropContracts.InteropCompatibilityReceipt BuildExportCompatibilityReceipt(
         string campaignId,
-        string? sessionId,
+        SessionBindingResolution sessionBinding,
         InteropContracts.InteropExportRequest request,
         InteropContracts.InteropExportManifest manifest)
     {
+        string? sessionId = NormalizeOptional(sessionBinding.SessionId);
         string formatId = sessionId is null
             ? "chummer.portable-campaign.v1"
             : "chummer.portable-campaign-session.v1";
@@ -311,13 +358,19 @@ public sealed class InteropExportService : IInteropExportService
             : SessionSupportedExchangeFormats;
         string contextSummary = sessionId is null
             ? $"Campaign {campaignId} is portable with governed dossier, prep, and aftermath truth, but the package does not yet pin a live session cutover."
-            : $"Campaign {campaignId} and session {sessionId} are pinned to the same portable exchange receipt.";
+            : sessionBinding.Inferred
+                ? $"Campaign {campaignId} auto-pinned session {sessionId} from portable continuity evidence on the same governed exchange receipt."
+                : $"Campaign {campaignId} and session {sessionId} are pinned to the same portable exchange receipt.";
         string receiptSummary = sessionId is null
             ? "Portable dossier/campaign exchange is ready for inspect-only review or merge, while governed replace stays review-required until a live session export is pinned."
-            : "Portable dossier/campaign exchange is ready for inspect-only review, merge, or governed replace with a pinned session receipt.";
+            : sessionBinding.Inferred
+                ? "Portable dossier/campaign exchange auto-pinned one live session from exported continuity evidence, so inspect-only, merge, and governed replace can cite one receipt."
+                : "Portable dossier/campaign exchange is ready for inspect-only review, merge, or governed replace with a pinned session receipt.";
         string nextSafeAction = sessionId is null
             ? "Open inspect-only first or export again with a pinned session before you authorize governed replace on another surface."
-            : "Share the portable package or open inspect-only first if the receiving surface wants a no-mutation compatibility review.";
+            : sessionBinding.Inferred
+                ? "Share the package or open inspect-only first if the receiving surface wants a no-mutation review before governed replace."
+                : "Share the portable package or open inspect-only first if the receiving surface wants a no-mutation compatibility review.";
 
         List<InteropContracts.InteropCompatibilityNote> notes =
         [
@@ -341,6 +394,13 @@ public sealed class InteropExportService : IInteropExportService
                 Code: "session-binding-required-for-replace",
                 Severity: InteropContracts.InteropCompatibilityNoteSeverities.Warning,
                 Summary: "No live session binding was requested, so replace should wait for a session-scoped export even though inspect-only and merge remain safe."));
+        }
+        else if (sessionBinding.Inferred)
+        {
+            notes.Add(new InteropContracts.InteropCompatibilityNote(
+                Code: "session-binding-inferred",
+                Severity: InteropContracts.InteropCompatibilityNoteSeverities.Info,
+                Summary: $"Session {sessionId} binding was inferred from exported session continuity assets, so governed replace can stay on one pinned exchange receipt."));
         }
         else
         {
