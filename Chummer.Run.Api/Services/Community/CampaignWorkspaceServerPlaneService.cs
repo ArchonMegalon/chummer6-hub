@@ -969,7 +969,17 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         PublicationSafeProjection[] recapShelf = DeduplicateSemanticPublicationRecapVersions(workspace.RecapShelf).ToArray();
         Dictionary<string, DateTimeOffset> aftermathTimes = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
-            .ToDictionary(static item => item.PackageId, static item => item.GeneratedAtUtc, StringComparer.OrdinalIgnoreCase);
+            .Select(static item => new
+            {
+                PackageId = NormalizeOptional(item.PackageId),
+                item.GeneratedAtUtc
+            })
+            .Where(static item => item.PackageId is not null)
+            .GroupBy(static item => item.PackageId!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.Max(static item => item.GeneratedAtUtc),
+                StringComparer.OrdinalIgnoreCase);
         DateTimeOffset defaultUpdatedAtUtc = workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow;
         var publicationsById = creatorPublications.ToDictionary(static item => item.PublicationId, StringComparer.OrdinalIgnoreCase);
         var publicationsByArtifactId = creatorPublications
