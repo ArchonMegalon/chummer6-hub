@@ -14,10 +14,12 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("selectedBuildLabHandoff.Outputs.Count - 8", view, StringComparison.Ordinal);
         Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
         Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
+        Assert.Contains("BuildLabOutputLaneLabel(output.Kind)", view, StringComparison.Ordinal);
         Assert.Contains("@output.PublicationSummary", view, StringComparison.Ordinal);
         Assert.Contains("output.PublicationState", view, StringComparison.Ordinal);
         Assert.Contains("output.TrustBand", view, StringComparison.Ordinal);
         Assert.Contains("@output.AuditSummary", view, StringComparison.Ordinal);
+        Assert.Contains("Output lane:", view, StringComparison.Ordinal);
         Assert.Contains("Publication:", view, StringComparison.Ordinal);
         Assert.Contains("Lane status:", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.ProgressionOutcomes.Take(3)", view, StringComparison.Ordinal);
@@ -37,6 +39,10 @@ public sealed class AccountBuildLabHandoffViewTests
 
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.OfflineActionabilitySummary", view, StringComparison.Ordinal);
+        Assert.Contains("selectedWorkspaceServerPlane.TravelMode.OfflineLaneCues.Count > 0", view, StringComparison.Ordinal);
+        Assert.Contains("laneCue.Lane.Replace('_', ' ')", view, StringComparison.Ordinal);
+        Assert.Contains("laneCue.SignalCount", view, StringComparison.Ordinal);
+        Assert.Contains("laneCue.Summary", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.FreshCacheDeviceCount", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.StaleCacheDeviceCount", view, StringComparison.Ordinal);
         Assert.Contains("HumanizeStatus(device.Status, \"Status\")", view, StringComparison.Ordinal);

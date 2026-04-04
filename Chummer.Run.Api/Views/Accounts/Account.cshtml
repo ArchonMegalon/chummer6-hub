@@ -186,6 +186,20 @@
         return parts.Count == 0 ? "Current device" : string.Join(" · ", parts);
     }
 
+    static string BuildLabOutputLaneLabel(string? kind)
+        => kind?.Trim().ToLowerInvariant() switch
+        {
+            "character_template" => "Character template",
+            "json_exchange" => "JSON exchange",
+            "foundry_exchange" => "Foundry exchange",
+            "sheet_viewer" => "Sheet viewer",
+            "print_pdf_export" => "Print/PDF export",
+            "replay_timeline" => "Replay timeline",
+            "session_recap" => "Session recap",
+            "run_module" => "Run module",
+            _ => HumanizeStatus(kind, "Governed output")
+        };
+
     static string WorkspaceDetailHref(string workspaceId) => $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}";
     static string RunDetailHref(string runId) => $"/account/work/runs/{Uri.EscapeDataString(runId)}";
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
@@ -1409,6 +1423,19 @@
                             <p><strong>Prefetch inventory:</strong> @selectedWorkspaceServerPlane.TravelMode.PrefetchInventorySummary</p>
                             <p><strong>Cache freshness:</strong> @selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary</p>
                             <p><strong>Offline actionability:</strong> @selectedWorkspaceServerPlane.TravelMode.OfflineActionabilitySummary</p>
+                            @if (selectedWorkspaceServerPlane.TravelMode.OfflineLaneCues.Count > 0)
+                            {
+                                <div class="settings-summary-list">
+                                    @foreach (var laneCue in selectedWorkspaceServerPlane.TravelMode.OfflineLaneCues)
+                                    {
+                                        <div class="settings-summary-row">
+                                            <span>@HumanizeStatus(laneCue.Lane.Replace('_', ' '), "Lane")</span>
+                                            <strong>@($"{HumanizeStatus(laneCue.Status, "Status")} · {laneCue.SignalCount} cue(s)")</strong>
+                                        </div>
+                                        <p class="muted-copy">@laneCue.Summary</p>
+                                    }
+                                </div>
+                            }
                             @if (selectedWorkspaceServerPlane.TravelMode.Devices.Count > 0)
                             {
                                 <form id="travelPrefetchForm" class="settings-form">
@@ -1835,6 +1862,7 @@
                                         {
                                             <span> Provenance: @output.ProvenanceSummary</span>
                                         }
+                                        <span> Output lane: @BuildLabOutputLaneLabel(output.Kind)</span>
                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
                                         {
                                             <span> Publication: @output.PublicationSummary</span>
@@ -1846,6 +1874,14 @@
                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                         {
                                             <span> Audit: @output.AuditSummary</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(output.CompatibilitySummary))
+                                        {
+                                            <span> Compatibility: @output.CompatibilitySummary</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(output.LineageSummary))
+                                        {
+                                            <span> Lineage: @output.LineageSummary</span>
                                         }
                                     </li>
                                 }
