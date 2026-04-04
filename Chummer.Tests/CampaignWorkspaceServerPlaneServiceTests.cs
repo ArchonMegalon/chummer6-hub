@@ -945,8 +945,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> splitCrewMovementsTokens = InvokeBuildTokens("crew movements");
         IReadOnlyList<string> splitRosterTransfersTokens = InvokeBuildTokens("roster transfers");
         IReadOnlyList<string> splitRosterTransferTokens = InvokeBuildTokens("roster transfer");
+        IReadOnlyList<string> compactRosterTransferTokens = InvokeBuildTokens("rostertransfer");
+        IReadOnlyList<string> compactRosterTransfersTokens = InvokeBuildTokens("rostertransfers");
         IReadOnlyList<string> splitRosterHandoffsTokens = InvokeBuildTokens("roster handoffs");
         IReadOnlyList<string> splitRosterHandoffTokens = InvokeBuildTokens("roster handoff");
+        IReadOnlyList<string> compactRosterHandoffTokens = InvokeBuildTokens("rosterhandoff");
+        IReadOnlyList<string> compactRosterHandoffsTokens = InvokeBuildTokens("rosterhandoffs");
         IReadOnlyList<string> compactRosterHandoverTokens = InvokeBuildTokens("rosterhandover");
         IReadOnlyList<string> compactRosterHandoversTokens = InvokeBuildTokens("rosterhandovers");
         IReadOnlyList<string> splitRosterHandoverTokens = InvokeBuildTokens("roster handover");
@@ -996,8 +1000,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, splitCrewMovementsTokens));
         Assert.True(InvokeMatches(packet, splitRosterTransfersTokens));
         Assert.True(InvokeMatches(packet, splitRosterTransferTokens));
+        Assert.True(InvokeMatches(packet, compactRosterTransferTokens));
+        Assert.True(InvokeMatches(packet, compactRosterTransfersTokens));
         Assert.True(InvokeMatches(packet, splitRosterHandoffsTokens));
         Assert.True(InvokeMatches(packet, splitRosterHandoffTokens));
+        Assert.True(InvokeMatches(packet, compactRosterHandoffTokens));
+        Assert.True(InvokeMatches(packet, compactRosterHandoffsTokens));
         Assert.True(InvokeMatches(packet, compactRosterHandoverTokens));
         Assert.True(InvokeMatches(packet, compactRosterHandoversTokens));
         Assert.True(InvokeMatches(packet, splitRosterHandoverTokens));

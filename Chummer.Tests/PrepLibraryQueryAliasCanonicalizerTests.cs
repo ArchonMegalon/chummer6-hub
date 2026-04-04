@@ -241,6 +241,10 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
             "gamemasteropspacket",
             "gamemasteroperationpackets",
             "gamemastercontrolpacket",
+            "rostertransfer",
+            "rostertransfers",
+            "rosterhandoff",
+            "rosterhandoffs",
             "gamemasterctls",
             "gamemasterctrls"
         };
@@ -282,6 +286,10 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("gamemasteropspacket", tokens);
         Assert.DoesNotContain("gamemasteroperationpackets", tokens);
         Assert.DoesNotContain("gamemastercontrolpacket", tokens);
+        Assert.DoesNotContain("rostertransfer", tokens);
+        Assert.DoesNotContain("rostertransfers", tokens);
+        Assert.DoesNotContain("rosterhandoff", tokens);
+        Assert.DoesNotContain("rosterhandoffs", tokens);
         Assert.DoesNotContain("gamemasterctls", tokens);
         Assert.DoesNotContain("gamemasterctrls", tokens);
     }
