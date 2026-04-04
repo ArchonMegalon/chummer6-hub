@@ -14,6 +14,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("selectedBuildLabHandoff.Outputs.Count - 8", view, StringComparison.Ordinal);
         Assert.Contains("@output.NextSafeAction", view, StringComparison.Ordinal);
         Assert.Contains("@output.ProvenanceSummary", view, StringComparison.Ordinal);
+        Assert.Contains("@output.AuditSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.ProgressionOutcomes.Take(3)", view, StringComparison.Ordinal);
         Assert.Contains("selectedBuildLabHandoff.RuleEnvironmentDiff", view, StringComparison.Ordinal);
         Assert.Contains("Rule diff before", view, StringComparison.Ordinal);
@@ -32,6 +33,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.FreshCacheDeviceCount", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceServerPlane.TravelMode.StaleCacheDeviceCount", view, StringComparison.Ordinal);
+        Assert.Contains("HumanizeStatus(device.Status, \"Status\")", view, StringComparison.Ordinal);
         Assert.Contains("Cache freshness", view, StringComparison.Ordinal);
     }
 }
