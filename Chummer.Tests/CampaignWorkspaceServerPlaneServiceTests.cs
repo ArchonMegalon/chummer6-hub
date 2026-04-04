@@ -5327,6 +5327,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketFallsBackToCompactEventControlSignalsWhenCanonicalEventTermsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCompactEventControlSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("eventcontrol", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("seasonops", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void OppositionPacketActivatesFromCarryForwardOppositionSignalsWhenOtherFamiliesLag()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithOppositionCarryForwardSignalsOnly();
@@ -5696,6 +5710,21 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(packet.Reusable);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("movement board label", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("roster movement signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RosterMovementPacketFallsBackToCompactRosterMovementSignalsWhenCanonicalRosterTermsAreMissing()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCompactRosterMovementSignalsOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        RunProjection leadRun = Assert.Single(workspace.Runs);
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, leadRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("rostermove", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("crewhandoff", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -12011,6 +12040,50 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             TravelPrefetches: []);
     }
 
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCompactEventControlSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        WorkspaceChangePacketProjection eventControlCompact = new(
+            PacketId: "packet-compact-eventcontrol",
+            Kind: "eventcontrol_shift",
+            Label: "Eventcontrol window shift",
+            Summary: "Eventcontrol board remains active while canonical event receipts hydrate.",
+            UpdatedAtUtc: now.AddMinutes(1));
+        WorkspaceChangePacketProjection seasonOpsCompact = new(
+            PacketId: "packet-compact-seasonops",
+            Kind: "seasonops_checkpoint",
+            Label: "Seasonops checkpoint",
+            Summary: "Seasonops timeline remains governed for the next launch gate.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-compact-eventcontrol-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [eventControlCompact, seasonOpsCompact],
+            Consequences: [],
+            PrepLaunches: [],
+            TravelPrefetches: []);
+    }
+
     private static CampaignWorkspaceProjection BuildWorkspaceWithRosterSignalsOnly()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
@@ -12342,6 +12415,73 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             LatestContinuity: null,
             ReturnSummary: "",
             ChangePackets: [rosterChange],
+            Consequences: [],
+            NextSessionCarryForward: carryForward);
+    }
+
+    private static CampaignWorkspaceProjection BuildWorkspaceWithCompactRosterMovementSignalsOnly()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+
+        ObjectiveProjection objective = new(
+            ObjectiveId: "objective-compact-roster-1",
+            Title: "Rostermove handoff review",
+            Status: "open",
+            Pressure: "medium",
+            Summary: "Rostermove queue remains pending until crewhandoff approval lands.",
+            UpdatedAtUtc: now.AddMinutes(2));
+
+        RunProjection run = new(
+            RunId: "run-compact-roster-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard roster pressure test",
+            Status: "active",
+            Summary: "Current run remains active under compact roster transfer pressure.",
+            ActiveSceneId: null,
+            Objectives: [objective],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(3));
+
+        WorkspaceChangePacketProjection compactRosterSignal = new(
+            PacketId: "packet-compact-roster-1",
+            Kind: "rostermove_signal",
+            Label: "Rostermove checkpoint",
+            Summary: "Rostermove queue keeps runner assignment governed without local shadow notes.",
+            UpdatedAtUtc: now.AddMinutes(4));
+
+        NextSessionCarryForwardProjection carryForward = new(
+            CarryForwardId: "carry-compact-roster-1",
+            Label: "Crewhandoff carry-forward",
+            Summary: "Crewhandoff remains pending for the next session return loop.",
+            ReturnSummary: "Compact roster movement posture remains attached to campaign return.",
+            NextSafeAction: "Close crewhandoff approvals before launch.",
+            EvidenceLines: ["Rostermove receipt line remains open for this return."],
+            UpdatedAtUtc: now.AddMinutes(5));
+
+        return new CampaignWorkspaceProjection(
+            WorkspaceId: "workspace-compact-roster-1",
+            CampaignId: "campaign-a",
+            CampaignName: "Neon Cradle",
+            Visibility: "group",
+            RuleEnvironment: environment,
+            Crews: [],
+            Dossiers: [],
+            Runs: [run],
+            RecapShelf: [],
+            ReadinessCues: [],
+            LatestContinuity: null,
+            ReturnSummary: "Return lane summary",
+            ChangePackets: [compactRosterSignal],
             Consequences: [],
             NextSessionCarryForward: carryForward);
     }
