@@ -1,5 +1,6 @@
 using Chummer.Campaign.Contracts;
 using System.Reflection;
+using Chummer.Control.Contracts.Support;
 using Chummer.Run.Api.Contracts;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.ViewModels;
@@ -550,6 +551,54 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Equal("rule_environment_mismatch", summary.Status);
         Assert.Contains("One runner uses a stale compatibility fingerprint.", summary.Summary, StringComparison.Ordinal);
         Assert.DoesNotContain("Ruleset should be reviewed.", summary.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DecisionNoticesPreferReporterActionSupportCaseOverEarlierNonActionCase()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceDigestProjection digest = BuildWorkspaceDigest(workspace);
+        CampaignPrepLibrarySummary prepLibrary = BuildEmptyPrepLibrary();
+        SupportCaseDigestViewModel informationalCase = BuildSupportCaseDigest(
+            caseId: "case-info",
+            releaseProgressSummary: "Informational support case is tracking in the background.");
+        SupportCaseDigestViewModel reporterActionCase = BuildSupportCaseDigest(
+            caseId: "case-reporter-action",
+            releaseProgressSummary: "Reporter action support case needs immediate follow-through.",
+            reporterActionNeeded: true);
+
+        IReadOnlyList<DecisionNotice> notices = InvokeBuildDecisionNotices(
+            workspace,
+            digest,
+            [informationalCase, reporterActionCase],
+            prepLibrary);
+
+        DecisionNotice supportNotice = Assert.Single(notices, notice => string.Equals(notice.Kind, "support_follow_through", StringComparison.Ordinal));
+        Assert.Contains("Reporter action support case needs immediate follow-through.", supportNotice.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DecisionNoticesPreferCanVerifySupportCaseOverEarlierNonActionCase()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceDigestProjection digest = BuildWorkspaceDigest(workspace);
+        CampaignPrepLibrarySummary prepLibrary = BuildEmptyPrepLibrary();
+        SupportCaseDigestViewModel informationalCase = BuildSupportCaseDigest(
+            caseId: "case-info",
+            releaseProgressSummary: "Informational support case is tracking in the background.");
+        SupportCaseDigestViewModel canVerifyCase = BuildSupportCaseDigest(
+            caseId: "case-can-verify",
+            releaseProgressSummary: "Fix-verify support case is ready for user confirmation.",
+            canVerifyFix: true);
+
+        IReadOnlyList<DecisionNotice> notices = InvokeBuildDecisionNotices(
+            workspace,
+            digest,
+            [informationalCase, canVerifyCase],
+            prepLibrary);
+
+        DecisionNotice supportNotice = Assert.Single(notices, notice => string.Equals(notice.Kind, "support_follow_through", StringComparison.Ordinal));
+        Assert.Contains("Fix-verify support case is ready for user confirmation.", supportNotice.Summary, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -6017,6 +6066,72 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         return Assert.IsAssignableFrom<IReadOnlyList<string>>(method.Invoke(null, [workspaces]));
     }
+
+    private static IReadOnlyList<DecisionNotice> InvokeBuildDecisionNotices(
+        CampaignWorkspaceProjection workspace,
+        CampaignWorkspaceDigestProjection digest,
+        IReadOnlyList<SupportCaseDigestViewModel> supportDigests,
+        CampaignPrepLibrarySummary prepLibrary)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BuildDecisionNotices", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildDecisionNotices was not found.");
+
+        return Assert.IsAssignableFrom<IReadOnlyList<DecisionNotice>>(method.Invoke(null, [workspace, digest, null, supportDigests, prepLibrary, null]));
+    }
+
+    private static CampaignWorkspaceDigestProjection BuildWorkspaceDigest(CampaignWorkspaceProjection workspace)
+        => new(
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            CampaignName: workspace.CampaignName,
+            ReturnSummary: workspace.ReturnSummary,
+            RuleEnvironmentSummary: $"{workspace.RuleEnvironment.OwnerScope} · {workspace.RuleEnvironment.CompatibilityFingerprint}",
+            DeviceRoleSummary: "workstation on linux/avalonia (stable)",
+            SupportClosureSummary: "Support closure stays attached to release-aware install truth.",
+            ActiveSceneSummary: workspace.ActiveSceneSummary,
+            NextSafeAction: workspace.NextSafeAction ?? "Open shared campaign view.",
+            ReadinessHighlights: [],
+            Watchouts: [],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+    private static CampaignPrepLibrarySummary BuildEmptyPrepLibrary()
+        => new(
+            Summary: "No governed prep packet is compiled yet for this shared campaign view.",
+            BindingSummary: "Packets stay bound to the shared campaign return lane.",
+            SearchSummary: "Search tokens compile from campaign and restore context.",
+            ReusablePacketCount: 0,
+            SearchablePacketCount: 0,
+            Packets: []);
+
+    private static SupportCaseDigestViewModel BuildSupportCaseDigest(
+        string caseId,
+        string releaseProgressSummary,
+        bool reporterActionNeeded = false,
+        bool canVerifyFix = false)
+        => new(
+            CaseId: caseId,
+            Title: $"Support case {caseId}",
+            Summary: "Support case summary.",
+            StatusLabel: "In progress",
+            StageLabel: "Needs follow-through",
+            NextSafeAction: "Open support case details and follow through.",
+            ClosureSummary: "Closure remains pending follow-through.",
+            VerificationSummary: "Verification lane is active.",
+            DetailHref: $"/account/support/{Uri.EscapeDataString(caseId)}",
+            PrimaryActionLabel: "Open support case",
+            PrimaryActionHref: $"/account/support/{Uri.EscapeDataString(caseId)}",
+            UpdatedLabel: "updated just now",
+            FixedReleaseLabel: null,
+            AffectedInstallSummary: "Affects workstation on linux/avalonia (stable).",
+            FollowUpLaneSummary: "Follow-up remains on governed lane.",
+            ReleaseProgressSummary: releaseProgressSummary,
+            ReporterActionNeeded: reporterActionNeeded,
+            CanVerifyFix: canVerifyFix,
+            InstallReadinessSummary: "Install readiness is known.",
+            FixReadyOnLinkedInstall: canVerifyFix,
+            NeedsInstallUpdate: false,
+            NeedsLinkedInstall: false);
 
     private static CampaignWorkspaceDigestProjection InvokeCampaignSpineBuildWorkspaceDigest(
         AccountCampaignSummary summary,
