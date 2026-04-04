@@ -2260,6 +2260,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail leagueops compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leagueops compact search');
 
+  await page.fill('#prepQuery', 'leagueop');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=leagueop/.test(page.url()), 'Workspace detail search should preserve the compact leagueop prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail leagueop compact search');
+  await expectBodyText(page, 'match(es) for "leagueop"', '/account/work/workspaces detail leagueop compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail leagueop compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail leagueop compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail leagueop compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail leagueop compact search');
+  const workspaceLeagueOpCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueOpCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact leagueop query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail leagueop compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leagueop compact search');
+
   await page.fill('#prepQuery', 'leagueoperation');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -2763,6 +2784,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail communityops compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityops compact search');
+
+  await page.fill('#prepQuery', 'communityop');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=communityop/.test(page.url()), 'Workspace detail search should preserve the compact communityop prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail communityop compact search');
+  await expectBodyText(page, 'match(es) for "communityop"', '/account/work/workspaces detail communityop compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail communityop compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail communityop compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail communityop compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail communityop compact search');
+  const workspaceCommunityOpCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityOpCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact communityop query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail communityop compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityop compact search');
 
   await page.fill('#prepQuery', 'communityoperation');
   await Promise.all([
