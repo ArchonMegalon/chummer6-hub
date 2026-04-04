@@ -598,7 +598,9 @@ public sealed record BuildLabHandoffProjection(
     string? SourceHintSummary = null,
     IReadOnlyList<string>? SourceHintLines = null,
     string? BuildSurfaceSummary = null,
-    IReadOnlyList<string>? BuildSurfaceLines = null);
+    IReadOnlyList<string>? BuildSurfaceLines = null,
+    string? ExchangeParitySummary = null,
+    IReadOnlyList<string>? ExchangeParityLines = null);
 
 public sealed record BuildLabRuleEnvironmentDiffProjection(
     string Status,

@@ -954,6 +954,10 @@
                                                                 {
                                                                     <span> Build surface: @handoff.BuildSurfaceSummary.</span>
                                                                 }
+                                                                @if (!string.IsNullOrWhiteSpace(handoff.ExchangeParitySummary))
+                                                                {
+                                                                    <span> Exchange parity: @handoff.ExchangeParitySummary.</span>
+                                                                }
                                                                 @if (handoff.SourceHintLines is { Count: > 0 })
                                                                 {
                                                                     foreach (var sourceHintLine in handoff.SourceHintLines.Take(2))
@@ -966,6 +970,13 @@
                                                                     foreach (var buildSurfaceLine in handoff.BuildSurfaceLines.Take(2))
                                                                     {
                                                                         <span> Build lane: @buildSurfaceLine</span>
+                                                                    }
+                                                                }
+                                                                @if (handoff.ExchangeParityLines is { Count: > 0 })
+                                                                {
+                                                                    foreach (var parityLine in handoff.ExchangeParityLines.Take(2))
+                                                                    {
+                                                                        <span> Parity lane: @parityLine</span>
                                                                     }
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SupportClosureSummary))

@@ -2299,6 +2299,8 @@ public sealed class CampaignSpineService
                 var sourceHintLines = BuildBuildLabSourceHintLines(dossier, workspace);
                 var buildSurfaceSummary = BuildBuildLabSurfaceSummary(dossier, workspace, ruleEnvironmentDiff);
                 var buildSurfaceLines = BuildBuildLabSurfaceLines(dossier, workspace, ruleEnvironmentDiff);
+                var exchangeParitySummary = BuildBuildLabExchangeParitySummary(outputs);
+                var exchangeParityLines = BuildBuildLabExchangeParityLines(outputs);
                 return new BuildLabHandoffProjection(
                     HandoffId: StableId("buildlab", dossier.DossierId),
                     DossierId: dossier.DossierId,
@@ -2340,7 +2342,9 @@ public sealed class CampaignSpineService
                     SourceHintSummary: sourceHintSummary,
                     SourceHintLines: sourceHintLines,
                     BuildSurfaceSummary: buildSurfaceSummary,
-                    BuildSurfaceLines: buildSurfaceLines);
+                    BuildSurfaceLines: buildSurfaceLines,
+                    ExchangeParitySummary: exchangeParitySummary,
+                    ExchangeParityLines: exchangeParityLines);
             })
             .Take(3)
             .ToArray();
@@ -3014,6 +3018,45 @@ public sealed class CampaignSpineService
             || normalized.Contains("variant", StringComparison.Ordinal)
             || normalized.Contains("build_idea", StringComparison.Ordinal)
             || normalized.Contains("build-idea", StringComparison.Ordinal);
+    }
+
+    private static string BuildBuildLabExchangeParitySummary(IReadOnlyList<PublicationSafeProjection> outputs)
+    {
+        var parity = ResolveBuildLabExchangeParity(outputs);
+        int readyCount = parity.Count(static lane => lane.ready);
+        return $"{readyCount} of {parity.Count} sheet/print/export/viewer parity lanes are release-ready.";
+    }
+
+    private static IReadOnlyList<string> BuildBuildLabExchangeParityLines(IReadOnlyList<PublicationSafeProjection> outputs)
+        => ResolveBuildLabExchangeParity(outputs)
+            .Select(static lane => $"{lane.label}: {(lane.ready ? "ready" : "pending")} — {lane.detail}")
+            .ToArray();
+
+    private static IReadOnlyList<(string label, bool ready, string detail)> ResolveBuildLabExchangeParity(IReadOnlyList<PublicationSafeProjection> outputs)
+    {
+        static (string label, bool ready, string detail) Lane(string label, string kind, IReadOnlyList<PublicationSafeProjection> outputs)
+        {
+            var output = outputs.FirstOrDefault(item => string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase));
+            if (output is null)
+            {
+                return (label, false, "Lane artifact is missing from this handoff.");
+            }
+
+            bool ready = string.Equals(output.PublicationState, "ready", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(output.TrustBand, "governed", StringComparison.OrdinalIgnoreCase);
+            return (label, ready, ready
+                ? $"Governed {label.ToLowerInvariant()} artifact is attached."
+                : $"Artifact is attached but still needs publication/trust review ({output.PublicationState ?? "unknown"} / {output.TrustBand ?? "unknown"}).");
+        }
+
+        return
+        [
+            Lane("Sheet viewer", "sheet_viewer", outputs),
+            Lane("Print PDF export", "print_pdf_export", outputs),
+            Lane("JSON exchange", "json_exchange", outputs),
+            Lane("Foundry exchange", "foundry_exchange", outputs),
+            Lane("Character template export", "character_template", outputs)
+        ];
     }
 
     private static SceneProjection? ResolveActiveScene(RunProjection run)
