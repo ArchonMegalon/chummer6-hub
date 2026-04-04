@@ -164,13 +164,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     [HttpGet("/downloads/files/{**path}")]
     public async Task<IActionResult> DownloadFile([FromRoute] string? path, CancellationToken cancellationToken)
     {
-        var originalArtifact = _releases.FindDownloadByPath(path);
-        if (originalArtifact is null)
-        {
-            return NotFound();
-        }
-
-        var (manifest, artifact) = ResolveManifestArtifact(originalArtifact.Id);
+        var (manifest, artifact) = ResolvePublicManifestArtifactByPath(path);
         if (artifact is null)
         {
             return NotFound();
@@ -248,6 +242,41 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         artifact = rawManifest.Downloads
             .FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
         return (rawManifest, artifact);
+    }
+
+    private (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto? Artifact) ResolvePublicManifestArtifactByPath(string? path)
+    {
+        string? normalized = string.IsNullOrWhiteSpace(path)
+            ? null
+            : path.Trim().TrimStart('/');
+        if (normalized is null)
+        {
+            var emptyManifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+            return (emptyManifest, null);
+        }
+
+        string targetFile = Path.GetFileName(normalized.Split('?', '#')[0]);
+        if (string.IsNullOrWhiteSpace(targetFile))
+        {
+            var emptyManifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+            return (emptyManifest, null);
+        }
+
+        PublicReleaseManifestDto manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        PublicReleaseArtifactDto? artifact = manifest.Downloads.FirstOrDefault(item =>
+        {
+            string? fileName = item.FileName;
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                string rawUrl = item.Url ?? string.Empty;
+                string withoutQuery = rawUrl.Split('?', '#')[0];
+                fileName = Path.GetFileName(withoutQuery);
+            }
+
+            return string.Equals(fileName, targetFile, StringComparison.OrdinalIgnoreCase);
+        });
+
+        return (manifest, artifact);
     }
 
     private async Task<AuthenticatedHubSubject?> TryGetOptionalSubjectAsync(CancellationToken cancellationToken)
