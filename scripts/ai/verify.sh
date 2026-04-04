@@ -26,6 +26,12 @@ if [[ -z "$release_channel_path" || ! -f "$release_channel_path" ]]; then
   exit 1
 fi
 
+release_channel_fixture_path="$(mktemp)"
+cp "$release_channel_path" "$release_channel_fixture_path"
+trap 'rm -f "$release_channel_fixture_path"' EXIT
+export CHUMMER_UI_PARITY_RELEASE_CHANNEL_PATH="$release_channel_fixture_path"
+release_channel_path="$release_channel_fixture_path"
+
 release_channel_backup="$(mktemp)"
 cp "$release_channel_path" "$release_channel_backup"
 python3 - "$release_channel_path" <<'PY'
