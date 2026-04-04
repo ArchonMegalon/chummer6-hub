@@ -911,10 +911,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
-        IReadOnlyList<ObjectiveProjection> openObjectives = leadRun.Objectives
-            .Where(static item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(static item => item.UpdatedAtUtc)
+        IReadOnlyList<ObjectiveProjection> openObjectives = DeduplicateIdenticalObjectiveVersions(
+                leadRun.Objectives
+                    .Where(static item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(static item => item.UpdatedAtUtc))
             .ToArray();
         string objectiveSummary = openObjectives.Count == 0
             ? "No open objective is pinned right now."
