@@ -78,6 +78,14 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnloops", "campaign", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnlane", "campaign", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnlanes", "campaign", "return", "loop");
+        RewriteCompactContinuityMutationAlias(tokens, "preplibrarypacket", "prep", "library", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "preplibrarypackets", "prep", "library", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "oppositionpacket", "opposition", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "oppositionpackets", "opposition", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "rostermovementpacket", "roster", "movement", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "rostermovementpackets", "roster", "movement", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "eventcontrolpacket", "event", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "eventcontrolpackets", "event", "control", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "offlinereadiness", "offline", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "offlinereadinesses", "offline", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "travelreadiness", "travel", "readiness");
