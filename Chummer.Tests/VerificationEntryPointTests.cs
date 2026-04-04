@@ -205,7 +205,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject releaseProof.baseUrl outside allowed canonical release origins", script, StringComparison.Ordinal);
         Assert.Contains("reject conflicting alias values between releaseProof.baseUrl and releaseProof.base_url", script, StringComparison.Ordinal);
         Assert.Contains("reject conflicting alias values between releaseProof.proofRoutes and releaseProof.proof_routes", script, StringComparison.Ordinal);
+        Assert.Contains("reject whitespace-padded releaseProof.proof_routes entries", script, StringComparison.Ordinal);
         Assert.Contains("reject conflicting alias values between releaseProof.journeysPassed and releaseProof.journeys_passed", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-canonical token shape in releaseProof.journeys_passed journey ids", script, StringComparison.Ordinal);
         Assert.Contains("reject non-canonical releaseProof.baseUrl origin casing/trailing slash", script, StringComparison.Ordinal);
         Assert.Contains("reject missing releaseProof.baseUrl origin", script, StringComparison.Ordinal);
         Assert.Contains("reject non-http(s) releaseProof.baseUrl schemes", script, StringComparison.Ordinal);
@@ -606,6 +608,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=connection", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=connections", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=faction", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=factions", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=journal", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=journals", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=sessionlog", audit, StringComparison.Ordinal);
@@ -728,6 +731,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=connection", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=connections", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=faction", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=factions", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=journal", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=journals", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=sessionlog", audit, StringComparison.Ordinal);
@@ -1029,6 +1033,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("connections continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=faction", playwright, StringComparison.Ordinal);
         Assert.Contains("faction continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=factions", playwright, StringComparison.Ordinal);
+        Assert.Contains("factions continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=journal", playwright, StringComparison.Ordinal);
         Assert.Contains("journal continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=journals", playwright, StringComparison.Ordinal);
