@@ -1256,6 +1256,132 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineBuildFirstPlayableSessionPrefersAttentionCueOverEarlierReviewCue()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-04T00:00:00Z");
+        RuleEnvironmentRef environment = new(
+            EnvironmentId: "env-1",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        CampaignProjection campaign = new(
+            CampaignId: "campaign-a",
+            GroupId: "group-a",
+            Name: "Neon Cradle",
+            Status: "active",
+            Visibility: "group",
+            Summary: "Campaign continuity remains attached to one governed lane.",
+            RuleEnvironment: environment,
+            ActiveRunId: "run-1",
+            CrewIds: ["crew-1"],
+            DossierIds: ["dossier-1"],
+            RunIds: ["run-1"],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-3),
+            UpdatedAtUtc: now);
+        WorkspaceRestoreProjection restore = new(
+            RestoreId: "restore-1",
+            UserId: "user-1",
+            RecentDossiers: [],
+            RecentCampaigns: [],
+            RecentRuleEnvironments: [],
+            RecentArtifacts: [],
+            Entitlements: [],
+            ClaimedDevices: [],
+            ConflictSummaries: [],
+            LocalOnlyNotes: [],
+            GeneratedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+        CampaignReadinessCue reviewCue = new(
+            CueId: "cue-review-1",
+            Severity: "review",
+            Title: "Rule environment review",
+            Summary: "Ruleset should be reviewed.");
+        CampaignReadinessCue attentionCue = new(
+            CueId: "cue-attention-1",
+            Severity: "attention",
+            Title: "Open objective pressure",
+            Summary: "Objective pressure remains high.");
+        CrewProjection crew = new(
+            CrewId: "crew-1",
+            Name: "Wardens",
+            Visibility: "group",
+            GroupId: "group-a",
+            CampaignId: "campaign-a",
+            Members:
+            [
+                new CrewAssignmentProjection(
+                    UserId: "user-1",
+                    DossierId: "dossier-1",
+                    Role: "face",
+                    Availability: "ready",
+                    AddedAtUtc: now.AddDays(-2))
+            ],
+            CreatedAtUtc: now.AddDays(-2),
+            UpdatedAtUtc: now.AddMinutes(-1));
+        RunnerDossierProjection dossier = new(
+            DossierId: "dossier-1",
+            RunnerHandle: "Ghostline",
+            DisplayName: "Avery Quinn",
+            Status: DossierStatuses.Active,
+            OwnerUserId: "user-1",
+            CrewId: "crew-1",
+            CampaignId: "campaign-a",
+            CurrentRunId: "run-1",
+            CurrentSceneId: "scene-1",
+            RuleEnvironment: environment,
+            LatestContinuity: null,
+            BuildReceiptIds: [],
+            SnapshotIds: [],
+            Projections: [],
+            CreatedAtUtc: now.AddDays(-2),
+            UpdatedAtUtc: now.AddMinutes(-2));
+        ObjectiveProjection leadObjective = new(
+            ObjectiveId: "objective-1",
+            Title: "Secure dockyard manifest",
+            Status: "open",
+            Pressure: "high",
+            Summary: "Objective pressure remains high.",
+            UpdatedAtUtc: now.AddMinutes(-3));
+        SceneProjection activeScene = new(
+            SceneId: "scene-1",
+            RunId: "run-1",
+            Title: "Dockyard checkpoint",
+            Revision: "v3",
+            Status: "active",
+            Summary: "Scene remains active.",
+            UpdatedAtUtc: now.AddMinutes(-2));
+        RunProjection leadRun = new(
+            RunId: "run-1",
+            CampaignId: "campaign-a",
+            Title: "Dockyard pressure test",
+            Status: "active",
+            Summary: "Run remains active.",
+            ActiveSceneId: "scene-1",
+            Objectives: [leadObjective],
+            Scenes: [activeScene],
+            LatestContinuity: null,
+            CreatedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now.AddMinutes(-1));
+
+        FirstPlayableSessionProjection? firstPlayable = InvokeCampaignSpineBuildFirstPlayableSession(
+            campaign,
+            restore,
+            [reviewCue, attentionCue],
+            [crew],
+            [dossier],
+            leadRun,
+            activeScene,
+            leadObjective);
+
+        Assert.NotNull(firstPlayable);
+        Assert.Contains("Open objective pressure", firstPlayable!.Summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule environment review", firstPlayable.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CampaignSpineCampaignMemoryPrefersMostRecentConsequenceRosterPrepAndTravelReceipts()
     {
         CampaignWorkspaceProjection rosterWorkspace = BuildWorkspaceWithRosterAndAftermath();
@@ -5559,6 +5685,37 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             activeScene,
             leadObjective
         ]));
+    }
+
+    private static FirstPlayableSessionProjection? InvokeCampaignSpineBuildFirstPlayableSession(
+        CampaignProjection campaign,
+        WorkspaceRestoreProjection restore,
+        IReadOnlyList<CampaignReadinessCue> readinessCues,
+        IReadOnlyList<CrewProjection> workspaceCrews,
+        IReadOnlyList<RunnerDossierProjection> workspaceDossiers,
+        RunProjection? leadRun,
+        SceneProjection? activeScene,
+        ObjectiveProjection? leadObjective)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("BuildFirstPlayableSession", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildFirstPlayableSession was not found.");
+
+        return (FirstPlayableSessionProjection?)method.Invoke(null,
+        [
+            campaign,
+            restore,
+            readinessCues,
+            workspaceCrews,
+            workspaceDossiers,
+            leadRun,
+            activeScene,
+            leadObjective,
+            "Keep return loop on governed lane.",
+            Array.Empty<GovernedPrepLaunchProjection>(),
+            Array.Empty<TravelPrefetchReceiptProjection>(),
+            Array.Empty<AftermathRecapPackageProjection>()
+        ]);
     }
 
     private static IReadOnlyList<CreatorPublicationProjection> InvokeCampaignSpineBuildCreatorPublications(

@@ -2535,7 +2535,10 @@ public sealed class CampaignSpineService
         }
 
         int crewMemberCount = workspaceCrews.Sum(static crew => crew.Members.Count);
-        CampaignReadinessCue? attentionCue = readinessCues.FirstOrDefault(static cue => NeedsAttention(cue.Severity));
+        CampaignReadinessCue? attentionCue = readinessCues
+            .Where(static cue => NeedsAttention(cue.Severity))
+            .OrderByDescending(static cue => ResolveReadinessAttentionPriority(cue.Severity))
+            .FirstOrDefault();
         ClaimedDeviceRestoreProjection? claimedDevice = restore.ClaimedDevices.FirstOrDefault();
         string rosterSummary = $"{workspaceDossiers.Count} dossier(s) and {crewMemberCount} crew member(s) are already attached to the shared return lane.";
         string readinessSummary = attentionCue is null
