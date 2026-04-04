@@ -206,12 +206,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("season-control")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leagueops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("leagueop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("leagueoperation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("leagueoperations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("league ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("league-ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("league operations")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("league-operations")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("league control")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("league-control")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("leaguecontrol")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("leaguecontrols")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("leaguectrl")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("communityops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("communityop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("communityoperation")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("communityoperations")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("community ops")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("community-ops")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("community operations")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("community-operations")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("community control")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("community-control")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("communitycontrol")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("communitycontrols")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("communityctrl")));
     }
 
     [Fact]

@@ -471,6 +471,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=gm%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=gmop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=leagueops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=leagueoperations", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=league%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=league-ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=leaguecontrol", audit, StringComparison.Ordinal);
@@ -478,6 +479,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=league-control", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=leaguectrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=communityops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=communityoperations", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=community-ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=communitycontrol", audit, StringComparison.Ordinal);
@@ -572,6 +574,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=travelprefetch", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=travelprefetches", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=leagueops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=leagueoperations", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=league%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=league-ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=leaguecontrol", audit, StringComparison.Ordinal);
@@ -579,6 +582,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=league-control", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=leaguectrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=communityops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=communityoperations", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=community%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=community-ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=communitycontrol", audit, StringComparison.Ordinal);

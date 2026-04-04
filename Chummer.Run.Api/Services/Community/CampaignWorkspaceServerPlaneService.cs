@@ -104,8 +104,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         "seasonop",
         "leagueops",
         "leagueop",
+        "leagueoperation",
+        "leagueoperations",
         "communityops",
-        "communityop"
+        "communityop",
+        "communityoperation",
+        "communityoperations"
     ];
 
     private static readonly string[] OppositionWordTokens =
@@ -4446,11 +4450,51 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("operation");
         }
 
+        if ((tokens.Contains("league") && tokens.Contains("operations")) || (tokens.Contains("league") && tokens.Contains("operation")))
+        {
+            tokens.Remove("league");
+            tokens.Remove("operations");
+            tokens.Remove("operation");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if ((tokens.Contains("community") && tokens.Contains("operations")) || (tokens.Contains("community") && tokens.Contains("operation")))
+        {
+            tokens.Remove("community");
+            tokens.Remove("operations");
+            tokens.Remove("operation");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
         if ((tokens.Contains("community") && tokens.Contains("ops")) || (tokens.Contains("community") && tokens.Contains("op")))
         {
             tokens.Remove("community");
             tokens.Remove("ops");
             tokens.Remove("op");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if ((tokens.Contains("league") && tokens.Contains("ctrl")) || (tokens.Contains("league") && tokens.Contains("control")))
+        {
+            tokens.Remove("league");
+            tokens.Remove("ctrl");
+            tokens.Remove("control");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if ((tokens.Contains("community") && tokens.Contains("ctrl")) || (tokens.Contains("community") && tokens.Contains("control")))
+        {
+            tokens.Remove("community");
+            tokens.Remove("ctrl");
+            tokens.Remove("control");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");
@@ -4583,6 +4627,22 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("operation");
         }
 
+        if (tokens.Contains("leagueoperation"))
+        {
+            tokens.Remove("leagueoperation");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("leagueoperations"))
+        {
+            tokens.Remove("leagueoperations");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
         if (tokens.Contains("communityops"))
         {
             tokens.Remove("communityops");
@@ -4594,6 +4654,70 @@ public sealed class CampaignWorkspaceServerPlaneService
         if (tokens.Contains("communityop"))
         {
             tokens.Remove("communityop");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communityoperation"))
+        {
+            tokens.Remove("communityoperation");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communityoperations"))
+        {
+            tokens.Remove("communityoperations");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("leaguectrl"))
+        {
+            tokens.Remove("leaguectrl");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("leaguecontrol"))
+        {
+            tokens.Remove("leaguecontrol");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("leaguecontrols"))
+        {
+            tokens.Remove("leaguecontrols");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communityctrl"))
+        {
+            tokens.Remove("communityctrl");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communitycontrol"))
+        {
+            tokens.Remove("communitycontrol");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communitycontrols"))
+        {
+            tokens.Remove("communitycontrols");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");

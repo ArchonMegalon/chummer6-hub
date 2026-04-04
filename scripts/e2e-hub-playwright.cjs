@@ -1252,6 +1252,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail leagueops compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leagueops compact search');
 
+  await page.fill('#prepQuery', 'leagueoperations');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=leagueoperations/.test(page.url()), 'Workspace detail search should preserve the compact leagueoperations prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail leagueoperations compact search');
+  await expectBodyText(page, 'match(es) for "leagueoperations"', '/account/work/workspaces detail leagueoperations compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail leagueoperations compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail leagueoperations compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail leagueoperations compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail leagueoperations compact search');
+  const workspaceLeagueOperationsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceLeagueOperationsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact leagueoperations query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail leagueoperations compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail leagueoperations compact search');
+
   await page.fill('#prepQuery', 'league ops');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -1398,6 +1419,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail communityops compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityops compact search');
+
+  await page.fill('#prepQuery', 'communityoperations');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=communityoperations/.test(page.url()), 'Workspace detail search should preserve the compact communityoperations prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail communityoperations compact search');
+  await expectBodyText(page, 'match(es) for "communityoperations"', '/account/work/workspaces detail communityoperations compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail communityoperations compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail communityoperations compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail communityoperations compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail communityoperations compact search');
+  const workspaceCommunityOperationsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceCommunityOperationsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact communityoperations query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail communityoperations compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail communityoperations compact search');
 
   await page.fill('#prepQuery', 'community ops');
   await Promise.all([
