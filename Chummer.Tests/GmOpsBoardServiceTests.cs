@@ -618,6 +618,13 @@ public sealed class GmOpsBoardServiceTests
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
+                Payload: "Open de-briefing prep lane remains unresolved before next return checkpoint.",
+                AtUtc: baseTime.AddMinutes(5).AddSeconds(40),
+                EventId: "evt-de-briefing"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
                 Payload: "Open outbriefed prep lane remains unresolved before next return checkpoint.",
                 AtUtc: baseTime.AddMinutes(5).AddSeconds(45),
                 EventId: "evt-outbriefed"),
@@ -658,8 +665,8 @@ public sealed class GmOpsBoardServiceTests
         Assert.Equal("ops:evt-retrospective", projection.UnresolvedItems[1].ItemId);
         Assert.Equal("ops:evt-aar", projection.UnresolvedItems[2].ItemId);
         Assert.Contains(projection.UnresolvedItems, item => item.ItemId == "ops:evt-outbriefed");
-        Assert.Contains(projection.UnresolvedItems, item => item.ItemId == "ops:evt-debriefing");
         Assert.Contains(projection.UnresolvedItems, item => item.ItemId == "ops:evt-debriefed");
+        Assert.Contains(projection.UnresolvedItems, item => item.ItemId == "ops:evt-de-briefing");
     }
 
     [Fact]
@@ -1878,6 +1885,16 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse debriefedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "debriefed");
         GmPrepAssetListResponse debriefingMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "debriefing");
         GmPrepAssetListResponse debriefingsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "debriefings");
+        GmPrepAssetListResponse deBriefSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "de brief");
+        GmPrepAssetListResponse deBriefsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "de briefs");
+        GmPrepAssetListResponse deBriefedSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "de briefed");
+        GmPrepAssetListResponse deBriefingSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "de briefing");
+        GmPrepAssetListResponse deBriefingsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "de briefings");
+        GmPrepAssetListResponse deBriefHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "de-brief");
+        GmPrepAssetListResponse deBriefsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "de-briefs");
+        GmPrepAssetListResponse deBriefedHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "de-briefed");
+        GmPrepAssetListResponse deBriefingHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "de-briefing");
+        GmPrepAssetListResponse deBriefingsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "de-briefings");
         GmPrepAssetListResponse outbriefMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "outbrief");
         GmPrepAssetListResponse outbriefsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "outbriefs");
         GmPrepAssetListResponse outbriefedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "outbriefed");
@@ -1985,6 +2002,16 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(debriefedMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(debriefingMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(debriefingsMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(deBriefSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(deBriefsSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(deBriefedSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(deBriefingSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(deBriefingsSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(deBriefHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(deBriefsHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(deBriefedHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(deBriefingHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(deBriefingsHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(outbriefMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(outbriefsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(outbriefedMatches.Items, item => item.AssetId == "continuity_plural_ops");

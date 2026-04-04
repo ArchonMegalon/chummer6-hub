@@ -831,6 +831,22 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("recap");
         }
 
+        if (tokens.Contains("de")
+            && (tokens.Contains("brief")
+                || tokens.Contains("briefs")
+                || tokens.Contains("briefed")
+                || tokens.Contains("briefing")
+                || tokens.Contains("briefings")))
+        {
+            tokens.Remove("de");
+            tokens.Remove("brief");
+            tokens.Remove("briefs");
+            tokens.Remove("briefed");
+            tokens.Remove("briefing");
+            tokens.Remove("briefings");
+            tokens.Add("recap");
+        }
+
         if (tokens.Contains("outbrief"))
         {
             tokens.Remove("outbrief");
