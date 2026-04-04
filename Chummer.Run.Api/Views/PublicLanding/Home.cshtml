@@ -931,6 +931,10 @@
                                                                         {
                                                                             <span> Output provenance: @output.ProvenanceSummary.</span>
                                                                         }
+                                                                        @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
+                                                                        {
+                                                                            <span> Output audit: @output.AuditSummary.</span>
+                                                                        }
                                                                     }
                                                                 }
                                                                 @if (handoff.Watchouts is { Count: > 0 })
