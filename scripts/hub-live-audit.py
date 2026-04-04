@@ -2557,6 +2557,20 @@ def verify_signed_in_work_audit(
     prep_library_faction = json.loads(body)
     if not (prep_library_faction.get("items") or []):
         raise AssertionError("prep-library faction search did not expose any governed packet")
+    prep_library_factions_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=factions"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_factions_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_factions_path} returned {status}, expected 200")
+
+    prep_library_factions = json.loads(body)
+    if not (prep_library_factions.get("items") or []):
+        raise AssertionError("prep-library factions search did not expose any governed packet")
     prep_library_journal_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=journal"
     status, body, _, _ = fetch(
         base_url,
@@ -5257,6 +5271,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_faction_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_faction_search_path} should return at least one governed prep packet for the faction query")
+    workspace_factions_search_path = f"{workspace_path}?prepQuery=factions"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_factions_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_factions_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_factions_search_path)
+    require_snippet(body, 'match(es) for "factions"', workspace_factions_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_factions_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_factions_search_path} should return at least one governed prep packet for the factions query")
     workspace_journal_search_path = f"{workspace_path}?prepQuery=journal"
     status, body, _, _ = fetch(
         base_url,

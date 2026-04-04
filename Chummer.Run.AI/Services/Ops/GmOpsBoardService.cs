@@ -784,6 +784,12 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("connection");
         }
 
+        if (tokens.Contains("factions"))
+        {
+            tokens.Remove("factions");
+            tokens.Add("faction");
+        }
+
         if (tokens.Contains("heats"))
         {
             tokens.Remove("heats");
