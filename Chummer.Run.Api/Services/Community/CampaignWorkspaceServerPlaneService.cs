@@ -3168,6 +3168,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         return ContainsAnyWordToken(normalizedKind, AftermathRecapWordTokens)
             || ContainsAfterActionTokenPair(normalizedKind)
             || ContainsPostGameTokenPair(normalizedKind)
+            || ContainsOutBriefTokenPair(normalizedKind)
+            || ContainsHotWashTokenPair(normalizedKind)
             || ContainsLessonLearnedTokenPair(normalizedKind);
     }
 
@@ -3199,6 +3201,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         return ContainsAnyWordToken(value, AftermathRecapWordTokens)
             || ContainsAfterActionTokenPair(value)
             || ContainsPostGameTokenPair(value)
+            || ContainsOutBriefTokenPair(value)
+            || ContainsHotWashTokenPair(value)
             || ContainsLessonLearnedTokenPair(value);
     }
 
