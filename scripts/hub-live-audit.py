@@ -1406,6 +1406,20 @@ def verify_signed_in_work_audit(
     prep_library_opforces = json.loads(body)
     if not (prep_library_opforces.get("items") or []):
         raise AssertionError("prep-library opforces search did not expose any governed packet")
+    prep_library_opfors_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=opfors"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_opfors_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_opfors_path} returned {status}, expected 200")
+
+    prep_library_opfors = json.loads(body)
+    if not (prep_library_opfors.get("items") or []):
+        raise AssertionError("prep-library opfors search did not expose any governed packet")
     prep_library_op_force_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=op-force"
     status, body, _, _ = fetch(
         base_url,
@@ -4237,6 +4251,21 @@ def verify_signed_in_work_audit(
     require_snippet(body, prep_launch["packetTitle"], workspace_opforces_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_opforces_search_path} should return at least one governed prep packet for the opforces query")
+    workspace_opfors_search_path = f"{workspace_path}?prepQuery=opfors"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_opfors_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_opfors_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_opfors_search_path)
+    require_snippet(body, 'match(es) for "opfors"', workspace_opfors_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_opfors_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_opfors_search_path} should return at least one governed prep packet for the opfors query")
     workspace_op_force_search_path = f"{workspace_path}?prepQuery=op-force"
     status, body, _, _ = fetch(
         base_url,
