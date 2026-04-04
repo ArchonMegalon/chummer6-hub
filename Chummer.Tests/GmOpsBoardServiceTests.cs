@@ -2178,6 +2178,39 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public void ListPrepAssets_QueryCollapsesContactHeatAndDiaryMutationShorthand()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult import = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "continuity_mutation_ops",
+                now: now,
+                title: "Diary, contacts, connection, and heat return packet",
+                body: "Relationship continuity remains governed on the same next-session return lane with a shared connection signal.")
+        ]);
+
+        Assert.Equal(1, import.ImportedCount);
+        Assert.Equal(0, import.SkippedCount);
+        Assert.Empty(import.Conflicts);
+
+        GmPrepAssetListResponse contactUpdatesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "contact updates");
+        GmPrepAssetListResponse contactsChangedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "contacts changed");
+        GmPrepAssetListResponse heatChangesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "heat changes");
+        GmPrepAssetListResponse diaryUpdateMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "diary update");
+        GmPrepAssetListResponse diariesUpdatesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "diaries updates");
+        GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrix updates");
+
+        Assert.Contains(contactUpdatesMatches.Items, item => item.AssetId == "continuity_mutation_ops");
+        Assert.Contains(contactsChangedMatches.Items, item => item.AssetId == "continuity_mutation_ops");
+        Assert.Contains(heatChangesMatches.Items, item => item.AssetId == "continuity_mutation_ops");
+        Assert.Contains(diaryUpdateMatches.Items, item => item.AssetId == "continuity_mutation_ops");
+        Assert.Contains(diariesUpdatesMatches.Items, item => item.AssetId == "continuity_mutation_ops");
+        Assert.Empty(negativeMatches.Items);
+    }
+
+    [Fact]
     public void ListPrepAssets_QuerySupportsNextSessionReturnLoopPluralShorthandAcrossWhitespaceAndPunctuation()
     {
         var service = CreateService();
