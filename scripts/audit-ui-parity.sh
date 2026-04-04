@@ -271,6 +271,14 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.journeysPassed is missing required baseline journey ids: "
             f"{release_channel_path} ({', '.join(missing_required_journeys)})"
         )
+    unexpected_journeys = sorted(
+        journey for journey in normalized_journeys if journey not in REQUIRED_RELEASE_PROOF_JOURNEYS
+    )
+    if unexpected_journeys:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.journeysPassed declares unexpected journey ids: "
+            f"{release_channel_path} ({', '.join(unexpected_journeys)})"
+        )
     proof_routes = proof.get("proofRoutes") or proof.get("proof_routes")
     raw_routes = require_string_list(
         proof_routes,
@@ -303,6 +311,14 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
         raise SystemExit(
             "parity audit failed: release-channel nested receipt releaseProof.proofRoutes is missing required flagship routes: "
             f"{release_channel_path} ({', '.join(missing_required_routes)})"
+        )
+    unexpected_routes = sorted(
+        route for route in normalized_routes if route not in REQUIRED_RELEASE_PROOF_ROUTES
+    )
+    if unexpected_routes:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.proofRoutes declares unexpected flagship routes: "
+            f"{release_channel_path} ({', '.join(unexpected_routes)})"
         )
 
 
