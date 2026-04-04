@@ -1067,6 +1067,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             || combined.Contains("open", StringComparison.OrdinalIgnoreCase)
             || combined.Contains("todo", StringComparison.OrdinalIgnoreCase)
             || combined.Contains("pending", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("still active", StringComparison.OrdinalIgnoreCase)
             || combined.Contains("threat", StringComparison.OrdinalIgnoreCase)
             || combined.Contains("heat", StringComparison.OrdinalIgnoreCase)
             || combined.Contains("carry-forward", StringComparison.OrdinalIgnoreCase)
@@ -1511,12 +1512,18 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 "return loop",
                 "next session return",
                 "next-session return",
+                "travel",
                 "carry-forward",
                 "carry forward")
             && ContainsAny(combined,
                 "campaign",
                 "session",
+                "travel",
                 "return",
+                "safehouse",
+                "mobile",
+                "offline",
+                "cache",
                 "loop",
                 "lane",
                 "pending",
