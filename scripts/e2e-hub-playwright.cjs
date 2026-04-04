@@ -4213,6 +4213,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail afteractions compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail afteractions compact search');
 
+  await page.fill('#prepQuery', 'afteractionreport');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=afteractionreport/.test(page.url()), 'Workspace detail search should preserve the compact afteractionreport continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail afteractionreport compact search');
+  await expectBodyText(page, 'match(es) for "afteractionreport"', '/account/work/workspaces detail afteractionreport compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail afteractionreport compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail afteractionreport compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail afteractionreport compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail afteractionreport compact search');
+  const workspaceAfterActionReportCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReportCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact afteractionreport continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail afteractionreport compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail afteractionreport compact search');
+
+  await page.fill('#prepQuery', 'afteractionreports');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=afteractionreports/.test(page.url()), 'Workspace detail search should preserve the compact afteractionreports continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail afteractionreports compact search');
+  await expectBodyText(page, 'match(es) for "afteractionreports"', '/account/work/workspaces detail afteractionreports compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail afteractionreports compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail afteractionreports compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail afteractionreports compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail afteractionreports compact search');
+  const workspaceAfterActionReportsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReportsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact afteractionreports continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail afteractionreports compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail afteractionreports compact search');
+
   await page.fill('#prepQuery', 'after action');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -4255,6 +4297,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail split after actions search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail split after actions search');
 
+  await page.fill('#prepQuery', 'after action report');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=after(?:%20|\+)action(?:%20|\+)report/.test(page.url()), 'Workspace detail search should preserve the split after action report continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail split after action report search');
+  await expectBodyText(page, 'match(es) for "after action report"', '/account/work/workspaces detail split after action report search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail split after action report search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail split after action report search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail split after action report search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail split after action report search');
+  const workspaceAfterActionReportSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReportSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split after action report continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail split after action report search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail split after action report search');
+
+  await page.fill('#prepQuery', 'after action reports');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=after(?:%20|\+)action(?:%20|\+)reports/.test(page.url()), 'Workspace detail search should preserve the split after action reports continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail split after action reports search');
+  await expectBodyText(page, 'match(es) for "after action reports"', '/account/work/workspaces detail split after action reports search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail split after action reports search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail split after action reports search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail split after action reports search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail split after action reports search');
+  const workspaceAfterActionReportsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReportsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split after action reports continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail split after action reports search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail split after action reports search');
+
   await page.fill('#prepQuery', 'after-action');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -4296,6 +4380,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail hyphen after-actions search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hyphen after-actions search');
+
+  await page.fill('#prepQuery', 'after-action report');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=after-action(?:%20|\+)report/.test(page.url()), 'Workspace detail search should preserve the hyphen after-action report continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail hyphen after-action report search');
+  await expectBodyText(page, 'match(es) for "after-action report"', '/account/work/workspaces detail hyphen after-action report search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail hyphen after-action report search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail hyphen after-action report search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail hyphen after-action report search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail hyphen after-action report search');
+  const workspaceAfterActionReportHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReportHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen after-action report continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail hyphen after-action report search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hyphen after-action report search');
+
+  await page.fill('#prepQuery', 'after-action reports');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=after-action(?:%20|\+)reports/.test(page.url()), 'Workspace detail search should preserve the hyphen after-action reports continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail hyphen after-action reports search');
+  await expectBodyText(page, 'match(es) for "after-action reports"', '/account/work/workspaces detail hyphen after-action reports search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail hyphen after-action reports search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail hyphen after-action reports search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail hyphen after-action reports search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail hyphen after-action reports search');
+  const workspaceAfterActionReportsHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReportsHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen after-action reports continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail hyphen after-action reports search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hyphen after-action reports search');
 
   await page.fill('#prepQuery', 'return');
   await Promise.all([

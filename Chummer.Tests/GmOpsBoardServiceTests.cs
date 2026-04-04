@@ -557,7 +557,7 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
-    public async Task GetProjection_UnresolvedItemsTreatPostSessionAndPostRunSignalsAsPrepLibraryDomain()
+    public async Task GetProjection_UnresolvedItemsTreatPostSessionPostRunAndAfterActionReportSignalsAsPrepLibraryDomain()
     {
         SessionLedgerService ledger = new();
         var service = CreateService(ledger);
@@ -583,17 +583,25 @@ public sealed class GmOpsBoardServiceTests
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
+                Payload: "Open after-action report prep lane remains unresolved before next return checkpoint.",
+                AtUtc: baseTime.AddMinutes(2),
+                EventId: "evt-after-action-report"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
                 Payload: "Open checklist remains unresolved.",
-                AtUtc: baseTime.AddMinutes(20),
+                AtUtc: baseTime.AddMinutes(21),
                 EventId: "evt-general")
         ]);
 
         OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
 
-        Assert.Equal(3, projection.UnresolvedItems.Count);
-        Assert.Equal("ops:evt-post-run", projection.UnresolvedItems[0].ItemId);
-        Assert.Equal("ops:evt-postsession", projection.UnresolvedItems[1].ItemId);
-        Assert.Equal("ops:evt-general", projection.UnresolvedItems[2].ItemId);
+        Assert.Equal(4, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-after-action-report", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-post-run", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-postsession", projection.UnresolvedItems[2].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[3].ItemId);
     }
 
     [Fact]
@@ -1697,10 +1705,16 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse postRunHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "post-run");
         GmPrepAssetListResponse afterActionCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteraction");
         GmPrepAssetListResponse afterActionsCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteractions");
+        GmPrepAssetListResponse afterActionReportCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteractionreport");
+        GmPrepAssetListResponse afterActionReportsCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteractionreports");
         GmPrepAssetListResponse afterActionSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after action");
         GmPrepAssetListResponse afterActionsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after actions");
+        GmPrepAssetListResponse afterActionReportSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after action report");
+        GmPrepAssetListResponse afterActionReportsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after action reports");
         GmPrepAssetListResponse afterActionHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after-action");
         GmPrepAssetListResponse afterActionsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after-actions");
+        GmPrepAssetListResponse afterActionReportHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after-action report");
+        GmPrepAssetListResponse afterActionReportsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after-action reports");
         GmPrepAssetListResponse recapsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "recaps");
         GmPrepAssetListResponse returnsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "returns");
         GmPrepAssetListResponse memoriesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "memories");
@@ -1746,10 +1760,16 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(postRunHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionsCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReportCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReportsCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionsSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReportSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReportsSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionsHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReportHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReportsHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(recapsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(returnsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(memoriesMatches.Items, item => item.AssetId == "continuity_plural_ops");

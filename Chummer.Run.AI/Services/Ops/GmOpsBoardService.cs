@@ -1309,7 +1309,13 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
                 "postrun",
                 "postruns",
                 "post-run",
-                "post run")
+                "post run",
+                "afteractionreport",
+                "afteractionreports",
+                "after action report",
+                "after action reports",
+                "after-action report",
+                "after-action reports")
             || (ContainsAny(combined,
                     "packet",
                     "packets",

@@ -256,7 +256,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         "debrief",
         "postmortem",
         "postsession",
-        "postrun"
+        "postrun",
+        "afteractionreport",
+        "afteractionreports"
     ];
 
     private static readonly string[] RosterIdentityWordTokens =
