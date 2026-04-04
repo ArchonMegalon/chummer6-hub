@@ -606,6 +606,29 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignReturnPacketDeduplicatesIdenticalSignalVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithCampaignReturnSignalLabelsOnly();
+        IReadOnlyList<WorkspaceChangePacketProjection> seedPackets =
+            Assert.IsAssignableFrom<IReadOnlyList<WorkspaceChangePacketProjection>>(seed.ChangePackets);
+        WorkspaceChangePacketProjection first = seedPackets[0];
+        WorkspaceChangePacketProjection second = seedPackets[1];
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            ChangePackets = [first, first, second]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_return_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("2 diary/continuity signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("return window label", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("fixer obligation label", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void CampaignReturnPacketFallsBackToSignalLabelsWhenChangeSignalKindsAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignReturnSparseSignalKindsAndLabelsOnly();

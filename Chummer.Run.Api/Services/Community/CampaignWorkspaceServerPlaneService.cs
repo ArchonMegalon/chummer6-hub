@@ -1665,9 +1665,10 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         RunProjection? leadRun)
     {
-        WorkspaceChangePacketProjection[] oppositionSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsOppositionSignal(packet))
-            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+        WorkspaceChangePacketProjection[] oppositionSignals = DeduplicateIdenticalChangePacketVersions(
+                (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+                .Where(static packet => IsOppositionSignal(packet))
+                .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
         CampaignConsequenceProjection[] consequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
@@ -1947,9 +1948,10 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         CampaignMemoryProjection? campaignMemory = workspace.CampaignMemory;
         NextSessionCarryForwardProjection? carryForward = workspace.NextSessionCarryForward;
-        WorkspaceChangePacketProjection[] memorySignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsCampaignMemorySignal(packet))
-            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+        WorkspaceChangePacketProjection[] memorySignals = DeduplicateIdenticalChangePacketVersions(
+                (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+                .Where(static packet => IsCampaignMemorySignal(packet))
+                .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
         CampaignConsequenceProjection[] memoryConsequences = (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
@@ -2101,14 +2103,16 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] returnChanges = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsCampaignReturnSignal(packet))
-            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+        WorkspaceChangePacketProjection[] returnChanges = DeduplicateIdenticalChangePacketVersions(
+                (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+                .Where(static packet => IsCampaignReturnSignal(packet))
+                .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] aftermathChanges = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsAftermathSignal(packet))
-            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+        WorkspaceChangePacketProjection[] aftermathChanges = DeduplicateIdenticalChangePacketVersions(
+                (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+                .Where(static packet => IsAftermathSignal(packet))
+                .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
         bool carryForwardSignal = IsCampaignReturnCarryForwardSignal(carryForward);
@@ -2543,9 +2547,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static consequence => consequence.UpdatedAtUtc)
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] rosterChangeSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsRosterMovementSignal(packet))
-            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+        WorkspaceChangePacketProjection[] rosterChangeSignals = DeduplicateIdenticalChangePacketVersions(
+                (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+                .Where(static packet => IsRosterMovementSignal(packet))
+                .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
         ObjectiveProjection[] rosterObjectives = (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
@@ -2762,9 +2767,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Where(static item => IsAftermathRecapSignal(item))
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] aftermathSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsAftermathSignal(packet))
-            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+        WorkspaceChangePacketProjection[] aftermathSignals = DeduplicateIdenticalChangePacketVersions(
+                (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+                .Where(static packet => IsAftermathSignal(packet))
+                .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
         bool carryForwardSignal = IsAftermathCarryForwardSignal(carryForward);
@@ -2918,9 +2924,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static item => item.LaunchedAtUtc)
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] launchSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsPrepLaunchSignal(packet))
-            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+        WorkspaceChangePacketProjection[] launchSignals = DeduplicateIdenticalChangePacketVersions(
+                (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+                .Where(static packet => IsPrepLaunchSignal(packet))
+                .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
         bool carryForwardSignal = IsPrepLaunchCarryForwardSignal(carryForward);
@@ -3502,9 +3509,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             .OrderByDescending(static item => item.StagedAtUtc)
             .Take(4)
             .ToArray();
-        WorkspaceChangePacketProjection[] prefetchSignals = (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
-            .Where(static packet => IsTravelPrefetchSignal(packet))
-            .OrderByDescending(static packet => packet.UpdatedAtUtc)
+        WorkspaceChangePacketProjection[] prefetchSignals = DeduplicateIdenticalChangePacketVersions(
+                (workspace.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>())
+                .Where(static packet => IsTravelPrefetchSignal(packet))
+                .OrderByDescending(static packet => packet.UpdatedAtUtc))
             .Take(4)
             .ToArray();
         bool carryForwardSignal = IsTravelPrefetchCarryForwardSignal(carryForward);
