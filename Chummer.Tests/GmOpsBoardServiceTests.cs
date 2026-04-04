@@ -1311,6 +1311,39 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public void ListPrepAssets_QuerySupportsOpForShorthandAcrossWhitespaceAndPunctuation()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult import = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "opfor_ops",
+                now: now,
+                title: "Opposition opfor packet",
+                body: "Opfor opposition lane remains governed for launch and return continuity.")
+        ]);
+
+        Assert.Equal(1, import.ImportedCount);
+        Assert.Equal(0, import.SkippedCount);
+        Assert.Empty(import.Conflicts);
+
+        GmPrepAssetListResponse compactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "opfor");
+        GmPrepAssetListResponse compactForceMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "opforce");
+        GmPrepAssetListResponse hyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "op-force");
+        GmPrepAssetListResponse splitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "op force");
+        GmPrepAssetListResponse splitShortMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "op for");
+        GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixforce");
+
+        Assert.Contains(compactMatches.Items, item => item.AssetId == "opfor_ops");
+        Assert.Contains(compactForceMatches.Items, item => item.AssetId == "opfor_ops");
+        Assert.Contains(hyphenMatches.Items, item => item.AssetId == "opfor_ops");
+        Assert.Contains(splitMatches.Items, item => item.AssetId == "opfor_ops");
+        Assert.Contains(splitShortMatches.Items, item => item.AssetId == "opfor_ops");
+        Assert.Empty(negativeMatches.Items);
+    }
+
+    [Fact]
     public void ReconcilePortableAssets_SkipsAssets_WhenIncomingPayloadContainsAmbiguousDuplicateAssetVersions()
     {
         var service = CreateService();

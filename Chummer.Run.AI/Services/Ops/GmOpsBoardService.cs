@@ -725,6 +725,21 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("operation");
         }
 
+        if ((tokens.Contains("op") && tokens.Contains("for"))
+            || (tokens.Contains("op") && tokens.Contains("force")))
+        {
+            tokens.Remove("op");
+            tokens.Remove("for");
+            tokens.Remove("force");
+            tokens.Add("opfor");
+        }
+
+        if (tokens.Contains("opforce"))
+        {
+            tokens.Remove("opforce");
+            tokens.Add("opfor");
+        }
+
         if (tokens.Contains("sessionlogs"))
         {
             tokens.Remove("sessionlogs");
