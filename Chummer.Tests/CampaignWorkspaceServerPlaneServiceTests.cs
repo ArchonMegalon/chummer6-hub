@@ -7207,8 +7207,10 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "character_template", StringComparison.Ordinal));
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "foundry_exchange", StringComparison.Ordinal));
         Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "sheet_viewer", StringComparison.Ordinal));
+        Assert.Contains(handoff.Outputs, output => string.Equals(output.Kind, "print_pdf_export", StringComparison.Ordinal));
         Assert.Contains(handoff.TradeoffLines, line => line.Contains("Rule-environment diff", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("Explain receipt", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.ProgressionOutcomes, line => line.Contains("print-ready PDF", StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
