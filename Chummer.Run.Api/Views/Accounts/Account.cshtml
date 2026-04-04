@@ -1878,6 +1878,13 @@
                                     <strong>@selectedBuildLabHandoff.SourceHintSummary</strong>
                                 </div>
                             }
+                            @if (!string.IsNullOrWhiteSpace(selectedBuildLabHandoff.BuildSurfaceSummary))
+                            {
+                                <div class="settings-summary-row">
+                                    <span>Build surface</span>
+                                    <strong>@selectedBuildLabHandoff.BuildSurfaceSummary</strong>
+                                </div>
+                            }
                         </div>
                         @if (selectedBuildLabHandoff.TradeoffLines.Count > 0)
                         {
@@ -1902,6 +1909,10 @@
                         @if (selectedBuildLabHandoff.SourceHintLines is { Count: > 0 })
                         {
                             <p><strong>Source-linked hints:</strong> @string.Join(" ", selectedBuildLabHandoff.SourceHintLines.Take(3))</p>
+                        }
+                        @if (selectedBuildLabHandoff.BuildSurfaceLines is { Count: > 0 })
+                        {
+                            <p><strong>Build surface:</strong> @string.Join(" ", selectedBuildLabHandoff.BuildSurfaceLines.Take(4))</p>
                         }
                         @if (selectedBuildLabHandoff.Outputs.Count > 0)
                         {

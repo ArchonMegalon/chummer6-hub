@@ -2297,6 +2297,8 @@ public sealed class CampaignSpineService
                 var conditionalStateLines = BuildBuildLabConditionalStateLines(dossier, workspace);
                 var sourceHintSummary = BuildBuildLabSourceHintSummary(dossier, workspace);
                 var sourceHintLines = BuildBuildLabSourceHintLines(dossier, workspace);
+                var buildSurfaceSummary = BuildBuildLabSurfaceSummary(dossier, workspace, ruleEnvironmentDiff);
+                var buildSurfaceLines = BuildBuildLabSurfaceLines(dossier, workspace, ruleEnvironmentDiff);
                 return new BuildLabHandoffProjection(
                     HandoffId: StableId("buildlab", dossier.DossierId),
                     DossierId: dossier.DossierId,
@@ -2336,7 +2338,9 @@ public sealed class CampaignSpineService
                     ConditionalStateSummary: conditionalStateSummary,
                     ConditionalStateLines: conditionalStateLines,
                     SourceHintSummary: sourceHintSummary,
-                    SourceHintLines: sourceHintLines);
+                    SourceHintLines: sourceHintLines,
+                    BuildSurfaceSummary: buildSurfaceSummary,
+                    BuildSurfaceLines: buildSurfaceLines);
             })
             .Take(3)
             .ToArray();
@@ -2929,6 +2933,87 @@ public sealed class CampaignSpineService
         return lines
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .ToArray();
+    }
+
+    private static string BuildBuildLabSurfaceSummary(
+        RunnerDossierProjection dossier,
+        CampaignWorkspaceProjection? workspace,
+        BuildLabRuleEnvironmentDiffProjection ruleEnvironmentDiff)
+    {
+        var coverage = ResolveBuildLabSurfaceCoverage(dossier, workspace, ruleEnvironmentDiff);
+        int covered = coverage.Count(static lane => lane.status);
+        return $"{covered} of 4 build-surface lanes are grounded on one handoff (creation, compare, advancement, crew-fit).";
+    }
+
+    private static IReadOnlyList<string> BuildBuildLabSurfaceLines(
+        RunnerDossierProjection dossier,
+        CampaignWorkspaceProjection? workspace,
+        BuildLabRuleEnvironmentDiffProjection ruleEnvironmentDiff)
+    {
+        var coverage = ResolveBuildLabSurfaceCoverage(dossier, workspace, ruleEnvironmentDiff);
+        return coverage
+            .Select(static lane => $"{lane.label}: {(lane.status ? "grounded" : "pending")} — {lane.detail}")
+            .ToArray();
+    }
+
+    private static IReadOnlyList<(string label, bool status, string detail)> ResolveBuildLabSurfaceCoverage(
+        RunnerDossierProjection dossier,
+        CampaignWorkspaceProjection? workspace,
+        BuildLabRuleEnvironmentDiffProjection ruleEnvironmentDiff)
+    {
+        bool creationGrounded = dossier.BuildReceiptIds.Count > 0;
+        bool compareGrounded = dossier.Projections.Any(static projection => IsBuildLabCompareProjectionKind(projection.Kind))
+            || ruleEnvironmentDiff.Changed;
+        bool advancementGrounded = workspace is not null;
+        bool crewFitGrounded = workspace is not null
+            && workspace.Crews.SelectMany(static crew => crew.Members)
+                .Any(member => string.Equals(member.DossierId, dossier.DossierId, StringComparison.OrdinalIgnoreCase));
+
+        return
+        [
+            (
+                "Creation lane",
+                creationGrounded,
+                creationGrounded
+                    ? $"Build receipts are attached ({dossier.BuildReceiptIds.Count})."
+                    : "No build receipt is attached yet."
+            ),
+            (
+                "Compare lane",
+                compareGrounded,
+                compareGrounded
+                    ? "Variant comparison evidence is attached through compare cards or rule-environment diff posture."
+                    : "No compare evidence is attached yet."
+            ),
+            (
+                "Advancement lane",
+                advancementGrounded,
+                advancementGrounded
+                    ? $"Campaign workspace {workspace!.CampaignName} is attached for progression planning."
+                    : "Campaign workspace is not attached yet."
+            ),
+            (
+                "Crew-fit lane",
+                crewFitGrounded,
+                crewFitGrounded
+                    ? $"{dossier.DisplayName} is assigned to a governed crew lane."
+                    : "Runner is not yet assigned to a governed crew lane."
+            )
+        ];
+    }
+
+    private static bool IsBuildLabCompareProjectionKind(string? kind)
+    {
+        if (string.IsNullOrWhiteSpace(kind))
+        {
+            return false;
+        }
+
+        string normalized = kind.Trim().ToLowerInvariant();
+        return normalized.Contains("compare", StringComparison.Ordinal)
+            || normalized.Contains("variant", StringComparison.Ordinal)
+            || normalized.Contains("build_idea", StringComparison.Ordinal)
+            || normalized.Contains("build-idea", StringComparison.Ordinal);
     }
 
     private static SceneProjection? ResolveActiveScene(RunProjection run)

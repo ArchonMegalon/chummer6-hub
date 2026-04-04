@@ -596,7 +596,9 @@ public sealed record BuildLabHandoffProjection(
     string? ConditionalStateSummary = null,
     IReadOnlyList<string>? ConditionalStateLines = null,
     string? SourceHintSummary = null,
-    IReadOnlyList<string>? SourceHintLines = null);
+    IReadOnlyList<string>? SourceHintLines = null,
+    string? BuildSurfaceSummary = null,
+    IReadOnlyList<string>? BuildSurfaceLines = null);
 
 public sealed record BuildLabRuleEnvironmentDiffProjection(
     string Status,
