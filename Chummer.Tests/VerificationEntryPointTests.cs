@@ -205,6 +205,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject query/fragment releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
         Assert.Contains("reject escaped-path releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
         Assert.Contains("reject dot-segment traversal releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
+        Assert.Contains("reject non-canonical uppercase releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
+        Assert.Contains("reject empty-segment releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
         Assert.Contains("reject duplicate-normalized releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
         Assert.Contains("reject missing required releaseProof.proofRoutes flagship routes", script, StringComparison.Ordinal);
         Assert.Contains("reject unexpected releaseProof.proofRoutes flagship routes", script, StringComparison.Ordinal);
