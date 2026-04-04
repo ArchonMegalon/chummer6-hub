@@ -40,9 +40,14 @@ if [[ -z "$summary_block" ]]; then
 fi
 
 if ! python3 - "$WORKFLOW_GATE_RECEIPT" "$VISUAL_FAMILIARITY_RECEIPT" <<'PY'
+import datetime as dt
 import json
 import pathlib
 import sys
+
+UTC = dt.timezone.utc
+DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS = 24 * 60 * 60
+DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS = 5 * 60
 
 
 def require_object(value: object, *, message: str) -> dict:
@@ -89,6 +94,71 @@ def read_status(path: pathlib.Path, data: dict) -> str:
     return status
 
 
+def parse_generated_at(path: pathlib.Path, data: dict) -> dt.datetime:
+    raw = str(data.get("generatedAt") or data.get("generated_at") or "").strip()
+    if not raw:
+        raise SystemExit(f"parity audit failed: executable receipt generatedAt/generated_at is missing: {path}")
+    normalized = raw.replace("Z", "+00:00")
+    try:
+        parsed = dt.datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise SystemExit(
+            f"parity audit failed: executable receipt generatedAt/generated_at is invalid: {path} ({raw})"
+        ) from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def read_int_value(
+    evidence: dict,
+    key: str,
+    *,
+    default_value: int,
+    path: pathlib.Path,
+) -> int:
+    value = evidence.get(key)
+    if value is None:
+        return default_value
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise SystemExit(
+            f"parity audit failed: receipt evidence field {key} must be an integer when present: {path}"
+        ) from exc
+    if parsed < 0:
+        raise SystemExit(f"parity audit failed: receipt evidence field {key} must be >= 0: {path}")
+    return parsed
+
+
+def validate_timestamp_freshness(path: pathlib.Path, data: dict, evidence: dict) -> None:
+    generated_at = parse_generated_at(path, data)
+    max_age_seconds = read_int_value(
+        evidence,
+        "proof_freshness_max_age_seconds",
+        default_value=DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS,
+        path=path,
+    )
+    max_future_skew_seconds = read_int_value(
+        evidence,
+        "proof_freshness_max_future_skew_seconds",
+        default_value=DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS,
+        path=path,
+    )
+    now = dt.datetime.now(UTC)
+    age_seconds = int((now - generated_at).total_seconds())
+    if age_seconds > max_age_seconds:
+        raise SystemExit(
+            "parity audit failed: executable receipt generatedAt/generated_at is stale: "
+            f"{path} (age_seconds={age_seconds}, max_age_seconds={max_age_seconds})"
+        )
+    if age_seconds < -max_future_skew_seconds:
+        raise SystemExit(
+            "parity audit failed: executable receipt generatedAt/generated_at is in the future: "
+            f"{path} (future_skew_seconds={abs(age_seconds)}, max_future_skew_seconds={max_future_skew_seconds})"
+        )
+
+
 def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
     evidence = require_object(
         data.get("evidence"),
@@ -133,6 +203,7 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("workflow_execution_failing_receipts"),
         message=f"parity audit failed: workflow receipt reports failing execution receipts: {path}",
     )
+    validate_timestamp_freshness(path, data, evidence)
 
 
 def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
@@ -172,6 +243,7 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("missing_tests"),
         message=f"parity audit failed: visual receipt reports missing required visual tests: {path}",
     )
+    validate_timestamp_freshness(path, data, evidence)
 
 
 workflow_path = pathlib.Path(sys.argv[1])
