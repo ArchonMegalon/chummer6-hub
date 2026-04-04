@@ -1717,6 +1717,15 @@ public sealed class CampaignSpineService
            && !severity.Equals("ok", StringComparison.OrdinalIgnoreCase)
            && !severity.Equals("ready", StringComparison.OrdinalIgnoreCase);
 
+    private static int ResolveReadinessAttentionPriority(string? severity)
+        => severity?.Trim().ToLowerInvariant() switch
+        {
+            "attention" => 3,
+            "warning" => 2,
+            "review" => 1,
+            _ => 0
+        };
+
     private static string ResolveOperatorRole(GroupDto group, string userId)
         => group.Memberships
                .Where(member => string.Equals(member.UserId, userId, StringComparison.OrdinalIgnoreCase))
@@ -2471,11 +2480,10 @@ public sealed class CampaignSpineService
             return $"Resolve restore review before you reopen {campaign.Name}: {restoreConflict}";
         }
 
-        CampaignReadinessCue? attentionCue = readinessCues.FirstOrDefault(static cue =>
-            !string.Equals(cue.Severity, "ready", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(cue.Severity, "healthy", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(cue.Severity, "ok", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(cue.Severity, "info", StringComparison.OrdinalIgnoreCase));
+        CampaignReadinessCue? attentionCue = readinessCues
+            .Where(static cue => NeedsAttention(cue.Severity))
+            .OrderByDescending(static cue => ResolveReadinessAttentionPriority(cue.Severity))
+            .FirstOrDefault();
         if (attentionCue is not null)
         {
             return $"Review {attentionCue.Title} before you continue {campaign.Name}: {attentionCue.Summary}";

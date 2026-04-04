@@ -1176,6 +1176,86 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineResolveWorkspaceNextSafeActionPrefersAttentionCueOverEarlierReviewCue()
+    {
+        CampaignProjection campaign = BuildCampaignProjection(BuildWorkspaceWithRosterAndAftermath());
+        WorkspaceRestoreProjection restore = new(
+            RestoreId: "restore-1",
+            UserId: "user-1",
+            RecentDossiers: [],
+            RecentCampaigns: [],
+            RecentRuleEnvironments: [],
+            RecentArtifacts: [],
+            Entitlements: [],
+            ClaimedDevices: [],
+            ConflictSummaries: [],
+            LocalOnlyNotes: [],
+            GeneratedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+        CampaignReadinessCue reviewCue = new(
+            CueId: "cue-review-1",
+            Severity: "review",
+            Title: "Rule environment review",
+            Summary: "Ruleset should be reviewed.");
+        CampaignReadinessCue attentionCue = new(
+            CueId: "cue-attention-1",
+            Severity: "attention",
+            Title: "Open objective pressure",
+            Summary: "Objective pressure remains high.");
+
+        string nextSafeAction = InvokeCampaignSpineResolveWorkspaceNextSafeAction(
+            campaign,
+            restore,
+            [],
+            [reviewCue, attentionCue],
+            leadRun: null,
+            activeScene: null,
+            leadObjective: null);
+
+        Assert.Contains("Open objective pressure", nextSafeAction, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule environment review", nextSafeAction, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CampaignSpineResolveWorkspaceNextSafeActionPrefersWarningCueOverEarlierReviewCue()
+    {
+        CampaignProjection campaign = BuildCampaignProjection(BuildWorkspaceWithRosterAndAftermath());
+        WorkspaceRestoreProjection restore = new(
+            RestoreId: "restore-1",
+            UserId: "user-1",
+            RecentDossiers: [],
+            RecentCampaigns: [],
+            RecentRuleEnvironments: [],
+            RecentArtifacts: [],
+            Entitlements: [],
+            ClaimedDevices: [],
+            ConflictSummaries: [],
+            LocalOnlyNotes: [],
+            GeneratedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+        CampaignReadinessCue reviewCue = new(
+            CueId: "cue-review-1",
+            Severity: "review",
+            Title: "Rule environment review",
+            Summary: "Ruleset should be reviewed.");
+        CampaignReadinessCue warningCue = new(
+            CueId: "cue-warning-1",
+            Severity: "warning",
+            Title: "Continuity gap detected",
+            Summary: "At least one dossier is missing continuity.");
+
+        string nextSafeAction = InvokeCampaignSpineResolveWorkspaceNextSafeAction(
+            campaign,
+            restore,
+            [],
+            [reviewCue, warningCue],
+            leadRun: null,
+            activeScene: null,
+            leadObjective: null);
+
+        Assert.Contains("Continuity gap detected", nextSafeAction, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rule environment review", nextSafeAction, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CampaignSpineCampaignMemoryPrefersMostRecentConsequenceRosterPrepAndTravelReceipts()
     {
         CampaignWorkspaceProjection rosterWorkspace = BuildWorkspaceWithRosterAndAftermath();
