@@ -7588,6 +7588,53 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Run module:", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void CampaignSpineBuildLabSurfaceCompareLaneGroundsWhenRuleEnvironmentDiffIsClear()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-04T00:00:00Z");
+        RuleEnvironmentRef sharedEnvironment = new(
+            EnvironmentId: "env-shared",
+            OwnerScope: "campaign",
+            CompatibilityFingerprint: "sr6-mainline",
+            ApprovalState: "approved",
+            SourcePacks: ["sr6-core"],
+            HouseRulePacks: [],
+            OptionToggles: []);
+        RunnerDossierProjection dossier = new(
+            DossierId: "dossier-build-clear-diff",
+            RunnerHandle: "Ghostline",
+            DisplayName: "Ghostline",
+            Status: "active",
+            OwnerUserId: "user-1",
+            CrewId: null,
+            CampaignId: "campaign-a",
+            CurrentRunId: null,
+            CurrentSceneId: null,
+            RuleEnvironment: sharedEnvironment,
+            LatestContinuity: null,
+            BuildReceiptIds: ["receipt-1"],
+            SnapshotIds: [],
+            Projections: [],
+            CreatedAtUtc: now,
+            UpdatedAtUtc: now);
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath() with
+        {
+            CampaignId = "campaign-a",
+            RuleEnvironment = sharedEnvironment
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        BuildLabHandoffProjection handoff = Assert.Single(
+            InvokeCampaignSpineBuildBuildLabHandoffs([dossier], [workspace], restore));
+
+        Assert.NotNull(handoff.RuleEnvironmentDiff);
+        Assert.Equal("clear", handoff.RuleEnvironmentDiff!.Status);
+        Assert.NotNull(handoff.BuildSurfaceLines);
+        Assert.Contains(
+            handoff.BuildSurfaceLines!,
+            line => line.Contains("Compare lane: grounded", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static IReadOnlyList<string> InvokeBuildTokens(string? queryText)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)

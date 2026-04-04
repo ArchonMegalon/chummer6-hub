@@ -2970,8 +2970,9 @@ public sealed class CampaignSpineService
         BuildLabRuleEnvironmentDiffProjection ruleEnvironmentDiff)
     {
         bool creationGrounded = dossier.BuildReceiptIds.Count > 0;
+        bool hasRuleEnvironmentDiffPosture = !string.Equals(ruleEnvironmentDiff.Status, "pending", StringComparison.OrdinalIgnoreCase);
         bool compareGrounded = dossier.Projections.Any(static projection => IsBuildLabCompareProjectionKind(projection.Kind))
-            || ruleEnvironmentDiff.Changed;
+            || hasRuleEnvironmentDiffPosture;
         bool advancementGrounded = workspace is not null;
         bool crewFitGrounded = workspace is not null
             && workspace.Crews.SelectMany(static crew => crew.Members)
