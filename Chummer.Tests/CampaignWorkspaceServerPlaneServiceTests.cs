@@ -162,12 +162,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplibrarypacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplibrarybrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplibrarybriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplibrarybrf")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplibrarybrfs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplibrarypkt")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplibrarypkts")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionbrf")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionbrfs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionpkt")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionpkts")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovepacket")));
@@ -179,12 +183,18 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovementpkts")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovebrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovementbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovebrf")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovebrfs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovementbrf")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("rostermovementbrfs")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolpacket")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolpackets")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolpkt")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolpkts")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbrief")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbriefs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbrf")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolbrfs")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpacket")));
     }
 
