@@ -27,12 +27,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("CHUMMER_PARITY_DESKTOP_DIALOG_FACTORY_PATH", script, StringComparison.Ordinal);
         Assert.Contains("acknowledgedCatalogOnlyTabs", script, StringComparison.Ordinal);
         Assert.Contains("acknowledgedCatalogOnlyWorkspaceActions", script, StringComparison.Ordinal);
+        Assert.Contains("acknowledgedDialogFactoryOnlyDesktopControls", script, StringComparison.Ordinal);
         Assert.Contains("desktopControls", script, StringComparison.Ordinal);
         Assert.Contains("must not contain blank token values", script, StringComparison.Ordinal);
         Assert.Contains("contains whitespace-padded token", script, StringComparison.Ordinal);
         Assert.Contains("contains duplicate normalized token", script, StringComparison.Ordinal);
         Assert.Contains("is missing required acknowledged catalog-only", script, StringComparison.Ordinal);
         Assert.Contains("is missing required legacy desktop control ids", script, StringComparison.Ordinal);
+        Assert.Contains("dialog-factory-only desktop control", script, StringComparison.Ordinal);
         Assert.Contains("no longer catalog-only", script, StringComparison.Ordinal);
     }
 
@@ -48,6 +50,7 @@ public sealed class VerificationEntryPointTests
         AssertCanonicalTokenArray(root, "workspaceActions");
         AssertCanonicalTokenArray(root, "acknowledgedCatalogOnlyTabs");
         AssertCanonicalTokenArray(root, "acknowledgedCatalogOnlyWorkspaceActions");
+        AssertCanonicalTokenArray(root, "acknowledgedDialogFactoryOnlyDesktopControls");
         AssertCanonicalTokenArray(root, "desktopControls");
     }
 

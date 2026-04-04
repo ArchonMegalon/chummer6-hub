@@ -10,6 +10,7 @@ Generated automatically from the parity oracle and current contracts catalogs.
 - Workspace Actions coverage compares parity-oracle action IDs to action `TargetId` values.
 - Catalog-only IDs must be acknowledged explicitly in `docs/PARITY_ORACLE.json`.
 - Desktop Controls coverage compares parity-oracle control IDs to dialog control IDs in `DesktopDialogFactory`.
+- Dialog-factory-only desktop controls must be acknowledged explicitly in `docs/PARITY_ORACLE.json`.
 
 ## Summary
 
@@ -130,44 +131,44 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `skill_remove` | covered |
 | `skill_specialize` | covered |
 | `toggle_free_paid` | covered |
-| `about` | present_in_dialog_factory_only |
-| `adept_power_add` | present_in_dialog_factory_only |
-| `character_roster` | present_in_dialog_factory_only |
-| `character_settings` | present_in_dialog_factory_only |
-| `close_window` | present_in_dialog_factory_only |
-| `complex_form_add` | present_in_dialog_factory_only |
-| `critter_power_add` | present_in_dialog_factory_only |
-| `cyberware_add` | present_in_dialog_factory_only |
-| `cyberware_delete` | present_in_dialog_factory_only |
-| `cyberware_edit` | present_in_dialog_factory_only |
-| `data_exporter` | present_in_dialog_factory_only |
-| `dice_roller` | present_in_dialog_factory_only |
-| `discord` | present_in_dialog_factory_only |
-| `drug_add` | present_in_dialog_factory_only |
-| `drug_delete` | present_in_dialog_factory_only |
-| `dumpshock` | present_in_dialog_factory_only |
-| `export_character` | present_in_dialog_factory_only |
-| `global_settings` | present_in_dialog_factory_only |
-| `hero_lab_importer` | present_in_dialog_factory_only |
-| `initiation_add` | present_in_dialog_factory_only |
-| `master_index` | present_in_dialog_factory_only |
-| `matrix_program_add` | present_in_dialog_factory_only |
-| `new_window` | present_in_dialog_factory_only |
-| `print_character` | present_in_dialog_factory_only |
-| `print_multiple` | present_in_dialog_factory_only |
-| `print_setup` | present_in_dialog_factory_only |
-| `quality_add` | present_in_dialog_factory_only |
-| `quality_delete` | present_in_dialog_factory_only |
-| `report_bug` | present_in_dialog_factory_only |
-| `revision_history` | present_in_dialog_factory_only |
-| `spell_add` | present_in_dialog_factory_only |
-| `spirit_add` | present_in_dialog_factory_only |
-| `switch_ruleset` | present_in_dialog_factory_only |
-| `translator` | present_in_dialog_factory_only |
-| `update` | present_in_dialog_factory_only |
-| `vehicle_add` | present_in_dialog_factory_only |
-| `vehicle_delete` | present_in_dialog_factory_only |
-| `vehicle_edit` | present_in_dialog_factory_only |
-| `vehicle_mod_add` | present_in_dialog_factory_only |
-| `wiki` | present_in_dialog_factory_only |
-| `xml_editor` | present_in_dialog_factory_only |
+| `about` | present_in_dialog_factory_acknowledged |
+| `adept_power_add` | present_in_dialog_factory_acknowledged |
+| `character_roster` | present_in_dialog_factory_acknowledged |
+| `character_settings` | present_in_dialog_factory_acknowledged |
+| `close_window` | present_in_dialog_factory_acknowledged |
+| `complex_form_add` | present_in_dialog_factory_acknowledged |
+| `critter_power_add` | present_in_dialog_factory_acknowledged |
+| `cyberware_add` | present_in_dialog_factory_acknowledged |
+| `cyberware_delete` | present_in_dialog_factory_acknowledged |
+| `cyberware_edit` | present_in_dialog_factory_acknowledged |
+| `data_exporter` | present_in_dialog_factory_acknowledged |
+| `dice_roller` | present_in_dialog_factory_acknowledged |
+| `discord` | present_in_dialog_factory_acknowledged |
+| `drug_add` | present_in_dialog_factory_acknowledged |
+| `drug_delete` | present_in_dialog_factory_acknowledged |
+| `dumpshock` | present_in_dialog_factory_acknowledged |
+| `export_character` | present_in_dialog_factory_acknowledged |
+| `global_settings` | present_in_dialog_factory_acknowledged |
+| `hero_lab_importer` | present_in_dialog_factory_acknowledged |
+| `initiation_add` | present_in_dialog_factory_acknowledged |
+| `master_index` | present_in_dialog_factory_acknowledged |
+| `matrix_program_add` | present_in_dialog_factory_acknowledged |
+| `new_window` | present_in_dialog_factory_acknowledged |
+| `print_character` | present_in_dialog_factory_acknowledged |
+| `print_multiple` | present_in_dialog_factory_acknowledged |
+| `print_setup` | present_in_dialog_factory_acknowledged |
+| `quality_add` | present_in_dialog_factory_acknowledged |
+| `quality_delete` | present_in_dialog_factory_acknowledged |
+| `report_bug` | present_in_dialog_factory_acknowledged |
+| `revision_history` | present_in_dialog_factory_acknowledged |
+| `spell_add` | present_in_dialog_factory_acknowledged |
+| `spirit_add` | present_in_dialog_factory_acknowledged |
+| `switch_ruleset` | present_in_dialog_factory_acknowledged |
+| `translator` | present_in_dialog_factory_acknowledged |
+| `update` | present_in_dialog_factory_acknowledged |
+| `vehicle_add` | present_in_dialog_factory_acknowledged |
+| `vehicle_delete` | present_in_dialog_factory_acknowledged |
+| `vehicle_edit` | present_in_dialog_factory_acknowledged |
+| `vehicle_mod_add` | present_in_dialog_factory_acknowledged |
+| `wiki` | present_in_dialog_factory_acknowledged |
+| `xml_editor` | present_in_dialog_factory_acknowledged |
