@@ -3867,7 +3867,6 @@ public sealed class CampaignWorkspaceServerPlaneService
         string.Join('|',
             NormalizeOptional(launch.WorkspaceId) ?? string.Empty,
             NormalizeOptional(launch.CampaignId) ?? string.Empty,
-            NormalizeOptional(launch.PacketId) ?? string.Empty,
             NormalizeOptional(launch.PacketKind) ?? string.Empty,
             NormalizeOptional(launch.PacketTitle) ?? string.Empty,
             NormalizeOptional(launch.TargetRunId) ?? string.Empty,
