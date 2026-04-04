@@ -104,6 +104,14 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "gmoperationpackets", "gm", "operation", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "gmcontrolpacket", "gm", "control", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "gmcontrolpackets", "gm", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "workspacev4", "workspace", "v4");
+        RewriteCompactContinuityMutationAlias(tokens, "workspacev4packet", "workspace", "v4", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "workspacev4packets", "workspace", "v4", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignworkspacev4", "campaign", "workspace", "v4");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignworkspacev4packet", "campaign", "workspace", "v4", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignworkspacev4packets", "campaign", "workspace", "v4", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignworkspacev4brief", "campaign", "workspace", "v4", "brief");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignworkspacev4briefs", "campaign", "workspace", "v4", "briefs");
         RewriteCompactContinuityMutationAlias(tokens, "offlinereadiness", "offline", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "offlinereadinesses", "offline", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "travelreadiness", "travel", "readiness");
@@ -1099,6 +1107,20 @@ public static class PrepLibraryQueryAliasCanonicalizer
         {
             tokens.Remove("loops");
             tokens.Add("loop");
+        }
+
+        if ((tokens.Contains("workspace") || tokens.Contains("workspaces"))
+            && (tokens.Contains("v4") || tokens.Contains("4")))
+        {
+            tokens.Remove("workspace");
+            tokens.Remove("workspaces");
+            tokens.Remove("v4");
+            tokens.Remove("4");
+            tokens.Remove("brief");
+            tokens.Remove("briefs");
+            tokens.Add("campaign");
+            tokens.Add("return");
+            tokens.Add("packet");
         }
 
         if (tokens.Contains("sessions")
