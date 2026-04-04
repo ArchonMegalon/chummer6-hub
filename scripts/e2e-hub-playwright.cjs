@@ -58,6 +58,34 @@ async function expectBodyText(page, needle, label) {
   );
 }
 
+async function assertWorkspacePrepQuerySearch(page, pageErrors, query, label) {
+  await page.fill('#prepQuery', query);
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  const encodedQueryPattern = encodeURIComponent(query).replace(/%20/g, '(?:%20|\\+)');
+  assert(
+    new RegExp(`/account/work/workspaces/.+\\?prepQuery=${encodedQueryPattern}`).test(page.url()),
+    `Workspace detail search should preserve the ${label} prep query in the route.`
+  );
+  const searchLabel = `/account/work/workspaces detail ${label} search`;
+  await expectBodyText(page, 'Search results:', searchLabel);
+  await expectBodyText(page, `match(es) for "${query}"`, searchLabel);
+  await expectBodyText(page, 'Recent governed prep launches', searchLabel);
+  await expectBodyText(page, 'Recent travel prefetch receipts', searchLabel);
+  await expectBodyText(page, 'Recent aftermath recap packages', searchLabel);
+  await expectBodyText(page, 'Next-session carry-forward', searchLabel);
+  const bodyText = await page.locator('body').innerText();
+  assert.equal(
+    bodyText.includes('No governed prep packet matched that search yet.'),
+    false,
+    `Workspace detail search should return at least one governed prep packet for the ${label} query.`
+  );
+  await assertNoBannedCopy(page, searchLabel);
+  await assertNoPageErrors(page, pageErrors, searchLabel);
+}
+
 function isPublicCreatorPublicationPath(path) {
   return /\/artifacts\/(?:publications|creator)\//.test(path || '');
 }
@@ -5913,6 +5941,38 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail nextsessionreturns compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail nextsessionreturns compact search');
+
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'nextsessionreturnloop', 'compact nextsessionreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'nextsessionreturnloops', 'compact nextsessionreturnloops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'nextsessionreturnlane', 'compact nextsessionreturnlane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'nextsessionreturnlanes', 'compact nextsessionreturnlanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'nextsessionloop', 'compact nextsessionloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'nextsessionloops', 'compact nextsessionloops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'sessionreturnloop', 'compact sessionreturnloop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'sessionreturnloops', 'compact sessionreturnloops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'sessionreturnlane', 'compact sessionreturnlane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'sessionreturnlanes', 'compact sessionreturnlanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'session return loops', 'split session return loops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'session-return-loops', 'hyphen session-return-loops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'session return lane', 'split session return lane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'session return lanes', 'split session return lanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'session-return-lane', 'hyphen session-return-lane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'session-return-lanes', 'hyphen session-return-lanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'return loop', 'split return loop continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'return loops', 'split return loops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'return-loops', 'hyphen return-loops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'return lane', 'split return lane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'return lanes', 'split return lanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'return-lane', 'hyphen return-lane continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'return-lanes', 'hyphen return-lanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'next session return loops', 'split next session return loops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'next-session-return-loops', 'hyphen next-session-return-loops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'next sessions return loops', 'split next sessions return loops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'next-sessions-return-loops', 'hyphen next-sessions-return-loops continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'next session return lanes', 'split next session return lanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'next-session-return-lanes', 'hyphen next-session-return-lanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'next sessions return lanes', 'split next sessions return lanes continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'next-sessions-return-lanes', 'hyphen next-sessions-return-lanes continuity prep');
 
   await page.fill('#prepQuery', 'sessionreturn');
   await Promise.all([
