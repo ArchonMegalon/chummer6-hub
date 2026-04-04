@@ -4956,6 +4956,24 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Remove("logs");
             tokens.Add("log");
         }
+
+        if (tokens.Contains("diaries"))
+        {
+            tokens.Remove("diaries");
+            tokens.Add("diary");
+        }
+
+        if (tokens.Contains("downtimes"))
+        {
+            tokens.Remove("downtimes");
+            tokens.Add("downtime");
+        }
+
+        if (tokens.Contains("aftermaths"))
+        {
+            tokens.Remove("aftermaths");
+            tokens.Add("aftermath");
+        }
     }
 
     private static bool MatchesPrepLibraryQuery(
