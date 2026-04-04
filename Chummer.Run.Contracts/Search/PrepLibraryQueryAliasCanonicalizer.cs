@@ -79,22 +79,62 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnlane", "campaign", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "campaignreturnlanes", "campaign", "return", "loop");
         RewriteCompactContinuityMutationAlias(tokens, "offlinereadiness", "offline", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "offlinereadinesses", "offline", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "travelreadiness", "travel", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "travelreadinesses", "travel", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "safehousereadiness", "safehouse", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "safehousereadinesses", "safehouse", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "offlinecache", "offline", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "offlinecaches", "offline", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "travelcache", "travel", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "travelcaches", "travel", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "safehousecache", "safehouse", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "safehousecaches", "safehouse", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "stalecache", "stale", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "staleofflinecache", "stale", "offline", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "mobileofflinereadiness", "mobile", "offline", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "mobileofflinereadinesses", "mobile", "offline", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "mobiletravelreadiness", "mobile", "travel", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "mobiletravelreadinesses", "mobile", "travel", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "mobilesafehousereadiness", "mobile", "safehouse", "readiness");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilesafehousereadinesses", "mobile", "safehouse", "readiness");
         RewriteCompactContinuityMutationAlias(tokens, "mobileofflinecache", "mobile", "offline", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "mobileofflinecaches", "mobile", "offline", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "mobiletravelcache", "mobile", "travel", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "mobiletravelcaches", "mobile", "travel", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "mobilesafehousecache", "mobile", "safehouse", "cache");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilesafehousecaches", "mobile", "safehouse", "cache");
         RewriteCompactContinuityMutationAlias(tokens, "mobilesafehouse", "mobile", "safehouse");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilesafehouses", "mobile", "safehouse");
         RewriteCompactContinuityMutationAlias(tokens, "mobiletravel", "mobile", "travel");
+        RewriteCompactContinuityMutationAlias(tokens, "mobiletravels", "mobile", "travel");
         RewriteCompactContinuityMutationAlias(tokens, "mobileoffline", "mobile", "offline");
+        RewriteCompactContinuityMutationAlias(tokens, "mobileofflines", "mobile", "offline");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilecompanion", "mobile", "companion");
+        RewriteCompactContinuityMutationAlias(tokens, "mobilecompanions", "mobile", "companion");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignmobilecompanion", "campaign", "mobile", "companion");
+        RewriteCompactContinuityMutationAlias(tokens, "campaignmobilecompanions", "campaign", "mobile", "companion");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemaster", "game", "master");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasters", "game", "master");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasterop", "game", "master", "op");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasterops", "game", "master", "ops");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasteroperation", "game", "master", "operation");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasteroperations", "game", "master", "operations");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemastercontrol", "game", "master", "control");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemastercontrols", "game", "master", "controls");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasterctrl", "game", "master", "ctrl");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasterctl", "game", "master", "ctl");
+
+        if ((tokens.Contains("mobile") || tokens.Contains("campaign"))
+            && (tokens.Contains("companion") || tokens.Contains("companions")))
+        {
+            tokens.Remove("companion");
+            tokens.Remove("companions");
+            tokens.Add("mobile");
+            tokens.Add("offline");
+            tokens.Add("travel");
+            tokens.Add("safehouse");
+        }
 
         if ((tokens.Contains("gm") && tokens.Contains("ops"))
             || (tokens.Contains("gm") && tokens.Contains("op"))
@@ -106,6 +146,35 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Remove("op");
             tokens.Remove("operation");
             tokens.Remove("operations");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if ((tokens.Contains("game") && tokens.Contains("master"))
+            && (tokens.Contains("ops")
+                || tokens.Contains("op")
+                || tokens.Contains("operation")
+                || tokens.Contains("operations")
+                || tokens.Contains("control")
+                || tokens.Contains("controls")
+                || tokens.Contains("ctrl")
+                || tokens.Contains("ctl")
+                || tokens.Contains("ctls")
+                || tokens.Contains("ctrls")))
+        {
+            tokens.Remove("game");
+            tokens.Remove("master");
+            tokens.Remove("ops");
+            tokens.Remove("op");
+            tokens.Remove("operation");
+            tokens.Remove("operations");
+            tokens.Remove("control");
+            tokens.Remove("controls");
+            tokens.Remove("ctrl");
+            tokens.Remove("ctl");
+            tokens.Remove("ctls");
+            tokens.Remove("ctrls");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");
@@ -1084,6 +1153,22 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("diary");
         }
 
+        if (tokens.Contains("off") && (tokens.Contains("line") || tokens.Contains("lines")))
+        {
+            tokens.Remove("off");
+            tokens.Remove("line");
+            tokens.Remove("lines");
+            tokens.Add("offline");
+        }
+
+        if (tokens.Contains("safe") && (tokens.Contains("house") || tokens.Contains("houses")))
+        {
+            tokens.Remove("safe");
+            tokens.Remove("house");
+            tokens.Remove("houses");
+            tokens.Add("safehouse");
+        }
+
         bool hasCampaignRelationshipOrDiaryScope =
             tokens.Contains("contact")
             || tokens.Contains("contacts")
@@ -1121,6 +1206,24 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Remove("shifting");
             tokens.Remove("mutation");
             tokens.Remove("mutations");
+        }
+
+        if (tokens.Contains("safehouses"))
+        {
+            tokens.Remove("safehouses");
+            tokens.Add("safehouse");
+        }
+
+        if (tokens.Contains("travels"))
+        {
+            tokens.Remove("travels");
+            tokens.Add("travel");
+        }
+
+        if (tokens.Contains("offlines"))
+        {
+            tokens.Remove("offlines");
+            tokens.Add("offline");
         }
 
         bool hasTravelOfflineScope =
