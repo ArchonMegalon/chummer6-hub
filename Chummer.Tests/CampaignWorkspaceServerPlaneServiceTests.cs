@@ -109,6 +109,29 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsGmOpsShorthandAcrossWhitespaceBoundaries()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "event:gmops",
+            Kind: "event_control_packet",
+            Title: "Dockyard event control board",
+            Summary: "Season operations stay governed for the next launch window.",
+            BindingSummary: "Bound to campaign return and event controls.",
+            Reusable: true,
+            SearchTerms: ["event", "control", "season", "operations"],
+            EvidenceLines: ["GM operations checkpoint receipt captured for event-control lane."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("gmops");
+        IReadOnlyList<string> compactSingularTokens = InvokeBuildTokens("gmop");
+        IReadOnlyList<string> negativeTokens = InvokeBuildTokens("gmatrix");
+
+        Assert.True(InvokeMatches(packet, compactPluralTokens));
+        Assert.True(InvokeMatches(packet, compactSingularTokens));
+        Assert.False(InvokeMatches(packet, negativeTokens));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsCrewTransferShorthandAcrossWhitespaceBoundaries()
     {
         var packet = new GovernedPrepPacketSummary(

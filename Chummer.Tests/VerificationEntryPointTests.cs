@@ -119,6 +119,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("missing_required_legacy_interaction_keys", script, StringComparison.Ordinal);
         Assert.Contains("reports non-pass flagship head contract markers", script, StringComparison.Ordinal);
         Assert.Contains("required_tests", script, StringComparison.Ordinal);
+        Assert.Contains("visual receipt required_tests[", script, StringComparison.Ordinal);
+        Assert.Contains("visual receipt required_tests must not contain duplicate ids", script, StringComparison.Ordinal);
+        Assert.Contains("visual receipt required_legacy_interaction_keys must not contain duplicate ids", script, StringComparison.Ordinal);
+        Assert.Contains("visual receipt required_screenshots must not contain duplicate ids", script, StringComparison.Ordinal);
         Assert.Contains("Desktop_shell_preserves_classic_dense_three_pane_workbench_posture", script, StringComparison.Ordinal);
         Assert.Contains("Gear_builder_preserves_familiar_browse_detail_confirm_rhythm", script, StringComparison.Ordinal);
         Assert.Contains("Cyberware_and_cyberlimb_builder_preserve_legacy_dialog_familiarity_cues", script, StringComparison.Ordinal);
@@ -430,6 +434,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=eventcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventctrl", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gmops", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=gmop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=heat", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=oppositions", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=encounter", audit, StringComparison.Ordinal);
@@ -471,6 +477,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=eventcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventctrl", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=gmops", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=gmop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=oppositions", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=encounter", audit, StringComparison.Ordinal);
@@ -545,6 +553,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact eventcontrols prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventctrl", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventctrl prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=gmops", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact gmops prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=gmop", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact gmop prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=heat", playwright, StringComparison.Ordinal);
         Assert.Contains("heat continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=oppositions", playwright, StringComparison.Ordinal);
