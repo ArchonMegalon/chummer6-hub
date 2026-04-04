@@ -650,6 +650,14 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeDomainCoverage is missing shipping locales: "
             f"{release_channel_path} ({', '.join(missing_locale_domain_coverage)})"
         )
+    unexpected_locale_domain_coverage = sorted(
+        locale for locale in locale_domain_coverage if locale not in REQUIRED_LOCALIZATION_SHIPPING_LOCALES
+    )
+    if unexpected_locale_domain_coverage:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.localeDomainCoverage has unexpected locales: "
+            f"{release_channel_path} ({', '.join(unexpected_locale_domain_coverage)})"
+        )
     for locale in REQUIRED_LOCALIZATION_SHIPPING_LOCALES:
         locale_domain_map = require_string_map(
             locale_domain_coverage.get(locale),
