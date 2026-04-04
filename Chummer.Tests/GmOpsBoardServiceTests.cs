@@ -701,6 +701,46 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatLeagueAndCommunityOpsShorthandAsEventControlDomain()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:48:30Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open league ops board remains unresolved before next checkpoint.",
+                AtUtc: baseTime,
+                EventId: "evt-league-ops"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open community-ops queue remains unresolved for event-control handoff.",
+                AtUtc: baseTime.AddMinutes(1),
+                EventId: "evt-community-ops"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open checklist remains unresolved.",
+                AtUtc: baseTime.AddMinutes(20),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(3, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-community-ops", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-league-ops", projection.UnresolvedItems[1].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[2].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatCompactPrepLaunchAndTravelPrefetchShorthandAsEventControlDomain()
     {
         SessionLedgerService ledger = new();
@@ -979,6 +1019,14 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse seasonCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "seasonctrl");
         GmPrepAssetListResponse seasonControlSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season control");
         GmPrepAssetListResponse seasonControlHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "season-control");
+        GmPrepAssetListResponse leagueOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leagueops");
+        GmPrepAssetListResponse leagueOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "leagueop");
+        GmPrepAssetListResponse leagueOpsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league ops");
+        GmPrepAssetListResponse leagueOpsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "league-ops");
+        GmPrepAssetListResponse communityOpsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityops");
+        GmPrepAssetListResponse communityOpMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "communityop");
+        GmPrepAssetListResponse communityOpsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community ops");
+        GmPrepAssetListResponse communityOpsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "community-ops");
         GmPrepAssetListResponse rosterMoveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostermove");
         GmPrepAssetListResponse crewMoveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmove");
         GmPrepAssetListResponse crewTransferMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewtransfer");
@@ -1005,6 +1053,14 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(seasonCtrlMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(seasonControlSpacedMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(seasonControlHyphenMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueOpsMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueOpMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueOpsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(leagueOpsHyphenMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityOpsMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityOpMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityOpsSpacedMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(communityOpsHyphenMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(rosterMoveMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMoveMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewTransferMatches.Items, item => item.AssetId == "roster_move_ops");

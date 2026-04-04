@@ -510,6 +510,26 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("operation");
         }
 
+        if ((tokens.Contains("league") && tokens.Contains("ops")) || (tokens.Contains("league") && tokens.Contains("op")))
+        {
+            tokens.Remove("league");
+            tokens.Remove("ops");
+            tokens.Remove("op");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if ((tokens.Contains("community") && tokens.Contains("ops")) || (tokens.Contains("community") && tokens.Contains("op")))
+        {
+            tokens.Remove("community");
+            tokens.Remove("ops");
+            tokens.Remove("op");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
         if (tokens.Contains("event") && tokens.Contains("ctrl"))
         {
             tokens.Remove("ctrl");
@@ -616,6 +636,38 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
         if (tokens.Contains("seasoncontrols"))
         {
             tokens.Remove("seasoncontrols");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("leagueops"))
+        {
+            tokens.Remove("leagueops");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("leagueop"))
+        {
+            tokens.Remove("leagueop");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communityops"))
+        {
+            tokens.Remove("communityops");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("communityop"))
+        {
+            tokens.Remove("communityop");
             tokens.Add("eventcontrol");
             tokens.Add("season");
             tokens.Add("operation");
@@ -1261,6 +1313,16 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "gm ops",
             "gm-ops",
             "gm_op",
+            "leagueops",
+            "leagueop",
+            "league ops",
+            "league-ops",
+            "league_op",
+            "communityops",
+            "communityop",
+            "community ops",
+            "community-ops",
+            "community_op",
             "season",
             "seasonops",
             "seasonop",
