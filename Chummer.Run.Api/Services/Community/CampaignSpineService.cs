@@ -1726,6 +1726,15 @@ public sealed class CampaignSpineService
             _ => 0
         };
 
+    private static CampaignReadinessCue? ResolvePriorityReadinessCue(
+        IReadOnlyList<CampaignReadinessCue> readinessCues,
+        bool requireSummary = false)
+        => readinessCues
+            .Where(static cue => NeedsAttention(cue.Severity))
+            .Where(cue => !requireSummary || !string.IsNullOrWhiteSpace(cue.Summary))
+            .OrderByDescending(static cue => ResolveReadinessAttentionPriority(cue.Severity))
+            .FirstOrDefault();
+
     private static string ResolveOperatorRole(GroupDto group, string userId)
         => group.Memberships
                .Where(member => string.Equals(member.UserId, userId, StringComparison.OrdinalIgnoreCase))
@@ -2480,10 +2489,7 @@ public sealed class CampaignSpineService
             return $"Resolve restore review before you reopen {campaign.Name}: {restoreConflict}";
         }
 
-        CampaignReadinessCue? attentionCue = readinessCues
-            .Where(static cue => NeedsAttention(cue.Severity))
-            .OrderByDescending(static cue => ResolveReadinessAttentionPriority(cue.Severity))
-            .FirstOrDefault();
+        CampaignReadinessCue? attentionCue = ResolvePriorityReadinessCue(readinessCues);
         if (attentionCue is not null)
         {
             return $"Review {attentionCue.Title} before you continue {campaign.Name}: {attentionCue.Summary}";
@@ -2535,10 +2541,7 @@ public sealed class CampaignSpineService
         }
 
         int crewMemberCount = workspaceCrews.Sum(static crew => crew.Members.Count);
-        CampaignReadinessCue? attentionCue = readinessCues
-            .Where(static cue => NeedsAttention(cue.Severity))
-            .OrderByDescending(static cue => ResolveReadinessAttentionPriority(cue.Severity))
-            .FirstOrDefault();
+        CampaignReadinessCue? attentionCue = ResolvePriorityReadinessCue(readinessCues);
         ClaimedDeviceRestoreProjection? claimedDevice = restore.ClaimedDevices.FirstOrDefault();
         string rosterSummary = $"{workspaceDossiers.Count} dossier(s) and {crewMemberCount} crew member(s) are already attached to the shared return lane.";
         string readinessSummary = attentionCue is null
@@ -3541,7 +3544,7 @@ public sealed class CampaignSpineService
         CampaignWorkspaceProjection workspace)
     {
         string explainRoot = $"rules.navigator.{workspace.WorkspaceId}";
-        string readinessReason = workspace.ReadinessCues.FirstOrDefault(static cue => !string.IsNullOrWhiteSpace(cue.Summary))?.Summary
+        string readinessReason = ResolvePriorityReadinessCue(workspace.ReadinessCues, requireSummary: true)?.Summary
             ?? "The campaign workspace still computes readiness from the same governed return context.";
 
         return
