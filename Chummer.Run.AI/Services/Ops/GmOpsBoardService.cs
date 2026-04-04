@@ -485,6 +485,50 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             .Select(static token => token.Trim().ToLowerInvariant())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        if ((tokens.Contains("gm") && tokens.Contains("ops")) || (tokens.Contains("gm") && tokens.Contains("op")))
+        {
+            tokens.Remove("gm");
+            tokens.Remove("ops");
+            tokens.Remove("op");
+            tokens.Add("eventcontrol");
+            tokens.Add("season");
+            tokens.Add("operation");
+        }
+
+        if ((tokens.Contains("event") && tokens.Contains("ops")) || (tokens.Contains("event") && tokens.Contains("op")))
+        {
+            tokens.Remove("ops");
+            tokens.Remove("op");
+            tokens.Add("eventcontrol");
+            tokens.Add("operation");
+        }
+
+        if ((tokens.Contains("season") && tokens.Contains("ops")) || (tokens.Contains("season") && tokens.Contains("op")))
+        {
+            tokens.Remove("ops");
+            tokens.Remove("op");
+            tokens.Add("operation");
+        }
+
+        if (tokens.Contains("event") && tokens.Contains("ctrl"))
+        {
+            tokens.Remove("ctrl");
+            tokens.Add("eventcontrol");
+        }
+
+        if (tokens.Contains("season") && tokens.Contains("ctrl"))
+        {
+            tokens.Remove("ctrl");
+            tokens.Add("seasoncontrol");
+        }
+
+        if (tokens.Contains("season") && tokens.Contains("control"))
+        {
+            tokens.Remove("control");
+            tokens.Add("eventcontrol");
+            tokens.Add("operation");
+        }
+
         if (tokens.Contains("eventctrl"))
         {
             tokens.Remove("eventctrl");
@@ -1214,6 +1258,9 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "event ops",
             "gmops",
             "gmop",
+            "gm ops",
+            "gm-ops",
+            "gm_op",
             "season",
             "seasonops",
             "seasonop",
