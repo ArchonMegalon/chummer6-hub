@@ -456,14 +456,20 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteractions")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteractionreport")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteractionreports")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteractionreview")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("afteractionreviews")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after action")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after actions")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after action report")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after action reports")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("after action review")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("after action reviews")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-action")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-actions")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-action report")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-action reports")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-action review")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("after-action reviews")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aar")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("aars")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("retro")));
@@ -497,6 +503,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaftermaths")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixafteraction")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixafteractionreport")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixafteractionreview")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixaar")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixretro")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixretrospective")));

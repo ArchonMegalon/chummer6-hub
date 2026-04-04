@@ -590,29 +590,36 @@ public sealed class GmOpsBoardServiceTests
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
-                Payload: "Open postmortem prep lane remains unresolved before next return checkpoint.",
+                Payload: "Open after-action review prep lane remains unresolved before next return checkpoint.",
                 AtUtc: baseTime.AddMinutes(3),
+                EventId: "evt-after-action-review"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Open postmortem prep lane remains unresolved before next return checkpoint.",
+                AtUtc: baseTime.AddMinutes(4),
                 EventId: "evt-postmortem"),
             new SessionEventEnvelope(
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
                 Payload: "Open debriefing prep lane remains unresolved before next return checkpoint.",
-                AtUtc: baseTime.AddMinutes(4),
+                AtUtc: baseTime.AddMinutes(5),
                 EventId: "evt-debriefing"),
             new SessionEventEnvelope(
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
                 Payload: "Open AAR prep lane remains unresolved before next return checkpoint.",
-                AtUtc: baseTime.AddMinutes(5),
+                AtUtc: baseTime.AddMinutes(6),
                 EventId: "evt-aar"),
             new SessionEventEnvelope(
                 SessionId: "session_ops",
                 SceneId: "scene_ops",
                 EventType: "ops.note",
                 Payload: "Open retrospective prep lane remains unresolved before next return checkpoint.",
-                AtUtc: baseTime.AddMinutes(6),
+                AtUtc: baseTime.AddMinutes(7),
                 EventId: "evt-retrospective"),
             new SessionEventEnvelope(
                 SessionId: "session_ops",
@@ -630,8 +637,8 @@ public sealed class GmOpsBoardServiceTests
         Assert.Equal("ops:evt-aar", projection.UnresolvedItems[1].ItemId);
         Assert.Equal("ops:evt-debriefing", projection.UnresolvedItems[2].ItemId);
         Assert.Equal("ops:evt-postmortem", projection.UnresolvedItems[3].ItemId);
-        Assert.Equal("ops:evt-after-action-report", projection.UnresolvedItems[4].ItemId);
-        Assert.Equal("ops:evt-post-run", projection.UnresolvedItems[5].ItemId);
+        Assert.Equal("ops:evt-after-action-review", projection.UnresolvedItems[4].ItemId);
+        Assert.Equal("ops:evt-after-action-report", projection.UnresolvedItems[5].ItemId);
     }
 
     [Fact]
@@ -1737,14 +1744,20 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse afterActionsCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteractions");
         GmPrepAssetListResponse afterActionReportCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteractionreport");
         GmPrepAssetListResponse afterActionReportsCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteractionreports");
+        GmPrepAssetListResponse afterActionReviewCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteractionreview");
+        GmPrepAssetListResponse afterActionReviewsCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "afteractionreviews");
         GmPrepAssetListResponse afterActionSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after action");
         GmPrepAssetListResponse afterActionsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after actions");
         GmPrepAssetListResponse afterActionReportSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after action report");
         GmPrepAssetListResponse afterActionReportsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after action reports");
+        GmPrepAssetListResponse afterActionReviewSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after action review");
+        GmPrepAssetListResponse afterActionReviewsSplitMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after action reviews");
         GmPrepAssetListResponse afterActionHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after-action");
         GmPrepAssetListResponse afterActionsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after-actions");
         GmPrepAssetListResponse afterActionReportHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after-action report");
         GmPrepAssetListResponse afterActionReportsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after-action reports");
+        GmPrepAssetListResponse afterActionReviewHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after-action review");
+        GmPrepAssetListResponse afterActionReviewsHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "after-action reviews");
         GmPrepAssetListResponse aarMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aar");
         GmPrepAssetListResponse aarsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aars");
         GmPrepAssetListResponse retroMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "retro");
@@ -1798,14 +1811,20 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(afterActionsCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionReportCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionReportsCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReviewCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReviewsCompactMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionsSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionReportSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionReportsSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReviewSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReviewsSplitMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionsHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionReportHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(afterActionReportsHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReviewHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(afterActionReviewsHyphenMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(aarMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(aarsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(retroMatches.Items, item => item.AssetId == "continuity_plural_ops");

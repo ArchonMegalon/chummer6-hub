@@ -909,6 +909,18 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("recap");
         }
 
+        if (tokens.Contains("afteractionreview"))
+        {
+            tokens.Remove("afteractionreview");
+            tokens.Add("recap");
+        }
+
+        if (tokens.Contains("afteractionreviews"))
+        {
+            tokens.Remove("afteractionreviews");
+            tokens.Add("recap");
+        }
+
         if (tokens.Contains("after") && (tokens.Contains("action") || tokens.Contains("actions")))
         {
             tokens.Remove("after");
@@ -916,6 +928,8 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Remove("actions");
             tokens.Remove("report");
             tokens.Remove("reports");
+            tokens.Remove("review");
+            tokens.Remove("reviews");
             tokens.Add("recap");
         }
 

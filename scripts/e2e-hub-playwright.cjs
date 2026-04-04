@@ -4381,6 +4381,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail afteractionreports compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail afteractionreports compact search');
 
+  await page.fill('#prepQuery', 'afteractionreview');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=afteractionreview/.test(page.url()), 'Workspace detail search should preserve the compact afteractionreview continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail afteractionreview compact search');
+  await expectBodyText(page, 'match(es) for "afteractionreview"', '/account/work/workspaces detail afteractionreview compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail afteractionreview compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail afteractionreview compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail afteractionreview compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail afteractionreview compact search');
+  const workspaceAfterActionReviewCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReviewCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact afteractionreview continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail afteractionreview compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail afteractionreview compact search');
+
+  await page.fill('#prepQuery', 'afteractionreviews');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=afteractionreviews/.test(page.url()), 'Workspace detail search should preserve the compact afteractionreviews continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail afteractionreviews compact search');
+  await expectBodyText(page, 'match(es) for "afteractionreviews"', '/account/work/workspaces detail afteractionreviews compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail afteractionreviews compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail afteractionreviews compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail afteractionreviews compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail afteractionreviews compact search');
+  const workspaceAfterActionReviewsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReviewsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact afteractionreviews continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail afteractionreviews compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail afteractionreviews compact search');
+
   await page.fill('#prepQuery', 'after action');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -4465,6 +4507,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail split after action reports search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail split after action reports search');
 
+  await page.fill('#prepQuery', 'after action review');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=after(?:%20|\+)action(?:%20|\+)review/.test(page.url()), 'Workspace detail search should preserve the split after action review continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail split after action review search');
+  await expectBodyText(page, 'match(es) for "after action review"', '/account/work/workspaces detail split after action review search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail split after action review search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail split after action review search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail split after action review search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail split after action review search');
+  const workspaceAfterActionReviewSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReviewSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split after action review continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail split after action review search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail split after action review search');
+
+  await page.fill('#prepQuery', 'after action reviews');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=after(?:%20|\+)action(?:%20|\+)reviews/.test(page.url()), 'Workspace detail search should preserve the split after action reviews continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail split after action reviews search');
+  await expectBodyText(page, 'match(es) for "after action reviews"', '/account/work/workspaces detail split after action reviews search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail split after action reviews search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail split after action reviews search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail split after action reviews search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail split after action reviews search');
+  const workspaceAfterActionReviewsSplitSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReviewsSplitSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the split after action reviews continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail split after action reviews search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail split after action reviews search');
+
   await page.fill('#prepQuery', 'after-action');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -4548,6 +4632,48 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail hyphen after-action reports search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hyphen after-action reports search');
+
+  await page.fill('#prepQuery', 'after-action review');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=after-action(?:%20|\+)review/.test(page.url()), 'Workspace detail search should preserve the hyphen after-action review continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail hyphen after-action review search');
+  await expectBodyText(page, 'match(es) for "after-action review"', '/account/work/workspaces detail hyphen after-action review search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail hyphen after-action review search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail hyphen after-action review search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail hyphen after-action review search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail hyphen after-action review search');
+  const workspaceAfterActionReviewHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReviewHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen after-action review continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail hyphen after-action review search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hyphen after-action review search');
+
+  await page.fill('#prepQuery', 'after-action reviews');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=after-action(?:%20|\+)reviews/.test(page.url()), 'Workspace detail search should preserve the hyphen after-action reviews continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail hyphen after-action reviews search');
+  await expectBodyText(page, 'match(es) for "after-action reviews"', '/account/work/workspaces detail hyphen after-action reviews search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail hyphen after-action reviews search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail hyphen after-action reviews search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail hyphen after-action reviews search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail hyphen after-action reviews search');
+  const workspaceAfterActionReviewsHyphenSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceAfterActionReviewsHyphenSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the hyphen after-action reviews continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail hyphen after-action reviews search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail hyphen after-action reviews search');
 
   await page.fill('#prepQuery', 'return');
   await Promise.all([
