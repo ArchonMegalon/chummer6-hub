@@ -7,6 +7,7 @@ Generated automatically from the parity oracle and current contracts catalogs.
 - Tab catalog source: `../chummer-core-engine/Chummer.Rulesets.Hosting/Presentation/NavigationTabCatalog.cs`
 - Action catalog source: `../chummer-core-engine/Chummer.Rulesets.Hosting/Presentation/WorkspaceSurfaceActionCatalog.cs`
 - Workspace Actions coverage compares parity-oracle action IDs to action `TargetId` values.
+- Catalog-only IDs must be acknowledged explicitly in `docs/PARITY_ORACLE.json`.
 - Legacy desktop control parity is enforced by dialog-template compliance tests, not by a shared control catalog.
 
 ## Summary
@@ -37,8 +38,8 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `tab-skills` | covered |
 | `tab-technomancer` | covered |
 | `tab-vehicles` | covered |
-| `tab-create` | catalog_only |
-| `tab-rules` | catalog_only |
+| `tab-create` | catalog_only_acknowledged |
+| `tab-rules` | catalog_only_acknowledged |
 
 ## Workspace Actions Coverage
 
@@ -91,5 +92,5 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `weaponaccessories` | covered |
 | `weaponlocations` | covered |
 | `weapons` | covered |
-| `build-lab` | catalog_only |
-| `data_exporter` | catalog_only |
+| `build-lab` | catalog_only_acknowledged |
+| `data_exporter` | catalog_only_acknowledged |

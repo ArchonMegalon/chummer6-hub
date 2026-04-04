@@ -124,6 +124,29 @@ def partition_coverage(legacy_ids: Sequence[str], catalog_ids: Sequence[str]) ->
     return covered, missing, catalog_only
 
 
+def fail_on_unacknowledged_catalog_only(
+    *,
+    surface_label: str,
+    catalog_only_ids: Sequence[str],
+    acknowledged_ids: Sequence[str],
+    source: str,
+) -> None:
+    catalog_only_set = set(catalog_only_ids)
+    acknowledged_set = set(acknowledged_ids)
+    unacknowledged = sorted(catalog_only_set - acknowledged_set)
+    stale = sorted(acknowledged_set - catalog_only_set)
+    if unacknowledged:
+        raise ValueError(
+            f"{source} is missing required acknowledged catalog-only {surface_label} ids "
+            f"({', '.join(unacknowledged)})"
+        )
+    if stale:
+        raise ValueError(
+            f"{source} acknowledged catalog-only {surface_label} ids that are no longer catalog-only "
+            f"({', '.join(stale)})"
+        )
+
+
 def write_summary_row(kind: str, legacy_ids: Sequence[str], covered: Sequence[str], missing: Sequence[str], catalog_only: Sequence[str]) -> str:
     return f"| {kind} | {len(legacy_ids)} | {len(covered)} | {len(missing)} | {len(catalog_only)} |"
 
@@ -135,7 +158,7 @@ def write_coverage_table(title: str, covered: Sequence[str], missing: Sequence[s
     for value in missing:
         lines.append(f"| `{value}` | missing_in_catalog |")
     for value in catalog_only:
-        lines.append(f"| `{value}` | catalog_only |")
+        lines.append(f"| `{value}` | catalog_only_acknowledged |")
     if not (covered or missing or catalog_only):
         lines.append("| _(none)_ | _(none)_ |")
     lines.append("")
@@ -158,11 +181,33 @@ legacy_actions = parse_required_token_list(
     "workspaceActions",
     source=display_path(parity_oracle_path),
 )
+acknowledged_catalog_only_tabs = parse_required_token_list(
+    parity_oracle,
+    "acknowledgedCatalogOnlyTabs",
+    source=display_path(parity_oracle_path),
+)
+acknowledged_catalog_only_actions = parse_required_token_list(
+    parity_oracle,
+    "acknowledgedCatalogOnlyWorkspaceActions",
+    source=display_path(parity_oracle_path),
+)
 catalog_tabs = parse_catalog_ids(navigation_catalog_text)
 catalog_actions = parse_workspace_action_target_ids(action_catalog_text)
 
 covered_tabs, missing_tabs, catalog_only_tabs = partition_coverage(legacy_tabs, catalog_tabs)
 covered_actions, missing_actions, catalog_only_actions = partition_coverage(legacy_actions, catalog_actions)
+fail_on_unacknowledged_catalog_only(
+    surface_label="tab",
+    catalog_only_ids=catalog_only_tabs,
+    acknowledged_ids=acknowledged_catalog_only_tabs,
+    source=display_path(parity_oracle_path),
+)
+fail_on_unacknowledged_catalog_only(
+    surface_label="workspace action",
+    catalog_only_ids=catalog_only_actions,
+    acknowledged_ids=acknowledged_catalog_only_actions,
+    source=display_path(parity_oracle_path),
+)
 
 output_lines: list[str] = [
     "# UI Parity Checklist",
@@ -174,6 +219,7 @@ output_lines: list[str] = [
     f"- Tab catalog source: `{display_path(navigation_catalog_path)}`",
     f"- Action catalog source: `{display_path(action_catalog_path)}`",
     "- Workspace Actions coverage compares parity-oracle action IDs to action `TargetId` values.",
+    "- Catalog-only IDs must be acknowledged explicitly in `docs/PARITY_ORACLE.json`.",
     "- Legacy desktop control parity is enforced by dialog-template compliance tests, not by a shared control catalog.",
     "",
     "## Summary",
