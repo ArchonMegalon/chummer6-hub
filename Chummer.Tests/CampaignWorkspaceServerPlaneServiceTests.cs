@@ -328,6 +328,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemastercontrol")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("game master ctrl")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemasterctrl")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemasterctls")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("gamemasterctrls")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrix master ops")));
     }
 

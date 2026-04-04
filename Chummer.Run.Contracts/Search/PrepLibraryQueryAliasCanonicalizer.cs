@@ -188,6 +188,8 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "gamemastercontrols", "game", "master", "controls");
         RewriteCompactContinuityMutationAlias(tokens, "gamemasterctrl", "game", "master", "ctrl");
         RewriteCompactContinuityMutationAlias(tokens, "gamemasterctl", "game", "master", "ctl");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasterctrls", "game", "master", "ctrls");
+        RewriteCompactContinuityMutationAlias(tokens, "gamemasterctls", "game", "master", "ctls");
 
         if ((tokens.Contains("mobile") || tokens.Contains("campaign"))
             && (tokens.Contains("companion") || tokens.Contains("companions")))
