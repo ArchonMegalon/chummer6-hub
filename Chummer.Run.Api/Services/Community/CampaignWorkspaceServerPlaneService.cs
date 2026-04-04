@@ -2603,8 +2603,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return ContainsAnyWordToken(value, ["street"])
-            && ContainsAnyWordToken(value, ["cred"]);
+        return ContainsAnyWordToken(value, ["streetcred", "street_cred", "street-cred"])
+            || (ContainsAnyWordToken(value, ["street"])
+            && ContainsAnyWordToken(value, ["cred"]));
     }
 
     private static bool ContainsPublicAwarenessTokenPair(string? value)
@@ -2614,8 +2615,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             return false;
         }
 
-        return ContainsAnyWordToken(value, ["public"])
-            && ContainsAnyWordToken(value, ["awareness"]);
+        return ContainsAnyWordToken(value, ["publicawareness", "public_awareness", "public-awareness"])
+            || (ContainsAnyWordToken(value, ["public"])
+            && ContainsAnyWordToken(value, ["awareness"]));
     }
 
     private static bool ContainsCampaignRelationshipMutationToken(string? value)
