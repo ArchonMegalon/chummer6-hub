@@ -2315,7 +2315,7 @@ public sealed class CampaignSpineService
                             ? "25 / 50 / 100 Karma checkpoints stay attached to the living dossier until the first governed campaign workspace exists."
                             : $"25 / 50 / 100 Karma checkpoints stay attached to {workspace.CampaignName} so the return path keeps the same upgrade plan.",
                         readyOutputSummary,
-                        $"Explain receipt {explainReceiptId} stays attached across character-template, Foundry-class exchange, sheet-viewer checks, and print-ready PDF export follow-through."
+                        $"Explain receipt {explainReceiptId} stays attached across character-template, JSON exchange, Foundry-class exchange, sheet-viewer checks, and print-ready PDF export follow-through."
                     ],
                     Outputs: outputs,
                     UpdatedAtUtc: dossier.UpdatedAtUtc,
@@ -2350,6 +2350,15 @@ public sealed class CampaignSpineService
                 runtimeFingerprint: runtimeFingerprint,
                 explainReceiptId: explainReceiptId,
                 nextSafeAction: "Open workflow.templates.character to save a governed character-template export."),
+            BuildBuildLabGovernedOutput(
+                dossier,
+                projectionIdSuffix: "json-exchange",
+                kind: "json_exchange",
+                label: "Governed JSON exchange export",
+                summary: "Prepare a governed JSON exchange payload from this build handoff before external handoff or replay ingest.",
+                runtimeFingerprint: runtimeFingerprint,
+                explainReceiptId: explainReceiptId,
+                nextSafeAction: "Open workflow.exchange.json before publishing JSON exchange payloads."),
             BuildBuildLabGovernedOutput(
                 dossier,
                 projectionIdSuffix: "foundry-export",
@@ -2396,6 +2405,7 @@ public sealed class CampaignSpineService
         => kind?.Trim().ToLowerInvariant() switch
         {
             "character_template" => true,
+            "json_exchange" => true,
             "foundry_exchange" => true,
             "sheet_viewer" => true,
             "print_pdf_export" => true,
