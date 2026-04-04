@@ -66,10 +66,10 @@ public sealed class TravelModeCacheFreshnessTests
         Assert.Equal(1, summary.FreshCacheDeviceCount);
         Assert.Equal(1, summary.StaleCacheDeviceCount);
         Assert.Contains("fresh staged cache", summary.CacheFreshnessSummary, StringComparison.Ordinal);
-        Assert.Contains("Offline actionability is explicit across", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
+        Assert.Contains("Offline actionability is bounded but degraded across", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
         Assert.Contains("downtime/diary", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
         Assert.Equal(4, summary.OfflineLaneCues.Count);
-        Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("ready", cue.Status));
+        Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("degraded", cue.Status));
         Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "downtime_diary" && cue.SignalCount >= 0);
         Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "contacts_heat" && cue.SignalCount >= 0);
         Assert.Contains(summary.OfflineLaneCues, cue => cue.Lane == "aftermath_recap" && cue.SignalCount >= 0);
@@ -98,9 +98,9 @@ public sealed class TravelModeCacheFreshnessTests
         Assert.Equal(0, summary.FreshCacheDeviceCount);
         Assert.Equal(1, summary.StaleCacheDeviceCount);
         Assert.Contains("No travel-prefetch receipt exists yet", summary.CacheFreshnessSummary, StringComparison.Ordinal);
-        Assert.Contains("Offline actionability is explicit across", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
+        Assert.Contains("Offline actionability is bounded but degraded across", summary.OfflineActionabilitySummary, StringComparison.Ordinal);
         Assert.Equal(4, summary.OfflineLaneCues.Count);
-        Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("ready", cue.Status));
+        Assert.All(summary.OfflineLaneCues, cue => Assert.Equal("degraded", cue.Status));
         Assert.Equal("stale", summary.Devices.Single().Status);
     }
 
