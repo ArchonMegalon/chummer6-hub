@@ -696,11 +696,13 @@ public sealed class GmOpsBoardServiceTests
 
         GmPrepAssetListResponse prepLibraryMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "preplibrary");
         GmPrepAssetListResponse eventControlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventcontrol");
+        GmPrepAssetListResponse eventCtrlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventctrl");
         GmPrepAssetListResponse rosterMoveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostermove");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixlibrary");
 
         Assert.Contains(prepLibraryMatches.Items, item => item.AssetId == "prep_library_ops");
         Assert.Contains(eventControlMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(eventCtrlMatches.Items, item => item.AssetId == "event_control_ops");
         Assert.Contains(rosterMoveMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Empty(negativeMatches.Items);
     }

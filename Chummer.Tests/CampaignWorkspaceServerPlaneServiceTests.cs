@@ -65,6 +65,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsEventCtrlShorthandAcrossWhitespaceBoundaries()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "event:demo",
+            Kind: "event_control_packet",
+            Title: "Dockyard event control board",
+            Summary: "Season operations remain governed for launch.",
+            BindingSummary: "Bound to campaign return and opposition lanes.",
+            Reusable: true,
+            SearchTerms: ["event", "control", "seasonops"],
+            EvidenceLines: ["Event control receipt captured for next checkpoint."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+
+        IReadOnlyList<string> compactTokens = InvokeBuildTokens("eventctrl");
+        IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixctrl");
+
+        Assert.True(InvokeMatches(packet, compactTokens));
+        Assert.False(InvokeMatches(packet, negativeTokens));
+    }
+
+    [Fact]
     public void ResolvePrepPacketNormalizesWhitespacePaddedPacketIds()
     {
         DateTimeOffset updatedAtUtc = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
