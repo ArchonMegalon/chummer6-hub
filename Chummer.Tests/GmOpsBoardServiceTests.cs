@@ -627,6 +627,45 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public void ListPrepAssets_QuerySupportsCompactShorthandAcrossWhitespaceAndPunctuation()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult import = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "prep_library_ops",
+                now: now,
+                title: "Prep library packet",
+                body: "Bound to GM prep packet lane."),
+            BuildPortableAsset(
+                assetId: "event_control_ops",
+                now: now.AddMinutes(1),
+                title: "Event-control board",
+                body: "Season operations timeline remains governed."),
+            BuildPortableAsset(
+                assetId: "roster_move_ops",
+                now: now.AddMinutes(2),
+                title: "Roster move checklist",
+                body: "Crew handoff receipts are attached.")
+        ]);
+
+        Assert.Equal(3, import.ImportedCount);
+        Assert.Equal(0, import.SkippedCount);
+        Assert.Empty(import.Conflicts);
+
+        GmPrepAssetListResponse prepLibraryMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "preplibrary");
+        GmPrepAssetListResponse eventControlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "eventcontrol");
+        GmPrepAssetListResponse rosterMoveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostermove");
+        GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixlibrary");
+
+        Assert.Contains(prepLibraryMatches.Items, item => item.AssetId == "prep_library_ops");
+        Assert.Contains(eventControlMatches.Items, item => item.AssetId == "event_control_ops");
+        Assert.Contains(rosterMoveMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Empty(negativeMatches.Items);
+    }
+
+    [Fact]
     public void ReconcilePortableAssets_SkipsAssets_WhenIncomingPayloadContainsAmbiguousDuplicateAssetVersions()
     {
         var service = CreateService();
