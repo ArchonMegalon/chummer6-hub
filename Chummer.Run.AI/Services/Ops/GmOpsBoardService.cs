@@ -981,6 +981,41 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("operation");
         }
 
+        if (tokens.Contains("nextsessionreturn") || tokens.Contains("nextsessionreturns"))
+        {
+            tokens.Remove("nextsessionreturn");
+            tokens.Remove("nextsessionreturns");
+            tokens.Add("next");
+            tokens.Add("session");
+            tokens.Add("return");
+        }
+
+        if (tokens.Contains("sessionreturn") || tokens.Contains("sessionreturns"))
+        {
+            tokens.Remove("sessionreturn");
+            tokens.Remove("sessionreturns");
+            tokens.Add("session");
+            tokens.Add("return");
+        }
+
+        if (tokens.Contains("nextsession") || tokens.Contains("nextsessions"))
+        {
+            tokens.Remove("nextsession");
+            tokens.Remove("nextsessions");
+            tokens.Add("next");
+            tokens.Add("session");
+            tokens.Add("return");
+        }
+
+        if (tokens.Contains("returnloop") || tokens.Contains("returnloops"))
+        {
+            tokens.Remove("returnloop");
+            tokens.Remove("returnloops");
+            tokens.Add("return");
+            tokens.Add("loop");
+            tokens.Add("session");
+        }
+
         return tokens.ToArray();
     }
 

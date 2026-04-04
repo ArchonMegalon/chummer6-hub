@@ -1311,6 +1311,61 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public void ListPrepAssets_QuerySupportsNextSessionReturnLoopPluralShorthandAcrossWhitespaceAndPunctuation()
+    {
+        var service = CreateService();
+        var now = DateTimeOffset.UtcNow;
+        OfflineSyncSurfaceMergeResult import = service.ReconcilePortableAssets(
+        [
+            BuildPortableAsset(
+                assetId: "return_loop_ops",
+                now: now,
+                title: "Next-session return loop packet",
+                body: "Next-session return loop remains governed across downtime recap and memory carry-forward.")
+        ]);
+
+        Assert.Equal(1, import.ImportedCount);
+        Assert.Equal(0, import.SkippedCount);
+        Assert.Empty(import.Conflicts);
+
+        GmPrepAssetListResponse nextSessionMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsession");
+        GmPrepAssetListResponse nextSessionPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsessions");
+        GmPrepAssetListResponse nextSessionReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsessionreturn");
+        GmPrepAssetListResponse nextSessionReturnPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "nextsessionreturns");
+        GmPrepAssetListResponse sessionReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sessionreturn");
+        GmPrepAssetListResponse sessionReturnPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sessionreturns");
+        GmPrepAssetListResponse returnLoopMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "returnloop");
+        GmPrepAssetListResponse returnLoopPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "returnloops");
+        GmPrepAssetListResponse hyphenNextSessionMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "next-session");
+        GmPrepAssetListResponse splitNextSessionMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "next session");
+        GmPrepAssetListResponse hyphenNextSessionReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "next-session-return");
+        GmPrepAssetListResponse splitNextSessionReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "next session return");
+        GmPrepAssetListResponse hyphenSessionReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "session-return");
+        GmPrepAssetListResponse splitSessionReturnMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "session return");
+        GmPrepAssetListResponse hyphenReturnLoopMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "return-loop");
+        GmPrepAssetListResponse splitReturnLoopMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "return loop");
+        GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixloop");
+
+        Assert.Contains(nextSessionMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(nextSessionPluralMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(nextSessionReturnMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(nextSessionReturnPluralMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(sessionReturnMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(sessionReturnPluralMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(returnLoopMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(returnLoopPluralMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(hyphenNextSessionMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(splitNextSessionMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(hyphenNextSessionReturnMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(splitNextSessionReturnMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(hyphenSessionReturnMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(splitSessionReturnMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(hyphenReturnLoopMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Contains(splitReturnLoopMatches.Items, item => item.AssetId == "return_loop_ops");
+        Assert.Empty(negativeMatches.Items);
+    }
+
+    [Fact]
     public void ListPrepAssets_QuerySupportsOpForShorthandAcrossWhitespaceAndPunctuation()
     {
         var service = CreateService();

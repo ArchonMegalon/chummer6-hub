@@ -2827,6 +2827,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail returnloop compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail returnloop compact search');
 
+  await page.fill('#prepQuery', 'returnloops');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=returnloops/.test(page.url()), 'Workspace detail search should preserve the compact returnloops continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail returnloops compact search');
+  await expectBodyText(page, 'match(es) for "returnloops"', '/account/work/workspaces detail returnloops compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail returnloops compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail returnloops compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail returnloops compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail returnloops compact search');
+  const workspaceReturnLoopsSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceReturnLoopsSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact returnloops continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail returnloops compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail returnloops compact search');
+
   await page.fill('#prepQuery', 'nextsession');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -2869,6 +2890,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail nextsessionreturn compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail nextsessionreturn compact search');
 
+  await page.fill('#prepQuery', 'nextsessionreturns');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=nextsessionreturns/.test(page.url()), 'Workspace detail search should preserve the compact nextsessionreturns continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail nextsessionreturns compact search');
+  await expectBodyText(page, 'match(es) for "nextsessionreturns"', '/account/work/workspaces detail nextsessionreturns compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail nextsessionreturns compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail nextsessionreturns compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail nextsessionreturns compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail nextsessionreturns compact search');
+  const workspaceNextSessionReturnsSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceNextSessionReturnsSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact nextsessionreturns continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail nextsessionreturns compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail nextsessionreturns compact search');
+
   await page.fill('#prepQuery', 'sessionreturn');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
@@ -2889,6 +2931,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   );
   await assertNoBannedCopy(page, '/account/work/workspaces detail sessionreturn compact search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail sessionreturn compact search');
+
+  await page.fill('#prepQuery', 'sessionreturns');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=sessionreturns/.test(page.url()), 'Workspace detail search should preserve the compact sessionreturns continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail sessionreturns compact search');
+  await expectBodyText(page, 'match(es) for "sessionreturns"', '/account/work/workspaces detail sessionreturns compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail sessionreturns compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail sessionreturns compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail sessionreturns compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail sessionreturns compact search');
+  const workspaceSessionReturnsSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceSessionReturnsSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact sessionreturns continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail sessionreturns compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail sessionreturns compact search');
 
   await page.fill('#prepQuery', 'memory');
   await Promise.all([
