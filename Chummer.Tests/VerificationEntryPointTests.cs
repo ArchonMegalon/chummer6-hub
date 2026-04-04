@@ -211,6 +211,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("reject hostless releaseProof.baseUrl origins", script, StringComparison.Ordinal);
         Assert.Contains("reject userinfo credentials in releaseProof.baseUrl origins", script, StringComparison.Ordinal);
         Assert.Contains("reject whitespace-padded releaseProof.baseUrl values", script, StringComparison.Ordinal);
+        Assert.Contains("reject whitespace-padded releaseProof.base_url alias values", script, StringComparison.Ordinal);
         Assert.Contains("reject percent-encoded releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
         Assert.Contains("reject query/fragment releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
         Assert.Contains("reject escaped-path releaseProof.proofRoutes entries", script, StringComparison.Ordinal);
@@ -527,6 +528,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventop", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=eventoperation", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=eventoperations", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event-op", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event-operation", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=event-operations", audit, StringComparison.Ordinal);
@@ -657,6 +660,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=eventops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event%20ops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventop", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=eventoperation", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=eventoperations", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event-op", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event-operation", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=event-operations", audit, StringComparison.Ordinal);
@@ -834,6 +839,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("split event ops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventop", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventop prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=eventoperation", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact eventoperation prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=eventoperations", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact eventoperations prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=event-op", playwright, StringComparison.Ordinal);
         Assert.Contains("hyphen event-op prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=event-operation", playwright, StringComparison.Ordinal);
