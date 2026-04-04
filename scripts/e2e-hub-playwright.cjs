@@ -6013,6 +6013,14 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolbriefs', 'compact eventcontrolbriefs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolbrf', 'compact eventcontrolbrf continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolbrfs', 'compact eventcontrolbrfs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolspacket', 'compact eventcontrolspacket continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolspackets', 'compact eventcontrolspackets continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolspkt', 'compact eventcontrolspkt continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolspkts', 'compact eventcontrolspkts continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolsbrief', 'compact eventcontrolsbrief continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolsbriefs', 'compact eventcontrolsbriefs continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolsbrf', 'compact eventcontrolsbrf continuity prep');
+  await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventcontrolsbrfs', 'compact eventcontrolsbrfs continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventoppacket', 'compact eventoppacket continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventoppackets', 'compact eventoppackets continuity prep');
   await assertWorkspacePrepQuerySearch(page, pageErrors, 'eventoppkt', 'compact eventoppkt continuity prep');

@@ -176,6 +176,14 @@ public static class PrepLibraryQueryAliasCanonicalizer
         RewriteCompactContinuityMutationAlias(tokens, "eventcontrolbriefs", "event", "control", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "eventcontrolbrf", "event", "control", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "eventcontrolbrfs", "event", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "eventcontrolspacket", "event", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "eventcontrolspackets", "event", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "eventcontrolspkt", "event", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "eventcontrolspkts", "event", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "eventcontrolsbrief", "event", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "eventcontrolsbriefs", "event", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "eventcontrolsbrf", "event", "control", "packet");
+        RewriteCompactContinuityMutationAlias(tokens, "eventcontrolsbrfs", "event", "control", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "eventoppacket", "event", "control", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "eventoppackets", "event", "control", "packet");
         RewriteCompactContinuityMutationAlias(tokens, "eventoppkt", "event", "control", "packet");
