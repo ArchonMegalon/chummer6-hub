@@ -63,6 +63,7 @@ if ! python3 - "$WORKFLOW_GATE_RECEIPT" "$VISUAL_FAMILIARITY_RECEIPT" <<'PY'
 import datetime as dt
 import json
 import pathlib
+import re
 import sys
 
 UTC = dt.timezone.utc
@@ -206,6 +207,10 @@ def normalize_release_proof_route(raw_route: object, *, field_path: str, source:
     route = raw_route.strip()
     if not route:
         raise SystemExit(f"parity audit failed: {field_path} must not be blank: {source}")
+    if route != raw_route:
+        raise SystemExit(
+            f"parity audit failed: {field_path} must not include leading/trailing whitespace: {source}"
+        )
     if not route.startswith("/"):
         raise SystemExit(f"parity audit failed: {field_path} must be a slash-led route path: {source}")
     if any(character.isspace() for character in route):
@@ -219,6 +224,10 @@ def normalize_release_proof_route(raw_route: object, *, field_path: str, source:
     segments = route.split("/")
     if any(segment in {".", ".."} for segment in segments):
         raise SystemExit(f"parity audit failed: {field_path} must not include dot-segment traversal: {source}")
+    if route != route.lower():
+        raise SystemExit(
+            f"parity audit failed: {field_path} must use canonical lowercase route casing: {source}"
+        )
     canonical_route = route.lower()
     if canonical_route != "/":
         canonical_route = canonical_route.rstrip("/")
@@ -250,11 +259,28 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
         ),
     )
     normalized_journeys = [normalized_token(journey) for journey in journeys]
-    if any(not journey for journey in normalized_journeys):
-        raise SystemExit(
-            "parity audit failed: release-channel nested receipt releaseProof.journeysPassed must not contain blank ids: "
-            f"{release_channel_path}"
-        )
+    for index, raw_journey in enumerate(journeys):
+        stripped_journey = raw_journey.strip()
+        if not stripped_journey:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.journeysPassed must not contain blank ids: "
+                f"{release_channel_path}"
+            )
+        if raw_journey != stripped_journey:
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.journeysPassed must not include leading/trailing whitespace: "
+                f"{release_channel_path} (index={index})"
+            )
+        if stripped_journey != stripped_journey.lower():
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.journeysPassed must use canonical lowercase journey ids: "
+                f"{release_channel_path} (index={index}, value={raw_journey!r})"
+            )
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", stripped_journey):
+            raise SystemExit(
+                "parity audit failed: release-channel nested receipt releaseProof.journeysPassed must use canonical journey id tokens: "
+                f"{release_channel_path} (index={index}, value={raw_journey!r})"
+            )
     duplicate_journeys = sorted(
         journey for journey in set(normalized_journeys) if normalized_journeys.count(journey) > 1
     )
