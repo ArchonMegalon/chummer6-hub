@@ -1122,6 +1122,38 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             return "roster_movement";
         }
 
+        if (ContainsAny(combined,
+                "prep library",
+                "prep-library",
+                "prep_library",
+                "prep packet",
+                "prep_packet",
+                "packet prep",
+                "prep dossier",
+                "prep briefing",
+                "prep brief",
+                "prep binder",
+                "prep catalog")
+            || (ContainsAny(combined,
+                    "packet",
+                    "packets",
+                    "library",
+                    "runbook",
+                    "playbook",
+                    "briefing",
+                    "briefings",
+                    "dossier",
+                    "binder",
+                    "catalog")
+                && ContainsAny(combined,
+                    "prep",
+                    "gm",
+                    "campaign",
+                    "session")))
+        {
+            return "prep_library";
+        }
+
         return "general";
     }
 
@@ -1134,6 +1166,7 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "opposition" => 4,
             "event_control" => 3,
             "roster_movement" => 2,
+            "prep_library" => 2,
             "general" => 1,
             _ => 0
         };
