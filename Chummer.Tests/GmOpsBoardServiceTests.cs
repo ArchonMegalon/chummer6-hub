@@ -1321,7 +1321,7 @@ public sealed class GmOpsBoardServiceTests
                 assetId: "continuity_plural_ops",
                 now: now,
                 title: "Diary downtime aftermath continuity packet",
-                body: "Diary journal downtime aftermath heat faction connection continuity remains governed for next-session return.")
+                body: "Diary journal downtime aftermath recap heat faction connection continuity remains governed for next-session return.")
         ]);
 
         Assert.Equal(1, import.ImportedCount);
@@ -1332,6 +1332,8 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse journalsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "journals");
         GmPrepAssetListResponse downtimesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "downtimes");
         GmPrepAssetListResponse aftermathsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aftermaths");
+        GmPrepAssetListResponse recapsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "recaps");
+        GmPrepAssetListResponse returnsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "returns");
         GmPrepAssetListResponse heatsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "heats");
         GmPrepAssetListResponse factionsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "factions");
         GmPrepAssetListResponse connectionsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "connections");
@@ -1341,6 +1343,8 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(journalsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(downtimesMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(aftermathsMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(recapsMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(returnsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(heatsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(factionsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(connectionsMatches.Items, item => item.AssetId == "continuity_plural_ops");

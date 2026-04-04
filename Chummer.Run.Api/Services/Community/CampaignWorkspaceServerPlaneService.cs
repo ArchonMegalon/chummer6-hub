@@ -4982,6 +4982,18 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("aftermath");
         }
 
+        if (tokens.Contains("recaps"))
+        {
+            tokens.Remove("recaps");
+            tokens.Add("recap");
+        }
+
+        if (tokens.Contains("returns"))
+        {
+            tokens.Remove("returns");
+            tokens.Add("return");
+        }
+
         if (tokens.Contains("connections"))
         {
             tokens.Remove("connections");

@@ -621,7 +621,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=aftermath", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=aftermaths", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=recap", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=recaps", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=return", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=returns", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returnloop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returnloops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=nextsession", audit, StringComparison.Ordinal);
@@ -744,7 +746,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=aftermath", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=aftermaths", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=recap", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=recaps", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=return", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=returns", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=returnloop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=returnloops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=nextsession", audit, StringComparison.Ordinal);
@@ -1059,8 +1063,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("aftermaths continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=recap", playwright, StringComparison.Ordinal);
         Assert.Contains("recap continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=recaps", playwright, StringComparison.Ordinal);
+        Assert.Contains("recaps continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=return", playwright, StringComparison.Ordinal);
         Assert.Contains("return-loop continuity prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=returns", playwright, StringComparison.Ordinal);
+        Assert.Contains("returns continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=returnloop", playwright, StringComparison.Ordinal);
         Assert.Contains("compact returnloop continuity prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=returnloops", playwright, StringComparison.Ordinal);
