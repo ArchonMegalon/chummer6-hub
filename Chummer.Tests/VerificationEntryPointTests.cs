@@ -208,10 +208,10 @@ public sealed class VerificationEntryPointTests
 
         Assert.Contains("bash scripts/audit-ui-parity.sh", script, StringComparison.Ordinal);
         Assert.Contains("run_ui_parity_audit_with_workflow_gate_retry", script, StringComparison.Ordinal);
-        Assert.Contains("WORKFLOW_GATE_DRIFT_RETRY_MARKER", script, StringComparison.Ordinal);
-        Assert.Contains("milestone-2 workflow/visual release-channel generated_at drift", script, StringComparison.Ordinal);
+        Assert.Contains("WORKFLOW_GATE_DRIFT_RETRY_MARKER_PREFIX", script, StringComparison.Ordinal);
+        Assert.Contains("milestone-2 workflow/visual release-channel ", script, StringComparison.Ordinal);
         Assert.Contains("materialize-desktop-workflow-execution-gate.sh", script, StringComparison.Ordinal);
-        Assert.Contains("verify note: rematerializing desktop workflow execution gate after generated_at drift.", script, StringComparison.Ordinal);
+        Assert.Contains("verify note: rematerializing desktop workflow execution gate after milestone-2 release-channel drift.", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_path", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_fixture_path", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_UI_PARITY_RELEASE_CHANNEL_PATH", script, StringComparison.Ordinal);
