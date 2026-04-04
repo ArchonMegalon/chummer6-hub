@@ -583,6 +583,57 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineNextSessionCarryForwardTreatsWhitespacePaddedReplayPackageKindAsReplay()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        AftermathRecapPackageProjection replayPackage = new(
+            PackageId: "package-replay-kind-whitespace",
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            RunId: null,
+            RunTitle: null,
+            PackageKind: "  replay_timeline  ",
+            Title: "Replay timeline",
+            Summary: "Replay packet stays attached to continuity.",
+            ArtifactId: "artifact-replay-kind-whitespace",
+            EvidenceLines: ["Replay evidence line."],
+            InitiatedByUserId: "gm-1",
+            GeneratedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+
+        NextSessionCarryForwardProjection? carryForward = InvokeCampaignSpineBuildNextSessionCarryForward(campaign, [replayPackage]);
+
+        Assert.NotNull(carryForward);
+        Assert.Contains("replay-safe carry-forward packet", carryForward!.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CampaignSpineCampaignMemoryTreatsWhitespacePaddedDowntimePackageKindAsDowntimeBrief()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        AftermathRecapPackageProjection downtimePackage = new(
+            PackageId: "package-downtime-kind-whitespace",
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            RunId: null,
+            RunTitle: null,
+            PackageKind: "  downtime_brief  ",
+            Title: "Downtime brief",
+            Summary: "Downtime obligations remain attached to return lane.",
+            ArtifactId: "artifact-downtime-kind-whitespace",
+            EvidenceLines: ["Downtime evidence line."],
+            InitiatedByUserId: "gm-1",
+            GeneratedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
+
+        CampaignMemoryProjection? memory = InvokeCampaignSpineBuildCampaignMemory(campaign, [downtimePackage]);
+
+        Assert.NotNull(memory);
+        Assert.Contains("downtime brief", memory!.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("aftermath recap", memory.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void CampaignMemoryPacketDoesNotActivateFromCarryForwardWindowSignalsWithoutMemoryContext()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlCarryForwardWindowOnly();
@@ -4213,6 +4264,52 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         return Assert.IsAssignableFrom<IReadOnlyList<CreatorPublicationProjection>>(method.Invoke(null, [workspaces, Array.Empty<RunnerDossierProjection>(), Array.Empty<BuildLabHandoffProjection>()]));
     }
 
+    private static NextSessionCarryForwardProjection? InvokeCampaignSpineBuildNextSessionCarryForward(
+        CampaignProjection campaign,
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("BuildNextSessionCarryForward", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildNextSessionCarryForward was not found.");
+
+        return (NextSessionCarryForwardProjection?)method.Invoke(null,
+        [
+            campaign,
+            "Keep return loop on governed lane.",
+            null,
+            null,
+            null,
+            Array.Empty<CampaignConsequenceProjection>(),
+            Array.Empty<GovernedPrepLaunchProjection>(),
+            Array.Empty<TravelPrefetchReceiptProjection>(),
+            aftermathPackages
+        ]);
+    }
+
+    private static CampaignMemoryProjection? InvokeCampaignSpineBuildCampaignMemory(
+        CampaignProjection campaign,
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+    {
+        MethodInfo method = typeof(CampaignSpineService)
+            .GetMethod("BuildCampaignMemory", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildCampaignMemory was not found.");
+
+        return (CampaignMemoryProjection?)method.Invoke(null,
+        [
+            campaign,
+            "Keep return loop on governed lane.",
+            null,
+            null,
+            null,
+            Array.Empty<CampaignConsequenceProjection>(),
+            Array.Empty<RosterTransferProjection>(),
+            Array.Empty<GovernedPrepLaunchProjection>(),
+            Array.Empty<TravelPrefetchReceiptProjection>(),
+            aftermathPackages,
+            null
+        ]);
+    }
+
     private static IReadOnlyList<RecapShelfEntry> InvokeBuildRecapShelf(CampaignWorkspaceProjection workspace)
         => InvokeBuildRecapShelf(workspace, Array.Empty<CreatorPublicationProjection>());
 
@@ -4347,6 +4444,26 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReturnSummary: "Return lane summary",
             RosterTransfers: [transfer],
             AftermathPackages: [aftermath]);
+    }
+
+    private static CampaignProjection BuildCampaignProjection(CampaignWorkspaceProjection workspace)
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-04-03T00:00:00Z");
+        return new CampaignProjection(
+            CampaignId: workspace.CampaignId,
+            GroupId: "group-a",
+            Name: workspace.CampaignName,
+            Status: "active",
+            Visibility: workspace.Visibility,
+            Summary: "Campaign continuity remains attached to one governed lane.",
+            RuleEnvironment: workspace.RuleEnvironment,
+            ActiveRunId: null,
+            CrewIds: [],
+            DossierIds: [],
+            RunIds: [],
+            LatestContinuity: null,
+            CreatedAtUtc: now,
+            UpdatedAtUtc: now);
     }
 
     private static CampaignWorkspaceProjection BuildWorkspaceWithEventControls()

@@ -2674,7 +2674,7 @@ public sealed class CampaignSpineService
         }
         else if (leadAftermathPackage is not null)
         {
-            summary = string.Equals(leadAftermathPackage.PackageKind, "replay_timeline", StringComparison.OrdinalIgnoreCase)
+            summary = IsAftermathPackageKind(leadAftermathPackage, "replay_timeline")
                 ? $"{leadAftermathPackage.Title} is pinned as the replay-safe carry-forward packet for {campaign.Name}."
                 : $"{leadAftermathPackage.Title} is pinned as the recap-safe carry-forward packet for {campaign.Name}.";
         }
@@ -2754,10 +2754,16 @@ public sealed class CampaignSpineService
         GovernedPrepLaunchProjection? leadPrepLaunch = prepLaunches.FirstOrDefault();
         TravelPrefetchReceiptProjection? leadTravelPrefetch = travelPrefetchReceipts.FirstOrDefault();
         AftermathRecapPackageProjection? leadAftermathPackage = aftermathPackages
-            .FirstOrDefault(item => !string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault(item => !IsAftermathPackageKind(item, "downtime_brief"))
             ?? aftermathPackages.FirstOrDefault();
         AftermathRecapPackageProjection? leadDowntimePackage = aftermathPackages
-            .FirstOrDefault(item => string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(item => IsAftermathPackageKind(item, "downtime_brief"));
+        if (leadAftermathPackage is not null
+            && leadDowntimePackage is not null
+            && string.Equals(leadAftermathPackage.PackageId, leadDowntimePackage.PackageId, StringComparison.OrdinalIgnoreCase))
+        {
+            leadAftermathPackage = null;
+        }
 
         if (continuity is null
             && nextSessionCarryForward is null
@@ -2837,7 +2843,7 @@ public sealed class CampaignSpineService
 
         if (leadAftermathPackage is not null)
         {
-            anchors.Add(leadAftermathPackage.PackageKind.Trim().ToLowerInvariant() switch
+            anchors.Add(NormalizeAftermathPackageKind(leadAftermathPackage.PackageKind) switch
             {
                 "replay_timeline" => "replay package",
                 "after_action_report" => "after-action report",
@@ -2969,9 +2975,9 @@ public sealed class CampaignSpineService
         }
 
         AftermathRecapPackageProjection? replayPackage = aftermathPackages
-            .FirstOrDefault(item => string.Equals(item.PackageKind, "replay_timeline", StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(item => IsAftermathPackageKind(item, "replay_timeline"));
         AftermathRecapPackageProjection? aftermathPackage = aftermathPackages
-            .FirstOrDefault(item => !string.Equals(item.PackageKind, "replay_timeline", StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(item => !IsAftermathPackageKind(item, "replay_timeline"));
         foreach (AftermathRecapPackageProjection package in new[] { replayPackage, aftermathPackage }
                      .Where(static item => item is not null)
                      .Cast<AftermathRecapPackageProjection>()
@@ -3078,6 +3084,12 @@ public sealed class CampaignSpineService
             "replay_timeline" => "replay_package",
             _ => "aftermath_recap"
         };
+
+    private static bool IsAftermathPackageKind(AftermathRecapPackageProjection package, string kind)
+        => string.Equals(NormalizeAftermathPackageKind(package.PackageKind), kind, StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeAftermathPackageKind(string? packageKind)
+        => AccountService.NormalizeOptional(packageKind)?.ToLowerInvariant() ?? string.Empty;
 
     private static string BuildAftermathRecapProvenanceSummary(AftermathRecapPackageProjection package)
     {
