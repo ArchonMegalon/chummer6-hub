@@ -1280,6 +1280,90 @@ def verify_signed_in_work_audit(
     prep_items = prep_library.get("items") or []
     if not prep_items:
         raise AssertionError("prep-library search did not expose any governed packet to launch")
+    prep_library_oppositions_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=oppositions"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_oppositions_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_oppositions_path} returned {status}, expected 200")
+
+    prep_library_oppositions = json.loads(body)
+    if not (prep_library_oppositions.get("items") or []):
+        raise AssertionError("prep-library oppositions search did not expose any governed packet")
+    prep_library_encounter_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=encounter"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_encounter_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_encounter_path} returned {status}, expected 200")
+
+    prep_library_encounter = json.loads(body)
+    if not (prep_library_encounter.get("items") or []):
+        raise AssertionError("prep-library encounter search did not expose any governed packet")
+    prep_library_enemy_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=enemy"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_enemy_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_enemy_path} returned {status}, expected 200")
+
+    prep_library_enemy = json.loads(body)
+    if not (prep_library_enemy.get("items") or []):
+        raise AssertionError("prep-library enemy search did not expose any governed packet")
+    prep_library_hostile_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=hostile"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_hostile_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_hostile_path} returned {status}, expected 200")
+
+    prep_library_hostile = json.loads(body)
+    if not (prep_library_hostile.get("items") or []):
+        raise AssertionError("prep-library hostile search did not expose any governed packet")
+    prep_library_adversary_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=adversary"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_adversary_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_adversary_path} returned {status}, expected 200")
+
+    prep_library_adversary = json.loads(body)
+    if not (prep_library_adversary.get("items") or []):
+        raise AssertionError("prep-library adversary search did not expose any governed packet")
+    prep_library_threat_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=threat"
+    status, body, _, _ = fetch(
+        base_url,
+        prep_library_threat_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{prep_library_threat_path} returned {status}, expected 200")
+
+    prep_library_threat = json.loads(body)
+    if not (prep_library_threat.get("items") or []):
+        raise AssertionError("prep-library threat search did not expose any governed packet")
 
     prep_library_season_path = f"/api/v1/campaign-spine/me/workspaces/{workspace_id}/prep-library?queryText=seasonops"
     status, body, _, _ = fetch(
@@ -2170,6 +2254,96 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Next-session carry-forward", workspace_search_path)
     if "No governed prep packet matched that search yet." in body:
         raise AssertionError(f"{workspace_search_path} should return at least one governed prep packet for the opposition query")
+    workspace_oppositions_search_path = f"{workspace_path}?prepQuery=oppositions"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_oppositions_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_oppositions_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_oppositions_search_path)
+    require_snippet(body, 'match(es) for "oppositions"', workspace_oppositions_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_oppositions_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_oppositions_search_path} should return at least one governed prep packet for the oppositions query")
+    workspace_encounter_search_path = f"{workspace_path}?prepQuery=encounter"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_encounter_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_encounter_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_encounter_search_path)
+    require_snippet(body, 'match(es) for "encounter"', workspace_encounter_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_encounter_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_encounter_search_path} should return at least one governed prep packet for the encounter query")
+    workspace_enemy_search_path = f"{workspace_path}?prepQuery=enemy"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_enemy_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_enemy_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_enemy_search_path)
+    require_snippet(body, 'match(es) for "enemy"', workspace_enemy_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_enemy_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_enemy_search_path} should return at least one governed prep packet for the enemy query")
+    workspace_hostile_search_path = f"{workspace_path}?prepQuery=hostile"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_hostile_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_hostile_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_hostile_search_path)
+    require_snippet(body, 'match(es) for "hostile"', workspace_hostile_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_hostile_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_hostile_search_path} should return at least one governed prep packet for the hostile query")
+    workspace_adversary_search_path = f"{workspace_path}?prepQuery=adversary"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_adversary_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_adversary_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_adversary_search_path)
+    require_snippet(body, 'match(es) for "adversary"', workspace_adversary_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_adversary_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_adversary_search_path} should return at least one governed prep packet for the adversary query")
+    workspace_threat_search_path = f"{workspace_path}?prepQuery=threat"
+    status, body, _, _ = fetch(
+        base_url,
+        workspace_threat_search_path,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{workspace_threat_search_path} returned {status}, expected 200")
+    require_snippet(body, "Search results:", workspace_threat_search_path)
+    require_snippet(body, 'match(es) for "threat"', workspace_threat_search_path)
+    require_snippet(body, prep_launch["packetTitle"], workspace_threat_search_path)
+    if "No governed prep packet matched that search yet." in body:
+        raise AssertionError(f"{workspace_threat_search_path} should return at least one governed prep packet for the threat query")
     workspace_season_search_path = f"{workspace_path}?prepQuery=seasonops"
     status, body, _, _ = fetch(
         base_url,

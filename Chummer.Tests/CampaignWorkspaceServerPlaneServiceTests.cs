@@ -5360,6 +5360,12 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
         Assert.Contains("opposition", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("oppositions", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("encounter", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("enemy", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("hostile", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("adversary", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("threat", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("packet", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("opposition", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("threat", StringComparison.OrdinalIgnoreCase));
