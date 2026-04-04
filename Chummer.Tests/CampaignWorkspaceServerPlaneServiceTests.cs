@@ -81,9 +81,13 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             UpdatedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"));
 
         IReadOnlyList<string> compactTokens = InvokeBuildTokens("preplibrary");
+        IReadOnlyList<string> pluralPacketTokens = InvokeBuildTokens("packets");
+        IReadOnlyList<string> splitPluralPacketTokens = InvokeBuildTokens("prep packets");
         IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixlibrary");
 
         Assert.True(InvokeMatches(packet, compactTokens));
+        Assert.True(InvokeMatches(packet, pluralPacketTokens));
+        Assert.True(InvokeMatches(packet, splitPluralPacketTokens));
         Assert.False(InvokeMatches(packet, negativeTokens));
     }
 
