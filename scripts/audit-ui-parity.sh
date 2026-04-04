@@ -99,10 +99,16 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         message=f"parity audit failed: workflow receipt required_workflow_family_ids must be a string array: {path}",
     )
     expected_families = {
+        "metatype-priorities-karma-entry",
+        "attributes-skills-skill-groups-specializations-knowledge-languages",
+        "create-open-import-save-save-as-print-export",
+        "dense-workbench-affordances-search-add-edit-remove-preview-drill-in-compare",
+        "improvements-explain-result-parity",
         "qualities-contacts-identities-notes-calendar-expenses-lifestyles-sources",
         "cyberware-bioware-modular-hierarchies-nested-plugins",
         "armor-weapons-gear-vehicles-drones-mods-custom-items-locations-containers",
         "magic-adept-resonance-sprites-spells-rituals-spirits-powers-metamagics-echoes-complex-forms",
+        "recovery-reload-migration-roundtrips",
     }
     missing_expected = sorted(expected_families.difference(required_families))
     if missing_expected:
