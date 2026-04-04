@@ -1151,7 +1151,10 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse rosterMoveHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster-move");
         GmPrepAssetListResponse crewMoveMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmove");
         GmPrepAssetListResponse crewMovesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmoves");
+        GmPrepAssetListResponse crewMovementMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmovement");
+        GmPrepAssetListResponse crewMovementsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewmovements");
         GmPrepAssetListResponse crewMoveHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew-move");
+        GmPrepAssetListResponse crewMovementHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew-movement");
         GmPrepAssetListResponse crewTransferMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewtransfer");
         GmPrepAssetListResponse crewTransfersMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crewtransfers");
         GmPrepAssetListResponse crewTransfersSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew transfers");
@@ -1166,6 +1169,13 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse rosterHandoffSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster handoff");
         GmPrepAssetListResponse rosterMovesSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster moves");
         GmPrepAssetListResponse rosterMoveSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster move");
+        GmPrepAssetListResponse crewMovementSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew movement");
+        GmPrepAssetListResponse crewMovementsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "crew movements");
+        GmPrepAssetListResponse rosterMovementCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostermovement");
+        GmPrepAssetListResponse rosterMovementsCompactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "rostermovements");
+        GmPrepAssetListResponse rosterMovementSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster movement");
+        GmPrepAssetListResponse rosterMovementsSpacedMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster movements");
+        GmPrepAssetListResponse rosterMovementHyphenMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "roster-movement");
         GmPrepAssetListResponse packetsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "packets");
         GmPrepAssetListResponse prepPacketsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "prep packets");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixlibrary");
@@ -1259,7 +1269,10 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(rosterMoveHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMoveMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMovesMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewMovementMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewMovementsMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewMoveHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewMovementHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewTransferMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewTransfersMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(crewTransfersSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
@@ -1274,6 +1287,13 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(rosterHandoffSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterMovesSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(rosterMoveSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewMovementSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(crewMovementsSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterMovementCompactMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterMovementsCompactMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterMovementSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterMovementsSpacedMatches.Items, item => item.AssetId == "roster_move_ops");
+        Assert.Contains(rosterMovementHyphenMatches.Items, item => item.AssetId == "roster_move_ops");
         Assert.Contains(packetsMatches.Items, item => item.AssetId == "prep_library_ops");
         Assert.Contains(prepPacketsMatches.Items, item => item.AssetId == "prep_library_ops");
         Assert.Empty(negativeMatches.Items);
@@ -1325,7 +1345,7 @@ public sealed class GmOpsBoardServiceTests
                 assetId: "continuity_plural_ops",
                 now: now,
                 title: "Diary downtime aftermath continuity packet",
-                body: "Diary journal downtime aftermath recap return memory archive history timeline ledger heat faction connection relationship continuity remains governed for next-session return.")
+                body: "Diary journal downtime aftermath recap return memory archive history timeline ledger lifestyle license SIN heat faction connection relationship continuity remains governed for next-session return.")
         ]);
 
         Assert.Equal(1, import.ImportedCount);
@@ -1347,6 +1367,13 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse historiesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "histories");
         GmPrepAssetListResponse timelinesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "timelines");
         GmPrepAssetListResponse ledgersMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "ledgers");
+        GmPrepAssetListResponse lifestyleMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lifestyle");
+        GmPrepAssetListResponse lifestylesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "lifestyles");
+        GmPrepAssetListResponse licenseMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "license");
+        GmPrepAssetListResponse licensesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "licenses");
+        GmPrepAssetListResponse licencesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "licences");
+        GmPrepAssetListResponse sinMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sin");
+        GmPrepAssetListResponse sinsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "sins");
         GmPrepAssetListResponse heatsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "heats");
         GmPrepAssetListResponse factionsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "factions");
         GmPrepAssetListResponse contactMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "contact");
@@ -1371,6 +1398,13 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(historiesMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(timelinesMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(ledgersMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(lifestyleMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(lifestylesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(licenseMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(licensesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(licencesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(sinMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(sinsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(heatsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(factionsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(contactMatches.Items, item => item.AssetId == "continuity_plural_ops");

@@ -277,9 +277,21 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("rostermove");
         }
 
+        if (tokens.Contains("crewmovement"))
+        {
+            tokens.Remove("crewmovement");
+            tokens.Add("rostermove");
+        }
+
         if (tokens.Contains("crewmoves"))
         {
             tokens.Remove("crewmoves");
+            tokens.Add("rostermove");
+        }
+
+        if (tokens.Contains("crewmovements"))
+        {
+            tokens.Remove("crewmovements");
             tokens.Add("rostermove");
         }
 
@@ -289,9 +301,28 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("rostermove");
         }
 
+        if (tokens.Contains("rostermovement"))
+        {
+            tokens.Remove("rostermovement");
+            tokens.Add("rostermove");
+        }
+
+        if (tokens.Contains("rostermovements"))
+        {
+            tokens.Remove("rostermovements");
+            tokens.Add("rostermove");
+        }
+
         if (tokens.Contains("crew") && tokens.Contains("moves"))
         {
             tokens.Remove("moves");
+            tokens.Add("move");
+        }
+
+        if (tokens.Contains("crew") && (tokens.Contains("movement") || tokens.Contains("movements")))
+        {
+            tokens.Remove("movement");
+            tokens.Remove("movements");
             tokens.Add("move");
         }
 
@@ -329,6 +360,13 @@ public static class PrepLibraryQueryAliasCanonicalizer
         if (tokens.Contains("roster") && tokens.Contains("moves"))
         {
             tokens.Remove("moves");
+            tokens.Add("move");
+        }
+
+        if (tokens.Contains("roster") && (tokens.Contains("movement") || tokens.Contains("movements")))
+        {
+            tokens.Remove("movement");
+            tokens.Remove("movements");
             tokens.Add("move");
         }
 
@@ -614,6 +652,30 @@ public static class PrepLibraryQueryAliasCanonicalizer
         {
             tokens.Remove("histories");
             tokens.Add("history");
+        }
+
+        if (tokens.Contains("lifestyles"))
+        {
+            tokens.Remove("lifestyles");
+            tokens.Add("lifestyle");
+        }
+
+        if (tokens.Contains("licenses"))
+        {
+            tokens.Remove("licenses");
+            tokens.Add("license");
+        }
+
+        if (tokens.Contains("licences"))
+        {
+            tokens.Remove("licences");
+            tokens.Add("license");
+        }
+
+        if (tokens.Contains("sins"))
+        {
+            tokens.Remove("sins");
+            tokens.Add("sin");
         }
 
         if (tokens.Contains("timelines"))
