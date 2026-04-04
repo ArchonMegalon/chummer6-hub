@@ -422,6 +422,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=rostertransfer", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=rosterhandoff", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=crewhandoff", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=preplaunch", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=preplaunches", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=travelprefetch", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=travelprefetches", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonop", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventcontrol", audit, StringComparison.Ordinal);
@@ -438,6 +442,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("prepQuery=rostertransfer", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=rosterhandoff", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=crewhandoff", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=preplaunch", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=preplaunches", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=travelprefetch", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=travelprefetches", audit, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -498,6 +506,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact rosterhandoff prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=crewhandoff", playwright, StringComparison.Ordinal);
         Assert.Contains("compact crewhandoff prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=preplaunch", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact preplaunch prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=preplaunches", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact preplaunches prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=travelprefetch", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact travelprefetch prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=travelprefetches", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact travelprefetches prep query", playwright, StringComparison.Ordinal);
     }
 
     [Fact]
