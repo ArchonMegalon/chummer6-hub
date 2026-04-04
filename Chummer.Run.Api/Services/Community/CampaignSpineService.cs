@@ -2293,6 +2293,8 @@ public sealed class CampaignSpineService
                 var crewFitSummary = BuildBuildLabCrewFitSummary(dossier, workspace);
                 var plannerCoverageSummary = BuildBuildLabPlannerCoverageSummary(dossier, workspace, outputs, restore);
                 var plannerCoverageLines = BuildBuildLabPlannerCoverageLines(dossier, workspace, outputs, restore);
+                var conditionalStateSummary = BuildBuildLabConditionalStateSummary(dossier, workspace);
+                var conditionalStateLines = BuildBuildLabConditionalStateLines(dossier, workspace);
                 return new BuildLabHandoffProjection(
                     HandoffId: StableId("buildlab", dossier.DossierId),
                     DossierId: dossier.DossierId,
@@ -2328,7 +2330,9 @@ public sealed class CampaignSpineService
                     Watchouts: watchouts,
                     PlannerCoverageSummary: plannerCoverageSummary,
                     PlannerCoverageLines: plannerCoverageLines,
-                    CrewFitSummary: crewFitSummary);
+                    CrewFitSummary: crewFitSummary,
+                    ConditionalStateSummary: conditionalStateSummary,
+                    ConditionalStateLines: conditionalStateLines);
             })
             .Take(3)
             .ToArray();
@@ -2692,6 +2696,96 @@ public sealed class CampaignSpineService
         }
 
         return $"{coveredCheckpoints} of {totalCheckpoints} build follow-through checkpoints are already grounded.";
+    }
+
+    private static string BuildBuildLabConditionalStateSummary(
+        RunnerDossierProjection dossier,
+        CampaignWorkspaceProjection? workspace)
+    {
+        var signals = ResolveBuildLabConditionalStateSignals(dossier, workspace);
+        if (signals.Count == 0)
+        {
+            return workspace is null
+                ? "Conditional state rail is pending: attach a campaign workspace to verify drugs, foci, sustained effects, acquisition timing, and reputation spends before final export."
+                : $"Conditional state rail in {workspace.CampaignName} is in review: no explicit conditional toggles are active yet, so drugs, foci, sustained effects, acquisition timing, and reputation spends still need explicit checks.";
+        }
+
+        string signalSummary = string.Join(", ", signals.Select(signal => signal.label));
+        return workspace is null
+            ? $"Conditional state rail is attached to the living dossier and currently tracks {signalSummary}."
+            : $"Conditional state rail in {workspace.CampaignName} currently tracks {signalSummary}.";
+    }
+
+    private static IReadOnlyList<string> BuildBuildLabConditionalStateLines(
+        RunnerDossierProjection dossier,
+        CampaignWorkspaceProjection? workspace)
+    {
+        var signals = ResolveBuildLabConditionalStateSignals(dossier, workspace);
+        if (signals.Count == 0)
+        {
+            return
+            [
+                workspace is null
+                    ? "Conditional state lane: campaign workspace is not attached yet, so state checks are still dossier-first."
+                    : "Conditional state lane: campaign workspace is attached, but explicit conditional toggles are not active yet.",
+                "Conditional checks pending: drugs and temporary chemistry modifiers.",
+                "Conditional checks pending: foci bonding and sustained effects.",
+                "Conditional checks pending: acquisition timing and reputation spends."
+            ];
+        }
+
+        List<string> lines =
+        [
+            workspace is null
+                ? "Conditional state lane: living dossier conditions are active before campaign return handoff."
+                : $"Conditional state lane: {workspace.CampaignName} is carrying conditional checks on the governed return lane."
+        ];
+
+        lines.AddRange(signals.Select(static signal => signal.line));
+        return lines;
+    }
+
+    private static IReadOnlyList<(string key, string label, string line)> ResolveBuildLabConditionalStateSignals(
+        RunnerDossierProjection dossier,
+        CampaignWorkspaceProjection? workspace)
+    {
+        var activeEnvironment = workspace?.RuleEnvironment ?? dossier.RuleEnvironment;
+        var toggles = activeEnvironment.OptionToggles
+            .Concat(activeEnvironment.SourcePacks)
+            .Concat(activeEnvironment.HouseRulePacks)
+            .Select(static value => value?.Trim().ToLowerInvariant())
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        List<(string key, string label, string line)> signals = [];
+        if (toggles.Any(static token => token.Contains("drug", StringComparison.OrdinalIgnoreCase) || token.Contains("chem", StringComparison.OrdinalIgnoreCase)))
+        {
+            signals.Add(("drugs", "drug modifiers", "Conditional check: drug and chemistry modifiers stay explicit on this handoff."));
+        }
+
+        if (toggles.Any(static token => token.Contains("focus", StringComparison.OrdinalIgnoreCase) || token.Contains("foci", StringComparison.OrdinalIgnoreCase)))
+        {
+            signals.Add(("foci", "foci bindings", "Conditional check: focus/foci bonding state is pinned to this build path."));
+        }
+
+        if (toggles.Any(static token => token.Contains("sustain", StringComparison.OrdinalIgnoreCase)))
+        {
+            signals.Add(("sustained", "sustained effects", "Conditional check: sustained effects remain visible instead of collapsing into final totals."));
+        }
+
+        if (toggles.Any(static token => token.Contains("acquisition", StringComparison.OrdinalIgnoreCase) || token.Contains("availability", StringComparison.OrdinalIgnoreCase) || token.Contains("downtime", StringComparison.OrdinalIgnoreCase)))
+        {
+            signals.Add(("acquisition", "acquisition timing", "Conditional check: acquisition timing and availability posture remain reviewable."));
+        }
+
+        if (toggles.Any(static token => token.Contains("reputation", StringComparison.OrdinalIgnoreCase) || token.Contains("street_cred", StringComparison.OrdinalIgnoreCase) || token.Contains("notoriety", StringComparison.OrdinalIgnoreCase)))
+        {
+            signals.Add(("reputation", "reputation spends", "Conditional check: reputation/spend assumptions stay attached to this variant."));
+        }
+
+        return signals;
     }
 
     private static IReadOnlyList<string> BuildBuildLabPlannerCoverageLines(
