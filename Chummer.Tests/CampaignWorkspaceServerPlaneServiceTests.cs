@@ -63,6 +63,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("op-for")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("op force")));
         Assert.True(InvokeMatches(packet, InvokeBuildTokens("op_force")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositions")));
         Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixforce")));
     }
 
