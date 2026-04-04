@@ -967,6 +967,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         IReadOnlyList<CreatorPublicationProjection> creatorPublications)
     {
+        PublicationSafeProjection[] recapShelf = DeduplicateSemanticPublicationRecapVersions(workspace.RecapShelf).ToArray();
         Dictionary<string, DateTimeOffset> aftermathTimes = (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
             .ToDictionary(static item => item.PackageId, static item => item.GeneratedAtUtc, StringComparer.OrdinalIgnoreCase);
         DateTimeOffset defaultUpdatedAtUtc = workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow;
@@ -980,7 +981,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                     .OrderByDescending(static item => item.UpdatedAtUtc)
                     .First(),
                 StringComparer.OrdinalIgnoreCase);
-        return SelectBoundedRecapShelfItems(workspace.RecapShelf, aftermathTimes, defaultUpdatedAtUtc)
+        return SelectBoundedRecapShelfItems(recapShelf, aftermathTimes, defaultUpdatedAtUtc)
             .Select(item =>
             {
                 CreatorPublicationProjection? creatorPublication = ResolveCreatorPublicationForRecapItem(item, publicationsById, publicationsByArtifactId);
@@ -3943,6 +3944,36 @@ public sealed class CampaignWorkspaceServerPlaneService
             NormalizeOptional(recap.Kind) ?? string.Empty,
             NormalizeOptional(recap.Label) ?? string.Empty,
             NormalizeOptional(recap.Summary) ?? string.Empty);
+
+    private static IEnumerable<PublicationSafeProjection> DeduplicateSemanticPublicationRecapVersions(
+        IEnumerable<PublicationSafeProjection> recaps)
+    {
+        HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
+        foreach (PublicationSafeProjection recap in recaps)
+        {
+            if (seenKeys.Add(BuildPublicationRecapSemanticDedupeKey(recap)))
+            {
+                yield return recap;
+            }
+        }
+    }
+
+    private static string BuildPublicationRecapSemanticDedupeKey(PublicationSafeProjection recap) =>
+        string.Join('|',
+            NormalizeOptional(recap.Kind) ?? string.Empty,
+            NormalizeOptional(recap.Label) ?? string.Empty,
+            NormalizeOptional(recap.Summary) ?? string.Empty,
+            NormalizeOptional(recap.ArtifactId) ?? string.Empty,
+            NormalizeOptional(recap.Audience) ?? string.Empty,
+            NormalizeOptional(recap.OwnershipSummary) ?? string.Empty,
+            NormalizeOptional(recap.PublicationState) ?? string.Empty,
+            NormalizeOptional(recap.TrustBand) ?? string.Empty,
+            recap.Discoverable.ToString(),
+            NormalizeOptional(recap.PublicationSummary) ?? string.Empty,
+            NormalizeOptional(recap.CreatorPublicationId) ?? string.Empty,
+            NormalizeOptional(recap.NextSafeAction) ?? string.Empty,
+            NormalizeOptional(recap.ProvenanceSummary) ?? string.Empty,
+            NormalizeOptional(recap.AuditSummary) ?? string.Empty);
 
     private static IEnumerable<CampaignConsequenceProjection> DeduplicateIdenticalCampaignConsequenceVersions(
         IEnumerable<CampaignConsequenceProjection> consequences)
