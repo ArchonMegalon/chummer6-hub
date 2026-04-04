@@ -899,8 +899,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=gmcontrolpackets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=workspacev4", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=workspacev4packet", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=workspacev4packets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=campaignworkspacev4packet", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=campaignworkspacev4packets", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=campaignworkspacev4brief", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=campaignworkspacev4briefs", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returnloop", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returnloops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=returnlane", audit, StringComparison.Ordinal);
@@ -1109,8 +1112,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("(\"gmcontrolpackets\", \"gmcontrolpackets\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"workspacev4\", \"workspacev4\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"workspacev4packet\", \"workspacev4packet\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"workspacev4packets\", \"workspacev4packets\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"campaignworkspacev4packet\", \"campaignworkspacev4packet\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"campaignworkspacev4packets\", \"campaignworkspacev4packets\")", audit, StringComparison.Ordinal);
         Assert.Contains("(\"campaignworkspacev4brief\", \"campaignworkspacev4brief\")", audit, StringComparison.Ordinal);
+        Assert.Contains("(\"campaignworkspacev4briefs\", \"campaignworkspacev4briefs\")", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heat", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=heats", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=oppositions", audit, StringComparison.Ordinal);
@@ -1960,8 +1966,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'gmcontrolpackets', 'compact gmcontrolpackets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4', 'compact workspacev4 continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4packet', 'compact workspacev4packet continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'workspacev4packets', 'compact workspacev4packets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4packet', 'compact campaignworkspacev4packet continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4packets', 'compact campaignworkspacev4packets continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4brief', 'compact campaignworkspacev4brief continuity prep');", playwright, StringComparison.Ordinal);
+        Assert.Contains("assertWorkspacePrepQuerySearch(page, pageErrors, 'campaignworkspacev4briefs', 'compact campaignworkspacev4briefs continuity prep');", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=memory", playwright, StringComparison.Ordinal);
         Assert.Contains("campaign-memory prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=memories", playwright, StringComparison.Ordinal);
