@@ -645,10 +645,46 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("crewhandoff");
         }
 
+        if (tokens.Contains("crewtransfers"))
+        {
+            tokens.Remove("crewtransfers");
+            tokens.Add("crewhandoff");
+        }
+
         if (tokens.Contains("crewmove"))
         {
             tokens.Remove("crewmove");
             tokens.Add("rostermove");
+        }
+
+        if (tokens.Contains("crewmoves"))
+        {
+            tokens.Remove("crewmoves");
+            tokens.Add("rostermove");
+        }
+
+        if (tokens.Contains("rostermoves"))
+        {
+            tokens.Remove("rostermoves");
+            tokens.Add("rostermove");
+        }
+
+        if (tokens.Contains("rostertransfers"))
+        {
+            tokens.Remove("rostertransfers");
+            tokens.Add("rostertransfer");
+        }
+
+        if (tokens.Contains("rosterhandoffs"))
+        {
+            tokens.Remove("rosterhandoffs");
+            tokens.Add("rosterhandoff");
+        }
+
+        if (tokens.Contains("crewhandoffs"))
+        {
+            tokens.Remove("crewhandoffs");
+            tokens.Add("crewhandoff");
         }
 
         if (tokens.Contains("seasonops"))
@@ -1507,11 +1543,17 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             "roster",
             "crew",
             "rostermove",
+            "rostermoves",
             "crewmove",
+            "crewmoves",
             "rostertransfer",
+            "rostertransfers",
             "rosterhandoff",
+            "rosterhandoffs",
             "crewhandoff",
+            "crewhandoffs",
             "crewtransfer",
+            "crewtransfers",
             "handoff",
             "transfer",
             "assignment",

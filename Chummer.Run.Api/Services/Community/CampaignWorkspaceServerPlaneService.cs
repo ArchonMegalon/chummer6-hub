@@ -290,11 +290,17 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static readonly string[] RosterMovementCompactWordTokens =
     [
         "rostermove",
+        "rostermoves",
         "crewmove",
+        "crewmoves",
         "rostertransfer",
+        "rostertransfers",
         "rosterhandoff",
+        "rosterhandoffs",
         "crewhandoff",
-        "crewtransfer"
+        "crewhandoffs",
+        "crewtransfer",
+        "crewtransfers"
     ];
 
     private static readonly string[] RosterReturnWordTokens =
@@ -4575,10 +4581,46 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("crewhandoff");
         }
 
+        if (tokens.Contains("crewtransfers"))
+        {
+            tokens.Remove("crewtransfers");
+            tokens.Add("crewhandoff");
+        }
+
         if (tokens.Contains("crewmove"))
         {
             tokens.Remove("crewmove");
             tokens.Add("rostermove");
+        }
+
+        if (tokens.Contains("crewmoves"))
+        {
+            tokens.Remove("crewmoves");
+            tokens.Add("rostermove");
+        }
+
+        if (tokens.Contains("rostermoves"))
+        {
+            tokens.Remove("rostermoves");
+            tokens.Add("rostermove");
+        }
+
+        if (tokens.Contains("rostertransfers"))
+        {
+            tokens.Remove("rostertransfers");
+            tokens.Add("rostertransfer");
+        }
+
+        if (tokens.Contains("rosterhandoffs"))
+        {
+            tokens.Remove("rosterhandoffs");
+            tokens.Add("rosterhandoff");
+        }
+
+        if (tokens.Contains("crewhandoffs"))
+        {
+            tokens.Remove("crewhandoffs");
+            tokens.Add("crewhandoff");
         }
 
         if (tokens.Contains("seasonops"))
