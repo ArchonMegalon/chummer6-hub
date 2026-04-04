@@ -2270,6 +2270,10 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse compactForcesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "opforces");
         GmPrepAssetListResponse compactPluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "opfors");
         GmPrepAssetListResponse pluralMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "oppositions");
+        GmPrepAssetListResponse oppositionWindowMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "oppositionwindow");
+        GmPrepAssetListResponse oppositionWindowsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "oppositionwindows");
+        GmPrepAssetListResponse oppositionControlMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "oppositioncontrol");
+        GmPrepAssetListResponse oppositionControlsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "oppositioncontrols");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixforce");
 
         Assert.Contains(compactMatches.Items, item => item.AssetId == "opfor_ops");
@@ -2280,6 +2284,10 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(compactForcesMatches.Items, item => item.AssetId == "opfor_ops");
         Assert.Contains(compactPluralMatches.Items, item => item.AssetId == "opfor_ops");
         Assert.Contains(pluralMatches.Items, item => item.AssetId == "opfor_ops");
+        Assert.Contains(oppositionWindowMatches.Items, item => item.AssetId == "opfor_ops");
+        Assert.Contains(oppositionWindowsMatches.Items, item => item.AssetId == "opfor_ops");
+        Assert.Contains(oppositionControlMatches.Items, item => item.AssetId == "opfor_ops");
+        Assert.Contains(oppositionControlsMatches.Items, item => item.AssetId == "opfor_ops");
         Assert.Empty(negativeMatches.Items);
     }
 
