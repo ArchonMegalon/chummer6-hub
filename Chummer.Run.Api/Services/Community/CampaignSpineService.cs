@@ -2758,9 +2758,11 @@ public sealed class CampaignSpineService
             ?? aftermathPackages.FirstOrDefault();
         AftermathRecapPackageProjection? leadDowntimePackage = aftermathPackages
             .FirstOrDefault(item => IsAftermathPackageKind(item, "downtime_brief"));
+        string? leadAftermathPackageId = leadAftermathPackage is null ? null : ResolveAftermathPackageIdentity(leadAftermathPackage);
+        string? leadDowntimePackageId = leadDowntimePackage is null ? null : ResolveAftermathPackageIdentity(leadDowntimePackage);
         if (leadAftermathPackage is not null
             && leadDowntimePackage is not null
-            && string.Equals(leadAftermathPackage.PackageId, leadDowntimePackage.PackageId, StringComparison.OrdinalIgnoreCase))
+            && string.Equals(leadAftermathPackageId, leadDowntimePackageId, StringComparison.OrdinalIgnoreCase))
         {
             leadAftermathPackage = null;
         }
@@ -2981,10 +2983,11 @@ public sealed class CampaignSpineService
         foreach (AftermathRecapPackageProjection package in new[] { replayPackage, aftermathPackage }
                      .Where(static item => item is not null)
                      .Cast<AftermathRecapPackageProjection>()
-                     .DistinctBy(static item => item.PackageId, StringComparer.OrdinalIgnoreCase))
+                     .DistinctBy(static package => ResolveAftermathPackageIdentity(package), StringComparer.OrdinalIgnoreCase))
         {
+            string packageId = ResolveAftermathPackageIdentity(package);
             packets.Add(new WorkspaceChangePacketProjection(
-                PacketId: StableId("packet", $"{campaign.CampaignId}:aftermath:{package.PackageId}"),
+                PacketId: StableId("packet", $"{campaign.CampaignId}:aftermath:{packageId}"),
                 Kind: DescribeAftermathChangePacketKind(package.PackageKind),
                 Label: DescribeAftermathChangeLabel(package.PackageKind),
                 Summary: package.Summary,
@@ -3010,7 +3013,7 @@ public sealed class CampaignSpineService
 
     private static PublicationSafeProjection BuildAftermathRecapShelfProjection(AftermathRecapPackageProjection package)
         => new(
-            ProjectionId: package.PackageId,
+            ProjectionId: ResolveAftermathPackageIdentity(package),
             Kind: package.PackageKind,
             Label: package.Title,
             Summary: package.Summary,
@@ -3088,6 +3091,22 @@ public sealed class CampaignSpineService
     private static bool IsAftermathPackageKind(AftermathRecapPackageProjection package, string kind)
         => string.Equals(NormalizeAftermathPackageKind(package.PackageKind), kind, StringComparison.OrdinalIgnoreCase);
 
+    private static string ResolveAftermathPackageIdentity(AftermathRecapPackageProjection package)
+    {
+        string? packageId = AccountService.NormalizeOptional(package.PackageId);
+        if (packageId is not null)
+        {
+            return packageId;
+        }
+
+        return StableId("aftermath-package",
+            $"{AccountService.NormalizeOptional(package.WorkspaceId) ?? "workspace"}:" +
+            $"{AccountService.NormalizeOptional(package.CampaignId) ?? "campaign"}:" +
+            $"{package.GeneratedAtUtc.ToUnixTimeMilliseconds()}:" +
+            $"{NormalizeAftermathPackageKind(package.PackageKind)}:" +
+            $"{AccountService.NormalizeOptional(package.ArtifactId) ?? "artifact"}");
+    }
+
     private static string NormalizeAftermathPackageKind(string? packageKind)
         => AccountService.NormalizeOptional(packageKind)?.ToLowerInvariant() ?? string.Empty;
 
@@ -3105,7 +3124,7 @@ public sealed class CampaignSpineService
         string continuity = package.EvidenceLines.FirstOrDefault(static line => line.StartsWith("Continuity:", StringComparison.OrdinalIgnoreCase))
             ?? "Continuity: governed return lane remains attached to the same campaign spine.";
         string artifactDescriptor = BuildAftermathArtifactDescriptor(package);
-        return $"{runScope} {continuity} {artifactDescriptor} stays attached to package {package.PackageId}.";
+        return $"{runScope} {continuity} {artifactDescriptor} stays attached to package {ResolveAftermathPackageIdentity(package)}.";
     }
 
     private static string BuildAftermathRecapAuditSummary(AftermathRecapPackageProjection package)
