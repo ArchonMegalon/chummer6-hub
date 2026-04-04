@@ -2453,6 +2453,18 @@ public sealed class CampaignSpineService
             _ => false
         };
 
+    private static readonly string[] RequiredBuildLabOutputKinds =
+    [
+        "character_template",
+        "json_exchange",
+        "foundry_exchange",
+        "sheet_viewer",
+        "print_pdf_export",
+        "replay_timeline",
+        "session_recap",
+        "run_module"
+    ];
+
     private static string BuildBuildLabOutputLaneLabel(string? kind)
         => kind?.Trim().ToLowerInvariant() switch
         {
@@ -2466,6 +2478,24 @@ public sealed class CampaignSpineService
             "run_module" => "run-module",
             _ => "governed-output"
         };
+
+    private static string BuildBuildLabOutputLaneCoverageLine(IReadOnlyList<PublicationSafeProjection> outputs)
+    {
+        List<string> laneStatuses = [];
+        foreach (string requiredKind in RequiredBuildLabOutputKinds)
+        {
+            var output = outputs.FirstOrDefault(item => string.Equals(item.Kind, requiredKind, StringComparison.OrdinalIgnoreCase));
+            string status = output is null
+                ? "missing"
+                : string.Equals(output.PublicationState, "ready", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(output.TrustBand, "governed", StringComparison.OrdinalIgnoreCase)
+                    ? "ready"
+                    : "review";
+            laneStatuses.Add($"{BuildBuildLabOutputLaneLabel(requiredKind)}={status}");
+        }
+
+        return $"Output lane coverage: {string.Join("; ", laneStatuses)}.";
+    }
 
     private static PublicationSafeProjection BuildBuildLabGovernedOutput(
         RunnerDossierProjection dossier,
@@ -2685,6 +2715,7 @@ public sealed class CampaignSpineService
                 > 1 => $"Outputs: {outputs.Count} dossier or campaign-safe outputs are already attached to the handoff.",
                 _ => "Outputs: no dossier or campaign-safe output is attached yet, so export, exchange, replay, and recap proof are still pending."
             },
+            BuildBuildLabOutputLaneCoverageLine(outputs),
             restore.ConflictSummaries.Count switch
             {
                 0 => "Restore posture: no restore conflicts are currently blocking replay-safe handoff follow-through.",
