@@ -1321,7 +1321,7 @@ public sealed class GmOpsBoardServiceTests
                 assetId: "continuity_plural_ops",
                 now: now,
                 title: "Diary downtime aftermath continuity packet",
-                body: "Diary journal downtime aftermath recap heat faction connection continuity remains governed for next-session return.")
+                body: "Diary journal downtime aftermath recap return memory archive history timeline ledger heat faction connection continuity remains governed for next-session return.")
         ]);
 
         Assert.Equal(1, import.ImportedCount);
@@ -1334,6 +1334,11 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse aftermathsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aftermaths");
         GmPrepAssetListResponse recapsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "recaps");
         GmPrepAssetListResponse returnsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "returns");
+        GmPrepAssetListResponse memoriesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "memories");
+        GmPrepAssetListResponse archivesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "archives");
+        GmPrepAssetListResponse historiesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "histories");
+        GmPrepAssetListResponse timelinesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "timelines");
+        GmPrepAssetListResponse ledgersMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "ledgers");
         GmPrepAssetListResponse heatsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "heats");
         GmPrepAssetListResponse factionsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "factions");
         GmPrepAssetListResponse connectionsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "connections");
@@ -1345,6 +1350,11 @@ public sealed class GmOpsBoardServiceTests
         Assert.Contains(aftermathsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(recapsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(returnsMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(memoriesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(archivesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(historiesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(timelinesMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(ledgersMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(heatsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(factionsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(connectionsMatches.Items, item => item.AssetId == "continuity_plural_ops");

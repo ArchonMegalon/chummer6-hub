@@ -4994,6 +4994,36 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Add("return");
         }
 
+        if (tokens.Contains("memories"))
+        {
+            tokens.Remove("memories");
+            tokens.Add("memory");
+        }
+
+        if (tokens.Contains("archives"))
+        {
+            tokens.Remove("archives");
+            tokens.Add("archive");
+        }
+
+        if (tokens.Contains("histories"))
+        {
+            tokens.Remove("histories");
+            tokens.Add("history");
+        }
+
+        if (tokens.Contains("timelines"))
+        {
+            tokens.Remove("timelines");
+            tokens.Add("timeline");
+        }
+
+        if (tokens.Contains("ledgers"))
+        {
+            tokens.Remove("ledgers");
+            tokens.Add("ledger");
+        }
+
         if (tokens.Contains("connections"))
         {
             tokens.Remove("connections");
