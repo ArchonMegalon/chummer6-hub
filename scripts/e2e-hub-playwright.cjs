@@ -2596,6 +2596,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail connection search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail connection search');
 
+  await page.fill('#prepQuery', 'connections');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=connections/.test(page.url()), 'Workspace detail search should preserve the connections continuity prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail connections search');
+  await expectBodyText(page, 'match(es) for "connections"', '/account/work/workspaces detail connections search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail connections search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail connections search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail connections search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail connections search');
+  const workspaceConnectionsSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceConnectionsSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the connections continuity query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail connections search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail connections search');
+
   await page.fill('#prepQuery', 'faction');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),

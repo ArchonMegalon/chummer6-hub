@@ -771,6 +771,12 @@ public sealed class GmOpsBoardService : IGmOpsBoardService
             tokens.Add("aftermath");
         }
 
+        if (tokens.Contains("connections"))
+        {
+            tokens.Remove("connections");
+            tokens.Add("connection");
+        }
+
         if (tokens.Contains("crewtransfer"))
         {
             tokens.Remove("crewtransfer");
