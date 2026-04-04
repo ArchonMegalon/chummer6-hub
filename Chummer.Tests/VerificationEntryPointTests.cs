@@ -85,8 +85,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release-channel nested receipt releaseProof.status must be pass/passed/ready", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed is missing required baseline journey ids", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.journeysPassed declares unexpected journey ids", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.journeysPassed must use canonical lowercase journey ids", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel nested receipt releaseProof.journeysPassed must use canonical journey id tokens", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.proofRoutes is missing required flagship routes", script, StringComparison.Ordinal);
         Assert.Contains("release-channel nested receipt releaseProof.proofRoutes declares unexpected flagship routes", script, StringComparison.Ordinal);
+        Assert.Contains("must use canonical lowercase route casing", script, StringComparison.Ordinal);
         Assert.Contains("workflow_parity_receipt_channel_ids", script, StringComparison.Ordinal);
         Assert.Contains("milestone-2 workflow/visual release-channel ids drift", script, StringComparison.Ordinal);
         Assert.Contains("milestone-2 workflow/visual release-channel versions drift", script, StringComparison.Ordinal);
@@ -435,6 +438,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Pragma", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=seasonop", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=seasoncontrol", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=seasoncontrols", audit, StringComparison.Ordinal);
+        Assert.Contains("queryText=seasonctrl", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("queryText=eventctrl", audit, StringComparison.Ordinal);
@@ -480,6 +486,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("queryText=travelprefetches", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonops", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=seasonop", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=seasoncontrol", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=seasoncontrols", audit, StringComparison.Ordinal);
+        Assert.Contains("prepQuery=seasonctrl", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventcontrol", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventcontrols", audit, StringComparison.Ordinal);
         Assert.Contains("prepQuery=eventctrl", audit, StringComparison.Ordinal);
@@ -555,6 +564,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("compact seasonops prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=seasonop", playwright, StringComparison.Ordinal);
         Assert.Contains("compact seasonop prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=seasoncontrol", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact seasoncontrol prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=seasoncontrols", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact seasoncontrols prep query", playwright, StringComparison.Ordinal);
+        Assert.Contains("?prepQuery=seasonctrl", playwright, StringComparison.Ordinal);
+        Assert.Contains("compact seasonctrl prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventcontrol", playwright, StringComparison.Ordinal);
         Assert.Contains("compact eventcontrol prep query", playwright, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=eventcontrols", playwright, StringComparison.Ordinal);

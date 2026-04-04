@@ -958,6 +958,69 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, '/account/work/workspaces detail season singular search');
   await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season singular search');
 
+  await page.fill('#prepQuery', 'seasoncontrol');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=seasoncontrol/.test(page.url()), 'Workspace detail search should preserve the compact seasoncontrol prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail season-control compact search');
+  await expectBodyText(page, 'match(es) for "seasoncontrol"', '/account/work/workspaces detail season-control compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail season-control compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail season-control compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail season-control compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail season-control compact search');
+  const workspaceSeasonControlCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceSeasonControlCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact seasoncontrol query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail season-control compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season-control compact search');
+
+  await page.fill('#prepQuery', 'seasoncontrols');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=seasoncontrols/.test(page.url()), 'Workspace detail search should preserve the compact seasoncontrols prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail season-controls compact search');
+  await expectBodyText(page, 'match(es) for "seasoncontrols"', '/account/work/workspaces detail season-controls compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail season-controls compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail season-controls compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail season-controls compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail season-controls compact search');
+  const workspaceSeasonControlsCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceSeasonControlsCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact seasoncontrols query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail season-controls compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season-controls compact search');
+
+  await page.fill('#prepQuery', 'seasonctrl');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.getByRole('button', { name: 'Search prep library' }).click()
+  ]);
+  assert(/\/account\/work\/workspaces\/.+\?prepQuery=seasonctrl/.test(page.url()), 'Workspace detail search should preserve the compact seasonctrl prep query in the route.');
+  await expectBodyText(page, 'Search results:', '/account/work/workspaces detail season-ctrl compact search');
+  await expectBodyText(page, 'match(es) for "seasonctrl"', '/account/work/workspaces detail season-ctrl compact search');
+  await expectBodyText(page, 'Recent governed prep launches', '/account/work/workspaces detail season-ctrl compact search');
+  await expectBodyText(page, 'Recent travel prefetch receipts', '/account/work/workspaces detail season-ctrl compact search');
+  await expectBodyText(page, 'Recent aftermath recap packages', '/account/work/workspaces detail season-ctrl compact search');
+  await expectBodyText(page, 'Next-session carry-forward', '/account/work/workspaces detail season-ctrl compact search');
+  const workspaceSeasonCtrlCompactSearchText = await page.locator('body').innerText();
+  assert.equal(
+    workspaceSeasonCtrlCompactSearchText.includes('No governed prep packet matched that search yet.'),
+    false,
+    'Workspace detail search should return at least one governed prep packet for the compact seasonctrl query.'
+  );
+  await assertNoBannedCopy(page, '/account/work/workspaces detail season-ctrl compact search');
+  await assertNoPageErrors(page, pageErrors, '/account/work/workspaces detail season-ctrl compact search');
+
   await page.fill('#prepQuery', 'eventcontrol');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),

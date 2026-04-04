@@ -109,6 +109,31 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingSupportsSeasonControlShorthandAcrossWhitespaceBoundaries()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "event:season-control",
+            Kind: "event_control_packet",
+            Title: "Dockyard season control board",
+            Summary: "Season operations stay governed for the next launch window.",
+            BindingSummary: "Bound to campaign return and event controls.",
+            Reusable: true,
+            SearchTerms: ["event", "control", "season", "operations"],
+            EvidenceLines: ["Season control receipt captured for checkpoint timing."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        IReadOnlyList<string> compactTokens = InvokeBuildTokens("seasoncontrol");
+        IReadOnlyList<string> compactPluralTokens = InvokeBuildTokens("seasoncontrols");
+        IReadOnlyList<string> compactAbbrevTokens = InvokeBuildTokens("seasonctrl");
+        IReadOnlyList<string> negativeTokens = InvokeBuildTokens("matrixcontrol");
+
+        Assert.True(InvokeMatches(packet, compactTokens));
+        Assert.True(InvokeMatches(packet, compactPluralTokens));
+        Assert.True(InvokeMatches(packet, compactAbbrevTokens));
+        Assert.False(InvokeMatches(packet, negativeTokens));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsGmOpsShorthandAcrossWhitespaceBoundaries()
     {
         var packet = new GovernedPrepPacketSummary(
