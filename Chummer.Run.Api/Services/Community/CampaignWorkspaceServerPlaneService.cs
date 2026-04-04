@@ -491,7 +491,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<ContinuityConflictCue> continuityConflicts = BuildContinuityConflicts(context.Workspace, context.Restore);
         IReadOnlyList<SupportClosureCue> supportClosures = BuildSupportClosures(context.SupportDigests);
         IReadOnlyList<KnownIssueAffectingInstall> knownIssues = BuildKnownIssues(context.SupportDigests);
-        IReadOnlyList<DecisionNotice> decisionNotices = BuildDecisionNotices(context.Workspace, context.Digest, installLinking, context.SupportDigests, prepLibrary, context.LeadRun);
+        IReadOnlyList<DecisionNotice> decisionNotices = BuildDecisionNotices(context.Workspace, context.Digest, installLinking, context.SupportDigests, prepLibrary, gmOperations, context.LeadRun);
         NextSafeActionCue nextSafeAction = BuildNextSafeActionCue(context.Workspace, installLinking, context.SupportDigests);
         WorkspaceStateSummary workspaceState = BuildWorkspaceStateSummary(
             context.Workspace,
@@ -1696,6 +1696,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         InstallLinkingSummaryDto? installLinking,
         IReadOnlyList<SupportCaseDigestViewModel> supportDigests,
         CampaignPrepLibrarySummary prepLibrary,
+        GmOperationsReadinessSummary gmOperations,
         RunProjection? leadRun)
     {
         List<DecisionNotice> notices = [];
@@ -1723,6 +1724,11 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         notices.Add(BuildPortableExchangeDecisionNotice(workspace, prepLibrary, leadRun));
 
+        if (!string.Equals(gmOperations.Status, "governed", StringComparison.OrdinalIgnoreCase))
+        {
+            notices.Add(BuildGmOperationsDecisionNotice(workspace, gmOperations));
+        }
+
         if ((digest?.Watchouts.Count ?? 0) > 0)
         {
             notices.Add(new DecisionNotice(
@@ -1747,6 +1753,25 @@ public sealed class CampaignWorkspaceServerPlaneService
             .DistinctBy(static item => item.NoticeId, StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
+    }
+
+    private static DecisionNotice BuildGmOperationsDecisionNotice(
+        CampaignWorkspaceProjection workspace,
+        GmOperationsReadinessSummary gmOperations)
+    {
+        GmOperationsLaneCue? leadLane = gmOperations.LaneCues
+            .FirstOrDefault(static cue => !string.Equals(cue.Status, "governed", StringComparison.OrdinalIgnoreCase))
+            ?? gmOperations.LaneCues.FirstOrDefault();
+        string summary = leadLane is null
+            ? gmOperations.Summary
+            : $"{gmOperations.Summary} {leadLane.Summary}";
+
+        return new DecisionNotice(
+            NoticeId: $"gm-ops:{workspace.WorkspaceId}",
+            Kind: "gm_operations_readiness",
+            Summary: summary,
+            ActionLabel: "Open GM operations",
+            ActionHref: $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#prep-launches");
     }
 
     private static DecisionNotice BuildPortableExchangeDecisionNotice(

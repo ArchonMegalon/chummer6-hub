@@ -1542,6 +1542,41 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void DecisionNoticesIncludeGmOperationsNoticeWhenReadinessIsNotGoverned()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceDigestProjection digest = BuildWorkspaceDigest(workspace);
+        CampaignPrepLibrarySummary prepLibrary = BuildEmptyPrepLibrary();
+
+        IReadOnlyList<DecisionNotice> notices = InvokeBuildDecisionNotices(
+            workspace,
+            digest,
+            supportDigests: [],
+            prepLibrary: prepLibrary,
+            gmOperations: BuildMissingGmOperationsReadiness());
+
+        DecisionNotice gmNotice = Assert.Single(notices, notice => string.Equals(notice.Kind, "gm_operations_readiness", StringComparison.Ordinal));
+        Assert.Contains("GM operations still need governed receipts.", gmNotice.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DecisionNoticesSkipGmOperationsNoticeWhenReadinessIsGoverned()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceDigestProjection digest = BuildWorkspaceDigest(workspace);
+        CampaignPrepLibrarySummary prepLibrary = BuildEmptyPrepLibrary();
+
+        IReadOnlyList<DecisionNotice> notices = InvokeBuildDecisionNotices(
+            workspace,
+            digest,
+            supportDigests: [],
+            prepLibrary: prepLibrary,
+            gmOperations: BuildGovernedGmOperationsReadiness());
+
+        Assert.DoesNotContain(notices, notice => string.Equals(notice.Kind, "gm_operations_readiness", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void SupportClosuresPreferReporterActionCaseOverEarlierNonActionCase()
     {
         SupportCaseDigestViewModel informationalCase = BuildSupportCaseDigest(
@@ -7519,13 +7554,14 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         CampaignWorkspaceProjection workspace,
         CampaignWorkspaceDigestProjection digest,
         IReadOnlyList<SupportCaseDigestViewModel> supportDigests,
-        CampaignPrepLibrarySummary prepLibrary)
+        CampaignPrepLibrarySummary prepLibrary,
+        GmOperationsReadinessSummary? gmOperations = null)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
             .GetMethod("BuildDecisionNotices", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException("BuildDecisionNotices was not found.");
 
-        return Assert.IsAssignableFrom<IReadOnlyList<DecisionNotice>>(method.Invoke(null, [workspace, digest, null, supportDigests, prepLibrary, null]));
+        return Assert.IsAssignableFrom<IReadOnlyList<DecisionNotice>>(method.Invoke(null, [workspace, digest, null, supportDigests, prepLibrary, gmOperations ?? BuildMissingGmOperationsReadiness(), null]));
     }
 
     private static IReadOnlyList<SupportClosureCue> InvokeBuildSupportClosures(
@@ -7571,6 +7607,40 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ReusablePacketCount: 0,
             SearchablePacketCount: 0,
             Packets: []);
+
+    private static GmOperationsReadinessSummary BuildMissingGmOperationsReadiness()
+        => new(
+            Status: "missing",
+            Summary: "GM operations still need governed receipts.",
+            AccountBackboneSummary: "Operator actions stay on account and audit rails.",
+            OppositionSignalCount: 0,
+            RosterMovementSignalCount: 0,
+            PrepPacketCount: 0,
+            PrepLaunchCount: 0,
+            EventControlSignalCount: 0,
+            LaneCues:
+            [
+                new GmOperationsLaneCue("opposition_packets", "missing", 0, "Opposition is missing."),
+                new GmOperationsLaneCue("roster_movement", "missing", 0, "Roster movement is missing.")
+            ]);
+
+    private static GmOperationsReadinessSummary BuildGovernedGmOperationsReadiness()
+        => new(
+            Status: "governed",
+            Summary: "GM operations are governed.",
+            AccountBackboneSummary: "Operator actions stay on account and audit rails.",
+            OppositionSignalCount: 1,
+            RosterMovementSignalCount: 1,
+            PrepPacketCount: 1,
+            PrepLaunchCount: 1,
+            EventControlSignalCount: 1,
+            LaneCues:
+            [
+                new GmOperationsLaneCue("opposition_packets", "governed", 1, "Opposition is governed."),
+                new GmOperationsLaneCue("roster_movement", "governed", 1, "Roster movement is governed."),
+                new GmOperationsLaneCue("prep_library_launch", "governed", 2, "Prep is governed."),
+                new GmOperationsLaneCue("event_controls", "governed", 1, "Event controls are governed.")
+            ]);
 
     private static SupportCaseDigestViewModel BuildSupportCaseDigest(
         string caseId,
