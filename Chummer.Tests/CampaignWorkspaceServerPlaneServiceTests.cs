@@ -565,6 +565,32 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineAttachCreatorPublicationPostureNormalizesRecapIdsWhenCreatorPublicationsAreEmpty()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-no-publications-whitespace-1",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap-safe output remains attached to campaign continuity.",
+            ArtifactId: "  artifact-unlinked  ",
+            CreatorPublicationId: "  pub-unlinked  ");
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recap]
+        };
+
+        IReadOnlyList<CampaignWorkspaceProjection> updated = InvokeCampaignSpineAttachCreatorPublicationPosture(
+            [workspace],
+            Array.Empty<CreatorPublicationProjection>());
+
+        CampaignWorkspaceProjection updatedWorkspace = Assert.Single(updated);
+        PublicationSafeProjection updatedRecap = Assert.Single(updatedWorkspace.RecapShelf);
+        Assert.Equal("pub-unlinked", updatedRecap.CreatorPublicationId);
+        Assert.Equal("artifact-unlinked", updatedRecap.ArtifactId);
+    }
+
+    [Fact]
     public void CampaignSpineBuildCreatorPublicationsDeduplicatesRows_WhenPublicationIdsRepeat()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
@@ -620,6 +646,28 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignSpineBuildCreatorPublicationsNormalizesWhitespaceArtifactIds()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-publication-artifact-whitespace",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap row",
+            ArtifactId: "  artifact-whitespace  ",
+            CreatorPublicationId: "pub-duplicate");
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            RecapShelf = [recap]
+        };
+
+        CreatorPublicationProjection publication = Assert.Single(
+            InvokeCampaignSpineBuildCreatorPublications([workspace]));
+
+        Assert.Equal("artifact-whitespace", publication.ArtifactId);
+    }
+
+    [Fact]
     public void CampaignSpineEnrichWorkspaceRecapShelfUsesCanonicalProjectionIdForFallbackPublicationId()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
@@ -648,6 +696,27 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         PublicationSafeProjection canonicalRecap = Assert.Single(canonicalResult);
         Assert.Equal(canonicalRecap.CreatorPublicationId, whitespaceRecap.CreatorPublicationId);
         Assert.NotNull(whitespaceRecap.CreatorPublicationId);
+    }
+
+    [Fact]
+    public void CampaignSpineEnrichWorkspaceRecapShelfNormalizesProvidedWhitespacePublicationId()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignProjection campaign = BuildCampaignProjection(workspace);
+        PublicationSafeProjection recap = new(
+            ProjectionId: "recap-provided-publication-id-whitespace",
+            Kind: "campaign_recap_bundle",
+            Label: "Session recap",
+            Summary: "Recap summary",
+            CreatorPublicationId: "  pub-provided  ");
+
+        PublicationSafeProjection enrichedRecap = Assert.Single(
+            InvokeCampaignSpineEnrichWorkspaceRecapShelf(
+                campaign,
+                workspace.WorkspaceId,
+                [recap]));
+
+        Assert.Equal("pub-provided", enrichedRecap.CreatorPublicationId);
     }
 
     [Fact]
