@@ -1677,11 +1677,12 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static item => item.UpdatedAtUtc))
             .Take(3)
             .ToArray();
-        ObjectiveProjection[] objectiveSignals = (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
-            .Where(static item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase)
-                && IsOppositionObjectiveSignal(item.Title, item.Summary, item.Pressure))
-            .OrderByDescending(static item => item.UpdatedAtUtc)
+        ObjectiveProjection[] objectiveSignals = DeduplicateIdenticalObjectiveVersions(
+                (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
+                .Where(static item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase)
+                    && IsOppositionObjectiveSignal(item.Title, item.Summary, item.Pressure))
+                .OrderByDescending(static item => item.UpdatedAtUtc))
             .Take(3)
             .ToArray();
         SceneProjection? activeScene = leadRun?.Scenes
@@ -3105,9 +3106,10 @@ public sealed class CampaignWorkspaceServerPlaneService
                 .OrderByDescending(static receipt => receipt.StagedAtUtc))
             .Take(3)
             .ToArray();
-        ObjectiveProjection[] eventObjectives = (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
-            .Where(static objective => IsEventControlObjectiveSignal(objective.Title, objective.Summary))
-            .OrderByDescending(static objective => objective.UpdatedAtUtc)
+        ObjectiveProjection[] eventObjectives = DeduplicateIdenticalObjectiveVersions(
+                (leadRun?.Objectives ?? Array.Empty<ObjectiveProjection>())
+                .Where(static objective => IsEventControlObjectiveSignal(objective.Title, objective.Summary))
+                .OrderByDescending(static objective => objective.UpdatedAtUtc))
             .Take(3)
             .ToArray();
         SceneProjection? activeScene = leadRun?.Scenes
@@ -3942,6 +3944,28 @@ public sealed class CampaignWorkspaceServerPlaneService
             }
         }
     }
+
+    private static IEnumerable<ObjectiveProjection> DeduplicateIdenticalObjectiveVersions(
+        IEnumerable<ObjectiveProjection> objectives)
+    {
+        HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
+        foreach (ObjectiveProjection objective in objectives)
+        {
+            if (seenKeys.Add(BuildObjectiveDedupeKey(objective)))
+            {
+                yield return objective;
+            }
+        }
+    }
+
+    private static string BuildObjectiveDedupeKey(ObjectiveProjection objective) =>
+        string.Join('|',
+            NormalizeOptional(objective.ObjectiveId) ?? string.Empty,
+            NormalizeOptional(objective.Title) ?? string.Empty,
+            NormalizeOptional(objective.Status) ?? string.Empty,
+            NormalizeOptional(objective.Pressure) ?? string.Empty,
+            NormalizeOptional(objective.Summary) ?? string.Empty,
+            objective.UpdatedAtUtc.ToUnixTimeMilliseconds().ToString());
 
     private static string BuildCampaignConsequenceDedupeKey(CampaignConsequenceProjection consequence) =>
         string.Join('|',

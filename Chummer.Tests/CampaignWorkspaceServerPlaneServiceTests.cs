@@ -2410,6 +2410,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EventControlPacketDeduplicatesIdenticalRunPressureObjectiveVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithEventControlRunPressureSignalsOnly();
+        RunProjection run = Assert.Single(seed.Runs);
+        ObjectiveProjection objective = Assert.Single(run.Objectives);
+        RunProjection updatedRun = run with
+        {
+            Objectives = [objective, objective]
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            Runs = [updatedRun]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, updatedRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "event_control_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("2 event-control receipt(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(packet.EvidenceLines, line => line.Contains("event window", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void EventControlPacketIncludesRosterTransferReceiptsWhenChangePacketsAreMissing()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithEventControlRosterTransfersOnly();
@@ -2656,6 +2680,30 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("opposition", packet.PacketId, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("hostile", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("high", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("run pressure", packet.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void OppositionPacketDeduplicatesIdenticalRunPressureObjectiveVersions_WhenPayloadRepeatsSameRow()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRunPressureSignalsOnly();
+        RunProjection run = Assert.Single(seed.Runs);
+        ObjectiveProjection objective = Assert.Single(run.Objectives);
+        RunProjection updatedRun = run with
+        {
+            Objectives = [objective, objective]
+        };
+        CampaignWorkspaceProjection workspace = seed with
+        {
+            Runs = [updatedRun]
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore, updatedRun);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "opposition_packet", StringComparison.Ordinal));
+        Assert.True(packet.Reusable);
+        Assert.Contains("2 governed opposition signal(s)", packet.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("run pressure", packet.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
