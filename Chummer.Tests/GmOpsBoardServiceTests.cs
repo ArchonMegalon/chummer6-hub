@@ -1321,7 +1321,7 @@ public sealed class GmOpsBoardServiceTests
                 assetId: "continuity_plural_ops",
                 now: now,
                 title: "Diary downtime aftermath continuity packet",
-                body: "Diary downtime aftermath continuity remains governed for next-session return.")
+                body: "Diary downtime aftermath connection continuity remains governed for next-session return.")
         ]);
 
         Assert.Equal(1, import.ImportedCount);
@@ -1331,11 +1331,13 @@ public sealed class GmOpsBoardServiceTests
         GmPrepAssetListResponse diariesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "diaries");
         GmPrepAssetListResponse downtimesMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "downtimes");
         GmPrepAssetListResponse aftermathsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "aftermaths");
+        GmPrepAssetListResponse connectionsMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "connections");
         GmPrepAssetListResponse negativeMatches = service.ListPrepAssets(campaignId: "campaign_ops", queryText: "matrixaftermaths");
 
         Assert.Contains(diariesMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(downtimesMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Contains(aftermathsMatches.Items, item => item.AssetId == "continuity_plural_ops");
+        Assert.Contains(connectionsMatches.Items, item => item.AssetId == "continuity_plural_ops");
         Assert.Empty(negativeMatches.Items);
     }
 

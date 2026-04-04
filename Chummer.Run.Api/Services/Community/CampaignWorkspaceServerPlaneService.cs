@@ -4974,6 +4974,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             tokens.Remove("aftermaths");
             tokens.Add("aftermath");
         }
+
+        if (tokens.Contains("connections"))
+        {
+            tokens.Remove("connections");
+            tokens.Add("connection");
+        }
     }
 
     private static bool MatchesPrepLibraryQuery(
