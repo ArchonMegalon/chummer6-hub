@@ -591,6 +591,11 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.acceptanceGates has unexpected gate ids: "
             f"{release_channel_path} ({', '.join(unexpected_acceptance_gates)})"
         )
+    if tuple(acceptance_gates) != REQUIRED_LOCALIZATION_ACCEPTANCE_GATES:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.uiLocalizationReleaseGate.acceptanceGates must preserve canonical gate ordering: "
+            f"{release_channel_path} (actual={acceptance_gates}, expected={list(REQUIRED_LOCALIZATION_ACCEPTANCE_GATES)})"
+        )
     domain_coverage = require_string_map(
         resolve_alias_value(
             localization_gate_object,
