@@ -303,4 +303,31 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("brief", tokens);
         Assert.DoesNotContain("briefs", tokens);
     }
+
+    [Fact]
+    public void RewriteAliases_CollapsesCompactNextSessionsReturnFormsIntoNextSessionReturnLoopTokens()
+    {
+        HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "nextsessionsreturn",
+            "nextsessionsreturns",
+            "nextsessionsreturnloop",
+            "nextsessionsreturnloops",
+            "nextsessionsreturnlane",
+            "nextsessionsreturnlanes"
+        };
+
+        PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
+
+        Assert.Contains("next", tokens);
+        Assert.Contains("session", tokens);
+        Assert.Contains("return", tokens);
+        Assert.Contains("loop", tokens);
+        Assert.DoesNotContain("nextsessionsreturn", tokens);
+        Assert.DoesNotContain("nextsessionsreturns", tokens);
+        Assert.DoesNotContain("nextsessionsreturnloop", tokens);
+        Assert.DoesNotContain("nextsessionsreturnloops", tokens);
+        Assert.DoesNotContain("nextsessionsreturnlane", tokens);
+        Assert.DoesNotContain("nextsessionsreturnlanes", tokens);
+    }
 }

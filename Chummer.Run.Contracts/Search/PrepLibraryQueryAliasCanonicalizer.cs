@@ -1038,6 +1038,15 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("return");
         }
 
+        if (tokens.Contains("nextsessionsreturn") || tokens.Contains("nextsessionsreturns"))
+        {
+            tokens.Remove("nextsessionsreturn");
+            tokens.Remove("nextsessionsreturns");
+            tokens.Add("next");
+            tokens.Add("session");
+            tokens.Add("return");
+        }
+
         if (tokens.Contains("nextsessionreturnloop") || tokens.Contains("nextsessionreturnloops"))
         {
             tokens.Remove("nextsessionreturnloop");
@@ -1048,10 +1057,30 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("loop");
         }
 
+        if (tokens.Contains("nextsessionsreturnloop") || tokens.Contains("nextsessionsreturnloops"))
+        {
+            tokens.Remove("nextsessionsreturnloop");
+            tokens.Remove("nextsessionsreturnloops");
+            tokens.Add("next");
+            tokens.Add("session");
+            tokens.Add("return");
+            tokens.Add("loop");
+        }
+
         if (tokens.Contains("nextsessionreturnlane") || tokens.Contains("nextsessionreturnlanes"))
         {
             tokens.Remove("nextsessionreturnlane");
             tokens.Remove("nextsessionreturnlanes");
+            tokens.Add("next");
+            tokens.Add("session");
+            tokens.Add("return");
+            tokens.Add("loop");
+        }
+
+        if (tokens.Contains("nextsessionsreturnlane") || tokens.Contains("nextsessionsreturnlanes"))
+        {
+            tokens.Remove("nextsessionsreturnlane");
+            tokens.Remove("nextsessionsreturnlanes");
             tokens.Add("next");
             tokens.Add("session");
             tokens.Add("return");
