@@ -45,9 +45,8 @@ def main() -> int:
         ],
     }
 
-    # Always refresh generated_at when materializing proof so downstream freshness
-    # gates can trust an explicit local re-validation event.
     payload["generated_at"] = iso_now()
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(f"wrote hub local proof: {out_path}")

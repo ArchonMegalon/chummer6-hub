@@ -13,12 +13,12 @@ internal static class HubApiRuntimeGuardrailExtensions
         builder.Services.AddSingleton(options);
         builder.Services.Configure<FormOptions>(formOptions =>
         {
-            formOptions.MultipartBodyLengthLimit = options.MaxMultipartBodyBytes;
+            formOptions.MultipartBodyLengthLimit = Math.Max(options.MaxMultipartBodyBytes, options.MaxReleaseBundleBodyBytes);
             formOptions.ValueLengthLimit = (int)Math.Min(options.MaxJsonBodyBytes, int.MaxValue);
         });
         builder.WebHost.ConfigureKestrel(kestrel =>
         {
-            kestrel.Limits.MaxRequestBodySize = options.MaxRequestBodyBytes;
+            kestrel.Limits.MaxRequestBodySize = Math.Max(options.MaxRequestBodyBytes, options.MaxReleaseBundleBodyBytes);
         });
         builder.Services.AddRateLimiter(rateLimiter =>
         {

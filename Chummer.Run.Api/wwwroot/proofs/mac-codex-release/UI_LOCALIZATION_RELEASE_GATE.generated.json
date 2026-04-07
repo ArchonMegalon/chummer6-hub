@@ -1,0 +1,189 @@
+{
+  "contract_name": "chummer6-ui.localization_release_gate",
+  "generated_at": "2026-04-04T18:02:33Z",
+  "status": "pass",
+  "shipping_locales": [
+    "en-us",
+    "de-de",
+    "fr-fr",
+    "ja-jp",
+    "pt-br",
+    "zh-cn"
+  ],
+  "default_key_count": 383,
+  "release_seed_keys": [
+    "desktop.shell.menu.file",
+    "desktop.shell.tool.update_status",
+    "desktop.shell.tool.open_support",
+    "desktop.shell.tool.report_issue",
+    "desktop.home.title",
+    "desktop.home.section.install_support",
+    "desktop.home.section.update_posture",
+    "desktop.support.title"
+  ],
+  "explicit_fallback_runtime": "pass",
+  "signoff_smoke_runner": {
+    "status": "pass",
+    "retry_attempted": false,
+    "retry_reason": "",
+    "log_excerpt": [
+      "[B15] PASS: localization release smoke runner checks passed."
+    ]
+  },
+  "locale_summary": [
+    {
+      "locale": "en-us",
+      "override_count": 383,
+      "minimum_override_count": 383,
+      "default_key_count": 383,
+      "untranslated_key_count": 0,
+      "missing_release_seed_keys": [],
+      "legacy_xml_present": true,
+      "legacy_data_xml_present": true
+    },
+    {
+      "locale": "de-de",
+      "override_count": 383,
+      "minimum_override_count": 40,
+      "default_key_count": 383,
+      "untranslated_key_count": 0,
+      "missing_release_seed_keys": [],
+      "legacy_xml_present": true,
+      "legacy_data_xml_present": true
+    },
+    {
+      "locale": "fr-fr",
+      "override_count": 383,
+      "minimum_override_count": 40,
+      "default_key_count": 383,
+      "untranslated_key_count": 0,
+      "missing_release_seed_keys": [],
+      "legacy_xml_present": true,
+      "legacy_data_xml_present": true
+    },
+    {
+      "locale": "ja-jp",
+      "override_count": 383,
+      "minimum_override_count": 40,
+      "default_key_count": 383,
+      "untranslated_key_count": 0,
+      "missing_release_seed_keys": [],
+      "legacy_xml_present": true,
+      "legacy_data_xml_present": true
+    },
+    {
+      "locale": "pt-br",
+      "override_count": 383,
+      "minimum_override_count": 40,
+      "default_key_count": 383,
+      "untranslated_key_count": 0,
+      "missing_release_seed_keys": [],
+      "legacy_xml_present": true,
+      "legacy_data_xml_present": true
+    },
+    {
+      "locale": "zh-cn",
+      "override_count": 383,
+      "minimum_override_count": 40,
+      "default_key_count": 383,
+      "untranslated_key_count": 0,
+      "missing_release_seed_keys": [],
+      "legacy_xml_present": true,
+      "legacy_data_xml_present": true
+    }
+  ],
+  "legacy_language_root": "/docker/chummercomplete/chummer-presentation/Chummer/lang",
+  "local_release_proof": {
+    "contract_name": "chummer6-ui.local_release_proof",
+    "generated_at": "2026-03-28T14:39:05Z",
+    "status": "passed",
+    "base_url": "http://127.0.0.1:8091",
+    "compose_file": "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml",
+    "playwright_timeout_seconds": 240,
+    "edge_rebuild_skipped": true,
+    "route_probe_executed": true,
+    "journeys_passed": [
+      "public_bridge_boot",
+      "desktop_downloads_projection",
+      "portal_route_probe"
+    ],
+    "proof_routes": [
+      "/",
+      "/blazor/",
+      "/hub/",
+      "/avalonia/",
+      "/downloads/",
+      "/downloads/releases.json",
+      "/session/",
+      "/coach/",
+      "/contact",
+      "/what-is-chummer",
+      "/artifacts",
+      "/faq"
+    ]
+  },
+  "blocking_findings": [],
+  "translation_backlog_findings": [],
+  "domain_coverage": {
+    "app_chrome": "pass",
+    "data_rules_names": "pass",
+    "explain_receipts": "pass",
+    "generated_artifacts": "pass",
+    "install_update_support": "pass"
+  },
+  "locale_domain_coverage": {
+    "en-us": {
+      "app_chrome": "pass",
+      "data_rules_names": "pass",
+      "explain_receipts": "pass",
+      "generated_artifacts": "pass",
+      "install_update_support": "pass"
+    },
+    "de-de": {
+      "app_chrome": "pass",
+      "data_rules_names": "pass",
+      "explain_receipts": "pass",
+      "generated_artifacts": "pass",
+      "install_update_support": "pass"
+    },
+    "fr-fr": {
+      "app_chrome": "pass",
+      "data_rules_names": "pass",
+      "explain_receipts": "pass",
+      "generated_artifacts": "pass",
+      "install_update_support": "pass"
+    },
+    "ja-jp": {
+      "app_chrome": "pass",
+      "data_rules_names": "pass",
+      "explain_receipts": "pass",
+      "generated_artifacts": "pass",
+      "install_update_support": "pass"
+    },
+    "pt-br": {
+      "app_chrome": "pass",
+      "data_rules_names": "pass",
+      "explain_receipts": "pass",
+      "generated_artifacts": "pass",
+      "install_update_support": "pass"
+    },
+    "zh-cn": {
+      "app_chrome": "pass",
+      "data_rules_names": "pass",
+      "explain_receipts": "pass",
+      "generated_artifacts": "pass",
+      "install_update_support": "pass"
+    }
+  },
+  "acceptance_gates": [
+    "pseudo_localization",
+    "missing_key_fail_fast",
+    "top_surface_overflow_checks",
+    "locale_smoke_first_launch",
+    "locale_smoke_settings",
+    "locale_smoke_explain",
+    "locale_smoke_updater",
+    "locale_smoke_support",
+    "non_english_generated_artifact_smoke"
+  ]
+}

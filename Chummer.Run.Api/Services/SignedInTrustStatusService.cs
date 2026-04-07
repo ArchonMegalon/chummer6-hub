@@ -516,7 +516,7 @@ public sealed class SignedInTrustStatusService
 
         if (releaseExperience.GuestDownloadAvailable)
         {
-            return "Guest-readable handoff is visible now, and signing in adds linked-install follow-through.";
+            return "Guest-readable handoff is visible now, and Signed-in handoff adds linked-install follow-through once you want the install attached to your account.";
         }
 
         return "Signed-in handoff is available now for linked-install follow-through.";

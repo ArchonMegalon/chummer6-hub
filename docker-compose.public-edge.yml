@@ -39,6 +39,7 @@ services:
     depends_on:
       - chummer-run-identity
     environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
       CHUMMER_PUBLIC_CANON_ROOT: /repo
       CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT: /fleet-artifacts
@@ -59,7 +60,7 @@ services:
       - chummer-run-api-state:/app/state
       - ./:/repo:ro
       - /docker/fleet/.codex-studio/published:/fleet-artifacts:ro
-      - /docker/chummer5a/Docker/Downloads:/downloads-source
+      - /docker/chummercomplete/chummer-presentation/Chummer.Portal/downloads:/downloads-source
     ports:
       - "${CHUMMER_PUBLIC_EDGE_PORT:-8091}:8080"
     networks:

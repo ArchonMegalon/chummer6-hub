@@ -13,6 +13,7 @@ LIVE_VERIFY_TARGET="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-}"
 MANIFEST_SOURCE="$BUNDLE_DIR/releases.json"
 FILES_SOURCE="$BUNDLE_DIR/files"
 RELEASE_PROOF_PATH="${RELEASE_PROOF_PATH:-}"
+STARTUP_SMOKE_SOURCE="${STARTUP_SMOKE_SOURCE:-$BUNDLE_DIR/startup-smoke}"
 
 to_bool() {
   local value
@@ -53,9 +54,11 @@ if [[ ! -d "$FILES_SOURCE" ]]; then
 fi
 
 mapfile -t artifacts < <(find "$FILES_SOURCE" -maxdepth 1 -type f \
-  \( -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
+  \( -name "chummer-avalonia-*.exe" -o -name "chummer-avalonia-*.zip" -o \
+     -name "chummer-avalonia-*.tar.gz" -o -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
      -name "chummer-avalonia-*-installer.pkg" -o -name "chummer-avalonia-*-installer.dmg" -o \
-     -name "chummer-avalonia-*-installer.msix" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
+     -name "chummer-avalonia-*-installer.msix" -o -name "chummer-blazor-desktop-*.exe" -o -name "chummer-blazor-desktop-*.zip" -o \
+     -name "chummer-blazor-desktop-*.tar.gz" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
      -name "chummer-blazor-desktop-*-installer.deb" -o -name "chummer-blazor-desktop-*-installer.pkg" -o \
      -name "chummer-blazor-desktop-*-installer.dmg" -o -name "chummer-blazor-desktop-*-installer.msix" \) \
   | sort | while IFS= read -r artifact; do
@@ -70,19 +73,14 @@ if [[ "${#artifacts[@]}" -eq 0 ]]; then
   exit 1
 fi
 
-mkdir -p "$DEPLOY_DIR/files"
-find "$DEPLOY_DIR/files" -maxdepth 1 -type f \
-  \( -name "chummer-avalonia-*.zip" -o -name "chummer-avalonia-*.tar.gz" -o \
-     -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
-     -name "chummer-avalonia-*-installer.pkg" -o -name "chummer-avalonia-*-installer.dmg" -o \
-     -name "chummer-avalonia-*-installer.msix" -o -name "chummer-blazor-desktop-*.zip" -o \
-     -name "chummer-blazor-desktop-*.tar.gz" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
-     -name "chummer-blazor-desktop-*-installer.deb" -o -name "chummer-blazor-desktop-*-installer.pkg" -o \
-     -name "chummer-blazor-desktop-*-installer.dmg" -o -name "chummer-blazor-desktop-*-installer.msix" \) \
-  -delete
+sync_source_dir="$(mktemp -d)"
+cleanup() {
+  rm -rf "$sync_source_dir"
+}
+trap cleanup EXIT
 
 for artifact in "${artifacts[@]}"; do
-  cp "$artifact" "$DEPLOY_DIR/files/"
+  cp "$artifact" "$sync_source_dir/"
 done
 
 release_version="unpublished"
@@ -114,7 +112,7 @@ PY
   fi
 fi
 
-DOWNLOADS_DIR="$DEPLOY_DIR/files" \
+DOWNLOADS_DIR="$sync_source_dir" \
 MANIFEST_PATH="$DEPLOY_DIR/releases.json" \
 PORTAL_MANIFEST_PATH="$PORTAL_MANIFEST_PATH" \
 PORTAL_DOWNLOADS_DIR="$PORTAL_DOWNLOADS_DIR" \
@@ -123,7 +121,47 @@ RELEASE_CHANNEL="$release_channel" \
 RELEASE_PUBLISHED_AT="$release_published_at" \
 SOURCE_MANIFEST_PATH="$MANIFEST_SOURCE" \
 RELEASE_PROOF_PATH="$RELEASE_PROOF_PATH" \
+STARTUP_SMOKE_DIR="$STARTUP_SMOKE_SOURCE" \
 bash "$SCRIPT_DIR/generate-releases-manifest.sh"
+
+readarray -t promoted_file_names < <(python3 - "$DEPLOY_DIR/RELEASE_CHANNEL.generated.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+seen = set()
+for artifact in payload.get("artifacts") or []:
+    if not isinstance(artifact, dict):
+        continue
+    file_name = str(artifact.get("fileName") or "").strip()
+    if not file_name:
+        file_name = Path(str(artifact.get("downloadUrl") or "").strip()).name
+    if file_name and file_name not in seen:
+        print(file_name)
+        seen.add(file_name)
+PY
+)
+
+mkdir -p "$DEPLOY_DIR/files"
+find "$DEPLOY_DIR/files" -maxdepth 1 -type f \
+  \( -name "chummer-avalonia-*.exe" -o -name "chummer-avalonia-*.zip" -o -name "chummer-avalonia-*.tar.gz" -o \
+     -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
+     -name "chummer-avalonia-*-installer.pkg" -o -name "chummer-avalonia-*-installer.dmg" -o \
+     -name "chummer-avalonia-*-installer.msix" -o -name "chummer-blazor-desktop-*.exe" -o -name "chummer-blazor-desktop-*.zip" -o \
+     -name "chummer-blazor-desktop-*.tar.gz" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
+     -name "chummer-blazor-desktop-*-installer.deb" -o -name "chummer-blazor-desktop-*-installer.pkg" -o \
+     -name "chummer-blazor-desktop-*-installer.dmg" -o -name "chummer-blazor-desktop-*-installer.msix" \) \
+  -delete
+
+for file_name in "${promoted_file_names[@]}"; do
+  source_path="$sync_source_dir/$file_name"
+  if [[ ! -f "$source_path" ]]; then
+    echo "promoted artifact missing from bundle source: $source_path" >&2
+    exit 1
+  fi
+  cp "$source_path" "$DEPLOY_DIR/files/"
+done
 
 if to_bool "$DEPLOY_MODE"; then
   export CHUMMER_PORTAL_DOWNLOADS_REQUIRE_PUBLISHED_VERSION="${CHUMMER_PORTAL_DOWNLOADS_REQUIRE_PUBLISHED_VERSION:-true}"
@@ -134,10 +172,10 @@ if to_bool "$DEPLOY_MODE"; then
   fi
 fi
 
-bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$DEPLOY_DIR/releases.json"
+bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$DEPLOY_DIR"
 
 if [[ -n "$LIVE_VERIFY_TARGET" ]]; then
   bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$LIVE_VERIFY_TARGET"
 fi
 
-echo "Published ${#artifacts[@]} public desktop artifact(s) into $DEPLOY_DIR"
+echo "Published ${#promoted_file_names[@]} public desktop artifact(s) into $DEPLOY_DIR"

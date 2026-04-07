@@ -70,7 +70,9 @@ internal static class ServiceCollectionBoundedContextExtensions
     {
         services.AddSingleton<InstallLinkingStore>();
         services.AddSingleton<InstallLinkingService>();
+        services.AddSingleton<InstallBootstrapTicketService>();
         services.AddSingleton<ReleaseBundlePromotionService>();
+        services.AddSingleton<ReleaseBundleUploadSessionService>();
         services.AddSingleton<ReleaseUploadTicketService>();
         services.AddSingleton<FleetReceiptVerifier>();
         services.AddSingleton<HubEmailLinkVerificationService>();

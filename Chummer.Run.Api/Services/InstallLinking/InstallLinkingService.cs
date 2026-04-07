@@ -289,6 +289,48 @@ public sealed class InstallLinkingService
         }
     }
 
+    public bool CanDownloadArtifactWithClaimCode(string? artifactId, string? claimCode)
+    {
+        return ResolveClaimTicketForDownload(artifactId, claimCode) is not null;
+    }
+
+    public InstallClaimTicketDto? ResolveClaimTicketForDownload(string? artifactId, string? claimCode)
+    {
+        string? normalizedArtifactId = NormalizeOptional(artifactId);
+        string? normalizedClaimCode = NormalizeClaimCode(claimCode);
+        if (normalizedArtifactId is null || normalizedClaimCode is null)
+        {
+            return null;
+        }
+
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            ExpireTicketsLocked(now);
+
+            InstallClaimTicketDto? ticket = FindTicketByClaimCodeLocked(normalizedClaimCode);
+            if (ticket is null)
+            {
+                return null;
+            }
+
+            if (!string.Equals(ticket.ArtifactId, normalizedArtifactId, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            if (ticket.ExpiresAtUtc <= now)
+            {
+                return null;
+            }
+
+            return string.Equals(ticket.Status, InstallClaimTicketStates.Revoked, StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(ticket.Status, InstallClaimTicketStates.Expired, StringComparison.OrdinalIgnoreCase)
+                ? null
+                : ticket;
+        }
+    }
+
     private InstallClaimTicketDto? FindReusableTicketLocked(string artifactId, string? userId, string? subjectId, DateTimeOffset now)
         => _store.ClaimTicketsById.Values
             .Where(item => string.Equals(item.ArtifactId, artifactId, StringComparison.OrdinalIgnoreCase))

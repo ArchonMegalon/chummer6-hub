@@ -1,5 +1,7 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
@@ -42,6 +44,7 @@ public sealed class PublicLandingController : Controller
     private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
+    private readonly IConfiguration _configuration;
     private readonly InstallBootstrapTicketService _installBootstrapTickets;
     private readonly ReleaseUploadTicketService _releaseUploadTickets;
     private readonly IWebHostEnvironment _webHostEnvironment;
@@ -68,6 +71,7 @@ public sealed class PublicLandingController : Controller
         SignedInTrustStatusService signedInTrustStatus,
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
+        IConfiguration configuration,
         InstallBootstrapTicketService installBootstrapTickets,
         ReleaseUploadTicketService releaseUploadTickets,
         IWebHostEnvironment webHostEnvironment,
@@ -93,6 +97,7 @@ public sealed class PublicLandingController : Controller
         _signedInTrustStatus = signedInTrustStatus;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
+        _configuration = configuration;
         _installBootstrapTickets = installBootstrapTickets;
         _releaseUploadTickets = releaseUploadTickets;
         _webHostEnvironment = webHostEnvironment;
@@ -239,7 +244,7 @@ public sealed class PublicLandingController : Controller
             string bootstrapUrl = BuildAbsoluteUrl(
                 "/downloads/release-upload/bootstrap.sh",
                 QueryString.Create("ticket", ticket.Ticket));
-            string command = $"bash <(curl -fsSL {SingleQuoteShellValue(bootstrapUrl)})";
+            string command = BuildReleaseUploadBootstrapCommand(bootstrapUrl);
             var model = new ReleaseUploadPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(
                     "Release upload handoff",
@@ -272,9 +277,9 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/downloads/release-upload/bootstrap.sh")]
     [Produces("text/plain")]
-    public IActionResult ReleaseUploadBootstrapScript([FromQuery] string? ticket)
+    public IActionResult ReleaseUploadBootstrapScript([FromQuery] string? ticket, [FromQuery] string? apiToken)
     {
-        if (!_releaseUploadTickets.TryValidate(ticket, out _))
+        if (!TryResolveReleaseUploadToken(ticket, apiToken, out string? uploadToken))
         {
             return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "release upload ticket is missing, expired, or invalid.");
         }
@@ -287,8 +292,54 @@ public sealed class PublicLandingController : Controller
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
         }
 
-        string rendered = RenderReleaseUploadBootstrapScript(System.IO.File.ReadAllText(templatePath), ticket!);
+        string rendered = RenderReleaseUploadBootstrapScript(System.IO.File.ReadAllText(templatePath), uploadToken!);
         return Content(rendered, "text/x-shellscript; charset=utf-8", Encoding.UTF8);
+    }
+
+    private bool TryResolveReleaseUploadToken(string? ticket, string? apiToken, out string? uploadToken)
+    {
+        if (_releaseUploadTickets.TryValidate(ticket, out _))
+        {
+            uploadToken = ticket;
+            return true;
+        }
+
+        if (IsConfiguredApiToken(apiToken))
+        {
+            uploadToken = apiToken;
+            return true;
+        }
+
+        uploadToken = null;
+        return false;
+    }
+
+    private bool IsConfiguredApiToken(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return false;
+        }
+
+        string configuredToken = (_configuration["FLEET_INTERNAL_API_TOKEN"] ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(configuredToken))
+        {
+            return false;
+        }
+
+        return FixedTimeEquals(token.Trim(), configuredToken);
+    }
+
+    private static bool FixedTimeEquals(string left, string right)
+    {
+        ReadOnlySpan<byte> leftBytes = Encoding.UTF8.GetBytes(left);
+        ReadOnlySpan<byte> rightBytes = Encoding.UTF8.GetBytes(right);
+        if (leftBytes.Length != rightBytes.Length)
+        {
+            return false;
+        }
+
+        return CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
     }
 
     [HttpGet("/downloads/install/{artifactId}")]
@@ -368,6 +419,7 @@ public sealed class PublicLandingController : Controller
                 BootstrapFeatureCards: BuildBootstrapFeatureCards(bootstrapPlatform),
                 AutoStartDownload: !bootstrapScriptDownload,
                 BootstrapScriptDownload: bootstrapScriptDownload,
+                PromoteSecondaryDownload: string.Equals(bootstrapPlatform, "windows", StringComparison.Ordinal),
                 SecondaryDownloadHref: bootstrapScriptDownload ? rawDownloadHref : null,
                 SecondaryDownloadLabel: bootstrapScriptDownload ? BuildBootstrapSecondaryDownloadLabel(bootstrapPlatform) : null,
                 AccountHref: "/account/access",
@@ -382,6 +434,7 @@ public sealed class PublicLandingController : Controller
                     : option.PlatformLabel,
                 PlatformLabel: option.PlatformLabel,
                 HeadLabel: option.HeadLabel,
+                ClaimExchangeUrl: bootstrapScriptDownload ? null : $"/downloads/install/{Uri.EscapeDataString(artifactId)}/claim.json",
                 ClaimCode: bootstrapScriptDownload ? null : dispatch.ClaimTicket?.ClaimCode,
                 ClaimCodeExpiresAtUtc: bootstrapScriptDownload ? null : dispatch.ClaimTicket?.ExpiresAtUtc,
                 Steps: steps,
@@ -2521,7 +2574,7 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => "Mac install command",
-            "windows" => "Windows install command",
+            "windows" => "Windows install command (advanced)",
             "linux" => "Linux install command",
             _ => null
         };
@@ -2530,7 +2583,7 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => "Paste this into Terminal.",
-            "windows" => "Paste this into PowerShell.",
+            "windows" => "Advanced: paste this into PowerShell when you want the guided linked setup flow.",
             "linux" => "Paste this into your shell.",
             _ => null
         };
@@ -2583,7 +2636,7 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => "Download raw DMG instead",
-            "windows" => "Download raw installer instead",
+            "windows" => "Download installer .exe",
             "linux" => "Download raw package instead",
             _ => null
         };
@@ -2591,7 +2644,7 @@ public sealed class PublicLandingController : Controller
     private static string BuildBootstrapDispatchSummary(string? platform)
         => platform switch
         {
-            "windows" => "Paste the PowerShell install command below. It streams a short-lived Windows setup assistant, asks which Chummer apps to install and where to put them, then downloads, verifies, installs, and links the selected apps to this account.",
+            "windows" => "Download the Windows installer .exe below. The PowerShell setup assistant stays available as an advanced option when you want the guided account-linked setup flow.",
             "linux" => "Paste the shell install command below. It streams a short-lived Linux setup assistant, asks which Chummer apps to install and where to put them, then downloads, verifies, installs, and links the selected apps to this account.",
             _ => "Paste the Terminal install command below. It streams the short-lived Mac setup assistant directly into bash, asks which Chummer apps to install and where to put them, then downloads, verifies, installs, and links the selected apps to this account."
         };
@@ -2599,7 +2652,7 @@ public sealed class PublicLandingController : Controller
     private static string BuildBootstrapDispatchNote(string? platform)
         => platform switch
         {
-            "windows" => "The PowerShell command keeps the published Windows installers unchanged while streaming a short-lived guided setup assistant that can attach the install relationship to this account from the first launch.",
+            "windows" => "The direct .exe is the normal Windows path. The PowerShell setup assistant remains available as an advanced account-linked flow when you want guided multi-step setup and claim recovery.",
             "linux" => "The shell command keeps the published Debian packages unchanged while streaming a short-lived guided setup assistant that can attach the install relationship to this account from the first launch.",
             _ => "macOS can quarantine a downloaded unsigned .command and label it as damaged. The Terminal command avoids that by streaming the same short-lived setup assistant directly into bash while keeping the published DMGs unchanged."
         };
@@ -2609,7 +2662,8 @@ public sealed class PublicLandingController : Controller
         {
             "windows" =>
             [
-                "Copy the PowerShell install command below and paste it into PowerShell.",
+                "Download the installer .exe below for the normal Windows setup flow.",
+                "Open the advanced PowerShell section only when you want the guided account-linked setup assistant instead of the direct installer path.",
                 "The Windows setup assistant offers Auto select for the matching desktop builds on this PC, lets you switch to manual selection when you want different heads, asks where to install them, whether quick access should stay in the Start menu or add Desktop links, whether to open Chummer when it finishes, and then verifies that linking actually completed.",
                 "PowerShell then shows staged progress while it downloads the selected installers, verifies their published SHA-256 digests, installs the selected apps, and preserves rollback-safe installer behavior.",
                 "Each selected app is started once through a short-lived environment handoff so it is already linked to this account the next time you open it."
@@ -4154,9 +4208,19 @@ function Show-FolderDialog([string]$Description, [string]$SelectedPath) {
 }
 
 function Get-HostArchitecture {
-    $arch = ($env:PROCESSOR_ARCHITECTURE ?? '').Trim().ToUpperInvariant()
-    if ($arch.Contains('ARM64')) {
-        return 'arm64'
+    foreach ($candidate in @($env:PROCESSOR_ARCHITEW6432, $env:PROCESSOR_ARCHITECTURE)) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+
+        $arch = $candidate.Trim().ToUpperInvariant()
+        if ($arch.Contains('ARM64')) {
+            return 'arm64'
+        }
+
+        if ($arch.Contains('64')) {
+            return 'x64'
+        }
     }
 
     return 'x64'
@@ -4243,7 +4307,7 @@ function Verify-ArtifactHash([string]$DownloadedPath, [object]$Artifact) {
     }
 }
 
-function Invoke-Installer([string]$InstallerPath, [string]$TargetDir, [string]$ShortcutMode) {
+function Invoke-Installer([string]$InstallerPath, [string]$TargetDir, [string]$ShortcutMode, [string]$InstallClaimCode) {
     $startMenu = if ($ShortcutMode -eq 'desktop') { 'off' } else { 'on' }
     $desktop = if ($ShortcutMode -eq 'start') { 'off' } else { 'on' }
     $arguments = @(
@@ -4252,6 +4316,9 @@ function Invoke-Installer([string]$InstallerPath, [string]$TargetDir, [string]$S
         '--desktop-shortcut', $desktop,
         '--launch', 'off'
     )
+    if (-not [string]::IsNullOrWhiteSpace($InstallClaimCode)) {
+        $arguments += @('--install-claim-code', $InstallClaimCode)
+    }
     $process = Start-Process -FilePath $InstallerPath -ArgumentList $arguments -Wait -PassThru
     if ($process.ExitCode -ne 0) {
         throw ("Installer exited with code {0} for {1}" -f $process.ExitCode, $InstallerPath)
@@ -4360,7 +4427,7 @@ Write-Host ("Finish behavior: {0}" -f $(if ($openAfterInstall) { 'open the selec
 $downloadRoot = Join-Path $env:TEMP ("chummer-setup-" + [Guid]::NewGuid().ToString('N'))
 $installedArtifacts = New-Object System.Collections.Generic.List[object]
 $installWarnings = New-Object System.Collections.Generic.List[string]
-$linkedConfirmed = 0
+$stagedLinkCount = 0
 
 foreach ($artifact in $selectedArtifacts) {
     Write-Step 2 6 ("Downloading " + $artifact.Title)
@@ -4368,15 +4435,28 @@ foreach ($artifact in $selectedArtifacts) {
     Verify-ArtifactHash $downloadedInstaller $artifact
 
     $targetDir = Join-Path $installRoot ([string]$artifact.InstallFolderName)
+    $claimCode = $null
+    try {
+        Write-Step 3 6 ("Preparing account linking for " + $artifact.Title)
+        $claimCode = Get-InstallClaimCode $artifact
+    }
+    catch {
+        $installWarnings.Add("$($artifact.Title) could not fetch a short-lived setup ticket for account linking. Setup will continue, but Devices and access may stay guest-only until you rerun the guided installer.") | Out-Null
+    }
     Write-Step 3 6 ("Installing " + $artifact.Title)
     Write-Host ("Installing {0} to {1}" -f $artifact.Title, $targetDir)
-    Invoke-Installer $downloadedInstaller $targetDir $shortcutMode
+    Invoke-Installer $downloadedInstaller $targetDir $shortcutMode $claimCode
 
     $installedArtifacts.Add([pscustomobject]@{
         Artifact = $artifact
         InstallDir = $targetDir
         ExecutablePath = (Resolve-InstalledExecutable $targetDir $artifact)
+        ClaimCodeStaged = (-not [string]::IsNullOrWhiteSpace($claimCode))
     }) | Out-Null
+    if (-not [string]::IsNullOrWhiteSpace($claimCode)) {
+        $stagedLinkCount += 1
+        Write-Host ($artifact.Title + ' is staged to finish account linking on first open.')
+    }
 }
 
 Write-Host ''
@@ -4384,57 +4464,25 @@ Write-Host 'Installed Windows desktop builds:'
 foreach ($installed in $installedArtifacts) {
     Write-Host (" - {0}" -f $installed.InstallDir)
 }
-Write-Host 'Running a first-launch link check for the selected installs...'
-
-foreach ($installed in $installedArtifacts) {
-    $artifact = $installed.Artifact
-    Write-Step 4 6 ("Linking " + $artifact.Title + " to this account")
-    $statePath = Get-StatePath $artifact
-    $claimProcess = Start-ClaimLaunch $installed.ExecutablePath $artifact
-    if (Wait-ForClaimSuccess $statePath 25) {
-        $linkedConfirmed += 1
-        $message = Get-StateField $statePath 'lastClaimMessage'
-        if ([string]::IsNullOrWhiteSpace($message)) {
-            Write-Host ($artifact.Title + ' linked successfully.')
+if ($openAfterInstall) {
+    Write-Step 4 6 'Opening selected apps'
+    foreach ($installed in $installedArtifacts) {
+        if ([bool]$installed.Artifact.LaunchAfterInstall) {
+            Start-Process -FilePath $installed.ExecutablePath -WorkingDirectory $installed.InstallDir | Out-Null
         }
-        else {
-            Write-Host ($artifact.Title + ': ' + $message)
-        }
-    }
-    else {
-        $claimError = Get-StateField $statePath 'lastClaimError'
-        $claimStatus = Get-StateField $statePath 'status'
-        if (-not [string]::IsNullOrWhiteSpace($claimError)) {
-            $installWarnings.Add("$($artifact.Title) could not confirm account linking automatically: $claimError Re-run the current Windows install command or open the app manually once if Devices and access does not show it yet.") | Out-Null
-        }
-        elseif (-not [string]::IsNullOrWhiteSpace($claimStatus)) {
-            $installWarnings.Add("$($artifact.Title) finished first-launch work with status '$claimStatus' instead of a confirmed linked state. Re-run the current Windows install command or open the app manually once if Devices and access does not show it yet.") | Out-Null
-        }
-        else {
-            $installWarnings.Add("$($artifact.Title) did not write a confirmed install-link receipt yet. Re-run the current Windows install command or open the app manually once if Devices and access does not show it yet.") | Out-Null
-        }
-    }
-
-    if ($openAfterInstall -and [bool]$artifact.LaunchAfterInstall) {
-        continue
-    }
-
-    if ($claimProcess -and -not $claimProcess.HasExited) {
-        Stop-Process -Id $claimProcess.Id -Force -ErrorAction SilentlyContinue
-        Wait-Process -Id $claimProcess.Id -ErrorAction SilentlyContinue
     }
 }
 
 Write-Step 5 6 'Finishing Chummer Setup'
 Write-Host ''
-Write-Host ("Confirmed linked installs: {0} / {1}" -f $linkedConfirmed, $installedArtifacts.Count)
-if ($linkedConfirmed -eq $installedArtifacts.Count) {
-    Write-Host 'The selected Chummer app or apps were installed and linked to this account.'
-    Write-Host 'When you open them again later, they should already be linked to this account.'
+Write-Host ("Prepared first-open account linking: {0} / {1}" -f $stagedLinkCount, $installedArtifacts.Count)
+if ($stagedLinkCount -eq $installedArtifacts.Count) {
+    Write-Host 'The selected Chummer app or apps were installed and setup staged account linking for first open.'
+    Write-Host 'When you open them, they should attach to this account without asking you to copy a claim code from the website.'
 }
 else {
-    Write-Host 'The selected Chummer app or apps were installed, but setup could not confirm linking for every app yet.'
-    Write-Host 'If Devices and access does not show them, rerun the current install command or open the app manually once.'
+    Write-Host 'The selected Chummer app or apps were installed, but setup could not pre-stage account linking for every app.'
+    Write-Host 'If Devices and access does not show them after first open, rerun the current guided installer.'
 }
 
 if ($installWarnings.Count -gt 0) {
@@ -4784,12 +4832,14 @@ write_desktop_entry() {
   local desktop_path="$1"
   local app_name="$2"
   local exec_path="$3"
+  local icon_path="${4:-}"
   mkdir -p "$(dirname "$desktop_path")"
   cat >"$desktop_path" <<ENTRY
 [Desktop Entry]
 Type=Application
 Name=$app_name
 Exec=$exec_path
+$( [[ -n "$icon_path" ]] && printf 'Icon=%s\n' "$icon_path" )
 Terminal=false
 Categories=Game;
 ENTRY
@@ -4882,6 +4932,22 @@ build_install_state_path() {
   printf '%s/install-linking/%s/linux/%s/state.json\n' "$(resolve_install_state_root)/Chummer6" "$head_id" "$artifact_arch"
 }
 
+build_pending_claim_code_path() {
+  local head_id="$1"
+  local artifact_arch="$2"
+  printf '%s/install-linking/%s/linux/%s/pending-claim-code.txt\n' "$(resolve_install_state_root)/Chummer6" "$head_id" "$artifact_arch"
+}
+
+persist_pending_claim_code() {
+  local head_id="$1"
+  local artifact_arch="$2"
+  local claim_code="$3"
+  local pending_path
+  pending_path="$(build_pending_claim_code_path "$head_id" "$artifact_arch")"
+  mkdir -p "$(dirname "$pending_path")"
+  printf '%s\n' "$claim_code" >"$pending_path"
+}
+
 install_artifact() {
   local idx="$1"
   local download_root="$2"
@@ -4898,6 +4964,7 @@ install_artifact() {
   local staging_root="${download_root}/extract-${idx}"
   local extracted_root="${staging_root}/opt/chummer6/${install_folder}"
   local target_dir="${install_root}/${install_folder}"
+  local icon_target="${target_dir}/chummer-icon.png"
   local launcher_target
   local desktop_entry_target
 
@@ -4958,6 +5025,7 @@ cat >"${desktop_entry_target}" <<ENTRY
 Type=Application
 Name=${SHORT_LABELS[$idx]}
 Exec=${launcher_target}
+Icon=${icon_target}
 Terminal=false
 Categories=Game;
 ENTRY
@@ -4966,7 +5034,7 @@ SCRIPT
     run_privileged_script "$shortcuts_script"
   else
     write_wrapper_script "$launcher_target" "${target_dir}/${executable_name}"
-    write_desktop_entry "$desktop_entry_target" "${SHORT_LABELS[$idx]}" "$launcher_target"
+    write_desktop_entry "$desktop_entry_target" "${SHORT_LABELS[$idx]}" "$launcher_target" "$icon_target"
   fi
 
   if [[ "$shortcut_mode" == "desktop" || "$shortcut_mode" == "both" ]]; then
@@ -4975,6 +5043,17 @@ SCRIPT
 
   INSTALLED_PATHS+=("${target_dir}")
   INSTALLED_ARTIFACT_INDEXES+=("$idx")
+  local claim_code
+  local claim_url="${CLAIM_URLS[$idx]}"
+  local head_id="${HEAD_IDS[$idx]}"
+  local artifact_arch="${ARTIFACT_ARCHES[$idx]}"
+  claim_code="$(fetch_install_claim_code "$claim_url")" || {
+    INSTALL_WARNINGS+=("${artifact_title} could not fetch a short-lived setup ticket for account linking. Setup will continue, but Devices and access may stay guest-only until you rerun the guided installer.")
+    return 0
+  }
+  persist_pending_claim_code "$head_id" "$artifact_arch" "$claim_code"
+  LINKED_CONFIRMED_COUNT=$((LINKED_CONFIRMED_COUNT + 1))
+  echo "${artifact_title} is staged to finish account linking on first open."
 }
 
 launch_installed_app() {
@@ -4982,49 +5061,11 @@ launch_installed_app() {
   local artifact_idx="${INSTALLED_ARTIFACT_INDEXES[$installed_idx]}"
   local target_dir="${INSTALLED_PATHS[$installed_idx]}"
   local executable_path="${target_dir}/${EXECUTABLE_NAMES[$artifact_idx]}"
-  local claim_url="${CLAIM_URLS[$artifact_idx]}"
-  local claim_code
-  local head_id="${HEAD_IDS[$artifact_idx]}"
-  local artifact_arch="${ARTIFACT_ARCHES[$artifact_idx]}"
   local artifact_title="${ARTIFACT_TITLES[$artifact_idx]}"
-  local state_path launch_pid claim_error claim_status claim_message
-
-  state_path="$(build_install_state_path "$head_id" "$artifact_arch")"
-  advance_progress "Linking ${artifact_title} to this account"
-  echo "Linking ${artifact_title} to this account..."
-  claim_code="$(fetch_install_claim_code "$claim_url")" || {
-    INSTALL_WARNINGS+=("${artifact_title} could not fetch a short-lived install claim from the downloads handoff. Re-run the current Linux install command from ${DOWNLOADS_URL} and try again.")
-    return 0
-  }
-  env CHUMMER_INSTALL_CLAIM_CODE="$claim_code" CHUMMER_API_BASE_URL="$PUBLIC_BASE_URL" CHUMMER_WEB_BASE_URL="$PUBLIC_BASE_URL" "$executable_path" >/dev/null 2>&1 &
-  launch_pid="$!"
-
-  if wait_for_claim_success "$state_path" 25; then
-    LINKED_CONFIRMED_COUNT=$((LINKED_CONFIRMED_COUNT + 1))
-    claim_message="$(read_install_state_field "$state_path" lastClaimMessage || true)"
-    if [[ -n "$claim_message" ]]; then
-      echo "${artifact_title}: ${claim_message}"
-    else
-      echo "${artifact_title} linked successfully."
-    fi
-  else
-    claim_error="$(read_install_state_field "$state_path" lastClaimError || true)"
-    claim_status="$(read_install_state_field "$state_path" status || true)"
-    if [[ -n "$claim_error" ]]; then
-      INSTALL_WARNINGS+=("${artifact_title} could not confirm account linking automatically: ${claim_error} Re-run the current Linux install command or open the app manually once if Devices and access does not show it yet.")
-    elif [[ -n "$claim_status" ]]; then
-      INSTALL_WARNINGS+=("${artifact_title} finished first-launch work with status '${claim_status}' instead of a confirmed linked state. Re-run the current Linux install command or open the app manually once if Devices and access does not show it yet.")
-    else
-      INSTALL_WARNINGS+=("${artifact_title} did not write a confirmed install-link receipt yet. Re-run the current Linux install command or open the app manually once if Devices and access does not show it yet.")
-    fi
-  fi
-
   if [[ "$OPEN_SELECTED_AFTER_INSTALL" == "1" && "${LAUNCH_AFTER_INSTALL[$artifact_idx]}" == "1" ]]; then
-    :
-  else
-    sleep 2
-    kill "$launch_pid" >/dev/null 2>&1 || true
-    wait "$launch_pid" >/dev/null 2>&1 || true
+    advance_progress "Opening ${artifact_title}"
+    echo "Opening ${artifact_title}..."
+    "$executable_path" >/dev/null 2>&1 &
   fi
 }
 
@@ -5086,20 +5127,22 @@ echo "Installed Linux desktop builds:"
 for target_dir in "${INSTALLED_PATHS[@]}"; do
   echo " - ${target_dir}"
 done
-echo "Running a first-launch link check for the selected installs..."
+if [[ "$OPEN_SELECTED_AFTER_INSTALL" == "1" ]]; then
+  echo "Opening the selected Linux desktop builds..."
+fi
 for install_idx in "${!INSTALLED_PATHS[@]}"; do
   launch_installed_app "$install_idx"
 done
 
 advance_progress "Finishing Chummer Setup"
 echo
-echo "Confirmed linked installs: ${LINKED_CONFIRMED_COUNT} / ${#INSTALLED_PATHS[@]}"
+echo "Prepared first-open account linking: ${LINKED_CONFIRMED_COUNT} / ${#INSTALLED_PATHS[@]}"
 if [[ "${LINKED_CONFIRMED_COUNT}" -eq "${#INSTALLED_PATHS[@]}" ]]; then
-  echo "The selected Chummer app or apps were installed and linked to this account."
-  echo "When you open them again later, they should already be linked to this account."
+  echo "The selected Chummer app or apps were installed and setup staged account linking for first open."
+  echo "When you open them, they should attach to this account without asking you to copy a claim code from the website."
 else
-  echo "The selected Chummer app or apps were installed, but setup could not confirm linking for every app yet."
-  echo "If Devices and access does not show them, rerun the current install command or open the app manually once."
+  echo "The selected Chummer app or apps were installed, but setup could not pre-stage account linking for every app."
+  echo "If Devices and access does not show them after first open, rerun the current guided installer."
 fi
 if [[ "${#INSTALL_WARNINGS[@]}" -gt 0 ]]; then
   echo
@@ -5135,6 +5178,8 @@ echo "Help: ${HELP_URL}"
             .Append(SingleQuoteShellLiteral(ticket))
             .AppendLine("'");
         builder.AppendLine("export CHUMMER_RELEASE_UPLOAD_URL=\"https://chummer.run/api/internal/releases/bundles\"");
+        builder.AppendLine("export CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH='https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json'");
+        builder.AppendLine("export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH='https://chummer.run/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json'");
         builder.AppendLine(scriptBody);
         return builder.ToString();
     }
@@ -5144,6 +5189,19 @@ echo "Help: ${HELP_URL}"
 
     private static string SingleQuoteShellLiteral(string value)
         => value.Replace("'", "'\"'\"'", StringComparison.Ordinal);
+
+    private static string BuildReleaseUploadBootstrapCommand(string bootstrapUrl)
+    {
+        return "set -euo pipefail; " +
+            "export CHUMMER_RELEASE_CHANNEL='preview'; " +
+            "export CHUMMER_ALLOW_UNSIGNED_PREVIEW='1'; " +
+            "export CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='1'; " +
+            "export CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS='4'; " +
+            "TMP_BOOTSTRAP_SCRIPT=\"$(mktemp)\"; " +
+            "trap 'rm -f \"$TMP_BOOTSTRAP_SCRIPT\"' EXIT; " +
+            "curl -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch bootstrap script; check authentication, channel, and ticket freshness.' >&2; exit 1; }; " +
+            "bash \"$TMP_BOOTSTRAP_SCRIPT\"";
+    }
 
     internal sealed record MacInstallBootstrapArtifact(
         string ArtifactId,

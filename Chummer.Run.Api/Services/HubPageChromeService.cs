@@ -93,12 +93,33 @@ public sealed class HubPageChromeService
         var surface = _landing.LoadSurface();
         var nav = _navigation.LoadNavigation();
         var normalizedCurrentPath = NormalizeRoute(currentPath);
-        var actions = new[]
+        var actions = new List<SiteChromeActionViewModel>
         {
             new SiteChromeActionViewModel("Home", "/home", "secondary", normalizedCurrentPath.StartsWith("/home", StringComparison.OrdinalIgnoreCase)),
+            new SiteChromeActionViewModel("Build", "/downloads/release-upload", "secondary", normalizedCurrentPath.StartsWith("/downloads/release-upload", StringComparison.OrdinalIgnoreCase)),
             new SiteChromeActionViewModel("Account", "/account", "secondary", normalizedCurrentPath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)),
             new SiteChromeActionViewModel("Sign out", "/logout", "primary")
         };
+
+        bool hasBuildAction = actions.Any(action =>
+            string.Equals(NormalizeRoute(action.Href), "/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(action.Label, "Build", StringComparison.OrdinalIgnoreCase));
+        if (!hasBuildAction)
+        {
+            int signOutIndex = actions.FindIndex(action =>
+                string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(action.Label, "Sign out", StringComparison.OrdinalIgnoreCase));
+            if (signOutIndex < 0)
+            {
+                signOutIndex = actions.Count;
+            }
+
+            actions.Insert(signOutIndex, new SiteChromeActionViewModel(
+                "Build",
+                "/downloads/release-upload",
+                "secondary",
+                normalizedCurrentPath.StartsWith("/downloads/release-upload", StringComparison.OrdinalIgnoreCase)));
+        }
 
         return new SiteChromeViewModel(
             Title: title,

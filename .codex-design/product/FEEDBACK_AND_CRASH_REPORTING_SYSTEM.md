@@ -101,6 +101,7 @@ Phase-1 expectations:
 * optional diagnostics attachment
 * auto-filled build, platform, channel, and version facts
 * clean split between public-safe issue filing and private Hub intake
+* every user-facing bug/help/contact route must resolve to a public, externally routable host rather than an internal Docker, cluster-local, or service-discovery hostname
 
 ### Lane 3 - Feedback
 
@@ -124,6 +125,22 @@ Private or potentially sensitive material must stay out of the public issue lane
 * logs or traces with user content
 
 The support plane must make that split obvious to normal users.
+
+## Public-route safety rule
+
+User-visible support, feedback, bug, crash, and contact handoffs must resolve to:
+
+* the public Chummer host
+* or an in-app local dialog that never exposes transport details
+
+They must not resolve to:
+
+* Docker hostnames such as `chummer-api`
+* cluster-local service names
+* internal ports
+* operator-only HTTP origins
+
+If the public route is unavailable, the product must keep the action in-shell or mark it unavailable with honest guidance. It must not leak an internal fallback URL into the user experience.
 
 ## Crash automation rule
 

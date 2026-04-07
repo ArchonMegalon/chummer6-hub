@@ -88,6 +88,22 @@ public sealed class DownloadsCompatibilityControllerTests
     }
 
     [Fact]
+    public async Task AccountRequiredWindowsArtifactStillRedirectsToLoginWithoutClaimCode()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-win-x64-installer.exe", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.StartsWith("/login?next=", redirect.Url, StringComparison.Ordinal);
+        Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", redirect.Url, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AccountRequiredMacArtifactRejectsInvalidClaimCodeWithoutRedirectingToLogin()
     {
         using Fixture fixture = new();
@@ -142,6 +158,7 @@ public sealed class DownloadsCompatibilityControllerTests
             string filesRoot = Path.Combine(downloadsRoot, "files");
             Directory.CreateDirectory(filesRoot);
             File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-osx-x64-installer.dmg"), "mac-preview"u8.ToArray());
+            File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-win-x64-installer.exe"), "win-preview"u8.ToArray());
             File.WriteAllText(
                 Path.Combine(downloadsRoot, "releases.json"),
                 """
@@ -152,7 +169,8 @@ public sealed class DownloadsCompatibilityControllerTests
                   "proofStatus": "passed",
                   "proofRoutes": [
                     "/downloads/install/avalonia-osx-x64-installer",
-                    "/downloads/file/avalonia-osx-x64-installer"
+                    "/downloads/file/avalonia-osx-x64-installer",
+                    "/downloads/install/avalonia-win-x64-installer"
                   ],
                   "downloads": [
                     {
@@ -166,6 +184,19 @@ public sealed class DownloadsCompatibilityControllerTests
                       "arch": "x64",
                       "kind": "dmg",
                       "fileName": "chummer-avalonia-osx-x64-installer.dmg",
+                      "installAccessClass": "account_required"
+                    },
+                    {
+                      "id": "avalonia-win-x64-installer",
+                      "platform": "Avalonia Desktop Windows X64 Installer",
+                      "url": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                      "sha256": "34f6cb5006019d6c8e19d55c32302efea6aaed7cd63f3770aee7f087f0ee4bf9",
+                      "sizeBytes": 51887995,
+                      "head": "avalonia",
+                      "platformId": "win-x64",
+                      "arch": "x64",
+                      "kind": "installer",
+                      "fileName": "chummer-avalonia-win-x64-installer.exe",
                       "installAccessClass": "account_required"
                     }
                   ]
@@ -191,6 +222,19 @@ public sealed class DownloadsCompatibilityControllerTests
                       "fileName": "chummer-avalonia-osx-x64-installer.dmg",
                       "downloadUrl": "/downloads/files/chummer-avalonia-osx-x64-installer.dmg",
                       "sha256": "71cea7987b5323078baed5c104ca82ef80060b249f3fa8401ddf42d0e6ed8c39",
+                      "sizeBytes": 51887995,
+                      "installAccessClass": "account_required"
+                    },
+                    {
+                      "artifactId": "avalonia-win-x64-installer",
+                      "head": "avalonia",
+                      "platform": "windows",
+                      "arch": "x64",
+                      "kind": "installer",
+                      "platformLabel": "Avalonia Desktop Windows X64 Installer",
+                      "fileName": "chummer-avalonia-win-x64-installer.exe",
+                      "downloadUrl": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                      "sha256": "34f6cb5006019d6c8e19d55c32302efea6aaed7cd63f3770aee7f087f0ee4bf9",
                       "sizeBytes": 51887995,
                       "installAccessClass": "account_required"
                     }

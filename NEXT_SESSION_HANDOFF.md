@@ -37,7 +37,7 @@ Updated: 2026-03-30T11:00:07+02:00
 - Re-verified clean with:
   - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "FullyQualifiedName~ReleaseSelectionServiceTests|FullyQualifiedName~PublicReleaseManifestServiceTests" --nologo`
   - `bash scripts/ai/run_services_smoke.sh`
-  - `python3 ../chummer-hub-registry/scripts/verify_public_release_channel.py /docker/chummer5a/Docker/Downloads`
+  - `python3 ../chummer-hub-registry/scripts/verify_public_release_channel.py /docker/chummercomplete/chummer-presentation/Chummer.Portal/downloads`
 
 ## Handoff refresh (2026-03-30T11:00:07+02:00)
 

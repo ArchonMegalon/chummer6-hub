@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Chummer.Run.Contracts.PublicSurface;
 
 public sealed record PublicLandingActionDto(
@@ -79,7 +81,31 @@ public sealed record PublicReleaseManifestDto(
     DateTimeOffset? ProofGeneratedAt = null,
     string? ProofBaseUrl = null,
     IReadOnlyList<string>? ProofJourneys = null,
-    IReadOnlyList<string>? ProofRoutes = null);
+    IReadOnlyList<string>? ProofRoutes = null)
+{
+    [JsonPropertyName("releaseProof")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PublicReleaseProofDto? ReleaseProof =>
+        string.IsNullOrWhiteSpace(ProofStatus)
+        && ProofGeneratedAt is null
+        && string.IsNullOrWhiteSpace(ProofBaseUrl)
+        && (ProofJourneys is null || ProofJourneys.Count == 0)
+        && (ProofRoutes is null || ProofRoutes.Count == 0)
+            ? null
+            : new(
+                Status: ProofStatus,
+                GeneratedAt: ProofGeneratedAt,
+                BaseUrl: ProofBaseUrl,
+                JourneysPassed: ProofJourneys,
+                ProofRoutes: ProofRoutes);
+}
+
+public sealed record PublicReleaseProofDto(
+    string? Status,
+    DateTimeOffset? GeneratedAt,
+    string? BaseUrl,
+    IReadOnlyList<string>? JourneysPassed,
+    IReadOnlyList<string>? ProofRoutes);
 
 public sealed record PublicFeatureCardDto(
     string Id,

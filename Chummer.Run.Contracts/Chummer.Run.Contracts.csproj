@@ -19,7 +19,7 @@
     <ProjectReference Include="..\..\chummer-core-engine\Chummer.Contracts\Chummer.Contracts.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\Chummer.Play.Contracts\Chummer.Play.Contracts.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\Chummer.Media.Contracts.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\Chummer.Media.Contracts.csproj" ReferenceOutputAssembly="false" Condition="Exists('..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\Chummer.Media.Contracts.csproj')" />
   </ItemGroup>
 
   <PropertyGroup>

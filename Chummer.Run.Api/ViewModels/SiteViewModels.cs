@@ -79,6 +79,16 @@ public sealed record ReleaseDisplayViewModel(
     string BuildLabel,
     string PublishedLabel);
 
+public sealed record ReleasePlatformAvailabilityViewModel(
+    string PlatformId,
+    string PlatformLabel,
+    string StatusLabel,
+    string Summary,
+    string PrimaryPackageLabel,
+    string SupportabilityLabel,
+    bool PubliclyAvailable,
+    bool CurrentDevice);
+
 public sealed record ReleaseExperienceViewModel(
     ReleaseDisplayViewModel Display,
     ReleaseOptionViewModel? Recommended,
@@ -92,9 +102,11 @@ public sealed record ReleaseExperienceViewModel(
     string InstallHelpHref,
     string UpdatePostureSummary,
     bool GuestDownloadAvailable,
+    bool RequestedPlatformHasPublicDownload,
     string? PlatformShelfNoticeTitle,
     string? PlatformShelfNoticeSummary,
     string? RequestedPlatformLabel,
+    IReadOnlyList<ReleasePlatformAvailabilityViewModel> PlatformAvailability,
     string GuestGateHeading,
     string GuestGateSummary,
     string GuestGatePrimaryLabel,
@@ -220,10 +232,21 @@ public sealed record DownloadDispatchPageViewModel(
     SiteChromeViewModel Chrome,
     string Heading,
     string Summary,
+    string DispatchNote,
     string ArtifactTitle,
     string ArtifactSupportLine,
     string DownloadHref,
     string DownloadLabel,
+    string? TerminalInstallCommand,
+    string? BootstrapCommandLabel,
+    string? BootstrapCommandIntro,
+    string? BootstrapCommandNote,
+    IReadOnlyList<DownloadDispatchFeatureCardViewModel> BootstrapFeatureCards,
+    bool AutoStartDownload,
+    bool BootstrapScriptDownload,
+    bool PromoteSecondaryDownload,
+    string? SecondaryDownloadHref,
+    string? SecondaryDownloadLabel,
     string AccountHref,
     string AccountLabel,
     string HelpHref,
@@ -231,13 +254,19 @@ public sealed record DownloadDispatchPageViewModel(
     ReleaseDisplayViewModel Display,
     string Channel,
     string Version,
+    string CurrentReleaseSummary,
     string PlatformLabel,
     string HeadLabel,
+    string? ClaimExchangeUrl,
     string? ClaimCode,
     DateTimeOffset? ClaimCodeExpiresAtUtc,
     IReadOnlyList<string> Steps,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record DownloadDispatchFeatureCardViewModel(
+    string Heading,
+    string Body);
 
 public sealed record TrustPageSectionViewModel(
     string Id,

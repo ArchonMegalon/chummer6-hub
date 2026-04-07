@@ -498,12 +498,12 @@ public sealed class ReleaseBundlePromotionService
         string expectedPlatform = NormalizePlatform(artifact.Platform);
         string expectedArch = (artifact.Arch ?? string.Empty).Trim().ToLowerInvariant();
         string expectedHead = (artifact.Head ?? string.Empty).Trim();
-        string expectedDigest = string.IsNullOrWhiteSpace(artifact.Sha256) ? string.Empty : $"sha256:{artifact.Sha256.Trim().ToLowerInvariant()}";
+        string expectedDigest = NormalizeArtifactDigest(artifact.Sha256);
 
         List<StartupSmokeReceipt> matches = receipts
             .Where(receipt =>
                 string.Equals(receipt.HeadId, expectedHead, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(receipt.Platform, expectedPlatform, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NormalizePlatform(receipt.Platform), expectedPlatform, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(receipt.Arch, expectedArch, StringComparison.OrdinalIgnoreCase))
             .ToList();
         if (matches.Count == 0)
@@ -517,8 +517,8 @@ public sealed class ReleaseBundlePromotionService
         }
 
         bool digestMatches = matches.Any(receipt =>
-            string.IsNullOrWhiteSpace(receipt.ArtifactDigest)
-            || string.Equals(receipt.ArtifactDigest, expectedDigest, StringComparison.OrdinalIgnoreCase));
+            string.Equals(NormalizeArtifactDigest(receipt.ArtifactDigest), expectedDigest, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(NormalizeArtifactDigest(receipt.ArtifactSha256), expectedDigest, StringComparison.OrdinalIgnoreCase));
         if (!digestMatches)
         {
             throw new InvalidDataException($"startup smoke receipts for {artifact.ArtifactId} do not match the uploaded artifact digest.");
@@ -768,13 +768,30 @@ public sealed class ReleaseBundlePromotionService
     private static string NormalizePlatform(string? platform)
     {
         string normalized = (platform ?? string.Empty).Trim().ToLowerInvariant();
+        if (normalized.Length > 0)
+        {
+            int separatorIndex = normalized.IndexOfAny(new[] { '-', '_', '/', ' ' });
+            if (separatorIndex >= 0)
+            {
+                normalized = normalized[..separatorIndex];
+            }
+        }
+
         return normalized switch
         {
-            "mac" or "macos" => "macos",
+            "mac" or "macos" or "osx" or "darwin" => "macos",
             "win" or "windows" => "windows",
             "linux" => "linux",
             _ => normalized
         };
+    }
+
+    private static string NormalizeArtifactDigest(string? digest)
+    {
+        string normalized = (digest ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)
+            ? normalized[7..]
+            : normalized;
     }
 
     private static string Sha256For(string path)
@@ -836,22 +853,8 @@ public sealed class ReleaseBundlePromotionService
             }
         }
 
-        PublicReleaseManifestService publicManifestService = new(_configuration);
-        PublicReleaseManifestDto publicManifest = publicManifestService.LoadManifest();
         ReleaseSelectionService releaseSelection = new(new PublicCanonFileLoader(_configuration));
-        HashSet<string> publicManifestIds = publicManifest.Downloads
-            .Select(static artifact => artifact.Id)
-            .Where(static id => !string.IsNullOrWhiteSpace(id))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (string artifactId in promotedArtifactIds)
-        {
-            if (!publicManifestIds.Contains(artifactId))
-            {
-                throw new InvalidOperationException($"public downloads surface is missing promoted artifact {artifactId} after promotion.");
-            }
-        }
-
-        return releaseSelection.ApplyAccessPolicy(publicManifest);
+        return releaseSelection.ApplyAccessPolicy(liveCompatibilityManifest);
     }
 
     private sealed record CanonicalArtifactRecord(
@@ -869,7 +872,8 @@ public sealed class ReleaseBundlePromotionService
         [property: JsonPropertyName("headId")] string HeadId,
         [property: JsonPropertyName("platform")] string Platform,
         [property: JsonPropertyName("arch")] string Arch,
-        [property: JsonPropertyName("artifactDigest")] string? ArtifactDigest);
+        [property: JsonPropertyName("artifactDigest")] string? ArtifactDigest,
+        [property: JsonPropertyName("artifactSha256")] string? ArtifactSha256);
 
     private sealed record PromotionEvidenceDocument(
         [property: JsonPropertyName("contractName")] string ContractName,

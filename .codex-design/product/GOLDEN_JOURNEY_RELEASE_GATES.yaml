@@ -1,7 +1,7 @@
 product: chummer
 surface: release_control
 version: 1
-last_reviewed: 2026-04-01
+last_reviewed: 2026-04-04
 purpose: Canonical six-journey release gate layer for proving the campaign OS as a lived system instead of only a coherent repo graph.
 
 journey_gates:
@@ -44,17 +44,82 @@ journey_gates:
           must_contain:
             - '"contract_name": "chummer6-hub.local_release_proof"'
             - '"status": "passed"'
+          max_age_hours: 48
+          generated_at_fields:
+            - generated_at
+            - generatedAt
+        - repo: chummer6-hub-registry
+          path: .codex-studio/published/RELEASE_CHANNEL.generated.json
+          json_must_equal:
+            releaseProof.status: passed
+            desktopTupleCoverage.missingRequiredPlatforms: []
+            desktopTupleCoverage.missingRequiredPlatformHeadPairs: []
+            desktopTupleCoverage.missingRequiredPlatformHeadRidTuples: []
+          json_must_be_one_of:
+            status:
+              - published
+              - publishable
+          json_must_be_non_empty_string:
+            contract_name: true
+            releaseProof.generatedAt: true
+            rolloutReason: true
+            supportabilitySummary: true
+            knownIssueSummary: true
+            fixAvailabilitySummary: true
+          must_contain:
+            - '"desktopTupleCoverage"'
+            - '"releaseProof"'
+            - '"status": "passed"'
+            - '"missingRequiredPlatforms"'
+            - '"missingRequiredPlatformHeadPairs"'
+            - '"missingRequiredPlatformHeadRidTuples"'
+          max_age_hours: 48
+          generated_at_fields:
+            - generated_at
+            - generatedAt
         - repo: chummer6-ui
           path: Chummer.Desktop.Runtime/DesktopInstallLinkingRuntime.cs
           must_contain:
             - BuildSupportPortalRelativePathForInstall
             - BuildSupportPortalRelativePathForWorkspace
+        - repo: chummer6-ui
+          path: .codex-studio/published/DESKTOP_EXECUTABLE_EXIT_GATE.generated.json
+          json_must_equal:
+            local_blocking_findings_count: 0
+            evidence.hub_registry_root_trusted_for_startup_smoke_proof: true
+            evidence.flagship_status: pass
+            evidence.visual_familiarity_status: pass
+            evidence.workflow_execution_status: pass
+            evidence.receipt_scope.windows_gate:avalonia:win-x64.within_repo_root: true
+            evidence.receipt_scope.windows_gate:blazor-desktop:win-x64.within_repo_root: true
+            evidence.receipt_scope.linux_gate:avalonia:linux-x64.within_repo_root: true
+            evidence.receipt_scope.linux_gate:blazor-desktop:linux-x64.within_repo_root: true
+            evidence.receipt_scope.macos_gate:avalonia:osx-arm64.within_repo_root: true
+            evidence.receipt_scope.macos_gate:blazor-desktop:osx-arm64.within_repo_root: true
+          must_contain:
+            - '"contract_name": "chummer6-ui.desktop_executable_exit_gate"'
+            - '"local_blocking_findings_count": 0'
+            - '"windows_gate:avalonia:win-x64"'
+            - '"windows_gate:blazor-desktop:win-x64"'
+            - '"linux_gate:avalonia:linux-x64"'
+            - '"linux_gate:blazor-desktop:linux-x64"'
+            - '"macos_gate:avalonia:osx-arm64"'
+            - '"macos_gate:blazor-desktop:osx-arm64"'
+            - '"hub_registry_root_trusted_for_startup_smoke_proof": true'
+          max_age_hours: 48
+          generated_at_fields:
+            - generated_at
+            - generatedAt
         - repo: chummer6-mobile
           path: .codex-studio/published/MOBILE_LOCAL_RELEASE_PROOF.generated.json
           must_contain:
             - '"contract_name": "chummer6-mobile.local_release_proof"'
             - '"status": "passed"'
             - '"install_claim_restore_continue"'
+          max_age_hours: 48
+          generated_at_fields:
+            - generated_at
+            - generatedAt
       required_project_posture:
         - project_id: ui
           minimum_stage: pre_repo_local_complete
@@ -113,6 +178,72 @@ journey_gates:
           must_contain:
             - "Next safe action:"
             - "Closure:"
+        - repo: chummer6-core
+          path: Chummer.Tests/ApiIntegrationTests.cs
+          must_contain:
+            - 'response["referenceSourceLaneReceipt"]'
+            - 'response["settingsLaneReceipt"]'
+            - 'response["sourceToggleLaneReceipt"]'
+            - 'response["sourceSelectionLaneReceipt"]'
+            - 'response["customDataLaneReceipt"]'
+            - 'response["customDataAuthoringLaneReceipt"]'
+            - 'response["xmlBridgeLaneReceipt"]'
+            - 'response["translatorLaneReceipt"]'
+            - 'response["importOracleLaneReceipt"]'
+            - 'response["importOracleMissingSources"]'
+            - 'response["adjacentSr6OracleReceiptPosture"]'
+            - 'response["adjacentSr6OracleSourcesCovered"]'
+            - 'response["adjacentSr6OracleLaneReceipt"]'
+            - 'response["sr6SuccessorLaneReceipt"]'
+            - 'response["onlineStorageLanePosture"]'
+            - 'response["onlineStorageReceiptPosture"]'
+            - 'response["onlineStorageLaneReceipt"]'
+            - 'firstSourcebook["referenceSnapshotPosture"]'
+        - repo: chummer6-core
+          path: Chummer.Infrastructure/Xml/XmlToolCatalogService.cs
+          must_contain:
+            - BuildReferenceSourceLaneReceipt
+            - BuildSettingsLaneReceipt
+            - BuildSourceToggleLaneReceipt
+            - BuildSourceSelectionLaneReceipt
+            - BuildCustomDataLaneReceipt
+            - BuildCustomDataAuthoringLaneReceipt
+            - BuildXmlBridgeLaneReceipt
+            - BuildTranslatorLaneReceipt
+            - BuildImportOracleLaneReceipt
+            - BuildAdjacentSr6OracleLaneReceipt
+            - ImportOracleMissingSources
+            - ResolveAdjacentSr6OracleCoverage
+            - BuildSr6SuccessorLaneReceipt
+            - BuildOnlineStorageSummary
+            - BuildOnlineStorageLaneReceipt
+            - ResolveReferenceSnapshotPosture
+        - repo: chummer6-core
+          path: Chummer.CoreEngine.Tests/Program.cs
+          must_contain:
+            - BuildLabWorkspaceProjectionFactoryProjectsIntakeState
+            - RuntimeLockDiffIsDeterministicAndParameterized
+            - target.foundry-export
+            - target.json-exchange
+            - target.sheet-viewer
+            - target.print-pdf-export
+            - target.replay-timeline
+            - target.session-recap
+            - target.run-module
+        - repo: chummer6-hub
+          path: Chummer.Tests/PublicLandingBuildLabHandoffViewTests.cs
+          must_contain:
+            - handoff.RuleEnvironmentDiff
+            - handoff.RuleEnvironmentDiff.BeforeScope
+            - handoff.RuleEnvironmentDiff.AfterScope
+        - repo: chummer6-hub
+          path: Chummer.Run.AI/Services/Interop/InteropExportService.cs
+          must_contain:
+            - chummer.portable-dossier.v1
+            - chummer.portable-campaign.v1
+            - foundry-vtt.scene-ledger.v1
+            - ReceiptSummary
+            - nextSafeAction
         - repo: chummer6-ui
           path: Chummer.Presentation/UiKit/ChummerPatternBoundary.cs
           must_contain:
@@ -134,6 +265,34 @@ journey_gates:
           must_contain:
             - Decision rail
             - buildLab.SupportClosureSummary
+        - repo: chummer6-ui
+          path: Chummer.Presentation/Overview/DesktopDialogFactory.cs
+          must_contain:
+            - new DesktopDialogField("masterIndexSourceSelectionReceipt"
+            - new DesktopDialogField("masterIndexCustomDataAuthoringReceipt"
+            - new DesktopDialogField("masterIndexImportOracleReceipt"
+            - new DesktopDialogField("masterIndexAdjacentSr6OracleLane"
+            - new DesktopDialogField("masterIndexOnlineStorageLane"
+            - new DesktopDialogField("masterIndexOnlineStorageCoverage"
+            - new DesktopDialogField("masterIndexOnlineStorageReceipt"
+            - new DesktopDialogField("masterIndexSr6SupplementLane"
+            - new DesktopDialogField("masterIndexSr6DesignerCoverage"
+            - new DesktopDialogField("masterIndexHouseRuleLane"
+            - new DesktopDialogField("masterIndexSr6SuccessorReceipt"
+        - repo: chummer6-ui
+          path: Chummer.Tests/Presentation/DesktopDialogFactoryTests.cs
+          must_contain:
+            - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexSourceSelectionReceipt")
+            - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexCustomDataAuthoringReceipt")
+            - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexImportOracleReceipt")
+            - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexAdjacentSr6OracleLane")
+            - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexOnlineStorageLane")
+            - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexOnlineStorageCoverage")
+            - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexOnlineStorageReceipt")
+            - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexSr6SupplementLane")
+            - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexSr6DesignerCoverage")
+            - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexHouseRuleLane")
+            - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexSr6SuccessorReceipt")
       required_project_posture:
         - project_id: core
           minimum_stage: pre_repo_local_complete
@@ -163,6 +322,7 @@ journey_gates:
       - chummer6-mobile
       - chummer6-ui
       - fleet
+      - executive-assistant
     scorecard_refs:
       slos:
         - session_continuity
@@ -187,11 +347,92 @@ journey_gates:
           must_contain:
             - '"contract_name": "chummer6-hub.local_release_proof"'
             - '"campaign_session_recover_recap"'
+        - repo: chummer6-hub
+          path: Chummer.Run.Api/Services/Community/CampaignSpineService.cs
+          must_contain:
+            - "governed faction, heat, contact, and reputation signal(s)"
+            - "governed aftermath package(s) keep return, replay review, and next-session carry-forward"
+            - "travel-prefetch receipt(s) keep the exact offline inventory deliberate and reviewable per claimed device."
+        - repo: chummer6-hub
+          path: Chummer.Tests/CampaignWorkspaceServerPlaneServiceTests.cs
+          must_contain:
+            - 'Title: "Neon Cradle diary, contacts, and heat return packet"'
+            - 'Kind: "campaign_diary_packet"'
+            - 'Kind: "heat_pressure_lane"'
+            - 'Kind: "downtime_brief"'
+            - 'Kind: "opposition_packet"'
+            - 'Kind: "roster_movement_packet"'
+            - 'Kind: "event_control_packet"'
+            - 'InvokeBuildTokens("next-session-return-loops")'
+        - repo: chummer6-hub
+          path: tests/RunServicesVerification/GmOpsBoardVerification.cs
+          must_contain:
+            - 'EventType: "heat.alert"'
+            - 'AdditionalTags: ["opposition", "packet"]'
+            - 'AdditionalTags: ["opposition", "roster"]'
+        - repo: chummer6-hub
+          path: tests/RunServicesVerification/OfflineSyncVerification.cs
+          must_contain:
+            - "offline_sync_snapshot_v1"
+            - "Snapshot should include reusable campaign prep assets for offline library continuity."
+        - repo: chummer6-ui
+          path: scripts/audit-ui-parity.sh
+          must_contain:
+            - "dice_roller"
+            - "character_roster"
+        - repo: chummer6-ui
+          path: Chummer.Presentation/Overview/DesktopDialogFactory.cs
+          must_contain:
+            - '"dice_roller" => new DesktopDialogState('
+            - '"character_roster" => new DesktopDialogState('
+            - '"dialog.dice_roller"'
+            - '"dialog.character_roster"'
+        - repo: chummer6-ui
+          path: Chummer.Blazor/Components/Shared/GmBoardFeed.razor
+          must_contain:
+            - "<header class=\"trace-section-title\">Initiative Rail</header>"
+            - "<div class=\"gm-board-initiative-strip\">"
+            - "data-gm-board-initiative-pill="
+        - repo: chummer6-ui
+          path: Chummer/Forms/Utility Forms/CharacterRoster.cs
+          must_contain:
+            - "new FileSystemWatcher(GlobalSettings.CharacterRosterPath, \"*.chum5*\")"
+            - "Log.Trace(\"Populating CharacterRosterTreeNode Watch Folder (MainThread).\")"
+        - repo: chummer6-hub
+          path: Chummer.Run.Contracts/CompatCore/Presentation/WorkflowSurfaceContracts.cs
+          must_contain:
+            - 'public const string Dashboard = "dashboard";'
+            - 'public const string SessionDashboard = "session-dashboard";'
         - repo: chummer6-mobile
           path: .codex-studio/published/MOBILE_LOCAL_RELEASE_PROOF.generated.json
           must_contain:
             - '"contract_name": "chummer6-mobile.local_release_proof"'
             - '"campaign_session_recover_recap"'
+            - 'Assert(projection.OfflineTruthSummary.Contains(\"Stale:\", StringComparison.Ordinal)'
+            - 'Assert(plan.TravelCompanionSummary.Contains(\"Cached:\", StringComparison.Ordinal)'
+            - 'Assert(plan.TravelCompanionSummary.Contains(\"Offline actions:\", StringComparison.Ordinal)'
+            - 'id=\"workspace-offline-truth\"'
+            - 'id=\"restore-offline-truth\"'
+            - 'id=\"restore-travel-companion\"'
+        - repo: executive-assistant
+          path: SKILLS.md
+          must_contain:
+            - "`gm_ops_briefing`"
+            - "`opposition_packet`"
+            - "`roster_movement_plan`"
+            - "`prep_library_packet`"
+            - "`event_control_brief`"
+            - "`campaign_downtime_plan`"
+            - "`campaign_diary_packet`"
+            - "`campaign_contacts_update`"
+            - "`campaign_heat_brief`"
+            - "`campaign_aftermath_packet`"
+            - "`campaign_return_loop_brief`"
+            - "`campaign_safehouse_readiness_brief`"
+            - "`campaign_travel_continuity_packet`"
+            - "`campaign_offline_continuity_brief`"
+            - "`campaign_mobile_companion_brief`"
+            - "`campaign_workspace_v4_brief`"
       required_project_posture:
         - project_id: hub
           minimum_stage: pre_repo_local_complete
@@ -304,6 +545,9 @@ journey_gates:
             - '"/contact"'
       require_support_freshness: true
       require_support_closure_waiting_zero: true
+      require_support_update_required_routes_to_downloads: true
+      require_support_install_truth_contract: true
+      require_support_recovery_path_contract: true
       required_project_posture:
         - project_id: hub
           minimum_stage: pre_repo_local_complete

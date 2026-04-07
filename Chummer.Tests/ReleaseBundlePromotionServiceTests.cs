@@ -124,6 +124,96 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.Equal("run-20260401-221500", result.Version);
         Assert.Contains("avalonia-osx-arm64-dmg", result.PromotedArtifactIds);
         Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", "chummer-avalonia-osx-arm64-installer.dmg")));
+        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "startup-smoke", "startup-smoke-avalonia-macos-arm64.receipt.json")));
+    }
+
+    [Fact]
+    public async Task PromoteAsyncAllowsArtifactSha256ReceiptFieldAndPlatformAlias()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260401-223000",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-dmg",
+                    Head: "avalonia",
+                    Platform: "osx",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-preview"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview",
+                    UseArtifactSha256ReceiptField: true,
+                    ReceiptPlatformOverride: "darwin")
+            ]);
+
+        ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
+
+        Assert.Equal("run-20260401-223000", result.Version);
+        Assert.Contains("avalonia-osx-arm64-dmg", result.PromotedArtifactIds);
+        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", "chummer-avalonia-osx-arm64-installer.dmg")));
+    }
+
+    [Fact]
+    public async Task PromoteAsyncAllowsRidStylePlatformTokens()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260401-224000",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-dmg",
+                    Head: "avalonia",
+                    Platform: "osx-arm64",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-preview"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview",
+                    ReceiptPlatformOverride: "osx-arm64")
+            ]);
+
+        ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
+
+        Assert.Equal("run-20260401-224000", result.Version);
+        Assert.Contains("avalonia-osx-arm64-dmg", result.PromotedArtifactIds);
+        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", "chummer-avalonia-osx-arm64-installer.dmg")));
+    }
+
+    [Fact]
+    public async Task PromoteAsyncAllowsUnsignedWindowsPreviewArtifactWhenEvidenceMarksSkippedPreview()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260401-222500",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-win-x64-installer",
+                    Head: "avalonia",
+                    Platform: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    Bytes: "windows-preview"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview")
+            ]);
+
+        ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
+
+        Assert.Equal("run-20260401-222500", result.Version);
+        Assert.Contains("avalonia-win-x64-installer", result.PromotedArtifactIds);
+        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", "chummer-avalonia-win-x64-installer.exe")));
     }
 
     private sealed class ReleaseBundlePromotionFixture : IDisposable
@@ -264,9 +354,10 @@ public sealed class ReleaseBundlePromotionServiceTests
                     JsonSerializer.Serialize(new
                     {
                         headId = artifact.Head,
-                        platform = artifact.Platform,
+                        platform = artifact.ReceiptPlatformOverride ?? artifact.Platform,
                         arch = artifact.Arch,
-                        artifactDigest = $"sha256:{sha}"
+                        artifactDigest = artifact.UseArtifactSha256ReceiptField ? null : $"sha256:{sha}",
+                        artifactSha256 = artifact.UseArtifactSha256ReceiptField ? sha : null
                     }, TestJsonOptions));
 
                 evidenceArtifacts.Add(new PromotionEvidenceArtifact(
@@ -367,7 +458,9 @@ public sealed class ReleaseBundlePromotionServiceTests
         bool RequiresSigning,
         bool RequiresNotarization,
         string? SigningStatusOverride = null,
-        string? NotarizationStatusOverride = null);
+        string? NotarizationStatusOverride = null,
+        bool UseArtifactSha256ReceiptField = false,
+        string? ReceiptPlatformOverride = null);
 
     private sealed record CompatibilityArtifact(
         string Id,

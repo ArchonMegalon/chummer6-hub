@@ -431,7 +431,9 @@ public sealed class VerificationEntryPointTests
 
         Assert.Contains("/downloads/release-upload", controller, StringComparison.Ordinal);
         Assert.Contains("/downloads/release-upload/bootstrap.sh", controller, StringComparison.Ordinal);
-        Assert.Contains("bash <(curl -fsSL", controller, StringComparison.Ordinal);
+        Assert.Contains("set -o pipefail", controller, StringComparison.Ordinal);
+        Assert.Contains("curl -fsSL", controller, StringComparison.Ordinal);
+        Assert.Contains("TMP_BOOTSTRAP_SCRIPT", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadTicketService", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadPageViewModel", viewModel, StringComparison.Ordinal);
         Assert.Contains("Signed-in release upload", view, StringComparison.Ordinal);
@@ -484,19 +486,19 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("The Windows setup assistant offers Auto select", controller, StringComparison.Ordinal);
         Assert.Contains("The Linux setup assistant offers Auto select", controller, StringComparison.Ordinal);
         Assert.Contains("whether to leave quick access in Applications only or add Desktop links", controller, StringComparison.Ordinal);
-        Assert.Contains("verifies that linking actually completed", controller, StringComparison.Ordinal);
-        Assert.Contains("Each selected app is started once through a short-lived environment handoff", controller, StringComparison.Ordinal);
+        Assert.Contains("staged account linking for first open", controller, StringComparison.Ordinal);
         Assert.Contains("verify_download_digest", controller, StringComparison.Ordinal);
         Assert.Contains("perform_staged_install", controller, StringComparison.Ordinal);
         Assert.Contains("launch_bundle_binary_with_claim", controller, StringComparison.Ordinal);
         Assert.Contains("ConvertFrom-Json", controller, StringComparison.Ordinal);
         Assert.Contains("--bootstrap-install", controller, StringComparison.Ordinal);
+        Assert.Contains("--install-claim-code", controller, StringComparison.Ordinal);
         Assert.Contains("dpkg-deb -x", controller, StringComparison.Ordinal);
         Assert.Contains("resolve_install_state_root", controller, StringComparison.Ordinal);
         Assert.Contains("build_install_state_path", controller, StringComparison.Ordinal);
-        Assert.Contains("read_install_state_field", controller, StringComparison.Ordinal);
-        Assert.Contains("wait_for_claim_success", controller, StringComparison.Ordinal);
-        Assert.Contains("Confirmed linked installs", controller, StringComparison.Ordinal);
+        Assert.Contains("build_pending_claim_code_path", controller, StringComparison.Ordinal);
+        Assert.Contains("persist_pending_claim_code", controller, StringComparison.Ordinal);
+        Assert.Contains("Prepared first-open account linking", controller, StringComparison.Ordinal);
         Assert.Contains("create_desktop_link", controller, StringComparison.Ordinal);
         Assert.Contains("run_privileged_script", controller, StringComparison.Ordinal);
         Assert.Contains("Current Mac architecture", controller, StringComparison.Ordinal);
@@ -505,11 +507,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("wait \\\"$launch_pid\\\" >/dev/null 2>&1 || true", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("copies them to your clipboard", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("xattr -dr com.apple.quarantine", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("--install-claim-code", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("pkill -f \"$target_app/Contents/MacOS\"", controller, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_INSTALL_CLAIM_CODE", controller, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_API_BASE_URL", controller, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_WEB_BASE_URL", controller, StringComparison.Ordinal);
         Assert.Contains("InstallBootstrapTicketService", controller, StringComparison.Ordinal);
         Assert.Contains("QueryString.Create(\"ticket\"", controller, StringComparison.Ordinal);
         Assert.Contains("invalid_or_expired_install_ticket", controller, StringComparison.Ordinal);
@@ -529,6 +527,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("BootstrapFeatureCards", viewModel, StringComparison.Ordinal);
         Assert.Contains("CurrentReleaseSummary", viewModel, StringComparison.Ordinal);
         Assert.Contains("AutoStartDownload", viewModel, StringComparison.Ordinal);
+        Assert.Contains("ClaimExchangeUrl", viewModel, StringComparison.Ordinal);
         Assert.DoesNotContain("downloads-quicknav", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Advanced download options", downloadsView, StringComparison.Ordinal);
         Assert.Contains("copy the Terminal command", downloadsView, StringComparison.Ordinal);
@@ -541,7 +540,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("CurrentReleaseSummary", dispatchView, StringComparison.Ordinal);
         Assert.Contains("Fallbacks and recovery", dispatchView, StringComparison.Ordinal);
         Assert.Contains("Setup highlights", dispatchView, StringComparison.Ordinal);
-        Assert.Contains("Recovery claim code", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("enter the support or recovery code inside setup instead of copying one from this page", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("claimExchangeUrl", dispatchView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicTrustPulsePanel.cshtml", dispatchView, StringComparison.Ordinal);
         Assert.Contains("if (autoStartDownload)", dispatchView, StringComparison.Ordinal);
         Assert.Contains("SecondaryDownloadLabel", dispatchView, StringComparison.Ordinal);

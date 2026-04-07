@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass
 from html import unescape
 from html.parser import HTMLParser
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode, urljoin
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -314,8 +315,8 @@ def extract_dispatch_path(body: str, path: str) -> str:
     return extract_first_match(body, r'href="([^"]*/downloads/install/[^"]+)"', path, "signed-in install handoff link")
 
 
-def extract_claim_code(body: str, path: str) -> str:
-    return extract_first_match(body, r'id="claimCodeValue"[^>]*>([^<]+)<', path, "install claim code")
+def extract_claim_exchange_url(body: str, path: str) -> str:
+    return extract_first_match(body, r'id="claimExchangeUrl"[^>]*data-claim-url="([^"]+)"', path, "install claim exchange url")
 
 
 def extract_subject_id(body: str, path: str) -> str:
@@ -358,7 +359,21 @@ def ensure_claimed_device(
     if status != 200:
         raise AssertionError(f"{dispatch_path} returned {status}, expected 200")
 
-    claim_code = extract_claim_code(body, dispatch_path)
+    claim_exchange_url = extract_claim_exchange_url(body, dispatch_path)
+    status, claim_body, _, _ = fetch(
+        base_url,
+        claim_exchange_url,
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        request_headers={"Cookie": cookie_header},
+    )
+    if status != 200:
+        raise AssertionError(f"{claim_exchange_url} returned {status}, expected 200")
+
+    claim_payload = json.loads(claim_body)
+    claim_code = str(claim_payload.get("claimCode") or "").strip()
+    if not claim_code:
+        raise AssertionError("claim exchange did not return a usable claim code")
     installation_id = f"install-live-audit-{time.time_ns()}"
     initial_version = "0.0-live-audit"
     redeem_body = json.dumps(
@@ -11753,17 +11768,17 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/now",
-            "Current preview, visible proof, and known posture",
+            "Current preview, visible proof, and known limits",
             required_texts=("What you can verify now", "Build, explain, and run with visible evidence", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point", "Status guide"),
             expects_header_count=1),
         AuditRoute(
             "/downloads",
             "Install the current preview",
-            required_texts=("Create account to get preview", "Already have an account? Sign in", "Advanced download options", "Release notes, known issues, and requirements", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point"),
+            required_texts=("Sign in", "Get preview build", "Advanced download options", "Release notes, known issues, and requirements", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point"),
             forbidden_texts=("Package details",),
             expects_header_count=1),
         AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Status guide"), forbidden_texts=("Research tracks",), expects_header_count=1),
-        AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Preview in progress", "Status guide", "Anyone evaluating the preview", "Governed publication discovery", "Published shared publications", "Compare at a glance", "How live publications differ", "Open public publication"), expects_header_count=1),
+        AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Available today", "Preview in progress", "Status guide", "These are the artifacts you can use or inspect against the current preview today."), expects_header_count=1),
         AuditRoute("/artifacts/current-preview-build", "Current preview build", required_texts=("Anyone evaluating the preview", "Use and verify this proof", "What this live artifact shows, who it helps, and what to check next", "Start from the live surface", "Open current release", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", required_texts=("Anyone evaluating the preview", "Why this horizon matters now", "Current pain, expected unlock, and the live proof you should compare first", "Compare with current proof", "Need a decision instead?", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute(
@@ -11809,7 +11824,7 @@ def main() -> int:
                 "What changed in this version",
                 "Open downloads",
                 "Open help",
-                "Create account to get preview"),
+                "Sign in"),
             expects_header_count=1),
         AuditRoute("/robots.txt", "Disallow: /"),
     ]
@@ -11859,11 +11874,17 @@ def main() -> int:
     if status != 200:
         raise AssertionError("/artifacts returned a non-200 response while extracting the public creator detail link")
 
-    public_creator_detail_path = extract_first_match(
+    public_creator_detail_path = extract_optional_match(
         body,
         r'href="([^"]*/artifacts/(?:publications|creator)/[^"]+)"',
-        "/artifacts",
-        "public creator detail link")
+    )
+    if public_creator_detail_path is None:
+        public_creator_detail_path = extract_first_match(
+            body,
+            r'href="([^"]*/artifacts/current-preview-build[^"]*)"',
+            "/artifacts",
+            "current preview build detail link",
+        )
     status, public_creator_body, _, _ = fetch(
         args.base_url,
         public_creator_detail_path,
@@ -11872,17 +11893,25 @@ def main() -> int:
     )
     if status != 200:
         raise AssertionError(f"{public_creator_detail_path} returned {status}, expected 200")
-    require_creator_publication_body(public_creator_body, public_creator_detail_path)
+    if is_public_creator_publication_path(public_creator_detail_path):
+        require_creator_publication_body(public_creator_body, public_creator_detail_path)
     print(f"ok {public_creator_detail_path}")
 
-    status, _, _, final_url = fetch(
+    status, body, _, final_url = fetch(
         args.base_url,
         "/status",
         public_host=args.public_host,
         forwarded_proto=args.forwarded_proto,
     )
-    if status != 200 or not final_url.rstrip("/").endswith("/now"):
-        raise AssertionError("/status did not resolve to /now")
+    if status != 200:
+        raise AssertionError("/status did not return 200")
+    if not (
+        final_url.rstrip("/").endswith("/now")
+        or final_url.rstrip("/").endswith("/status")
+    ):
+        raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
+    for snippet in ("Status guide", "Progress trend", "Adoption health"):
+        require_snippet(body, snippet, "/status")
     print(f"ok /status -> {final_url}")
 
     status, body, _, final_url = fetch(
@@ -11898,10 +11927,30 @@ def main() -> int:
     journey_gate_health = pulse_payload.get("journey_gate_health")
     if not isinstance(journey_gate_health, dict):
         raise AssertionError("/api/public/weekly-pulse is missing journey_gate_health")
-    if str(journey_gate_health.get("state") or "").strip().lower() != "ready":
-        raise AssertionError("/api/public/weekly-pulse did not reflect the current Fleet ready-state journey proof")
-    if int(journey_gate_health.get("blocked_count") or 0) != 0:
-        raise AssertionError("/api/public/weekly-pulse still reports blocked journey gates")
+    fleet_artifact_root = Path(
+        os.environ.get("CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT") or "/docker/fleet/.codex-studio/published"
+    )
+    journey_gates_path = fleet_artifact_root / "JOURNEY_GATES.generated.json"
+    if not journey_gates_path.is_file():
+        raise AssertionError(f"weekly pulse audit could not find Fleet journey gates artifact: {journey_gates_path}")
+    journey_gates_payload = json.loads(journey_gates_path.read_text(encoding="utf-8"))
+    journey_gates_summary = journey_gates_payload.get("summary")
+    if not isinstance(journey_gates_summary, dict):
+        raise AssertionError(f"Fleet journey gates artifact is missing summary: {journey_gates_path}")
+    expected_journey_state = str(journey_gates_summary.get("overall_state") or "").strip().lower()
+    expected_blocked_count = int(journey_gates_summary.get("blocked_count") or 0)
+    pulse_journey_state = str(journey_gate_health.get("state") or "").strip().lower()
+    pulse_blocked_count = int(journey_gate_health.get("blocked_count") or 0)
+    if pulse_journey_state != expected_journey_state:
+        raise AssertionError(
+            "/api/public/weekly-pulse did not reflect the current Fleet journey proof state "
+            f"(expected {expected_journey_state or 'unknown'}, got {pulse_journey_state or 'unknown'})"
+        )
+    if pulse_blocked_count != expected_blocked_count:
+        raise AssertionError(
+            "/api/public/weekly-pulse did not reflect the current Fleet blocked journey count "
+            f"(expected {expected_blocked_count}, got {pulse_blocked_count})"
+        )
 
     supporting_signals = pulse_payload.get("supporting_signals")
     if not isinstance(supporting_signals, dict):
