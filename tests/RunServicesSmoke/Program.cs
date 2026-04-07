@@ -2405,7 +2405,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var dispatchView = await authenticatedLandingController.DownloadDispatchPage("smoke-poc-linux-x64", CancellationToken.None) as ViewResult;
     var dispatchModel = dispatchView?.Model as DownloadDispatchPageViewModel;
     Assert(dispatchModel is not null && string.Equals(dispatchModel.DownloadHref, "/downloads/file/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in download handoff should expose the canonical file route.");
-    Assert(!string.IsNullOrWhiteSpace(dispatchModel?.ClaimCode), "signed-in download handoff should expose a claim code.");
+    Assert(!string.IsNullOrWhiteSpace(dispatchModel?.ClaimExchangeUrl), "signed-in download handoff should expose a private claim-exchange route.");
     Assert(!string.IsNullOrWhiteSpace(dispatchModel?.Heading), "signed-in download handoff should expose a non-empty heading.");
     Assert(!string.IsNullOrWhiteSpace(dispatchModel?.Summary), "signed-in download handoff should expose a non-empty summary.");
     Assert(dispatchModel?.Steps.Count > 0, "signed-in download handoff should expose the signed-in install steps.");

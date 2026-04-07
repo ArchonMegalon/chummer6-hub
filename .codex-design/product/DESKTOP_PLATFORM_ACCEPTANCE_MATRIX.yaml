@@ -23,13 +23,13 @@ platforms:
     updater_mode: in_app_or_installer_handoff
     supportability: secondary
   - id: macOS
-    public_shelf_status: buildable_not_publicly_promoted
-    primary_package_kind: dmg
+    public_shelf_status: account_gated_setup_script_preview
+    primary_package_kind: setup_script
     fallback_package_kinds:
       - none
     startup_smoke_gate: required
     signing_posture: codesign_and_notarization_required
-    updater_mode: handoff_until_public_promotion
-    supportability: gated_by_signing_and_notarization
-    public_manifest_visibility: hidden_until_signed_and_promoted
-    public_promotion_gate: signed_dmg_notarized_and_release_truth_promoted
+    updater_mode: claimed_setup_script_then_dmg_handoff
+    supportability: account_gated_setup_script_preview
+    public_manifest_visibility: visible_as_account_gated_setup_script_preview
+    public_promotion_gate: account_gated_setup_script_with_bounded_preview_truth

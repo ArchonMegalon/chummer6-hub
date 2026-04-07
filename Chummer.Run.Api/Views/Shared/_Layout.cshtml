@@ -12,6 +12,38 @@
     var supportLinks = chrome.SecondaryNavigation.Where(link =>
         link.Href is "/help" or "/faq" or "/privacy" or "/terms" or "/contact").ToArray();
     var productLinks = chrome.SecondaryNavigation.Except(supportLinks).ToArray();
+    Func<string?, string> normalizeHeaderActionPath = href =>
+    {
+        if (string.IsNullOrWhiteSpace(href))
+        {
+            return string.Empty;
+        }
+
+        var candidate = href!;
+        int queryIndex = candidate.IndexOf('?');
+        if (queryIndex >= 0)
+        {
+            candidate = candidate[..queryIndex];
+        }
+
+        if (Uri.TryCreate(candidate, UriKind.Absolute, out Uri? uri))
+        {
+            candidate = uri.AbsolutePath;
+        }
+
+        return candidate.Trim().TrimEnd('/');
+    };
+
+    Func<string?, bool> isBuildAction = href =>
+    {
+        return string.Equals(normalizeHeaderActionPath(href), "/downloads/release-upload", StringComparison.OrdinalIgnoreCase);
+    };
+
+    var buildAction = chrome.HeaderActions.FirstOrDefault(action => isBuildAction(action.Href));
+    var hasBuildAction = buildAction is not null;
+    var nonBuildHeaderActions = chrome.HeaderActions.Where(action => !isBuildAction(action.Href)).ToArray();
+    var isBuildCurrent = string.Equals(chrome.CurrentPath, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
+        || chrome.CurrentPath.StartsWith("/downloads/release-upload/", StringComparison.OrdinalIgnoreCase);
     var compactFooter = routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "artifacts" or "downloads" or "participate" or "help" or "faq" or "privacy" or "terms" or "contact"
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
         || routeKey.StartsWith("roadmap-", StringComparison.Ordinal);
@@ -50,6 +82,14 @@
                     <a class="site-actions__link" href="/help">Help</a>
                     <a class="site-actions__link" href="/faq">FAQ</a>
                     <a class="site-actions__link" href="/contact">Contact</a>
+                    @if (isBuildCurrent)
+                    {
+                        <span class="site-actions__label">Build</span>
+                    }
+                    else
+                    {
+                        <a class="site-actions__link" href="/downloads/release-upload">Build</a>
+                    }
                 </div>
             </div>
         </header>
@@ -81,7 +121,7 @@
                     {
                         <span class="site-actions__label">@chrome.SignedInLabel</span>
                     }
-                    @foreach (var action in chrome.HeaderActions)
+                    @foreach (var action in nonBuildHeaderActions)
                     {
                         if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
                         {
@@ -100,6 +140,28 @@
                                 ? "site-actions__link"
                                 : $"action-pill action-pill--{action.Tone}";
                             <a class="@actionClass" href="@action.Href">@action.Label</a>
+                        }
+                    }
+                    @if (buildAction is not null)
+                    {
+                        if (buildAction.Current)
+                        {
+                            <span class="action-pill action-pill--current">@buildAction.Label</span>
+                        }
+                        else
+                        {
+                            <a class="action-pill action-pill--secondary" href="@buildAction.Href">@buildAction.Label</a>
+                        }
+                    }
+                    @if (chrome.Authenticated && !hasBuildAction)
+                    {
+                        if (isBuildCurrent)
+                        {
+                            <span class="action-pill action-pill--current">Build</span>
+                        }
+                        else
+                        {
+                            <a class="action-pill action-pill--secondary" href="/downloads/release-upload">Build</a>
                         }
                     }
                 </div>

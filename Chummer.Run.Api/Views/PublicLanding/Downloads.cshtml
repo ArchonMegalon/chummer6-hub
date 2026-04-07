@@ -116,11 +116,12 @@ else
                         {
                             <a class="button-like button-like--secondary" href="/login?next=@Uri.EscapeDataString("/downloads")">Already have an account? Sign in</a>
                         }
-                        else
-                        {
-                            <a class="button-like button-like--secondary" href="/account/access">Open Devices and access</a>
-                        }
+                    else
+                    {
+                        <a class="button-like button-like--secondary" href="/downloads/release-upload">Release upload handoff</a>
+                        <a class="button-like button-like--secondary" href="/account/access">Open Devices and access</a>
                     }
+                }
                 </div>
                 @if (!requestedPlatformUnavailable)
                 {
@@ -132,6 +133,12 @@ else
                 }
                 @if (hasAdvancedPanels)
                 {
+                    @if (Model.Chrome.Authenticated)
+                    {
+                        <p class="downloads-inline-note">
+                            Signed-in release producer? Open the <a href="/downloads/release-upload">release upload handoff</a> to get a single-copy Mac bootstrap command that carries an upload token and promotes directly to the live shelf.
+                        </p>
+                    }
                     <p class="downloads-advanced-link">
                         <a class="inline-link" href="#advanced-downloads">Advanced download options</a>
                     </p>

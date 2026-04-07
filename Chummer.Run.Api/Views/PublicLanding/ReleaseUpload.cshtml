@@ -6,35 +6,12 @@
     var expires = Model.TicketExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'");
 }
 
-<section class="release-stage">
-    <div class="release-stage__lead">
-        <p class="eyebrow">Signed-in release upload</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Summary</p>
-        <p class="release-stage__note">This command already carries the short-lived upload ticket. The release runner can build, sign, notarize, upload, promote, and print the resulting claim-code handoff without another credential step.</p>
-    </div>
-    <div class="release-stage__integrity">
-        <span class="tag">Ticket window</span>
-        <p>Expires @expires.</p>
-    </div>
-</section>
-
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
 <section class="recommended-download" id="release-upload-command">
     <article class="recommended-download__card">
         <div class="recommended-download__copy">
             <span class="tag">Mac Codex one-liner</span>
-            <h2>Paste this into the release shell</h2>
-            <p>The bootstrap clones the required repos, bundles the legacy demo runner, builds the desktop artifact, uploads the signed release bundle over HTTP, and prints the live install handoff plus claim code.</p>
+            <h2>Run this in your mac release shell</h2>
+            <p>The command clones repos, builds the osx-arm64 desktop artifact, runs startup smoke checks, publishes the signed upload bundle, and prints the install handoff plus claim code for immediate install verification.</p>
             <div class="code-panel">
                 <div class="code-panel__label">Command</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadCommand">@Model.Command</pre>
@@ -48,26 +25,57 @@
     </article>
 </section>
 
+<section class="release-stage">
+    <div class="release-stage__lead">
+        <p class="eyebrow">Signed-in release upload</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Summary</p>
+        <p class="release-stage__note">
+            This page is the source of truth for release upload in Chummer: one authenticated handoff, one bootstrap command, and one claim-code return.
+        </p>
+    </div>
+</section>
+
+<section class="release-stage">
+    <div class="release-stage__integrity">
+        <span class="tag">Ticket window</span>
+        <p>Expires @expires.</p>
+    </div>
+    <div class="release-stage__note">
+        The command is preconfigured for preview uploads with unsigned mode enabled.
+        Replace <code>CHUMMER_ALLOW_UNSIGNED_PREVIEW=1</code> with a valid <code>CHUMMER_APP_SIGN_IDENTITY</code> when you are ready for signed delivery.
+    </div>
+</section>
+
 <section class="release-guidance release-guidance--detail">
     <article class="release-guidance__item">
         <span class="tag">What happens next</span>
-        <h2>Automatic public promotion and claim-code return</h2>
+        <h2>Automatic publication and claim-code return</h2>
         <ul class="trust-page-section__list">
-            <li>The uploaded bundle is validated and merged into the live downloads shelf instead of replacing unrelated platforms.</li>
-            <li>The upload response prints the signed-in install handoff and the claim code for the promoted artifact so you can jump straight into first launch.</li>
+            <li>The upload response validates the bundle and publishes only the target platform artifact lane to the live downloads shelf.</li>
+            <li>The response returns the install handoff URL and the claim code so you can verify launch in one pass.</li>
             <li>The promoted artifact appears in the public manifest at <a href="@Model.VerifyUrl">@Model.VerifyUrl</a>.</li>
         </ul>
     </article>
     <article class="release-guidance__item">
         <span class="tag tag--quiet">Windows too</span>
-        <h2>Same endpoint, same publication contract</h2>
+        <h2>Same endpoint, same contract</h2>
         <p>@Model.WindowsUploadNote</p>
         <ul class="trust-page-section__list">
             <li>Upload endpoint: <a href="@Model.UploadUrl">@Model.UploadUrl</a></li>
-            <li>General runbook: <a href="@Model.ReadmeUrl">@Model.ReadmeUrl</a></li>
+            <li>Runbook: <a href="@Model.ReadmeUrl">@Model.ReadmeUrl</a></li>
         </ul>
     </article>
 </section>
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
 
 @section Scripts {
 <script>

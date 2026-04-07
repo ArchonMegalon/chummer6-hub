@@ -8,6 +8,12 @@ Purpose: keep the live hosted-boundary queue readable. Historical re-entry and q
 - `blocked`
 - `done`
 
+## Fleet execution sequence (cross-shard)
+
+- P0 foundation: complete `core/WL-200` first, then run `DR-120` and launch trust/recovery surface parity slices in parallel (`ui/WL-240`, `hub/WL-240`, `mobile/WL-027`, `hub-registry/WL-260`, `media/MF-014`).
+- P1 hardening: after `WL-200` is stable and `design/DR-124` is in review, execute `core/WL-201`, then the follow-on clarity/visibility slices (`ui/WL-241`, `hub/WL-241`, `hub-registry/WL-261`, `hub-registry/WL-262`, `mobile/WL-028`, `media/MF-015`).
+- P2 quality finish: gate on `design/DR-121` through `design/DR-127` before closure on `design/DR-123`; complete ui-kit flagship reliability slice in the same cycle after cross-shard copy/state/known-issue coherence settles.
+
 ## Queue
 | ID | Status | Priority | Task | Owner | Notes |
 |---|---|---|---|---|---|
@@ -31,6 +37,11 @@ Purpose: keep the live hosted-boundary queue readable. Historical re-entry and q
 | WL-239 | done | P1 | Reconcile repeated runnable-backlog/add-mapping publication prompts for the `Chummer.Run.Contracts.Media` render-only versus orchestration DTO split against existing executable coverage. | agent | Completed 2026-03-23: incorporated unread feedback in order (`2026-03-10-public-repo-graph-audit.md`, then `2026-03-21-github-review-pr.md`), re-validated this exact split is already materially covered by `WL-088`, `WL-102`, `WL-104`, `WL-110`, `WL-120`, `WL-124`, `WL-135`, `WL-136`, `WL-154`, `WL-158`, `WL-172`, `WL-179`, and `WL-186` plus `docs/HUB_EXTRACTION_ACCEPTANCE.md` with verification path `scripts/ai/verify.sh`, then removed only the duplicate stale runnable-backlog/add-mapping overlay prompts from `.codex-studio/published/QUEUE.generated.yaml` without reopening completed implementation work. |
 
 ## Current repo truth
+
+| WL-240 | queued | P0 | Improve campaign orchestration UX by adding clear participant lifecycle states, explicit consent/decision breadcrumbs, and failure guidance in hosted assistant/operator surfaces. | agent | This slice closes user-visible gaps in assisted decision flows so campaign moderation and guidance are understandable even during transient infra failures. Depends on `core/WL-200` and `design/DR-120` before execution. Acceptance checks: (1) `GOLDEN_JOURNEY_RELEASE_GATES.yaml` run-journey blockers remain zero for hosted moderation/decision paths; (2) `design/DR-124` failure-mode script IDs include consent and recovery handoff branches; (3) no unowned bypass in `support_and_closure_honesty` scorecard lane. |
+| WL-241 | queued | P1 | Add trust and transparency UX polish to hosted projection and review lanes with clearer status timelines, actionable next steps, and rate-limited feedback surfaces. | agent | This slice adds visibility for moderation and operator actions without exposing internal private controls or weakening product boundaries. Depends on `hub/WL-240` and `core/WL-201` (and therefore `design/DR-121`); must complete with failure-mode scripts from `design/DR-124` and completion of known-issue language alignment in `design/DR-126`. Acceptance checks: (1) status timelines map to support closure language from `design/DR-126`; (2) moderation and projection notices produce one canonical "next safe action"; (3) release proof can demonstrate parity of in-product and public support language via `FEEDBACK_AND_CRASH_REPORTING_SYSTEM.md`. |
+| WL-242 | queued | P2 | Add explicit decision-receipt history and resumability notes for assisted moderation and campaign-automation actions so users can see why a job was paused, canceled, or retried. | agent | Depends on `hub/WL-241`, `core/WL-202`, and `design/DR-129`; this closes the trust gap between action and visible outcome during automation-heavy flows. Acceptance checks: (1) one receipt timeline per assist/automation action; (2) failure/retry outcomes include safe next-step text aligned to `design/DR-126`; (3) no irreversible action can proceed without visible confirmation and recovery path. |
+| WL-243 | queued | P2 | Add no-content and empty-state onboarding guidance for hosted workspace entrypoints, especially for new org/creators with no active campaigns. | agent | Depends on `run-services/WL-242`, `mobile/WL-027`, and `design/DR-128`; implemented across hosted entrypoints and launcher surfaces. Acceptance checks: (1) every empty-state entry path points to one clear next action; (2) copy matches localization risk expectations from `design/DR-129`; (3) support handoff CTA is always visible in failure/empty state states. |
 
 - Repo-local live queue: none
 - Registry/media ownership, contract canon, orchestration-side adapter authority, hub-side product-consumer planes, and assistant-plane governance are verifier-backed and materially closed.

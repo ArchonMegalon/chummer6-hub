@@ -45,6 +45,7 @@ It must prove:
 * one obvious flagship head and one bounded fallback story
 * startup, install, update, crash-recovery, and support flows that feel boring on the promoted path
 * dense-data builder, compare, and explain flows that stay fast and readable under expert use
+* the flagship shell still feels recognizably like Chummer to Chummer5a users: desktop menu, quick-action toolstrip, dense workbench center, and compact trust strip all survive in modern form
 * authored SR4, SR5, and SR6 interactions where edition differences materially change the user's reasoning
 * active ruleset, preset, and amend-package state that never turns rule drift into mystery local cargo
 * import, claim, feedback, and release-help surfaces that agree with the public shelf and support truth
@@ -103,4 +104,4 @@ For the current wave:
 * compatibility/fallback head: `Chummer.Blazor.Desktop`
 * Windows public lane: installer-first with portable `.exe` fallback allowed
 * Linux public lane: `.deb` first, bounded manual fallback allowed when the installer lane is not yet boring enough
-* macOS lane: buildable but withheld from the public shelf until signed/notarized `.dmg` promotion and release-truth close
+* macOS lane: public only after signed/notarized `.dmg` promotion, startup-smoke proof, and release-truth close

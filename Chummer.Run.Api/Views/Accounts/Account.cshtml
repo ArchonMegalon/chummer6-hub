@@ -1940,7 +1940,7 @@
                         {
                             <p><strong>Outputs:</strong> @string.Join(", ", selectedBuildLabHandoff.Outputs.Select(item => item.Label))</p>
                             <ul class="muted-copy">
-                                @foreach (var output in selectedBuildLabHandoff.Outputs.Take(8))
+                                @foreach (var output in selectedBuildLabHandoff.Outputs.Take(3))
                                 {
                                     <li>
                                         <strong>@output.Label</strong>
@@ -1975,9 +1975,9 @@
                                         }
                                     </li>
                                 }
-                                @if (selectedBuildLabHandoff.Outputs.Count > 8)
+                                @if (selectedBuildLabHandoff.Outputs.Count > 3)
                                 {
-                                    <li>Output lanes continue: +@(selectedBuildLabHandoff.Outputs.Count - 8) more governed follow-through lane(s).</li>
+                                    <li>Output lanes continue: +@(selectedBuildLabHandoff.Outputs.Count - 3) more governed follow-through lane(s).</li>
                                 }
                             </ul>
                         }

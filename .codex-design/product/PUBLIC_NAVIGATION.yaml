@@ -4,17 +4,19 @@ version: 1
 primary_nav:
   - label: Product
     href: /what-is-chummer
+  - label: Downloads
+    href: /downloads
   - label: What works today
     href: /now
   - label: Roadmap
     href: /horizons
   - label: Artifacts
     href: /artifacts
+  - label: Build
+    href: /downloads/release-upload
   - label: Participate
     href: /participate
 secondary_nav:
-  - label: Downloads
-    href: /downloads
   - label: Status
     href: /status
   - label: Help

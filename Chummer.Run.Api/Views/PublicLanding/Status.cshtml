@@ -88,6 +88,33 @@
     </article>
 </section>
 
+@if (Model.ReleaseExperience.PlatformAvailability.Count > 0)
+{
+    <section class="release-shelf release-shelf--manual">
+        <details class="release-accordion">
+            <summary>Desktop platform availability</summary>
+            <div class="release-accordion__body">
+                <div class="evidence-row-list">
+                    @foreach (var platform in Model.ReleaseExperience.PlatformAvailability)
+                    {
+                        <article class="evidence-row evidence-row--download" id="status-platform-@platform.PlatformId">
+                            <div class="evidence-row__copy">
+                                <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this device)" : string.Empty)</h3>
+                                <p>@platform.Summary</p>
+                            </div>
+                            <div class="download-row__meta">
+                                <span class="platform-pill">@platform.StatusLabel</span>
+                                <span class="muted-copy">@platform.PrimaryPackageLabel</span>
+                                <span class="muted-copy">@platform.SupportabilityLabel</span>
+                            </div>
+                        </article>
+                    }
+                </div>
+            </div>
+        </details>
+    </section>
+}
+
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
         <p class="eyebrow">Status poster</p>

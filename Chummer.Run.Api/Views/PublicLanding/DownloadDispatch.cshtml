@@ -3,7 +3,6 @@
     ViewData["Title"] = "Download handoff";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads";
-    var claimExpires = Model.ClaimCodeExpiresAtUtc?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'");
 }
 
 <section class="release-stage">
@@ -11,87 +10,128 @@
         <p class="eyebrow">Signed-in download</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Summary</p>
-        <p class="release-stage__note">This handoff keeps the published installer unchanged while attaching the install relationship to your account through a short-lived claim code.</p>
-    </div>
-    <div class="release-stage__integrity">
-        <span class="tag">Current release</span>
-        <p>@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @Model.PlatformLabel.</p>
+        <p class="release-stage__note">@Model.DispatchNote</p>
+        <p class="release-stage__note"><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @Model.CurrentReleaseSummary.</p>
     </div>
 </section>
-
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
 
 <section class="recommended-download" id="signed-in-download">
     <article class="recommended-download__card">
         <div class="recommended-download__copy">
-            <span class="tag">Account-aware install</span>
-            <h2>@Model.ArtifactTitle</h2>
-            <p>@Model.ArtifactSupportLine</p>
-            <div class="recommended-download__meta">
-                <span>@Model.PlatformLabel</span>
-                <span>@Model.Display.ChannelLabel</span>
-            </div>
-
-            @if (!string.IsNullOrWhiteSpace(Model.ClaimCode))
+            @if (!string.IsNullOrWhiteSpace(Model.ClaimExchangeUrl))
+            {
+                <div id="claimExchangeUrl" data-claim-url="@Model.ClaimExchangeUrl" hidden></div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.TerminalInstallCommand) && Model.PromoteSecondaryDownload && !string.IsNullOrWhiteSpace(Model.SecondaryDownloadHref) && !string.IsNullOrWhiteSpace(Model.SecondaryDownloadLabel))
+            {
+                <div class="stacked-actions">
+                    <a class="button-like button-like--primary" href="@Model.SecondaryDownloadHref" id="startSignedInDownloadButton">@Model.SecondaryDownloadLabel</a>
+                </div>
+                <p class="muted-copy">Direct installer download is the cleanest Windows path when you want the standard setup wizard. Use the guided setup assistant below when you want both desktop heads and automatic account linking handled for you.</p>
+                <details class="release-disclosure">
+                    <summary>Guided Windows setup assistant</summary>
+                    <div class="release-disclosure__body">
+                        <div class="code-panel">
+                            <div class="code-panel__label">@(Model.BootstrapCommandLabel ?? "Install command")</div>
+                            <p class="handoff-command__intro"><strong>@(Model.BootstrapCommandIntro ?? "Paste this into your platform shell.")</strong></p>
+                            <div class="code-panel__value code-panel__value--terminal mono-receipt" id="terminalInstallCommandValue">@Model.TerminalInstallCommand</div>
+                            @if (!string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
+                            {
+                                <p class="handoff-command__note">@Model.BootstrapCommandNote</p>
+                            }
+                            <div class="stacked-actions">
+                                <button class="button-like button-like--secondary" type="button" id="copyTerminalInstallCommandButton">Copy install command</button>
+                                <a class="button-like button-like--ghost" href="@Model.DownloadHref">@Model.DownloadLabel</a>
+                            </div>
+                            <p class="status-copy" id="terminalInstallCommandNotice" hidden></p>
+                        </div>
+                        @if (Model.BootstrapFeatureCards.Count > 0)
+                        {
+                            <div class="handoff-feature-grid" aria-label="Setup highlights">
+                                @foreach (var card in Model.BootstrapFeatureCards)
+                                {
+                                    <article class="handoff-feature-card">
+                                        <h2>@card.Heading</h2>
+                                        <p>@card.Body</p>
+                                    </article>
+                                }
+                            </div>
+                        }
+                    </div>
+                </details>
+            }
+            else if (!string.IsNullOrWhiteSpace(Model.TerminalInstallCommand))
             {
                 <div class="code-panel">
-                    <div class="code-panel__label">Install claim code</div>
-                    <div class="code-panel__value mono-receipt" id="claimCodeValue">@Model.ClaimCode</div>
-                    <p class="muted-copy">Copy this now. Chummer can use it on first launch to link this copy to your account.</p>
-                    @if (!string.IsNullOrWhiteSpace(claimExpires))
+                    <div class="code-panel__label">@(Model.BootstrapCommandLabel ?? "Install command")</div>
+                    <p class="handoff-command__intro"><strong>@(Model.BootstrapCommandIntro ?? "Paste this into your platform shell.")</strong></p>
+                    <div class="code-panel__value code-panel__value--terminal mono-receipt" id="terminalInstallCommandValue">@Model.TerminalInstallCommand</div>
+                    @if (!string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
                     {
-                        <p class="muted-copy">Expires @claimExpires.</p>
+                        <p class="handoff-command__note">@Model.BootstrapCommandNote</p>
                     }
                     <div class="stacked-actions">
-                        <button class="button-like button-like--secondary" type="button" id="copyClaimCodeButton">Copy claim code</button>
+                        <button class="button-like button-like--primary" type="button" id="copyTerminalInstallCommandButton">Copy install command</button>
                     </div>
-                    <p class="status-copy" id="claimCodeNotice" hidden></p>
+                    <p class="status-copy" id="terminalInstallCommandNotice" hidden></p>
+                </div>
+                @if (Model.BootstrapFeatureCards.Count > 0)
+                {
+                    <div class="handoff-feature-grid" aria-label="Setup highlights">
+                        @foreach (var card in Model.BootstrapFeatureCards)
+                        {
+                            <article class="handoff-feature-card">
+                                <h2>@card.Heading</h2>
+                                <p>@card.Body</p>
+                            </article>
+                        }
+                    </div>
+                }
+            }
+            @if (string.IsNullOrWhiteSpace(Model.TerminalInstallCommand))
+            {
+                <div class="stacked-actions">
+                    <a class="button-like button-like--primary" href="@Model.DownloadHref" id="startSignedInDownloadButton">@Model.DownloadLabel</a>
                 </div>
             }
-
-            <div class="stacked-actions">
-                <a class="button-like button-like--primary" href="@Model.DownloadHref" id="startSignedInDownloadButton">@Model.DownloadLabel</a>
-                <a class="button-like button-like--secondary" href="@Model.AccountHref">@Model.AccountLabel</a>
-                <a class="button-like button-like--ghost" href="@Model.HelpHref">@Model.HelpLabel</a>
-            </div>
+            <details class="release-disclosure">
+                <summary>Fallbacks and recovery</summary>
+                <div class="release-disclosure__body">
+                    <p class="muted-copy">@Model.ArtifactSupportLine</p>
+                    @if (Model.Steps.Count > 0)
+                    {
+                        <ul class="trust-page-section__list">
+                            @foreach (var step in Model.Steps)
+                            {
+                                <li>@step</li>
+                            }
+                        </ul>
+                    }
+                    <div class="stacked-actions">
+                        @if (!string.IsNullOrWhiteSpace(Model.TerminalInstallCommand))
+                        {
+                            <a class="button-like button-like--primary" href="@Model.DownloadHref">@Model.DownloadLabel</a>
+                        }
+                        @if (!Model.PromoteSecondaryDownload && !string.IsNullOrWhiteSpace(Model.SecondaryDownloadHref) && !string.IsNullOrWhiteSpace(Model.SecondaryDownloadLabel))
+                        {
+                            <a class="button-like button-like--ghost" href="@Model.SecondaryDownloadHref">@Model.SecondaryDownloadLabel</a>
+                        }
+                        <a class="button-like button-like--secondary" href="@Model.AccountHref">@Model.AccountLabel</a>
+                        <a class="button-like button-like--ghost" href="@Model.HelpHref">@Model.HelpLabel</a>
+                        <a class="button-like button-like--ghost" href="/downloads">Back to downloads</a>
+                    </div>
+                    <p class="muted-copy">@(Model.BootstrapScriptDownload
+                        ? "The published packages stay the same for every user. The account-aware part is the short-lived setup assistant and the install ticket it carries, not a personalized app binary."
+                        : "The installer bytes stay the same for every user. If account linking is needed, enter the support or recovery code inside setup instead of copying one from this page.")</p>
+                </div>
+            </details>
         </div>
     </article>
 </section>
 
-@if (Model.Steps.Count > 0)
-{
-    <section class="release-guidance release-guidance--detail">
-        <article class="release-guidance__item">
-            <span class="tag">First launch</span>
-            <h2>Keep this copy linked from the start</h2>
-            <ul class="trust-page-section__list">
-                @foreach (var step in Model.Steps)
-                {
-                    <li>@step</li>
-                }
-            </ul>
-        </article>
-        <article class="release-guidance__item">
-            <span class="tag tag--quiet">Need it later?</span>
-            <h2>Devices &amp; access keeps the same handoff visible</h2>
-            <p>If you close this page or miss the first launch, you can reopen your account and copy the pending install claim code from the Devices &amp; access section.</p>
-        </article>
-    </section>
-}
-
 <section class="release-footnote">
-    <p class="muted-copy">The installer bytes stay the same for every user. The account-aware part is the short-lived claim ticket, not a personalized binary.</p>
     <div class="stacked-actions">
-        <a class="button-like button-like--secondary" href="@Model.AccountHref">@Model.AccountLabel</a>
-        <a class="button-like button-like--ghost" href="/downloads">Back to downloads</a>
+        <a class="button-like button-like--secondary" href="/downloads">Back to downloads</a>
     </div>
 </section>
 
@@ -102,11 +142,12 @@
 (() => {
   const ui = window.ChummerUi;
   const downloadHref = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DownloadHref));
+  const autoStartDownload = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AutoStartDownload));
   const downloadButton = document.getElementById("startSignedInDownloadButton");
   const downloadFrame = document.getElementById("signedInDownloadFrame");
-  const copyButton = document.getElementById("copyClaimCodeButton");
-  const claimCodeValue = document.getElementById("claimCodeValue");
-  const claimCodeNotice = document.getElementById("claimCodeNotice");
+  const commandCopyButton = document.getElementById("copyTerminalInstallCommandButton");
+  const terminalInstallCommandValue = document.getElementById("terminalInstallCommandValue");
+  const terminalInstallCommandNotice = document.getElementById("terminalInstallCommandNotice");
 
   const startDownload = () => {
     if (!downloadFrame || !downloadHref) return;
@@ -114,24 +155,29 @@
   };
 
   if (downloadButton) {
-    downloadButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      startDownload();
-    });
+    if (autoStartDownload) {
+      downloadButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        startDownload();
+      });
+    }
   }
 
-  window.setTimeout(startDownload, 250);
+  if (autoStartDownload) {
+    window.setTimeout(startDownload, 250);
+  }
 
-  if (copyButton && claimCodeValue && ui?.copyToClipboard) {
-    copyButton.addEventListener("click", async () => {
+  if (commandCopyButton && terminalInstallCommandValue && ui?.copyToClipboard) {
+    commandCopyButton.addEventListener("click", async () => {
       try {
-        await ui.copyToClipboard(claimCodeValue.textContent || "", copyButton, "Copied");
-        ui.setNotice(claimCodeNotice, "Claim code copied.");
+        await ui.copyToClipboard(terminalInstallCommandValue.textContent || "", commandCopyButton, "Copied");
+        ui.setNotice(terminalInstallCommandNotice, "Install command copied.");
       } catch (error) {
-        ui.setNotice(claimCodeNotice, ui.describeError(error, "Claim code copy failed. Copy it manually from the code panel."), true);
+        ui.setNotice(terminalInstallCommandNotice, ui.describeError(error, "Terminal command copy failed. Copy it manually from the panel."), true);
       }
     });
   }
+
 })();
 </script>
 }

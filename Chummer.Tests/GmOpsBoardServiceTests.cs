@@ -990,6 +990,38 @@ public sealed class GmOpsBoardServiceTests
     }
 
     [Fact]
+    public async Task GetProjection_UnresolvedItemsTreatTravelCacheUnsyncedSignalsAsContinuityReturnDomainWithoutCampaignOrOpenKeywords()
+    {
+        SessionLedgerService ledger = new();
+        var service = CreateService(ledger);
+        DateTimeOffset baseTime = DateTimeOffset.Parse("2026-04-04T04:27:00Z");
+
+        await ledger.MergeEventsAsync(
+        [
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "Mobile travel cache unsynced while safehouse remains unavailable.",
+                AtUtc: baseTime,
+                EventId: "evt-unsynced"),
+            new SessionEventEnvelope(
+                SessionId: "session_ops",
+                SceneId: "scene_ops",
+                EventType: "ops.note",
+                Payload: "General session note is still active.",
+                AtUtc: baseTime.AddMinutes(5),
+                EventId: "evt-general")
+        ]);
+
+        OpsBoardProjection projection = service.GetProjection("session_ops", "scene_ops");
+
+        Assert.Equal(2, projection.UnresolvedItems.Count);
+        Assert.Equal("ops:evt-unsynced", projection.UnresolvedItems[0].ItemId);
+        Assert.Equal("ops:evt-general", projection.UnresolvedItems[1].ItemId);
+    }
+
+    [Fact]
     public async Task GetProjection_UnresolvedItemsTreatCompactDomainShorthandAsGovernedOpsDomains()
     {
         SessionLedgerService ledger = new();

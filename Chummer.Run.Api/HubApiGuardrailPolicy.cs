@@ -55,7 +55,8 @@ public static class HubApiGuardrailPolicy
            || IsFileTransferPath(path);
 
     public static bool IsReleaseBundleUploadPath(PathString path)
-        => path.StartsWithSegments("/api/internal/releases/bundles", StringComparison.OrdinalIgnoreCase);
+        => path.StartsWithSegments("/api/internal/releases/bundles", StringComparison.OrdinalIgnoreCase)
+           || path.StartsWithSegments("/api/internal/releases/upload-sessions", StringComparison.OrdinalIgnoreCase);
 
     public static bool IsMultipartSupportPath(PathString path)
         => path.StartsWithSegments("/api/v1/support/cases/form", StringComparison.OrdinalIgnoreCase)
