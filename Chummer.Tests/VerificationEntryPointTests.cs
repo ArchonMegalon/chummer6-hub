@@ -3370,6 +3370,22 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void AccountWorkSurfaceShowsDecisionReceiptHistoryAndResumabilityNotes()
+    {
+        string accountViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
+        string accountView = File.ReadAllText(accountViewPath);
+
+        Assert.Contains("Decision receipt history", accountView, StringComparison.Ordinal);
+        Assert.Contains("PublicationDecisionOutcomeSummary", accountView, StringComparison.Ordinal);
+        Assert.Contains("PublicationResumabilitySummary", accountView, StringComparison.Ordinal);
+        Assert.Contains("AutomationOutcomeSummary", accountView, StringComparison.Ordinal);
+        Assert.Contains("AutomationResumabilitySummary", accountView, StringComparison.Ordinal);
+        Assert.Contains("Recent governed prep launches", accountView, StringComparison.Ordinal);
+        Assert.Contains("Recent travel prefetch receipts", accountView, StringComparison.Ordinal);
+        Assert.Contains("Recent aftermath and replay packages", accountView, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PublicProgressControllerPublishesWeeklyPulseArtifact()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicProgressController.cs");
