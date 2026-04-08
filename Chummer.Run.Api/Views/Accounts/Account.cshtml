@@ -250,6 +250,129 @@
         string label,
         string fallback)
         => panel?.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))?.Value ?? fallback;
+
+    static string FormatUtc(DateTimeOffset value)
+        => value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'");
+
+    static string PublicationDecisionOutcomeSummary(string? publicationStatus, string? reviewState, string? moderationState)
+    {
+        string publication = publicationStatus?.Trim().ToLowerInvariant() ?? string.Empty;
+        string review = reviewState?.Trim().ToLowerInvariant() ?? string.Empty;
+        string moderation = moderationState?.Trim().ToLowerInvariant() ?? string.Empty;
+
+        if (publication is "published")
+        {
+            return "Published: moderation and review receipts completed on the governed lane.";
+        }
+
+        if (publication is "archived" or "delisted")
+        {
+            return "Canceled: publication is not active on discovery routes.";
+        }
+
+        if (review is "rejected")
+        {
+            return "Paused for revision: review requested changes before this can continue.";
+        }
+
+        if (review is "pending_review" || moderation is "pending_review")
+        {
+            return "Paused on moderation: waiting for governed review decision.";
+        }
+
+        if (review is "approved")
+        {
+            return "Ready to publish: review passed and waiting on explicit publish confirmation.";
+        }
+
+        return "Tracked: draft and moderation receipts are attached to this publication lane.";
+    }
+
+    static string PublicationResumabilitySummary(string? publicationStatus, string? reviewState, string? moderationState)
+    {
+        string publication = publicationStatus?.Trim().ToLowerInvariant() ?? string.Empty;
+        string review = reviewState?.Trim().ToLowerInvariant() ?? string.Empty;
+        string moderation = moderationState?.Trim().ToLowerInvariant() ?? string.Empty;
+
+        if (publication is "archived" or "delisted")
+        {
+            return "Not resumable on this lane. Create a new draft when this publication should return.";
+        }
+
+        if (review is "rejected")
+        {
+            return "Resumable after edits. Update notes, then submit for review again.";
+        }
+
+        if (review is "pending_review" || moderation is "pending_review")
+        {
+            return "Resumable after moderation decision. Keep this lane open and avoid duplicate submissions.";
+        }
+
+        if (review is "approved" && publication is not "published")
+        {
+            return "Resumable immediately. Use Publish on public shelf to complete this lane.";
+        }
+
+        return "No recovery action needed right now.";
+    }
+
+    static string AutomationOutcomeSummary(string? summary)
+    {
+        string normalized = summary?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (normalized.Length == 0)
+        {
+            return "Tracked: receipt exists with no additional action required.";
+        }
+
+        if (normalized.Contains("retry", StringComparison.Ordinal)
+            || normalized.Contains("relaunch", StringComparison.Ordinal)
+            || normalized.Contains("refresh", StringComparison.Ordinal))
+        {
+            return "Retried: this automation lane has an explicit retry/resume signal.";
+        }
+
+        if (normalized.Contains("pending", StringComparison.Ordinal)
+            || normalized.Contains("queued", StringComparison.Ordinal)
+            || normalized.Contains("hydrate", StringComparison.Ordinal)
+            || normalized.Contains("catch up", StringComparison.Ordinal))
+        {
+            return "Paused: waiting on downstream receipt hydration before final closure.";
+        }
+
+        if (normalized.Contains("cancel", StringComparison.Ordinal)
+            || normalized.Contains("revoked", StringComparison.Ordinal)
+            || normalized.Contains("stopped", StringComparison.Ordinal))
+        {
+            return "Canceled: this action lane is closed and needs a new explicit request to continue.";
+        }
+
+        return "Completed: action is receipt-backed and attached to campaign continuity.";
+    }
+
+    static string AutomationResumabilitySummary(string? summary)
+    {
+        string normalized = summary?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (normalized.Contains("cancel", StringComparison.Ordinal)
+            || normalized.Contains("revoked", StringComparison.Ordinal)
+            || normalized.Contains("stopped", StringComparison.Ordinal))
+        {
+            return "Not resumable from this receipt. Start a fresh automation action if still needed.";
+        }
+
+        if (normalized.Contains("retry", StringComparison.Ordinal)
+            || normalized.Contains("relaunch", StringComparison.Ordinal)
+            || normalized.Contains("refresh", StringComparison.Ordinal)
+            || normalized.Contains("pending", StringComparison.Ordinal)
+            || normalized.Contains("queued", StringComparison.Ordinal)
+            || normalized.Contains("hydrate", StringComparison.Ordinal)
+            || normalized.Contains("catch up", StringComparison.Ordinal))
+        {
+            return "Resumable. Retry from this workspace and keep the lane on the same account rail.";
+        }
+
+        return "No resume action needed right now.";
+    }
 }
 
 <section class="account-stage">
@@ -1608,7 +1731,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var launch in selectedWorkspacePrepLaunches)
                                         {
-                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary</li>
+                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary <span> Receipt: @launch.LaunchId at @FormatUtc(launch.LaunchedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(launch.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(launch.Summary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -1620,7 +1743,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var receipt in selectedWorkspaceTravelPrefetches)
                                         {
-                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary</li>
+                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary <span> Receipt: @receipt.ReceiptId at @FormatUtc(receipt.StagedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(receipt.PrefetchSummary)</span> <span> Resumability: @AutomationResumabilitySummary(receipt.PrefetchSummary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -1786,7 +1909,7 @@
                                         <ul class="muted-copy">
                                             @foreach (var package in selectedWorkspaceAftermathPackages)
                                             {
-                                                <li><strong>@package.Title:</strong> @package.Summary</li>
+                                                <li><strong>@package.Title:</strong> @package.Summary <span> Receipt: @package.PackageId at @FormatUtc(package.GeneratedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(package.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(package.Summary)</span></li>
                                             }
                                         </ul>
                                     </details>
@@ -2233,6 +2356,41 @@
                                     </div>
                                 }
                             </div>
+                            <details class="details-drawer">
+                                <summary>Decision receipt history</summary>
+                                <ul class="muted-copy">
+                                    <li>
+                                        <strong>Draft state:</strong> @HumanizeStatus(selectedCreatorPublicationDraftDetail.Draft.State, "Draft")
+                                        <span> · @PublicationDecisionOutcomeSummary(selectedCreatorPublicationReceipt?.PublicationStatus, selectedCreatorPublicationReceipt?.ReviewState, selectedCreatorPublicationDraftDetail.Moderation?.State)</span>
+                                    </li>
+                                    @if (selectedCreatorPublicationDraftDetail.Moderation is not null)
+                                    {
+                                        <li>
+                                            <strong>Moderation case @selectedCreatorPublicationDraftDetail.Moderation.CaseId:</strong> @HumanizeStatus(selectedCreatorPublicationDraftDetail.Moderation.State, "Pending review")
+                                        </li>
+                                    }
+                                    @if (selectedCreatorPublicationReceipt is not null)
+                                    {
+                                        <li>
+                                            <strong>Registry review:</strong> @HumanizeStatus(selectedCreatorPublicationReceipt.ReviewState, "Not required")
+                                        </li>
+                                        <li>
+                                            <strong>Publication status:</strong> @HumanizeStatus(selectedCreatorPublicationReceipt.PublicationStatus, "Draft")
+                                            @if (selectedCreatorPublicationReceipt.PublishedAtUtc is not null)
+                                            {
+                                                <span> · published @FormatUtc(selectedCreatorPublicationReceipt.PublishedAtUtc.Value)</span>
+                                            }
+                                            else
+                                            {
+                                                <span> · last updated @FormatUtc(selectedCreatorPublication.UpdatedAtUtc)</span>
+                                            }
+                                        </li>
+                                    }
+                                    <li>
+                                        <strong>Resumability:</strong> @PublicationResumabilitySummary(selectedCreatorPublicationReceipt?.PublicationStatus, selectedCreatorPublicationReceipt?.ReviewState, selectedCreatorPublicationDraftDetail.Moderation?.State)
+                                    </li>
+                                </ul>
+                            </details>
                             @if (!string.Equals(selectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.PendingReview, StringComparison.OrdinalIgnoreCase)
                                 && !string.Equals(selectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Approved, StringComparison.OrdinalIgnoreCase)
                                 && !string.Equals(selectedCreatorPublicationDraftDetail.Draft.State, Chummer.Hub.Registry.Contracts.HubPublicationStates.Archived, StringComparison.OrdinalIgnoreCase))
@@ -2432,7 +2590,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var launch in workspace.PrepLaunches)
                                         {
-                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary</li>
+                                            <li><strong>@launch.PacketTitle:</strong> @launch.Summary <span> Receipt: @launch.LaunchId at @FormatUtc(launch.LaunchedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(launch.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(launch.Summary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -2445,7 +2603,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var receipt in workspace.TravelPrefetches)
                                         {
-                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary</li>
+                                            <li><strong>@receipt.DeviceRole:</strong> @receipt.PrefetchSummary <span> Receipt: @receipt.ReceiptId at @FormatUtc(receipt.StagedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(receipt.PrefetchSummary)</span> <span> Resumability: @AutomationResumabilitySummary(receipt.PrefetchSummary)</span></li>
                                         }
                                     </ul>
                                 </details>
@@ -2458,7 +2616,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var package in workspace.AftermathPackages)
                                         {
-                                            <li><strong>@package.Title:</strong> @package.Summary</li>
+                                            <li><strong>@package.Title:</strong> @package.Summary <span> Receipt: @package.PackageId at @FormatUtc(package.GeneratedAtUtc).</span> <span> Outcome: @AutomationOutcomeSummary(package.Summary)</span> <span> Resumability: @AutomationResumabilitySummary(package.Summary)</span></li>
                                         }
                                     </ul>
                                 </details>
