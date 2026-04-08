@@ -200,6 +200,36 @@
             _ => HumanizeStatus(kind, "Governed output")
         };
 
+    static string SponsorLifecycleStateLabel(string? status)
+        => status?.Trim().ToLowerInvariant() switch
+        {
+            "intent_created" => "Intent recorded",
+            "consented" => "Consent recorded",
+            "pending_auth" => "Waiting for authorization",
+            "fleet_lane_created" => "Lane created",
+            "lane_pending" => "Activation in progress",
+            "waiting_for_slot" => "Queued for capacity",
+            "active" => "Active",
+            "stopped" => "Stopped",
+            "revoked" => "Revoked",
+            _ => HumanizeStatus(status, "Tracked")
+        };
+
+    static string SponsorNextSafeAction(string? status)
+        => status?.Trim().ToLowerInvariant() switch
+        {
+            "intent_created" => "Record consent to continue this lane.",
+            "consented" => "Start device authorization from the participation flow.",
+            "pending_auth" => "Open ChatGPT verification and enter the one-time code.",
+            "fleet_lane_created" => "Wait for activation confirmation before assigning work.",
+            "lane_pending" => "Keep this lane open while activation completes.",
+            "waiting_for_slot" => "Stay on this rail and retry for a fresh code if authorization expires.",
+            "active" => "Assign bounded contribution work and track receipts.",
+            "stopped" => "Start a new lane when the participant is ready again.",
+            "revoked" => "Open a new lane with fresh consent and authorization.",
+            _ => "Open participation details and choose the latest recovery action."
+        };
+
     static string WorkspaceDetailHref(string workspaceId) => $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}";
     static string RunDetailHref(string runId) => $"/account/work/runs/{Uri.EscapeDataString(runId)}";
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
@@ -3165,10 +3195,12 @@
                                                 <li>
                                                     <strong>@sponsorSession.UserDisplayName</strong>: @sponsorSession.CampaignName · @HumanizeStatus(sponsorSession.Status, "Tracked")
                                                     <span> @sponsorSession.StatusSummary</span>
+                                                    <span> Lifecycle: @SponsorLifecycleStateLabel(sponsorSession.Status).</span>
                                                     @if (!string.IsNullOrWhiteSpace(sponsorSession.LatestEventSummary))
                                                     {
-                                                        <span> Latest: @sponsorSession.LatestEventSummary</span>
+                                                        <span> Decision breadcrumb: @sponsorSession.LatestEventSummary</span>
                                                     }
+                                                    <span> Next safe action: @SponsorNextSafeAction(sponsorSession.Status)</span>
                                                 </li>
                                             }
                                         </ul>

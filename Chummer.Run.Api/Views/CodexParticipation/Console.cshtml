@@ -117,6 +117,20 @@
         <h2 id="participationHeading">Open a fresh contribution lane</h2>
         <p id="stateSupport">Chummer only generates a one-time code after you explicitly start, because those codes expire quickly.</p>
         <div id="stateLine" class="wizard-status" aria-live="polite"></div>
+        <div id="lifecycleStateLine" class="wizard-status muted-copy" aria-live="polite"></div>
+        <details id="lifecycleSteps" class="details-drawer" hidden>
+            <summary>Participant lifecycle states</summary>
+            <ul id="lifecycleStepsList" class="muted-copy"></ul>
+        </details>
+        <details id="decisionBreadcrumbs" class="details-drawer" hidden>
+            <summary>Consent and decision breadcrumbs</summary>
+            <ul id="decisionBreadcrumbList" class="muted-copy"></ul>
+        </details>
+        <details id="failureGuidance" class="details-drawer" hidden>
+            <summary>Failure guidance</summary>
+            <p id="failureGuidanceSummary" class="muted-copy"></p>
+            <p id="failureGuidanceNext" class="muted-copy"></p>
+        </details>
 
         <div id="startState" class="state-stack">
             <div class="wizard-card">
@@ -244,6 +258,14 @@ const nodes = {
   heading: document.getElementById("participationHeading"),
   support: document.getElementById("stateSupport"),
   statusLine: document.getElementById("stateLine"),
+  lifecycleStateLine: document.getElementById("lifecycleStateLine"),
+  lifecycleSteps: document.getElementById("lifecycleSteps"),
+  lifecycleStepsList: document.getElementById("lifecycleStepsList"),
+  decisionBreadcrumbs: document.getElementById("decisionBreadcrumbs"),
+  decisionBreadcrumbList: document.getElementById("decisionBreadcrumbList"),
+  failureGuidance: document.getElementById("failureGuidance"),
+  failureGuidanceSummary: document.getElementById("failureGuidanceSummary"),
+  failureGuidanceNext: document.getElementById("failureGuidanceNext"),
   wizardStepLabel: document.getElementById("wizardStepLabel"),
   unavailableHomeLink: document.getElementById("unavailableHomeLink"),
   unavailableAccountLink: document.getElementById("unavailableAccountLink"),
@@ -374,6 +396,10 @@ function showPreparingState() {
   ui.setText(nodes.heading, "Preparing a fresh authorization code");
   ui.setText(nodes.support, "Chummer is opening a fresh participation challenge for this session.");
   ui.setText(nodes.statusLine, "Codes are only generated after you explicitly start.");
+  ui.setText(nodes.lifecycleStateLine, "Lifecycle: preparing new lane.");
+  nodes.lifecycleSteps.hidden = true;
+  nodes.decisionBreadcrumbs.hidden = true;
+  nodes.failureGuidance.hidden = true;
   nodes.technicalDetails.hidden = true;
   nodes.badgeReveal.hidden = true;
 }
@@ -392,6 +418,12 @@ function renderError(error) {
   ui.setText(nodes.heading, "The contribution flow could not continue");
   ui.setText(nodes.support, error?.message || "Something interrupted the current request.");
   ui.setText(nodes.statusLine, "Try again in a moment.");
+  ui.setText(nodes.lifecycleStateLine, "Lifecycle: temporary interruption.");
+  nodes.lifecycleSteps.hidden = true;
+  nodes.decisionBreadcrumbs.hidden = true;
+  nodes.failureGuidance.hidden = false;
+  ui.setText(nodes.failureGuidanceSummary, "The request failed before a stable lane status was confirmed.");
+  ui.setText(nodes.failureGuidanceNext, "Next safe action: retry this flow. If retries fail, open Account > Support with the approximate time of this attempt.");
   nodes.technicalDetails.hidden = true;
   setWizardStep("start", "error");
   toggleState("start");
@@ -441,11 +473,75 @@ function syncContributionActions(phase, status) {
   nodes.cancelContributionButton.hidden = !currentContributionId || phase === "unavailable";
 }
 
+function syncLifecycle(lifecycle) {
+  if (!lifecycle) {
+    ui.setText(nodes.lifecycleStateLine, "");
+    nodes.lifecycleSteps.hidden = true;
+    nodes.lifecycleStepsList.innerHTML = "";
+    return;
+  }
+
+  const stateLabel = lifecycle.currentState || "Tracked";
+  ui.setText(nodes.lifecycleStateLine, `Lifecycle: ${stateLabel}`);
+  const steps = Array.isArray(lifecycle.steps) ? lifecycle.steps : [];
+  nodes.lifecycleStepsList.innerHTML = "";
+  if (steps.length === 0) {
+    nodes.lifecycleSteps.hidden = true;
+    return;
+  }
+
+  for (const step of steps) {
+    const li = document.createElement("li");
+    const label = step.label || "Step";
+    const state = (step.state || "pending").split("_").join(" ");
+    const summary = step.summary || "No summary available.";
+    const when = step.happenedAtUtc ? ` (${formatDate(step.happenedAtUtc)})` : "";
+    li.textContent = `${label} · ${state}: ${summary}${when}`;
+    nodes.lifecycleStepsList.appendChild(li);
+  }
+
+  nodes.lifecycleSteps.hidden = false;
+}
+
+function syncDecisionBreadcrumbs(breadcrumbs) {
+  const entries = Array.isArray(breadcrumbs) ? breadcrumbs : [];
+  nodes.decisionBreadcrumbList.innerHTML = "";
+  if (entries.length === 0) {
+    nodes.decisionBreadcrumbs.hidden = true;
+    return;
+  }
+
+  for (const entry of entries) {
+    const li = document.createElement("li");
+    const label = entry.label || "Decision event";
+    const message = entry.message || "No detail recorded.";
+    const when = formatDate(entry.createdAtUtc);
+    li.textContent = `${label}: ${message} (${when})`;
+    nodes.decisionBreadcrumbList.appendChild(li);
+  }
+
+  nodes.decisionBreadcrumbs.hidden = false;
+}
+
+function syncFailureGuidance(guidance) {
+  if (!guidance || !guidance.summary) {
+    nodes.failureGuidance.hidden = true;
+    return;
+  }
+
+  nodes.failureGuidance.hidden = false;
+  ui.setText(nodes.failureGuidanceSummary, guidance.title ? `${guidance.title}: ${guidance.summary}` : guidance.summary);
+  ui.setText(nodes.failureGuidanceNext, guidance.nextSafeAction ? `Next safe action: ${guidance.nextSafeAction}` : "");
+}
+
 function render(data) {
   const contribution = data.contribution || null;
   const details = data.details || null;
   const auth = data.auth || {};
   const badge = data.badge || null;
+  const lifecycle = data.lifecycle || null;
+  const breadcrumbs = data.breadcrumbs || [];
+  const failureGuidance = data.failureGuidance || null;
   const phase = data.phase || "start";
   const status = data.status || "ready_to_start";
   const actions = data.actions || {};
@@ -469,6 +565,9 @@ function render(data) {
   syncAuthorization(auth, status);
   syncUnavailableActions(actions);
   syncBadge(phase, badge);
+  syncLifecycle(lifecycle);
+  syncDecisionBreadcrumbs(breadcrumbs);
+  syncFailureGuidance(failureGuidance);
   syncTechnicalDetails(contribution, details);
   syncContributionActions(phase, status);
 
