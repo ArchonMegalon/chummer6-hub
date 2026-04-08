@@ -4016,6 +4016,26 @@
     }
   });
 
+  const setRateLimitNotice = (noticeNode, error, prefix, nextSafeAction) => {
+    const payload = error?.payload && typeof error.payload === "object" ? error.payload : null;
+    const status = payload?.status;
+    if (status !== 429) {
+      return false;
+    }
+
+    const retryAfter = Number.isFinite(payload?.retryAfterSeconds) && payload.retryAfterSeconds > 0
+      ? payload.retryAfterSeconds
+      : null;
+    const waitLabel = retryAfter
+      ? `${retryAfter} second${retryAfter === 1 ? "" : "s"}`
+      : "a short cooldown";
+    ui.setNotice(
+      noticeNode,
+      `${prefix} Retry after ${waitLabel}. Next safe action: ${nextSafeAction}`,
+      true);
+    return true;
+  };
+
   bindSubmit("supportAssistantForm", async (event) => {
     event.preventDefault();
     const notice = document.getElementById("supportAssistantStatusNotice");
@@ -4080,7 +4100,15 @@
       const confidence = payload.confidence ? ` (${payload.confidence.replaceAll("_", " ")})` : "";
       ui.setNotice(notice, `Grounded guidance loaded${confidence}.`);
     } catch (error) {
-      ui.setNotice(notice, ui.describeError(error, "Grounded guidance could not be loaded right now."), true);
+      const rateLimited = setRateLimitNotice(
+        notice,
+        error,
+        "Grounded guidance is pacing requests so review status timelines stay readable.",
+        "Wait for the timer, then retry with one focused question or open Account > Support."
+      );
+      if (!rateLimited) {
+        ui.setNotice(notice, ui.describeError(error, "Grounded guidance could not be loaded right now."), true);
+      }
     } finally {
       ui.setButtonBusy(button, false, "Checking...");
     }
@@ -4122,7 +4150,15 @@
       const payload = await ui.readJsonResponse(response, "Support case could not be submitted right now.");
       window.location.href = `/account/support/${encodeURIComponent(payload.caseId)}`;
     } catch (error) {
-      ui.setNotice(notice, ui.describeError(error, "Support case could not be submitted right now."), true);
+      const rateLimited = setRateLimitNotice(
+        notice,
+        error,
+        "Support intake is pacing requests to keep queue and closure timelines trustworthy.",
+        "Wait for the timer, then submit one updated case instead of rapid retries."
+      );
+      if (!rateLimited) {
+        ui.setNotice(notice, ui.describeError(error, "Support case could not be submitted right now."), true);
+      }
     } finally {
       ui.setButtonBusy(button, false, "Submitting...");
     }
@@ -4194,7 +4230,15 @@
             : "Thanks. The tracked case reopened for follow-up on this install.");
         window.location.reload();
       } catch (error) {
-        ui.setNotice(notice, ui.describeError(error, "Fix verification could not be recorded right now."), true);
+        const rateLimited = setRateLimitNotice(
+          notice,
+          error,
+          "Fix verification is pacing repeated submissions to preserve one reliable decision timeline.",
+          "Wait for the timer, then submit only the final verification result for this install."
+        );
+        if (!rateLimited) {
+          ui.setNotice(notice, ui.describeError(error, "Fix verification could not be recorded right now."), true);
+        }
       } finally {
         siblingButtons.forEach((item) => ui.setButtonBusy(item, false, "Saving..."));
       }

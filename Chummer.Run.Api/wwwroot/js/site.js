@@ -84,7 +84,15 @@
     const data = await ChummerUi.readResponseData(response);
     if (!response.ok) {
       const error = new Error(data?.detail || data?.title || fallback || "Request failed.");
-      error.payload = data;
+      const retryAfterRaw = response.headers.get("Retry-After");
+      const retryAfterSeconds = retryAfterRaw ? Number.parseInt(retryAfterRaw, 10) : Number.NaN;
+      error.payload = {
+        ...(data && typeof data === "object" ? data : {}),
+        status: Number.isFinite(data?.status) ? data.status : response.status,
+        retryAfterSeconds: Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+          ? retryAfterSeconds
+          : null
+      };
       throw error;
     }
 
@@ -113,7 +121,15 @@
     const data = await ChummerUi.readResponseData(response);
     if (!response.ok) {
       const error = new Error(data?.detail || data?.title || "Request failed.");
-      error.payload = data;
+      const retryAfterRaw = response.headers.get("Retry-After");
+      const retryAfterSeconds = retryAfterRaw ? Number.parseInt(retryAfterRaw, 10) : Number.NaN;
+      error.payload = {
+        ...(data && typeof data === "object" ? data : {}),
+        status: Number.isFinite(data?.status) ? data.status : response.status,
+        retryAfterSeconds: Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+          ? retryAfterSeconds
+          : null
+      };
       throw error;
     }
 
