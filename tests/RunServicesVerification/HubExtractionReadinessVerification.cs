@@ -471,12 +471,58 @@ internal static class HubExtractionReadinessVerification
                      "BoostSessionService",
                      "/api/v1/participation/intents",
                      "sponsor-session/community-ledger path",
-                     "BuildIntentEnvelope"
+                     "BuildIntentEnvelope",
+                     "BuildContributionLifecycle",
+                     "BuildContributionBreadcrumbs",
+                     "BuildContributionFailureGuidance"
                  })
         {
             VerificationAssert.True(
                 participationControllerText.Contains(requiredToken, StringComparison.Ordinal),
                 $"Codex participation controller must keep convergence token '{requiredToken}'.");
+        }
+
+        var participationConsoleText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Views", "CodexParticipation", "Console.cshtml"));
+        foreach (var requiredToken in new[]
+                 {
+                     "Participant lifecycle states",
+                     "Consent and decision breadcrumbs",
+                     "Failure guidance",
+                     "syncLifecycle(lifecycle);",
+                     "syncDecisionBreadcrumbs(breadcrumbs);",
+                     "syncFailureGuidance(failureGuidance);"
+                 })
+        {
+            VerificationAssert.True(
+                participationConsoleText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Codex participation view must keep lifecycle and guidance token '{requiredToken}'.");
+        }
+
+        var accountViewText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"));
+        foreach (var requiredToken in new[]
+                 {
+                     "setRateLimitNotice",
+                     "Retry after",
+                     "Next safe action:",
+                     "Support intake is pacing requests to keep queue and closure timelines trustworthy."
+                 })
+        {
+            VerificationAssert.True(
+                accountViewText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Account support surface must keep rate-limit trust token '{requiredToken}'.");
+        }
+
+        var siteScriptText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "wwwroot", "js", "site.js"));
+        foreach (var requiredToken in new[]
+                 {
+                     "Retry-After",
+                     "retryAfterSeconds",
+                     "status: Number.isFinite(data?.status) ? data.status : response.status"
+                 })
+        {
+            VerificationAssert.True(
+                siteScriptText.Contains(requiredToken, StringComparison.Ordinal),
+                $"Shared site script must keep API pacing token '{requiredToken}'.");
         }
 
         var apiProgramText = File.ReadAllText(Path.Combine(RepoRoot, "Chummer.Run.Api", "Program.cs"));

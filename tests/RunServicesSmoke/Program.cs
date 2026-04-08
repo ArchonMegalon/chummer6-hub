@@ -1182,6 +1182,10 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var unavailableContributionStart = await missingLaneController.StartContribution(CancellationToken.None);
     var unavailableContributionStartProblem = unavailableContributionStart.Result as ObjectResult;
     Assert(unavailableContributionStartProblem?.StatusCode == StatusCodes.Status503ServiceUnavailable, "contribution start should report missing Fleet lane ids as 503 instead of bad request.");
+    var unavailableContributionEnvelopeJson = JsonSerializer.Serialize(unavailableContributionStartProblem?.Value);
+    Assert(unavailableContributionEnvelopeJson.Contains("\"lifecycle\"", StringComparison.Ordinal), "unavailable contribution envelopes should include lifecycle state details.");
+    Assert(unavailableContributionEnvelopeJson.Contains("\"breadcrumbs\"", StringComparison.Ordinal), "unavailable contribution envelopes should include decision breadcrumb projections.");
+    Assert(unavailableContributionEnvelopeJson.Contains("\"failureGuidance\"", StringComparison.Ordinal), "unavailable contribution envelopes should include explicit failure guidance.");
 
     var waitingBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
     {
@@ -1205,6 +1209,25 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var waitingResult = await waitingSessions.StartDeviceAuthAsync(waitingSession.SponsorSessionId, CancellationToken.None);
     Assert(string.Equals(waitingResult.Session.Status, "waiting_for_slot", StringComparison.OrdinalIgnoreCase), "capacity pressure should move sponsor sessions into waiting_for_slot instead of throwing.");
     Assert(string.Equals(waitingResult.Session.RequestedLaneRole, "review", StringComparison.OrdinalIgnoreCase), "waiting sessions should keep the requested sponsor role.");
+    var waitingController = new CodexParticipationController(
+        accounts,
+        identityClient,
+        leaderboards,
+        waitingSessions,
+        identityLinks,
+        experience,
+        chrome,
+        configuration,
+        loggerFactory.CreateLogger<CodexParticipationController>())
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
+    var waitingEnvelopeResult = await waitingController.GetIntent(waitingSession.SponsorSessionId, CancellationToken.None);
+    var waitingEnvelopePayload = waitingEnvelopeResult.Result is OkObjectResult waitingOk
+        ? waitingOk.Value
+        : waitingEnvelopeResult.Value;
+    var waitingEnvelopeJson = JsonSerializer.Serialize(waitingEnvelopePayload);
+    Assert(waitingEnvelopeJson.Contains("\"waiting_for_slot\"", StringComparison.Ordinal), "waiting contribution envelopes should preserve queue status.");
 
     var occupiedBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(request =>
     {
@@ -1984,6 +2007,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Release progress:", StringComparison.Ordinal), "account support detail should surface reporter-lane release progress instead of only the closure summary.");
     Assert(accountSource.Contains("Affected install", StringComparison.Ordinal), "account support detail should surface the install linked to the tracked case.");
     Assert(accountSource.Contains("Next safe action:", StringComparison.Ordinal), "account support detail should surface the next honest user action for a tracked case.");
+    Assert(accountSource.Contains("setRateLimitNotice", StringComparison.Ordinal), "account support interactions should keep a shared rate-limit notice helper.");
+    Assert(accountSource.Contains("Retry after", StringComparison.Ordinal), "account support interactions should project retry timing when pacing applies.");
+    Assert(accountSource.Contains("Support intake is pacing requests to keep queue and closure timelines trustworthy.", StringComparison.Ordinal), "account support form should surface a trustworthy pacing explanation instead of a generic failure.");
     Assert(accountSource.Contains("More settings", StringComparison.Ordinal), "account should keep non-core sections behind a calmer secondary settings disclosure.");
     Assert(accountSource.Contains("Model.PrivacyBoundary", StringComparison.Ordinal), "account privacy should render the shared privacy-boundary panel on the signed-in surface.");
     Assert(accountSource.Contains("<summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should keep primary sign-in inside a calmer drawer instead of a full stacked section.");
@@ -2017,6 +2043,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(faqSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "faq should reuse the shared signed-in trust panel instead of inventing a faq-only trust surface.");
     Assert(faqSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "faq should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
     Assert(!faqSource.Contains("story-guide-tail", StringComparison.Ordinal), "faq should end with a quieter footnote instead of a full landing-style CTA band.");
+    var siteScriptSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "wwwroot", "js", "site.js"));
+    Assert(siteScriptSource.Contains("Retry-After", StringComparison.Ordinal), "shared site script should preserve Retry-After parsing for paced API responses.");
+    Assert(siteScriptSource.Contains("retryAfterSeconds", StringComparison.Ordinal), "shared site script should project retryAfterSeconds into error payloads for support UX pacing notices.");
     var trustCanonSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", ".codex-design", "product", "PUBLIC_TRUST_CONTENT.yaml"));
     Assert(!trustCanonSource.Contains("signed-in shell", StringComparison.Ordinal), "public trust canon should not leak signed-in-shell language into customer copy.");
     Assert(!trustCanonSource.Contains("stays canonical", StringComparison.Ordinal), "public trust canon should not use canonical jargon on public trust surfaces.");
