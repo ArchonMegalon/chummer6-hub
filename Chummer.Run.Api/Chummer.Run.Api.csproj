@@ -1,19 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <Reference Include="Chummer.Engine.Contracts">
-      <HintPath>..\..\chummer-core-engine\Chummer.Contracts\bin\$(Configuration)\net10.0\Chummer.Engine.Contracts.dll</HintPath>
-    </Reference>
-    <Reference Include="Chummer.Hub.Registry.Contracts">
-      <HintPath>..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\bin\$(Configuration)\net10.0\Chummer.Hub.Registry.Contracts.dll</HintPath>
-    </Reference>
-    <Reference Include="Chummer.Run.Registry">
-      <HintPath>..\..\chummer-hub-registry\Chummer.Run.Registry\bin\$(Configuration)\net10.0\Chummer.Run.Registry.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\chummer-core-engine\Chummer.Contracts\Chummer.Contracts.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\chummer-core-engine\Chummer.Contracts\Chummer.Contracts.csproj" />
+    <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
+    <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Run.Registry\Chummer.Run.Registry.csproj">
+      <ExcludeAssets>contentFiles</ExcludeAssets>
+    </ProjectReference>
     <ProjectReference Include="..\Chummer.Campaign.Contracts\Chummer.Campaign.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Control.Contracts\Chummer.Control.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Run.Contracts\Chummer.Run.Contracts.csproj" />
@@ -28,11 +20,4 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
-
-  <Target Name="BuildRegistryDependency" BeforeTargets="CoreCompile">
-    <MSBuild Projects="..\..\chummer-hub-registry\Chummer.Run.Registry\Chummer.Run.Registry.csproj"
-             Targets="Build"
-             Properties="Configuration=$(Configuration)" />
-  </Target>
-
 </Project>

@@ -24,6 +24,13 @@
     var previewCount = Model.PreviewItems.Count;
     var previewHighlight = Model.PreviewItems.FirstOrDefault();
     var release = Model.ReleaseExperience;
+    var guestNeedsInstallGate = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
+    var contextualHeroPrimaryHref = guestNeedsInstallGate
+        ? release.GuestGatePrimaryHref
+        : Model.PrimaryHeroAction.Href;
+    var contextualProductProofPrimaryHref = guestNeedsInstallGate
+        ? release.GuestGatePrimaryHref
+        : Model.Surface.ProductProofPrimaryHref;
     var trustPulse = Model.TrustPulse;
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
@@ -41,6 +48,22 @@
             ? section
             : throw new InvalidOperationException($"Landing section '{id}' is required.");
 
+    string ContextualPreviewHref(string? href)
+    {
+        var resolvedHref = href ?? string.Empty;
+        if (!guestNeedsInstallGate)
+        {
+            return resolvedHref;
+        }
+
+        var trimmed = resolvedHref.Trim();
+        var queryIndex = trimmed.IndexOf('?');
+        var route = queryIndex >= 0 ? trimmed[..queryIndex] : trimmed;
+        return string.Equals(route, "/downloads", StringComparison.OrdinalIgnoreCase)
+            ? (release.GuestGatePrimaryHref ?? resolvedHref)
+            : resolvedHref;
+    }
+
     static string TrustRowValue(
         SignedInTrustStatusPanelViewModel? panel,
         string label,
@@ -55,7 +78,7 @@
             <h1 class="launch-hero__title">@Model.Surface.Headline</h1>
             <p class="launch-hero__support">@Model.Surface.Subhead</p>
             <div class="launch-hero__actions">
-                <a class="button-like button-like--primary" href="@Model.PrimaryHeroAction.Href">@Model.PrimaryHeroAction.Label</a>
+                <a class="button-like button-like--primary" href="@contextualHeroPrimaryHref">@Model.PrimaryHeroAction.Label</a>
                 <a class="button-like button-like--secondary" href="@Model.SecondaryHeroAction.Href">@Model.SecondaryHeroAction.Label</a>
             </div>
             <div class="proof-chip-row" aria-label="Trust anchors">
@@ -179,11 +202,11 @@
         {
             var workflow = proofNotes[0];
             <div class="release-footnote">
-                <p><strong>@workflow.Card.Title:</strong> @(workflow.Card.ProofNote ?? workflow.Card.Payoff ?? workflow.Card.Summary) <a class="inline-link" href="@workflow.Action.Href">@workflow.Action.Label</a>.</p>
+                <p><strong>@workflow.Card.Title:</strong> @(workflow.Card.ProofNote ?? workflow.Card.Payoff ?? workflow.Card.Summary) <a class="inline-link" href="@ContextualPreviewHref(workflow.Action.Href)">@workflow.Action.Label</a>.</p>
             </div>
         }
         <div class="stacked-actions">
-            <a class="button-like button-like--primary" href="@Model.Surface.ProductProofPrimaryHref">@Model.Surface.ProductProofPrimaryLabel</a>
+            <a class="button-like button-like--primary" href="@contextualProductProofPrimaryHref">@Model.Surface.ProductProofPrimaryLabel</a>
         </div>
         <p class="muted-copy">Need the broader shelf? <a class="inline-link" href="@Model.Surface.ProductProofSecondaryHref">@Model.Surface.ProductProofSecondaryLabel</a>.</p>
     </div>

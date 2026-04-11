@@ -9,6 +9,76 @@ namespace Chummer.Tests;
 public sealed class ReleaseSelectionServiceTests
 {
     [Fact]
+    public void LoadPlatformAcceptanceCanonAcceptsGoldReleaseHeadPolicySections()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "release-selection-canon-tests", Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            string productRoot = Path.Combine(root, ".codex-design", "product");
+            Directory.CreateDirectory(productRoot);
+            File.WriteAllText(
+                Path.Combine(productRoot, "DESKTOP_PLATFORM_ACCEPTANCE_MATRIX.yaml"),
+                """
+product: chummer
+surface: desktop_delivery
+version: 1
+flagship_head: Chummer.Avalonia
+fallback_head: Chummer.Blazor.Desktop
+gold_release_head_policy:
+  primary_public_route_must_be_unique: true
+  independent_flagship_proof_required_for_all_shipped_heads: true
+  secondary_head_must_not_ship_on_thinner_proof: true
+  preview_only_fallback_exceptions_do_not_satisfy_gold: true
+head_policies:
+  - head: Chummer.Avalonia
+    role: flagship_primary
+    pass_conditions:
+      - Avalonia clears the flagship bar.
+    fail_conditions:
+      - Avalonia silently falls back.
+  - head: Chummer.Blazor.Desktop
+    role: compatibility_fallback_by_default
+    fallback_allowed_when:
+      - Avalonia is also promoted as primary.
+    must_independently_meet_flagship_when:
+      - Blazor is the only visible desktop head.
+platforms:
+  - id: windows
+    public_shelf_status: promoted_preview
+    primary_package_kind: installer
+    startup_smoke_gate: required
+    signing_posture: required_for_promoted_release
+    updater_mode: in_app_apply_helper
+    supportability: primary
+""");
+
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_PUBLIC_CANON_ROOT"] = root
+                })
+                .Build();
+
+            var loader = new PublicCanonFileLoader(configuration);
+            var document = loader.LoadRequiredYaml<DesktopPlatformAcceptanceDocument>(".codex-design/product/DESKTOP_PLATFORM_ACCEPTANCE_MATRIX.yaml");
+
+            Assert.Equal("Chummer.Avalonia", document.FlagshipHead);
+            Assert.NotNull(document.GoldReleaseHeadPolicy);
+            Assert.True(document.GoldReleaseHeadPolicy!.PrimaryPublicRouteMustBeUnique);
+            Assert.Equal(2, document.HeadPolicies?.Count);
+            Assert.Equal("compatibility_fallback_by_default", document.HeadPolicies?[1].Role);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void BuildExperienceLoadsCurrentPublicReleaseCanon()
     {
         var configuration = new ConfigurationBuilder()
@@ -187,6 +257,7 @@ public sealed class ReleaseSelectionServiceTests
         Assert.Equal("Open Mac install command", recommended.ActionLabel);
         Assert.Equal("/downloads/install/avalonia-osx-arm64-installer", recommended.DispatchHref);
         Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
+        Assert.Contains("one Terminal command", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("verifies the published DMG digest", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && item.PubliclyAvailable);
         Assert.True(service.UsesMacBootstrapScript(recommended.Artifact));

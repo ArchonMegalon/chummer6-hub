@@ -259,7 +259,7 @@ async Task VerifySupportCrashWorkflowAsync()
 
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static builder => { });
         InstallLinkingStore installLinkingStore = new(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
-        InstallLinkingService installLinking = new(installLinkingStore);
+        InstallLinkingService installLinking = new(installLinkingStore, configuration);
         SupportStore store = new(configuration, loggerFactory.CreateLogger<SupportStore>());
         SupportAttachmentStorageService supportAttachments = new(configuration);
         SupportCaseService supportCases = new(store, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
@@ -533,7 +533,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
     var supportAttachments = new SupportAttachmentStorageService(configuration);
-    var installLinking = new InstallLinkingService(installLinkingStore);
+    var installLinking = new InstallLinkingService(installLinkingStore, configuration);
     var supportCases = new SupportCaseService(supportStore, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
     var publicationDraftWorkflow = new HubPublicationDraftService();
     var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(store), publicationDraftWorkflow);
@@ -1548,7 +1548,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
     var supportAttachments = new SupportAttachmentStorageService(configuration);
-    var installLinking = new InstallLinkingService(installLinkingStore);
+    var installLinking = new InstallLinkingService(installLinkingStore, configuration);
     var supportCases = new SupportCaseService(supportStore, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
     var robotsPath = Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "wwwroot", "robots.txt");
     Assert(File.Exists(robotsPath), "public shell should ship a robots.txt file.");
@@ -2152,6 +2152,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var installBootstrapTickets = new InstallBootstrapTicketService(
         DataProtectionProvider.Create(Path.Combine(tempRoot, "install-bootstrap-tickets")),
         configuration);
+    var personalizedInstallScripts = new PersonalizedInstallScriptService(installLinkingStore, configuration);
     var releaseUploadTickets = new ReleaseUploadTicketService(
         DataProtectionProvider.Create(Path.Combine(tempRoot, "release-upload-tickets")),
         configuration);
@@ -2162,19 +2163,20 @@ async Task VerifyPublicLandingProjectionAsync()
         ContentRootPath = tempRoot,
         WebRootPath = Path.Combine(tempRoot, "wwwroot")
     };
-    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
     var downloadsController = new DownloadsCompatibilityController(
         releases,
+        new WindowsProofInstallerService(configuration),
         releaseSelection,
         installLinking,
         installBootstrapTickets,
@@ -3932,7 +3934,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

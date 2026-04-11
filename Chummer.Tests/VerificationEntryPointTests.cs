@@ -435,14 +435,20 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("curl -fsSL", controller, StringComparison.Ordinal);
         Assert.Contains("TMP_BOOTSTRAP_SCRIPT", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadTicketService", controller, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_PUBLISH_MODE='http'", controller, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_UPLOAD_SESSIONS_URL", controller, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='https://chummer.run/downloads/releases.json'", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadPageViewModel", viewModel, StringComparison.Ordinal);
         Assert.Contains("Signed-in release upload", view, StringComparison.Ordinal);
-        Assert.Contains("operator source of truth", view, StringComparison.Ordinal);
+        Assert.Contains("source of truth for release upload in Chummer", view, StringComparison.Ordinal);
         Assert.Contains("claim code", view, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_TOKEN", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_URL", bootstrap, StringComparison.Ordinal);
         Assert.Contains("log_bootstrap_identity", bootstrap, StringComparison.Ordinal);
         Assert.Contains("bootstrap source:", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("to_lower_ascii()", bootstrap, StringComparison.Ordinal);
+        Assert.DoesNotContain("${release_proof_status,,}", bootstrap, StringComparison.Ordinal);
+        Assert.DoesNotContain("${ui_gate_status,,}", bootstrap, StringComparison.Ordinal);
         Assert.Contains("bootstrap template not found", wrapper, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload", wrapper, StringComparison.Ordinal);
         Assert.Contains("artifacts/mac-codex-release-pipeline/bootstrap.sh", wrapper, StringComparison.Ordinal);
@@ -516,7 +522,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("UsesMacBootstrapScript", service, StringComparison.Ordinal);
         Assert.Contains("visible_as_account_gated_setup_script_preview", service, StringComparison.Ordinal);
         Assert.Contains("DetectPreferredArchitecture", service, StringComparison.Ordinal);
-        Assert.Contains("guided Mac setup assistant", service, StringComparison.Ordinal);
+        Assert.Contains("one Terminal command", service, StringComparison.Ordinal);
         Assert.Contains("verifies the published DMG digest", service, StringComparison.Ordinal);
         Assert.Contains("macOS (Apple Silicon)", service, StringComparison.Ordinal);
         Assert.Contains("BootstrapScriptDownload", viewModel, StringComparison.Ordinal);
@@ -524,6 +530,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("BootstrapCommandLabel", viewModel, StringComparison.Ordinal);
         Assert.Contains("BootstrapCommandIntro", viewModel, StringComparison.Ordinal);
         Assert.Contains("BootstrapCommandNote", viewModel, StringComparison.Ordinal);
+        Assert.Contains("CopyCommandLabel", viewModel, StringComparison.Ordinal);
+        Assert.Contains("CompactDispatchLayout", viewModel, StringComparison.Ordinal);
         Assert.Contains("BootstrapFeatureCards", viewModel, StringComparison.Ordinal);
         Assert.Contains("CurrentReleaseSummary", viewModel, StringComparison.Ordinal);
         Assert.Contains("AutoStartDownload", viewModel, StringComparison.Ordinal);
@@ -533,13 +541,18 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("copy the Terminal command", downloadsView, StringComparison.Ordinal);
         Assert.Contains("BuildMacBootstrapTerminalCommand", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveClaimTicketForDownload", controller, StringComparison.Ordinal);
-        Assert.Contains("Copy install command", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("CopyCommandLabel", controller, StringComparison.Ordinal);
         Assert.Contains("BootstrapCommandIntro", dispatchView, StringComparison.Ordinal);
         Assert.Contains("BootstrapCommandLabel", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("CopyCommandLabel", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("CompactDispatchLayout", dispatchView, StringComparison.Ordinal);
         Assert.Contains("BootstrapFeatureCards", dispatchView, StringComparison.Ordinal);
         Assert.Contains("CurrentReleaseSummary", dispatchView, StringComparison.Ordinal);
         Assert.Contains("Fallbacks and recovery", dispatchView, StringComparison.Ordinal);
         Assert.Contains("Setup highlights", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("dispatch-inline-info", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("data-install-info", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("Install details", dispatchView, StringComparison.Ordinal);
         Assert.Contains("enter the support or recovery code inside setup instead of copying one from this page", dispatchView, StringComparison.Ordinal);
         Assert.Contains("claimExchangeUrl", dispatchView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicTrustPulsePanel.cshtml", dispatchView, StringComparison.Ordinal);
@@ -3367,6 +3380,85 @@ public sealed class VerificationEntryPointTests
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", downloadDispatchView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", homeView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", supportSubmittedView, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LandingPageContextualizesGuestPreviewInstallLinks()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string landingViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml");
+
+        string controller = File.ReadAllText(controllerPath);
+        string landingView = File.ReadAllText(landingViewPath);
+
+        Assert.Contains("var releaseExperience = _releaseSelection.BuildExperience", controller, StringComparison.Ordinal);
+        Assert.Contains("guestNeedsInstallGate", landingView, StringComparison.Ordinal);
+        Assert.Contains("contextualHeroPrimaryHref", landingView, StringComparison.Ordinal);
+        Assert.Contains("contextualProductProofPrimaryHref", landingView, StringComparison.Ordinal);
+        Assert.Contains("ContextualPreviewHref", landingView, StringComparison.Ordinal);
+        Assert.Contains("release.GuestGatePrimaryHref", landingView, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicStoryNowAndStatusPagesContextualizeGuestPreviewInstallLinks()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
+        string storyViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml");
+        string nowViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml");
+        string statusViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
+
+        string controller = File.ReadAllText(controllerPath);
+        string viewModels = File.ReadAllText(viewModelPath);
+        string storyView = File.ReadAllText(storyViewPath);
+        string nowView = File.ReadAllText(nowViewPath);
+        string statusView = File.ReadAllText(statusViewPath);
+
+        Assert.Contains("ReleaseExperience: releaseExperience", controller, StringComparison.Ordinal);
+        Assert.Contains("StoryPageViewModel(", viewModels, StringComparison.Ordinal);
+        Assert.Contains("ReleaseExperienceViewModel ReleaseExperience", viewModels, StringComparison.Ordinal);
+        Assert.Contains("ContextualPreviewHref", storyView, StringComparison.Ordinal);
+        Assert.Contains("Model.ReleaseExperience.GuestGatePrimaryHref", storyView, StringComparison.Ordinal);
+        Assert.Contains("ContextualPreviewHref", nowView, StringComparison.Ordinal);
+        Assert.Contains("Model.ReleaseExperience.GuestGatePrimaryHref", nowView, StringComparison.Ordinal);
+        Assert.Contains("ContextualPreviewHref", statusView, StringComparison.Ordinal);
+        Assert.Contains("Model.ReleaseExperience.GuestGatePrimaryHref", statusView, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SignedInHomePageContextualizesInstallLinksThroughReleaseExperience()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
+        string homeViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml");
+
+        string controller = File.ReadAllText(controllerPath);
+        string viewModel = File.ReadAllText(viewModelPath);
+        string homeView = File.ReadAllText(homeViewPath);
+
+        Assert.Contains("ReleaseExperience: releaseExperience", controller, StringComparison.Ordinal);
+        Assert.Contains("ReleaseExperienceViewModel ReleaseExperience", viewModel, StringComparison.Ordinal);
+        Assert.Contains("ContextualPreviewHref(Model.PrimaryAction.Href)", homeView, StringComparison.Ordinal);
+        Assert.Contains("ContextualPreviewHref(supportCase.PrimaryActionHref)", homeView, StringComparison.Ordinal);
+        Assert.Contains("ContextualPreviewHref(\"/downloads\")", homeView, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicHelpFaqAndTrustPulseContextualizeGuestPreviewInstallLinks()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string faqViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Faq.cshtml");
+        string trustViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml");
+
+        string controller = File.ReadAllText(controllerPath);
+        string faqView = File.ReadAllText(faqViewPath);
+        string trustView = File.ReadAllText(trustViewPath);
+
+        Assert.Contains("releaseExperience.GuestGatePrimaryHref", controller, StringComparison.Ordinal);
+        Assert.Contains("ContextualPreviewHref", faqView, StringComparison.Ordinal);
+        Assert.Contains("Model.Chrome.PublicPrimaryCta", faqView, StringComparison.Ordinal);
+        Assert.Contains("ContextualPreviewHref", trustView, StringComparison.Ordinal);
+        Assert.Contains("Model.Chrome.PublicPrimaryCta", trustView, StringComparison.Ordinal);
     }
 
     [Fact]

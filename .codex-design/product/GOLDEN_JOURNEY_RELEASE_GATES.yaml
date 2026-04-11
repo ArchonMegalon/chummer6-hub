@@ -1,7 +1,7 @@
 product: chummer
 surface: release_control
 version: 1
-last_reviewed: 2026-04-04
+last_reviewed: 2026-04-10
 purpose: Canonical six-journey release gate layer for proving the campaign OS as a lived system instead of only a coherent repo graph.
 
 journey_gates:
@@ -87,9 +87,15 @@ journey_gates:
           json_must_equal:
             local_blocking_findings_count: 0
             evidence.hub_registry_root_trusted_for_startup_smoke_proof: true
-            evidence.flagship_status: pass
             evidence.visual_familiarity_status: pass
             evidence.workflow_execution_status: pass
+            evidence.desktop_familiarity.file_menu_live: true
+            evidence.desktop_familiarity.master_index_first_class: true
+            evidence.desktop_familiarity.character_roster_first_class: true
+            evidence.desktop_familiarity.startup_opens_workbench_not_landing: true
+            evidence.install_experience.manual_browser_claim_code_required: false
+            evidence.install_experience.claim_flow_surface: installer_or_in_app
+            evidence.install_experience.product_installer_guides_head_choice: true
             evidence.receipt_scope.windows_gate:avalonia:win-x64.within_repo_root: true
             evidence.receipt_scope.windows_gate:blazor-desktop:win-x64.within_repo_root: true
             evidence.receipt_scope.linux_gate:avalonia:linux-x64.within_repo_root: true
@@ -241,9 +247,41 @@ journey_gates:
           must_contain:
             - chummer.portable-dossier.v1
             - chummer.portable-campaign.v1
+            - chummer.portable-campaign-session.v1
             - foundry-vtt.scene-ledger.v1
             - ReceiptSummary
             - nextSafeAction
+            - session-binding-inferred
+            - session continuity binding
+        - repo: chummer6-hub
+          path: Chummer.Tests/InteropExportServiceTests.cs
+          must_contain:
+            - Export_campaign_scope_infers_session_binding_from_session_assets
+            - Export_character_only_campaign_scope_keeps_unpinned_session_warning
+            - session-binding-inferred
+            - session-binding-required-for-replace
+        - repo: chummer6-media-factory
+          path: src/Chummer.Media.Factory.Runtime/Assets/CreatorPublicationPlannerService.cs
+          must_contain:
+            - 'PreserveLaneLine("JSON exchange:", handoff.ExchangeParityLines, selectedParityLines);'
+            - 'PreserveLaneLine("Foundry exchange:", handoff.ExchangeParityLines, selectedParityLines);'
+            - 'PreserveLaneLine("Sheet viewer:", handoff.ExchangeParityLines, selectedParityLines);'
+            - 'PreserveLaneLine("Print PDF:", handoff.ExchangeParityLines, selectedParityLines);'
+            - 'PreserveLaneLine("Character template export:", handoff.ExchangeParityLines, selectedParityLines);'
+            - 'PreserveLaneLine("Replay timeline:", handoff.PortabilityPillarLines, selectedPortabilityLines);'
+            - 'PreserveLaneLine("Session recap:", handoff.PortabilityPillarLines, selectedPortabilityLines);'
+            - 'PreserveLaneLine("Run module:", handoff.PortabilityPillarLines, selectedPortabilityLines);'
+        - repo: chummer6-media-factory
+          path: Chummer.Media.Factory.Runtime.Verify/Program.cs
+          must_contain:
+            - 'Assert(creatorPublicationPlan.EvidenceLines.Any(static line => line.Contains("JSON exchange:", StringComparison.Ordinal)),'
+            - 'Assert(creatorPublicationPlan.EvidenceLines.Any(static line => line.Contains("Foundry exchange:", StringComparison.Ordinal)),'
+            - 'Assert(creatorPublicationPlan.EvidenceLines.Any(static line => line.Contains("Sheet viewer:", StringComparison.Ordinal)),'
+            - 'Assert(creatorPublicationPlan.EvidenceLines.Any(static line => line.Contains("Print PDF:", StringComparison.Ordinal)),'
+            - 'Assert(creatorPublicationPlan.EvidenceLines.Any(static line => line.Contains("Character template export:", StringComparison.Ordinal)),'
+            - 'Assert(creatorPublicationPlan.EvidenceLines.Any(static line => line.Contains("Replay timeline:", StringComparison.Ordinal)),'
+            - 'Assert(creatorPublicationPlan.EvidenceLines.Any(static line => line.Contains("Session recap:", StringComparison.Ordinal)),'
+            - 'Assert(creatorPublicationPlan.EvidenceLines.Any(static line => line.Contains("Run module:", StringComparison.Ordinal)),'
         - repo: chummer6-ui
           path: Chummer.Presentation/UiKit/ChummerPatternBoundary.cs
           must_contain:
@@ -321,6 +359,7 @@ journey_gates:
       - chummer6-hub
       - chummer6-mobile
       - chummer6-ui
+      - chummer6-core
       - fleet
       - executive-assistant
     scorecard_refs:
@@ -364,6 +403,14 @@ journey_gates:
             - 'Kind: "roster_movement_packet"'
             - 'Kind: "event_control_packet"'
             - 'InvokeBuildTokens("next-session-return-loops")'
+            - "PrepLibraryQueryMatchingSupportsCompactGovernedPacketForms"
+            - 'InvokeBuildTokens("preplibrarypacket")'
+            - 'InvokeBuildTokens("oppositionpackets")'
+            - 'InvokeBuildTokens("rostermovementpacket")'
+            - 'InvokeBuildTokens("eventcontrolpackets")'
+            - "PrepLibraryQueryMatchingCollapsesCompactMobileCompanionReturnLoopForms"
+            - 'InvokeBuildTokens("mobilecompanionreturnloop")'
+            - 'InvokeBuildTokens("campaignmobilecompanionsreturnlanes")'
         - repo: chummer6-hub
           path: tests/RunServicesVerification/GmOpsBoardVerification.cs
           must_contain:
@@ -371,10 +418,47 @@ journey_gates:
             - 'AdditionalTags: ["opposition", "packet"]'
             - 'AdditionalTags: ["opposition", "roster"]'
         - repo: chummer6-hub
+          path: Chummer.Run.AI/Services/Ops/GmOpsBoardService.cs
+          must_contain:
+            - 'return "continuity_return";'
+            - '"sync drift",'
+            - '"out-of-sync",'
+            - '"unsynced",'
+            - '"safehouse",'
+            - '"cache stale",'
+        - repo: chummer6-hub
+          path: Chummer.Tests/GmOpsBoardServiceTests.cs
+          must_contain:
+            - "GetProjection_UnresolvedItemsTreatOfflineSafehouseTravelCacheStaleSignalsAsContinuityReturnDomain"
+            - "GetProjection_UnresolvedItemsTreatOfflineSyncDriftSignalsAsContinuityReturnDomainWithoutOpenKeyword"
+            - "ListPrepAssets_QuerySupportsGameMasterOpsShorthandAcrossWhitespaceAndPunctuation"
+        - repo: chummer6-hub
           path: tests/RunServicesVerification/OfflineSyncVerification.cs
           must_contain:
             - "offline_sync_snapshot_v1"
             - "Snapshot should include reusable campaign prep assets for offline library continuity."
+        - repo: chummer6-core
+          path: Chummer.Application/Workspaces/WorkspaceService.cs
+          must_contain:
+            - "Portable package keeps profile, progress, attributes, skills, inventory, qualities, and contacts on the same governed receipt."
+            - "Use the workspace normally or export a portable package when you need a governed cross-surface handoff."
+        - repo: chummer6-core
+          path: Chummer.Application/Simulation/DefaultRelationshipHeatService.cs
+          must_contain:
+            - "public HeatComputationResult ComputeHeat(HeatComputationInput input)"
+            - "< 70m => \"heat.high\","
+            - "public DowntimeProgressionResult ComputeDowntimeProgression(DowntimeProgressionInput input)"
+        - repo: chummer6-core
+          path: Chummer.Tests/Compliance/MigrationComplianceTests.cs
+          must_contain:
+            - "public void Relationship_and_heat_simulation_contracts_lock_in_computation_primitives()"
+            - "StringAssert.Contains(simulationContractsText, \"public sealed record DowntimeProgressionInput\");"
+            - "StringAssert.Contains(simulationServiceText, \"heat.low\");"
+        - repo: chummer6-core
+          path: Chummer.CoreEngine.Tests/Program.cs
+          must_contain:
+            - "private static void RelationshipHeatSimulationStaysDeterministic()"
+            - "AssertEx.Equal(\"heat.high\", heat.ThresholdKey, \"Relationship heat should resolve the deterministic threshold band.\");"
         - repo: chummer6-ui
           path: scripts/audit-ui-parity.sh
           must_contain:
@@ -387,6 +471,36 @@ journey_gates:
             - '"character_roster" => new DesktopDialogState('
             - '"dialog.dice_roller"'
             - '"dialog.character_roster"'
+            - '"diceThreshold"'
+            - '"diceUtilityLane"'
+            - '"initiativePreview"'
+            - '"rosterOpenCount"'
+            - '"rosterOpsLane"'
+            - '"rosterEntries"'
+        - repo: chummer6-ui
+          path: Chummer.Presentation/Overview/DialogCoordinator.cs
+          must_contain:
+            - '"derive_initiative"'
+            - '"diceThreshold"'
+            - '"initiativePreview"'
+            - "BuildInitiativePreview(dialog)"
+        - repo: chummer6-ui
+          path: Chummer.Presentation/Shell/CatalogOnlyRulesetShellCatalogResolver.cs
+          must_contain:
+            - 'WorkflowDefinitionIds.DiceTool'
+            - '"Utility Tooling"'
+            - '["dice_roller"]'
+            - '["character_roster"]'
+        - repo: chummer6-ui
+          path: Chummer.Tests/Presentation/DesktopDialogFactoryTests.cs
+          must_contain:
+            - "CreateCommandDialog_dice_roller_surfaces_initiative_preview_and_roster_context"
+            - "CreateCommandDialog_character_roster_summarizes_open_workspaces"
+        - repo: chummer6-ui
+          path: Chummer.Tests/Presentation/DialogCoordinatorTests.cs
+          must_contain:
+            - "CoordinateAsync_roll_adds_result_field_to_dice_dialog"
+            - "CoordinateAsync_derive_initiative_updates_preview_without_closing_dialog"
         - repo: chummer6-ui
           path: Chummer.Blazor/Components/Shared/GmBoardFeed.razor
           must_contain:
@@ -408,12 +522,42 @@ journey_gates:
           must_contain:
             - '"contract_name": "chummer6-mobile.local_release_proof"'
             - '"campaign_session_recover_recap"'
+            - 'Assert(projection.ContinuityRailSummary.Contains(\"Downtime:\", StringComparison.Ordinal)'
+            - 'Assert(projection.ContinuityRailSummary.Contains(\"Diary:\", StringComparison.Ordinal)'
+            - 'Assert(projection.ContinuityRailSummary.Contains(\"Contacts:\", StringComparison.Ordinal)'
+            - 'Assert(projection.ContinuityRailSummary.Contains(\"Heat:\", StringComparison.Ordinal)'
+            - 'Assert(projection.ContinuityRailSummary.Contains(\"Aftermath:\", StringComparison.Ordinal)'
+            - 'Assert(projection.ContinuityRailSummary.Contains(\"Return:\", StringComparison.Ordinal)'
+            - 'Assert(projection.GmOperationsSummary.Contains(\"Opposition:\", StringComparison.Ordinal)'
+            - 'Assert(projection.GmOperationsSummary.Contains(\"Roster movement:\", StringComparison.Ordinal)'
+            - 'Assert(projection.GmOperationsSummary.Contains(\"Prep library:\", StringComparison.Ordinal)'
+            - 'Assert(projection.GmOperationsSummary.Contains(\"Event controls:\", StringComparison.Ordinal)'
+            - 'Assert(projection.GmOperationsSummary.Contains(\"audit-visible\", StringComparison.Ordinal)'
+            - 'Assert(projection.GmOperationsSummary.Contains(\"support-linked\", StringComparison.Ordinal)'
+            - 'Assert(projection.GmOperationsLabels.Any(item => item.Contains(\"Opposition lane:\", StringComparison.Ordinal))'
+            - 'Assert(projection.GmOperationsLabels.Any(item => item.Contains(\"Roster movement lane:\", StringComparison.Ordinal))'
+            - 'Assert(projection.GmOperationsLabels.Any(item => item.Contains(\"Prep library lane:\", StringComparison.Ordinal))'
+            - 'Assert(projection.GmOperationsLabels.Any(item => item.Contains(\"Event controls lane:\", StringComparison.Ordinal))'
+            - 'Assert(projection.GmOperationsLabels.Any(item => item.Contains(\"Governance lane:\", StringComparison.Ordinal))'
             - 'Assert(projection.OfflineTruthSummary.Contains(\"Stale:\", StringComparison.Ordinal)'
+            - 'Assert(projection.OfflineTruthSummary.Contains(\"Can do now:\", StringComparison.Ordinal)'
+            - 'Assert(projection.OfflineTruthSummary.Contains(\"Needs online:\", StringComparison.Ordinal)'
+            - 'Assert(projection.OfflineTruthLabels.Any(item => item.Contains(\"Can-do-now lane:\", StringComparison.Ordinal))'
+            - 'Assert(projection.OfflineTruthLabels.Any(item => item.Contains(\"Needs-online lane:\", StringComparison.Ordinal))'
             - 'Assert(plan.TravelCompanionSummary.Contains(\"Cached:\", StringComparison.Ordinal)'
+            - 'Assert(plan.TravelCompanionSummary.Contains(\"Stale:\", StringComparison.Ordinal)'
             - 'Assert(plan.TravelCompanionSummary.Contains(\"Offline actions:\", StringComparison.Ordinal)'
+            - 'Assert(plan.TravelCompanionLabels.Any(item => item.Contains(\"Cached lane:\", StringComparison.Ordinal))'
+            - 'Assert(plan.TravelCompanionLabels.Any(item => item.Contains(\"Stale lane:\", StringComparison.Ordinal))'
+            - 'Assert(plan.TravelCompanionLabels.Any(item => item.Contains(\"Offline action lane:\", StringComparison.Ordinal))'
+            - 'id=\"workspace-continuity-rail\"'
+            - 'id=\"workspace-continuity-rail-list\"'
+            - 'id=\"workspace-gm-ops\"'
+            - 'id=\"workspace-gm-ops-list\"'
             - 'id=\"workspace-offline-truth\"'
             - 'id=\"restore-offline-truth\"'
             - 'id=\"restore-travel-companion\"'
+            - 'id=\"restore-travel-companion-labels\"'
         - repo: executive-assistant
           path: SKILLS.md
           must_contain:
@@ -433,7 +577,41 @@ journey_gates:
             - "`campaign_offline_continuity_brief`"
             - "`campaign_mobile_companion_brief`"
             - "`campaign_workspace_v4_brief`"
+        - repo: executive-assistant
+          path: ea/app/services/task_contracts.py
+          must_contain:
+            - '"gm_ops_briefing",'
+            - '"campaign_workspace_v4_brief",'
+            - '"gm_ops_briefing": "gm_ops_brief",'
+            - '"campaign_workspace_v4_brief": "campaign_workspace_v4_brief",'
+            - "W3_CONTRACT_SKILL_MEMORY_READS: dict[str, tuple[str, ...]] = {"
+            - '"campaign_workspace_v4_brief": ('
+            - '"offline_actions",'
+            - "W3_CONTRACT_SKILL_MEMORY_WRITES: dict[str, str] = {"
+            - '"campaign_workspace_v4_brief": "campaign_workspace_v4_fact",'
+            - '"workflow_template": "tool_then_artifact",'
+            - '"pre_artifact_capability_key": "structured_generate",'
+            - '"memory_reads": list(memory_reads),'
+            - '"memory_writes": [memory_write_key] if memory_write_key else [],'
+            - '"primary": ["Gemini Vortex", "AI Magicx", "BrowserAct"],'
+        - repo: executive-assistant
+          path: tests/test_task_contract_runtime_policy.py
+          must_contain:
+            - "def test_builtin_w3_campaign_and_gm_contracts_resolve_with_groundwork_runtime_policy("
+            - "def test_builtin_w3_gm_ops_contract_projects_lane_memory_metadata() -> None:"
+            - "def test_builtin_w3_mobile_continuity_contract_projects_safehouse_travel_offline_reads() -> None:"
+            - "def test_builtin_w3_workspace_v4_contract_projects_unified_campaign_gm_and_offline_reads() -> None:"
+            - '("gm_ops_briefing", "gm_ops_brief"),'
+            - '("campaign_workspace_v4_brief", "campaign_workspace_v4_brief"),'
+            - 'assert runtime_policy.workflow_template_key == "tool_then_artifact"'
+            - 'assert runtime_policy.pre_artifact_capability_key == "structured_generate"'
+            - 'assert runtime_policy.skill_catalog.memory_writes == ("gm_ops_brief_fact",)'
+            - 'assert runtime_policy.skill_catalog.memory_writes == ("campaign_mobile_companion_fact",)'
+            - 'assert runtime_policy.skill_catalog.memory_writes == ("campaign_workspace_v4_fact",)'
       required_project_posture:
+        - project_id: core
+          minimum_stage: boundary_pure
+          target_stage: boundary_pure
         - project_id: hub
           minimum_stage: pre_repo_local_complete
           target_stage: publicly_promoted
@@ -543,6 +721,19 @@ journey_gates:
             - '"report_cluster_release_notify"'
             - '"/account/support"'
             - '"/contact"'
+        - repo: chummer6-hub-registry
+          path: .codex-studio/published/RELEASE_CHANNEL.generated.json
+          json_must_be_one_of:
+            status:
+              - published
+              - publishable
+          must_contain:
+            - '"desktopTupleCoverage"'
+            - '"externalProofRequests"'
+          max_age_hours: 48
+          generated_at_fields:
+            - generated_at
+            - generatedAt
       require_support_freshness: true
       require_support_closure_waiting_zero: true
       require_support_update_required_routes_to_downloads: true
@@ -607,4 +798,4 @@ journey_gates:
 rules:
   - A journey gate is blocked when required published artifacts are missing or stale, or when an owning project falls below its minimum stage or deployment posture.
   - A journey gate is warning when the minimum posture is met but the target posture or history depth is still not boring.
-  - Fleet publish readiness must consume this registry through a generated JOURNEY_GATES artifact rather than by ad hoc prose.
+  - Fleet publish readiness must consume this registry through the design-owned `JOURNEY_GATES.generated.json` truth plane rather than by ad hoc prose, then mirror that truth into the fleet-published artifact.

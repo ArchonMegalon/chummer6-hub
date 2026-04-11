@@ -46,6 +46,7 @@ public sealed class PublicLandingController : Controller
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly IConfiguration _configuration;
     private readonly InstallBootstrapTicketService _installBootstrapTickets;
+    private readonly PersonalizedInstallScriptService _personalizedInstallScripts;
     private readonly ReleaseUploadTicketService _releaseUploadTickets;
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly ILogger<PublicLandingController> _logger;
@@ -73,6 +74,7 @@ public sealed class PublicLandingController : Controller
         SupportCasePresentationService supportPresentation,
         IConfiguration configuration,
         InstallBootstrapTicketService installBootstrapTickets,
+        PersonalizedInstallScriptService personalizedInstallScripts,
         ReleaseUploadTicketService releaseUploadTickets,
         IWebHostEnvironment webHostEnvironment,
         ILogger<PublicLandingController> logger)
@@ -99,6 +101,7 @@ public sealed class PublicLandingController : Controller
         _supportPresentation = supportPresentation;
         _configuration = configuration;
         _installBootstrapTickets = installBootstrapTickets;
+        _personalizedInstallScripts = personalizedInstallScripts;
         _releaseUploadTickets = releaseUploadTickets;
         _webHostEnvironment = webHostEnvironment;
         _logger = logger;
@@ -158,6 +161,7 @@ public sealed class PublicLandingController : Controller
             Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/what-is-chummer"),
             TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),
             Lanes: ResolveCards(_landing.CardsForBucket(surface, "choose_your_lane"), assetCatalog, authenticated: false, "/what-is-chummer"),
+            ReleaseExperience: releaseExperience,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/ProductStory.cshtml", model);
@@ -356,7 +360,6 @@ public sealed class PublicLandingController : Controller
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            var dispatch = _installLinking.IssueDownload(manifest, artifact, user.UserId, subject.SubjectId);
             var release = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
             var option = _releaseSelection.BuildOption(manifest, artifact, authenticated: true, recommended: false);
             var bootstrapScriptDownload = _releaseSelection.UsesGuidedBootstrapScript(artifact);
@@ -364,7 +367,17 @@ public sealed class PublicLandingController : Controller
             var guidedBootstrapArtifacts = bootstrapScriptDownload
                 ? ResolveGuidedBootstrapArtifacts(manifest, artifact)
                 : Array.Empty<PublicReleaseArtifactDto>();
-            var bootstrapTicket = bootstrapScriptDownload
+            var dispatch = bootstrapScriptDownload
+                ? null
+                : _installLinking.IssueDownload(manifest, artifact, user.UserId, subject.SubjectId);
+            var personalizedMacInstallScript = bootstrapScriptDownload && string.Equals(bootstrapPlatform, "macos", StringComparison.Ordinal)
+                ? _personalizedInstallScripts.IssueMacScript(
+                    artifact.Id,
+                    guidedBootstrapArtifacts.Select(candidate => candidate.Id),
+                    user.UserId,
+                    subject.SubjectId)
+                : null;
+            var bootstrapTicket = bootstrapScriptDownload && !string.Equals(bootstrapPlatform, "macos", StringComparison.Ordinal)
                 ? _installBootstrapTickets.Issue(
                     artifact.Id,
                     guidedBootstrapArtifacts.Select(candidate => candidate.Id),
@@ -375,11 +388,15 @@ public sealed class PublicLandingController : Controller
                 ? QueryString.Empty
                 : QueryString.Create("ticket", bootstrapTicket.Ticket);
             var bootstrapScriptPath = bootstrapScriptDownload && bootstrapPlatform is not null
-                ? BuildBootstrapScriptPath(artifact.Id, bootstrapPlatform)
+                ? string.Equals(bootstrapPlatform, "macos", StringComparison.Ordinal)
+                    ? BuildPersonalizedMacBootstrapScriptPath(personalizedMacInstallScript!.ScriptId)
+                    : BuildBootstrapScriptPath(artifact.Id, bootstrapPlatform)
                 : null;
             var bootstrapScriptHref = bootstrapScriptPath is null
                 ? null
-                : $"{bootstrapScriptPath}{bootstrapQuery}";
+                : bootstrapTicket is null
+                    ? bootstrapScriptPath
+                    : $"{bootstrapScriptPath}{bootstrapQuery}";
             var rawDownloadHref = option.DirectFileHref;
             var downloadHref = bootstrapScriptDownload
                 ? bootstrapScriptHref!
@@ -402,10 +419,16 @@ public sealed class PublicLandingController : Controller
                     BuildAbsoluteUrl(
                         BuildBootstrapScriptPath(artifact.Id, bootstrapPlatform!),
                         QueryString.Create("ticket", bootstrapTicket.Ticket)))
+                : bootstrapScriptDownload && bootstrapScriptPath is not null
+                    ? BuildBootstrapInstallCommand(
+                        bootstrapPlatform,
+                        BuildAbsoluteUrl(bootstrapScriptPath))
                 : null;
             var model = new DownloadDispatchPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome("Download handoff", "Start the installer download and keep the install linked to this account from the first launch.", "/downloads", user.DisplayName),
-                Heading: release.SignedInDispatchHeading,
+                Heading: bootstrapScriptDownload
+                    ? BuildDispatchHeading(release.SignedInDispatchHeading, bootstrapPlatform)
+                    : release.SignedInDispatchHeading,
                 Summary: dispatchSummary,
                 DispatchNote: dispatchNote,
                 ArtifactTitle: option.Title,
@@ -416,6 +439,8 @@ public sealed class PublicLandingController : Controller
                 BootstrapCommandLabel: BuildBootstrapCommandLabel(bootstrapPlatform),
                 BootstrapCommandIntro: BuildBootstrapCommandIntro(bootstrapPlatform),
                 BootstrapCommandNote: BuildBootstrapCommandNote(bootstrapPlatform),
+                CopyCommandLabel: BuildCopyCommandLabel(bootstrapPlatform),
+                CompactDispatchLayout: bootstrapScriptDownload && string.Equals(bootstrapPlatform, "macos", StringComparison.Ordinal),
                 BootstrapFeatureCards: BuildBootstrapFeatureCards(bootstrapPlatform),
                 AutoStartDownload: !bootstrapScriptDownload,
                 BootstrapScriptDownload: bootstrapScriptDownload,
@@ -435,8 +460,8 @@ public sealed class PublicLandingController : Controller
                 PlatformLabel: option.PlatformLabel,
                 HeadLabel: option.HeadLabel,
                 ClaimExchangeUrl: bootstrapScriptDownload ? null : $"/downloads/install/{Uri.EscapeDataString(artifactId)}/claim.json",
-                ClaimCode: bootstrapScriptDownload ? null : dispatch.ClaimTicket?.ClaimCode,
-                ClaimCodeExpiresAtUtc: bootstrapScriptDownload ? null : dispatch.ClaimTicket?.ExpiresAtUtc,
+                ClaimCode: dispatch?.ClaimTicket?.ClaimCode,
+                ClaimCodeExpiresAtUtc: dispatch?.ClaimTicket?.ExpiresAtUtc,
                 Steps: steps,
                 TrustPulse: BuildPublicTrustPulsePanel(manifest, release),
                 SignedInStatus: _signedInTrustStatus.Build(user, manifest, release));
@@ -463,19 +488,11 @@ public sealed class PublicLandingController : Controller
             return failure;
         }
 
-        var scriptArtifacts = context!.Artifacts
-            .Select(candidate => new MacInstallBootstrapArtifact(
-                ArtifactId: candidate.ArtifactId,
-                HeadId: candidate.HeadId,
-                Title: candidate.Title,
-                ShortLabel: candidate.ShortLabel,
-                DownloadUrl: candidate.DownloadUrl,
-                ClaimUrl: candidate.ClaimUrl,
-                Sha256: candidate.Sha256,
-                DmgName: candidate.PackageName,
-                Architecture: candidate.Architecture,
-                LaunchAfterInstall: candidate.LaunchAfterInstall))
-            .ToArray();
+        MacInstallBootstrapArtifact[] scriptArtifacts = BuildMacInstallBootstrapArtifacts(
+            context!.Manifest,
+            context.Artifacts,
+            context.UserId,
+            context.SubjectId);
 
         string script = RenderMacInstallBootstrapScript(
             scriptArtifacts,
@@ -489,6 +506,85 @@ public sealed class PublicLandingController : Controller
             Encoding.UTF8.GetBytes(script),
             "text/x-shellscript; charset=utf-8",
             BuildMacBootstrapFileName(context.Artifact));
+    }
+
+    [HttpGet("/install-{scriptId}.sh")]
+    [Produces("text/plain")]
+    public IActionResult DownloadDispatchPersonalizedMacBootstrapScript([FromRoute] string scriptId)
+    {
+        PersonalizedInstallScriptConsumeResult consume = _personalizedInstallScripts.Consume(scriptId);
+        if (consume.Status != PersonalizedInstallScriptConsumeStatus.Success || consume.Link is null)
+        {
+            Response.Headers["Cache-Control"] = "private, no-store";
+            return StatusCode(
+                StatusCodes.Status410Gone,
+                new
+                {
+                    error = consume.Status switch
+                    {
+                        PersonalizedInstallScriptConsumeStatus.Consumed => "install_command_already_used",
+                        PersonalizedInstallScriptConsumeStatus.Expired => "install_command_expired",
+                        PersonalizedInstallScriptConsumeStatus.Revoked => "install_command_revoked",
+                        _ => "install_command_unavailable",
+                    },
+                    message = "The install command expired or was already used. Re-open the signed-in downloads handoff and copy a fresh install command."
+                });
+        }
+
+        var (manifest, artifact) = ResolveInstallDispatchArtifact(consume.Link.ArtifactId);
+        if (artifact is null
+            || !string.Equals(consume.Link.Platform, "macos", StringComparison.OrdinalIgnoreCase)
+            || !_releaseSelection.UsesGuidedBootstrapScript(artifact)
+            || !string.Equals(ResolveGuidedBootstrapPlatform(artifact), "macos", StringComparison.OrdinalIgnoreCase))
+        {
+            Response.Headers["Cache-Control"] = "private, no-store";
+            return NotFound();
+        }
+
+        IReadOnlyList<GuidedBootstrapArtifact> guidedArtifacts = ResolveGuidedBootstrapArtifacts(manifest, artifact)
+            .Where(candidate => consume.Link.AllowedArtifactIds.Contains(candidate.Id, StringComparer.OrdinalIgnoreCase))
+            .Select(candidate => new GuidedBootstrapArtifact(
+                ArtifactId: candidate.Id,
+                HeadId: candidate.Head ?? string.Empty,
+                Title: BuildGuidedBootstrapArtifactTitle(candidate),
+                ShortLabel: BuildGuidedBootstrapShortLabel(candidate),
+                DownloadUrl: BuildAbsoluteUrl($"/downloads/file/{Uri.EscapeDataString(candidate.Id)}"),
+                ClaimUrl: string.Empty,
+                Sha256: candidate.Sha256,
+                PackageName: candidate.FileName ?? Path.GetFileName(candidate.Url),
+                Architecture: candidate.Arch,
+                LaunchAfterInstall: string.Equals(candidate.Id, artifact.Id, StringComparison.OrdinalIgnoreCase),
+                InstallFolderName: ResolveGuidedBootstrapInstallFolderName(candidate),
+                ExecutableName: ResolveGuidedBootstrapExecutableName(candidate),
+                LauncherName: ResolveGuidedBootstrapLauncherName(candidate),
+                DesktopEntryName: ResolveGuidedBootstrapDesktopEntryName(candidate)))
+            .ToArray();
+        if (guidedArtifacts.Count == 0)
+        {
+            Response.Headers["Cache-Control"] = "private, no-store";
+            return Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                detail: "no macOS bootstrap artifacts are available for this personalized handoff.");
+        }
+
+        MacInstallBootstrapArtifact[] scriptArtifacts = BuildMacInstallBootstrapArtifacts(
+            manifest,
+            guidedArtifacts,
+            consume.Link.UserId,
+            consume.Link.SubjectId);
+
+        string script = RenderMacInstallBootstrapScript(
+            scriptArtifacts,
+            BuildAbsoluteUrl("/"),
+            BuildAbsoluteUrl("/account/access"),
+            BuildAbsoluteUrl("/downloads"),
+            BuildAbsoluteUrl("/help"));
+
+        Response.Headers["Cache-Control"] = "private, no-store";
+        return File(
+            Encoding.UTF8.GetBytes(script),
+            "text/x-shellscript; charset=utf-8",
+            BuildMacBootstrapFileName(artifact));
     }
 
     [HttpGet("/downloads/install/{artifactId}/bootstrap.ps1")]
@@ -940,6 +1036,7 @@ public sealed class PublicLandingController : Controller
             Sections: BuildHomeSections(selectedSection),
             Surface: surface,
             Assets: assetCatalog,
+            ReleaseExperience: releaseExperience,
             User: user,
             Links: links,
             Experience: experience,
@@ -1394,7 +1491,12 @@ public sealed class PublicLandingController : Controller
             TrendSamples: trendSamples,
             Rows: rows,
             PrimaryAction: new TrustPageActionViewModel("Open progress", "/progress", "secondary"),
-            SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "ghost"));
+            SecondaryAction: new TrustPageActionViewModel(
+                "Open downloads",
+                string.IsNullOrWhiteSpace(releaseExperience.GuestGatePrimaryHref)
+                    ? "/downloads"
+                    : releaseExperience.GuestGatePrimaryHref,
+                "ghost"));
     }
 
     private async Task<SignedInTrustStatusPanelViewModel?> BuildSignedInTrustStatusPanelAsync(
@@ -2471,7 +2573,7 @@ public sealed class PublicLandingController : Controller
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
-            return _chrome.BuildPublicChrome(title, description, currentPath);
+            return BuildContextualPublicChrome(title, description, currentPath);
         }
         catch (HubRequestAuthException ex)
         {
@@ -2481,7 +2583,7 @@ public sealed class PublicLandingController : Controller
                 return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
             }
 
-            return _chrome.BuildPublicChrome(title, description, currentPath);
+            return BuildContextualPublicChrome(title, description, currentPath);
         }
         catch (Exception ex) when (
             ex is HttpRequestException
@@ -2494,11 +2596,28 @@ public sealed class PublicLandingController : Controller
                 return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
             }
 
-            return _chrome.BuildPublicChrome(title, description, currentPath);
+            return BuildContextualPublicChrome(title, description, currentPath);
         }
     }
 
+    private SiteChromeViewModel BuildContextualPublicChrome(string title, string description, string currentPath)
+    {
+        var chrome = _chrome.BuildPublicChrome(title, description, currentPath);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(
+            manifest,
+            Request.Headers.UserAgent.ToString(),
+            authenticated: false);
+        return RebindGuestGateChromeActions(chrome, releaseExperience, rebindSignIn: false);
+    }
+
     private static SiteChromeViewModel RebindDownloadsHeaderActions(SiteChromeViewModel chrome, ReleaseExperienceViewModel releaseExperience)
+        => RebindGuestGateChromeActions(chrome, releaseExperience, rebindSignIn: true);
+
+    private static SiteChromeViewModel RebindGuestGateChromeActions(
+        SiteChromeViewModel chrome,
+        ReleaseExperienceViewModel releaseExperience,
+        bool rebindSignIn)
     {
         if (chrome.Authenticated || releaseExperience.Recommended?.RequiresAccount != true)
         {
@@ -2508,7 +2627,7 @@ public sealed class PublicLandingController : Controller
         var reboundActions = chrome.HeaderActions
             .Select(action =>
             {
-                if (string.Equals(action.Label, "Sign in", StringComparison.OrdinalIgnoreCase))
+                if (rebindSignIn && string.Equals(action.Label, "Sign in", StringComparison.OrdinalIgnoreCase))
                 {
                     return action with
                     {
@@ -2517,7 +2636,9 @@ public sealed class PublicLandingController : Controller
                     };
                 }
 
-                if (string.Equals(action.Label, "Get preview build", StringComparison.OrdinalIgnoreCase))
+                // Downloads chrome always exposes a single primary CTA, but the copy
+                // now varies between public-preview and guest-gated account flows.
+                if (string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase))
                 {
                     return action with
                     {
@@ -2530,7 +2651,19 @@ public sealed class PublicLandingController : Controller
             })
             .ToArray();
 
-        return chrome with { HeaderActions = reboundActions };
+        var reboundPublicPrimaryCta = chrome.PublicPrimaryCta is not null
+            ? chrome.PublicPrimaryCta with
+            {
+                Href = releaseExperience.GuestGatePrimaryHref,
+                Current = false
+            }
+            : null;
+
+        return chrome with
+        {
+            HeaderActions = reboundActions,
+            PublicPrimaryCta = reboundPublicPrimaryCta
+        };
     }
 
     private string BuildAbsoluteUrl(string path, QueryString query = default)
@@ -2570,10 +2703,13 @@ public sealed class PublicLandingController : Controller
             _ => throw new InvalidOperationException($"unsupported bootstrap platform '{platform}'.")
         };
 
+    internal static string BuildPersonalizedMacBootstrapScriptPath(string scriptId)
+        => $"/install-{Uri.EscapeDataString(scriptId)}.sh";
+
     private static string? BuildBootstrapCommandLabel(string? platform)
         => platform switch
         {
-            "macos" => "Mac install command",
+            "macos" => "Install command",
             "windows" => "Windows install command (advanced)",
             "linux" => "Linux install command",
             _ => null
@@ -2582,16 +2718,30 @@ public sealed class PublicLandingController : Controller
     private static string? BuildBootstrapCommandIntro(string? platform)
         => platform switch
         {
-            "macos" => "Paste this into Terminal.",
+            "macos" => "Copy this into Terminal.",
             "windows" => "Advanced: paste this into PowerShell when you want the guided linked setup flow.",
             "linux" => "Paste this into your shell.",
             _ => null
         };
 
+    private static string BuildDispatchHeading(string defaultHeading, string? platform)
+        => platform switch
+        {
+            "macos" => "Install your personalized Chummer6 app",
+            _ => defaultHeading
+        };
+
+    private static string BuildCopyCommandLabel(string? platform)
+        => platform switch
+        {
+            "macos" => "Copy the install command",
+            _ => "Copy install command"
+        };
+
     private static string? BuildBootstrapCommandNote(string? platform)
         => platform switch
         {
-            "macos" => "It streams the short-lived setup assistant directly into bash. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Applications folder or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
+            "macos" => "It streams a single-use, short-lived setup assistant directly into bash. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Applications folder or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
             "windows" => "It streams a short-lived PowerShell setup assistant. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Start menu or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
             "linux" => "It streams a short-lived shell setup assistant. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the applications menu or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
             _ => null
@@ -2627,6 +2777,7 @@ public sealed class PublicLandingController : Controller
     private static string BuildBootstrapFallbackDownloadLabel(string? platform)
         => platform switch
         {
+            "macos" => "Download one-time setup script",
             "windows" => "Download setup script fallback",
             "linux" => "Download setup script fallback",
             _ => "Download setup script fallback"
@@ -2646,7 +2797,7 @@ public sealed class PublicLandingController : Controller
         {
             "windows" => "Download the Windows installer .exe below. The PowerShell setup assistant stays available as an advanced option when you want the guided account-linked setup flow.",
             "linux" => "Paste the shell install command below. It streams a short-lived Linux setup assistant, asks which Chummer apps to install and where to put them, then downloads, verifies, installs, and links the selected apps to this account.",
-            _ => "Paste the Terminal install command below. It streams the short-lived Mac setup assistant directly into bash, asks which Chummer apps to install and where to put them, then downloads, verifies, installs, and links the selected apps to this account."
+            _ => "Copy the install command and run it in Terminal."
         };
 
     private static string BuildBootstrapDispatchNote(string? platform)
@@ -2654,7 +2805,7 @@ public sealed class PublicLandingController : Controller
         {
             "windows" => "The direct .exe is the normal Windows path. The PowerShell setup assistant remains available as an advanced account-linked flow when you want guided multi-step setup and claim recovery.",
             "linux" => "The shell command keeps the published Debian packages unchanged while streaming a short-lived guided setup assistant that can attach the install relationship to this account from the first launch.",
-            _ => "macOS can quarantine a downloaded unsigned .command and label it as damaged. The Terminal command avoids that by streaming the same short-lived setup assistant directly into bash while keeping the published DMGs unchanged."
+            _ => "macOS can quarantine a downloaded unsigned .command and label it as damaged. The single-use Terminal command avoids that by streaming the same short-lived setup assistant directly into bash while keeping the published DMGs unchanged."
         };
 
     private static IReadOnlyList<string> BuildBootstrapSteps(string? platform)
@@ -2677,7 +2828,7 @@ public sealed class PublicLandingController : Controller
             ],
             _ =>
             [
-                "Copy the Terminal install command below and paste it into Terminal.",
+                "Copy the single-use Terminal install command below and paste it into Terminal.",
                 "The Mac setup assistant offers Auto select for the matching Apple Silicon or Intel builds on this Mac, lets you switch to manual selection when you want different heads, asks whether to use /Applications or ~/Applications, whether to leave quick access in Applications only or add Desktop links, whether to open Chummer when it finishes, and then verifies that linking actually completed.",
                 "Terminal then shows staged progress while it downloads the selected DMGs, verifies their published SHA-256 digests, mounts them, and installs the app bundles with a staged swap instead of a delete-first replace.",
                 "Each selected app is started once through a short-lived environment handoff so it is already linked to this account the next time you open it."
@@ -2709,6 +2860,33 @@ public sealed class PublicLandingController : Controller
 
     internal static string BuildMacBootstrapTerminalCommand(string bootstrapUrl)
         => $"set -o pipefail; curl -fsSL {SingleQuoteShellValue(bootstrapUrl)} | /bin/bash";
+
+    private MacInstallBootstrapArtifact[] BuildMacInstallBootstrapArtifacts(
+        PublicReleaseManifestDto manifest,
+        IReadOnlyList<GuidedBootstrapArtifact> guidedArtifacts,
+        string? userId,
+        string? subjectId)
+        => guidedArtifacts
+            .Select(candidate =>
+            {
+                PublicReleaseArtifactDto sourceArtifact = manifest.Downloads
+                    .First(item => string.Equals(item.Id, candidate.ArtifactId, StringComparison.OrdinalIgnoreCase));
+                DownloadDispatchResult dispatch = _installLinking.IssueDownload(manifest, sourceArtifact, userId, subjectId);
+                string claimCode = dispatch.ClaimTicket?.ClaimCode
+                    ?? throw new InvalidOperationException($"install claim code is unavailable for {candidate.ArtifactId}.");
+                return new MacInstallBootstrapArtifact(
+                    ArtifactId: candidate.ArtifactId,
+                    HeadId: candidate.HeadId,
+                    Title: candidate.Title,
+                    ShortLabel: candidate.ShortLabel,
+                    DownloadUrl: BuildAbsoluteUrl($"/downloads/file/{Uri.EscapeDataString(candidate.ArtifactId)}"),
+                    ClaimCode: claimCode,
+                    Sha256: candidate.Sha256,
+                    DmgName: candidate.PackageName,
+                    Architecture: candidate.Architecture,
+                    LaunchAfterInstall: candidate.LaunchAfterInstall);
+            })
+            .ToArray();
 
     internal static IReadOnlyList<PublicReleaseArtifactDto> ResolveGuidedBootstrapArtifacts(
         PublicReleaseManifestDto manifest,
@@ -2800,10 +2978,10 @@ public sealed class PublicLandingController : Controller
             builder.Append("  '").Append(SingleQuoteShellLiteral(artifact.DownloadUrl)).AppendLine("'");
         }
         builder.AppendLine(")");
-        builder.AppendLine("CLAIM_ENDPOINTS=(");
+        builder.AppendLine("CLAIM_CODES=(");
         foreach (var artifact in artifacts)
         {
-            builder.Append("  '").Append(SingleQuoteShellLiteral(artifact.ClaimUrl)).AppendLine("'");
+            builder.Append("  '").Append(SingleQuoteShellLiteral(artifact.ClaimCode)).AppendLine("'");
         }
         builder.AppendLine(")");
         builder.AppendLine("HEAD_IDS=(");
@@ -3243,28 +3421,6 @@ public sealed class PublicLandingController : Controller
         builder.AppendLine("  return 1");
         builder.AppendLine("}");
         builder.AppendLine();
-        builder.AppendLine("fetch_install_claim_code() {");
-        builder.AppendLine("  local claim_url=\"$1\"");
-        builder.AppendLine("  local response_path=\"$WORK_ROOT/claim-$RANDOM.json\"");
-        builder.AppendLine("  local http_code claim_code claim_error");
-        builder.AppendLine("  http_code=\"$(curl --silent --show-error --location --output \"$response_path\" --write-out '%{http_code}' \"$claim_url\")\" || {");
-        builder.AppendLine("    rm -f \"$response_path\"");
-        builder.AppendLine("    return 1");
-        builder.AppendLine("  }");
-        builder.AppendLine("  if [[ \"$http_code\" != \"200\" ]]; then");
-        builder.AppendLine("    claim_error=\"$(/usr/bin/plutil -extract message raw -o - \"$response_path\" 2>/dev/null || true)\"");
-        builder.AppendLine("    if [[ -n \"$claim_error\" ]]; then");
-        builder.AppendLine("      echo \"$claim_error\" >&2");
-        builder.AppendLine("    fi");
-        builder.AppendLine("    rm -f \"$response_path\"");
-        builder.AppendLine("    return 1");
-        builder.AppendLine("  fi");
-        builder.AppendLine("  claim_code=\"$(/usr/bin/plutil -extract claimCode raw -o - \"$response_path\" 2>/dev/null || true)\"");
-        builder.AppendLine("  rm -f \"$response_path\"");
-        builder.AppendLine("  [[ -n \"$claim_code\" ]] || return 1");
-        builder.AppendLine("  printf '%s' \"$claim_code\"");
-        builder.AppendLine("}");
-        builder.AppendLine();
         builder.AppendLine("launch_bundle_binary_with_claim() {");
         builder.AppendLine("  local target_app=\"$1\"");
         builder.AppendLine("  local claim_code=\"$2\"");
@@ -3277,6 +3433,20 @@ public sealed class PublicLandingController : Controller
         builder.AppendLine("  env CHUMMER_INSTALL_CLAIM_CODE=\"$claim_code\" CHUMMER_API_BASE_URL=\"$PUBLIC_BASE_URL\" CHUMMER_WEB_BASE_URL=\"$PUBLIC_BASE_URL\" \"$executable_path\" >/dev/null 2>&1 &");
         builder.AppendLine("  printf '%s' \"$!\"");
         builder.AppendLine("  return 0");
+        builder.AppendLine("}");
+        builder.AppendLine();
+        builder.AppendLine("build_claim_download_url() {");
+        builder.AppendLine("  local base_url=\"$1\"");
+        builder.AppendLine("  local claim_code=\"$2\"");
+        builder.AppendLine("  if [[ -z \"$claim_code\" ]]; then");
+        builder.AppendLine("    printf '%s' \"$base_url\"");
+        builder.AppendLine("    return 0");
+        builder.AppendLine("  fi");
+        builder.AppendLine("  if [[ \"$base_url\" == *\\?* ]]; then");
+        builder.AppendLine("    printf '%s&claimCode=%s' \"$base_url\" \"$claim_code\"");
+        builder.AppendLine("    return 0");
+        builder.AppendLine("  fi");
+        builder.AppendLine("  printf '%s?claimCode=%s' \"$base_url\" \"$claim_code\"");
         builder.AppendLine("}");
         builder.AppendLine();
         builder.AppendLine("create_desktop_link() {");
@@ -3349,7 +3519,8 @@ public sealed class PublicLandingController : Controller
         builder.AppendLine("install_artifact() {");
         builder.AppendLine("  local idx=\"$1\"");
         builder.AppendLine("  local artifact_title=\"${ARTIFACT_TITLES[$idx]}\"");
-        builder.AppendLine("  local download_url=\"${DOWNLOAD_URLS[$idx]}\"");
+        builder.AppendLine("  local claim_code=\"${CLAIM_CODES[$idx]}\"");
+        builder.AppendLine("  local download_url");
         builder.AppendLine("  local expected_sha256=\"${SHA256_DIGESTS[$idx]}\"");
         builder.AppendLine("  local dmg_name=\"${DMG_NAMES[$idx]}\"");
         builder.AppendLine("  local stage_root=\"$WORK_ROOT/$idx\"");
@@ -3357,6 +3528,7 @@ public sealed class PublicLandingController : Controller
         builder.AppendLine("  local dmg_path=\"$DOWNLOAD_DIR/$dmg_name\"");
         builder.AppendLine("  mkdir -p \"$stage_root\" \"$mount_point\"");
         builder.AppendLine("  MOUNT_POINTS+=(\"$mount_point\")");
+        builder.AppendLine("  download_url=\"$(build_claim_download_url \"${DOWNLOAD_URLS[$idx]}\" \"$claim_code\")\"");
         builder.AppendLine("  advance_progress \"Downloading $artifact_title\"");
         builder.AppendLine("  echo \"Downloading $artifact_title to $dmg_path\"");
         builder.AppendLine("  local http_code");
@@ -3428,8 +3600,7 @@ public sealed class PublicLandingController : Controller
         builder.AppendLine("  local installed_idx=\"$1\"");
         builder.AppendLine("  local artifact_idx=\"${INSTALLED_ARTIFACT_INDEXES[$installed_idx]}\"");
         builder.AppendLine("  local target_app=\"${INSTALLED_APPS[$installed_idx]}\"");
-        builder.AppendLine("  local claim_endpoint=\"${CLAIM_ENDPOINTS[$artifact_idx]}\"");
-        builder.AppendLine("  local claim_code");
+        builder.AppendLine("  local claim_code=\"${CLAIM_CODES[$artifact_idx]}\"");
         builder.AppendLine("  local head_id=\"${HEAD_IDS[$artifact_idx]}\"");
         builder.AppendLine("  local artifact_arch=\"${ARTIFACT_ARCHES[$artifact_idx]}\"");
         builder.AppendLine("  local artifact_title=\"${ARTIFACT_TITLES[$artifact_idx]}\"");
@@ -3439,10 +3610,10 @@ public sealed class PublicLandingController : Controller
         builder.AppendLine("  state_path=\"$(build_install_state_path \"$head_id\" \"$artifact_arch\")\"");
         builder.AppendLine("  advance_progress \"Linking $artifact_title to this account\"");
         builder.AppendLine("  echo \"Linking $artifact_title to this account...\"");
-        builder.AppendLine("  claim_code=\"$(fetch_install_claim_code \"$claim_endpoint\")\" || {");
-        builder.AppendLine("    INSTALL_WARNINGS+=(\"$artifact_title could not fetch a short-lived install claim from the downloads handoff. Re-open the current Mac install command from $DOWNLOADS_URL and run it again.\")");
+        builder.AppendLine("  if [[ -z \"$claim_code\" ]]; then");
+        builder.AppendLine("    INSTALL_WARNINGS+=(\"$artifact_title could not find the embedded short-lived install claim for this handoff. Re-open the current Mac install command from $DOWNLOADS_URL and run it again.\")");
         builder.AppendLine("    return 0");
-        builder.AppendLine("  }");
+        builder.AppendLine("  fi");
         builder.AppendLine("  launch_pid=\"$(launch_bundle_binary_with_claim \"$target_app\" \"$claim_code\")\" || {");
         builder.AppendLine("    return 0");
         builder.AppendLine("  }");
@@ -3642,7 +3813,7 @@ public sealed class PublicLandingController : Controller
             })
             .ToArray();
 
-        return (new GuidedBootstrapScriptContext(artifact, scriptArtifacts, effectiveBootstrapTicket), null);
+        return (new GuidedBootstrapScriptContext(manifest, artifact, scriptArtifacts, effectiveBootstrapTicket, userId, subjectId), null);
     }
 
     private (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto? Artifact) ResolveInstallDispatchArtifact(string artifactId)
@@ -4475,6 +4646,7 @@ if ($openAfterInstall) {
 
 Write-Step 5 6 'Finishing Chummer Setup'
 Write-Host ''
+Write-Host ("Confirmed linked installs: {0} / {1}" -f $stagedLinkCount, $installedArtifacts.Count)
 Write-Host ("Prepared first-open account linking: {0} / {1}" -f $stagedLinkCount, $installedArtifacts.Count)
 if ($stagedLinkCount -eq $installedArtifacts.Count) {
     Write-Host 'The selected Chummer app or apps were installed and setup staged account linking for first open.'
@@ -5136,6 +5308,7 @@ done
 
 advance_progress "Finishing Chummer Setup"
 echo
+echo "Confirmed linked installs: ${LINKED_CONFIRMED_COUNT} / ${#INSTALLED_PATHS[@]}"
 echo "Prepared first-open account linking: ${LINKED_CONFIRMED_COUNT} / ${#INSTALLED_PATHS[@]}"
 if [[ "${LINKED_CONFIRMED_COUNT}" -eq "${#INSTALLED_PATHS[@]}" ]]; then
   echo "The selected Chummer app or apps were installed and setup staged account linking for first open."
@@ -5174,10 +5347,14 @@ echo "Help: ${HELP_URL}"
             : template;
         StringBuilder builder = new();
         builder.AppendLine("#!/usr/bin/env bash");
+        builder.AppendLine("# Signed-in release upload always targets the live chummer.run shelf.");
         builder.Append("export CHUMMER_RELEASE_UPLOAD_TOKEN='")
             .Append(SingleQuoteShellLiteral(ticket))
             .AppendLine("'");
+        builder.AppendLine("export CHUMMER_RELEASE_PUBLISH_MODE='http'");
         builder.AppendLine("export CHUMMER_RELEASE_UPLOAD_URL=\"https://chummer.run/api/internal/releases/bundles\"");
+        builder.AppendLine("export CHUMMER_RELEASE_UPLOAD_SESSIONS_URL=\"https://chummer.run/api/internal/releases/upload-sessions\"");
+        builder.AppendLine("export CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='https://chummer.run/downloads/releases.json'");
         builder.AppendLine("export CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH='https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json'");
         builder.AppendLine("export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH='https://chummer.run/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json'");
         builder.AppendLine(scriptBody);
@@ -5209,7 +5386,7 @@ echo "Help: ${HELP_URL}"
         string Title,
         string ShortLabel,
         string DownloadUrl,
-        string ClaimUrl,
+        string ClaimCode,
         string? Sha256,
         string DmgName,
         string? Architecture,
@@ -5232,7 +5409,10 @@ echo "Help: ${HELP_URL}"
         string DesktopEntryName);
 
     private sealed record GuidedBootstrapScriptContext(
+        PublicReleaseManifestDto Manifest,
         PublicReleaseArtifactDto Artifact,
         IReadOnlyList<GuidedBootstrapArtifact> Artifacts,
-        string BootstrapTicket);
+        string BootstrapTicket,
+        string? UserId,
+        string? SubjectId);
 }

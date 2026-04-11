@@ -134,7 +134,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
     }
 
     [Fact]
-    public void RenderMacInstallBootstrapScriptIncludesTicketBackedDownloadsAndOnDemandClaims()
+    public void RenderMacInstallBootstrapScriptIncludesEmbeddedClaimsForDownloadsAndFirstLaunch()
     {
         string script = PublicLandingController.RenderMacInstallBootstrapScript(
             [
@@ -143,8 +143,8 @@ public sealed class PublicLandingMacBootstrapScriptTests
                     HeadId: "avalonia",
                     Title: "Avalonia Desktop macOS ARM64 Installer",
                     ShortLabel: "Chummer Avalonia (Apple Silicon)",
-                    DownloadUrl: "https://chummer.run/downloads/file/avalonia-osx-arm64-installer?ticket=T-1",
-                    ClaimUrl: "https://chummer.run/downloads/install/avalonia-osx-arm64-installer/claim.json?ticket=T-1",
+                    DownloadUrl: "https://chummer.run/downloads/file/avalonia-osx-arm64-installer",
+                    ClaimCode: "AAAAA-BBBBB-CCCCC-DDDDD",
                     Sha256: "sha-a",
                     DmgName: "chummer-avalonia-osx-arm64-installer.dmg",
                     Architecture: "arm64",
@@ -154,8 +154,8 @@ public sealed class PublicLandingMacBootstrapScriptTests
                     HeadId: "blazor-desktop",
                     Title: "Blazor Desktop macOS ARM64 Installer",
                     ShortLabel: "Chummer Blazor Desktop (Apple Silicon)",
-                    DownloadUrl: "https://chummer.run/downloads/file/blazor-desktop-osx-arm64-installer?ticket=T-1",
-                    ClaimUrl: "https://chummer.run/downloads/install/blazor-desktop-osx-arm64-installer/claim.json?ticket=T-1",
+                    DownloadUrl: "https://chummer.run/downloads/file/blazor-desktop-osx-arm64-installer",
+                    ClaimCode: "EEEEE-FFFFF-GGGGG-HHHHH",
                     Sha256: "sha-b",
                     DmgName: "chummer-blazor-desktop-osx-arm64-installer.dmg",
                     Architecture: "arm64",
@@ -170,8 +170,11 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("Blazor Desktop macOS ARM64 Installer", script, StringComparison.Ordinal);
         Assert.Contains("Chummer Avalonia (Apple Silicon)", script, StringComparison.Ordinal);
         Assert.Contains("Chummer Blazor Desktop (Apple Silicon)", script, StringComparison.Ordinal);
-        Assert.Contains("https://chummer.run/downloads/file/avalonia-osx-arm64-installer?ticket=T-1", script, StringComparison.Ordinal);
-        Assert.Contains("https://chummer.run/downloads/install/avalonia-osx-arm64-installer/claim.json?ticket=T-1", script, StringComparison.Ordinal);
+        Assert.Contains("https://chummer.run/downloads/file/avalonia-osx-arm64-installer", script, StringComparison.Ordinal);
+        Assert.Contains("CLAIM_CODES", script, StringComparison.Ordinal);
+        Assert.Contains("AAAAA-BBBBB-CCCCC-DDDDD", script, StringComparison.Ordinal);
+        Assert.Contains("build_claim_download_url()", script, StringComparison.Ordinal);
+        Assert.Contains("claimCode=", script, StringComparison.Ordinal);
         Assert.Contains("HEAD_IDS", script, StringComparison.Ordinal);
         Assert.Contains("chummer-avalonia-osx-arm64-installer.dmg", script, StringComparison.Ordinal);
         Assert.Contains("chummer-blazor-desktop-osx-arm64-installer.dmg", script, StringComparison.Ordinal);
@@ -206,8 +209,6 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("run_gui_dialog select-apps \"${#DEFAULT_APP_CHOICES[@]}\" \"${DEFAULT_APP_CHOICES[@]}\" \"${APP_CHOICES[@]}\"", script, StringComparison.Ordinal);
         Assert.Contains("wait_for_claim_success \"$state_path\" 25", script, StringComparison.Ordinal);
         Assert.Contains("claimed_at=\"$(read_install_state_field \"$state_path\" claimedAtUtc || true)\"", script, StringComparison.Ordinal);
-        Assert.Contains("CLAIM_ENDPOINTS", script, StringComparison.Ordinal);
-        Assert.Contains("fetch_install_claim_code()", script, StringComparison.Ordinal);
         Assert.Contains("Selected build: ${APP_CHOICES[$idx]}", script, StringComparison.Ordinal);
         Assert.Contains("Published artifact: ${ARTIFACT_TITLES[$idx]}", script, StringComparison.Ordinal);
         Assert.Contains("Confirmed linked installs: $LINKED_CONFIRMED_COUNT / ${#INSTALLED_APPS[@]}", script, StringComparison.Ordinal);
@@ -216,7 +217,6 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("launch_installed_app()", script, StringComparison.Ordinal);
         Assert.Contains("PUBLIC_BASE_URL='https://chummer.run/'", script, StringComparison.Ordinal);
         Assert.Contains("env CHUMMER_INSTALL_CLAIM_CODE=\"$claim_code\" CHUMMER_API_BASE_URL=\"$PUBLIC_BASE_URL\" CHUMMER_WEB_BASE_URL=\"$PUBLIC_BASE_URL\" \"$executable_path\"", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("claimCode=", script, StringComparison.Ordinal);
         Assert.Contains("printf '%s' \"$!\"", script, StringComparison.Ordinal);
         Assert.Contains("kill \"$launch_pid\"", script, StringComparison.Ordinal);
         Assert.Contains("wait \"$launch_pid\" >/dev/null 2>&1 || true", script, StringComparison.Ordinal);
@@ -233,11 +233,38 @@ public sealed class PublicLandingMacBootstrapScriptTests
     public void BuildMacBootstrapTerminalCommandUsesPipefailCurlAndBash()
     {
         string command = PublicLandingController.BuildMacBootstrapTerminalCommand(
-            "https://chummer.run/downloads/install/avalonia-osx-arm64-installer/bootstrap.command?ticket=ABC-123");
+            "https://chummer.run/install-abc123def456.sh");
 
         Assert.Equal(
-            "set -o pipefail; curl -fsSL 'https://chummer.run/downloads/install/avalonia-osx-arm64-installer/bootstrap.command?ticket=ABC-123' | /bin/bash",
+            "set -o pipefail; curl -fsSL 'https://chummer.run/install-abc123def456.sh' | /bin/bash",
             command);
+    }
+
+    [Fact]
+    public void ReleaseUploadBootstrapTemplateUsesStrictSafeStartupSmokeHostClassDefault()
+    {
+        string templatePath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Chummer.Run.Api",
+            "wwwroot",
+            "artifacts",
+            "mac-codex-release-pipeline",
+            "bootstrap.sh"));
+
+        string template = File.ReadAllText(templatePath);
+
+        Assert.Contains(
+            "local startup_host_class=\"${CHUMMER_DESKTOP_STARTUP_SMOKE_HOST_CLASS:-}\"",
+            template,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "local startup_host_class=\"$CHUMMER_DESKTOP_STARTUP_SMOKE_HOST_CLASS\"",
+            template,
+            StringComparison.Ordinal);
     }
 
     [Fact]

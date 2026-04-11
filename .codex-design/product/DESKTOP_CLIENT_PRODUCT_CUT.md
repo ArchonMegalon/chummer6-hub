@@ -18,6 +18,29 @@ It owns the primary native-shell preview, the default desktop UX posture, and th
 
 It is still a real maintained delivery lane, but it is not the flagship product statement for the preview shelf. It exists to preserve parity, support bounded fallback cases, and keep the shared presentation seam honest while the flagship head matures.
 
+### Head authority and fallback rule
+
+`Chummer.Avalonia` is the flagship desktop client for the current delivery wave.
+
+`Chummer.Blazor.Desktop` may be treated as fallback only when all of the following are true:
+
+* the current public shelf names Avalonia as the primary desktop route for the same lane
+* the shelf, release copy, and release evidence explicitly label Blazor as compatibility or fallback
+* the Blazor lane is being used for support-directed compatibility, recovery, or parity backfill rather than as the public default
+
+When Blazor Desktop is the only shipped desktop head for a lane, the recommended download, or the route used to justify promotion, it must independently satisfy the flagship bar rather than borrowing Avalonia proof.
+
+### Gold-target head rule
+
+A gold desktop claim is stricter than the current preview fallback story.
+
+For gold:
+
+* Avalonia may remain the default primary desktop route
+* Blazor Desktop may remain the secondary route
+* every shipped desktop head must independently satisfy the flagship bar
+* a secondary head is not allowed to ship on thinner shell-only, visual-only, or borrowed proof
+
 ## Current preview cut
 
 The desktop preview cut must feel like one coherent product, not a packaging demo.
@@ -43,6 +66,9 @@ A public-ready desktop release is not only a successful binary build.
 It must prove:
 
 * one obvious flagship head and one bounded fallback story
+* Avalonia is the flagship head by default, and Blazor Desktop only counts as fallback when the product cut and platform matrix say so
+* a fallback head never becomes the silent primary route
+* a gold claim may keep one primary head, but every shipped head must independently clear startup, install, update, crash-recovery, feedback, workflow, and visual-familiarity proof
 * startup, install, update, crash-recovery, and support flows that feel boring on the promoted path
 * dense-data builder, compare, and explain flows that stay fast and readable under expert use
 * the flagship shell still feels recognizably like Chummer to Chummer5a users: desktop menu, quick-action toolstrip, dense workbench center, and compact trust strip all survive in modern form

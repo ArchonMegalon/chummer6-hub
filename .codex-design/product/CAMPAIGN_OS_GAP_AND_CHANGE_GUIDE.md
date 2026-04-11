@@ -90,7 +90,8 @@ The product needs stronger evidence that users can install, claim, sync, recover
 
 It is now valid to modernize away from old window names, MDI posture, and one-form-per-job cargo.
 It is not valid to quietly drop serious user jobs just because the new shell is cleaner.
-Sourcebook and rules-reference posture, utility windows, sheet/export lanes, import oracles, and serious SR6 successor tools are now explicit flagship risks until the parity registry closes them.
+The parity registry now closes the in-scope non-plugin feature families through proof-backed successor routes.
+The remaining flagship risk is keeping installer/platform proof, localization proof, and lived-system journey proof from lagging that now-closed parity surface.
 
 ## Team change guide
 

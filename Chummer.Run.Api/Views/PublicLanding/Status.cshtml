@@ -3,6 +3,21 @@
     ViewData["Title"] = "Status";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-status";
+    var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
+
+    string ContextualPreviewHref(string? href)
+    {
+        var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
+        if (
+            guestNeedsInstallGate
+            && string.Equals(resolvedHref, "/downloads", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return Model.ReleaseExperience.GuestGatePrimaryHref ?? resolvedHref;
+        }
+
+        return resolvedHref;
+    }
 }
 
 @if (Model.SignedInStatus is not null)
@@ -63,7 +78,7 @@
             <h3>Release posture</h3>
             <p>@(Model.Manifest.SupportabilitySummary ?? Model.Manifest.Message ?? "The current release shelf, proof route, and support path should read like one honest record.")</p>
         </div>
-        <a class="inline-link" href="/downloads">Open downloads</a>
+        <a class="inline-link" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">

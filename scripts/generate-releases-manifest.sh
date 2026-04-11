@@ -179,7 +179,7 @@ mkdir -p "$(dirname "$MANIFEST_PATH")"
 mkdir -p "$(dirname "$PORTAL_MANIFEST_PATH")"
 mkdir -p "$DOWNLOADS_DIR"
 
-readarray -t promoted_file_names < <(true)
+promoted_file_names=()
 
 to_bool() {
   local value
@@ -258,7 +258,11 @@ if [[ -d "$STARTUP_SMOKE_DIR" && "$materializer_help" == *"--startup-smoke-dir"*
 fi
 
 python3 "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" "${materialize_args[@]}" >/dev/null
-readarray -t promoted_file_names < <(python3 - "$CANONICAL_MANIFEST_PATH" <<'PY'
+promoted_file_names=()
+while IFS= read -r file_name; do
+  [[ -n "$file_name" ]] || continue
+  promoted_file_names+=("$file_name")
+done < <(python3 - "$CANONICAL_MANIFEST_PATH" <<'PY'
 import json
 import sys
 from pathlib import Path

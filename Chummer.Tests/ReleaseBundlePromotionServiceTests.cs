@@ -2,6 +2,8 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.ViewModels;
+using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -216,6 +218,68 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", "chummer-avalonia-win-x64-installer.exe")));
     }
 
+    [Fact]
+    public async Task PromoteAsyncMakesPromotedMacPreviewVisibleOnDownloadsAsInstallCommand()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260409-061506",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-preview"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview"),
+                new BundleArtifact(
+                    ArtifactId: "blazor-desktop-osx-arm64-installer",
+                    Head: "blazor-desktop",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-blazor-desktop-osx-arm64-installer.dmg",
+                    Bytes: "mac-preview-alt"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ]);
+
+        await fixture.PromoteAsync(bundlePath);
+
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = fixture.DownloadsRoot,
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        PublicReleaseManifestDto manifest = new PublicReleaseManifestService(configuration).LoadManifest();
+        ReleaseSelectionService selection = new(new PublicCanonFileLoader(configuration));
+
+        ReleaseExperienceViewModel experience = selection.BuildExperience(
+            manifest,
+            userAgent: "Mozilla/5.0 (Macintosh; Apple Silicon Mac OS X 14_4) AppleWebKit/605.1.15 Version/17.4 Safari/605.1.15 arm64",
+            authenticated: true);
+
+        ReleaseOptionViewModel recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
+        Assert.Equal("avalonia-osx-arm64-installer", recommended.Artifact.Id);
+        Assert.Equal("Open Mac install command", recommended.ActionLabel);
+        Assert.Equal("/downloads/install/avalonia-osx-arm64-installer", recommended.DispatchHref);
+        Assert.True(experience.RequestedPlatformHasPublicDownload);
+        Assert.Null(experience.PlatformShelfNoticeTitle);
+        Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && item.PubliclyAvailable);
+        Assert.Contains(experience.Alternatives, item => item.Artifact.Id == "blazor-desktop-osx-arm64-installer");
+    }
+
     private sealed class ReleaseBundlePromotionFixture : IDisposable
     {
         private readonly string _root;
@@ -425,6 +489,10 @@ public sealed class ReleaseBundlePromotionServiceTests
 
         private static void WriteCanonicalManifest(string path, string version, IReadOnlyList<CanonicalArtifact> artifacts)
         {
+            string[] proofRoutes = artifacts
+                .Select(static artifact => $"/downloads/install/{artifact.ArtifactId}")
+                .ToArray();
+
             File.WriteAllText(
                 path,
                 JsonSerializer.Serialize(new
@@ -435,6 +503,14 @@ public sealed class ReleaseBundlePromotionServiceTests
                     version,
                     publishedAt = "2026-04-01T20:00:00Z",
                     status = "published",
+                    releaseProof = new
+                    {
+                        status = "passed",
+                        generatedAt = "2026-04-01T20:00:00Z",
+                        baseUrl = "https://chummer.run",
+                        journeysPassed = new[] { "build_explain_publish" },
+                        proofRoutes
+                    },
                     artifacts
                 }, TestJsonOptions));
         }

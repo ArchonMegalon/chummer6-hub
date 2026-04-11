@@ -401,10 +401,10 @@ public sealed class ReleaseSelectionService
         if (UsesMacBootstrapFlow(download))
         {
             return authenticated
-                ? "Open the Mac install handoff. It gives you a Terminal command that starts a guided Mac setup assistant, offers Auto select for the matching Apple Silicon or Intel builds on this Mac, lets you choose which Chummer apps to install and where to put them, verifies the published DMG digest, and confirms the selected apps wrote a linked install receipt successfully."
+                ? "Open the Mac install handoff. It gives you one Terminal command, verifies the published DMG digest, and confirms the selected apps wrote a linked install receipt successfully."
                 : string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                    ? "Create an account for the Mac install command. The signed-in handoff gives you a short-lived Terminal command that starts a guided Mac setup assistant, offers Auto select for the matching Apple Silicon or Intel builds on this Mac, carries a short-lived install ticket, verifies the DMG, and installs the selected Chummer apps."
-                    : "Sign in for the Mac install command. The signed-in handoff gives you a short-lived Terminal command that starts a guided Mac setup assistant, offers Auto select for the matching Apple Silicon or Intel builds on this Mac, carries a short-lived install ticket, verifies the DMG, and installs the selected Chummer apps.";
+                    ? "Create an account for the Mac install command. The signed-in handoff gives you a short-lived Terminal command that verifies the DMG and installs the selected Chummer apps."
+                    : "Sign in for the Mac install command. The signed-in handoff gives you a short-lived Terminal command that verifies the DMG and installs the selected Chummer apps.";
         }
 
         if (authenticated)
@@ -770,7 +770,7 @@ public sealed class ReleaseSelectionService
     {
         if (UsesMacBootstrapFlow(promotedDownload) && string.Equals(NormalizeInstallAccessClass(promotedDownload.InstallAccessClass), InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
         {
-            return "The current public shelf publishes a signed-in Mac install handoff as the live install path. It gives you a Terminal command that starts a guided Mac setup assistant, installs the selected Chummer apps, and carries a short-lived install ticket.";
+            return "The current public shelf uses the signed-in Mac install handoff as the live install path. It gives you one Terminal command for your personalized install.";
         }
 
         var packageKind = PackageKindLabel(promotedDownload.Kind);

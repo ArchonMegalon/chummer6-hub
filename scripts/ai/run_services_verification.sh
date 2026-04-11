@@ -142,9 +142,22 @@ if ! grep -En '<HintPath>\.\.\\\.\.\\\.\.\\fleet\\repos\\chummer-media-factory\\
   exit 1
 fi
 
-if ! grep -En '<HintPath>\.\.\\\.\.\\chummer-core-engine\\Chummer\.Contracts\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Engine\.Contracts\.dll</HintPath>' \
-  Chummer.Run.Contracts/Chummer.Run.Contracts.csproj >/dev/null; then
-  echo "Chummer.Run.Contracts must consume the owner-repo Chummer.Engine.Contracts assembly for hosted compatibility DTOs." >&2
+for project_file in \
+  Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj \
+  Chummer.Run.Contracts/Chummer.Run.Contracts.csproj \
+  Chummer.Run.Api/Chummer.Run.Api.csproj; do
+  if ! grep -En '<ProjectReference Include="\.\.\\\.\.\\chummer-core-engine\\Chummer\.Contracts\\Chummer\.Contracts\.csproj" />' \
+    "$project_file" >/dev/null; then
+    echo "${project_file} must project-reference the owner-repo Chummer.Contracts project." >&2
+    exit 1
+  fi
+done
+
+if grep -En '<HintPath>\.\.\\\.\.\\chummer-core-engine\\Chummer\.Contracts\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Engine\.Contracts\.dll</HintPath>' \
+  Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj \
+  Chummer.Run.Contracts/Chummer.Run.Contracts.csproj \
+  Chummer.Run.Api/Chummer.Run.Api.csproj >/dev/null; then
+  echo "run-services bridge projects must not consume Chummer.Engine.Contracts through a binary HintPath seam." >&2
   exit 1
 fi
 

@@ -39,16 +39,50 @@ public sealed class PublicLandingDownloadDispatchTests
         var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal("Chummer Setup.command", file.FileDownloadName);
         string script = Encoding.UTF8.GetString(file.FileContents);
-        Assert.Contains($"https://chummer.run/downloads/file/avalonia-osx-arm64-installer?ticket={Uri.EscapeDataString(ticket.Ticket)}", script, StringComparison.Ordinal);
-        Assert.Contains($"https://chummer.run/downloads/file/blazor-desktop-osx-arm64-installer?ticket={Uri.EscapeDataString(ticket.Ticket)}", script, StringComparison.Ordinal);
-        Assert.Contains($"https://chummer.run/downloads/file/avalonia-osx-x64-installer?ticket={Uri.EscapeDataString(ticket.Ticket)}", script, StringComparison.Ordinal);
-        Assert.Contains($"https://chummer.run/downloads/install/avalonia-osx-arm64-installer/claim.json?ticket={Uri.EscapeDataString(ticket.Ticket)}", script, StringComparison.Ordinal);
+        Assert.Contains("https://chummer.run/downloads/file/avalonia-osx-arm64-installer", script, StringComparison.Ordinal);
+        Assert.Contains("https://chummer.run/downloads/file/blazor-desktop-osx-arm64-installer", script, StringComparison.Ordinal);
+        Assert.Contains("https://chummer.run/downloads/file/avalonia-osx-x64-installer", script, StringComparison.Ordinal);
+        Assert.Contains("CLAIM_CODES", script, StringComparison.Ordinal);
+        Assert.Contains("build_claim_download_url()", script, StringComparison.Ordinal);
         Assert.Contains("HEAD_IDS", script, StringComparison.Ordinal);
         Assert.Contains("Chummer Avalonia (Intel)", script, StringComparison.Ordinal);
         Assert.Contains("wait_for_claim_success", script, StringComparison.Ordinal);
         Assert.Contains("Confirmed linked installs", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("claimCode=", script, StringComparison.Ordinal);
+        Assert.Contains("claimCode=", script, StringComparison.Ordinal);
         Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
+    }
+
+    [Fact]
+    public async Task PersonalizedMacBootstrapScriptConsumesSingleUseLinkAndEmbedsClaimCodes()
+    {
+        using Fixture fixture = new();
+        var issue = fixture.PersonalizedInstallScripts.IssueMacScript(
+            "avalonia-osx-arm64-installer",
+            ["avalonia-osx-arm64-installer", "blazor-desktop-osx-arm64-installer", "avalonia-osx-x64-installer"],
+            "user-archon",
+            "subject-archon");
+
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
+        fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
+
+        IActionResult first = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId);
+
+        var file = Assert.IsType<FileContentResult>(first);
+        string script = Encoding.UTF8.GetString(file.FileContents);
+        Assert.Contains("CLAIM_CODES", script, StringComparison.Ordinal);
+        Assert.Contains("build_claim_download_url()", script, StringComparison.Ordinal);
+        Assert.Contains("https://chummer.run/downloads/file/avalonia-osx-arm64-installer", script, StringComparison.Ordinal);
+        Assert.Contains("claimCode=", script, StringComparison.Ordinal);
+        Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
+
+        IActionResult second = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId);
+
+        var gone = Assert.IsType<ObjectResult>(second);
+        Assert.Equal(StatusCodes.Status410Gone, gone.StatusCode);
     }
 
     [Fact]
@@ -374,15 +408,19 @@ public sealed class PublicLandingDownloadDispatchTests
                     ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot,
                     ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking.json"),
-                    ["CHUMMER_INSTALL_BOOTSTRAP_TICKET_LIFETIME_MINUTES"] = "20"
+                    ["CHUMMER_INSTALL_BOOTSTRAP_TICKET_LIFETIME_MINUTES"] = "20",
+                    ["CHUMMER_INSTALL_CLAIM_TICKET_LIFETIME_HOURS"] = "24",
+                    ["CHUMMER_PERSONALIZED_INSTALL_SCRIPT_LIFETIME_HOURS"] = "24"
                 })
                 .Build();
 
             ManifestService = new PublicReleaseManifestService(Configuration);
             ReleaseSelection = new ReleaseSelectionService(new PublicCanonFileLoader(Configuration));
-            InstallLinking = new InstallLinkingService(new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance));
+            var installLinkingStore = new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance);
+            InstallLinking = new InstallLinkingService(installLinkingStore, Configuration);
             IDataProtectionProvider dataProtectionProvider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
             InstallBootstrapTickets = new InstallBootstrapTicketService(dataProtectionProvider, Configuration);
+            PersonalizedInstallScripts = new PersonalizedInstallScriptService(installLinkingStore, Configuration);
             Controller = new PublicLandingController(
                 landing: null!,
                 releases: ManifestService,
@@ -404,7 +442,9 @@ public sealed class PublicLandingDownloadDispatchTests
                 signedInTrustStatus: null!,
                 supportCases: null!,
                 supportPresentation: null!,
+                configuration: Configuration,
                 installBootstrapTickets: InstallBootstrapTickets,
+                personalizedInstallScripts: PersonalizedInstallScripts,
                 releaseUploadTickets: null!,
                 webHostEnvironment: null!,
                 logger: NullLogger<PublicLandingController>.Instance);
@@ -419,6 +459,8 @@ public sealed class PublicLandingDownloadDispatchTests
         public InstallLinkingService InstallLinking { get; }
 
         public InstallBootstrapTicketService InstallBootstrapTickets { get; }
+
+        public PersonalizedInstallScriptService PersonalizedInstallScripts { get; }
 
         public PublicLandingController Controller { get; }
 

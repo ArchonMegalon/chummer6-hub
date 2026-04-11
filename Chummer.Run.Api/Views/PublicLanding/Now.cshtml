@@ -34,6 +34,21 @@
         .Where(card => !proofTargets.Contains(NormalizeRoute(card.Action.Href)))
         .ToArray();
     var signedInBenefits = Model.SignedInPreview.ToArray();
+    var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
+
+    string ContextualPreviewHref(string? href)
+    {
+        var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
+        if (
+            guestNeedsInstallGate
+            && string.Equals(resolvedHref, "/downloads", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return Model.ReleaseExperience.GuestGatePrimaryHref ?? resolvedHref;
+        }
+
+        return resolvedHref;
+    }
 }
 
 <section class="evidence-header">
@@ -82,7 +97,7 @@
                     <h3>What changed since the last preview</h3>
                     <p>@Model.ReleaseExperience.ReleaseNotesSummary</p>
                 </div>
-                <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
+                <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
             </article>
             <article class="evidence-row">
                 <div class="evidence-row__copy">
@@ -103,7 +118,7 @@
                     <h3>First launch should show a finished runner fast</h3>
                     <p>The current desktop preview bundles <code class="mono-receipt">Soma-Career.chum5</code>. Open Chummer, click <code class="mono-receipt">Load Demo Runner</code>, and use that completed character to inspect the workbench before you build from scratch.</p>
                 </div>
-                <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
+                <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
             </article>
             @if (Model.CampaignOsProof is not null)
             {
@@ -216,5 +231,5 @@
             <a class="inline-link" href="/login?next=/home">Already have an account? Sign in</a>
         }
     </div>
-    <p class="muted-copy">Still deciding? <a class="inline-link" href="/downloads">Open downloads</a> or <a class="inline-link" href="/what-is-chummer">read the product story</a>.</p>
+    <p class="muted-copy">Still deciding? <a class="inline-link" href="@ContextualPreviewHref("/downloads")">Open downloads</a> or <a class="inline-link" href="/what-is-chummer">read the product story</a>.</p>
 </section>

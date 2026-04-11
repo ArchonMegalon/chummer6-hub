@@ -121,6 +121,9 @@
     var showAccessSection = string.Equals(Model.CurrentSection, "access", StringComparison.OrdinalIgnoreCase);
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
     var showSetupSection = string.Equals(Model.CurrentSection, "setup", StringComparison.OrdinalIgnoreCase);
+    var contextualDownloadsHref = string.IsNullOrWhiteSpace(Model.ReleaseExperience.Recommended?.DispatchHref)
+        ? "/downloads"
+        : Model.ReleaseExperience.Recommended.DispatchHref;
     var openSetupDialog = showOnboarding || showSetupSection;
     var heading = Model.CurrentSection switch
     {
@@ -136,6 +139,17 @@
         "setup" => "Finish the short setup flow first, then come back to access and work with a steadier account.",
         _ => "Pick up where you left off: finish the basics, install the current preview, and keep track of what is opening next."
     };
+
+    string ContextualPreviewHref(string? href)
+    {
+        var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
+        if (string.Equals(resolvedHref, "/downloads", StringComparison.OrdinalIgnoreCase))
+        {
+            return contextualDownloadsHref;
+        }
+
+        return resolvedHref;
+    }
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -254,7 +268,7 @@
                     }
                     else
                     {
-                        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href" id="openSetupButton">@Model.PrimaryAction.Label</a>
+                        <a class="button-like button-like--primary" href="@ContextualPreviewHref(Model.PrimaryAction.Href)" id="openSetupButton">@Model.PrimaryAction.Label</a>
                     }
                 </article>
                 <article class="app-action-card">
@@ -309,7 +323,7 @@
                                                             <p class="muted-copy">@supportCase.AffectedInstallSummary</p>
                                                         }
                                                     </div>
-                                                    <a class="inline-link" href="@supportCase.PrimaryActionHref">@supportCase.PrimaryActionLabel</a>
+                                                    <a class="inline-link" href="@ContextualPreviewHref(supportCase.PrimaryActionHref)">@supportCase.PrimaryActionLabel</a>
                                                 </article>
                                             }
                                             @foreach (var receipt in recentReceipts)
@@ -408,7 +422,7 @@
                                                 }
                                                 else
                                                 {
-                                                    <a class="inline-link" href="/downloads">Start from downloads</a>
+                                                    <a class="inline-link" href="@ContextualPreviewHref("/downloads")">Start from downloads</a>
                                                 }
                                             </article>
                                         }
@@ -894,7 +908,7 @@
                                                         <h3>Continuity is ready for the first grounded handoff</h3>
                                                         <p>Your next build comparison and rules answer will land here once the first dossier or campaign return is seeded.</p>
                                                     </div>
-                                                    <a class="inline-link" href="/downloads">Start from downloads</a>
+                                                    <a class="inline-link" href="@ContextualPreviewHref("/downloads")">Start from downloads</a>
                                                 </article>
                                             }
                                             else

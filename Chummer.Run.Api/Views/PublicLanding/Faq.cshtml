@@ -3,6 +3,20 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-faq";
+    var guestPreviewHref = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.Chrome.PublicPrimaryCta?.Href)
+        ? Model.Chrome.PublicPrimaryCta!.Href
+        : "/downloads";
+
+    string ContextualPreviewHref(string? href)
+    {
+        var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
+        if (string.Equals(resolvedHref, "/downloads", StringComparison.OrdinalIgnoreCase))
+        {
+            return guestPreviewHref;
+        }
+
+        return resolvedHref;
+    }
 
     static TrustPageActionViewModel? FaqActionFor(string sectionTitle, string question, bool authenticated)
     {
@@ -48,7 +62,7 @@
     <div class="stacked-actions">
         @foreach (var action in Model.Actions)
         {
-            <a class="button-like button-like--@action.Tone" href="@action.Href">@action.Label</a>
+            <a class="button-like button-like--@action.Tone" href="@ContextualPreviewHref(action.Href)">@action.Label</a>
         }
     </div>
 </section>
@@ -85,7 +99,7 @@
                         }
                         @if (answerAction is not null)
                         {
-                            <p><a class="inline-link" href="@answerAction.Href">@answerAction.Label</a></p>
+                            <p><a class="inline-link" href="@ContextualPreviewHref(answerAction.Href)">@answerAction.Label</a></p>
                         }
                     </details>
                 }

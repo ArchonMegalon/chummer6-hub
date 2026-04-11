@@ -96,6 +96,7 @@ REQUIRED_RELEASE_PROOF_ROUTES = (
     "/account/support",
     "/contact",
 )
+RELEASE_PROOF_ARTIFACT_INSTALL_ROUTE_RE = re.compile(r"^/downloads/install/[a-z0-9][a-z0-9-]*$")
 ALLOWED_RELEASE_PROOF_KEYS = (
     "status",
     "generatedAt",
@@ -1107,18 +1108,26 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.proofRoutes is missing required flagship routes: "
             f"{release_channel_path} ({', '.join(missing_required_routes)})"
         )
+    required_route_order = list(REQUIRED_RELEASE_PROOF_ROUTES)
+    required_prefix = normalized_routes[: len(required_route_order)]
+    if required_prefix != required_route_order:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.proofRoutes must preserve canonical flagship route ordering: "
+            f"{release_channel_path} (actual={normalized_routes}, expected_prefix={required_route_order})"
+        )
+    additional_routes = normalized_routes[len(required_route_order) :]
     unexpected_routes = sorted(
-        route for route in normalized_routes if route not in REQUIRED_RELEASE_PROOF_ROUTES
+        route for route in additional_routes if RELEASE_PROOF_ARTIFACT_INSTALL_ROUTE_RE.fullmatch(route) is None
     )
     if unexpected_routes:
         raise SystemExit(
             "parity audit failed: release-channel nested receipt releaseProof.proofRoutes declares unexpected flagship routes: "
             f"{release_channel_path} ({', '.join(unexpected_routes)})"
         )
-    if normalized_routes != list(REQUIRED_RELEASE_PROOF_ROUTES):
+    if additional_routes != sorted(additional_routes):
         raise SystemExit(
             "parity audit failed: release-channel nested receipt releaseProof.proofRoutes must preserve canonical flagship route ordering: "
-            f"{release_channel_path} (actual={normalized_routes}, expected={list(REQUIRED_RELEASE_PROOF_ROUTES)})"
+            f"{release_channel_path} (actual={normalized_routes}, expected={required_route_order + sorted(additional_routes)})"
         )
 
 
@@ -1695,6 +1704,10 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
     )
     required_surfaces = (
         "runtimeBackedLegacyWorkbench",
+        "runtimeBackedFileMenuRoutes",
+        "runtimeBackedMasterIndex",
+        "runtimeBackedCharacterRoster",
+        "legacyMainframeVisualSimilarity",
         "legacyDenseBuilderRhythm",
         "legacyCreationWorkflowRhythm",
         "legacyAdvancementWorkflowRhythm",
@@ -1733,6 +1746,10 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         )
     required_visual_status_fields = {
         "runtime_backed_legacy_workbench": "runtime-backed legacy workbench",
+        "runtime_backed_file_menu_routes": "runtime-backed file menu routes",
+        "runtime_backed_master_index": "runtime-backed master index",
+        "runtime_backed_character_roster": "runtime-backed character roster",
+        "legacy_mainframe_visual_similarity": "legacy mainframe visual similarity",
         "legacy_dense_builder_rhythm": "legacy dense builder rhythm",
         "legacy_creation_workflow_rhythm": "legacy creation workflow rhythm",
         "legacy_advancement_workflow_rhythm": "legacy advancement workflow rhythm",
@@ -1930,6 +1947,8 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         "13-matrix-dialog-light.png",
         "14-advancement-dialog-light.png",
         "15-creation-section-light.png",
+        "16-master-index-dialog-light.png",
+        "17-character-roster-dialog-light.png",
     )
     missing_required_screenshots = sorted(
         screenshot_name

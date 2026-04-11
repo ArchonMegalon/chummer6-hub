@@ -14,6 +14,7 @@ MANIFEST_SOURCE="$BUNDLE_DIR/releases.json"
 FILES_SOURCE="$BUNDLE_DIR/files"
 RELEASE_PROOF_PATH="${RELEASE_PROOF_PATH:-}"
 STARTUP_SMOKE_SOURCE="${STARTUP_SMOKE_SOURCE:-$BUNDLE_DIR/startup-smoke}"
+CHUMMER_MACOS_PUBLIC_SHELF_ENABLED="${CHUMMER_MACOS_PUBLIC_SHELF_ENABLED:-false}"
 
 to_bool() {
   local value
@@ -24,7 +25,7 @@ to_bool() {
 is_public_artifact() {
   local artifact_name
   artifact_name="$(basename "$1")"
-  if ! to_bool "${CHUMMER_MACOS_PUBLIC_SHELF_ENABLED:-false}" && [[ "$artifact_name" == chummer-*-osx-* ]]; then
+  if ! to_bool "$CHUMMER_MACOS_PUBLIC_SHELF_ENABLED" && [[ "$artifact_name" == chummer-*-osx-* ]]; then
     return 1
   fi
   return 0
@@ -53,7 +54,13 @@ if [[ ! -d "$FILES_SOURCE" ]]; then
   exit 1
 fi
 
-mapfile -t artifacts < <(find "$FILES_SOURCE" -maxdepth 1 -type f \
+artifacts=()
+while IFS= read -r artifact; do
+  [[ -n "$artifact" ]] || continue
+  if is_public_artifact "$artifact"; then
+    artifacts+=("$artifact")
+  fi
+done < <(find "$FILES_SOURCE" -maxdepth 1 -type f \
   \( -name "chummer-avalonia-*.exe" -o -name "chummer-avalonia-*.zip" -o \
      -name "chummer-avalonia-*.tar.gz" -o -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
      -name "chummer-avalonia-*-installer.pkg" -o -name "chummer-avalonia-*-installer.dmg" -o \
@@ -61,12 +68,7 @@ mapfile -t artifacts < <(find "$FILES_SOURCE" -maxdepth 1 -type f \
      -name "chummer-blazor-desktop-*.tar.gz" -o -name "chummer-blazor-desktop-*-installer.exe" -o \
      -name "chummer-blazor-desktop-*-installer.deb" -o -name "chummer-blazor-desktop-*-installer.pkg" -o \
      -name "chummer-blazor-desktop-*-installer.dmg" -o -name "chummer-blazor-desktop-*-installer.msix" \) \
-  | sort | while IFS= read -r artifact; do
-      [[ -f "$artifact" ]] || continue
-      if is_public_artifact "$artifact"; then
-        printf '%s\n' "$artifact"
-      fi
-    done)
+  | sort)
 
 if [[ "${#artifacts[@]}" -eq 0 ]]; then
   echo "No desktop artifacts found under $FILES_SOURCE" >&2
@@ -88,7 +90,10 @@ release_channel="docker"
 release_published_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 if [[ -f "$MANIFEST_SOURCE" ]]; then
-  readarray -t manifest_meta < <(python3 - "$MANIFEST_SOURCE" <<'PY'
+  manifest_meta=()
+  while IFS= read -r value; do
+    manifest_meta+=("$value")
+  done < <(python3 - "$MANIFEST_SOURCE" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -124,7 +129,11 @@ RELEASE_PROOF_PATH="$RELEASE_PROOF_PATH" \
 STARTUP_SMOKE_DIR="$STARTUP_SMOKE_SOURCE" \
 bash "$SCRIPT_DIR/generate-releases-manifest.sh"
 
-readarray -t promoted_file_names < <(python3 - "$DEPLOY_DIR/RELEASE_CHANNEL.generated.json" <<'PY'
+promoted_file_names=()
+while IFS= read -r file_name; do
+  [[ -n "$file_name" ]] || continue
+  promoted_file_names+=("$file_name")
+done < <(python3 - "$DEPLOY_DIR/RELEASE_CHANNEL.generated.json" <<'PY'
 import json
 import sys
 from pathlib import Path
