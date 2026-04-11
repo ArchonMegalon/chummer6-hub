@@ -53,15 +53,6 @@ to_bool() {
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
 }
 
-is_public_artifact() {
-  local artifact_name
-  artifact_name="$(basename "$1")"
-  if ! to_bool "${CHUMMER_MACOS_PUBLIC_SHELF_ENABLED:-false}" && [[ "$artifact_name" == chummer-*-osx-* ]]; then
-    return 1
-  fi
-  return 0
-}
-
 endpoint_args=()
 if [[ -n "$S3_ENDPOINT_URL" ]]; then
   endpoint_args=(--endpoint-url "$S3_ENDPOINT_URL")
@@ -76,9 +67,7 @@ trap cleanup EXIT
 mkdir -p "$filtered_files_dir"
 while IFS= read -r artifact; do
   [[ -f "$artifact" ]] || continue
-  if is_public_artifact "$artifact"; then
-    cp "$artifact" "$filtered_files_dir/"
-  fi
+  cp "$artifact" "$filtered_files_dir/"
 done < <(find "$FILES_SOURCE" -maxdepth 1 -type f \( \
   -name 'chummer-*-installer.exe' -o \
   -name 'chummer-*-installer.deb' -o \

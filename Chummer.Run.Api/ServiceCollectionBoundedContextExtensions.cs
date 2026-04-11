@@ -23,6 +23,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<PublicTrustPulseService>();
         services.AddSingleton<CampaignOsLocalProofService>();
         services.AddSingleton<PublicReleaseManifestService>();
+        services.AddSingleton<WindowsProofInstallerService>();
         services.AddSingleton<ReleaseSelectionService>();
         services.AddSingleton<SignedInTrustStatusService>();
         return services;
@@ -70,6 +71,7 @@ internal static class ServiceCollectionBoundedContextExtensions
     {
         services.AddSingleton<InstallLinkingStore>();
         services.AddSingleton<InstallLinkingService>();
+        services.AddSingleton<PersonalizedInstallScriptService>();
         services.AddSingleton<InstallBootstrapTicketService>();
         services.AddSingleton<ReleaseBundlePromotionService>();
         services.AddSingleton<ReleaseBundleUploadSessionService>();

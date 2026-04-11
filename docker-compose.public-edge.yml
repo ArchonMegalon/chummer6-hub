@@ -1,6 +1,7 @@
 services:
   chummer-run-identity:
     image: chummer-run-identity:local
+    restart: unless-stopped
     build:
       context: /docker
       dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Identity/Dockerfile
@@ -33,6 +34,7 @@ services:
 
   chummer-portal:
     image: chummer-run-api:local
+    restart: unless-stopped
     build:
       context: /docker
       dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Api/Dockerfile

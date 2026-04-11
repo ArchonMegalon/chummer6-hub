@@ -383,7 +383,7 @@ public sealed class InternalReleaseBundlesControllerTests
             var uploadSessions = new ReleaseBundleUploadSessionService(Configuration, NullLogger<ReleaseBundleUploadSessionService>.Instance);
             var manifestService = new PublicReleaseManifestService(Configuration);
             var accounts = new AccountService(new CommunityStore(Configuration, NullLogger<CommunityStore>.Instance));
-            var installLinking = new InstallLinkingService(new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance));
+            var installLinking = new InstallLinkingService(new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance), Configuration);
             Controller = new InternalReleaseBundlesController(
                 releasePromotion,
                 uploadSessions,

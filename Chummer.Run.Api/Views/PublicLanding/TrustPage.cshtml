@@ -5,6 +5,20 @@
     ViewData["SurfaceClass"] = "surface-trust-page";
     var policyPage = string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Model.PageId, "terms", StringComparison.OrdinalIgnoreCase);
+    var guestPreviewHref = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.Chrome.PublicPrimaryCta?.Href)
+        ? Model.Chrome.PublicPrimaryCta!.Href
+        : "/downloads";
+
+    string ContextualPreviewHref(string? href)
+    {
+        var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
+        if (string.Equals(resolvedHref, "/downloads", StringComparison.OrdinalIgnoreCase))
+        {
+            return guestPreviewHref;
+        }
+
+        return resolvedHref;
+    }
 
     static TrustPageActionViewModel? HelpActionFor(string sectionId, bool authenticated) => sectionId switch
     {
@@ -56,7 +70,7 @@
     <div class="stacked-actions">
         @foreach (var action in Model.Actions)
         {
-            <a class="button-like button-like--@action.Tone" href="@action.Href">@action.Label</a>
+            <a class="button-like button-like--@action.Tone" href="@ContextualPreviewHref(action.Href)">@action.Label</a>
         }
     </div>
 </section>
@@ -119,11 +133,11 @@
                         }
                         @if (quickAction is not null)
                         {
-                            <a class="inline-link" href="@quickAction.Href">@quickAction.Label</a>
+                            <a class="inline-link" href="@ContextualPreviewHref(quickAction.Href)">@quickAction.Label</a>
                         }
                         @if (fallbackAction is not null)
                         {
-                            <p class="muted-copy">Fallback: <a class="inline-link" href="@fallbackAction.Href">@fallbackAction.Label</a></p>
+                            <p class="muted-copy">Fallback: <a class="inline-link" href="@ContextualPreviewHref(fallbackAction.Href)">@fallbackAction.Label</a></p>
                         }
                     </div>
                 </article>

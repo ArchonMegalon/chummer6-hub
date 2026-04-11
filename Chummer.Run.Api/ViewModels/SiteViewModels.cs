@@ -157,6 +157,7 @@ public sealed record StoryPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> Workflows,
     IReadOnlyList<PublicFeatureCardDto> TrustPillars,
     IReadOnlyList<ResolvedPublicCardViewModel> Lanes,
+    ReleaseExperienceViewModel ReleaseExperience,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
@@ -241,6 +242,8 @@ public sealed record DownloadDispatchPageViewModel(
     string? BootstrapCommandLabel,
     string? BootstrapCommandIntro,
     string? BootstrapCommandNote,
+    string CopyCommandLabel,
+    bool CompactDispatchLayout,
     IReadOnlyList<DownloadDispatchFeatureCardViewModel> BootstrapFeatureCards,
     bool AutoStartDownload,
     bool BootstrapScriptDownload,
@@ -470,6 +473,7 @@ public sealed record HomePageViewModel(
     IReadOnlyList<SectionLinkViewModel> Sections,
     PublicLandingSurfaceDto Surface,
     AssetCatalogViewModel Assets,
+    ReleaseExperienceViewModel ReleaseExperience,
     HubUserDto User,
     AccountLinkSummaryDto Links,
     HubUserExperienceDto Experience,

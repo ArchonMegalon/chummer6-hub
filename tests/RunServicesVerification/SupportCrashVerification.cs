@@ -38,7 +38,7 @@ internal static class SupportCrashVerification
                 .Build();
 
             InstallLinkingStore installStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
-            InstallLinkingService installLinking = new(installStore);
+            InstallLinkingService installLinking = new(installStore, configuration);
             SupportStore store = new(configuration, NullLogger<SupportStore>.Instance);
             SupportAttachmentStorageService attachments = new(configuration);
             SupportCaseService supportCases = new(store, attachments, NullLogger<SupportCaseService>.Instance);
@@ -204,7 +204,7 @@ internal static class SupportCrashVerification
             SupportAttachmentStorageService reloadedAttachments = new(configuration);
             SupportCaseService reloadedSupportCases = new(reloadedStore, reloadedAttachments, NullLogger<SupportCaseService>.Instance);
             InstallLinkingStore reloadedInstallStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
-            InstallLinkingService reloadedInstallLinking = new(reloadedInstallStore);
+            InstallLinkingService reloadedInstallLinking = new(reloadedInstallStore, configuration);
             CrashSupportService reloadedService = new(reloadedStore, reloadedSupportCases, reloadedInstallLinking, NullLogger<CrashSupportService>.Instance);
             CrashIncidentProjection? reloadedIncident = reloadedService.GetIncident(first.Incident.IncidentId);
             VerificationAssert.NotNull(reloadedIncident, "Persisted crash incidents should reload from durable storage.");

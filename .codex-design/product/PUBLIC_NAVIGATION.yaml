@@ -12,8 +12,6 @@ primary_nav:
     href: /horizons
   - label: Artifacts
     href: /artifacts
-  - label: Build
-    href: /downloads/release-upload
   - label: Participate
     href: /participate
 secondary_nav:

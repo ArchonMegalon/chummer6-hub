@@ -653,6 +653,9 @@ public sealed class CodexParticipationController : Controller
                 },
                 badge = (object?)null,
                 details = (object?)null,
+                lifecycle = BuildContributionLifecycle(null),
+                breadcrumbs = Array.Empty<object>(),
+                failureGuidance = BuildContributionFailureGuidance(null, unavailable: false),
                 actions = BuildContributionActions()
             };
         }
@@ -686,6 +689,9 @@ public sealed class CodexParticipationController : Controller
                     note = "This is a thank-you marker only. Contribution credit appears later after validated work."
                 },
             details = BuildContributionDetails(session),
+            lifecycle = BuildContributionLifecycle(session),
+            breadcrumbs = BuildContributionBreadcrumbs(session),
+            failureGuidance = BuildContributionFailureGuidance(session, unavailable: false),
             actions = BuildContributionActions(),
             fleet = FleetProjectionSanitizer.Build(fleet)
         };
@@ -714,6 +720,9 @@ public sealed class CodexParticipationController : Controller
             },
             badge = (object?)null,
             details = BuildContributionDetails(session),
+            lifecycle = BuildContributionLifecycle(session),
+            breadcrumbs = BuildContributionBreadcrumbs(session),
+            failureGuidance = BuildContributionFailureGuidance(session, unavailable: true),
             actions = BuildContributionActions()
         };
 
@@ -751,6 +760,171 @@ public sealed class CodexParticipationController : Controller
             explainHref = "/participate",
             homeHref = "/home",
             accountHref = "/account"
+        };
+
+    private static object BuildContributionLifecycle(SponsorSessionStatusDto? session)
+    {
+        if (session is null)
+        {
+            return new
+            {
+                currentState = "Ready to start",
+                currentCode = "ready_to_start",
+                steps = new[]
+                {
+                    new { key = "intent", label = "Intent", state = "pending", happenedAtUtc = (DateTimeOffset?)null, summary = "Waiting for you to open a lane." },
+                    new { key = "consent", label = "Consent", state = "pending", happenedAtUtc = (DateTimeOffset?)null, summary = "Consent is recorded only after you explicitly continue." },
+                    new { key = "authorize", label = "Authorize", state = "pending", happenedAtUtc = (DateTimeOffset?)null, summary = "A one-time code appears only after lane start." },
+                    new { key = "activation", label = "Activation", state = "pending", happenedAtUtc = (DateTimeOffset?)null, summary = "Fleet lane activation stays pending until authorization succeeds." }
+                }
+            };
+        }
+
+        string normalizedStatus = (session.Status ?? string.Empty).Trim().ToLowerInvariant();
+        bool intentDone = session.CreatedAtUtc != default;
+        bool consentDone = session.Consented || session.ConsentedAtUtc is not null;
+        bool authDone = session.AuthorizedAtUtc is not null;
+        bool laneReady = string.Equals(normalizedStatus, "active", StringComparison.OrdinalIgnoreCase);
+        bool terminalStop = string.Equals(normalizedStatus, "stopped", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedStatus, "revoked", StringComparison.OrdinalIgnoreCase);
+        DateTimeOffset? activationAtUtc = session.ActivatedAtUtc
+            ?? session.Events
+                .Where(static evt => string.Equals(evt.Kind, "lane_activated", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static evt => evt.CreatedAtUtc)
+                .Select(static evt => (DateTimeOffset?)evt.CreatedAtUtc)
+                .FirstOrDefault();
+
+        string activationState = laneReady ? "complete" : terminalStop ? "stopped" : authDone ? "in_progress" : "pending";
+        string activationSummary = laneReady
+            ? "Lane is active and ready for bounded contribution work."
+            : terminalStop
+                ? "This lane is no longer active. Start a fresh lane when you want to contribute again."
+                : authDone
+                    ? "Authorization is complete; activation is waiting on slot and host readiness."
+                    : "Activation starts after consent and authorization complete.";
+
+        return new
+        {
+            currentState = ResolveContributionLifecycleState(session),
+            currentCode = string.IsNullOrWhiteSpace(normalizedStatus) ? "tracked" : normalizedStatus,
+            steps = new[]
+            {
+                new { key = "intent", label = "Intent", state = intentDone ? "complete" : "pending", happenedAtUtc = intentDone ? session.CreatedAtUtc : (DateTimeOffset?)null, summary = "Contribution intent is tracked on your account rail." },
+                new { key = "consent", label = "Consent", state = consentDone ? "complete" : "pending", happenedAtUtc = session.ConsentedAtUtc, summary = consentDone ? "Consent recorded and attached to this sponsor session." : "Consent is still required before device authorization starts." },
+                new { key = "authorize", label = "Authorize", state = authDone ? "complete" : "pending", happenedAtUtc = session.AuthorizedAtUtc, summary = authDone ? "ChatGPT authorization succeeded for this lane." : "Waiting for one-time device-auth verification." },
+                new { key = "activation", label = "Activation", state = activationState, happenedAtUtc = activationAtUtc, summary = activationSummary }
+            }
+        };
+    }
+
+    private static object[] BuildContributionBreadcrumbs(SponsorSessionStatusDto? session)
+    {
+        if (session?.Events is null || session.Events.Count == 0)
+        {
+            return Array.Empty<object>();
+        }
+
+        return session.Events
+            .OrderByDescending(static evt => evt.CreatedAtUtc)
+            .Take(6)
+            .Select(evt => (object)new
+            {
+                id = evt.EventId,
+                kind = evt.Kind,
+                label = ResolveContributionEventLabel(evt.Kind),
+                message = evt.Message,
+                createdAtUtc = evt.CreatedAtUtc
+            })
+            .ToArray();
+    }
+
+    private static object BuildContributionFailureGuidance(SponsorSessionStatusDto? session, bool unavailable)
+    {
+        if (unavailable)
+        {
+            return new
+            {
+                level = "warning",
+                title = "Host reachability issue",
+                summary = "The host could not refresh lane status. Keep your account flow on the same rail and retry from this screen.",
+                nextSafeAction = "Retry from Participate. If this continues, open Account > Support and mention the current contribution id."
+            };
+        }
+
+        if (session is null)
+        {
+            return new
+            {
+                level = "info",
+                title = "No active failure",
+                summary = "Start only when you want a fresh lane and one-time code.",
+                nextSafeAction = "Choose 'I want to participate' to generate a new authorization code."
+            };
+        }
+
+        return (session.Status ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "waiting_for_slot" => new
+            {
+                level = "warning",
+                title = "Capacity wait",
+                summary = "Authorization can still be valid while lane capacity is temporarily full.",
+                nextSafeAction = "Keep this page open for automatic polling, or request a fresh code if the current authorization expires."
+            },
+            "stopped" => new
+            {
+                level = "info",
+                title = "Lane stopped",
+                summary = "This lane was stopped intentionally and will not process new work.",
+                nextSafeAction = "Start a new contribution lane when you are ready to continue."
+            },
+            "revoked" => new
+            {
+                level = "warning",
+                title = "Lane revoked",
+                summary = "This lane was revoked and cannot be resumed.",
+                nextSafeAction = "Start a fresh lane and complete consent + authorization again."
+            },
+            _ => new
+            {
+                level = "info",
+                title = "Recovery ready",
+                summary = "If the one-time code expires or the verification page fails, this flow can issue a replacement code without losing account history.",
+                nextSafeAction = "Use 'Get a fresh code' and continue from the updated authorization step."
+            }
+        };
+    }
+
+    private static string ResolveContributionLifecycleState(SponsorSessionStatusDto session)
+        => (session.Status ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "intent_created" => "Intent recorded",
+            "consented" => "Consent recorded",
+            "pending_auth" => "Waiting for authorization",
+            "fleet_lane_created" => "Fleet lane created",
+            "auth_ready" => "Authorization ready",
+            "lane_pending" => "Activation in progress",
+            "waiting_for_slot" => session.AuthorizedAtUtc is null ? "Queued before authorization" : "Queued after authorization",
+            "active" => "Lane active",
+            "stopped" => "Lane stopped",
+            "revoked" => "Lane revoked",
+            _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase((session.Status ?? "tracked").Replace('_', ' '))
+        };
+
+    private static string ResolveContributionEventLabel(string? kind)
+        => (kind ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "intent_created" => "Intent created",
+            "consent_recorded" => "Consent recorded",
+            "device_auth_started" => "Authorization started",
+            "device_auth_ready" => "Authorization ready",
+            "lane_created" => "Lane created",
+            "lane_activated" => "Lane activated",
+            "lane_stopped" => "Lane stopped",
+            "lane_revoked" => "Lane revoked",
+            _ => string.IsNullOrWhiteSpace(kind)
+                ? "Decision event"
+                : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(kind.Replace('_', ' '))
         };
 
     private static string ResolveContributionPhase(SponsorSessionStatusDto session)

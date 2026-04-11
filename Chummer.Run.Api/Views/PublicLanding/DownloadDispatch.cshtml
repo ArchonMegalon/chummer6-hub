@@ -3,15 +3,58 @@
     ViewData["Title"] = "Download handoff";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads";
+    var showCompactDispatchInfo = Model.CompactDispatchLayout
+        && (!string.IsNullOrWhiteSpace(Model.DispatchNote)
+            || !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote)
+            || Model.BootstrapFeatureCards.Count > 0
+            || !string.IsNullOrWhiteSpace(Model.CurrentReleaseSummary));
 }
 
 <section class="release-stage">
     <div class="release-stage__lead">
         <p class="eyebrow">Signed-in download</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Summary</p>
-        <p class="release-stage__note">@Model.DispatchNote</p>
-        <p class="release-stage__note"><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @Model.CurrentReleaseSummary.</p>
+        @if (Model.CompactDispatchLayout)
+        {
+            <div class="dispatch-compact-lead">
+                <p class="page-copy">@Model.Summary</p>
+                @if (showCompactDispatchInfo)
+                {
+                    <details class="dispatch-inline-info" data-install-info>
+                        <summary aria-label="Install details">
+                            <span aria-hidden="true">i</span>
+                        </summary>
+                        <div class="dispatch-inline-info__panel" role="note">
+                            <p class="dispatch-inline-info__eyebrow">Install details</p>
+                            @if (!string.IsNullOrWhiteSpace(Model.DispatchNote))
+                            {
+                                <p>@Model.DispatchNote</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
+                            {
+                                <p>@Model.BootstrapCommandNote</p>
+                            }
+                            <p><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @Model.CurrentReleaseSummary.</p>
+                            @if (Model.BootstrapFeatureCards.Count > 0)
+                            {
+                                <ul class="dispatch-inline-info__list">
+                                    @foreach (var card in Model.BootstrapFeatureCards)
+                                    {
+                                        <li><strong>@card.Heading.</strong> @card.Body</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </details>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="page-copy">@Model.Summary</p>
+            <p class="release-stage__note">@Model.DispatchNote</p>
+            <p class="release-stage__note"><strong>Current release</strong><br />@Model.Display.ChannelLabel, @Model.Display.BuildLabel, @Model.CurrentReleaseSummary.</p>
+        }
     </div>
 </section>
 
@@ -35,17 +78,17 @@
                             <div class="code-panel__label">@(Model.BootstrapCommandLabel ?? "Install command")</div>
                             <p class="handoff-command__intro"><strong>@(Model.BootstrapCommandIntro ?? "Paste this into your platform shell.")</strong></p>
                             <div class="code-panel__value code-panel__value--terminal mono-receipt" id="terminalInstallCommandValue">@Model.TerminalInstallCommand</div>
-                            @if (!string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
+                            @if (!Model.CompactDispatchLayout && !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
                             {
                                 <p class="handoff-command__note">@Model.BootstrapCommandNote</p>
                             }
                             <div class="stacked-actions">
-                                <button class="button-like button-like--secondary" type="button" id="copyTerminalInstallCommandButton">Copy install command</button>
+                                <button class="button-like button-like--secondary" type="button" id="copyTerminalInstallCommandButton">@Model.CopyCommandLabel</button>
                                 <a class="button-like button-like--ghost" href="@Model.DownloadHref">@Model.DownloadLabel</a>
                             </div>
                             <p class="status-copy" id="terminalInstallCommandNotice" hidden></p>
                         </div>
-                        @if (Model.BootstrapFeatureCards.Count > 0)
+                        @if (!Model.CompactDispatchLayout && Model.BootstrapFeatureCards.Count > 0)
                         {
                             <div class="handoff-feature-grid" aria-label="Setup highlights">
                                 @foreach (var card in Model.BootstrapFeatureCards)
@@ -66,16 +109,16 @@
                     <div class="code-panel__label">@(Model.BootstrapCommandLabel ?? "Install command")</div>
                     <p class="handoff-command__intro"><strong>@(Model.BootstrapCommandIntro ?? "Paste this into your platform shell.")</strong></p>
                     <div class="code-panel__value code-panel__value--terminal mono-receipt" id="terminalInstallCommandValue">@Model.TerminalInstallCommand</div>
-                    @if (!string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
+                    @if (!Model.CompactDispatchLayout && !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote))
                     {
                         <p class="handoff-command__note">@Model.BootstrapCommandNote</p>
                     }
                     <div class="stacked-actions">
-                        <button class="button-like button-like--primary" type="button" id="copyTerminalInstallCommandButton">Copy install command</button>
+                        <button class="button-like button-like--primary" type="button" id="copyTerminalInstallCommandButton">@Model.CopyCommandLabel</button>
                     </div>
                     <p class="status-copy" id="terminalInstallCommandNotice" hidden></p>
                 </div>
-                @if (Model.BootstrapFeatureCards.Count > 0)
+                @if (!Model.CompactDispatchLayout && Model.BootstrapFeatureCards.Count > 0)
                 {
                     <div class="handoff-feature-grid" aria-label="Setup highlights">
                         @foreach (var card in Model.BootstrapFeatureCards)
@@ -117,12 +160,14 @@
                             <a class="button-like button-like--ghost" href="@Model.SecondaryDownloadHref">@Model.SecondaryDownloadLabel</a>
                         }
                         <a class="button-like button-like--secondary" href="@Model.AccountHref">@Model.AccountLabel</a>
+                        <a class="button-like button-like--ghost" href="/now">Open current release</a>
                         <a class="button-like button-like--ghost" href="@Model.HelpHref">@Model.HelpLabel</a>
                         <a class="button-like button-like--ghost" href="/downloads">Back to downloads</a>
                     </div>
                     <p class="muted-copy">@(Model.BootstrapScriptDownload
-                        ? "The published packages stay the same for every user. The account-aware part is the short-lived setup assistant and the install ticket it carries, not a personalized app binary."
+                        ? "The published packages stay the same for every user. The account-aware part is the short-lived setup assistant and the short-lived install claims it carries, not a personalized app binary."
                         : "The installer bytes stay the same for every user. If account linking is needed, enter the support or recovery code inside setup instead of copying one from this page.")</p>
+                    <p class="muted-copy">Proof, known issues, and install help stay on one release rail so recovery never depends on stale page copy.</p>
                 </div>
             </details>
         </div>
@@ -148,6 +193,7 @@
   const commandCopyButton = document.getElementById("copyTerminalInstallCommandButton");
   const terminalInstallCommandValue = document.getElementById("terminalInstallCommandValue");
   const terminalInstallCommandNotice = document.getElementById("terminalInstallCommandNotice");
+  const installInfo = document.querySelector("[data-install-info]");
 
   const startDownload = () => {
     if (!downloadFrame || !downloadHref) return;
@@ -174,6 +220,22 @@
         ui.setNotice(terminalInstallCommandNotice, "Install command copied.");
       } catch (error) {
         ui.setNotice(terminalInstallCommandNotice, ui.describeError(error, "Terminal command copy failed. Copy it manually from the panel."), true);
+      }
+    });
+  }
+
+  if (installInfo instanceof HTMLDetailsElement) {
+    document.addEventListener("click", (event) => {
+      if (!installInfo.open || installInfo.contains(event.target)) {
+        return;
+      }
+
+      installInfo.removeAttribute("open");
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        installInfo.removeAttribute("open");
       }
     });
   }

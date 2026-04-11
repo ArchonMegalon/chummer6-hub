@@ -4,6 +4,21 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-story";
     var leadAsset = Model.Assets.BySlot("scene_archive_stair");
+    var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
+
+    string ContextualPreviewHref(string? href)
+    {
+        var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
+        if (
+            guestNeedsInstallGate
+            && string.Equals(resolvedHref, "/downloads", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return Model.ReleaseExperience.GuestGatePrimaryHref ?? resolvedHref;
+        }
+
+        return resolvedHref;
+    }
 }
 
 <section class="story-cinematic">
@@ -63,7 +78,7 @@
 <section id="public-guide" class="release-footnote">
     <p class="muted-copy">
         Need proof? <a class="inline-link" href="/now">Open what works today</a>.
-        Ready to install? <a class="inline-link" href="/downloads">Open downloads</a>.
+        Ready to install? <a class="inline-link" href="@ContextualPreviewHref("/downloads")">Open downloads</a>.
         Need help instead? <a class="inline-link" href="/help">Open the help hub</a>.
     </p>
 </section>

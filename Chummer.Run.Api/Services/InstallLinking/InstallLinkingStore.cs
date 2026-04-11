@@ -25,6 +25,7 @@ public sealed class InstallLinkingStore
     public Dictionary<string, InstallClaimTicketDto> ClaimTicketsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, ClaimedInstallationDto> InstallationsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, InstallationGrantDto> GrantsById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, PersonalizedInstallScriptLinkDto> PersonalizedInstallScriptsById { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void PersistLocked()
     {
@@ -39,6 +40,9 @@ public sealed class InstallLinkingStore
                 .OrderByDescending(static item => item.UpdatedAtUtc)
                 .ToArray(),
             Grants: GrantsById.Values
+                .OrderByDescending(static item => item.IssuedAtUtc)
+                .ToArray(),
+            PersonalizedInstallScripts: PersonalizedInstallScriptsById.Values
                 .OrderByDescending(static item => item.IssuedAtUtc)
                 .ToArray());
 
@@ -64,10 +68,11 @@ public sealed class InstallLinkingStore
 
             ApplySnapshotLocked(snapshot);
             _logger.LogInformation(
-                "InstallLinkingStore loaded {ReceiptCount} receipts, {TicketCount} claim tickets, and {InstallCount} claimed installs from {StoragePath}.",
+                "InstallLinkingStore loaded {ReceiptCount} receipts, {TicketCount} claim tickets, {InstallCount} claimed installs, and {ScriptCount} personalized install scripts from {StoragePath}.",
                 ReceiptsById.Count,
                 ClaimTicketsById.Count,
                 InstallationsById.Count,
+                PersonalizedInstallScriptsById.Count,
                 _storagePath);
         }
     }
@@ -78,6 +83,7 @@ public sealed class InstallLinkingStore
         ClaimTicketsById.Clear();
         InstallationsById.Clear();
         GrantsById.Clear();
+        PersonalizedInstallScriptsById.Clear();
 
         foreach (var receipt in snapshot.Receipts ?? Array.Empty<DownloadReceiptDto>())
         {
@@ -98,6 +104,11 @@ public sealed class InstallLinkingStore
         {
             GrantsById[grant.GrantId] = grant;
         }
+
+        foreach (var script in snapshot.PersonalizedInstallScripts ?? Array.Empty<PersonalizedInstallScriptLinkDto>())
+        {
+            PersonalizedInstallScriptsById[script.ScriptId] = script;
+        }
     }
 
     private static string ResolveStoragePath(IConfiguration configuration)
@@ -116,4 +127,5 @@ internal sealed record InstallLinkingStoreSnapshot(
     IReadOnlyList<DownloadReceiptDto> Receipts,
     IReadOnlyList<InstallClaimTicketDto> ClaimTickets,
     IReadOnlyList<ClaimedInstallationDto> Installations,
-    IReadOnlyList<InstallationGrantDto> Grants);
+    IReadOnlyList<InstallationGrantDto> Grants,
+    IReadOnlyList<PersonalizedInstallScriptLinkDto>? PersonalizedInstallScripts = null);

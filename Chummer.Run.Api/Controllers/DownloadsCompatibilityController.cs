@@ -10,6 +10,7 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class DownloadsCompatibilityController : ControllerBase
 {
     private readonly PublicReleaseManifestService _releases;
+    private readonly WindowsProofInstallerService _windowsProofInstallers;
     private readonly ReleaseSelectionService _releaseSelection;
     private readonly InstallLinkingService _installLinking;
     private readonly InstallBootstrapTicketService _installBootstrapTickets;
@@ -18,6 +19,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
     public DownloadsCompatibilityController(
         PublicReleaseManifestService releases,
+        WindowsProofInstallerService windowsProofInstallers,
         ReleaseSelectionService releaseSelection,
         InstallLinkingService installLinking,
         InstallBootstrapTicketService installBootstrapTickets,
@@ -25,6 +27,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         ILogger<DownloadsCompatibilityController> logger)
     {
         _releases = releases;
+        _windowsProofInstallers = windowsProofInstallers;
         _releaseSelection = releaseSelection;
         _installLinking = installLinking;
         _installBootstrapTickets = installBootstrapTickets;
@@ -52,6 +55,54 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             manifestPath,
             "application/json; charset=utf-8",
             enableRangeProcessing: false);
+    }
+
+    [HttpGet("/downloads/proof/windows")]
+    public IActionResult WindowsProofInstallers()
+    {
+        var installers = _windowsProofInstallers.LoadCatalog();
+        if (installers.Count == 0)
+        {
+            return NotFound(new
+            {
+                status = "missing",
+                message = "No staged Windows proof installers are available right now."
+            });
+        }
+
+        return Ok(new
+        {
+            status = "proof_only",
+            message = "These Windows installers are published for manual proof only. They are not on the promoted public shelf until current Windows startup-smoke evidence exists for the active release head.",
+            downloads = installers.Select(static installer => new
+            {
+                installer.FileName,
+                installer.Head,
+                installer.Rid,
+                installer.Sha256,
+                installer.SizeBytes,
+                installer.UpdatedAtUtc,
+                installer.DownloadUrl
+            })
+        });
+    }
+
+    [HttpGet("/downloads/proof/windows/{fileName}")]
+    public IActionResult DownloadWindowsProofInstaller([FromRoute] string fileName)
+    {
+        var installer = _windowsProofInstallers.FindByFileName(fileName);
+        if (installer is null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers["Cache-Control"] = "no-store";
+        Response.Headers["X-Chummer-Install-Tier"] = "proof-only";
+        return PhysicalFile(
+            installer.FilePath,
+            "application/octet-stream",
+            installer.FileName,
+            enableRangeProcessing: true);
     }
 
     [HttpGet("/downloads/get/{artifactId}")]

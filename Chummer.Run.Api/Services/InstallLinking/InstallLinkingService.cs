@@ -7,13 +7,15 @@ namespace Chummer.Run.Api.Services.InstallLinking;
 
 public sealed class InstallLinkingService
 {
-    private static readonly TimeSpan ClaimTicketLifetime = TimeSpan.FromDays(3);
+    private static readonly TimeSpan DefaultClaimTicketLifetime = TimeSpan.FromDays(1);
     private static readonly TimeSpan GrantLifetime = TimeSpan.FromDays(30);
     private readonly InstallLinkingStore _store;
+    private readonly TimeSpan _claimTicketLifetime;
 
-    public InstallLinkingService(InstallLinkingStore store)
+    public InstallLinkingService(InstallLinkingStore store, IConfiguration configuration)
     {
         _store = store;
+        _claimTicketLifetime = ResolveClaimTicketLifetime(configuration);
     }
 
     public DownloadDispatchResult IssueDownload(
@@ -351,7 +353,7 @@ public sealed class InstallLinkingService
         string? subjectId,
         DateTimeOffset now)
     {
-        var expiresAtUtc = now.Add(ClaimTicketLifetime);
+        var expiresAtUtc = now.Add(_claimTicketLifetime);
         return new InstallClaimTicketDto(
             TicketId: NewId("ict"),
             ClaimCode: NewClaimCode(),
@@ -540,6 +542,25 @@ public sealed class InstallLinkingService
         }
 
         return "archive";
+    }
+
+    private static TimeSpan ResolveClaimTicketLifetime(IConfiguration configuration)
+    {
+        string? configuredHours = configuration["CHUMMER_INSTALL_CLAIM_TICKET_LIFETIME_HOURS"];
+        if (int.TryParse(configuredHours, out int hours))
+        {
+            hours = Math.Clamp(hours, 1, 7 * 24);
+            return TimeSpan.FromHours(hours);
+        }
+
+        string? configuredMinutes = configuration["CHUMMER_INSTALL_CLAIM_TICKET_LIFETIME_MINUTES"];
+        if (int.TryParse(configuredMinutes, out int minutes))
+        {
+            minutes = Math.Clamp(minutes, 30, 7 * 24 * 60);
+            return TimeSpan.FromMinutes(minutes);
+        }
+
+        return DefaultClaimTicketLifetime;
     }
 
     private static string NewId(string prefix)

@@ -298,7 +298,27 @@ internal sealed class DesktopPlatformAcceptanceDocument
     public int Version { get; init; }
     public string FlagshipHead { get; init; } = string.Empty;
     public string FallbackHead { get; init; } = string.Empty;
+    public DesktopPlatformAcceptanceGoldReleaseHeadPolicyDocument? GoldReleaseHeadPolicy { get; init; }
+    public List<DesktopPlatformAcceptanceHeadPolicyDocument>? HeadPolicies { get; init; }
     public List<DesktopPlatformAcceptancePlatformDocument>? Platforms { get; init; }
+}
+
+internal sealed class DesktopPlatformAcceptanceGoldReleaseHeadPolicyDocument
+{
+    public bool PrimaryPublicRouteMustBeUnique { get; init; }
+    public bool IndependentFlagshipProofRequiredForAllShippedHeads { get; init; }
+    public bool SecondaryHeadMustNotShipOnThinnerProof { get; init; }
+    public bool PreviewOnlyFallbackExceptionsDoNotSatisfyGold { get; init; }
+}
+
+internal sealed class DesktopPlatformAcceptanceHeadPolicyDocument
+{
+    public string Head { get; init; } = string.Empty;
+    public string Role { get; init; } = string.Empty;
+    public List<string>? FallbackAllowedWhen { get; init; }
+    public List<string>? MustIndependentlyMeetFlagshipWhen { get; init; }
+    public List<string>? PassConditions { get; init; }
+    public List<string>? FailConditions { get; init; }
 }
 
 internal sealed class DesktopPlatformAcceptancePlatformDocument

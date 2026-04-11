@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text.Json;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -147,6 +148,48 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.IsType<NotFoundResult>(result);
     }
 
+    [Fact]
+    public void WindowsProofInstallersCatalogListsStagedFiles()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.WindowsProofInstallers();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        string payload = JsonSerializer.Serialize(ok.Value);
+        Assert.Contains("\"status\":\"proof_only\"", payload, StringComparison.Ordinal);
+        Assert.Contains("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
+        Assert.Contains("chummer-blazor-desktop-win-x64-installer.exe", payload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowsProofInstallerDownloadServesStagedFile()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = fixture.Controller.DownloadWindowsProofInstaller("chummer-avalonia-win-x64-installer.exe");
+
+        var file = Assert.IsType<PhysicalFileResult>(result);
+        Assert.EndsWith("proof/windows/chummer-avalonia-win-x64-installer.exe", file.FileName, StringComparison.Ordinal);
+        Assert.Equal("chummer-avalonia-win-x64-installer.exe", file.FileDownloadName);
+        Assert.Equal("no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
+        Assert.Equal("proof-only", fixture.Controller.ControllerContext.HttpContext.Response.Headers["X-Chummer-Install-Tier"].ToString());
+    }
+
+    [Fact]
+    public void WindowsProofInstallerDownloadRejectsUnknownFiles()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.DownloadWindowsProofInstaller("../outside.exe");
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root;
@@ -156,9 +199,13 @@ public sealed class DownloadsCompatibilityControllerTests
             _root = Path.Combine(Path.GetTempPath(), "downloads-compatibility-controller-tests", Guid.NewGuid().ToString("N"));
             string downloadsRoot = Path.Combine(_root, "downloads");
             string filesRoot = Path.Combine(downloadsRoot, "files");
+            string proofRoot = Path.Combine(downloadsRoot, "proof", "windows");
             Directory.CreateDirectory(filesRoot);
+            Directory.CreateDirectory(proofRoot);
             File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-osx-x64-installer.dmg"), "mac-preview"u8.ToArray());
             File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-win-x64-installer.exe"), "win-preview"u8.ToArray());
+            File.WriteAllBytes(Path.Combine(proofRoot, "chummer-avalonia-win-x64-installer.exe"), "proof-win-avalonia"u8.ToArray());
+            File.WriteAllBytes(Path.Combine(proofRoot, "chummer-blazor-desktop-win-x64-installer.exe"), "proof-win-blazor"u8.ToArray());
             File.WriteAllText(
                 Path.Combine(downloadsRoot, "releases.json"),
                 """
@@ -257,10 +304,12 @@ public sealed class DownloadsCompatibilityControllerTests
             InstallBootstrapTickets = new InstallBootstrapTicketService(
                 Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys"))),
                 Configuration);
-            InstallLinking = new InstallLinkingService(new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance));
+            InstallLinking = new InstallLinkingService(new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance), Configuration);
+            var windowsProofInstallers = new WindowsProofInstallerService(Configuration);
             var identityClient = new HubIdentityClient(new HttpClient(), Configuration, NullLogger<HubIdentityClient>.Instance);
             Controller = new DownloadsCompatibilityController(
                 ManifestService,
+                windowsProofInstallers,
                 ReleaseSelection,
                 InstallLinking,
                 InstallBootstrapTickets,

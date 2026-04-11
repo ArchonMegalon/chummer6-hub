@@ -53,7 +53,7 @@
             @(platformShelfNotice
                 ? release.PlatformShelfNoticeSummary
                 : recommendedUsesMacSetupScript
-                        ? "On macOS, the default path is a signed-in install handoff instead of a double-clicked unsigned script. It gives you a Terminal command that starts the guided Mac setup assistant, installs the selected desktop apps, and carries a short-lived install ticket instead of exposing the link in the command URL."
+                        ? "On macOS, the default path is the signed-in install handoff. It gives you one Terminal command for your personalized install."
                     : guestGateRequired
                         ? release.GuestGateSummary
                         : "Advanced builds, manual packages, and release details stay collapsed underneath.")
@@ -127,9 +127,15 @@ else
                 {
                     <p class="downloads-inline-note">
                         @(recommendedUsesMacSetupScript
-                            ? "Open the Mac install handoff, copy the Terminal command, and paste it into Terminal. It starts a guided Mac setup assistant that lets you choose which Chummer apps to install, where to install them, and whether to open them when it finishes."
+                            ? "Open the Mac install handoff, copy the Terminal command, and run it in Terminal."
                             : "After install, open Chummer and use Load Demo Runner to inspect the bundled Soma-Career.chum5 sample before starting blank.")
                     </p>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--ghost" href="/now">Current release proof</a>
+                        <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
+                        <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                    </div>
+                    <p class="muted-copy">Proof, known issues, and install help stay attached to this same release rail before you commit this machine.</p>
                 }
                 @if (hasAdvancedPanels)
                 {

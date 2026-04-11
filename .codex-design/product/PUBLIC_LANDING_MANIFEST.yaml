@@ -192,15 +192,6 @@ public_routes:
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: static markdown instructions only
-  - path: /downloads/release-upload/bootstrap.sh
-    title: Signed-in release upload bootstrap script
-    audience: public
-    purpose: artifact_support_file
-    requires_auth: false
-    guest_fallback: /downloads/release-upload/bootstrap.sh
-    must_exist: true
-    placeholder_allowed: false
-    placeholder_requirements: release upload bootstrap script endpoint
   - path: /artifacts/explanation-receipt-trail
     title: Explanation receipt trail detail
     audience: public
@@ -491,15 +482,6 @@ registered_routes:
     must_exist: true
     placeholder_allowed: true
     placeholder_requirements: signed-in participation flow
-  - path: /downloads/release-upload
-    title: Signed-in release upload handoff
-    audience: registered
-    purpose: release_publish
-    requires_auth: true
-    guest_fallback: /login?next=/downloads/release-upload
-    must_exist: true
-    placeholder_allowed: false
-    placeholder_requirements: signed-in release handoff for authenticated artifact publishing
 sections:
   - id: hero
     eyebrow: Explainable Shadowrun

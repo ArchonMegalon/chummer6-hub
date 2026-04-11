@@ -47,6 +47,7 @@ A low-friction "something feels off", "this is confusing", or "please build this
 A user-reviewable attachment bundle created by the client.
 It defaults to redacted and safe metadata.
 Full diagnostics remain explicit opt-in.
+Crash-triggered temporary debug uplift may still exist as a narrow recovery exception, but the next-launch recovery UI must offer an opt-out and remember if the user declines future crash-triggered debug capture.
 
 ### Support case
 
@@ -83,6 +84,7 @@ Phase-1 expectations:
 
 * local interception of managed unexpected-failure paths where possible
 * next-launch recovery dialog
+* crash-triggered temporary debug uplift may be auto-armed for the immediate reopen, but the recovery dialog must offer a remembered opt-out
 * private send/review/don't-send choice
 * redacted diagnostics bundle creation
 * offline spool and retry when transport is unavailable
@@ -153,6 +155,18 @@ Automatic forwarding for triage is allowed, but the boundary stays clean:
 
 That does not make Fleet the support database, and it does not allow direct client-to-Fleet raw crash transport as the primary seam.
 Any user-visible repair still ships through the standard review, release, registry, and updater path.
+
+## Crash-triggered debug uplift rule
+
+Crash-focused debug uplift is not general always-on telemetry.
+
+The rule is:
+
+1. full diagnostics and manual debug uplift remain explicit opt-in
+2. after a crash, the crash handler may temporarily arm a crash-debug window for the immediate recovery reopen
+3. the recovery UI must say that this happened because Chummer crashed
+4. the user must get one clear opt-out that disables future crash-triggered debug uplift and remembers that decision
+5. declining crash-triggered debug uplift must not block crash reporting, recovery guidance, or the ability to reopen and continue
 
 ## Canonical split
 
