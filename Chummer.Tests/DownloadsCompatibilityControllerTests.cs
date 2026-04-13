@@ -176,7 +176,29 @@ public sealed class DownloadsCompatibilityControllerTests
         var file = Assert.IsType<PhysicalFileResult>(result);
         Assert.EndsWith("proof/windows/chummer-avalonia-win-x64-installer.exe", file.FileName, StringComparison.Ordinal);
         Assert.Equal("chummer-avalonia-win-x64-installer.exe", file.FileDownloadName);
-        Assert.Equal("no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
+        Assert.Equal("private, no-store, max-age=0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
+        Assert.Equal("no-cache", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Pragma.ToString());
+        Assert.Equal("0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Expires.ToString());
+        Assert.Equal("proof-only", fixture.Controller.ControllerContext.HttpContext.Response.Headers["X-Chummer-Install-Tier"].ToString());
+    }
+
+    [Fact]
+    public void WindowsProofInstallerArtifactRouteServesStagedFile()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = fixture.Controller.DownloadWindowsProofInstallerByArtifactId("avalonia-win-x64-installer");
+
+        var file = Assert.IsType<PhysicalFileResult>(result);
+        Assert.EndsWith("proof/windows/chummer-avalonia-win-x64-installer.exe", file.FileName, StringComparison.Ordinal);
+        Assert.Equal("chummer-avalonia-win-x64-installer.exe", file.FileDownloadName);
+        Assert.Equal("private, no-store, max-age=0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
+        Assert.Equal("no-cache", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Pragma.ToString());
+        Assert.Equal("0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Expires.ToString());
         Assert.Equal("proof-only", fixture.Controller.ControllerContext.HttpContext.Response.Headers["X-Chummer-Install-Tier"].ToString());
     }
 
@@ -188,6 +210,37 @@ public sealed class DownloadsCompatibilityControllerTests
         IActionResult result = fixture.Controller.DownloadWindowsProofInstaller("../outside.exe");
 
         Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public void WindowsProofInstallerArtifactRouteRejectsUnknownArtifact()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.DownloadWindowsProofInstallerByArtifactId("avalonia-win-arm64-installer");
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public void WindowsProofInstallerRoutesRejectPayloadlessInstaller()
+    {
+        using Fixture fixture = new();
+        File.WriteAllBytes(
+            Path.Combine(fixture.ProofRoot, "chummer-avalonia-win-x64-installer.exe"),
+            "payload-missing"u8.ToArray());
+
+        IActionResult fileResult = fixture.Controller.DownloadWindowsProofInstaller("chummer-avalonia-win-x64-installer.exe");
+        IActionResult artifactResult = fixture.Controller.DownloadWindowsProofInstallerByArtifactId("avalonia-win-x64-installer");
+        IActionResult catalogResult = fixture.Controller.WindowsProofInstallers();
+
+        Assert.IsType<NotFoundResult>(fileResult);
+        Assert.IsType<NotFoundResult>(artifactResult);
+
+        var ok = Assert.IsType<OkObjectResult>(catalogResult);
+        string payload = JsonSerializer.Serialize(ok.Value);
+        Assert.DoesNotContain("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
+        Assert.Contains("chummer-blazor-desktop-win-x64-installer.exe", payload, StringComparison.Ordinal);
     }
 
     private sealed class Fixture : IDisposable
@@ -204,8 +257,8 @@ public sealed class DownloadsCompatibilityControllerTests
             Directory.CreateDirectory(proofRoot);
             File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-osx-x64-installer.dmg"), "mac-preview"u8.ToArray());
             File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-win-x64-installer.exe"), "win-preview"u8.ToArray());
-            File.WriteAllBytes(Path.Combine(proofRoot, "chummer-avalonia-win-x64-installer.exe"), "proof-win-avalonia"u8.ToArray());
-            File.WriteAllBytes(Path.Combine(proofRoot, "chummer-blazor-desktop-win-x64-installer.exe"), "proof-win-blazor"u8.ToArray());
+            WriteProofInstaller(Path.Combine(proofRoot, "chummer-avalonia-win-x64-installer.exe"), "avalonia");
+            WriteProofInstaller(Path.Combine(proofRoot, "chummer-blazor-desktop-win-x64-installer.exe"), "blazor-desktop");
             File.WriteAllText(
                 Path.Combine(downloadsRoot, "releases.json"),
                 """
@@ -319,6 +372,8 @@ public sealed class DownloadsCompatibilityControllerTests
 
         public IConfiguration Configuration { get; }
 
+        public string ProofRoot => Path.Combine(_root, "downloads", "proof", "windows");
+
         public PublicReleaseManifestService ManifestService { get; }
 
         public ReleaseSelectionService ReleaseSelection { get; }
@@ -335,6 +390,14 @@ public sealed class DownloadsCompatibilityControllerTests
             {
                 Directory.Delete(_root, recursive: true);
             }
+        }
+
+        private static void WriteProofInstaller(string path, string head)
+        {
+            File.WriteAllBytes(
+                path,
+                System.Text.Encoding.UTF8.GetBytes(
+                    $"stub-{head}-binary\0ChummerInstaller.Payload.zip\0Samples/Legacy/Soma-Career.chum5\0tail"));
         }
     }
 }

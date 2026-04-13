@@ -48,6 +48,7 @@ public sealed class PublicLandingController : Controller
     private readonly InstallBootstrapTicketService _installBootstrapTickets;
     private readonly PersonalizedInstallScriptService _personalizedInstallScripts;
     private readonly ReleaseUploadTicketService _releaseUploadTickets;
+    private readonly WindowsProofInstallerService _windowsProofInstallers;
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly ILogger<PublicLandingController> _logger;
 
@@ -76,6 +77,7 @@ public sealed class PublicLandingController : Controller
         InstallBootstrapTicketService installBootstrapTickets,
         PersonalizedInstallScriptService personalizedInstallScripts,
         ReleaseUploadTicketService releaseUploadTickets,
+        WindowsProofInstallerService windowsProofInstallers,
         IWebHostEnvironment webHostEnvironment,
         ILogger<PublicLandingController> logger)
     {
@@ -103,6 +105,7 @@ public sealed class PublicLandingController : Controller
         _installBootstrapTickets = installBootstrapTickets;
         _personalizedInstallScripts = personalizedInstallScripts;
         _releaseUploadTickets = releaseUploadTickets;
+        _windowsProofInstallers = windowsProofInstallers;
         _webHostEnvironment = webHostEnvironment;
         _logger = logger;
     }
@@ -280,7 +283,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/downloads/release-upload/bootstrap.sh")]
-    [Produces("text/plain")]
+    [Produces("text/x-shellscript", "application/problem+json")]
     public IActionResult ReleaseUploadBootstrapScript([FromQuery] string? ticket, [FromQuery] string? apiToken)
     {
         if (!TryResolveReleaseUploadToken(ticket, apiToken, out string? uploadToken))
@@ -353,7 +356,13 @@ public sealed class PublicLandingController : Controller
         var (manifest, artifact) = ResolveInstallDispatchArtifact(artifactId);
         if (artifact is null)
         {
-            return NotFound();
+            WindowsProofInstallerRecord? proofInstaller = _windowsProofInstallers.FindByArtifactId(artifactId);
+            if (proofInstaller is null)
+            {
+                return NotFound();
+            }
+
+            return await BuildWindowsProofDispatchPageAsync(artifactId, proofInstaller, manifest, cancellationToken);
         }
 
         try
@@ -426,6 +435,7 @@ public sealed class PublicLandingController : Controller
                 : null;
             var model = new DownloadDispatchPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome("Download handoff", "Start the installer download and keep the install linked to this account from the first launch.", "/downloads", user.DisplayName),
+                Eyebrow: "Signed-in download",
                 Heading: bootstrapScriptDownload
                     ? BuildDispatchHeading(release.SignedInDispatchHeading, bootstrapPlatform)
                     : release.SignedInDispatchHeading,
@@ -465,6 +475,7 @@ public sealed class PublicLandingController : Controller
                 Steps: steps,
                 TrustPulse: BuildPublicTrustPulsePanel(manifest, release),
                 SignedInStatus: _signedInTrustStatus.Build(user, manifest, release));
+            ApplyNoStoreHeaders(Response.Headers);
             return View("~/Views/PublicLanding/DownloadDispatch.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -478,8 +489,78 @@ public sealed class PublicLandingController : Controller
         }
     }
 
+    private async Task<IActionResult> BuildWindowsProofDispatchPageAsync(
+        string artifactId,
+        WindowsProofInstallerRecord proofInstaller,
+        PublicReleaseManifestDto manifest,
+        CancellationToken cancellationToken)
+    {
+        bool authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync(
+            "Windows proof installer",
+            "Proof-only Windows installer handoff while the promoted Windows shelf is still waiting on current startup-smoke evidence.",
+            $"/downloads/install/{artifactId}",
+            cancellationToken);
+        var release = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        string headLabel = string.Equals(proofInstaller.Head, "blazor-desktop", StringComparison.OrdinalIgnoreCase)
+            ? "Blazor Desktop"
+            : "Avalonia Desktop";
+        var model = new DownloadDispatchPageViewModel(
+            Chrome: chrome,
+            Eyebrow: "Windows proof install",
+            Heading: $"{headLabel} Windows setup",
+            Summary: "This Windows installer is available on the proof rail. It is downloadable from chummer.run, but it is not yet on the promoted public shelf.",
+            DispatchNote: "Use this when you need the current Windows build directly. Promotion is still blocked on current Windows startup-smoke evidence, so this route stays explicitly proof-only.",
+            ArtifactTitle: $"{headLabel} Windows x64 installer",
+            ArtifactSupportLine: "Proof-only Windows installer. Treat it as the current validation build, not the promoted release rail.",
+            DownloadHref: $"/downloads/install/{Uri.EscapeDataString(artifactId)}/proof",
+            DownloadLabel: "Download proof installer",
+            TerminalInstallCommand: null,
+            BootstrapCommandLabel: null,
+            BootstrapCommandIntro: null,
+            BootstrapCommandNote: null,
+            CopyCommandLabel: "Copy command",
+            CompactDispatchLayout: false,
+            BootstrapFeatureCards: Array.Empty<DownloadDispatchFeatureCardViewModel>(),
+            AutoStartDownload: true,
+            BootstrapScriptDownload: false,
+            PromoteSecondaryDownload: false,
+            SecondaryDownloadHref: proofInstaller.DownloadUrl,
+            SecondaryDownloadLabel: "Direct proof file",
+            AccountHref: "/downloads",
+            AccountLabel: "Back to downloads",
+            HelpHref: release.InstallHelpHref,
+            HelpLabel: release.InstallHelpLabel,
+            Display: release.Display,
+            Channel: manifest.Channel,
+            Version: manifest.Version,
+            CurrentReleaseSummary: "Windows is on the proof rail; macOS remains the promoted signed-in preview route.",
+            PlatformLabel: "Windows x64",
+            HeadLabel: headLabel,
+            ClaimExchangeUrl: null,
+            ClaimCode: null,
+            ClaimCodeExpiresAtUtc: null,
+            Steps:
+            [
+                "Download the proof-only installer directly from this page.",
+                "Install and validate the current Windows build.",
+                "Use the install-help and support surfaces if you hit proof-only regressions."
+            ],
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, release),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, release, cancellationToken));
+        ApplyNoStoreHeaders(Response.Headers);
+        return View("~/Views/PublicLanding/DownloadDispatch.cshtml", model);
+    }
+
+    private static void ApplyNoStoreHeaders(IHeaderDictionary headers)
+    {
+        headers["Cache-Control"] = "private, no-store, max-age=0";
+        headers["Pragma"] = "no-cache";
+        headers["Expires"] = "0";
+    }
+
     [HttpGet("/downloads/install/{artifactId}/bootstrap.command")]
-    [Produces("text/plain")]
+    [Produces("text/x-shellscript", "application/problem+json")]
     public async Task<IActionResult> DownloadDispatchBootstrapScript([FromRoute] string artifactId, CancellationToken cancellationToken)
     {
         var (context, failure) = await TryBuildGuidedBootstrapContextAsync(artifactId, "macos", cancellationToken);
@@ -509,7 +590,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/install-{scriptId}.sh")]
-    [Produces("text/plain")]
+    [Produces("text/x-shellscript", "application/problem+json")]
     public IActionResult DownloadDispatchPersonalizedMacBootstrapScript([FromRoute] string scriptId)
     {
         PersonalizedInstallScriptConsumeResult consume = _personalizedInstallScripts.Consume(scriptId);
@@ -588,7 +669,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/downloads/install/{artifactId}/bootstrap.ps1")]
-    [Produces("text/plain")]
+    [Produces("text/plain", "application/problem+json")]
     public async Task<IActionResult> DownloadDispatchWindowsBootstrapScript([FromRoute] string artifactId, CancellationToken cancellationToken)
     {
         var (context, failure) = await TryBuildGuidedBootstrapContextAsync(artifactId, "windows", cancellationToken);
@@ -612,7 +693,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/downloads/install/{artifactId}/bootstrap.sh")]
-    [Produces("text/plain")]
+    [Produces("text/x-shellscript", "application/problem+json")]
     public async Task<IActionResult> DownloadDispatchLinuxBootstrapScript([FromRoute] string artifactId, CancellationToken cancellationToken)
     {
         var (context, failure) = await TryBuildGuidedBootstrapContextAsync(artifactId, "linux", cancellationToken);

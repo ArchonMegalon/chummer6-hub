@@ -1,5 +1,7 @@
+using System.Reflection;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Contracts.PublicSurface;
+using Microsoft.AspNetCore.Mvc;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -238,6 +240,23 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Equal(
             "set -o pipefail; curl -fsSL 'https://chummer.run/install-abc123def456.sh' | /bin/bash",
             command);
+    }
+
+    [Theory]
+    [InlineData(nameof(PublicLandingController.ReleaseUploadBootstrapScript))]
+    [InlineData(nameof(PublicLandingController.DownloadDispatchBootstrapScript))]
+    [InlineData(nameof(PublicLandingController.DownloadDispatchPersonalizedMacBootstrapScript))]
+    [InlineData(nameof(PublicLandingController.DownloadDispatchWindowsBootstrapScript))]
+    [InlineData(nameof(PublicLandingController.DownloadDispatchLinuxBootstrapScript))]
+    public void BootstrapEndpointsAdvertiseProblemJsonForFailureNegotiation(string methodName)
+    {
+        MethodInfo method = typeof(PublicLandingController).GetMethod(methodName)
+            ?? throw new InvalidOperationException($"missing controller method {methodName}");
+
+        ProducesAttribute produces = method.GetCustomAttribute<ProducesAttribute>()
+            ?? throw new InvalidOperationException($"missing ProducesAttribute on {methodName}");
+
+        Assert.Contains("application/problem+json", produces.ContentTypes, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]

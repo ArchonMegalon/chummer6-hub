@@ -96,13 +96,37 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return NotFound();
         }
 
-        Response.Headers["Cache-Control"] = "no-store";
-        Response.Headers["X-Chummer-Install-Tier"] = "proof-only";
+        ApplyProofInstallerHeaders(Response.Headers);
         return PhysicalFile(
             installer.FilePath,
             "application/octet-stream",
             installer.FileName,
             enableRangeProcessing: true);
+    }
+
+    [HttpGet("/downloads/install/{artifactId}/proof")]
+    public IActionResult DownloadWindowsProofInstallerByArtifactId([FromRoute] string artifactId)
+    {
+        var installer = _windowsProofInstallers.FindByArtifactId(artifactId);
+        if (installer is null)
+        {
+            return NotFound();
+        }
+
+        ApplyProofInstallerHeaders(Response.Headers);
+        return PhysicalFile(
+            installer.FilePath,
+            "application/octet-stream",
+            installer.FileName,
+            enableRangeProcessing: true);
+    }
+
+    private static void ApplyProofInstallerHeaders(IHeaderDictionary headers)
+    {
+        headers["Cache-Control"] = "private, no-store, max-age=0";
+        headers["Pragma"] = "no-cache";
+        headers["Expires"] = "0";
+        headers["X-Chummer-Install-Tier"] = "proof-only";
     }
 
     [HttpGet("/downloads/get/{artifactId}")]

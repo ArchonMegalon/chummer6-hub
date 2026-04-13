@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 
 namespace Chummer.Run.Api.Services;
 
@@ -11,6 +12,11 @@ public sealed class WindowsProofInstallerService
     {
         "chummer-avalonia-win-x64-installer.exe",
         "chummer-blazor-desktop-win-x64-installer.exe"
+    };
+    private static readonly byte[][] RequiredEmbeddedPayloadMarkers =
+    {
+        Encoding.UTF8.GetBytes("ChummerInstaller.Payload.zip"),
+        Encoding.UTF8.GetBytes("Samples/Legacy/Soma-Career.chum5")
     };
 
     private readonly IConfiguration _configuration;
@@ -56,6 +62,11 @@ public sealed class WindowsProofInstallerService
             return null;
         }
 
+        if (!HasEmbeddedPayloadMarkers(proofFilePath))
+        {
+            return null;
+        }
+
         var info = new FileInfo(proofFilePath);
         return new WindowsProofInstallerRecord(
             FileName: allowedFileName,
@@ -65,7 +76,26 @@ public sealed class WindowsProofInstallerService
             Sha256: ComputeSha256(proofFilePath),
             SizeBytes: info.Length,
             UpdatedAtUtc: info.LastWriteTimeUtc,
-            DownloadUrl: $"/downloads/proof/windows/{Uri.EscapeDataString(allowedFileName)}");
+            DownloadUrl: $"/downloads/proof/windows/{Uri.EscapeDataString(allowedFileName)}",
+            ArtifactId: ResolveArtifactId(allowedFileName));
+    }
+
+    public WindowsProofInstallerRecord? FindByArtifactId(string? artifactId)
+    {
+        string normalizedArtifactId = NormalizeArtifactId(artifactId);
+        if (string.IsNullOrWhiteSpace(normalizedArtifactId))
+        {
+            return null;
+        }
+
+        string? fileName = normalizedArtifactId switch
+        {
+            "avalonia-win-x64-installer" => "chummer-avalonia-win-x64-installer.exe",
+            "blazor-desktop-win-x64-installer" => "chummer-blazor-desktop-win-x64-installer.exe",
+            _ => null,
+        };
+
+        return fileName is null ? null : FindByFileName(fileName);
     }
 
     private string? ResolveProofFilePath(string fileName)
@@ -105,19 +135,34 @@ public sealed class WindowsProofInstallerService
     private static string NormalizeFileName(string? fileName)
         => Path.GetFileName((fileName ?? string.Empty).Trim());
 
+    private static string NormalizeArtifactId(string? artifactId)
+        => (artifactId ?? string.Empty).Trim().ToLowerInvariant();
+
     private static string ResolveHeadLabel(string fileName)
         => fileName.Contains("blazor-desktop", StringComparison.OrdinalIgnoreCase)
             ? "blazor-desktop"
             : "avalonia";
+
+    private static string ResolveArtifactId(string fileName)
+        => fileName.Contains("blazor-desktop", StringComparison.OrdinalIgnoreCase)
+            ? "blazor-desktop-win-x64-installer"
+            : "avalonia-win-x64-installer";
 
     private static string ComputeSha256(string path)
     {
         using var stream = File.OpenRead(path);
         return Convert.ToHexStringLower(SHA256.HashData(stream));
     }
+
+    private static bool HasEmbeddedPayloadMarkers(string path)
+    {
+        byte[] bytes = File.ReadAllBytes(path);
+        return RequiredEmbeddedPayloadMarkers.All(marker => bytes.AsSpan().IndexOf(marker) >= 0);
+    }
 }
 
 public sealed record WindowsProofInstallerRecord(
+    string ArtifactId,
     string FileName,
     string Head,
     string Rid,
