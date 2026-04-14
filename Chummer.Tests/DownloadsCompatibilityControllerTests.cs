@@ -4,6 +4,7 @@ using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
@@ -13,6 +14,38 @@ namespace Chummer.Tests;
 
 public sealed class DownloadsCompatibilityControllerTests
 {
+    [Fact]
+    public void WindowsProofInstallerRoutes_Advertise_Head_And_Get_For_Probe_Safe_Binary_Downloads()
+    {
+        var byFile = typeof(DownloadsCompatibilityController).GetMethod(nameof(DownloadsCompatibilityController.DownloadWindowsProofInstaller));
+        Assert.NotNull(byFile);
+
+        var byArtifact = typeof(DownloadsCompatibilityController).GetMethod(nameof(DownloadsCompatibilityController.DownloadWindowsProofInstallerByArtifactId));
+        Assert.NotNull(byArtifact);
+
+        var byFileRoutes = byFile!
+            .GetCustomAttributes(typeof(HttpMethodAttribute), inherit: true)
+            .Cast<HttpMethodAttribute>()
+            .ToArray();
+        var byArtifactRoutes = byArtifact!
+            .GetCustomAttributes(typeof(HttpMethodAttribute), inherit: true)
+            .Cast<HttpMethodAttribute>()
+            .ToArray();
+
+        Assert.Contains(byFileRoutes, route =>
+            string.Equals(route.Template, "/downloads/proof/windows/{fileName}", StringComparison.Ordinal)
+            && route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
+        Assert.Contains(byFileRoutes, route =>
+            string.Equals(route.Template, "/downloads/proof/windows/{fileName}", StringComparison.Ordinal)
+            && route.HttpMethods.Contains("HEAD", StringComparer.OrdinalIgnoreCase));
+        Assert.Contains(byArtifactRoutes, route =>
+            string.Equals(route.Template, "/downloads/install/{artifactId}/proof", StringComparison.Ordinal)
+            && route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
+        Assert.Contains(byArtifactRoutes, route =>
+            string.Equals(route.Template, "/downloads/install/{artifactId}/proof", StringComparison.Ordinal)
+            && route.HttpMethods.Contains("HEAD", StringComparer.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public void CanonicalReleaseManifestServesRegistryProjection()
     {

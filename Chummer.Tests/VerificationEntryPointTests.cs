@@ -76,7 +76,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release_channel_version", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_path", script, StringComparison.Ordinal);
         Assert.Contains("release_channel_generated_at", script, StringComparison.Ordinal);
-        Assert.Contains("release-channel receipt status must be pass/passed/ready/published", script, StringComparison.Ordinal);
+        Assert.Contains("release-channel receipt status must be pass/passed/ready/published/unpublished", script, StringComparison.Ordinal);
         Assert.Contains("release-channel channel id drifts from nested receipt", script, StringComparison.Ordinal);
         Assert.Contains("release-channel version drifts from nested receipt", script, StringComparison.Ordinal);
         Assert.Contains("release-channel generated_at drifts from nested receipt generatedAt", script, StringComparison.Ordinal);
@@ -223,11 +223,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("WORKFLOW_GATE_DRIFT_RETRY_MARKER_PREFIX", script, StringComparison.Ordinal);
         Assert.Contains("WORKFLOW_EVIDENCE_TIMESTAMP_DRIFT_MARKER_PREFIX", script, StringComparison.Ordinal);
         Assert.Contains("WORKFLOW_EVIDENCE_TIMESTAMP_DRIFT_MARKER_SUFFIX", script, StringComparison.Ordinal);
+        Assert.Contains("WORKFLOW_RELEASE_CHANNEL_TIMESTAMP_DRIFT_MARKER", script, StringComparison.Ordinal);
+        Assert.Contains("VISUAL_RELEASE_CHANNEL_TIMESTAMP_DRIFT_MARKER", script, StringComparison.Ordinal);
         Assert.Contains("UI_VISUAL_FAMILIARITY_GATE_MATERIALIZER", script, StringComparison.Ordinal);
         Assert.Contains("materialize-desktop-visual-familiarity-exit-gate.sh", script, StringComparison.Ordinal);
         Assert.Contains("VISUAL_REQUIRED_TESTS_ORDER_DRIFT_MARKER", script, StringComparison.Ordinal);
         Assert.Contains("VISUAL_INTERACTION_KEYS_ORDER_DRIFT_MARKER", script, StringComparison.Ordinal);
         Assert.Contains("VISUAL_SCREENSHOTS_ORDER_DRIFT_MARKER", script, StringComparison.Ordinal);
+        Assert.Contains("VISUAL_MISSING_INTERACTION_KEYS_MARKER", script, StringComparison.Ordinal);
         Assert.Contains("milestone-2 workflow/visual release-channel ", script, StringComparison.Ordinal);
         Assert.Contains("evidence generated_at drifts from nested receipt generatedAt", script, StringComparison.Ordinal);
         Assert.Contains("materialize-desktop-workflow-execution-gate.sh", script, StringComparison.Ordinal);
@@ -236,7 +239,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("CHUMMER_DESKTOP_VISUAL_SKIP_RELEASE_GATE_LOCK_WAIT=1", script, StringComparison.Ordinal);
         Assert.Contains("is missing or not readable", script, StringComparison.Ordinal);
         Assert.Contains("sync_workflow_evidence_timestamps_from_nested_receipts", script, StringComparison.Ordinal);
+        Assert.Contains("sync_ui_release_channel_evidence_timestamps_from_nested_receipts", script, StringComparison.Ordinal);
         Assert.Contains("verify note: syncing workflow parity evidence timestamps from nested workflow receipts.", script, StringComparison.Ordinal);
+        Assert.Contains("verify note: syncing UI release-channel evidence timestamps from nested release-channel receipt.", script, StringComparison.Ordinal);
         Assert.Contains("sync_release_channel_localization_gate_timestamp_from_ui_receipt", script, StringComparison.Ordinal);
         Assert.Contains("UI_LOCALIZATION_RELEASE_GATE.generated.json", script, StringComparison.Ordinal);
         Assert.Contains("UI_LOCALIZATION_GATE_TIMESTAMP_STALE_MARKER", script, StringComparison.Ordinal);
@@ -3278,6 +3283,24 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("MIG-091", backlog, StringComparison.Ordinal);
         Assert.Contains("Response.OnStarting", middleware, StringComparison.Ordinal);
         Assert.Contains("IDENTITY_ENABLE_HTTPS_REDIRECTION", identityProgram, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicEdgeProgramForcesNoStoreHeadersForProofAndInstallRoutes()
+    {
+        string programPath = RepoPaths.FromRoot("Chummer.Run.Api", "Program.cs");
+        string program = File.ReadAllText(programPath);
+
+        Assert.Contains("RequiresNoStoreHeaders", program, StringComparison.Ordinal);
+        Assert.Contains("/downloads/proof/windows", program, StringComparison.Ordinal);
+        Assert.Contains("/downloads/install", program, StringComparison.Ordinal);
+        Assert.Contains("/install-", program, StringComparison.Ordinal);
+        Assert.Contains("Cache-Control", program, StringComparison.Ordinal);
+        Assert.Contains("CDN-Cache-Control", program, StringComparison.Ordinal);
+        Assert.Contains("Cloudflare-CDN-Cache-Control", program, StringComparison.Ordinal);
+        Assert.Contains("Surrogate-Control", program, StringComparison.Ordinal);
+        Assert.Contains("no-store, max-age=0", program, StringComparison.Ordinal);
+        Assert.Contains("no-cache", program, StringComparison.Ordinal);
     }
 
     [Fact]

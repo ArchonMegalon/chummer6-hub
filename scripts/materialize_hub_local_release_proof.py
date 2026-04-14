@@ -34,6 +34,7 @@ def main() -> int:
             "build_explain_publish",
             "campaign_session_recover_recap",
             "report_cluster_release_notify",
+            "organize_community_and_close_loop",
         ],
         "proof_routes": [
             "/downloads/install/avalonia-linux-x64-installer",

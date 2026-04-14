@@ -216,6 +216,22 @@ def require_snippet(body: str, snippet: str, path: str) -> None:
         raise AssertionError(f"{path} missing required text: {snippet}")
 
 
+def require_support_progress_mail(payload: dict[str, object], stage_id: str) -> dict[str, object]:
+    for item in payload.get("timeline") or []:
+        if not isinstance(item, dict):
+            continue
+        metadata = item.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            continue
+        if str(metadata.get("email_stage_id") or "") != stage_id:
+            continue
+        if str(metadata.get("email_state") or "") != "sent":
+            raise AssertionError(f"support progress mail '{stage_id}' did not record a sent receipt")
+        return item
+
+    raise AssertionError(f"support progress mail '{stage_id}' is missing from the support-case timeline")
+
+
 def is_public_creator_publication_path(path: str) -> bool:
     lowered = path.lower()
     return "/artifacts/publications/" in lowered or "/artifacts/creator/" in lowered
@@ -776,6 +792,10 @@ def verify_signed_in_work_audit(
     support_case_id = str(support_case.get("caseId") or "")
     if not support_case_id:
         raise AssertionError("support case submission did not expose a case id")
+    request_received_mail = require_support_progress_mail(support_case, "request_received")
+    request_received_metadata = request_received_mail.get("metadata") or {}
+    if not isinstance(request_received_metadata, dict) or str(request_received_metadata.get("from_email") or "") != "wageslave@chummer.run":
+        raise AssertionError("support request-received mail did not use the wageslave@chummer.run sender")
     support_detail_path = f"/account/support/{quote(support_case_id, safe='')}"
     assistant_case_payload = json.dumps(
         {
@@ -806,7 +826,120 @@ def verify_signed_in_work_audit(
     case_truth_actions = [item for item in case_truth_assistant.get("actions") or [] if isinstance(item, dict)]
     if not any(str(item.get("actionId") or "") == "open_account_support" for item in case_truth_actions):
         raise AssertionError("support assistant did not route the newly filed support case back to the signed-in support timeline")
+    rejected_support_case_payload = json.dumps(
+        {
+            "kind": "bug_report",
+            "title": f"{SUPPORT_AUDIT_TITLE} denied",
+            "summary": "The signed-in release note already matches the intended recovery posture.",
+            "detail": f"Please keep the current wording; this report should be denied. Marker {time.time_ns()}.",
+            "installationId": claimed_installation_id,
+            "applicationVersion": "0.0-live-audit",
+            "releaseChannel": "preview",
+            "headId": "avalonia",
+            "platform": "linux",
+            "arch": "x64",
+            "source": "hub_account",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        "/api/v1/support/cases",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=rejected_support_case_payload,
+        request_headers={
+            "Content-Type": "application/json",
+            "Cookie": cookie_header,
+            "RequestVerificationToken": workspace_token,
+        },
+    )
+    if status != 202:
+        raise AssertionError(f"/api/v1/support/cases rejected-path returned {status}: {body[:400]}")
+    rejected_support_case = load_json_object(body, "/api/v1/support/cases rejected-path")
+    rejected_support_case_id = str(rejected_support_case.get("caseId") or "")
+    if not rejected_support_case_id:
+        raise AssertionError("rejected-path support case submission did not expose a case id")
+    rejected_request_mail = require_support_progress_mail(rejected_support_case, "request_received")
+    rejected_request_metadata = rejected_request_mail.get("metadata") or {}
+    if not isinstance(rejected_request_metadata, dict) or str(rejected_request_metadata.get("from_email") or "") != "wageslave@chummer.run":
+        raise AssertionError("rejected-path request-received mail did not use the wageslave@chummer.run sender")
+    rejected_transition_payload = json.dumps(
+        {
+            "targetStatus": "rejected",
+            "note": "Rejected because the current signed-in release note already matches the intended recovery posture.",
+            "actor": "fleet_automation",
+            "decisionOutcome": "denied",
+            "implementationPosture": "not_implemented",
+            "decisionReason": "The reported issue could not be reproduced because the current release and recovery guidance already match the supported flow.",
+            "etaText": "No implementation is planned for this report.",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        f"/api/v1/support/cases/{quote(rejected_support_case_id, safe='')}/transition",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=rejected_transition_payload,
+        request_headers={
+            "Authorization": f"Bearer {internal_token}",
+            "Content-Type": "application/json",
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/support/cases/{rejected_support_case_id}/transition rejected returned {status}: {body[:400]}")
+    rejected_case = load_json_object(body, f"/api/v1/support/cases/{rejected_support_case_id}/transition rejected")
+    if rejected_case.get("status") != "rejected":
+        raise AssertionError("rejected-path support case did not enter rejected")
+    denied_decision_mail = require_support_progress_mail(rejected_case, "audited_decision")
+    denied_decision_metadata = denied_decision_mail.get("metadata") or {}
+    if not isinstance(denied_decision_metadata, dict):
+        raise AssertionError("support rejected audited-decision mail metadata is missing")
+    if str(denied_decision_metadata.get("award_label") or "") != "Denied":
+        raise AssertionError("support rejected audited-decision mail did not award Denied")
+    if str(denied_decision_metadata.get("decision_outcome") or "") != "denied":
+        raise AssertionError("support rejected audited-decision mail did not preserve the denial outcome")
+    if str(denied_decision_metadata.get("eta_text") or "") != "No implementation is planned for this report.":
+        raise AssertionError("support rejected audited-decision mail did not preserve the explicit no-implementation explanation")
     support_fixed_version = f"0.0-live-audit-fix-{time.time_ns()}"
+    accepted_payload = json.dumps(
+        {
+            "targetStatus": "accepted",
+            "note": "Accepted for the tracked implementation lane.",
+            "actor": "fleet_automation",
+            "decisionOutcome": "approved",
+            "implementationPosture": "will_implement",
+            "decisionReason": "The signed-in support flow reproduced clearly enough to enter the tracked fix path.",
+            "etaText": "Within the next preview drop.",
+        }
+    ).encode("utf-8")
+    status, body, _, _ = fetch(
+        base_url,
+        f"/api/v1/support/cases/{quote(support_case_id, safe='')}/transition",
+        public_host=public_host,
+        forwarded_proto=forwarded_proto,
+        method="POST",
+        body=accepted_payload,
+        request_headers={
+            "Authorization": f"Bearer {internal_token}",
+            "Content-Type": "application/json",
+        },
+    )
+    if status != 200:
+        raise AssertionError(f"/api/v1/support/cases/{support_case_id}/transition accepted returned {status}: {body[:400]}")
+    accepted_case = load_json_object(body, f"/api/v1/support/cases/{support_case_id}/transition accepted")
+    if accepted_case.get("status") != "accepted":
+        raise AssertionError("support case did not enter accepted")
+    audited_decision_mail = require_support_progress_mail(accepted_case, "audited_decision")
+    audited_decision_metadata = audited_decision_mail.get("metadata") or {}
+    if not isinstance(audited_decision_metadata, dict):
+        raise AssertionError("support audited-decision mail metadata is missing")
+    if str(audited_decision_metadata.get("award_label") or "") != "Clad Feedbacker":
+        raise AssertionError("support audited-decision mail did not award Clad Feedbacker")
+    if str(audited_decision_metadata.get("eta_text") or "") != "Within the next preview drop.":
+        raise AssertionError("support audited-decision mail did not preserve the ETA text")
+
     transition_payload = json.dumps(
         {
             "targetStatus": "released_to_reporter_channel",
@@ -865,6 +998,7 @@ def verify_signed_in_work_audit(
             "note": f"Reporter notified that preview {support_fixed_version} contains the fix.",
             "actor": "hub",
             "channel": "account_history",
+            "downloadUrl": "https://chummer.run/downloads",
         }
     ).encode("utf-8")
     status, body, _, _ = fetch(
@@ -884,6 +1018,10 @@ def verify_signed_in_work_audit(
     notified_case = load_json_object(body, f"/api/v1/support/cases/{support_case_id}/notify")
     if notified_case.get("status") != "user_notified":
         raise AssertionError("support case did not enter user_notified")
+    fix_available_mail = require_support_progress_mail(notified_case, "fix_available")
+    fix_available_metadata = fix_available_mail.get("metadata") or {}
+    if not isinstance(fix_available_metadata, dict) or str(fix_available_metadata.get("download_url") or "") != "https://chummer.run/downloads":
+        raise AssertionError("support fix-available mail did not preserve the download route")
 
     status, body, _, _ = fetch(
         base_url,

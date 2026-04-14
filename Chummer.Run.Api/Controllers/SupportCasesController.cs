@@ -3,6 +3,7 @@ using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
+using Chummer.Run.Contracts.Community;
 using Chummer.Control.Contracts.Support;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Cryptography;
@@ -17,6 +18,7 @@ public sealed class SupportCasesController : ControllerBase
 {
     private readonly HubIdentityClient _identity;
     private readonly AccountService _accounts;
+    private readonly IdentityLinkService _links;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly SupportAssistantService _assistant;
@@ -27,6 +29,7 @@ public sealed class SupportCasesController : ControllerBase
     public SupportCasesController(
         HubIdentityClient identity,
         AccountService accounts,
+        IdentityLinkService links,
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
         SupportAssistantService assistant,
@@ -36,6 +39,7 @@ public sealed class SupportCasesController : ControllerBase
     {
         _identity = identity;
         _accounts = accounts;
+        _links = links;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
         _assistant = assistant;
@@ -156,7 +160,14 @@ public sealed class SupportCasesController : ControllerBase
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            SupportCaseProjection created = _supportCases.Submit(user.UserId, subject.SubjectId, request);
+            string? reporterEmail = ResolveReporterEmail(user.UserId, subject.Email, request.ReporterEmail);
+            SupportCaseProjection created = _supportCases.Submit(
+                user.UserId,
+                subject.SubjectId,
+                request with
+                {
+                    ReporterEmail = reporterEmail
+                });
             return AcceptedAtAction(nameof(GetCase), new { caseId = created.CaseId }, created);
         }
         catch (HubRequestAuthException ex)
@@ -203,10 +214,14 @@ public sealed class SupportCasesController : ControllerBase
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            string? reporterEmail = ResolveReporterEmail(user.UserId, subject.Email, request.ReporterEmail);
             SupportCaseProjection created = _supportCases.Submit(
                 user.UserId,
                 subject.SubjectId,
-                request,
+                request with
+                {
+                    ReporterEmail = reporterEmail
+                },
                 await ReadUploadsAsync(attachments, cancellationToken));
             return AcceptedAtAction(nameof(GetCase), new { caseId = created.CaseId }, created);
         }
@@ -426,5 +441,40 @@ public sealed class SupportCasesController : ControllerBase
         }
 
         return uploads;
+    }
+
+    private string? ResolveReporterEmail(string userId, string? subjectEmail, string? requestEmail)
+    {
+        string? explicitEmail = NormalizeOptionalEmail(requestEmail);
+        if (!string.IsNullOrWhiteSpace(explicitEmail))
+        {
+            return explicitEmail;
+        }
+
+        string? identityEmail = NormalizeOptionalEmail(subjectEmail);
+        if (!string.IsNullOrWhiteSpace(identityEmail))
+        {
+            return identityEmail;
+        }
+
+        LinkedIdentityDto? linkedEmail = _links.FindLinkedIdentityForUser(userId, "email");
+        if (linkedEmail is not null
+            && string.Equals(linkedEmail.Status, "verified", StringComparison.OrdinalIgnoreCase))
+        {
+            return NormalizeOptionalEmail(linkedEmail.ProviderSubject) ?? NormalizeOptionalEmail(linkedEmail.DisplayLabel);
+        }
+
+        return null;
+    }
+
+    private static string? NormalizeOptionalEmail(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string normalized = value.Trim();
+        return normalized.Length <= 256 ? normalized : normalized[..256];
     }
 }

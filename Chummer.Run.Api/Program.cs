@@ -62,9 +62,20 @@ app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 app.Use(async (context, next) =>
 {
+    bool requiresNoStore = RequiresNoStoreHeaders(context.Request.Path);
     context.Response.OnStarting(() =>
     {
         context.Response.Headers["X-Robots-Tag"] = SearchRobotsPolicy;
+        if (requiresNoStore)
+        {
+            context.Response.Headers["Cache-Control"] = "private, no-store, max-age=0";
+            context.Response.Headers["CDN-Cache-Control"] = "no-store, max-age=0";
+            context.Response.Headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";
+            context.Response.Headers["Surrogate-Control"] = "no-store";
+            context.Response.Headers["Pragma"] = "no-cache";
+            context.Response.Headers["Expires"] = "0";
+        }
+
         return Task.CompletedTask;
     });
 
@@ -85,3 +96,10 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static bool RequiresNoStoreHeaders(PathString path)
+{
+    return path.StartsWithSegments("/downloads/proof/windows", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
+        || path.Value?.StartsWith("/install-", StringComparison.OrdinalIgnoreCase) == true;
+}

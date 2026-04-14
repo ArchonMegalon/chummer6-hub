@@ -106,6 +106,14 @@ REQUIRED_MARKERS = {
         'TrackedCaseSummary!.FollowUpLaneSummary.Contains("Account > Support"',
         'authenticatedHomeModel.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && item.ClosureSummary.Contains("closure notice"',
     ],
+    "organize_community_and_close_loop": [
+        'homeSource.Contains("/account/work#community-op-league-"',
+        'homeSource.Contains("/account/work#community-op-board-"',
+        'homeSource.Contains("/account/work#community-op-invites-"',
+        'contactSubmittedModel.TrackedCaseSummary!.FollowUpLaneSummary.Contains("Account > Support"',
+        'contactSubmittedModel.TrackedCaseSummary.NextSafeAction.Contains("Update"',
+        'authenticatedHomeModel.CampaignSpine.CommunityOperations.Count >= 1',
+    ],
 }
 
 

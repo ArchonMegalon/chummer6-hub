@@ -231,6 +231,7 @@ public sealed record StatusPageViewModel(
 
 public sealed record DownloadDispatchPageViewModel(
     SiteChromeViewModel Chrome,
+    string Eyebrow,
     string Heading,
     string Summary,
     string DispatchNote,

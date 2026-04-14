@@ -5,12 +5,38 @@ source "$(dirname "$0")/_env.sh"
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+resolve_ui_repo_root() {
+  local explicit_root="${CHUMMER_UI_REPO_ROOT:-}"
+  if [[ -n "$explicit_root" ]]; then
+    echo "$explicit_root"
+    return 0
+  fi
+  local candidate
+  for candidate in \
+    "$ROOT_DIR/../chummer6-ui-finish" \
+    "$ROOT_DIR/../chummer6-ui" \
+    "$ROOT_DIR/../chummer-presentation"
+  do
+    if [[ -d "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  echo "$ROOT_DIR/../chummer6-ui-finish"
+}
+
+UI_REPO_ROOT="$(resolve_ui_repo_root)"
+UI_PUBLISHED_DIR="${CHUMMER_UI_PUBLISHED_DIR:-$UI_REPO_ROOT/.codex-studio/published}"
+UI_WORKFLOW_GATE_RECEIPT="$UI_PUBLISHED_DIR/DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json"
+UI_VISUAL_FAMILIARITY_RECEIPT="$UI_PUBLISHED_DIR/DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json"
 WORKFLOW_GATE_DRIFT_RETRY_MARKER_PREFIX="milestone-2 workflow/visual release-channel "
 WORKFLOW_EVIDENCE_TIMESTAMP_DRIFT_MARKER_PREFIX="workflow receipt "
 WORKFLOW_EVIDENCE_TIMESTAMP_DRIFT_MARKER_SUFFIX=" evidence generated_at drifts from nested receipt generatedAt"
-UI_WORKFLOW_GATE_MATERIALIZER="$ROOT_DIR/../chummer6-ui/scripts/ai/milestones/materialize-desktop-workflow-execution-gate.sh"
-UI_VISUAL_FAMILIARITY_GATE_MATERIALIZER="$ROOT_DIR/../chummer6-ui/scripts/ai/milestones/materialize-desktop-visual-familiarity-exit-gate.sh"
-UI_LOCALIZATION_RELEASE_GATE_RECEIPT="$ROOT_DIR/../chummer6-ui/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
+WORKFLOW_RELEASE_CHANNEL_TIMESTAMP_DRIFT_MARKER="workflow receipt release-channel generated_at drifts from nested receipt generatedAt"
+VISUAL_RELEASE_CHANNEL_TIMESTAMP_DRIFT_MARKER="visual receipt release-channel generated_at drifts from nested receipt generatedAt"
+UI_WORKFLOW_GATE_MATERIALIZER="$UI_REPO_ROOT/scripts/ai/milestones/materialize-desktop-workflow-execution-gate.sh"
+UI_VISUAL_FAMILIARITY_GATE_MATERIALIZER="$UI_REPO_ROOT/scripts/ai/milestones/materialize-desktop-visual-familiarity-exit-gate.sh"
+UI_LOCALIZATION_RELEASE_GATE_RECEIPT="$UI_PUBLISHED_DIR/UI_LOCALIZATION_RELEASE_GATE.generated.json"
 UI_LOCALIZATION_GATE_TIMESTAMP_STALE_MARKER="release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generatedAt is stale"
 UI_LOCALIZATION_GATE_TIMESTAMP_STALE_ALIAS_MARKER="release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generated_at is stale"
 UI_LOCALIZATION_GATE_TIMESTAMP_FUTURE_MARKER="release-channel nested receipt releaseProof.uiLocalizationReleaseGate.generatedAt is in the future"
@@ -22,9 +48,10 @@ RELEASE_PROOF_TIMESTAMP_FUTURE_ALIAS_MARKER="release-channel nested receipt rele
 VISUAL_REQUIRED_TESTS_ORDER_DRIFT_MARKER="visual receipt required_tests must preserve canonical milestone-2 visual test ordering"
 VISUAL_INTERACTION_KEYS_ORDER_DRIFT_MARKER="visual receipt required_legacy_interaction_keys must preserve canonical milestone-2 interaction key ordering"
 VISUAL_SCREENSHOTS_ORDER_DRIFT_MARKER="visual receipt required_screenshots must preserve canonical milestone-2 screenshot ordering"
+VISUAL_MISSING_INTERACTION_KEYS_MARKER="parity audit failed: visual receipt is missing required milestone-2 interaction keys: "
 
 sync_workflow_evidence_timestamps_from_nested_receipts() {
-  python3 - "$ROOT_DIR/../chummer6-ui/.codex-studio/published/DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json" <<'PY'
+  python3 - "$UI_WORKFLOW_GATE_RECEIPT" <<'PY'
 import datetime as dt
 import json
 import sys
@@ -91,7 +118,7 @@ PY
 }
 
 sync_release_channel_localization_gate_timestamp_from_ui_receipt() {
-  python3 - "$ROOT_DIR/../chummer6-ui/.codex-studio/published/DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json" "$UI_LOCALIZATION_RELEASE_GATE_RECEIPT" <<'PY'
+  python3 - "$UI_WORKFLOW_GATE_RECEIPT" "$UI_LOCALIZATION_RELEASE_GATE_RECEIPT" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -148,7 +175,7 @@ PY
 }
 
 sync_release_channel_proof_timestamp_from_release_channel_receipt() {
-  python3 - "$ROOT_DIR/../chummer6-ui/.codex-studio/published/DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json" <<'PY'
+  python3 - "$UI_WORKFLOW_GATE_RECEIPT" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -195,6 +222,72 @@ print(str(release_channel_path))
 PY
 }
 
+sync_ui_release_channel_evidence_timestamps_from_nested_receipts() {
+  python3 - "$UI_WORKFLOW_GATE_RECEIPT" "$UI_VISUAL_FAMILIARITY_RECEIPT" <<'PY'
+import datetime as dt
+import json
+import sys
+from pathlib import Path
+
+UTC = dt.timezone.utc
+
+
+def parse_generated_at(raw_value: str, *, source: Path) -> dt.datetime:
+    try:
+        parsed = dt.datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise SystemExit(
+            f"release-channel generated_at/generatedAt is invalid: {source} ({raw_value})"
+        ) from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+for receipt_path_raw in sys.argv[1:]:
+    receipt_path = Path(receipt_path_raw)
+    if not receipt_path.is_file():
+        raise SystemExit(f"UI parity receipt is missing: {receipt_path}")
+
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    evidence = receipt.get("evidence")
+    if not isinstance(evidence, dict):
+        raise SystemExit(f"UI parity receipt evidence is missing: {receipt_path}")
+
+    release_channel_path_text = (
+        evidence.get("release_channel_path")
+        or evidence.get("releaseChannelPath")
+        or ""
+    )
+    release_channel_path = Path(str(release_channel_path_text).strip())
+    if not release_channel_path_text or not release_channel_path.is_file():
+        raise SystemExit(
+            f"UI parity receipt evidence does not point to a readable release-channel receipt: {release_channel_path_text!r}"
+        )
+
+    release_channel = json.loads(release_channel_path.read_text(encoding="utf-8"))
+    release_channel_generated_at = (
+        release_channel.get("generated_at")
+        or release_channel.get("generatedAt")
+        or ""
+    )
+    if not isinstance(release_channel_generated_at, str) or not release_channel_generated_at.strip():
+        raise SystemExit(
+            f"release-channel generated_at/generatedAt is missing: {release_channel_path}"
+        )
+
+    generated_at_utc = parse_generated_at(
+        release_channel_generated_at.strip(),
+        source=release_channel_path,
+    )
+    age_seconds = int((dt.datetime.now(UTC) - generated_at_utc).total_seconds())
+    evidence["release_channel_generated_at"] = release_channel_generated_at.strip()
+    evidence["release_channel_age_seconds"] = max(0, age_seconds)
+    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    print(str(receipt_path))
+PY
+}
+
 run_gate_materializer_script() {
   local script_path="$1"
   local failure_label="$2"
@@ -224,11 +317,19 @@ run_ui_parity_audit_with_workflow_gate_retry() {
   fi
   if grep -Fq "$VISUAL_REQUIRED_TESTS_ORDER_DRIFT_MARKER" "$parity_log" \
     || grep -Fq "$VISUAL_INTERACTION_KEYS_ORDER_DRIFT_MARKER" "$parity_log" \
-    || grep -Fq "$VISUAL_SCREENSHOTS_ORDER_DRIFT_MARKER" "$parity_log"; then
+    || grep -Fq "$VISUAL_SCREENSHOTS_ORDER_DRIFT_MARKER" "$parity_log" \
+    || grep -Fq "$VISUAL_MISSING_INTERACTION_KEYS_MARKER" "$parity_log"; then
     echo "verify note: rematerializing desktop visual familiarity exit gate after canonical ordering drift." >&2
     CHUMMER_DESKTOP_VISUAL_SKIP_RELEASE_GATE_LOCK_WAIT=1 run_gate_materializer_script \
       "$UI_VISUAL_FAMILIARITY_GATE_MATERIALIZER" \
       "visual familiarity gate materializer"
+    bash scripts/audit-ui-parity.sh
+    return $?
+  fi
+  if grep -Fq "$WORKFLOW_RELEASE_CHANNEL_TIMESTAMP_DRIFT_MARKER" "$parity_log" \
+    || grep -Fq "$VISUAL_RELEASE_CHANNEL_TIMESTAMP_DRIFT_MARKER" "$parity_log"; then
+    echo "verify note: syncing UI release-channel evidence timestamps from nested release-channel receipt." >&2
+    sync_ui_release_channel_evidence_timestamps_from_nested_receipts
     bash scripts/audit-ui-parity.sh
     return $?
   fi
@@ -291,11 +392,12 @@ fi
 mv "$parity_oracle_backup" "$parity_oracle_path"
 
 release_channel_path="$(
-python3 - <<'PY'
+python3 - "$UI_WORKFLOW_GATE_RECEIPT" <<'PY'
 import json
+import sys
 from pathlib import Path
 
-receipt = Path("/docker/chummercomplete/chummer6-ui/.codex-studio/published/DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json")
+receipt = Path(sys.argv[1])
 payload = json.loads(receipt.read_text(encoding="utf-8"))
 evidence = payload.get("evidence") or {}
 print(str(evidence.get("release_channel_path") or evidence.get("releaseChannelPath") or ""))
@@ -596,6 +698,7 @@ payload["releaseProof"]["journeysPassed"] = [
     "build_explain_publish",
     "campaign_session_recover_recap",
     "report_cluster_release_notify",
+    "organize_community_and_close_loop",
 ]
 payload["releaseProof"]["journeys_passed"] = ["install_claim_restore_continue"]
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -993,6 +1096,7 @@ payload["releaseProof"]["journeysPassed"] = [
     "build_explain_publish",
     "campaign_session_recover_recap",
     "report_cluster_release_notify",
+    "organize_community_and_close_loop",
     "install_claim_restore_continue",
 ]
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -1037,6 +1141,7 @@ payload["releaseProof"]["journeysPassed"] = [
     "build_explain_publish",
     "campaign_session_recover_recap",
     "report_cluster_release_notify",
+    "organize_community_and_close_loop",
     "bonus-noncanonical-journey",
 ]
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -1858,6 +1963,7 @@ payload["releaseProof"]["journeysPassed"] = [
     "build_explain_publish",
     "campaign_session_recover_recap",
     "report_cluster_release_notify",
+    "organize_community_and_close_loop",
 ]
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
@@ -1882,6 +1988,7 @@ payload["releaseProof"]["journeysPassed"] = [
     42,
     "campaign_session_recover_recap",
     "report_cluster_release_notify",
+    "organize_community_and_close_loop",
 ]
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
@@ -1906,6 +2013,7 @@ payload["releaseProof"]["journeysPassed"] = [
     "build_explain_publish",
     "campaign_session_recover_recap",
     "report_cluster_release_notify",
+    "organize_community_and_close_loop",
 ]
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
@@ -2092,13 +2200,13 @@ if bash scripts/audit-ui-parity.sh; then
 fi
 mv "$release_channel_backup" "$release_channel_path"
 
-visual_receipt_path="$ROOT_DIR/../chummer6-ui/.codex-studio/published/DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json"
+visual_receipt_path="$UI_VISUAL_FAMILIARITY_RECEIPT"
 if [[ ! -f "$visual_receipt_path" ]]; then
   echo "verify gate failed: expected visual familiarity receipt at $visual_receipt_path" >&2
   exit 1
 fi
 
-workflow_receipt_path="$ROOT_DIR/../chummer6-ui/.codex-studio/published/DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json"
+workflow_receipt_path="$UI_WORKFLOW_GATE_RECEIPT"
 if [[ ! -f "$workflow_receipt_path" ]]; then
   echo "verify gate failed: expected workflow execution receipt at $workflow_receipt_path" >&2
   exit 1

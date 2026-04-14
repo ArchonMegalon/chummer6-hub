@@ -347,6 +347,7 @@ if [[ "$RUNBOOK_MODE" == "desktop-gate" ]]; then
   require_path "scripts/generate-parity-checklist.sh"
   require_path "scripts/check-host-gate-prereqs.sh"
   require_path "scripts/runbook-strict-host-gates.sh"
+  require_path "scripts/publish-download-bundle-http.sh"
   require_path "docs/SELF_HOSTED_DOWNLOADS_RUNBOOK.md"
   require_path "docs/ACTIVE_HEAD_RELEASE_ARTIFACTS.md"
 
@@ -372,12 +373,14 @@ if [[ "$RUNBOOK_MODE" == "desktop-gate" ]]; then
   require_match "RUNBOOK_MODE\" == \"host-prereqs\"" "scripts/runbook.sh"
   require_match "RUNBOOK_MODE\" == \"downloads-sync\"" "scripts/runbook.sh"
   require_match "RUNBOOK_MODE\" == \"downloads-sync-s3\"" "scripts/runbook.sh"
+  require_match "RUNBOOK_MODE\" == \"downloads-upload-http\"" "scripts/runbook.sh"
   require_match "RUNBOOK_MODE\" == \"parity-checklist\"" "scripts/runbook.sh"
   require_match "RUNBOOK_MODE\" == \"amend-checksums\"" "scripts/runbook.sh"
   require_match "bash scripts/generate-releases-manifest.sh" "scripts/runbook.sh"
   require_match "bash scripts/generate-parity-checklist.sh" "scripts/runbook.sh"
   require_match "bash scripts/publish-download-bundle.sh" "scripts/runbook.sh"
   require_match "bash scripts/publish-download-bundle-s3.sh" "scripts/runbook.sh"
+  require_match "bash scripts/publish-download-bundle-http.sh" "scripts/runbook.sh"
   require_match "DOCKER_TESTS_SOFT_FAIL=0" "scripts/runbook-strict-host-gates.sh"
   require_match "TEST_NUGET_SOFT_FAIL=0" "scripts/runbook-strict-host-gates.sh"
   require_match "RUNBOOK_MODE=docker-tests" "scripts/runbook-strict-host-gates.sh"
@@ -527,6 +530,19 @@ if [[ "$RUNBOOK_MODE" == "downloads-sync-s3" ]]; then
   exit "$status"
 fi
 
+if [[ "$RUNBOOK_MODE" == "downloads-upload-http" ]]; then
+  DOWNLOAD_BUNDLE_DIR="${DOWNLOAD_BUNDLE_DIR:-${RUNBOOK_ARG_FRAMEWORK:-$REPO_ROOT/Chummer.Portal/downloads}}"
+  DOWNLOADS_UPLOAD_HTTP_LOG_FILE="${DOWNLOADS_UPLOAD_HTTP_LOG_FILE:-$(resolve_runbook_log_file chummer-downloads-upload-http)}"
+  set +e
+  bash scripts/publish-download-bundle-http.sh "$DOWNLOAD_BUNDLE_DIR" 2>&1 | tee "$DOWNLOADS_UPLOAD_HTTP_LOG_FILE"
+  status=${PIPESTATUS[0]}
+  set -e
+  echo
+  echo "== http upload summary =="
+  rg -n "Publishing|Upload accepted|Verified route|Verified manifest|failed with HTTP|Dry run only|Exact live publish command" "$DOWNLOADS_UPLOAD_HTTP_LOG_FILE" | tail -n 200 || true
+  exit "$status"
+fi
+
 if [[ "$RUNBOOK_MODE" == "downloads-verify" ]]; then
   DOWNLOADS_VERIFY_TARGET="${DOWNLOADS_VERIFY_TARGET:-${RUNBOOK_ARG_FRAMEWORK:-${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-}}}"
   DOWNLOADS_VERIFY_LINKS="${DOWNLOADS_VERIFY_LINKS:-0}"
@@ -557,12 +573,15 @@ if [[ "$RUNBOOK_MODE" == "downloads-smoke" ]]; then
   DOWNLOADS_SMOKE_DEPLOY_DIR="${DOWNLOADS_SMOKE_DEPLOY_DIR:-$DOWNLOADS_SMOKE_RUN_DIR/deploy}"
   DOWNLOADS_SMOKE_LOG_FILE="${DOWNLOADS_SMOKE_LOG_FILE:-$(resolve_runbook_log_file chummer-downloads-smoke)}"
   DOWNLOADS_SMOKE_VERSION="${DOWNLOADS_SMOKE_VERSION:-smoke-0001}"
-  mkdir -p "$DOWNLOADS_SMOKE_BUNDLE_DIR/files" "$DOWNLOADS_SMOKE_DEPLOY_DIR"
+  DOWNLOADS_SMOKE_RELEASE_PROOF_PATH="${DOWNLOADS_SMOKE_RELEASE_PROOF_PATH:-$DOWNLOADS_SMOKE_RUN_DIR/local-release-proof.json}"
+  mkdir -p "$DOWNLOADS_SMOKE_BUNDLE_DIR/files" "$DOWNLOADS_SMOKE_BUNDLE_DIR/proof/windows" "$DOWNLOADS_SMOKE_BUNDLE_DIR/startup-smoke" "$DOWNLOADS_SMOKE_DEPLOY_DIR"
 
   artifact_path="$DOWNLOADS_SMOKE_BUNDLE_DIR/files/chummer-avalonia-linux-x64-installer.deb"
   installer_path="$DOWNLOADS_SMOKE_BUNDLE_DIR/files/chummer-avalonia-win-x64-installer.exe"
+  proof_path="$DOWNLOADS_SMOKE_BUNDLE_DIR/proof/windows/chummer-avalonia-win-x64-installer.exe"
   printf 'downloads smoke installer (linux deb)\n' > "$artifact_path"
   printf 'downloads smoke installer\n' > "$installer_path"
+  printf 'downloads smoke proof installer\n' > "$proof_path"
   cat > "$DOWNLOADS_SMOKE_BUNDLE_DIR/releases.json" <<JSON
 {
   "version": "$DOWNLOADS_SMOKE_VERSION",
@@ -571,6 +590,89 @@ if [[ "$RUNBOOK_MODE" == "downloads-smoke" ]]; then
   "downloads": []
 }
 JSON
+  cat > "$DOWNLOADS_SMOKE_RELEASE_PROOF_PATH" <<JSON
+{
+  "status": "passed",
+  "generatedAt": "2026-04-12T00:00:00Z",
+  "baseUrl": "https://chummer.run",
+  "journeysPassed": [
+    "install_claim_restore_continue",
+    "build_explain_publish",
+    "campaign_session_recover_recap",
+    "report_cluster_release_notify",
+    "organize_community_and_close_loop"
+  ],
+  "proofRoutes": [
+    "/downloads/install/avalonia-linux-x64-installer",
+    "/home/access",
+    "/home/work",
+    "/account/work",
+    "/account/support",
+    "/contact"
+  ]
+}
+JSON
+  python3 - <<'PY' "$artifact_path" "$installer_path" "$DOWNLOADS_SMOKE_BUNDLE_DIR/startup-smoke"
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+linux_path = Path(sys.argv[1])
+windows_path = Path(sys.argv[2])
+output_root = Path(sys.argv[3])
+
+def sha256_for(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+receipts = [
+    (
+        output_root / "startup-smoke-avalonia-linux-x64.receipt.json",
+        {
+            "headId": "avalonia",
+            "version": "smoke-0001",
+            "channelId": "smoke",
+            "platform": "linux",
+            "arch": "x64",
+            "readyCheckpoint": "pre_ui_event_loop",
+            "hostClass": "linux-host",
+            "operatingSystem": "Linux",
+            "recordedAtUtc": "2026-04-12T00:00:00Z",
+            "artifactId": "avalonia-linux-x64-installer",
+            "rid": "linux-x64",
+            "status": "pass",
+            "artifactFileName": linux_path.name,
+            "artifactRelativePath": f"files/{linux_path.name}",
+            "artifactDigest": f"sha256:{sha256_for(linux_path)}",
+            "artifactSha256": sha256_for(linux_path),
+        },
+    ),
+    (
+        output_root / "startup-smoke-avalonia-win-x64.receipt.json",
+        {
+            "headId": "avalonia",
+            "version": "smoke-0001",
+            "channelId": "smoke",
+            "platform": "windows",
+            "arch": "x64",
+            "readyCheckpoint": "pre_ui_event_loop",
+            "hostClass": "windows-host",
+            "operatingSystem": "Windows",
+            "recordedAtUtc": "2026-04-12T00:00:00Z",
+            "artifactId": "avalonia-win-x64-installer",
+            "rid": "win-x64",
+            "status": "pass",
+            "artifactFileName": windows_path.name,
+            "artifactRelativePath": f"files/{windows_path.name}",
+            "artifactDigest": f"sha256:{sha256_for(windows_path)}",
+            "artifactSha256": sha256_for(windows_path),
+        },
+    ),
+]
+
+for path, payload in receipts:
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
 
   set +e
   {
@@ -580,22 +682,33 @@ JSON
     RUNBOOK_MODE=downloads-sync \
       DOWNLOAD_BUNDLE_DIR="$DOWNLOADS_SMOKE_BUNDLE_DIR" \
       DOWNLOAD_DEPLOY_DIR="$DOWNLOADS_SMOKE_DEPLOY_DIR" \
+      RELEASE_PROOF_PATH="$DOWNLOADS_SMOKE_RELEASE_PROOF_PATH" \
+      CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH="/docker/chummercomplete/chummer6-ui-finish/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+      CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
       DOWNLOADS_SYNC_VERIFY_LINKS=1 \
       bash "$SCRIPT_DIR/runbook.sh"
     sync_status=$?
     RUNBOOK_MODE=downloads-verify \
       DOWNLOADS_VERIFY_TARGET="$DOWNLOADS_SMOKE_DEPLOY_DIR/releases.json" \
+      CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
       DOWNLOADS_VERIFY_LINKS=1 \
       bash "$SCRIPT_DIR/runbook.sh"
     verify_status=$?
+    if [[ -f "$DOWNLOADS_SMOKE_DEPLOY_DIR/proof/windows/$(basename "$proof_path")" ]]; then
+      proof_status=0
+      echo "downloads-smoke proof_status=0"
+    else
+      proof_status=1
+      echo "downloads-smoke proof_status=1"
+    fi
     echo "downloads-smoke sync_status=$sync_status verify_status=$verify_status"
-    exit $(( sync_status != 0 || verify_status != 0 ))
+    exit $(( sync_status != 0 || verify_status != 0 || proof_status != 0 ))
   } 2>&1 | tee "$DOWNLOADS_SMOKE_LOG_FILE"
   status=${PIPESTATUS[0]}
   set -e
   echo
   echo "== downloads smoke summary =="
-  rg -n "downloads-smoke sync_status|Verified manifest|Verified artifact links/files|failed artifact verification" "$DOWNLOADS_SMOKE_LOG_FILE" | tail -n 200 || true
+  rg -n "downloads-smoke sync_status|downloads-smoke proof_status|Verified manifest|Verified artifact links/files|failed artifact verification" "$DOWNLOADS_SMOKE_LOG_FILE" | tail -n 200 || true
   exit "$status"
 fi
 

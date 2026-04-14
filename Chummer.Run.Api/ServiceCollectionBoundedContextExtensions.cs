@@ -32,6 +32,9 @@ internal static class ServiceCollectionBoundedContextExtensions
     public static IServiceCollection AddHubAccountsAndCommunityContext(this IServiceCollection services)
     {
         services.AddSingleton<CommunityStore>();
+        services.AddSingleton<TeableUserProjectionService>();
+        services.AddHostedService<TeableUserProjectionSyncWorker>();
+        services.AddHttpClient();
         services.AddSingleton<AccountService>();
         services.AddSingleton<IdentityLinkService>();
         services.AddSingleton<UserExperienceService>();
@@ -64,6 +67,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<SupportCasePresentationService>();
         services.AddSingleton<SupportAssistantService>();
         services.AddSingleton<CrashSupportService>();
+        services.AddHttpClient<SupportProgressEmailWorkflowService>();
         return services;
     }
 

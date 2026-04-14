@@ -2,14 +2,15 @@
   "contract_name": "chummer6-hub.local_release_proof",
   "status": "passed",
   "base_url": "https://chummer.run",
-  "compose_file": "docker-compose.public-edge.yml",
-  "playwright_timeout_seconds": 300,
+  "compose_file": "docker-compose.yml",
+  "playwright_timeout_seconds": 120,
   "edge_rebuild_skipped": true,
   "journeys_passed": [
     "install_claim_restore_continue",
     "build_explain_publish",
     "campaign_session_recover_recap",
-    "report_cluster_release_notify"
+    "report_cluster_release_notify",
+    "organize_community_and_close_loop"
   ],
   "proof_routes": [
     "/downloads/install/avalonia-linux-x64-installer",
@@ -19,5 +20,5 @@
     "/account/support",
     "/contact"
   ],
-  "generated_at": "2026-04-10T04:40:41Z"
+  "generated_at": "2026-04-12T14:13:32Z"
 }

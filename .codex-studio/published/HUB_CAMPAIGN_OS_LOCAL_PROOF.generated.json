@@ -6,7 +6,8 @@
   "journeys_passed": [
     "build_explain_publish",
     "campaign_session_recover_recap",
-    "report_cluster_release_notify"
+    "report_cluster_release_notify",
+    "organize_community_and_close_loop"
   ],
   "required_markers": {
     "build_explain_publish": [
@@ -90,7 +91,15 @@
       "TrackedCaseSummary.NextSafeAction.Contains(\"Update\"",
       "TrackedCaseSummary!.FollowUpLaneSummary.Contains(\"Account > Support\"",
       "authenticatedHomeModel.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && item.ClosureSummary.Contains(\"closure notice\""
+    ],
+    "organize_community_and_close_loop": [
+      "homeSource.Contains(\"/account/work#community-op-league-\"",
+      "homeSource.Contains(\"/account/work#community-op-board-\"",
+      "homeSource.Contains(\"/account/work#community-op-invites-\"",
+      "contactSubmittedModel.TrackedCaseSummary!.FollowUpLaneSummary.Contains(\"Account > Support\"",
+      "contactSubmittedModel.TrackedCaseSummary.NextSafeAction.Contains(\"Update\"",
+      "authenticatedHomeModel.CampaignSpine.CommunityOperations.Count >= 1"
     ]
   },
-  "generated_at": "2026-03-31T00:52:20Z"
+  "generated_at": "2026-04-12T13:22:52Z"
 }

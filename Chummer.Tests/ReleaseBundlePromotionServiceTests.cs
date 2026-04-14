@@ -219,6 +219,43 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task PromoteAsyncCopiesWindowsProofPayloadWhenBundleProvidesIt()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260412-192500",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-preview"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ],
+            proofArtifacts:
+            [
+                new ProofArtifact(
+                    RelativePath: "windows/chummer-avalonia-win-x64-installer.exe",
+                    Bytes: "win-proof"u8.ToArray()),
+                new ProofArtifact(
+                    RelativePath: "windows/chummer-blazor-desktop-win-x64-installer.exe",
+                    Bytes: "win-proof-blazor"u8.ToArray())
+            ]);
+
+        await fixture.PromoteAsync(bundlePath);
+
+        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "proof", "windows", "chummer-avalonia-win-x64-installer.exe")));
+        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "proof", "windows", "chummer-blazor-desktop-win-x64-installer.exe")));
+    }
+
+    [Fact]
     public async Task PromoteAsyncMakesPromotedMacPreviewVisibleOnDownloadsAsInstallCommand()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
@@ -366,7 +403,8 @@ public sealed class ReleaseBundlePromotionServiceTests
         public string CreateBundle(
             string version,
             IReadOnlyList<BundleArtifact> artifacts,
-            bool includePromotionEvidence = true)
+            bool includePromotionEvidence = true,
+            IReadOnlyList<ProofArtifact>? proofArtifacts = null)
         {
             string bundleRoot = Path.Combine(_root, "bundle-" + Guid.NewGuid().ToString("N"));
             string filesRoot = Path.Combine(bundleRoot, "files");
@@ -453,6 +491,22 @@ public sealed class ReleaseBundlePromotionServiceTests
                         generatedAt = "2026-04-01T21:55:00Z",
                         artifacts = evidenceArtifacts
                     }, TestJsonOptions));
+            }
+
+            if (proofArtifacts is { Count: > 0 })
+            {
+                string proofRoot = Path.Combine(bundleRoot, "proof");
+                foreach (ProofArtifact proofArtifact in proofArtifacts)
+                {
+                    string targetPath = Path.Combine(proofRoot, proofArtifact.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+                    string? targetDirectory = Path.GetDirectoryName(targetPath);
+                    if (!string.IsNullOrWhiteSpace(targetDirectory))
+                    {
+                        Directory.CreateDirectory(targetDirectory);
+                    }
+
+                    File.WriteAllBytes(targetPath, proofArtifact.Bytes);
+                }
             }
 
             string zipPath = Path.Combine(_root, $"{Path.GetFileName(bundleRoot)}.zip");
@@ -571,4 +625,8 @@ public sealed class ReleaseBundlePromotionServiceTests
         string StartupSmokeStatus,
         string? SigningStatus,
         string? NotarizationStatus);
+
+    private sealed record ProofArtifact(
+        string RelativePath,
+        byte[] Bytes);
 }

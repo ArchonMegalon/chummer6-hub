@@ -9,6 +9,8 @@ BUNDLE_DIR="${1:-${DOWNLOAD_BUNDLE_DIR:-$REPO_ROOT/dist}}"
 MANIFEST_SOURCE="$BUNDLE_DIR/releases.json"
 CANONICAL_MANIFEST_SOURCE="$BUNDLE_DIR/RELEASE_CHANNEL.generated.json"
 FILES_SOURCE="$BUNDLE_DIR/files"
+PROOF_SOURCE="$BUNDLE_DIR/proof"
+STARTUP_SMOKE_SOURCE="${STARTUP_SMOKE_SOURCE:-$BUNDLE_DIR/startup-smoke}"
 S3_TARGET_URI="${CHUMMER_PORTAL_DOWNLOADS_S3_URI:-}"
 S3_LATEST_URI="${CHUMMER_PORTAL_DOWNLOADS_S3_LATEST_URI:-}"
 S3_ENDPOINT_URL="${CHUMMER_PORTAL_DOWNLOADS_S3_ENDPOINT_URL:-}"
@@ -79,6 +81,14 @@ done < <(find "$FILES_SOURCE" -maxdepth 1 -type f \( \
 copy_target() {
   local target_uri="$1"
   aws s3 cp "$filtered_files_dir/" "$target_uri/files/" --recursive "${endpoint_args[@]}"
+  aws s3 rm "$target_uri/proof/" --recursive "${endpoint_args[@]}" >/dev/null 2>&1 || true
+  if [[ -d "$PROOF_SOURCE" ]]; then
+    aws s3 cp "$PROOF_SOURCE/" "$target_uri/proof/" --recursive "${endpoint_args[@]}"
+  fi
+  aws s3 rm "$target_uri/startup-smoke/" --recursive "${endpoint_args[@]}" >/dev/null 2>&1 || true
+  if [[ -d "$STARTUP_SMOKE_SOURCE" ]]; then
+    aws s3 cp "$STARTUP_SMOKE_SOURCE/" "$target_uri/startup-smoke/" --recursive "${endpoint_args[@]}"
+  fi
   aws s3 cp "$MANIFEST_SOURCE" "$target_uri/releases.json" "${endpoint_args[@]}"
   aws s3 cp "$CANONICAL_MANIFEST_SOURCE" "$target_uri/RELEASE_CHANNEL.generated.json" "${endpoint_args[@]}"
 }
