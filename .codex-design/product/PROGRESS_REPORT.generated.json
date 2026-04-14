@@ -1,9 +1,9 @@
 {
   "contract_name": "fleet.public_progress_report",
   "contract_version": "2026-03-23",
-  "generated_at": "2026-04-13T20:25:51Z",
-  "as_of": "2026-04-13",
-  "history_snapshot_count": 14,
+  "generated_at": "2026-04-14T07:09:39Z",
+  "as_of": "2026-04-14",
+  "history_snapshot_count": 15,
   "brand": "Chummer6",
   "active_wave": "Next 12 Biggest Wins",
   "active_wave_status": "active",
@@ -196,7 +196,7 @@
           "body": "A boring, auditable core runtime with no hidden legacy cargo."
         }
       ],
-      "recent_commit_count_7d": 2,
+      "recent_commit_count_7d": 3,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -228,7 +228,7 @@
           "repo_slug": "chummer6-core",
           "path": "/docker/chummercomplete/chummer6-core",
           "lifecycle": "live",
-          "recent_commit_count_7d": 2,
+          "recent_commit_count_7d": 3,
           "design_total_weight": 40,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -282,7 +282,7 @@
           "body": "Complete desktop/browser workbench with accessibility, localization, and polished shared components."
         }
       ],
-      "recent_commit_count_7d": 21,
+      "recent_commit_count_7d": 22,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -344,13 +344,13 @@
           "repo_slug": "chummer6-ui-kit",
           "path": "/docker/chummercomplete/chummer-ui-kit",
           "lifecycle": "scaffold",
-          "recent_commit_count_7d": 21,
+          "recent_commit_count_7d": 22,
           "design_total_weight": 40,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-04-12T11:46:01.234922Z",
+            "published_at": "2026-04-13T22:32:13.054839Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -397,7 +397,7 @@
           "body": "A reliable session shell that survives weak networks and resumes cleanly."
         }
       ],
-      "recent_commit_count_7d": 56,
+      "recent_commit_count_7d": 57,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -429,7 +429,7 @@
           "repo_slug": "chummer6-mobile",
           "path": "/docker/chummercomplete/chummer6-mobile",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 56,
+          "recent_commit_count_7d": 57,
           "design_total_weight": 44,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -485,7 +485,7 @@
           "body": "A cohesive hosted community and publication stack ready for real public participation."
         }
       ],
-      "recent_commit_count_7d": 37,
+      "recent_commit_count_7d": 39,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -518,7 +518,7 @@
           "repo_slug": "chummer6-hub",
           "path": "/docker/chummercomplete/chummer6-hub",
           "lifecycle": "live",
-          "recent_commit_count_7d": 7,
+          "recent_commit_count_7d": 8,
           "design_total_weight": 60,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -547,7 +547,7 @@
           "repo_slug": "chummer6-hub-registry",
           "path": "/docker/chummercomplete/chummer-hub-registry",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 7,
+          "recent_commit_count_7d": 8,
           "design_total_weight": 44,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -631,7 +631,7 @@
           "body": "One authoritative public story, compiled cleanly into every downstream surface."
         }
       ],
-      "recent_commit_count_7d": 5,
+      "recent_commit_count_7d": 7,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -664,7 +664,7 @@
           "repo_slug": "chummer6-design",
           "path": "/docker/chummercomplete/chummer-design",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 3,
+          "recent_commit_count_7d": 4,
           "design_total_weight": 44,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -691,7 +691,7 @@
           "repo_slug": "Chummer6",
           "path": "/docker/chummercomplete/Chummer6",
           "lifecycle": "signoff_only",
-          "recent_commit_count_7d": 2,
+          "recent_commit_count_7d": 3,
           "design_total_weight": 1,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -752,23 +752,28 @@
     "limitations": [
       "ETA is a momentum-based planning band, not a delivery promise.",
       "Weekly public progress history is now available; ETA uses recorded velocity where enough snapshots exist and falls back to the short-horizon momentum proxy elsewhere.",
-      "Mapped public milestones are complete, but the full-product frontier remains open with 5 milestone(s). Full completion requires full frontier closure."
+      "Mapped public milestones are complete, but the full-product frontier remains open with 10 milestone(s). Full completion requires full frontier closure."
     ],
-    "history_snapshot_count": 14
+    "history_snapshot_count": 15
   },
   "eta_scope": "full_product_queue",
   "full_product_queue": {
     "mode": "sharded",
-    "active_runs_count": 5,
+    "active_runs_count": 4,
     "active_frontier_ids": [
+      1430909325,
+      1971142975,
       2541792707,
+      2594403904,
+      2756381468,
       3109832007,
       3449507998,
       4066417069,
+      4087117301,
       4182074715
     ],
-    "open_frontier_milestones": 5,
-    "open_milestone_ids_count": 5,
+    "open_frontier_milestones": 10,
+    "open_milestone_ids_count": 10,
     "eta": {
       "eta_human": "11h-1.1d",
       "eta_status": "tracked",
@@ -777,13 +782,13 @@
       "scope_warning": "",
       "eta_weeks_low": 1,
       "eta_weeks_high": 1,
-      "remaining_open_milestones": 5,
-      "remaining_in_progress_milestones": 5,
+      "remaining_open_milestones": 10,
+      "remaining_in_progress_milestones": 10,
       "remaining_not_started_milestones": 0
     },
     "active_runs": [
       {
-        "run_id": "20260413T201626Z-shard-1",
+        "run_id": "20260414T070703Z-shard-1",
         "shard": "shard-1",
         "frontier_count": 1,
         "frontier_ids": [
@@ -791,7 +796,7 @@
         ]
       },
       {
-        "run_id": "20260413T201630Z-shard-2",
+        "run_id": "20260414T070707Z-shard-2",
         "shard": "shard-2",
         "frontier_count": 1,
         "frontier_ids": [
@@ -799,7 +804,7 @@
         ]
       },
       {
-        "run_id": "20260413T201633Z-shard-3",
+        "run_id": "20260414T070711Z-shard-3",
         "shard": "shard-3",
         "frontier_count": 1,
         "frontier_ids": [
@@ -807,19 +812,11 @@
         ]
       },
       {
-        "run_id": "20260413T201638Z-shard-5",
+        "run_id": "20260414T070716Z-shard-5",
         "shard": "shard-5",
         "frontier_count": 1,
         "frontier_ids": [
           4182074715
-        ]
-      },
-      {
-        "run_id": "20260413T201648Z-shard-8",
-        "shard": "shard-8",
-        "frontier_count": 1,
-        "frontier_ids": [
-          3109832007
         ]
       }
     ]
