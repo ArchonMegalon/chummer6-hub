@@ -114,6 +114,7 @@ public sealed class ReleaseBundlePromotionService
         string canonicalManifestPath = RequireSingleFile(bundleRoot, CanonicalManifestName);
         string filesRoot = RequireSiblingDirectory(compatibilityManifestPath, "files");
         string? startupSmokeRoot = ResolveSiblingDirectory(compatibilityManifestPath, "startup-smoke");
+        string? proofRoot = ResolveSiblingDirectory(compatibilityManifestPath, "proof");
         string? promotionEvidencePath = ResolveOptionalFile(bundleRoot, PromotionEvidenceRelativePath);
 
         PublicReleaseManifestDto incomingCompatibilityManifest = LoadCompatibilityManifest(compatibilityManifestPath);
@@ -166,6 +167,14 @@ public sealed class ReleaseBundlePromotionService
             CopyDirectoryContents(
                 startupSmokeRoot,
                 Path.Combine(downloadsRoot, "startup-smoke"),
+                cancellationToken);
+        }
+
+        if (!string.IsNullOrWhiteSpace(proofRoot) && Directory.Exists(proofRoot))
+        {
+            MirrorDirectoryContents(
+                proofRoot,
+                Path.Combine(downloadsRoot, "proof"),
                 cancellationToken);
         }
 
@@ -271,6 +280,19 @@ public sealed class ReleaseBundlePromotionService
 
             File.Copy(sourcePath, destinationPath, overwrite: true);
         }
+    }
+
+    private static void MirrorDirectoryContents(
+        string sourceRoot,
+        string destinationRoot,
+        CancellationToken cancellationToken)
+    {
+        if (Directory.Exists(destinationRoot))
+        {
+            Directory.Delete(destinationRoot, recursive: true);
+        }
+
+        CopyDirectoryContents(sourceRoot, destinationRoot, cancellationToken);
     }
 
     private static string ResolveBundleRoot(string extractRoot)

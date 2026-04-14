@@ -4,27 +4,66 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PARITY_CHECKLIST="$ROOT/docs/PARITY_CHECKLIST.md"
 PARITY_GENERATOR="$ROOT/scripts/generate-parity-checklist.sh"
-DEFAULT_UI_PUBLISHED_DIR="$ROOT/../chummer6-ui/.codex-studio/published"
+resolve_ui_repo_root() {
+  local explicit_root="${CHUMMER_UI_REPO_ROOT:-}"
+  if [[ -n "$explicit_root" ]]; then
+    echo "$explicit_root"
+    return 0
+  fi
+  local candidate
+  for candidate in \
+    "$ROOT/../chummer6-ui-finish" \
+    "$ROOT/../chummer6-ui" \
+    "$ROOT/../chummer-presentation"
+  do
+    if [[ -d "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  echo "$ROOT/../chummer6-ui-finish"
+}
+
+resolve_ui_repo_file() {
+  local relative_path="$1"
+  local candidate
+  for candidate in \
+    "$UI_REPO_ROOT/$relative_path" \
+    "$FALLBACK_UI_REPO_ROOT/$relative_path" \
+    "$LEGACY_UI_REPO_ROOT/$relative_path"
+  do
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  echo "$UI_REPO_ROOT/$relative_path"
+}
+
+UI_REPO_ROOT="$(resolve_ui_repo_root)"
+FALLBACK_UI_REPO_ROOT="$ROOT/../chummer6-ui"
+LEGACY_UI_REPO_ROOT="$ROOT/../chummer-presentation"
+DEFAULT_UI_PUBLISHED_DIR="$UI_REPO_ROOT/.codex-studio/published"
+FALLBACK_UI_PUBLISHED_DIR="$FALLBACK_UI_REPO_ROOT/.codex-studio/published"
 LEGACY_UI_PUBLISHED_DIR="$ROOT/../chummer-presentation/.codex-studio/published"
 UI_PUBLISHED_DIR="${CHUMMER_UI_PUBLISHED_DIR:-$DEFAULT_UI_PUBLISHED_DIR}"
-SR4_WORKFLOW_LEDGER_PATH="$ROOT/../chummer6-ui/docs/SR4_WORKFLOW_PARITY_LEDGER.json"
-SR6_WORKFLOW_LEDGER_PATH="$ROOT/../chummer6-ui/docs/SR6_WORKFLOW_PARITY_LEDGER.json"
+SR4_WORKFLOW_LEDGER_PATH="${CHUMMER_UI_SR4_WORKFLOW_LEDGER_PATH:-$(resolve_ui_repo_file "docs/SR4_WORKFLOW_PARITY_LEDGER.json")}"
+SR6_WORKFLOW_LEDGER_PATH="${CHUMMER_UI_SR6_WORKFLOW_LEDGER_PATH:-$(resolve_ui_repo_file "docs/SR6_WORKFLOW_PARITY_LEDGER.json")}"
 
 resolve_receipt_path() {
   local file_name="$1"
-  local primary="$UI_PUBLISHED_DIR/$file_name"
-  if [[ -f "$primary" ]]; then
-    echo "$primary"
-    return 0
-  fi
-  if [[ -z "${CHUMMER_UI_PUBLISHED_DIR:-}" ]]; then
-    local legacy="$LEGACY_UI_PUBLISHED_DIR/$file_name"
-    if [[ -f "$legacy" ]]; then
-      echo "$legacy"
+  local candidate
+  for candidate in \
+    "$UI_PUBLISHED_DIR/$file_name" \
+    "$FALLBACK_UI_PUBLISHED_DIR/$file_name" \
+    "$LEGACY_UI_PUBLISHED_DIR/$file_name"
+  do
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
       return 0
     fi
-  fi
-  echo "$primary"
+  done
+  echo "$UI_PUBLISHED_DIR/$file_name"
 }
 
 WORKFLOW_GATE_RECEIPT="$(resolve_receipt_path "DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json")"
@@ -87,6 +126,7 @@ REQUIRED_RELEASE_PROOF_JOURNEYS = (
     "build_explain_publish",
     "campaign_session_recover_recap",
     "report_cluster_release_notify",
+    "organize_community_and_close_loop",
 )
 REQUIRED_RELEASE_PROOF_ROUTES = (
     "/downloads/install/avalonia-linux-x64-installer",
@@ -1225,9 +1265,9 @@ def parse_generated_at(path: pathlib.Path, data: dict) -> dt.datetime:
 
 def read_release_channel_status(path: pathlib.Path, data: dict) -> str:
     status = str(data.get("status", "")).strip().lower()
-    if status not in {"pass", "passed", "ready", "published"}:
+    if status not in {"pass", "passed", "ready", "published", "unpublished"}:
         raise SystemExit(
-            "parity audit failed: release-channel receipt status must be pass/passed/ready/published: "
+            "parity audit failed: release-channel receipt status must be pass/passed/ready/published/unpublished: "
             f"{path} (status={status or 'missing'})"
         )
     return status

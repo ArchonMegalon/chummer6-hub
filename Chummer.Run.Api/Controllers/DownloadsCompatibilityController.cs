@@ -88,6 +88,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     }
 
     [HttpGet("/downloads/proof/windows/{fileName}")]
+    [HttpHead("/downloads/proof/windows/{fileName}")]
     public IActionResult DownloadWindowsProofInstaller([FromRoute] string fileName)
     {
         var installer = _windowsProofInstallers.FindByFileName(fileName);
@@ -105,6 +106,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     }
 
     [HttpGet("/downloads/install/{artifactId}/proof")]
+    [HttpHead("/downloads/install/{artifactId}/proof")]
     public IActionResult DownloadWindowsProofInstallerByArtifactId([FromRoute] string artifactId)
     {
         var installer = _windowsProofInstallers.FindByArtifactId(artifactId);

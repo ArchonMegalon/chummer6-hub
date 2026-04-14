@@ -107,12 +107,17 @@ public sealed record SupportCaseTransitionRequest(
     [StringLength(160)] string? Note = null,
     [StringLength(64)] string? FixedVersion = null,
     [StringLength(64)] string? FixedChannel = null,
-    [StringLength(64)] string? Actor = null);
+    [StringLength(64)] string? Actor = null,
+    [StringLength(32)] string? DecisionOutcome = null,
+    [StringLength(32)] string? ImplementationPosture = null,
+    [StringLength(160)] string? DecisionReason = null,
+    [StringLength(80)] string? EtaText = null);
 
 public sealed record SupportCaseNotificationRequest(
     [Required(AllowEmptyStrings = false), StringLength(160)] string Note,
     [StringLength(64)] string? Actor = null,
-    [StringLength(64)] string? Channel = null);
+    [StringLength(64)] string? Channel = null,
+    [StringLength(400)] string? DownloadUrl = null);
 
 public sealed record SupportCaseVerificationRequest(
     [Required(AllowEmptyStrings = false), StringLength(64)] string Outcome,

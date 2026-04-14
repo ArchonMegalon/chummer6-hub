@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.AI.Services.Ops;
 using Chummer.Control.Contracts.Support;
@@ -34,14 +35,21 @@ internal static class SupportCrashVerification
                     ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
                     ["FLEET_INTERNAL_API_TOKEN"] = "verify-token",
+                    ["CHUMMER_SUPPORT_PROGRESS_EMAIL_ENABLED"] = "false",
                 })
                 .Build();
 
             InstallLinkingStore installStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
             InstallLinkingService installLinking = new(installStore, configuration);
+            CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
+            RewardService rewards = new(communityStore);
             SupportStore store = new(configuration, NullLogger<SupportStore>.Instance);
             SupportAttachmentStorageService attachments = new(configuration);
-            SupportCaseService supportCases = new(store, attachments, NullLogger<SupportCaseService>.Instance);
+            SupportProgressEmailWorkflowService progressEmails = new(
+                new HttpClient(new FakeJsonHandler(new { status = "disabled" })),
+                configuration,
+                NullLogger<SupportProgressEmailWorkflowService>.Instance);
+            SupportCaseService supportCases = new(store, attachments, rewards, progressEmails, NullLogger<SupportCaseService>.Instance);
             CrashSupportService service = new(store, supportCases, installLinking, NullLogger<CrashSupportService>.Instance);
             SeedInstallationGrant(installStore, "install-verified", "usr_linked", "subject.linked", "grant-active");
 
@@ -202,7 +210,13 @@ internal static class SupportCrashVerification
 
             SupportStore reloadedStore = new(configuration, NullLogger<SupportStore>.Instance);
             SupportAttachmentStorageService reloadedAttachments = new(configuration);
-            SupportCaseService reloadedSupportCases = new(reloadedStore, reloadedAttachments, NullLogger<SupportCaseService>.Instance);
+            CommunityStore reloadedCommunityStore = new(configuration, NullLogger<CommunityStore>.Instance);
+            RewardService reloadedRewards = new(reloadedCommunityStore);
+            SupportProgressEmailWorkflowService reloadedProgressEmails = new(
+                new HttpClient(new FakeJsonHandler(new { status = "disabled" })),
+                configuration,
+                NullLogger<SupportProgressEmailWorkflowService>.Instance);
+            SupportCaseService reloadedSupportCases = new(reloadedStore, reloadedAttachments, reloadedRewards, reloadedProgressEmails, NullLogger<SupportCaseService>.Instance);
             InstallLinkingStore reloadedInstallStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
             InstallLinkingService reloadedInstallLinking = new(reloadedInstallStore, configuration);
             CrashSupportService reloadedService = new(reloadedStore, reloadedSupportCases, reloadedInstallLinking, NullLogger<CrashSupportService>.Instance);

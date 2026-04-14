@@ -94,6 +94,7 @@ VerifyPublicationControllerHardening();
 VerifyIdentityWorkflow();
 VerifyIdentityEmailDeliveryProviders();
 await VerifyHubCommunitySecurityAndDurabilityAsync();
+await VerifyTeableUserProjectionWorkflowAsync();
 await VerifyPublicLandingProjectionAsync();
 VerifyRegistryWorkflow();
 VerifyRegistryControllerHardening();
@@ -254,15 +255,22 @@ async Task VerifySupportCrashWorkflowAsync()
                 ["CHUMMER_SUPPORT_ATTACHMENT_ROOT"] = Path.Combine(tempRoot, "support-attachments"),
                 ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
                 ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
+                ["CHUMMER_SUPPORT_PROGRESS_EMAIL_ENABLED"] = "false",
             })
             .Build();
 
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static builder => { });
         InstallLinkingStore installLinkingStore = new(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
         InstallLinkingService installLinking = new(installLinkingStore, configuration);
+        CommunityStore communityStore = new(configuration, loggerFactory.CreateLogger<CommunityStore>());
+        RewardService rewards = new(communityStore);
         SupportStore store = new(configuration, loggerFactory.CreateLogger<SupportStore>());
         SupportAttachmentStorageService supportAttachments = new(configuration);
-        SupportCaseService supportCases = new(store, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
+        SupportProgressEmailWorkflowService progressEmails = new(
+            new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { status = "disabled" }, HttpStatusCode.OK))),
+            configuration,
+            loggerFactory.CreateLogger<SupportProgressEmailWorkflowService>());
+        SupportCaseService supportCases = new(store, supportAttachments, rewards, progressEmails, loggerFactory.CreateLogger<SupportCaseService>());
         CrashSupportService service = new(store, supportCases, installLinking, loggerFactory.CreateLogger<CrashSupportService>());
         SupportCrashesController controller = new(service, configuration)
         {
@@ -526,6 +534,17 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
             ["CHUMMER_SUPPORT_ATTACHMENT_ROOT"] = Path.Combine(tempRoot, "support-attachments"),
             ["FLEET_RECEIPT_SIGNING_SECRET"] = "smoke-secret",
             ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_ENABLED"] = "true",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_BASE_URL"] = "http://ea-smoke:8090",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_API_TOKEN"] = "ea-smoke-token",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_PRINCIPAL_ID"] = "support-progress-principal",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_BINDING_ID"] = "binding-support-progress",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EMAILIT_API_KEY"] = "emailit-smoke-token",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EMAILIT_BASE_URL"] = "https://api.emailit.com/v2",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_FROM_EMAIL"] = "wageslave@chummer.run",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_FROM_NAME"] = "Wageslave",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_REPLY_TO"] = "support@chummer.run",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_PUBLIC_BASE_URL"] = "https://chummer.run",
         })
         .Build();
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
@@ -534,13 +553,74 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
     var supportAttachments = new SupportAttachmentStorageService(configuration);
     var installLinking = new InstallLinkingService(installLinkingStore, configuration);
-    var supportCases = new SupportCaseService(supportStore, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
+    var rewards = new RewardService(store);
+    var executeRequests = new List<(string Path, string Body, string Authorization, string PrincipalId)>();
+    var emailitRequests = new List<(string Path, string Body, string Authorization, string IdempotencyKey)>();
+    var sentReceiptRequests = new List<(string Path, string Body)>();
+    var failedReceiptRequests = new List<(string Path, string Body)>();
+    var progressWorkflowHttp = new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+        var body = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() ?? string.Empty;
+        if (string.Equals(path, "/v1/tools/execute", StringComparison.Ordinal))
+        {
+            executeRequests.Add((
+                path,
+                body,
+                request.Headers.Authorization?.Parameter ?? string.Empty,
+                request.Headers.TryGetValues("x-ea-principal-id", out var values) ? values.SingleOrDefault() ?? string.Empty : string.Empty));
+            string deliveryId = $"delivery-{executeRequests.Count}";
+            return JsonResponse(new
+            {
+                tool_name = "connector.dispatch",
+                target_ref = deliveryId,
+                output_json = new { delivery_id = deliveryId, status = "queued" },
+                receipt_json = new { handler_key = "connector.dispatch", invocation_contract = "tool.v1" }
+            }, HttpStatusCode.OK);
+        }
+
+        if (string.Equals(path, "/v2/emails", StringComparison.Ordinal))
+        {
+            emailitRequests.Add((
+                path,
+                body,
+                request.Headers.Authorization?.Parameter ?? string.Empty,
+                request.Headers.TryGetValues("Idempotency-Key", out var values) ? values.SingleOrDefault() ?? string.Empty : string.Empty));
+            return JsonResponse(new { id = $"emailit-{emailitRequests.Count}" }, HttpStatusCode.Accepted);
+        }
+
+        if (path.Contains("/v1/delivery/outbox/", StringComparison.Ordinal) && path.EndsWith("/sent", StringComparison.Ordinal))
+        {
+            sentReceiptRequests.Add((path, body));
+            return JsonResponse(new { status = "sent" }, HttpStatusCode.OK);
+        }
+
+        if (path.Contains("/v1/delivery/outbox/", StringComparison.Ordinal) && path.EndsWith("/failed", StringComparison.Ordinal))
+        {
+            failedReceiptRequests.Add((path, body));
+            return JsonResponse(new { status = "failed" }, HttpStatusCode.OK);
+        }
+
+        return new HttpResponseMessage(HttpStatusCode.NotFound)
+        {
+            Content = new StringContent($"unexpected request: {path}", Encoding.UTF8, "text/plain")
+        };
+    }));
+    var progressEmails = new SupportProgressEmailWorkflowService(
+        progressWorkflowHttp,
+        configuration,
+        loggerFactory.CreateLogger<SupportProgressEmailWorkflowService>());
+    var supportCases = new SupportCaseService(
+        supportStore,
+        supportAttachments,
+        rewards,
+        progressEmails,
+        loggerFactory.CreateLogger<SupportCaseService>());
     var publicationDraftWorkflow = new HubPublicationDraftService();
     var campaignSpine = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(store), publicationDraftWorkflow);
     var creatorPublicationRegistry = new CreatorPublicationRegistryBridge(publicationDraftWorkflow);
     var accounts = new AccountService(store);
     var groups = new GroupService(store, accounts);
-    var rewards = new RewardService(store);
     var leaderboards = new LeaderboardService(store);
     var entitlements = new EntitlementService(store);
     var ledger = new LedgerService(store, rewards, entitlements);
@@ -1419,6 +1499,155 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     Assert(invalidRoleThrown, "deep review sponsor sessions should require a higher authorization tier.");
 }
 
+async Task VerifyTeableUserProjectionWorkflowAsync()
+{
+    var tempRoot = Path.Combine(Path.GetTempPath(), "run-services-teable-smoke", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(tempRoot);
+    try
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json"),
+                ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
+                ["CHUMMER_TEABLE_USERS_ENABLED"] = "true",
+                ["CHUMMER_TEABLE_USERS_API_KEY"] = "teable-smoke-token",
+                ["CHUMMER_TEABLE_USERS_API_BASE_URL"] = "https://app.teable.ai/api",
+                ["CHUMMER_TEABLE_USERS_BASE_ID"] = "base-demo",
+                ["CHUMMER_TEABLE_USERS_TABLE_NAME"] = "Chummer Run Users",
+                ["CHUMMER_TEABLE_USERS_RECONCILE_ENABLED"] = "false",
+            })
+            .Build();
+        using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
+        var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
+        var teableRequests = new List<(HttpMethod Method, string Path, string Body)>();
+        var existingRecordIdByUserId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        static string? ExtractUserId(string path)
+        {
+            const string marker = "filterByTql=";
+            var markerIndex = path.IndexOf(marker, StringComparison.Ordinal);
+            if (markerIndex < 0)
+            {
+                return null;
+            }
+
+            var encoded = path[(markerIndex + marker.Length)..];
+            var next = encoded.IndexOf('&');
+            if (next >= 0)
+            {
+                encoded = encoded[..next];
+            }
+
+            var filter = Uri.UnescapeDataString(encoded);
+            const string prefix = "{User Id} = '";
+            var start = filter.IndexOf(prefix, StringComparison.Ordinal);
+            if (start < 0)
+            {
+                return null;
+            }
+
+            start += prefix.Length;
+            var end = filter.IndexOf('\'', start);
+            return end <= start ? null : filter[start..end];
+        }
+
+        var teableHttp = new HttpClient(new StubHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri?.PathAndQuery ?? string.Empty;
+            var body = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() ?? string.Empty;
+            teableRequests.Add((request.Method, path, body));
+
+            if (request.Method == HttpMethod.Get && path == "/api/base/base-demo/table")
+            {
+                return JsonResponse(Array.Empty<object>());
+            }
+
+            if (request.Method == HttpMethod.Post && path == "/api/base/base-demo/table/")
+            {
+                return JsonResponse(new { id = "tbl_users" }, HttpStatusCode.Created);
+            }
+
+            if (request.Method == HttpMethod.Get && path.StartsWith("/api/table/tbl_users/field", StringComparison.Ordinal))
+            {
+                return JsonResponse(fields.Select(static name => new { id = $"fld_{name.Replace(" ", "_", StringComparison.Ordinal)}", name }).ToArray());
+            }
+
+            if (request.Method == HttpMethod.Post && path == "/api/table/tbl_users/field")
+            {
+                using var document = JsonDocument.Parse(body);
+                var name = document.RootElement.GetProperty("name").GetString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    fields.Add(name);
+                }
+
+                return JsonResponse(new { id = $"fld_{fields.Count}", name }, HttpStatusCode.Created);
+            }
+
+            if (request.Method == HttpMethod.Get && path.StartsWith("/api/table/tbl_users/record?", StringComparison.Ordinal))
+            {
+                var userId = ExtractUserId(path) ?? string.Empty;
+                return existingRecordIdByUserId.TryGetValue(userId, out var recordId)
+                    ? JsonResponse(new { records = new[] { new { id = recordId } } })
+                    : JsonResponse(new { records = Array.Empty<object>() });
+            }
+
+            if (request.Method == HttpMethod.Post && path == "/api/table/tbl_users/record")
+            {
+                return JsonResponse(new { records = new[] { new { id = "rec_created" } } }, HttpStatusCode.Created);
+            }
+
+            if (request.Method == HttpMethod.Patch && path.StartsWith("/api/table/tbl_users/record/", StringComparison.Ordinal))
+            {
+                return JsonResponse(new { id = "rec_existing" });
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound)
+            {
+                Content = new StringContent($"unexpected teable request: {path}", Encoding.UTF8, "text/plain")
+            };
+        }));
+        var teableUsers = new TeableUserProjectionService(
+            store,
+            configuration,
+            new StubHttpClientFactory(teableHttp),
+            loggerFactory.CreateLogger<TeableUserProjectionService>());
+        var accounts = new AccountService(store, teableUsers, loggerFactory.CreateLogger<AccountService>());
+
+        var user = accounts.EnsureUser("subject.demo", "Runner Demo", "runner@example.invalid");
+        var controller = new InternalTeableUsersController(teableUsers, configuration)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer smoke-token";
+
+        var dashboardResponse = await controller.GetDashboard(sync: true, CancellationToken.None);
+        var dashboard = (dashboardResponse.Result as OkObjectResult)?.Value as TeableUserProjectionDashboard;
+        Assert(dashboard is not null, "internal Teable dashboard should return a payload.");
+        Assert(dashboard!.Users.Any(item => string.Equals(item.UserId, user.UserId, StringComparison.Ordinal) && string.Equals(item.Email, "runner@example.invalid", StringComparison.Ordinal)), "internal Teable dashboard should expose the stored hub user projection.");
+        Assert(teableRequests.Any(item => item.Method == HttpMethod.Post && item.Path == "/api/table/tbl_users/record"), "Teable dashboard sync should create a record for new users.");
+
+        teableRequests.Clear();
+        existingRecordIdByUserId[user.UserId] = "rec_existing";
+        var syncResponse = await controller.SyncAll(CancellationToken.None);
+        var syncResult = (syncResponse.Result as OkObjectResult)?.Value as TeableUserProjectionSyncResult;
+        Assert(syncResult is not null && string.Equals(syncResult.State, "passed", StringComparison.OrdinalIgnoreCase), "internal Teable sync should report success.");
+        Assert(teableRequests.Any(item => item.Method == HttpMethod.Patch && item.Path == "/api/table/tbl_users/record/rec_existing"), "Teable sync should patch existing user rows instead of duplicating them.");
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
 async Task VerifyPublicLandingProjectionAsync()
 {
     var tempRoot = Path.Combine(Path.GetTempPath(), "run-services-smoke", Guid.NewGuid().ToString("N"));
@@ -1531,6 +1760,17 @@ async Task VerifyPublicLandingProjectionAsync()
             ["CHUMMER_SUPPORT_ATTACHMENT_ROOT"] = Path.Combine(tempRoot, "support-attachments"),
             ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot,
             ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_ENABLED"] = "true",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_BASE_URL"] = "http://ea-smoke:8090",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_API_TOKEN"] = "ea-smoke-token",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_PRINCIPAL_ID"] = "support-progress-principal",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_BINDING_ID"] = "binding-support-progress",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EMAILIT_API_KEY"] = "emailit-smoke-token",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EMAILIT_BASE_URL"] = "https://api.emailit.com/v2",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_FROM_EMAIL"] = "wageslave@chummer.run",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_FROM_NAME"] = "Wageslave",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_REPLY_TO"] = "support@chummer.run",
+            ["CHUMMER_SUPPORT_PROGRESS_EMAIL_PUBLIC_BASE_URL"] = "https://chummer.run",
         })
         .Build();
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
@@ -1549,7 +1789,69 @@ async Task VerifyPublicLandingProjectionAsync()
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
     var supportAttachments = new SupportAttachmentStorageService(configuration);
     var installLinking = new InstallLinkingService(installLinkingStore, configuration);
-    var supportCases = new SupportCaseService(supportStore, supportAttachments, loggerFactory.CreateLogger<SupportCaseService>());
+    var communityStore = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
+    var rewards = new RewardService(communityStore);
+    var executeRequests = new List<(string Path, string Body, string Authorization, string PrincipalId)>();
+    var emailitRequests = new List<(string Path, string Body, string Authorization, string IdempotencyKey)>();
+    var sentReceiptRequests = new List<(string Path, string Body)>();
+    var failedReceiptRequests = new List<(string Path, string Body)>();
+    var progressEmails = new SupportProgressEmailWorkflowService(
+        new HttpClient(new StubHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+            var body = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() ?? string.Empty;
+            if (string.Equals(path, "/v1/tools/execute", StringComparison.Ordinal))
+            {
+                executeRequests.Add((
+                    path,
+                    body,
+                    request.Headers.Authorization?.Parameter ?? string.Empty,
+                    request.Headers.TryGetValues("x-ea-principal-id", out var values) ? values.SingleOrDefault() ?? string.Empty : string.Empty));
+                string deliveryId = $"delivery-{executeRequests.Count}";
+                return JsonResponse(new
+                {
+                    tool_name = "connector.dispatch",
+                    target_ref = deliveryId,
+                    output_json = new { delivery_id = deliveryId, status = "queued" },
+                    receipt_json = new { handler_key = "connector.dispatch", invocation_contract = "tool.v1" }
+                }, HttpStatusCode.OK);
+            }
+
+            if (string.Equals(path, "/v2/emails", StringComparison.Ordinal))
+            {
+                emailitRequests.Add((
+                    path,
+                    body,
+                    request.Headers.Authorization?.Parameter ?? string.Empty,
+                    request.Headers.TryGetValues("Idempotency-Key", out var values) ? values.SingleOrDefault() ?? string.Empty : string.Empty));
+                return JsonResponse(new { id = $"emailit-{emailitRequests.Count}" }, HttpStatusCode.Accepted);
+            }
+
+            if (path.Contains("/v1/delivery/outbox/", StringComparison.Ordinal) && path.EndsWith("/sent", StringComparison.Ordinal))
+            {
+                sentReceiptRequests.Add((path, body));
+                return JsonResponse(new { status = "sent" }, HttpStatusCode.OK);
+            }
+
+            if (path.Contains("/v1/delivery/outbox/", StringComparison.Ordinal) && path.EndsWith("/failed", StringComparison.Ordinal))
+            {
+                failedReceiptRequests.Add((path, body));
+                return JsonResponse(new { status = "failed" }, HttpStatusCode.OK);
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound)
+            {
+                Content = new StringContent($"unexpected request: {path}", Encoding.UTF8, "text/plain")
+            };
+        })),
+        configuration,
+        loggerFactory.CreateLogger<SupportProgressEmailWorkflowService>());
+    var supportCases = new SupportCaseService(
+        supportStore,
+        supportAttachments,
+        rewards,
+        progressEmails,
+        loggerFactory.CreateLogger<SupportCaseService>());
     var robotsPath = Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "wwwroot", "robots.txt");
     Assert(File.Exists(robotsPath), "public shell should ship a robots.txt file.");
     var robotsText = File.ReadAllText(robotsPath);
@@ -2163,20 +2465,21 @@ async Task VerifyPublicLandingProjectionAsync()
         ContentRootPath = tempRoot,
         WebRootPath = Path.Combine(tempRoot, "wwwroot")
     };
-    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var windowsProofInstallers = new WindowsProofInstallerService(configuration);
+    var controller = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
     var downloadsController = new DownloadsCompatibilityController(
         releases,
-        new WindowsProofInstallerService(configuration),
+        windowsProofInstallers,
         releaseSelection,
         installLinking,
         installBootstrapTickets,
@@ -2195,6 +2498,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var supportCasesController = new SupportCasesController(
         linkedIdentityClient,
         accounts,
+        identityLinks,
         supportCases,
         supportPresentation,
         new SupportAssistantService(supportCases, canon, campaignSpine, installLinking, supportPresentation, loggerFactory.CreateLogger<SupportAssistantService>()),
@@ -2207,6 +2511,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var supportAutomationController = new SupportCasesController(
         linkedIdentityClient,
         accounts,
+        identityLinks,
         supportCases,
         supportPresentation,
         new SupportAssistantService(supportCases, canon, campaignSpine, installLinking, supportPresentation, loggerFactory.CreateLogger<SupportAssistantService>()),
@@ -2448,6 +2753,13 @@ async Task VerifyPublicLandingProjectionAsync()
             && method.GetCustomAttributes(typeof(HttpGetAttribute), inherit: true).Length > 0);
     Assert(publicContactPageMethod.GetParameters().Length == 1 && publicContactPageMethod.GetParameters()[0].ParameterType == typeof(CancellationToken), "public contact page should not accept a spoofable submitted query parameter.");
     var linkedUser = accounts.EnsureUser("subject.demo", "Runner Demo", "runner@example.invalid");
+    var linkedEmail = identityLinks.LinkEmail(new LinkEmailIdentityRequest(
+        SubjectId: "subject.demo",
+        Email: "runner@example.invalid",
+        MakePrimary: true));
+    identityLinks.ConfirmIdentityLink(new ConfirmIdentityLinkRequest(
+        SubjectId: "subject.demo",
+        IdentityLinkId: linkedEmail.IdentityLinkId));
     var operatorGroup = groups.CreateGroup(new CreateGroupRequest(
         SubjectId: "subject.demo",
         Name: "Smoke Crew Ops",
@@ -2547,6 +2859,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var supportAccepted = supportSubmitResult.Result as AcceptedAtActionResult;
     var supportPayload = supportAccepted?.Value as SupportCaseProjection;
     Assert(supportPayload is not null && string.Equals(supportPayload.Status, SupportCaseStatuses.New, StringComparison.Ordinal), "support case submission should create a new support case.");
+    Assert(string.Equals(supportPayload!.ReporterEmail, "runner@example.invalid", StringComparison.Ordinal), "signed-in support submission should stamp the reporter email for follow-up mail.");
     SupportCaseProjection supportCase = supportCases.Submit(
         linkedUser.UserId,
         "subject.demo",
@@ -2555,6 +2868,7 @@ async Task VerifyPublicLandingProjectionAsync()
             Title: supportPayload.Title,
             Summary: supportPayload.Summary,
             Detail: supportPayload.Detail,
+            ReporterEmail: supportPayload.ReporterEmail,
             InstallationId: supportPayload.InstallationId,
             ApplicationVersion: supportPayload.ApplicationVersion,
             ReleaseChannel: supportPayload.ReleaseChannel,
@@ -2608,6 +2922,60 @@ async Task VerifyPublicLandingProjectionAsync()
         new SupportAssistantRequest(Query: "What is the safest build handoff before I export this dossier back into the campaign?", InstallationId: "install-smoke-001"));
     Assert(buildAssistant.Citations.Any(static item => string.Equals(item.SourceKind, "build_truth", StringComparison.Ordinal)), "support assistant should reuse build-path truth for dossier handoff questions.");
     Assert(buildAssistant.Actions.Any(static item => string.Equals(item.ActionId, "open_work", StringComparison.Ordinal)), "support assistant should route build-path questions back to the signed-in work surface.");
+    SupportCaseProjection rejectedSupportCase = supportCases.Submit(
+        linkedUser.UserId,
+        "subject.demo",
+        new SupportCaseSubmitRequest(
+            Kind: SupportCaseKinds.BugReport,
+            Title: "Preview note should stay unchanged",
+            Summary: "The signed-in note already matches the intended recovery posture.",
+            Detail: "Please keep the current wording because the release lane is already behaving as designed.",
+            ReporterEmail: "runner@example.invalid",
+            InstallationId: "install-smoke-001",
+            ApplicationVersion: "0.6.2-smoke",
+            ReleaseChannel: "preview",
+            HeadId: "avalonia",
+            Platform: "linux",
+            Arch: "x64",
+            Source: SupportCaseSourceKinds.HubAccount));
+    var rejectedResult = supportAutomationController.Transition(
+        rejectedSupportCase.CaseId,
+        new SupportCaseTransitionRequest(
+            TargetStatus: SupportCaseStatuses.Rejected,
+            Note: "Rejected because the current signed-in wording already matches the intended release posture.",
+            Actor: "fleet",
+            DecisionOutcome: "denied",
+            ImplementationPosture: "not_implemented",
+            DecisionReason: "The reported issue could not be reproduced because the current release and recovery guidance already match the supported flow.",
+            EtaText: "No implementation is planned for this report."));
+    var rejectedPayload = (rejectedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
+    Assert(rejectedPayload is not null && string.Equals(rejectedPayload.Status, SupportCaseStatuses.Rejected, StringComparison.Ordinal), "rejected transition should move the case into the denied lane.");
+    Assert(rewards.ListBadgesForUser(linkedUser.UserId).Any(static badge => string.Equals(badge.Key, "feedback-denied", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Label, "Denied", StringComparison.Ordinal)), "rejected audited decisions should award Denied on the reporter account.");
+    var deniedRequestMail = rejectedPayload!.Timeline?.FirstOrDefault(item =>
+        string.Equals(item.Metadata?.GetValueOrDefault("email_stage_id"), "request_received", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(item.Metadata?.GetValueOrDefault("email_state"), "sent", StringComparison.OrdinalIgnoreCase));
+    Assert(deniedRequestMail is not null, "rejected workflow should still record a sent request-received mail receipt.");
+    var deniedDecisionMail = rejectedPayload.Timeline?.FirstOrDefault(item =>
+        string.Equals(item.Metadata?.GetValueOrDefault("email_stage_id"), "audited_decision", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(item.Metadata?.GetValueOrDefault("email_state"), "sent", StringComparison.OrdinalIgnoreCase));
+    Assert(deniedDecisionMail is not null, "rejected workflow should record a sent audited-decision mail receipt.");
+    Assert(string.Equals(deniedDecisionMail!.Metadata?.GetValueOrDefault("award_label"), "Denied", StringComparison.Ordinal), "rejected audited-decision mail should record the Denied award.");
+    Assert(string.Equals(deniedDecisionMail.Metadata?.GetValueOrDefault("decision_outcome"), "denied", StringComparison.Ordinal), "rejected audited-decision mail should record the denial outcome.");
+    Assert(string.Equals(deniedDecisionMail.Metadata?.GetValueOrDefault("implementation_posture"), "not_implemented", StringComparison.Ordinal), "rejected audited-decision mail should record the not-implemented posture.");
+    Assert(string.Equals(deniedDecisionMail.Metadata?.GetValueOrDefault("eta_text"), "No implementation is planned for this report.", StringComparison.Ordinal), "rejected audited-decision mail should preserve the no-implementation explanation.");
+    var acceptedResult = supportAutomationController.Transition(
+        supportCase.CaseId,
+        new SupportCaseTransitionRequest(
+            TargetStatus: SupportCaseStatuses.Accepted,
+            Note: "Accepted for the tracked implementation lane.",
+            Actor: "fleet",
+            DecisionOutcome: "approved",
+            ImplementationPosture: "will_implement",
+            DecisionReason: "The signed-in restart wording reproduced clearly and blocks a user-facing update path.",
+            EtaText: "Within the next preview drop."));
+    var acceptedPayload = (acceptedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
+    Assert(acceptedPayload is not null && string.Equals(acceptedPayload.Status, SupportCaseStatuses.Accepted, StringComparison.Ordinal), "accepted transition should move the case into the tracked implementation lane.");
+    Assert(rewards.ListBadgesForUser(linkedUser.UserId).Any(static badge => string.Equals(badge.Key, "clad-feedbacker-accepted", StringComparison.OrdinalIgnoreCase) && string.Equals(badge.Label, "Clad Feedbacker", StringComparison.Ordinal)), "accepted audited decisions should award Clad Feedbacker on the reporter account.");
     var releasedResult = supportAutomationController.Transition(
         supportCase.CaseId,
         new SupportCaseTransitionRequest(
@@ -2631,9 +2999,44 @@ async Task VerifyPublicLandingProjectionAsync()
         new SupportCaseNotificationRequest(
             Note: "Reporter notified that preview 0.6.3-smoke contains the fix.",
             Actor: "hub",
-            Channel: "account_history"));
+            Channel: "account_history",
+            DownloadUrl: "https://chummer.run/downloads"));
     var notifiedPayload = (notifiedResult.Result as OkObjectResult)?.Value as SupportCaseProjection;
     Assert(notifiedPayload is not null && string.Equals(notifiedPayload.Status, SupportCaseStatuses.UserNotified, StringComparison.Ordinal), "internal notify should close the user-facing loop.");
+    var requestReceivedMail = notifiedPayload!.Timeline?.FirstOrDefault(item =>
+        string.Equals(item.Metadata?.GetValueOrDefault("email_stage_id"), "request_received", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(item.Metadata?.GetValueOrDefault("email_state"), "sent", StringComparison.OrdinalIgnoreCase));
+    Assert(requestReceivedMail is not null, "support workflow should record a sent request-received mail receipt.");
+    var auditedDecisionMail = notifiedPayload.Timeline?.FirstOrDefault(item =>
+        string.Equals(item.Metadata?.GetValueOrDefault("email_stage_id"), "audited_decision", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(item.Metadata?.GetValueOrDefault("email_state"), "sent", StringComparison.OrdinalIgnoreCase));
+    Assert(auditedDecisionMail is not null, "support workflow should record a sent audited-decision mail receipt.");
+    Assert(string.Equals(auditedDecisionMail!.Metadata?.GetValueOrDefault("award_label"), "Clad Feedbacker", StringComparison.Ordinal), "accepted audited-decision mail should record the Clad Feedbacker award.");
+    Assert(string.Equals(auditedDecisionMail.Metadata?.GetValueOrDefault("decision_outcome"), "approved", StringComparison.Ordinal), "audited-decision mail should record the approval decision.");
+    Assert(string.Equals(auditedDecisionMail.Metadata?.GetValueOrDefault("eta_text"), "Within the next preview drop.", StringComparison.Ordinal), "audited-decision mail should preserve the bounded ETA text.");
+    var fixAvailableMail = notifiedPayload.Timeline?.FirstOrDefault(item =>
+        string.Equals(item.Metadata?.GetValueOrDefault("email_stage_id"), "fix_available", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(item.Metadata?.GetValueOrDefault("email_state"), "sent", StringComparison.OrdinalIgnoreCase));
+    Assert(fixAvailableMail is not null, "support workflow should record a sent fix-available mail receipt.");
+    Assert(string.Equals(fixAvailableMail!.Metadata?.GetValueOrDefault("download_url"), "https://chummer.run/downloads", StringComparison.Ordinal), "fix-available mail should keep the download route in the recorded receipt.");
+    Assert(executeRequests.Count >= 3, "support workflow should queue staged progress mail through EA connector.dispatch.");
+    Assert(emailitRequests.Count >= 3, "support workflow should send the staged progress mail through Emailit.");
+    Assert(sentReceiptRequests.Count >= 3, "support workflow should mark the staged progress mail as sent in the EA outbox.");
+    Assert(failedReceiptRequests.Count == 0, "support workflow should not dead-letter staged progress mail in the smoke path.");
+    Assert(executeRequests.Any(item => item.Body.Contains("\"stage_id\":\"request_received\"", StringComparison.Ordinal)), "connector.dispatch payloads should include the request-received stage id.");
+    Assert(executeRequests.Any(item => item.Body.Contains("\"stage_id\":\"audited_decision\"", StringComparison.Ordinal)), "connector.dispatch payloads should include the audited-decision stage id.");
+    Assert(executeRequests.Any(item => item.Body.Contains("\"stage_id\":\"fix_available\"", StringComparison.Ordinal)), "connector.dispatch payloads should include the fix-available stage id.");
+    Assert(executeRequests.All(item => string.Equals(item.Authorization, "ea-smoke-token", StringComparison.Ordinal)), "connector.dispatch calls should use the configured EA bearer token.");
+    Assert(executeRequests.All(item => string.Equals(item.PrincipalId, "support-progress-principal", StringComparison.Ordinal)), "connector.dispatch calls should use the configured EA principal scope.");
+    Assert(emailitRequests.Any(item =>
+        item.Body.Contains("wageslave@chummer.run", StringComparison.OrdinalIgnoreCase)
+        && item.Body.Contains("Wageslave", StringComparison.Ordinal)), "Emailit payloads should send from the Wageslave support mailbox.");
+    Assert(emailitRequests.Any(item => item.Body.Contains("Your request is in.", StringComparison.Ordinal)), "request-received mail should acknowledge the submitted request.");
+    Assert(emailitRequests.Any(item => item.Body.Contains("Award: Denied", StringComparison.Ordinal) && item.Body.Contains("No implementation is planned for this report.", StringComparison.Ordinal)), "rejected audited-decision mail should include the Denied award and the no-implementation explanation.");
+    Assert(emailitRequests.Any(item => item.Body.Contains("Award: Clad Feedbacker", StringComparison.Ordinal) && item.Body.Contains("Within the next preview drop.", StringComparison.Ordinal)), "audited-decision mail should include the award and ETA text.");
+    Assert(emailitRequests.Any(item => item.Body.Contains("Please test it on the affected flow", StringComparison.Ordinal) && item.Body.Contains("https://chummer.run/downloads", StringComparison.Ordinal)), "fix-available mail should ask the reporter to test the release and include the download route.");
+    Assert(emailitRequests.All(item => string.Equals(item.Authorization, "emailit-smoke-token", StringComparison.Ordinal)), "Emailit sends should use the configured provider token.");
+    Assert(emailitRequests.All(item => !string.IsNullOrWhiteSpace(item.IdempotencyKey)), "Emailit sends should carry an idempotency key.");
 
     var accountPage = await accountController.AccountPage(section: null, caseId: null, CancellationToken.None) as ViewResult;
     var accountModel = accountPage?.Model as AccountPageViewModel;
@@ -3934,7 +4337,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -6048,6 +6451,18 @@ sealed class StubHttpMessageHandler : HttpMessageHandler
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         => Task.FromResult(_handler(request));
+}
+
+sealed class StubHttpClientFactory : IHttpClientFactory
+{
+    private readonly HttpClient _client;
+
+    public StubHttpClientFactory(HttpClient client)
+    {
+        _client = client;
+    }
+
+    public HttpClient CreateClient(string name) => _client;
 }
 
 sealed class StubReleaseChannelManifestStore : IReleaseChannelManifestStore

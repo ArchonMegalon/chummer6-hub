@@ -67,6 +67,38 @@ Manual path:
 1. `RUNBOOK_MODE=downloads-sync-s3 DOWNLOAD_BUNDLE_DIR=<bundleDir> CHUMMER_PORTAL_DOWNLOADS_S3_URI=<s3://bucket/path> CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL=<portalBaseOrManifestUrl> [CHUMMER_PORTAL_DOWNLOADS_S3_ENDPOINT_URL=<endpoint>] bash scripts/runbook.sh`
 2. `RUNBOOK_MODE=downloads-verify DOWNLOADS_VERIFY_LINKS=1 DOWNLOADS_VERIFY_TARGET=<portalBaseOrManifestUrl> bash scripts/runbook.sh`
 
+## Mode C: Live `chummer.run` HTTP Publish
+
+Use this mode when the public site must expose both the rebuilt downloads shelf and the new proof/deep-link controller routes.
+
+Repository variables:
+1. `CHUMMER_RELEASE_UPLOAD_TOKEN`
+2. `CHUMMER_RELEASE_UPLOAD_URL` (optional; defaults to `https://chummer.run/api/internal/releases/bundles`)
+3. `CHUMMER_RELEASE_UPLOAD_SESSIONS_URL` (optional; defaults to `https://chummer.run/api/internal/releases/upload-sessions`)
+4. `CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL` (optional; defaults to `https://chummer.run/downloads/RELEASE_CHANNEL.generated.json`)
+
+Required live sequence:
+1. Deploy the updated public edge app first so the proof routes exist:
+`docker compose --env-file .env -f docker-compose.public-edge.yml up -d --build chummer-portal`
+2. Rebuild the current unified shelf bundle:
+`bash scripts/materialize-public-downloads-bundle.sh`
+3. Upload the rebuilt bundle to the live shelf:
+`CHUMMER_RELEASE_UPLOAD_TOKEN=<ticket-or-token> RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
+
+Dry run:
+1. `CHUMMER_RELEASE_UPLOAD_DRY_RUN=1 RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
+
+Required post-publish checks:
+1. `https://chummer.run/downloads/RELEASE_CHANNEL.generated.json`
+2. `https://chummer.run/downloads/install/avalonia-osx-arm64-installer`
+3. `https://chummer.run/downloads/install/blazor-desktop-osx-arm64-installer`
+4. `https://chummer.run/downloads/install/avalonia-win-x64-installer`
+5. `https://chummer.run/downloads/install/blazor-desktop-win-x64-installer`
+6. `https://chummer.run/downloads/install/avalonia-win-x64-installer/proof`
+7. `https://chummer.run/downloads/install/blazor-desktop-win-x64-installer/proof`
+8. `https://chummer.run/downloads/proof/windows/chummer-avalonia-win-x64-installer.exe`
+9. `https://chummer.run/downloads/proof/windows/chummer-blazor-desktop-win-x64-installer.exe`
+
 ## Strict Test Gate Commands (host-side)
 
 Use these when you want hard failures instead of soft-skips.
@@ -93,6 +125,7 @@ Docker tests:
 2. `version` is not `"unpublished"` in deployment mode.
 3. When `CHUMMER_PORTAL_DOWNLOADS_VERIFY_LINKS=true` (or `DOWNLOADS_VERIFY_LINKS=1`), each artifact URL/file in manifest verification is reachable.
 4. Portal `/downloads/` renders artifact links that return HTTP 200.
+5. When the bundle ships `proof/windows`, the deployed shelf exposes both the proof dispatch routes and the direct proof files.
 
 ## Portal Status Meanings
 

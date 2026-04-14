@@ -5,6 +5,7 @@ using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -13,6 +14,25 @@ namespace Chummer.Tests;
 
 public sealed class PublicLandingDownloadDispatchTests
 {
+    [Fact]
+    public void DownloadDispatchPage_Advertises_Head_And_Get_For_Probe_Safe_Install_Handoff()
+    {
+        var method = typeof(PublicLandingController).GetMethod(nameof(PublicLandingController.DownloadDispatchPage));
+        Assert.NotNull(method);
+
+        var routes = method!
+            .GetCustomAttributes(typeof(HttpMethodAttribute), inherit: true)
+            .Cast<HttpMethodAttribute>()
+            .ToArray();
+
+        Assert.Contains(routes, route =>
+            string.Equals(route.Template, "/downloads/install/{artifactId}", StringComparison.Ordinal)
+            && route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
+        Assert.Contains(routes, route =>
+            string.Equals(route.Template, "/downloads/install/{artifactId}", StringComparison.Ordinal)
+            && route.HttpMethods.Contains("HEAD", StringComparer.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public async Task BootstrapScriptAcceptsInstallTicketWithoutBrowserSession()
     {
@@ -446,6 +466,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 installBootstrapTickets: InstallBootstrapTickets,
                 personalizedInstallScripts: PersonalizedInstallScripts,
                 releaseUploadTickets: null!,
+                windowsProofInstallers: new WindowsProofInstallerService(Configuration),
                 webHostEnvironment: null!,
                 logger: NullLogger<PublicLandingController>.Instance);
         }

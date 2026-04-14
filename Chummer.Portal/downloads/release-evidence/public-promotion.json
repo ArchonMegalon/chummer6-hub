@@ -1,0 +1,34 @@
+{
+  "contractName": "chummer.run.desktop_release_publication",
+  "generatedAt": "2026-04-05T00:57:29Z",
+  "artifacts": [
+    {
+      "artifactId": "avalonia-linux-x64-installer",
+      "fileName": "chummer-avalonia-linux-x64-installer.deb",
+      "platform": "linux",
+      "promotionStatus": "pass",
+      "startupSmokeStatus": "pass",
+      "startupSmokeReason": "",
+      "startupSmokeReceiptPath": "/docker/chummercomplete/chummer6-ui/Docker/Downloads/startup-smoke/startup-smoke-avalonia-linux-x64.receipt.json",
+      "signingStatus": null,
+      "notarizationStatus": null,
+      "artifactSha256": "4544ef844262d3381bc424105c4d67e95fa6f3c2541c1c79b00d0b4666a6198c",
+      "artifactSizeBytes": 31796460,
+      "kind": "installer"
+    },
+    {
+      "artifactId": "blazor-desktop-linux-x64-installer",
+      "fileName": "chummer-blazor-desktop-linux-x64-installer.deb",
+      "platform": "linux",
+      "promotionStatus": "pass",
+      "startupSmokeStatus": "pass",
+      "startupSmokeReason": "",
+      "startupSmokeReceiptPath": "/docker/chummercomplete/chummer6-ui/Docker/Downloads/startup-smoke/startup-smoke-blazor-desktop-linux-x64.receipt.json",
+      "signingStatus": null,
+      "notarizationStatus": null,
+      "artifactSha256": "fba47bb24a11f45dcd37c9d70b036346355d24802a434bf9eac2e6f3767c11f3",
+      "artifactSizeBytes": 34182932,
+      "kind": "installer"
+    }
+  ]
+}

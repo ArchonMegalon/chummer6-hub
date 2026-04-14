@@ -350,6 +350,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/downloads/install/{artifactId}")]
+    [HttpHead("/downloads/install/{artifactId}")]
     [Produces("text/html")]
     public async Task<IActionResult> DownloadDispatchPage([FromRoute] string artifactId, CancellationToken cancellationToken)
     {

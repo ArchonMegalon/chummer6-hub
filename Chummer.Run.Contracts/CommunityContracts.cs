@@ -13,7 +13,10 @@ public sealed record HubUserDto(
     IReadOnlyList<string> LinkedPrincipals,
     IReadOnlyList<string> GroupIds,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc)
+{
+    public string Email { get; init; } = string.Empty;
+}
 
 public sealed record UpsertHubUserProfileRequest(
     [StringLength(128)] string? SubjectId,

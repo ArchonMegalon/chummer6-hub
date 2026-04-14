@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Chummer.Control.Contracts.Support;
+using Chummer.Run.Api.Services.Community;
 
 namespace Chummer.Run.Api.Services.Support;
 
@@ -36,15 +37,21 @@ public sealed class SupportCaseService
 
     private readonly SupportStore _store;
     private readonly SupportAttachmentStorageService _attachments;
+    private readonly RewardService _rewards;
+    private readonly SupportProgressEmailWorkflowService _progressEmails;
     private readonly ILogger<SupportCaseService> _logger;
 
     public SupportCaseService(
         SupportStore store,
         SupportAttachmentStorageService attachments,
+        RewardService rewards,
+        SupportProgressEmailWorkflowService progressEmails,
         ILogger<SupportCaseService> logger)
     {
         _store = store;
         _attachments = attachments;
+        _rewards = rewards;
+        _progressEmails = progressEmails;
         _logger = logger;
     }
 
@@ -88,6 +95,7 @@ public sealed class SupportCaseService
             headId,
             candidateOwnerRepo);
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        SupportCaseProjection saved;
 
         lock (_store.Gate)
         {
@@ -119,52 +127,59 @@ public sealed class SupportCaseService
                 updated = AttachUploadsLocked(updated, attachments, source, now);
                 _store.CasesById[updated.CaseId] = updated;
                 _store.PersistLocked();
-                return updated;
+                saved = updated;
             }
+            else
+            {
+                string caseId = $"support_case_{NewIdFragment()}";
+                SupportCaseProjection created = new(
+                    CaseId: caseId,
+                    ClusterKey: clusterKey,
+                    Kind: kind,
+                    Status: SupportCaseStatuses.New,
+                    Title: title,
+                    Summary: summary,
+                    Detail: detail,
+                    CandidateOwnerRepo: candidateOwnerRepo,
+                    DesignImpactSuspected: designImpact,
+                    CreatedAtUtc: now,
+                    UpdatedAtUtc: now,
+                    Source: source,
+                    ReporterEmail: reporterEmail,
+                    ReporterUserId: userId,
+                    ReporterSubjectId: subjectId,
+                    InstallationId: installationId,
+                    ApplicationVersion: applicationVersion,
+                    ReleaseChannel: releaseChannel,
+                    HeadId: headId,
+                    Platform: platform,
+                    Arch: arch,
+                    RelatedIds: Array.Empty<string>(),
+                    Timeline:
+                    [
+                        BuildEvent(
+                            status: SupportCaseStatuses.New,
+                            summary: "Support case submitted.",
+                            occurredAtUtc: now,
+                            actor: source,
+                            metadata: BuildMetadata(
+                                ("candidate_owner_repo", candidateOwnerRepo),
+                                ("design_impact_suspected", designImpact ? "true" : "false")))
+                    ]);
 
-            string caseId = $"support_case_{NewIdFragment()}";
-            SupportCaseProjection created = new(
-                CaseId: caseId,
-                ClusterKey: clusterKey,
-                Kind: kind,
-                Status: SupportCaseStatuses.New,
-                Title: title,
-                Summary: summary,
-                Detail: detail,
-                CandidateOwnerRepo: candidateOwnerRepo,
-                DesignImpactSuspected: designImpact,
-                CreatedAtUtc: now,
-                UpdatedAtUtc: now,
-                Source: source,
-                ReporterEmail: reporterEmail,
-                ReporterUserId: userId,
-                ReporterSubjectId: subjectId,
-                InstallationId: installationId,
-                ApplicationVersion: applicationVersion,
-                ReleaseChannel: releaseChannel,
-                HeadId: headId,
-                Platform: platform,
-                Arch: arch,
-                RelatedIds: Array.Empty<string>(),
-                Timeline:
-                [
-                    BuildEvent(
-                        status: SupportCaseStatuses.New,
-                        summary: "Support case submitted.",
-                        occurredAtUtc: now,
-                        actor: source,
-                        metadata: BuildMetadata(
-                            ("candidate_owner_repo", candidateOwnerRepo),
-                            ("design_impact_suspected", designImpact ? "true" : "false")))
-                ]);
-
-            created = AttachUploadsLocked(created, attachments, source, now);
-            _store.CasesById[caseId] = created;
-            _store.CaseIdByClusterKey[clusterKey] = caseId;
-            _store.PersistLocked();
-            _logger.LogInformation("Accepted support case {CaseId} ({Kind}) for {CandidateOwnerRepo}.", caseId, kind, candidateOwnerRepo);
-            return created;
+                created = AttachUploadsLocked(created, attachments, source, now);
+                _store.CasesById[caseId] = created;
+                _store.CaseIdByClusterKey[clusterKey] = caseId;
+                _store.PersistLocked();
+                _logger.LogInformation("Accepted support case {CaseId} ({Kind}) for {CandidateOwnerRepo}.", caseId, kind, candidateOwnerRepo);
+                saved = created;
+            }
         }
+
+        SupportProgressEmailDispatchResult receipt = _progressEmails.SendRequestReceived(saved);
+        return string.Equals(receipt.State, "skipped", StringComparison.OrdinalIgnoreCase)
+            ? saved
+            : RecordProgressEmailReceipt(saved.CaseId, receipt, actor: saved.Source);
     }
 
     public SupportCaseProjection UpsertFromCrash(
@@ -333,7 +348,12 @@ public sealed class SupportCaseService
         string? fixedVersion = NormalizeOptional(request.FixedVersion, 64);
         string? fixedChannel = NormalizeOptional(request.FixedChannel, 64);
         string? actor = NormalizeOptional(request.Actor, 64) ?? SupportCaseSourceKinds.FleetAutomation;
+        string? decisionOutcome = NormalizeOptional(request.DecisionOutcome, 32);
+        string? implementationPosture = NormalizeOptional(request.ImplementationPosture, 32);
+        string? decisionReason = NormalizeOptional(request.DecisionReason, 160);
+        string? etaText = NormalizeOptional(request.EtaText, 80);
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        SupportCaseProjection updated;
 
         lock (_store.Gate)
         {
@@ -342,7 +362,7 @@ public sealed class SupportCaseService
                 throw new KeyNotFoundException($"Unknown support case: {caseId}");
             }
 
-            SupportCaseProjection updated = existing with
+            updated = existing with
             {
                 Status = targetStatus,
                 UpdatedAtUtc = now,
@@ -360,12 +380,27 @@ public sealed class SupportCaseService
                         actor: actor,
                         metadata: BuildMetadata(
                             ("fixed_version", fixedVersion),
-                            ("fixed_channel", fixedChannel))))
+                            ("fixed_channel", fixedChannel),
+                            ("decision_outcome", decisionOutcome),
+                            ("implementation_posture", implementationPosture),
+                            ("decision_reason", decisionReason),
+                            ("eta_text", etaText))))
             };
             _store.CasesById[updated.CaseId] = updated;
             _store.PersistLocked();
-            return updated;
         }
+
+        SyncDecisionAward(updated, targetStatus);
+        if (ShouldSendAuditedDecisionEmail(targetStatus))
+        {
+            SupportProgressEmailDispatchResult receipt = _progressEmails.SendAuditedDecision(updated, request);
+            if (!string.Equals(receipt.State, "skipped", StringComparison.OrdinalIgnoreCase))
+            {
+                updated = RecordProgressEmailReceipt(updated.CaseId, receipt, actor);
+            }
+        }
+
+        return updated;
     }
 
     public SupportCaseProjection RecordNotification(string caseId, SupportCaseNotificationRequest request)
@@ -376,7 +411,10 @@ public sealed class SupportCaseService
         string note = NormalizeRequired(request.Note, nameof(request.Note), 160);
         string? actor = NormalizeOptional(request.Actor, 64) ?? SupportCaseSourceKinds.FleetAutomation;
         string? channel = NormalizeOptional(request.Channel, 64);
+        string? downloadUrl = NormalizeOptional(request.DownloadUrl, 400);
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        SupportCaseProjection updated;
+        string priorStatus;
 
         lock (_store.Gate)
         {
@@ -393,7 +431,8 @@ public sealed class SupportCaseService
                     "Support cases may only send user-facing notifications after release-to-reporter-channel, deferral, or rejection.");
             }
 
-            SupportCaseProjection updated = existing with
+            priorStatus = existing.Status;
+            updated = existing with
             {
                 Status = SupportCaseStatuses.UserNotified,
                 UpdatedAtUtc = now,
@@ -405,12 +444,24 @@ public sealed class SupportCaseService
                         summary: note,
                         occurredAtUtc: now,
                         actor: actor,
-                        metadata: BuildMetadata(("channel", channel))))
+                        metadata: BuildMetadata(
+                            ("channel", channel),
+                            ("download_url", downloadUrl))))
             };
             _store.CasesById[updated.CaseId] = updated;
             _store.PersistLocked();
-            return updated;
         }
+
+        if (string.Equals(priorStatus, SupportCaseStatuses.ReleasedToReporterChannel, StringComparison.OrdinalIgnoreCase))
+        {
+            SupportProgressEmailDispatchResult receipt = _progressEmails.SendFixAvailable(updated, request);
+            if (!string.Equals(receipt.State, "skipped", StringComparison.OrdinalIgnoreCase))
+            {
+                updated = RecordProgressEmailReceipt(updated.CaseId, receipt, actor);
+            }
+        }
+
+        return updated;
     }
 
     public SupportCaseProjection VerifyForReporter(
@@ -561,8 +612,87 @@ public sealed class SupportCaseService
                     occurredAtUtc: occurredAtUtc,
                     actor: source,
                     metadata: BuildMetadata(("attachment_count", saved.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)))))
-        };
+            };
     }
+
+    private SupportCaseProjection RecordProgressEmailReceipt(
+        string caseId,
+        SupportProgressEmailDispatchResult receipt,
+        string? actor)
+    {
+        lock (_store.Gate)
+        {
+            if (!_store.CasesById.TryGetValue(caseId, out SupportCaseProjection? existing))
+            {
+                throw new KeyNotFoundException($"Unknown support case: {caseId}");
+            }
+
+            SupportCaseProjection updated = existing with
+            {
+                UpdatedAtUtc = receipt.OccurredAtUtc,
+                Timeline = AppendTimeline(
+                    existing.Timeline,
+                    BuildEvent(
+                        status: existing.Status,
+                        summary: BuildProgressEmailSummary(receipt),
+                        occurredAtUtc: receipt.OccurredAtUtc,
+                        actor: actor,
+                        metadata: BuildMetadata(
+                            ("email_stage_id", receipt.StageId),
+                            ("email_state", receipt.State),
+                            ("email_provider", receipt.Provider),
+                            ("delivery_id", receipt.DeliveryId),
+                            ("recipient", receipt.Recipient),
+                            ("from_email", receipt.FromEmail),
+                            ("subject", receipt.Subject),
+                            ("award_key", receipt.AwardKey),
+                            ("award_label", receipt.AwardLabel),
+                            ("decision_outcome", receipt.DecisionOutcome),
+                            ("implementation_posture", receipt.ImplementationPosture),
+                            ("reason", receipt.Reason),
+                            ("eta_text", receipt.EtaText),
+                            ("download_url", receipt.DownloadUrl),
+                            ("error", receipt.Error))))
+            };
+            _store.CasesById[updated.CaseId] = updated;
+            _store.PersistLocked();
+            return updated;
+        }
+    }
+
+    private void SyncDecisionAward(SupportCaseProjection supportCase, string targetStatus)
+    {
+        string? reporterUserId = NormalizeOptional(supportCase.ReporterUserId, 64);
+        if (reporterUserId is null)
+        {
+            return;
+        }
+
+        if (string.Equals(targetStatus, SupportCaseStatuses.Accepted, StringComparison.OrdinalIgnoreCase))
+        {
+            _rewards.AwardBadgeIfMissing(reporterUserId, "clad-feedbacker-accepted", "Clad Feedbacker");
+            _rewards.RevokeBadgeIfActive(reporterUserId, "feedback-denied", "accepted");
+        }
+        else if (string.Equals(targetStatus, SupportCaseStatuses.Deferred, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(targetStatus, SupportCaseStatuses.Rejected, StringComparison.OrdinalIgnoreCase))
+        {
+            _rewards.AwardBadgeIfMissing(reporterUserId, "feedback-denied", "Denied");
+            _rewards.RevokeBadgeIfActive(reporterUserId, "clad-feedbacker-accepted", "denied");
+        }
+    }
+
+    private static bool ShouldSendAuditedDecisionEmail(string targetStatus)
+        => string.Equals(targetStatus, SupportCaseStatuses.Accepted, StringComparison.OrdinalIgnoreCase)
+           || string.Equals(targetStatus, SupportCaseStatuses.Deferred, StringComparison.OrdinalIgnoreCase)
+           || string.Equals(targetStatus, SupportCaseStatuses.Rejected, StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildProgressEmailSummary(SupportProgressEmailDispatchResult receipt)
+        => receipt.State switch
+        {
+            "sent" => $"Progress email '{receipt.StageId}' sent to {receipt.Recipient}.",
+            "skipped" => $"Progress email '{receipt.StageId}' skipped.",
+            _ => $"Progress email '{receipt.StageId}' failed."
+        };
 
     private static SupportCaseTimelineEvent[] AppendTimeline(
         IReadOnlyList<SupportCaseTimelineEvent>? existing,

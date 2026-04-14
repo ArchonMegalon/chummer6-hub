@@ -72,8 +72,8 @@
   "rolloutState": "local_docker_preview",
   "rolloutReason": "Current release shelf was exercised by the local docker release proof harness before publication.",
   "supportabilityState": "local_docker_proven",
-  "supportabilitySummary": "Local release proof passed for: install_claim_restore_continue, build_explain_publish, campaign_session_recover_recap, report_cluster_release_notify. Claimed-device restore and bounded offline prefetch stayed grounded on the current shelf.",
-  "knownIssueSummary": "Preview caveats still apply, but the current shelf has recent install, claimed-device recovery, bounded offline prefetch, and support proof instead of only manifest presence.",
+  "supportabilitySummary": "Local release proof passed for: install_claim_restore_continue, build_explain_publish, campaign_session_recover_recap, report_cluster_release_notify, organize_community_and_close_loop. Claimed-device restore and bounded offline prefetch stayed grounded on the current shelf. Clustered release notification stayed grounded on the current shelf. Community organizer closure stayed grounded on the current shelf.",
+  "knownIssueSummary": "Preview caveats still apply, but the current shelf has recent install, claimed-device recovery, clustered release notification, community closure, bounded offline prefetch, and support proof instead of only manifest presence.",
   "fixAvailabilitySummary": "Only send fixed notices after the affected install can receive the published channel artifact now on the shelf.",
   "releaseProof": {
     "status": "passed",
@@ -83,7 +83,8 @@
       "install_claim_restore_continue",
       "build_explain_publish",
       "campaign_session_recover_recap",
-      "report_cluster_release_notify"
+      "report_cluster_release_notify",
+      "organize_community_and_close_loop"
     ],
     "proofRoutes": [
       "/downloads/install/avalonia-linux-x64-installer",

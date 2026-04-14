@@ -172,6 +172,18 @@ for file_name in "${promoted_file_names[@]}"; do
   cp "$source_path" "$DEPLOY_DIR/files/"
 done
 
+rm -rf "$DEPLOY_DIR/proof"
+if [[ -d "$BUNDLE_DIR/proof" ]]; then
+  mkdir -p "$DEPLOY_DIR/proof"
+  cp -R "$BUNDLE_DIR/proof"/. "$DEPLOY_DIR/proof"/
+fi
+
+rm -rf "$DEPLOY_DIR/startup-smoke"
+if [[ -d "$STARTUP_SMOKE_SOURCE" ]]; then
+  mkdir -p "$DEPLOY_DIR/startup-smoke"
+  cp -R "$STARTUP_SMOKE_SOURCE"/. "$DEPLOY_DIR/startup-smoke"/
+fi
+
 if to_bool "$DEPLOY_MODE"; then
   export CHUMMER_PORTAL_DOWNLOADS_REQUIRE_PUBLISHED_VERSION="${CHUMMER_PORTAL_DOWNLOADS_REQUIRE_PUBLISHED_VERSION:-true}"
   export CHUMMER_PORTAL_DOWNLOADS_VERIFY_LINKS="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_LINKS:-true}"

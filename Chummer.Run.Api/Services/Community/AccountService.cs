@@ -1,15 +1,23 @@
 using System.Text;
 using Chummer.Run.Contracts.Community;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chummer.Run.Api.Services.Community;
 
 public sealed class AccountService
 {
     private readonly CommunityStore _store;
+    private readonly TeableUserProjectionService? _teableUsers;
+    private readonly ILogger<AccountService> _logger;
 
-    public AccountService(CommunityStore store)
+    public AccountService(
+        CommunityStore store,
+        TeableUserProjectionService? teableUsers = null,
+        ILogger<AccountService>? logger = null)
     {
         _store = store;
+        _teableUsers = teableUsers;
+        _logger = logger ?? NullLogger<AccountService>.Instance;
     }
 
     public HubUserDto UpsertProfile(UpsertHubUserProfileRequest request)
@@ -18,6 +26,7 @@ public sealed class AccountService
         var now = DateTimeOffset.UtcNow;
         var requestedDisplayName = NormalizeUserFacingDisplayName(request.DisplayName, subjectId);
         var requestedHandle = NormalizeUserFacingHandle(request.Handle, subjectId);
+        HubUserDto result;
         lock (_store.Gate)
         {
             if (_store.UserIdBySubjectId.TryGetValue(subjectId, out var existingUserId)
@@ -36,34 +45,45 @@ public sealed class AccountService
                 };
                 _store.UsersById[updated.UserId] = updated;
                 _store.PersistLocked();
-                return updated;
+                result = updated;
             }
-
-            var createdDisplayName = ResolveDisplayName(subjectId, requestedDisplayName, email: null);
-            var createdHandle = ResolveHandle(subjectId, requestedHandle, createdDisplayName, email: null);
-            var created = new HubUserDto(
-                UserId: NewId("usr"),
-                SubjectId: subjectId,
-                DisplayName: createdDisplayName,
-                Handle: createdHandle,
-                Visibility: NormalizeOptional(request.Visibility) ?? "private",
-                Timezone: NormalizeOptional(request.Timezone) ?? "UTC",
-                CountryCode: NormalizeOptional(request.CountryCode) ?? "",
-                LinkedPrincipals: new[] { subjectId },
-                GroupIds: Array.Empty<string>(),
-                CreatedAtUtc: now,
-                UpdatedAtUtc: now);
-            _store.UserIdBySubjectId[subjectId] = created.UserId;
-            _store.UsersById[created.UserId] = created;
-            _store.PersistLocked();
-            return created;
+            else
+            {
+                var createdDisplayName = ResolveDisplayName(subjectId, requestedDisplayName, email: null);
+                var createdHandle = ResolveHandle(subjectId, requestedHandle, createdDisplayName, email: null);
+                var created = new HubUserDto(
+                    UserId: NewId("usr"),
+                    SubjectId: subjectId,
+                    DisplayName: createdDisplayName,
+                    Handle: createdHandle,
+                    Visibility: NormalizeOptional(request.Visibility) ?? "private",
+                    Timezone: NormalizeOptional(request.Timezone) ?? "UTC",
+                    CountryCode: NormalizeOptional(request.CountryCode) ?? "",
+                    LinkedPrincipals: new[] { subjectId },
+                    GroupIds: Array.Empty<string>(),
+                    CreatedAtUtc: now,
+                    UpdatedAtUtc: now)
+                {
+                    Email = string.Empty,
+                };
+                _store.UserIdBySubjectId[subjectId] = created.UserId;
+                _store.UsersById[created.UserId] = created;
+                _store.PersistLocked();
+                result = created;
+            }
         }
+
+        QueueTeableSync(result);
+        return result;
     }
 
     public HubUserDto EnsureUser(string subjectId, string? displayName = null, string? email = null)
     {
         var normalizedSubjectId = NormalizeRequired(subjectId, nameof(subjectId));
         var requestedDisplayName = NormalizeUserFacingDisplayName(displayName, normalizedSubjectId);
+        var normalizedEmail = NormalizeOptional(email) ?? string.Empty;
+        HubUserDto result;
+        bool changed;
         lock (_store.Gate)
         {
             if (_store.UserIdBySubjectId.TryGetValue(normalizedSubjectId, out var existingUserId)
@@ -72,9 +92,13 @@ public sealed class AccountService
                 var resolvedDisplayName = ResolveDisplayName(normalizedSubjectId, requestedDisplayName, email, existing.DisplayName);
                 var resolvedHandle = ResolveHandle(normalizedSubjectId, preferredHandle: null, resolvedDisplayName, email, existing.Handle);
                 var resolvedTimezone = NormalizeOptional(existing.Timezone) ?? "UTC";
+                var resolvedEmail = normalizedEmail.Length == 0
+                    ? NormalizeOptional(existing.Email) ?? string.Empty
+                    : normalizedEmail;
                 if (string.Equals(existing.DisplayName, resolvedDisplayName, StringComparison.Ordinal)
                     && string.Equals(existing.Handle, resolvedHandle, StringComparison.Ordinal)
-                    && string.Equals(existing.Timezone, resolvedTimezone, StringComparison.Ordinal))
+                    && string.Equals(existing.Timezone, resolvedTimezone, StringComparison.Ordinal)
+                    && string.Equals(NormalizeOptional(existing.Email) ?? string.Empty, resolvedEmail, StringComparison.Ordinal))
                 {
                     return existing;
                 }
@@ -84,33 +108,48 @@ public sealed class AccountService
                     DisplayName = resolvedDisplayName,
                     Handle = resolvedHandle,
                     Timezone = resolvedTimezone,
+                    Email = resolvedEmail,
                     UpdatedAtUtc = DateTimeOffset.UtcNow
                 };
                 _store.UsersById[updated.UserId] = updated;
                 _store.PersistLocked();
-                return updated;
+                result = updated;
+                changed = true;
             }
-
-            var createdDisplayName = ResolveDisplayName(normalizedSubjectId, requestedDisplayName, email);
-            var createdHandle = ResolveHandle(normalizedSubjectId, preferredHandle: null, createdDisplayName, email);
-            var now = DateTimeOffset.UtcNow;
-            var created = new HubUserDto(
-                UserId: NewId("usr"),
-                SubjectId: normalizedSubjectId,
-                DisplayName: createdDisplayName,
-                Handle: createdHandle,
-                Visibility: "private",
-                Timezone: "UTC",
-                CountryCode: "",
-                LinkedPrincipals: new[] { normalizedSubjectId },
-                GroupIds: Array.Empty<string>(),
-                CreatedAtUtc: now,
-                UpdatedAtUtc: now);
-            _store.UserIdBySubjectId[normalizedSubjectId] = created.UserId;
-            _store.UsersById[created.UserId] = created;
-            _store.PersistLocked();
-            return created;
+            else
+            {
+                var createdDisplayName = ResolveDisplayName(normalizedSubjectId, requestedDisplayName, email);
+                var createdHandle = ResolveHandle(normalizedSubjectId, preferredHandle: null, createdDisplayName, email);
+                var now = DateTimeOffset.UtcNow;
+                var created = new HubUserDto(
+                    UserId: NewId("usr"),
+                    SubjectId: normalizedSubjectId,
+                    DisplayName: createdDisplayName,
+                    Handle: createdHandle,
+                    Visibility: "private",
+                    Timezone: "UTC",
+                    CountryCode: "",
+                    LinkedPrincipals: new[] { normalizedSubjectId },
+                    GroupIds: Array.Empty<string>(),
+                    CreatedAtUtc: now,
+                    UpdatedAtUtc: now)
+                {
+                    Email = normalizedEmail,
+                };
+                _store.UserIdBySubjectId[normalizedSubjectId] = created.UserId;
+                _store.UsersById[created.UserId] = created;
+                _store.PersistLocked();
+                result = created;
+                changed = true;
+            }
         }
+
+        if (changed)
+        {
+            QueueTeableSync(result);
+        }
+
+        return result;
     }
 
     public HubUserDto? GetBySubject(string subjectId)
@@ -150,6 +189,7 @@ public sealed class AccountService
     public HubUserDto UpdateGroupMemberships(string userId, IReadOnlyList<string> groupIds)
     {
         var normalizedUserId = NormalizeRequired(userId, nameof(userId));
+        HubUserDto updated;
         lock (_store.Gate)
         {
             if (!_store.UsersById.TryGetValue(normalizedUserId, out var user))
@@ -157,7 +197,7 @@ public sealed class AccountService
                 throw new KeyNotFoundException($"Unknown user: {normalizedUserId}");
             }
 
-            var updated = user with
+            updated = user with
             {
                 GroupIds = groupIds
                     .Where(static value => !string.IsNullOrWhiteSpace(value))
@@ -168,8 +208,10 @@ public sealed class AccountService
             };
             _store.UsersById[normalizedUserId] = updated;
             _store.PersistLocked();
-            return updated;
         }
+
+        QueueTeableSync(updated);
+        return updated;
     }
 
     internal static string NewId(string prefix)
@@ -273,5 +315,22 @@ public sealed class AccountService
         return string.IsNullOrWhiteSpace(slug) || string.Equals(slug, "runner", StringComparison.Ordinal)
             ? null
             : slug;
+    }
+
+    private void QueueTeableSync(HubUserDto user)
+    {
+        if (_teableUsers is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _teableUsers.QueueSyncUser(user);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "hub user {UserId} persisted but could not be queued for Teable projection", user.UserId);
+        }
     }
 }
