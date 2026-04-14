@@ -238,6 +238,22 @@ WORK_QUEUE.md
 
 # Local agent and worker artifacts
 .agent-memory.md
+
+# Generated installer payloads
+/Chummer.Portal/downloads/files/*.deb
+/Chummer.Portal/downloads/files/*.dmg
+/Chummer.Portal/downloads/files/*.exe
+/Chummer.Portal/downloads/files/*.pkg
+/Chummer.Portal/downloads/files/*.tar.gz
+/Chummer.Portal/downloads/files/*.tgz
+/Chummer.Portal/downloads/files/*.zip
+/Chummer.Portal/downloads/proof/*/*.deb
+/Chummer.Portal/downloads/proof/*/*.dmg
+/Chummer.Portal/downloads/proof/*/*.exe
+/Chummer.Portal/downloads/proof/*/*.pkg
+/Chummer.Portal/downloads/proof/*/*.tar.gz
+/Chummer.Portal/downloads/proof/*/*.tgz
+/Chummer.Portal/downloads/proof/*/*.zip
 .agent-state.json
 .aider.chat.history.md
 .aider.input.history
