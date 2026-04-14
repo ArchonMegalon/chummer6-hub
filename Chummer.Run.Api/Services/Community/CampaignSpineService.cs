@@ -1431,6 +1431,24 @@ public sealed class CampaignSpineService
             .Take(4)
             .ToArray();
 
+        var provenanceReceipts = BuildRestoreProvenanceReceipts(
+            user.UserId,
+            claimedInstallations: claimedInstallations,
+            activeGrants: activeGrants,
+            recentArtifacts: recentArtifacts,
+            ruleEnvironments: ruleEnvironments,
+            dossiers: dossiers,
+            campaigns: campaigns,
+            observedAtUtc: generatedAtUtc);
+        var conflictReceipts = BuildRestoreConflictReceipts(
+            user.UserId,
+            claimedInstallations,
+            activeGrants,
+            recentArtifacts,
+            ruleEnvironments,
+            conflictSummaries,
+            generatedAtUtc);
+
         return new WorkspaceRestoreProjection(
             RestoreId: StableId("restore", user.UserId),
             UserId: user.UserId,
@@ -1446,7 +1464,206 @@ public sealed class CampaignSpineService
                 "Secrets, grant tokens, and runtime caches stay install-local and are never mirrored into the roaming restore packet.",
                 "Second-device restore replays dossiers, campaigns, rule environments, artifacts, and entitlements, but it still asks the target device to mint its own local cache and observer continuity token."
             ],
+            ProvenanceReceipts: provenanceReceipts,
+            ConflictReceipts: conflictReceipts,
             GeneratedAtUtc: generatedAtUtc);
+    }
+
+    private static IReadOnlyList<WorkspaceRestoreProvenanceReceipt> BuildRestoreProvenanceReceipts(
+        string userId,
+        IReadOnlyList<ClaimedInstallationDto> claimedInstallations,
+        IReadOnlyList<InstallationGrantDto> activeGrants,
+        IReadOnlyList<RestoreArtifactProjection> recentArtifacts,
+        IReadOnlyList<RuleEnvironmentRef> ruleEnvironments,
+        IReadOnlyList<RunnerDossierProjection> dossiers,
+        IReadOnlyList<CampaignProjection> campaigns,
+        DateTimeOffset observedAtUtc)
+    {
+        List<WorkspaceRestoreProvenanceReceipt> receipts = [];
+        Dictionary<string, ClaimedInstallationDto> installationsById = claimedInstallations
+            .Where(static item => !string.IsNullOrWhiteSpace(item.InstallationId))
+            .GroupBy(static item => item.InstallationId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(static group => group.Key, static group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        int installationIndex = 0;
+        foreach (ClaimedInstallationDto installation in claimedInstallations)
+        {
+            string artifactLabel = installation.ArtifactId;
+            if (!string.IsNullOrWhiteSpace(installation.HostLabel))
+            {
+                artifactLabel = $"{artifactLabel} ({installation.HostLabel})";
+            }
+
+            string? grantId = activeGrants
+                .FirstOrDefault(item => string.Equals(item.InstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase))
+                ?.GrantId;
+
+            receipts.Add(new WorkspaceRestoreProvenanceReceipt(
+                ReceiptId: StableId("restore-provenance", $"{userId}:{installation.InstallationId}:installation:{installationIndex}:{installation.Channel}"),
+                Kind: "claimed_installation",
+                SubjectId: installation.InstallationId,
+                Surface: "workspace_restore",
+                Summary: $"Restore packet retains claim for {artifactLabel} on {installation.Channel} ({installation.Platform ?? "unknown"}/{installation.Arch ?? "any"}) and binds to surface-bound continuity routing.",
+                Proof: string.IsNullOrWhiteSpace(grantId)
+                    ? $"artifact:{installation.ArtifactId}"
+                    : $"artifact:{installation.ArtifactId}; grant:{grantId}",
+                ObservedAtUtc: observedAtUtc));
+            installationIndex++;
+        }
+
+        foreach (InstallationGrantDto grant in activeGrants)
+        {
+            bool matchedInstallation = installationsById.ContainsKey(grant.InstallationId);
+            string label = matchedInstallation
+                ? $"device:{grant.InstallationId}"
+                : $"orphan-installation:{grant.InstallationId}";
+            receipts.Add(new WorkspaceRestoreProvenanceReceipt(
+                ReceiptId: StableId("restore-provenance", $"{userId}:{grant.GrantId}:entitlement:{grant.Status}"),
+                Kind: matchedInstallation ? "active_entitlement" : "orphan_entitlement",
+                SubjectId: grant.GrantId,
+                Surface: "entitlement_sync",
+                Summary: $"Entitlement grant {grant.GrantId} ({grant.Status}) on {label} is replayable to the restore plane until {grant.ExpiresAtUtc:yyyy-MM-dd}.",
+                Proof: $"status:{grant.Status};issued:{grant.IssuedAtUtc:O}",
+                ObservedAtUtc: observedAtUtc));
+        }
+
+        foreach (RestoreArtifactProjection artifact in recentArtifacts)
+        {
+            receipts.Add(new WorkspaceRestoreProvenanceReceipt(
+                ReceiptId: StableId("restore-provenance", $"{userId}:{artifact.ArtifactId}:artifact:{artifact.Kind}"),
+                Kind: "recent_artifact",
+                SubjectId: artifact.ArtifactId,
+                Surface: "entitlement_sync",
+                Summary: $"Recent artifact {artifact.Label} ({artifact.ArtifactId}) is explicit in restore with kind {artifact.Kind} and channel {artifact.Channel ?? "unknown"} {artifact.Version}.",
+                Proof: $"{artifact.Channel ?? "unknown"}::{artifact.Version ?? "rev"}::{artifact.Kind}",
+                ObservedAtUtc: observedAtUtc));
+        }
+
+        foreach (RuleEnvironmentRef environment in ruleEnvironments.Take(4))
+        {
+            string environmentLabel = $"{environment.CompatibilityFingerprint} [{environment.OwnerScope}/{environment.ApprovalState}]";
+            receipts.Add(new WorkspaceRestoreProvenanceReceipt(
+                ReceiptId: StableId("restore-provenance", $"{userId}:{environment.EnvironmentId}:ruleenv"),
+                Kind: "rule_environment",
+                SubjectId: environment.EnvironmentId,
+                Surface: "workspace_restore",
+                Summary: $"Restore retains rule environment {environmentLabel} with {environment.SourcePacks.Length} source pack(s) and {environment.HouseRulePacks.Length} house rule(s).",
+                Proof: $"{environment.CompatibilityFingerprint}:{environment.ApprovalState}",
+                ObservedAtUtc: observedAtUtc));
+        }
+
+        if (dossiers.Count > 0 || campaigns.Count > 0)
+        {
+            string inventory = $"{dossiers.Count} dossier(s), {campaigns.Count} campaign(s)";
+            receipts.Add(new WorkspaceRestoreProvenanceReceipt(
+                ReceiptId: StableId("restore-provenance", $"{userId}:inventory:{dossiers.Count}:{campaigns.Count}"),
+                Kind: "restore_inventory_snapshot",
+                SubjectId: userId,
+                Surface: "workspace_restore",
+                Summary: $"Restore plane inventory snapshot includes {inventory} for immediate continue readiness.",
+                Proof: inventory,
+                ObservedAtUtc: observedAtUtc));
+        }
+
+        return receipts;
+    }
+
+    private static IReadOnlyList<WorkspaceRestoreConflictReceipt> BuildRestoreConflictReceipts(
+        string userId,
+        IReadOnlyList<ClaimedInstallationDto> claimedInstallations,
+        IReadOnlyList<InstallationGrantDto> activeGrants,
+        IReadOnlyList<RestoreArtifactProjection> recentArtifacts,
+        IReadOnlyList<RuleEnvironmentRef> ruleEnvironments,
+        IReadOnlyList<string> conflictSummaries,
+        DateTimeOffset observedAtUtc)
+    {
+        List<WorkspaceRestoreConflictReceipt> receipts = [];
+
+        if (conflictSummaries.Count > 0)
+        {
+            int conflictIndex = 0;
+            foreach (string summary in conflictSummaries.Take(2))
+            {
+                receipts.Add(new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: StableId("restore-conflict", $"{userId}:{conflictIndex}:{summary.Length}:{observedAtUtc:yyyyMMddHHmmss}"),
+                    Severity: "warning",
+                    Kind: "restore_summary_conflict",
+                    SubjectId: "restore-plane",
+                    Summary: summary,
+                    Resolution: "Open the restore plane and confirm intended posture before editing or continuing this workspace on a different device.",
+                    ObservedAtUtc: observedAtUtc));
+                conflictIndex++;
+            }
+        }
+
+        Dictionary<string, ClaimedInstallationDto> grantsByInstallation = activeGrants
+            .Where(static item => !string.IsNullOrWhiteSpace(item.InstallationId))
+            .GroupBy(static item => item.InstallationId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(static group => group.Key, static group => group.First(), StringComparer.OrdinalIgnoreCase);
+        HashSet<string> claimedInstallationIds = claimedInstallations
+            .Select(static item => item.InstallationId)
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (InstallationGrantDto grant in activeGrants)
+        {
+            if (!claimedInstallationIds.Contains(grant.InstallationId))
+            {
+                receipts.Add(new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: StableId("restore-conflict", $"{userId}:{grant.GrantId}:orphan-grant"),
+                    Severity: "attention",
+                    Kind: "entitlement_orphan",
+                    SubjectId: grant.GrantId,
+                    Summary: $"Active entitlement {grant.GrantId} is not tied to a claimed installation ({grant.InstallationId}) in the roaming restore packet.",
+                    Resolution: "Resolve by reclaiming the install on this account or rotating the stale entitlement before reusing this device.",
+                    ObservedAtUtc: observedAtUtc));
+            }
+        }
+
+        foreach (ClaimedInstallationDto installation in claimedInstallations)
+        {
+            if (!grantsByInstallation.ContainsKey(installation.InstallationId)
+                && !string.Equals(string.Empty, installation.InstallationId, StringComparison.Ordinal))
+            {
+                receipts.Add(new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: StableId("restore-conflict", $"{userId}:{installation.InstallationId}:missing-grant"),
+                    Severity: "warning",
+                    Kind: "entitlement_missing",
+                    SubjectId: installation.InstallationId,
+                    Summary: $"Claimed install {installation.InstallationId} lacks an active entitlement grant in this roaming snapshot.",
+                    Resolution: "Refresh install linking or rotate local claim state so entitlement replay remains bounded and verifiable.",
+                    ObservedAtUtc: observedAtUtc));
+            }
+
+            bool hasArtifactEvidence = recentArtifacts.Any(
+                static item => !string.IsNullOrWhiteSpace(item.ArtifactId)
+                    && string.Equals(item.ArtifactId, installation.ArtifactId, StringComparison.OrdinalIgnoreCase));
+            if (!hasArtifactEvidence)
+            {
+                receipts.Add(new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: StableId("restore-conflict", $"{userId}:{installation.InstallationId}:missing-artifact"),
+                    Severity: "warning",
+                    Kind: "restore_artifact_missing",
+                    SubjectId: installation.InstallationId,
+                    Summary: $"Restore snapshot has no reconnectable artifact receipt for {installation.InstallationId}; stale install claims can silently lose continuity.",
+                    Resolution: "Open account claim/restore flow and refresh downloadable artifact receipts before proceeding.",
+                    ObservedAtUtc: observedAtUtc));
+            }
+        }
+
+        if (ruleEnvironments.Select(static environment => environment.CompatibilityFingerprint).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
+        {
+            receipts.Add(new WorkspaceRestoreConflictReceipt(
+                ReceiptId: StableId("restore-conflict", $"{userId}:rule-environment-mismatch"),
+                Severity: "attention",
+                Kind: "workspace_rule_environment_mismatch",
+                SubjectId: "rule-environment",
+                Summary: "Restore includes mixed rule-environment fingerprints across dossier and campaign projections.",
+                Resolution: "Review rule packs and choose a single active set before the next continue step.",
+                ObservedAtUtc: observedAtUtc));
+        }
+
+        return receipts;
     }
 
     private static string BuildClaimedDeviceRestoreSummary(

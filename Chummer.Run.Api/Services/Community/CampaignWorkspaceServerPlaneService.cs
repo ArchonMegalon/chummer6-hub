@@ -1217,6 +1217,14 @@ public sealed class CampaignWorkspaceServerPlaneService
                 ResolutionAction: $"Resolve restore review before you reopen {workspace.CampaignName} on another device."))
             .ToList();
 
+        IReadOnlyList<WorkspaceRestoreConflictReceipt> restoreConflictReceipts = restore.ConflictReceipts
+            ?? Array.Empty<WorkspaceRestoreConflictReceipt>();
+        cues.AddRange(restoreConflictReceipts.Select(receipt => new ContinuityConflictCue(
+            CueId: $"restore-conflict:{workspace.WorkspaceId}:{StableCueId(receipt.ReceiptId)}",
+            Severity: NormalizeSeverity(receipt.Severity),
+            Summary: receipt.Summary,
+            ResolutionAction: NormalizeOptional(receipt.Resolution) ?? $"Review restore evidence for {workspace.CampaignName} before continuing.")));
+
         cues.AddRange(restore.LocalOnlyNotes.Select(summary => new ContinuityConflictCue(
             CueId: $"local-only:{workspace.WorkspaceId}:{StableCueId(summary)}",
             Severity: "info",
@@ -1225,6 +1233,17 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         return cues.Take(6).ToArray();
     }
+
+    private static string NormalizeSeverity(string? severity)
+        => string.IsNullOrWhiteSpace(severity) ? "warning"
+            : severity switch
+            {
+                "attention" => "attention",
+                "warning" => "warning",
+                "info" => "info",
+                "critical" => "critical",
+                _ => "warning"
+            };
 
     private static IReadOnlyList<RecapShelfEntry> BuildRecapShelf(
         CampaignWorkspaceProjection workspace,

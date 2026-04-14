@@ -137,6 +137,14 @@ internal static class CampaignSpineRestoreVerification
             VerificationAssert.True(safehouse.DeviceRole == "travel_cache", "Offline stable safehouse installs should project as travel-cache restore lanes.");
             VerificationAssert.True(safehouse.RestoreSummary.Contains("Travel-safe cache keeps", StringComparison.Ordinal), "Travel-cache restore summaries should stay explicit about safehouse posture.");
             VerificationAssert.True(safehouse.RestoreSummary.Contains("Exact set:", StringComparison.Ordinal), "Travel-cache restore summaries should also name the exact prefetch set.");
+
+            VerificationAssert.True((restore.ProvenanceReceipts?.Count ?? 0) >= 3, "Restore projection should emit provenance receipts for entitlement, install, and rule-posture replay.");
+            VerificationAssert.True(restore.ProvenanceReceipts?.Any(item => string.Equals(item.Kind, "claimed_installation", StringComparison.OrdinalIgnoreCase) && string.Equals(item.SubjectId, tablet.InstallationId, StringComparison.Ordinal)) == true,
+                "Restore provenance should include each claimed device as a concrete receipt.");
+            VerificationAssert.True(restore.ProvenanceReceipts?.Any(item => string.Equals(item.Kind, "active_entitlement", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(item.Proof)) == true,
+                "Entitlement replay should remain proof-bound in restore provenance receipts.");
+            VerificationAssert.True(restore.ConflictReceipts?.Any(item => string.Equals(item.Kind, "restore_summary_conflict", StringComparison.OrdinalIgnoreCase)) == true,
+                "Restore conflicts should be emitted as structured receipts for review and recovery.");
         }
         finally
         {
