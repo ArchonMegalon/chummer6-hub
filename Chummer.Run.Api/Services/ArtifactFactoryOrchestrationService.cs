@@ -65,7 +65,8 @@ public sealed record ArtifactFactoryMediaSourcePack(
     IReadOnlyList<string> EvidenceRefs,
     string? ReleaseArtifactId,
     string? SupportCaseId,
-    string? PublicationId);
+    string? PublicationId,
+    string? PublicShelfRef);
 
 public sealed class ArtifactFactoryOrchestrationService
 {
@@ -163,7 +164,8 @@ public sealed class ArtifactFactoryOrchestrationService
                 EvidenceRefs: evidenceRefs,
                 ReleaseArtifactId: NormalizeOptional(sourcePack.ReleaseArtifactId),
                 SupportCaseId: NormalizeOptional(sourcePack.SupportCaseId),
-                PublicationId: NormalizeOptional(sourcePack.PublicationId)));
+                PublicationId: NormalizeOptional(sourcePack.PublicationId),
+                PublicShelfRef: NormalizeOptional(sourcePack.PublicShelfRef)));
 
             foreach (string evidenceRef in evidenceRefs)
             {
@@ -371,7 +373,8 @@ public sealed class ArtifactFactoryOrchestrationService
                     item.EvidenceRefs,
                     item.ReleaseArtifactId,
                     item.SupportCaseId,
-                    item.PublicationId
+                    item.PublicationId,
+                    item.PublicShelfRef
                 }),
             outputFormats,
             audience,
@@ -410,14 +413,22 @@ public sealed class ArtifactFactoryOrchestrationService
         return sourcePacks
             .Where(pack => family switch
             {
-                "release" => !string.IsNullOrWhiteSpace(pack.ReleaseArtifactId),
+                "release" => !string.IsNullOrWhiteSpace(pack.ReleaseArtifactId)
+                    || !string.IsNullOrWhiteSpace(pack.PublicShelfRef),
                 "fix" => !string.IsNullOrWhiteSpace(pack.SupportCaseId)
                     || !string.IsNullOrWhiteSpace(pack.ReleaseArtifactId),
                 "support" => !string.IsNullOrWhiteSpace(pack.SupportCaseId),
-                "publication" => !string.IsNullOrWhiteSpace(pack.PublicationId),
+                "publication" => !string.IsNullOrWhiteSpace(pack.PublicationId)
+                    || !string.IsNullOrWhiteSpace(pack.PublicShelfRef),
                 _ => false
             })
-            .OrderBy(static item => item.SourcePackId, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(pack => family switch
+            {
+                "release" when !string.IsNullOrWhiteSpace(pack.ReleaseArtifactId) => 0,
+                "publication" when !string.IsNullOrWhiteSpace(pack.PublicationId) => 0,
+                _ => 1
+            })
+            .ThenBy(static item => item.SourcePackId, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault()
             ?? sourcePacks.OrderBy(static item => item.SourcePackId, StringComparer.OrdinalIgnoreCase).First();
     }
@@ -443,6 +454,14 @@ public sealed class ArtifactFactoryOrchestrationService
         if (!string.IsNullOrWhiteSpace(anchor.PublicationId))
         {
             return $"/artifacts/publications/{Uri.EscapeDataString(anchor.PublicationId)}/bundles";
+        }
+
+        if (!string.IsNullOrWhiteSpace(anchor.PublicShelfRef))
+        {
+            string shelfRef = anchor.PublicShelfRef.Trim().TrimEnd('/');
+            return shelfRef.EndsWith("/bundles", StringComparison.OrdinalIgnoreCase)
+                ? shelfRef
+                : $"{shelfRef}/bundles";
         }
 
         return $"/artifacts/release-bundles/{Uri.EscapeDataString(jobId)}";
