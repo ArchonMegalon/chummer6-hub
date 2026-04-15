@@ -64,6 +64,39 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("/artifacts/release-bundles/", result.stderr)
 
+    def test_verifier_fails_closed_when_successor_registry_drops_closeout_evidence(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-registry-proof-") as temp_dir:
+            registry_path = Path(temp_dir) / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            registry_path.write_text(
+                "\n".join(
+                    [
+                        "program_wave: next_90_day_product_advance",
+                        "milestones:",
+                        "  - id: 107",
+                        "    title: Artifact factory and public proof shelf",
+                        "    work_tasks:",
+                        "      - id: 107.1",
+                        "        owner: chummer6-hub",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_SUCCESSOR_REGISTRY"] = str(registry_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Orchestrate recipe-backed artifact jobs", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
