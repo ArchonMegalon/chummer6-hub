@@ -827,7 +827,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         verifier = load_verifier_module()
 
         self.assertEqual(
-            ["160af58f", "e27f24c1", "0ea22419", "b4d761a2"],
+            ["160af58f", "e27f24c1", "0ea22419", "b4d761a2", "e75c4a97"],
             verifier._required_resolving_commits(),
         )
 
