@@ -34,7 +34,7 @@ DESIGN_QUEUE_STAGING_PATH = Path(
     )
 )
 PACKAGE_ID = "next90-m105-hub-workspace-continuity"
-LANDED_COMMIT = "2fe9dec5"
+LANDED_COMMIT = "4d4b3856"
 
 SOURCE_MARKERS: dict[str, list[str]] = {
     "Chummer.Campaign.Contracts/CampaignContracts.cs": [
@@ -98,7 +98,7 @@ REGISTRY_MARKERS = [
     "title: Emit provenance and conflict receipts for roaming workspace and entitlement replication.",
     "status: complete",
     f"landed_commit: {LANDED_COMMIT}",
-    "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Community/CampaignSpineService.cs emits workspace_restore provenance receipts",
+    f"/docker/chummercomplete/chummer.run-services commit {LANDED_COMMIT} emits workspace_restore provenance receipts",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
     "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
