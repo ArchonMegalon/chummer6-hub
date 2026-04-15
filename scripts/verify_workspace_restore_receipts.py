@@ -167,6 +167,11 @@ PROOF_MARKERS = [
     "accountSource.Contains(\"Continue is blocked until this receipt is resolved.\"",
 ]
 
+STANDARD_VERIFY_MARKERS = [
+    "python3 scripts/verify_workspace_restore_receipts.py",
+    "python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py",
+]
+
 LOCAL_RELEASE_PROOF_RECEIPTS: dict[str, dict[str, object]] = {
     "workspace_restore:provenance": {
         "routes": ["/home/work", "/account/work"],
@@ -606,6 +611,18 @@ def check_required_local_commits(missing: list[str]) -> None:
             missing.append(f"{ROOT}: required local commit does not resolve: {commit}")
 
 
+def check_standard_verify_entrypoint(missing: list[str]) -> None:
+    relative_path = "scripts/ai/verify.sh"
+    try:
+        verify_text = read_text(relative_path)
+    except FileNotFoundError as exc:
+        missing.append(str(exc))
+        return
+
+    require_markers(relative_path, verify_text, STANDARD_VERIFY_MARKERS, missing)
+    reject_forbidden_markers(relative_path, verify_text, FORBIDDEN_PROOF_MARKERS, missing)
+
+
 def main() -> int:
     missing: list[str] = []
 
@@ -657,6 +674,7 @@ def main() -> int:
     check_local_release_proof(SERVED_RELEASE_PROOF_PATH, missing)
     check_served_release_proof_matches_local(missing)
     check_required_local_commits(missing)
+    check_standard_verify_entrypoint(missing)
 
     if missing:
         for item in missing:

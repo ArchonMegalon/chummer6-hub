@@ -35,6 +35,35 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             script_text,
         )
 
+    def test_verifier_fails_closed_when_standard_verify_uses_active_run_helper_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-standard-verify-") as temp_dir:
+            temp_root = Path(temp_dir)
+            scripts_dir = temp_root / "scripts" / "ai"
+            scripts_dir.mkdir(parents=True)
+            verify_script = scripts_dir / "verify.sh"
+            source_verify_script = REPO_ROOT / "scripts" / "ai" / "verify.sh"
+            verify_script.write_text(
+                source_verify_script.read_text(encoding="utf-8")
+                + "\n# TASK_LOCAL_TELEMETRY.generated.json active-run helper output is forbidden proof.\n",
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("scripts/ai/verify.sh", result.stderr)
+        self.assertIn("forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
+
     def test_verifier_fails_closed_when_proof_drops_recovery_hint_marker(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-proof-") as temp_dir:
             temp_root = Path(temp_dir)
