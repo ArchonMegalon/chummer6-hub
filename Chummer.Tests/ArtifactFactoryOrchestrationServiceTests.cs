@@ -343,6 +343,35 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchJobRejectsProviderSpecificSlashEvidenceRefs()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "publication",
+            RequestedBy: "creator.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "publication-pack-redmond-brief",
+                    SourcePackKind: "creator_publication",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "publication:redmond-brief:v3",
+                    EvidenceRefs:
+                    [
+                        "publication:redmond-brief:v3",
+                        "moderation:approved:redmond-brief",
+                        "heygen/render/redmond-brief",
+                        "public-shelf:/artifacts/publications/redmond-brief"
+                    ],
+                    PublicationId: "redmond-brief")
+            ])));
+
+        Assert.Contains("provider-specific evidenceRef", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("one-off provider flows", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LaunchJobRejectsExternalPublicShelfRefs()
     {
         ArtifactFactoryOrchestrationService service = new();
