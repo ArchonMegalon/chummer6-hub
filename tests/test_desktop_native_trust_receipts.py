@@ -62,6 +62,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit 171c2de0 tightens M102 blocked run-helper proof guard.",
     "      - /docker/chummercomplete/chummer.run-services commit 73f1ee9a pins M102 desktop trust proof guard.",
     "      - /docker/chummercomplete/chummer.run-services commit 74dff34c tightens M102 forbidden command evidence guard.",
+    "      - /docker/chummercomplete/chummer.run-services commit aea02326 pins the M102 forbidden command proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -120,6 +121,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit 171c2de0 tightens M102 blocked run-helper proof guard.",
     "          - /docker/chummercomplete/chummer.run-services commit 73f1ee9a pins M102 desktop trust proof guard.",
     "          - /docker/chummercomplete/chummer.run-services commit 74dff34c tightens M102 forbidden command evidence guard.",
+    "          - /docker/chummercomplete/chummer.run-services commit aea02326 pins the M102 forbidden command proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1177,6 +1179,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "171c2de0",
                 "73f1ee9a",
                 "74dff34c",
+                "aea02326",
             ],
             verifier._required_resolving_commits(),
         )
