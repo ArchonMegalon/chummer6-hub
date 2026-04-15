@@ -652,7 +652,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 complete_queue.replace(
                     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py\n",
                     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py\n"
-                    "      - /var/lib/codex-fleet/chummer_design_supervisor/shard-1/ACTIVE_RUN_HANDOFF.generated.md\n",
+                    "      - /VAR/LIB/CODEX-FLEET/chummer_design_supervisor/shard-1/active_run_handoff.generated.md\n",
                 )
                 + "\n",
                 encoding="utf-8",
@@ -720,7 +720,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "\n".join(
                     [
                         *REGISTRY_102_1_LINES,
-                        "          - TASK_LOCAL_TELEMETRY.generated.json active-run helper output",
+                        "          - Task_Local_Telemetry.generated.json Active-Run Helper output",
                     ]
                 )
                 + "\n",
@@ -989,8 +989,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 if item["receipt_id"] == "support_followthrough:install_truth"
             )
             m102_receipt["evidence"] = [
-                "/var/lib/codex-fleet/chummer_design_supervisor/shard-1/ACTIVE_RUN_HANDOFF.generated.md",
-                "operator telemetry helper output",
+                "/VAR/LIB/CODEX-FLEET/chummer_design_supervisor/shard-1/active_run_handoff.generated.md",
+                "Operator Telemetry helper output",
             ]
             proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
 
