@@ -101,9 +101,12 @@ REQUIRED_TOP_LEVEL_JOURNEYS = [
 
 
 REQUIRED_CANONICAL_QUEUE_MARKERS = [
+    "title: Unify claim, install, update, and support recovery into one desktop-native flow",
+    "task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
     f"package_id: {PACKAGE_ID}",
     f"frontier_id: {FRONTIER_ID}",
     "milestone_id: 102",
+    "wave: W6",
     "repo: chummer6-hub",
     "status: complete",
     f"landed_commit: {LANDED_COMMIT}",
@@ -195,11 +198,13 @@ def _proof_path(repo_root: Path) -> Path:
 
 
 def _extract_yaml_block(text: str, anchor: str) -> str | None:
-    start = text.find(anchor)
-    if start < 0:
+    anchor_index = text.find(anchor)
+    if anchor_index < 0:
         return None
 
-    next_item = text.find("\n  - ", start + len(anchor))
+    item_start = text.rfind("\n  - ", 0, anchor_index)
+    start = anchor_index if item_start < 0 else item_start + 1
+    next_item = text.find("\n  - ", start + 1)
     return text[start:] if next_item < 0 else text[start:next_item]
 
 
