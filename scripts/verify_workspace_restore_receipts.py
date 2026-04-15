@@ -158,6 +158,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "python3 scripts/verify_workspace_restore_receipts.py",
     "python3 -m unittest tests/test_workspace_restore_receipts.py",
+    "allowed_paths:\n      - Chummer.Run.Api\n      - scripts\n      - tests\n    owned_surfaces:",
     "workspace_restore:provenance",
     "entitlement_sync:conflict_receipts",
 ]
