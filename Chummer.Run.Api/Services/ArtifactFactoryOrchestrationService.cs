@@ -37,6 +37,7 @@ public sealed record ArtifactFactoryJobLaunchResult(
     IReadOnlyList<string> OutputFormats,
     IReadOnlyList<string> RequiredReceiptRefs,
     IReadOnlyList<string> PublicProofShelfRefs,
+    IReadOnlyList<ArtifactFactoryOutputBinding> OutputBindings,
     ArtifactFactoryMediaRequest MediaFactoryRequest);
 
 public sealed record ArtifactFactoryMediaRequest(
@@ -46,7 +47,16 @@ public sealed record ArtifactFactoryMediaRequest(
     IReadOnlyList<ArtifactFactoryMediaSourcePack> ApprovedSourcePacks,
     IReadOnlyList<string> OutputFormats,
     IReadOnlyList<string> RequiredReceiptRefs,
-    IReadOnlyList<string> PublicProofShelfRefs);
+    IReadOnlyList<string> PublicProofShelfRefs,
+    IReadOnlyList<ArtifactFactoryOutputBinding> OutputBindings);
+
+public sealed record ArtifactFactoryOutputBinding(
+    string Format,
+    string PublicRef,
+    string ReceiptRef,
+    string? ReleaseArtifactId,
+    string? SupportCaseId,
+    string? PublicationId);
 
 public sealed record ArtifactFactoryMediaSourcePack(
     string SourcePackId,
@@ -168,6 +178,10 @@ public sealed class ArtifactFactoryOrchestrationService
             {
                 publicProofShelfRefs.Add($"/downloads/install/{Uri.EscapeDataString(sourcePack.ReleaseArtifactId.Trim())}");
             }
+            else if (!string.IsNullOrWhiteSpace(sourcePack.SupportCaseId))
+            {
+                publicProofShelfRefs.Add($"/account/support/{Uri.EscapeDataString(sourcePack.SupportCaseId.Trim())}");
+            }
             else if (!string.IsNullOrWhiteSpace(sourcePack.PublicationId))
             {
                 publicProofShelfRefs.Add($"/artifacts/publications/{Uri.EscapeDataString(sourcePack.PublicationId.Trim())}");
@@ -191,6 +205,7 @@ public sealed class ArtifactFactoryOrchestrationService
         string jobId = BuildJobId(family, sourcePacks, outputFormats, audience, locale);
         string[] receiptRefs = requiredReceiptRefs.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
         string[] proofShelfRefs = publicProofShelfRefs.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+        ArtifactFactoryOutputBinding[] outputBindings = BuildOutputBindings(family, jobId, sourcePacks, outputFormats);
 
         return new ArtifactFactoryJobLaunchResult(
             JobId: jobId,
@@ -206,6 +221,7 @@ public sealed class ArtifactFactoryOrchestrationService
             OutputFormats: outputFormats,
             RequiredReceiptRefs: receiptRefs,
             PublicProofShelfRefs: proofShelfRefs,
+            OutputBindings: outputBindings,
             MediaFactoryRequest: new ArtifactFactoryMediaRequest(
                 ContractName: ContractName,
                 RecipeId: recipe.RecipeId,
@@ -213,7 +229,8 @@ public sealed class ArtifactFactoryOrchestrationService
                 ApprovedSourcePacks: sourcePacks,
                 OutputFormats: outputFormats,
                 RequiredReceiptRefs: receiptRefs,
-                PublicProofShelfRefs: proofShelfRefs));
+                PublicProofShelfRefs: proofShelfRefs,
+                OutputBindings: outputBindings));
     }
 
     private static void ValidateSourcePack(ApprovedArtifactSourcePack sourcePack, ArtifactFactoryRecipe recipe)
@@ -363,6 +380,55 @@ public sealed class ArtifactFactoryOrchestrationService
         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(hashPayload, HashJsonOptions);
         byte[] hash = SHA256.HashData(payload);
         return $"artifact-job-{family}-{Convert.ToHexString(hash)[..16].ToLowerInvariant()}";
+    }
+
+    private static ArtifactFactoryOutputBinding[] BuildOutputBindings(
+        string family,
+        string jobId,
+        IReadOnlyList<ArtifactFactoryMediaSourcePack> sourcePacks,
+        IReadOnlyList<string> outputFormats)
+    {
+        ArtifactFactoryMediaSourcePack anchor = sourcePacks
+            .OrderBy(static item => item.SourcePackId, StringComparer.OrdinalIgnoreCase)
+            .First();
+        string baseRef = BuildPublicOutputBaseRef(family, jobId, anchor);
+
+        return outputFormats
+            .Select(format => new ArtifactFactoryOutputBinding(
+                Format: format,
+                PublicRef: $"{baseRef}/{Uri.EscapeDataString(format)}",
+                ReceiptRef: $"artifact-factory:{jobId}:{format}",
+                ReleaseArtifactId: anchor.ReleaseArtifactId,
+                SupportCaseId: anchor.SupportCaseId,
+                PublicationId: anchor.PublicationId))
+            .OrderBy(static item => item.Format, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string BuildPublicOutputBaseRef(
+        string family,
+        string jobId,
+        ArtifactFactoryMediaSourcePack anchor)
+    {
+        if (!string.IsNullOrWhiteSpace(anchor.ReleaseArtifactId))
+        {
+            return $"/artifacts/release-bundles/{Uri.EscapeDataString(anchor.ReleaseArtifactId)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(anchor.SupportCaseId))
+        {
+            string supportPath = family.Equals("fix", StringComparison.OrdinalIgnoreCase)
+                ? "fix-followthrough"
+                : "support-packets";
+            return $"/account/{supportPath}/{Uri.EscapeDataString(anchor.SupportCaseId)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(anchor.PublicationId))
+        {
+            return $"/artifacts/publications/{Uri.EscapeDataString(anchor.PublicationId)}/bundles";
+        }
+
+        return $"/artifacts/release-bundles/{Uri.EscapeDataString(jobId)}";
     }
 
     private static string NormalizeToken(string? value)
