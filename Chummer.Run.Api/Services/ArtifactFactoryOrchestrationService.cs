@@ -338,7 +338,7 @@ public sealed class ArtifactFactoryOrchestrationService
                 $"source pack '{sourcePackId}' has provider-specific {fieldName} '{value}'; artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.");
         }
 
-        if (IsAbsoluteHttpRef(normalized))
+        if (IsAbsoluteHttpRef(normalized) || IsUriLikeExternalRef(normalized, fieldName))
         {
             throw new InvalidDataException(
                 $"source pack '{sourcePackId}' has external absolute URI {fieldName} '{value}'; artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.");
@@ -371,6 +371,11 @@ public sealed class ArtifactFactoryOrchestrationService
         => Uri.TryCreate(normalized, UriKind.Absolute, out Uri? uri)
             && (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
                 || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsUriLikeExternalRef(string normalized, string fieldName)
+        => !(fieldName.Equals("evidenceRef", StringComparison.Ordinal)
+                && normalized.StartsWith("public-shelf:", StringComparison.OrdinalIgnoreCase))
+            && normalized.Contains("://", StringComparison.Ordinal);
 
     private static void RejectNonLocalPublicShelfEvidenceRef(string sourcePackId, string evidenceRef)
     {

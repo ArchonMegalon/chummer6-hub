@@ -103,6 +103,58 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchJobRejectsNonHttpUriLikeEvidenceRefs()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "publication",
+            RequestedBy: "creator.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "publication-pack-redmond-brief",
+                    SourcePackKind: "creator_publication",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "publication:redmond-brief:v3",
+                    EvidenceRefs:
+                    [
+                        "publication:redmond-brief:v3",
+                        "moderation:approved:redmond-brief",
+                        "s3://artifact-provider/rendered/redmond-brief",
+                        "public-shelf:/artifacts/publications/redmond-brief"
+                    ],
+                    PublicationId: "redmond-brief")
+            ])));
+
+        Assert.Contains("external absolute URI", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("approved source-pack receipts", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LaunchJobRejectsUriLikeProvenanceRefs()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "support",
+            RequestedBy: "support.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "case-11709",
+                    SourcePackKind: "support_case",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "file:///tmp/provider-rendered-case-11709",
+                    EvidenceRefs: ["support:11709", "privacy:bounded", "install:preview"],
+                    SupportCaseId: "11709")
+            ])));
+
+        Assert.Contains("external absolute URI", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("provenanceRef", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LaunchJobRejectsDuplicateSourcePackIds()
     {
         ArtifactFactoryOrchestrationService service = new();
