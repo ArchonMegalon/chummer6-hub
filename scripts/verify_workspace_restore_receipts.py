@@ -198,6 +198,7 @@ LOCAL_RELEASE_PROOF_PACKAGE: dict[str, object] = {
     "frontier_id": FRONTIER_ID,
     "status": "complete",
     "landed_commit": LANDED_COMMIT,
+    "title": "Emit provenance and conflict receipts for workspace restore and continuity",
     "allowed_paths": [
         "Chummer.Run.Api",
         "scripts",
@@ -207,6 +208,7 @@ LOCAL_RELEASE_PROOF_PACKAGE: dict[str, object] = {
         "workspace_restore:provenance",
         "entitlement_sync:conflict_receipts",
     ],
+    "exit_criterion": "Claimed users can restore workspace, entitlement, last context, and safe continuation with explicit stale and conflict posture.",
 }
 
 REGISTRY_MARKERS = [
@@ -442,10 +444,8 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
 
         for key in ["routes", "surfaces"]:
             values = receipt.get(key)
-            value_set = {item for item in values if isinstance(item, str)} if isinstance(values, list) else set()
-            for required in expected[key]:
-                if required not in value_set:
-                    missing.append(f"{path}: {receipt_id}.{key} missing {required}")
+            if values != expected[key]:
+                missing.append(f"{path}: {receipt_id}.{key} must match {expected[key]!r}")
 
         summary = receipt.get("summary")
         if not isinstance(summary, str):
